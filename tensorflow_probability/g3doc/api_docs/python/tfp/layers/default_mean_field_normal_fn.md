@@ -35,6 +35,7 @@ parameterized by a loc` and `scale` each created using `tf.get_variable`.
 
 #### Args:
 
+
 * <b>`is_singular`</b>: Python `bool` if `True`, forces the special case limit of
   `scale->0`, i.e., a `Deterministic` distribution.
 * <b>`loc_initializer`</b>: Initializer function for the `loc` parameters.
@@ -61,6 +62,7 @@ parameterized by a loc` and `scale` each created using `tf.get_variable`.
 
 
 #### Returns:
+
 
 * <b>`make_normal_fn`</b>: Python `callable` which creates a `tfd.Normal`
   using from args: `dtype, shape, name, trainable, add_variable_fn`.

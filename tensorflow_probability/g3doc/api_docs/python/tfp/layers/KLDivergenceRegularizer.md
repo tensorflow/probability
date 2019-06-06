@@ -70,7 +70,9 @@ __init__(
 
 Initialize the `KLDivergenceRegularizer` regularizer.
 
+
 #### Args:
+
 
 * <b>`distribution_b`</b>: distribution instance corresponding to `b` as in
   `KL[a, b]`. The previous layer's output is presumed to be a
@@ -105,6 +107,7 @@ __call__(distribution_a)
 
 Call self as a function.
 
+
 <h3 id="from_config"><code>from_config</code></h3>
 
 ``` python
@@ -113,6 +116,7 @@ from_config(
     config
 )
 ```
+
 
 
 

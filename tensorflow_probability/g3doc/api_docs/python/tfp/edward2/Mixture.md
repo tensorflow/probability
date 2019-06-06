@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Mixture for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -39,6 +40,7 @@ The `num_classes` of `cat` must be possible to infer at graph construction
 time and match `len(components)`.
 
 #### Args:
+
 
 * <b>`cat`</b>: A `Categorical` distribution instance, representing the probabilities
     of `distributions`.
@@ -62,6 +64,7 @@ time and match `len(components)`.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: If cat is not a `Categorical`, or `components` is not
   a list or tuple, or the elements of `components` are not

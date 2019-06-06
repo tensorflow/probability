@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Binomial for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Initialize a batch of Binomial distributions.
 
 #### Args:
+
 
 * <b>`total_count`</b>: Non-negative floating point tensor with shape broadcastable
   to `[N1,..., Nm]` with `m >= 0` and the same dtype as `probs` or

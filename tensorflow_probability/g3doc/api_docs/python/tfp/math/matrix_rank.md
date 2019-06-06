@@ -25,6 +25,7 @@ Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/t
 
 #### Arguments:
 
+
 * <b>`a`</b>: (Batch of) `float`-like matrix-shaped `Tensor`(s) which are to be
   pseudo-inverted.
 * <b>`tol`</b>: Threshold below which the singular value is counted as "zero".
@@ -37,6 +38,7 @@ Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/t
 
 
 #### Returns:
+
 
 * <b>`matrix_rank`</b>: (Batch of) `int32` scalars representing the number of non-zero
   singular values.

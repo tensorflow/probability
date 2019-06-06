@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Triangular for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Initialize a batch of Triangular distributions.
 
 #### Args:
+
 
 * <b>`low`</b>: Floating point tensor, lower boundary of the output interval. Must
   have `low < high`.
@@ -56,6 +58,7 @@ Initialize a batch of Triangular distributions.
 
 
 #### Raises:
+
 
 * <b>`InvalidArgumentError`</b>: if `validate_args=True` and one of the following is
   True:

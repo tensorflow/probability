@@ -49,6 +49,7 @@ For more information, see:
 
 #### Args:
 
+
 * <b>`logu`</b>: `float`-like `Tensor` representing `log(u)` from above.
 * <b>`alpha`</b>: `float`-like Python scalar. (See Mathematical Details for meaning.)
 * <b>`self_normalized`</b>: Python `bool` indicating whether `f'(u=1)=0`. When
@@ -59,11 +60,13 @@ For more information, see:
 
 #### Returns:
 
+
 * <b>`amari_alpha_of_u`</b>: `float`-like `Tensor` of the Csiszar-function evaluated
   at `u = exp(logu)`.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `alpha` is `None` or a `Tensor`.
 * <b>`TypeError`</b>: if `self_normalized` is `None` or a `Tensor`.

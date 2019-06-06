@@ -56,6 +56,7 @@ when `N = 1`, but is slightly biased.
 
 #### Args:
 
+
 * <b>`x`</b>:  A numeric `Tensor` holding samples.
 * <b>`y`</b>:  Optional `Tensor` with same `dtype` and `shape` as `x`.
   Default value: `None` (`y` is effectively set to `x`).
@@ -74,11 +75,13 @@ when `N = 1`, but is slightly biased.
 
 #### Returns:
 
+
 * <b>`corr`</b>: A `Tensor` of same `dtype` as the `x`, and rank equal to
   `rank(x) - len(sample_axis) + 2 * len(event_axis)`.
 
 
 #### Raises:
+
 
 * <b>`AssertionError`</b>:  If `x` and `y` are found to have different shape.
 * <b>`ValueError`</b>:  If `sample_axis` and `event_axis` are found to overlap.

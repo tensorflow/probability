@@ -31,6 +31,7 @@ previously computed results).
 <h3 id="is_calibrated"><code>is_calibrated</code></h3>
 
 Returns `True` if Markov chain converges to specified distribution.
+
 `TransitionKernel`s which are "uncalibrated" are often calibrated by
 composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp.mcmc.MetropolisHastings</code></a> `TransitionKernel`.
 
@@ -46,13 +47,16 @@ bootstrap_results(init_state)
 
 Returns an object with the same type as returned by `one_step(...)[1]`.
 
+
 #### Args:
+
 
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   initial state(s) of the Markov chain(s).
 
 
 #### Returns:
+
 
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
   `Tensor`s representing internal calculations made within this function.
@@ -67,9 +71,11 @@ one_step(
 ```
 
 Takes one step of the TransitionKernel.
+
 Must be overridden by subclasses.
 
 #### Args:
+
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   current state(s) of the Markov chain(s).
@@ -79,6 +85,7 @@ Must be overridden by subclasses.
 
 
 #### Returns:
+
 
 * <b>`next_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   next state(s) of the Markov chain(s).

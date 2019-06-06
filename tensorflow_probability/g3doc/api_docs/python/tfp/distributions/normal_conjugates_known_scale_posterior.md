@@ -47,6 +47,7 @@ will broadcast in the case of multidimensional sets of parameters.
 
 #### Args:
 
+
 * <b>`prior`</b>: `Normal` object of type `dtype`:
   the prior distribution having parameters `(loc0, scale0)`.
 * <b>`scale`</b>: tensor of type `dtype`, taking values `scale > 0`.
@@ -56,12 +57,14 @@ will broadcast in the case of multidimensional sets of parameters.
 
 
 #### Returns:
+
 A new Normal posterior distribution object for the unknown observation
 mean `loc`.
 
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if dtype of `s` does not match `dtype`, or `prior` is not a
   Normal object.

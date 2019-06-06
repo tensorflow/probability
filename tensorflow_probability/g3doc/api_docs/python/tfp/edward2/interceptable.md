@@ -25,8 +25,10 @@ interceptor.
 
 #### Args:
 
+
 * <b>`func`</b>: Function to wrap.
 
 
 #### Returns:
+
 The decorated function.

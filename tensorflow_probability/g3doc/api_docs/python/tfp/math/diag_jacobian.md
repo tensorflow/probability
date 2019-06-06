@@ -81,6 +81,7 @@ print('hessian computed through `diag_jacobian`, sample_shape skipped',
 
 #### Args:
 
+
 * <b>`xs`</b>: `Tensor` or a python `list` of `Tensors` of real-like dtypes and shapes
   `sample_shape` + `event_shape_i`, where `event_shape_i` can be different
   for different tensors.
@@ -101,6 +102,7 @@ print('hessian computed through `diag_jacobian`, sample_shape skipped',
 
 #### Returns:
 
+
 * <b>`ys`</b>: a list, which coincides with the input `ys`, when provided.
   If the input `ys` is None, `fn(*xs)` gets computed and returned as a list.
 * <b>`jacobians_diag_res`</b>: a `Tensor` or a Python list of `Tensor`s of the same
@@ -109,6 +111,7 @@ print('hessian computed through `diag_jacobian`, sample_shape skipped',
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if lists `xs` and `ys` have different length or both `ys` and
   `fn` are `None`, or `fn` is None in the eager execution mode.

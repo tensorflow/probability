@@ -37,6 +37,7 @@ correct results.
 
 #### Args:
 
+
 * <b>`t`</b>: A `Tensor`.
 * <b>`clip_value_min`</b>: A scalar `Tensor`, or a `Tensor` with the same shape
   as `t`. The minimum value to clip by.
@@ -47,5 +48,6 @@ correct results.
 
 
 #### Returns:
+
 
 * <b>`clipped_t`</b>: A clipped `Tensor`.

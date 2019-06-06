@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See JointDistributionSequential for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct the `JointDistributionSequential` distribution.
 
 #### Args:
+
 
 * <b>`model`</b>: Python list of either tfd.Distribution instances and/or
   lambda functions which take the `k` previous distributions and returns a

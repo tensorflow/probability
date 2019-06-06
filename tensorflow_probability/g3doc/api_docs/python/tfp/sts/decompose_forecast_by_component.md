@@ -24,6 +24,7 @@ Defined in [`python/sts/decomposition.py`](https://github.com/tensorflow/probabi
 
 #### Args:
 
+
 * <b>`model`</b>: An instance of <a href="../../tfp/sts/Sum.md"><code>tfp.sts.Sum</code></a> representing a structural time series
   model.
 * <b>`forecast_dist`</b>: A `Distribution` instance returned by `tfp.sts.forecast()`.
@@ -36,6 +37,7 @@ Defined in [`python/sts/decomposition.py`](https://github.com/tensorflow/probabi
   parameter names to `Tensor` values.
 
 #### Returns:
+
 
 * <b>`component_forecasts`</b>: A `collections.OrderedDict` instance mapping
   component StructuralTimeSeries instances (elements of `model.components`)

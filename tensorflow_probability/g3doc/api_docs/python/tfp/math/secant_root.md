@@ -35,6 +35,7 @@ as a finite-difference approximation of Newton's method.
 
 #### Args:
 
+
 * <b>`objective_fn`</b>: Python callable for which roots are searched. It must be a
   callable of a single variable. `objective_fn` must return a `Tensor` of
   the same shape and dtype as `initial_position`.
@@ -86,6 +87,7 @@ as a finite-difference approximation of Newton's method.
 
 #### Returns:
 
+
 * <b>`root_search_results`</b>: A Python `namedtuple` containing the following items:
   estimated_root: `Tensor` containing the last position explored. If the
     search was successful within the specified tolerance, this position is
@@ -97,6 +99,7 @@ as a finite-difference approximation of Newton's method.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if a non-callable `stopping_policy_fn` is passed.
 

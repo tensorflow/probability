@@ -4,7 +4,6 @@
 <meta itemprop="property" content="all_states"/>
 <meta itemprop="property" content="trace"/>
 <meta itemprop="property" content="final_kernel_results"/>
-<meta itemprop="property" content="__new__"/>
 </div>
 
 # tfp.mcmc.CheckpointableStatesAndTrace
@@ -26,6 +25,7 @@ attributes is the same and represents the chain length.
 
 #### Attributes:
 
+
 * <b>`all_states`</b>: A `Tensor` or a nested collection of `Tensor`s representing the
   MCMC chain state.
 * <b>`trace`</b>: A `Tensor` or a nested collection of `Tensor`s representing the
@@ -34,24 +34,10 @@ attributes is the same and represents the chain length.
   representing the final value of the auxiliary state of the
   `TransitionKernel` that generated this chain.
 
-<h2 id="__new__"><code>__new__</code></h2>
-
-``` python
-__new__(
-    _cls,
-    all_states,
-    trace,
-    final_kernel_results
-)
-```
-
-Create new instance of CheckpointableStatesAndTrace(all_states, trace, final_kernel_results)
-
-
-
 ## Properties
 
 <h3 id="all_states"><code>all_states</code></h3>
+
 
 
 
@@ -59,7 +45,9 @@ Create new instance of CheckpointableStatesAndTrace(all_states, trace, final_ker
 
 
 
+
 <h3 id="final_kernel_results"><code>final_kernel_results</code></h3>
+
 
 
 

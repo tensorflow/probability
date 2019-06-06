@@ -34,6 +34,7 @@ Defined in [`python/glm/fisher_scoring.py`](https://github.com/tensorflow/probab
 
 #### Args:
 
+
 * <b>`model_matrix`</b>: (Batch of) `float`-like, matrix-shaped `Tensor` where each row
   represents a sample's features.
 * <b>`response`</b>: (Batch of) vector-shaped `Tensor` where each element represents a
@@ -88,6 +89,7 @@ Defined in [`python/glm/fisher_scoring.py`](https://github.com/tensorflow/probab
 
 
 #### Returns:
+
 
 * <b>`model_coefficients`</b>: (Batch of) vector-shaped `Tensor`; represents the
   fitted model coefficients, one for each column in `model_matrix`.

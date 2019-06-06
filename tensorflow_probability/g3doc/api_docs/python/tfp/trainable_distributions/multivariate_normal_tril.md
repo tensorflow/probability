@@ -94,6 +94,7 @@ with tf.Session() as sess:
 
 #### Args:
 
+
 * <b>`x`</b>: `Tensor` with floating type. Must have statically defined rank and
   statically known right-most dimension.
 * <b>`dims`</b>: Scalar, `int`, `Tensor` indicated the MVN event size, i.e., the
@@ -116,5 +117,6 @@ with tf.Session() as sess:
 
 
 #### Returns:
+
 
 * <b>`mvntril`</b>: An instance of `tfd.MultivariateNormalTriL`.

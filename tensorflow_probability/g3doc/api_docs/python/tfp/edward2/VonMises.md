@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See VonMises for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -34,6 +35,7 @@ The parameters `loc` and `concentration` must be shaped in a way that
 supports broadcasting (e.g. `loc + concentration` is a valid operation).
 
 #### Args:
+
 
 * <b>`loc`</b>: Floating point tensor, the circular means of the distribution(s).
 * <b>`concentration`</b>: Floating point tensor, the level of concentration of the
@@ -52,5 +54,6 @@ supports broadcasting (e.g. `loc + concentration` is a valid operation).
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if loc and concentration are different dtypes.

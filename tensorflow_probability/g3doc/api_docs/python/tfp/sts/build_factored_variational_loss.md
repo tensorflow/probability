@@ -46,6 +46,7 @@ divergence encourages choosing a single mode) or dependence between variables.
 
 #### Args:
 
+
 * <b>`model`</b>: An instance of `StructuralTimeSeries` representing a
   time-series model. This represents a joint distribution over
   time-series and their parameters with batch shape `[b1, ..., bN]`.
@@ -64,6 +65,7 @@ divergence encourages choosing a single mode) or dependence between variables.
 
 
 #### Returns:
+
 
 * <b>`variational_loss`</b>: `float` `Tensor` of shape
   `concat([init_batch_shape, model.batch_shape])`, encoding a stochastic

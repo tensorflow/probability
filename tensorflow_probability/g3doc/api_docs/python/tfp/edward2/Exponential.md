@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Exponential for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct Exponential distribution with parameter `rate`.
 
 #### Args:
+
 
 * <b>`rate`</b>: Floating point tensor, equivalent to `1 / mean`. Must contain only
   positive values.

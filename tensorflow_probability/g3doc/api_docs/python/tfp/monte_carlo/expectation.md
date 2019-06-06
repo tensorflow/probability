@@ -71,6 +71,7 @@ distribution.
 #### Example Use:
 
 
+
 ```python
 # Monte-Carlo approximation of a reparameterized distribution, e.g., Normal.
 
@@ -121,6 +122,7 @@ approx_kl_p_q = bf.monte_carlo_csiszar_f_divergence(
 
 #### Args:
 
+
 * <b>`f`</b>: Python callable which can return `f(samples)`.
 * <b>`samples`</b>: `Tensor` of samples used to form the Monte-Carlo approximation of
   `E_p[f(X)]`.  A batch of samples should be indexed by `axis` dimensions.
@@ -144,11 +146,13 @@ approx_kl_p_q = bf.monte_carlo_csiszar_f_divergence(
 
 #### Returns:
 
+
 * <b>`approx_expectation`</b>: `Tensor` corresponding to the Monte-Carlo approximation
   of `E_p[f(X)]`.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `f` is not a Python `callable`.
 * <b>`ValueError`</b>: if `use_reparametrization=False` and `log_prob` is not a Python

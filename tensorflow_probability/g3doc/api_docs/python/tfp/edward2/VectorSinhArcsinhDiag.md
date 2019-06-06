@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See VectorSinhArcsinhDiag for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -46,6 +47,7 @@ The `event_shape` is given by last dimension of the matrix implied by
 Additional leading dimensions (if any) will index batches.
 
 #### Args:
+
 
 * <b>`loc`</b>: Floating-point `Tensor`. If this is set to `None`, `loc` is
   implicitly `0`. When specified, may have shape `[B1, ..., Bb, k]` where
@@ -86,5 +88,6 @@ Additional leading dimensions (if any) will index batches.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if at most `scale_identity_multiplier` is specified.

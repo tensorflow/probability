@@ -27,6 +27,7 @@ https://en.wikipedia.org/wiki/Rademacher_distribution).
 
 #### Args:
 
+
 * <b>`shape`</b>: Vector-shaped, `int` `Tensor` representing shape of output.
 * <b>`dtype`</b>: (Optional) TF `dtype` representing `dtype` of output.
 * <b>`seed`</b>: (Optional) Python integer to seed the random number generator.
@@ -35,6 +36,7 @@ https://en.wikipedia.org/wiki/Rademacher_distribution).
 
 
 #### Returns:
+
 
 * <b>`rademacher`</b>: `Tensor` with specified `shape` and `dtype` consisting of `-1`
   or `+1` chosen uniformly-at-random.

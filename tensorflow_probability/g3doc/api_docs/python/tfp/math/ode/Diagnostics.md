@@ -29,7 +29,9 @@ Defined in [`python/math/ode/base.py`](https://github.com/tensorflow/probability
 
 Number of Jacobian evaluations.
 
+
 #### Returns:
+
 
 * <b>`num_jacobian_evaluations`</b>: Scalar integer `Tensor` containing number of
   Jacobian evaluations.
@@ -38,7 +40,9 @@ Number of Jacobian evaluations.
 
 Number of matrix factorizations.
 
+
 #### Returns:
+
 
 * <b>`num_matrix_factorizations`</b>: Scalar integer `Tensor` containing the number
   of matrix factorizations.
@@ -47,7 +51,9 @@ Number of matrix factorizations.
 
 Number of function evaluations.
 
+
 #### Returns:
+
 
 * <b>`num_ode_fn_evaluations`</b>: Scalar integer `Tensor` containing the number of
   function evaluations.
@@ -56,7 +62,9 @@ Number of function evaluations.
 
 Completion status.
 
+
 #### Returns:
+
 
 * <b>`status`</b>: Scalar integer `Tensor` containing the reason for termination. -1
   on failure, 1 on termination by an event, and 0 otherwise.
@@ -65,7 +73,9 @@ Completion status.
 
 Boolean indicating whether or not the method succeeded.
 
+
 #### Returns:
+
 
 * <b>`success`</b>: Boolean `Tensor` equivalent to `status >= 0`.
 

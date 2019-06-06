@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Independent for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct a `Independent` distribution.
 
 #### Args:
+
 
 * <b>`distribution`</b>: The base distribution instance to transform. Typically an
   instance of `Distribution`.
@@ -46,6 +48,7 @@ Construct a `Independent` distribution.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `reinterpreted_batch_ndims` exceeds
   `distribution.batch_ndims`

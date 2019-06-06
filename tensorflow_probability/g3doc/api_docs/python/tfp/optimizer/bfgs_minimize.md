@@ -66,6 +66,7 @@ minimum for a simple two dimensional quadratic objective function.
 
 #### Args:
 
+
 * <b>`value_and_gradients_function`</b>:  A Python callable that accepts a point as a
   real `Tensor` and returns a tuple of `Tensor`s of real dtype containing
   the value of the function and its gradient at that point. The function
@@ -114,6 +115,7 @@ minimum for a simple two dimensional quadratic objective function.
 
 
 #### Returns:
+
 
 * <b>`optimizer_results`</b>: A namedtuple containing the following items:
   converged: boolean tensor of shape `[...]` indicating for each batch

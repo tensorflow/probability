@@ -20,7 +20,7 @@ Defined in [`python/distributions/kullback_leibler.py`](https://github.com/tenso
 
 ## Functions
 
-[`kl_divergence(...)`](../../../tfp/distributions/kl_divergence.md): Get the KL-divergence KL(distribution_a || distribution_b).
-
 [`augment_kl_xent_docs(...)`](../../../tfp/layers/dense_variational_v2/kullback_leibler/augment_kl_xent_docs.md): Augments doc on tfd.kl_divergence, EachDist.kl_divergence/cross_entropy.
+
+[`kl_divergence(...)`](../../../tfp/distributions/kl_divergence.md): Get the KL-divergence KL(distribution_a || distribution_b).
 

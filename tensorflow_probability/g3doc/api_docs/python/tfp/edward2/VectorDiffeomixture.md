@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See VectorDiffeomixture for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -39,6 +40,7 @@ p(x | z) := p(x | loc=sum_k z[k] loc[k], scale=sum_k z[k] scale[k])
 ```
 
 #### Args:
+
 
 * <b>`mix_loc`</b>: `float`-like `Tensor` with shape `[b1, ..., bB, K-1]`.
   In terms of samples, larger `mix_loc[..., k]` ==>
@@ -85,6 +87,7 @@ p(x | z) := p(x | loc=sum_k z[k] loc[k], scale=sum_k z[k] scale[k])
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `not scale or len(scale) < 2`.
 * <b>`ValueError`</b>: if `len(loc) != len(scale)`

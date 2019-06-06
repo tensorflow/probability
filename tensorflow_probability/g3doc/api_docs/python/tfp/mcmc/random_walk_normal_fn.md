@@ -31,6 +31,7 @@ as the state parts of `current_state`.
 
 #### Args:
 
+
 * <b>`scale`</b>: a `Tensor` or Python `list` of `Tensor`s of any shapes and `dtypes`
   controlling the scale of the normal proposal distribution.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
@@ -38,6 +39,7 @@ as the state parts of `current_state`.
 
 
 #### Returns:
+
 
 * <b>`random_walk_normal_fn`</b>: A callable accepting a Python `list` of `Tensor`s
   representing the state parts of the `current_state` and an `int`

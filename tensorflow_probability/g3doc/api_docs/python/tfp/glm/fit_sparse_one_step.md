@@ -59,6 +59,7 @@ up convergence.
 
 #### Args:
 
+
 * <b>`model_matrix`</b>: (Batch of) matrix-shaped, `float` `Tensor` or `SparseTensor`
   where each row represents a sample's features.  Has shape `[N, n]` where
   `N` is the number of data samples and `n` is the number of features per
@@ -103,6 +104,7 @@ up convergence.
 
 
 #### Returns:
+
 
 * <b>`model_coefficients`</b>: (Batch of) `Tensor` having the same shape and dtype as
   `model_coefficients_start`, representing the updated value of

@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Dirichlet for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Initialize a batch of Dirichlet distributions.
 
 #### Args:
+
 
 * <b>`concentration`</b>: Positive floating-point `Tensor` indicating mean number
   of class occurrences; aka "alpha". Implies `self.dtype`, and

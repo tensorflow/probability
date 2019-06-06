@@ -69,6 +69,7 @@ usually preferable to set `use_reparametrization = True`.
 #### Example Application:
 
 
+
 The Csiszar f-Divergence is a useful framework for variational inference.
 I.e., observe that,
 
@@ -85,6 +86,7 @@ BOund (ELBO) as a special case, i.e., `f(u) = -log(u)`, we call this framework
 "Evidence Divergence Bound Optimization" (EDBO).
 
 #### Args:
+
 
 * <b>`f`</b>: Python `callable` representing a Csiszar-function in log-space, i.e.,
   takes `p_log_prob(q_samples) - q.log_prob(q_samples)`.
@@ -108,11 +110,13 @@ BOund (ELBO) as a special case, i.e., `f(u) = -log(u)`, we call this framework
 
 #### Returns:
 
+
 * <b>`monte_carlo_csiszar_f_divergence`</b>: `float`-like `Tensor` Monte Carlo
   approximation of the Csiszar f-Divergence.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `q` is not a reparameterized distribution and
   `use_reparametrization = True`. A distribution `q` is said to be

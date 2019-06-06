@@ -35,6 +35,7 @@ https://en.wikipedia.org/wiki/Rayleigh_distribution)
 
 #### Args:
 
+
 * <b>`shape`</b>: Vector-shaped, `int` `Tensor` representing shape of output.
 * <b>`scale`</b>: (Optional) Positive `float` `Tensor` representing `Rayleigh` scale.
   Default value: `None` (i.e., `scale = 1.`).
@@ -47,6 +48,7 @@ https://en.wikipedia.org/wiki/Rayleigh_distribution)
 
 
 #### Returns:
+
 
 * <b>`rayleigh`</b>: `Tensor` with specified `shape` and `dtype` consisting of positive
   real values drawn from a Rayleigh distribution with specified `scale`.

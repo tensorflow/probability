@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See GaussianProcessRegressionModel for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct a GaussianProcessRegressionModel instance.
 
 #### Args:
+
 
 * <b>`kernel`</b>: `PositiveSemidefiniteKernel`-like instance representing the
   GP's covariance function.
@@ -100,6 +102,7 @@ Construct a GaussianProcessRegressionModel instance.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if either
   - only one of `observations` and `observation_index_points` is given, or

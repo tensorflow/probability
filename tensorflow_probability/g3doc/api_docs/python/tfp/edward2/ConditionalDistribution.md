@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See ConditionalDistribution for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -33,6 +34,7 @@ Constructs the `Distribution`.
 **This is a private method for subclass use.**
 
 #### Args:
+
 
 * <b>`dtype`</b>: The type of the event samples. `None` implies no type-enforcement.
 * <b>`reparameterization_type`</b>: Instance of `ReparameterizationType`.
@@ -58,5 +60,6 @@ Constructs the `Distribution`.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if any member of graph_parents is `None` or not a `Tensor`.

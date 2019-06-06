@@ -48,7 +48,6 @@
 <meta itemprop="property" content="get_shape"/>
 <meta itemprop="property" content="numpy"/>
 <meta itemprop="property" content="sample_shape_tensor"/>
-<meta itemprop="property" content="__array_priority__"/>
 </div>
 
 # tfp.edward2.RandomVariable
@@ -115,7 +114,9 @@ __init__(
 
 Create a new random variable.
 
+
 #### Args:
+
 
 * <b>`distribution`</b>: tfd.Distribution governing the distribution of the random
   variable, such as sampling and log-probabilities.
@@ -128,6 +129,7 @@ Create a new random variable.
 
 #### Raises:
 
+
 * <b>`ValueError`</b>: `value` has incompatible shape with
   `sample_shape + distribution.batch_shape + distribution.event_shape`.
 
@@ -139,21 +141,26 @@ Create a new random variable.
 
 Distribution of random variable.
 
+
 <h3 id="dtype"><code>dtype</code></h3>
 
 `Dtype` of elements in this random variable.
+
 
 <h3 id="sample_shape"><code>sample_shape</code></h3>
 
 Sample shape of random variable as a `TensorShape`.
 
+
 <h3 id="shape"><code>shape</code></h3>
 
 Shape of random variable.
 
+
 <h3 id="value"><code>value</code></h3>
 
 Get tensor that the random variable corresponds to.
+
 
 
 
@@ -169,6 +176,7 @@ __abs__(
 ```
 
 Computes the absolute value of a tensor.
+
 Given a tensor of integer or floating-point values, this operation returns a
 tensor of the same type, where each element contains the absolute value of the
 corresponding element in the input.
@@ -184,12 +192,14 @@ tf.abs(x)  # [5.25594902, 6.60492229]
 
 #### Args:
 
+
 * <b>`x`</b>: A `Tensor` or `SparseTensor` of type `float16`, `float32`, `float64`,
   `int32`, `int64`, `complex64` or `complex128`.
 * <b>`name`</b>: A name for the operation (optional).
 
 
 #### Returns:
+
 A `Tensor` or `SparseTensor` the same size, type, and sparsity as `x` with
   absolute values.
 Note, for `complex64` or `complex128` input, the returned `Tensor` will be
@@ -208,19 +218,7 @@ __add__(
 )
 ```
 
-Returns x + y element-wise.
-*NOTE*: `math.add` supports broadcasting. `AddN` does not. More about broadcasting
-[here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
-
-#### Args:
-
-* <b>`x`</b>: A `Tensor`. Must be one of the following types: `bfloat16`, `half`, `float32`, `float64`, `uint8`, `int8`, `int16`, `int32`, `int64`, `complex64`, `complex128`, `string`.
-* <b>`y`</b>: A `Tensor`. Must have the same type as `x`.
-* <b>`name`</b>: A name for the operation (optional).
-
-
-#### Returns:
-A `Tensor`. Has the same type as `x`.
+Dispatches to add for strings and add_v2 for all other types.
 
 
 <h3 id="__and__"><code>__and__</code></h3>
@@ -233,10 +231,12 @@ __and__(
 ```
 
 Returns the truth value of x AND y element-wise.
+
 *NOTE*: `math.logical_and` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
 
 #### Args:
+
 
 * <b>`x`</b>: A `Tensor` of type `bool`.
 * <b>`y`</b>: A `Tensor` of type `bool`.
@@ -244,6 +244,7 @@ Returns the truth value of x AND y element-wise.
 
 
 #### Returns:
+
 A `Tensor` of type `bool`.
 
 
@@ -257,6 +258,7 @@ __bool__(
 ```
 
 Dummy method to prevent a tensor from being used as a Python `bool`.
+
 This overload raises a `TypeError` when the user inadvertently
 treats a `Tensor` as a boolean (e.g. in an `if` statement). For
 example:
@@ -273,6 +275,7 @@ This disallows ambiguities between testing the Python value vs testing the
 dynamic condition of the `Tensor`.
 
 #### Raises:
+
 `TypeError`.
 
 
@@ -286,9 +289,11 @@ __div__(
 ```
 
 Divide two values using Python 2 semantics.
+
 Used for Tensor.__div__.
 
 #### Args:
+
 
 * <b>`x`</b>: `Tensor` numerator of real numeric type.
 * <b>`y`</b>: `Tensor` denominator of real numeric type.
@@ -296,6 +301,7 @@ Used for Tensor.__div__.
 
 
 #### Returns:
+
 `x / y` returns the quotient of x and y.
 
 
@@ -307,6 +313,7 @@ __eq__(other)
 
 Return self==value.
 
+
 <h3 id="__floordiv__"><code>__floordiv__</code></h3>
 
 ``` python
@@ -317,6 +324,7 @@ __floordiv__(
 ```
 
 Divides `x / y` elementwise, rounding toward the most negative integer.
+
 The same as `tf.compat.v1.div(x,y)` for integers, but uses
 `tf.floor(tf.compat.v1.div(x,y))` for
 floating point arguments so that the result is always an integer (though
@@ -329,17 +337,20 @@ as well.
 
 #### Args:
 
+
 * <b>`x`</b>: `Tensor` numerator of real numeric type.
 * <b>`y`</b>: `Tensor` denominator of real numeric type.
 * <b>`name`</b>: A name for the operation (optional).
 
 
 #### Returns:
+
 `x / y` rounded down.
 
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: If the inputs are complex.
 
@@ -353,10 +364,12 @@ __ge__(
 ```
 
 Returns the truth value of (x >= y) element-wise.
+
 *NOTE*: `math.greater_equal` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
 
 #### Args:
+
 
 * <b>`x`</b>: A `Tensor`. Must be one of the following types: `float32`, `float64`, `int32`, `uint8`, `int16`, `int8`, `int64`, `bfloat16`, `uint16`, `half`, `uint32`, `uint64`.
 * <b>`y`</b>: A `Tensor`. Must have the same type as `x`.
@@ -364,6 +377,7 @@ Returns the truth value of (x >= y) element-wise.
 
 
 #### Returns:
+
 A `Tensor` of type `bool`.
 
 
@@ -377,12 +391,14 @@ __getitem__(
 ```
 
 Overload for Tensor.__getitem__.
+
 This operation extracts the specified region from the tensor.
 The notation is similar to NumPy with the restriction that
 currently only support basic indexing. That means that
 using a non-scalar tensor as input is not currently allowed.
 
 #### Some useful examples:
+
 
 
 ```python
@@ -416,6 +432,7 @@ print(foo[foo > 2].eval())  # => [3, 4, 5, 6, 7, 8, 9]
 ```
 
 #### Notes:
+
 - `tf.newaxis` is `None` as in NumPy.
 - An implicit ellipsis is placed at the end of the `slice_spec`
 - NumPy advanced indexing is currently not supported.
@@ -424,6 +441,7 @@ print(foo[foo > 2].eval())  # => [3, 4, 5, 6, 7, 8, 9]
 
 #### Args:
 
+
 * <b>`tensor`</b>: An ops.Tensor object.
 * <b>`slice_spec`</b>: The arguments to Tensor.__getitem__.
 * <b>`var`</b>: In the case of variable slice assignment, the Variable object to slice
@@ -431,11 +449,13 @@ print(foo[foo > 2].eval())  # => [3, 4, 5, 6, 7, 8, 9]
 
 
 #### Returns:
+
 The appropriate slice of "tensor", based on "slice_spec".
 
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: If a slice range is negative size.
 * <b>`TypeError`</b>: If the slice indices aren't int, slice, ellipsis,
@@ -451,10 +471,12 @@ __gt__(
 ```
 
 Returns the truth value of (x > y) element-wise.
+
 *NOTE*: `math.greater` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
 
 #### Args:
+
 
 * <b>`x`</b>: A `Tensor`. Must be one of the following types: `float32`, `float64`, `int32`, `uint8`, `int16`, `int8`, `int64`, `bfloat16`, `uint16`, `half`, `uint32`, `uint64`.
 * <b>`y`</b>: A `Tensor`. Must have the same type as `x`.
@@ -462,6 +484,7 @@ Returns the truth value of (x > y) element-wise.
 
 
 #### Returns:
+
 A `Tensor` of type `bool`.
 
 
@@ -476,13 +499,16 @@ __invert__(
 
 Returns the truth value of NOT x element-wise.
 
+
 #### Args:
+
 
 * <b>`x`</b>: A `Tensor` of type `bool`.
 * <b>`name`</b>: A name for the operation (optional).
 
 
 #### Returns:
+
 A `Tensor` of type `bool`.
 
 
@@ -497,6 +523,7 @@ __iter__(
 
 
 
+
 <h3 id="__le__"><code>__le__</code></h3>
 
 ``` python
@@ -507,10 +534,12 @@ __le__(
 ```
 
 Returns the truth value of (x <= y) element-wise.
+
 *NOTE*: `math.less_equal` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
 
 #### Args:
+
 
 * <b>`x`</b>: A `Tensor`. Must be one of the following types: `float32`, `float64`, `int32`, `uint8`, `int16`, `int8`, `int64`, `bfloat16`, `uint16`, `half`, `uint32`, `uint64`.
 * <b>`y`</b>: A `Tensor`. Must have the same type as `x`.
@@ -518,6 +547,7 @@ Returns the truth value of (x <= y) element-wise.
 
 
 #### Returns:
+
 A `Tensor` of type `bool`.
 
 
@@ -531,10 +561,12 @@ __lt__(
 ```
 
 Returns the truth value of (x < y) element-wise.
+
 *NOTE*: `math.less` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
 
 #### Args:
+
 
 * <b>`x`</b>: A `Tensor`. Must be one of the following types: `float32`, `float64`, `int32`, `uint8`, `int16`, `int8`, `int64`, `bfloat16`, `uint16`, `half`, `uint32`, `uint64`.
 * <b>`y`</b>: A `Tensor`. Must have the same type as `x`.
@@ -542,6 +574,7 @@ Returns the truth value of (x < y) element-wise.
 
 
 #### Returns:
+
 A `Tensor` of type `bool`.
 
 
@@ -555,6 +588,7 @@ __matmul__(
 ```
 
 Multiplies matrix `a` by matrix `b`, producing `a` * `b`.
+
 The inputs must, following any transpositions, be tensors of rank >= 2
 where the inner 2 dimensions specify valid matrix multiplication arguments,
 and any further outer dimensions match.
@@ -573,6 +607,7 @@ This optimization is only available for plain matrices (rank-2 tensors) with
 datatypes `bfloat16` or `float32`.
 
 #### For example:
+
 
 
 ```python
@@ -627,6 +662,7 @@ d = tf.matmul(tf.matmul(a, b), [[10.], [11.]])
 
 #### Args:
 
+
 * <b>`a`</b>: `Tensor` of type `float16`, `float32`, `float64`, `int32`, `complex64`,
   `complex128` and rank > 1.
 * <b>`b`</b>: `Tensor` with same type and rank as `a`.
@@ -642,6 +678,7 @@ d = tf.matmul(tf.matmul(a, b), [[10.], [11.]])
 
 
 #### Returns:
+
 A `Tensor` of the same type as `a` and `b` where each inner-most matrix is
 the product of the corresponding matrices in `a` and `b`, e.g. if all
 transpose or adjoint attributes are `False`:
@@ -656,6 +693,7 @@ for all indices i, j.
 
 #### Raises:
 
+
 * <b>`ValueError`</b>: If transpose_a and adjoint_a, or transpose_b and adjoint_b
   are both set to True.
 
@@ -669,6 +707,7 @@ __mod__(
 ```
 
 Returns element-wise remainder of division. When `x < 0` xor `y < 0` is
+
 true, this follows Python semantics in that the result here is consistent
 with a flooring divide. E.g. `floor(x / y) * y + mod(x, y) = x`.
 
@@ -677,12 +716,14 @@ with a flooring divide. E.g. `floor(x / y) * y + mod(x, y) = x`.
 
 #### Args:
 
+
 * <b>`x`</b>: A `Tensor`. Must be one of the following types: `int32`, `int64`, `bfloat16`, `half`, `float32`, `float64`.
 * <b>`y`</b>: A `Tensor`. Must have the same type as `x`.
 * <b>`name`</b>: A name for the operation (optional).
 
 
 #### Returns:
+
 A `Tensor`. Has the same type as `x`.
 
 
@@ -697,6 +738,7 @@ __mul__(
 
 Dispatches cwise mul for "Dense*Dense" and "Dense*Sparse".
 
+
 <h3 id="__ne__"><code>__ne__</code></h3>
 
 ``` python
@@ -704,6 +746,7 @@ __ne__(other)
 ```
 
 Return self!=value.
+
 
 <h3 id="__neg__"><code>__neg__</code></h3>
 
@@ -715,15 +758,18 @@ __neg__(
 ```
 
 Computes numerical negative value element-wise.
+
 I.e., \\(y = -x\\).
 
 #### Args:
+
 
 * <b>`x`</b>: A `Tensor`. Must be one of the following types: `bfloat16`, `half`, `float32`, `float64`, `int32`, `int64`, `complex64`, `complex128`.
 * <b>`name`</b>: A name for the operation (optional).
 
 
 #### Returns:
+
 A `Tensor`. Has the same type as `x`.
 
 If `x` is a `SparseTensor`, returns
@@ -740,9 +786,11 @@ __nonzero__(
 ```
 
 Dummy method to prevent a tensor from being used as a Python `bool`.
+
 This is the Python 2.x counterpart to `__bool__()` above.
 
 #### Raises:
+
 `TypeError`.
 
 
@@ -756,10 +804,12 @@ __or__(
 ```
 
 Returns the truth value of x OR y element-wise.
+
 *NOTE*: `math.logical_or` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
 
 #### Args:
+
 
 * <b>`x`</b>: A `Tensor` of type `bool`.
 * <b>`y`</b>: A `Tensor` of type `bool`.
@@ -767,6 +817,7 @@ Returns the truth value of x OR y element-wise.
 
 
 #### Returns:
+
 A `Tensor` of type `bool`.
 
 
@@ -780,6 +831,7 @@ __pow__(
 ```
 
 Computes the power of one value to another.
+
 Given a tensor `x` and a tensor `y`, this operation computes \\(x^y\\) for
 corresponding elements in `x` and `y`. For example:
 
@@ -791,6 +843,7 @@ tf.pow(x, y)  # [[256, 65536], [9, 27]]
 
 #### Args:
 
+
 * <b>`x`</b>: A `Tensor` of type `float16`, `float32`, `float64`, `int32`, `int64`,
   `complex64`, or `complex128`.
 * <b>`y`</b>: A `Tensor` of type `float16`, `float32`, `float64`, `int32`, `int64`,
@@ -799,6 +852,7 @@ tf.pow(x, y)  # [[256, 65536], [9, 27]]
 
 
 #### Returns:
+
 A `Tensor`.
 
 
@@ -811,19 +865,7 @@ __radd__(
 )
 ```
 
-Returns x + y element-wise.
-*NOTE*: `math.add` supports broadcasting. `AddN` does not. More about broadcasting
-[here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
-
-#### Args:
-
-* <b>`x`</b>: A `Tensor`. Must be one of the following types: `bfloat16`, `half`, `float32`, `float64`, `uint8`, `int8`, `int16`, `int32`, `int64`, `complex64`, `complex128`, `string`.
-* <b>`y`</b>: A `Tensor`. Must have the same type as `x`.
-* <b>`name`</b>: A name for the operation (optional).
-
-
-#### Returns:
-A `Tensor`. Has the same type as `x`.
+Dispatches to add for strings and add_v2 for all other types.
 
 
 <h3 id="__rand__"><code>__rand__</code></h3>
@@ -836,10 +878,12 @@ __rand__(
 ```
 
 Returns the truth value of x AND y element-wise.
+
 *NOTE*: `math.logical_and` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
 
 #### Args:
+
 
 * <b>`x`</b>: A `Tensor` of type `bool`.
 * <b>`y`</b>: A `Tensor` of type `bool`.
@@ -847,6 +891,7 @@ Returns the truth value of x AND y element-wise.
 
 
 #### Returns:
+
 A `Tensor` of type `bool`.
 
 
@@ -860,9 +905,11 @@ __rdiv__(
 ```
 
 Divide two values using Python 2 semantics.
+
 Used for Tensor.__div__.
 
 #### Args:
+
 
 * <b>`x`</b>: `Tensor` numerator of real numeric type.
 * <b>`y`</b>: `Tensor` denominator of real numeric type.
@@ -870,6 +917,7 @@ Used for Tensor.__div__.
 
 
 #### Returns:
+
 `x / y` returns the quotient of x and y.
 
 
@@ -883,6 +931,7 @@ __rfloordiv__(
 ```
 
 Divides `x / y` elementwise, rounding toward the most negative integer.
+
 The same as `tf.compat.v1.div(x,y)` for integers, but uses
 `tf.floor(tf.compat.v1.div(x,y))` for
 floating point arguments so that the result is always an integer (though
@@ -895,17 +944,20 @@ as well.
 
 #### Args:
 
+
 * <b>`x`</b>: `Tensor` numerator of real numeric type.
 * <b>`y`</b>: `Tensor` denominator of real numeric type.
 * <b>`name`</b>: A name for the operation (optional).
 
 
 #### Returns:
+
 `x / y` rounded down.
 
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: If the inputs are complex.
 
@@ -919,6 +971,7 @@ __rmatmul__(
 ```
 
 Multiplies matrix `a` by matrix `b`, producing `a` * `b`.
+
 The inputs must, following any transpositions, be tensors of rank >= 2
 where the inner 2 dimensions specify valid matrix multiplication arguments,
 and any further outer dimensions match.
@@ -937,6 +990,7 @@ This optimization is only available for plain matrices (rank-2 tensors) with
 datatypes `bfloat16` or `float32`.
 
 #### For example:
+
 
 
 ```python
@@ -991,6 +1045,7 @@ d = tf.matmul(tf.matmul(a, b), [[10.], [11.]])
 
 #### Args:
 
+
 * <b>`a`</b>: `Tensor` of type `float16`, `float32`, `float64`, `int32`, `complex64`,
   `complex128` and rank > 1.
 * <b>`b`</b>: `Tensor` with same type and rank as `a`.
@@ -1006,6 +1061,7 @@ d = tf.matmul(tf.matmul(a, b), [[10.], [11.]])
 
 
 #### Returns:
+
 A `Tensor` of the same type as `a` and `b` where each inner-most matrix is
 the product of the corresponding matrices in `a` and `b`, e.g. if all
 transpose or adjoint attributes are `False`:
@@ -1020,6 +1076,7 @@ for all indices i, j.
 
 #### Raises:
 
+
 * <b>`ValueError`</b>: If transpose_a and adjoint_a, or transpose_b and adjoint_b
   are both set to True.
 
@@ -1033,6 +1090,7 @@ __rmod__(
 ```
 
 Returns element-wise remainder of division. When `x < 0` xor `y < 0` is
+
 true, this follows Python semantics in that the result here is consistent
 with a flooring divide. E.g. `floor(x / y) * y + mod(x, y) = x`.
 
@@ -1041,12 +1099,14 @@ with a flooring divide. E.g. `floor(x / y) * y + mod(x, y) = x`.
 
 #### Args:
 
+
 * <b>`x`</b>: A `Tensor`. Must be one of the following types: `int32`, `int64`, `bfloat16`, `half`, `float32`, `float64`.
 * <b>`y`</b>: A `Tensor`. Must have the same type as `x`.
 * <b>`name`</b>: A name for the operation (optional).
 
 
 #### Returns:
+
 A `Tensor`. Has the same type as `x`.
 
 
@@ -1061,6 +1121,7 @@ __rmul__(
 
 Dispatches cwise mul for "Dense*Dense" and "Dense*Sparse".
 
+
 <h3 id="__ror__"><code>__ror__</code></h3>
 
 ``` python
@@ -1071,10 +1132,12 @@ __ror__(
 ```
 
 Returns the truth value of x OR y element-wise.
+
 *NOTE*: `math.logical_or` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
 
 #### Args:
+
 
 * <b>`x`</b>: A `Tensor` of type `bool`.
 * <b>`y`</b>: A `Tensor` of type `bool`.
@@ -1082,6 +1145,7 @@ Returns the truth value of x OR y element-wise.
 
 
 #### Returns:
+
 A `Tensor` of type `bool`.
 
 
@@ -1095,6 +1159,7 @@ __rpow__(
 ```
 
 Computes the power of one value to another.
+
 Given a tensor `x` and a tensor `y`, this operation computes \\(x^y\\) for
 corresponding elements in `x` and `y`. For example:
 
@@ -1106,6 +1171,7 @@ tf.pow(x, y)  # [[256, 65536], [9, 27]]
 
 #### Args:
 
+
 * <b>`x`</b>: A `Tensor` of type `float16`, `float32`, `float64`, `int32`, `int64`,
   `complex64`, or `complex128`.
 * <b>`y`</b>: A `Tensor` of type `float16`, `float32`, `float64`, `int32`, `int64`,
@@ -1114,6 +1180,7 @@ tf.pow(x, y)  # [[256, 65536], [9, 27]]
 
 
 #### Returns:
+
 A `Tensor`.
 
 
@@ -1127,10 +1194,12 @@ __rsub__(
 ```
 
 Returns x - y element-wise.
+
 *NOTE*: `Subtract` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
 
 #### Args:
+
 
 * <b>`x`</b>: A `Tensor`. Must be one of the following types: `bfloat16`, `half`, `float32`, `float64`, `uint8`, `int8`, `uint16`, `int16`, `int32`, `int64`, `complex64`, `complex128`.
 * <b>`y`</b>: A `Tensor`. Must have the same type as `x`.
@@ -1138,6 +1207,7 @@ Returns x - y element-wise.
 
 
 #### Returns:
+
 A `Tensor`. Has the same type as `x`.
 
 
@@ -1152,6 +1222,7 @@ __rtruediv__(
 
 
 
+
 <h3 id="__rxor__"><code>__rxor__</code></h3>
 
 ``` python
@@ -1162,12 +1233,14 @@ __rxor__(
 ```
 
 Logical XOR function.
+
 x ^ y = (x | y) & ~(x & y)
 
 Inputs are tensor and if the tensors contains more than one element, an
 element-wise logical XOR is computed.
 
 #### Usage:
+
 
 
 ```python
@@ -1179,11 +1252,13 @@ z = tf.logical_xor(x, y, name="LogicalXor")
 
 #### Args:
 
+
 * <b>`x`</b>: A `Tensor` type bool.
 * <b>`y`</b>: A `Tensor` of type bool.
 
 
 #### Returns:
+
 A `Tensor` of type bool with the same size as that of x or y.
 
 
@@ -1197,10 +1272,12 @@ __sub__(
 ```
 
 Returns x - y element-wise.
+
 *NOTE*: `Subtract` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
 
 #### Args:
+
 
 * <b>`x`</b>: A `Tensor`. Must be one of the following types: `bfloat16`, `half`, `float32`, `float64`, `uint8`, `int8`, `uint16`, `int16`, `int32`, `int64`, `complex64`, `complex128`.
 * <b>`y`</b>: A `Tensor`. Must have the same type as `x`.
@@ -1208,6 +1285,7 @@ Returns x - y element-wise.
 
 
 #### Returns:
+
 A `Tensor`. Has the same type as `x`.
 
 
@@ -1222,6 +1300,7 @@ __truediv__(
 
 
 
+
 <h3 id="__xor__"><code>__xor__</code></h3>
 
 ``` python
@@ -1232,12 +1311,14 @@ __xor__(
 ```
 
 Logical XOR function.
+
 x ^ y = (x | y) & ~(x & y)
 
 Inputs are tensor and if the tensors contains more than one element, an
 element-wise logical XOR is computed.
 
 #### Usage:
+
 
 
 ```python
@@ -1249,11 +1330,13 @@ z = tf.logical_xor(x, y, name="LogicalXor")
 
 #### Args:
 
+
 * <b>`x`</b>: A `Tensor` type bool.
 * <b>`y`</b>: A `Tensor` of type bool.
 
 
 #### Returns:
+
 A `Tensor` of type bool with the same size as that of x or y.
 
 
@@ -1267,6 +1350,7 @@ eval(
 ```
 
 In a session, computes and returns the value of this random variable.
+
 This is not a graph construction method, it does not add ops to the graph.
 
 This convenience method requires a session where the graph
@@ -1274,6 +1358,7 @@ containing this variable has been launched. If no session is
 passed, the default session is used.
 
 #### Args:
+
 
 * <b>`session`</b>: tf.BaseSession.
   The `tf.Session` to use to evaluate this random variable. If
@@ -1284,6 +1369,7 @@ passed, the default session is used.
 
 
 #### Returns:
+
 Value of the random variable.
 
 
@@ -1307,6 +1393,7 @@ get_shape()
 
 Get shape of random variable.
 
+
 <h3 id="numpy"><code>numpy</code></h3>
 
 ``` python
@@ -1314,6 +1401,7 @@ numpy()
 ```
 
 Value as NumPy array, only available for TF Eager.
+
 
 <h3 id="sample_shape_tensor"><code>sample_shape_tensor</code></h3>
 
@@ -1323,18 +1411,17 @@ sample_shape_tensor(name='sample_shape_tensor')
 
 Sample shape of random variable as a 1-D `Tensor`.
 
+
 #### Args:
+
 
 * <b>`name`</b>: name to give to the op
 
 
 #### Returns:
 
+
 * <b>`sample_shape`</b>: `Tensor`.
 
 
-
-## Class Members
-
-<h3 id="__array_priority__"><code>__array_priority__</code></h3>
 

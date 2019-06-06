@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Sample for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct the `Sample` distribution.
 
 #### Args:
+
 
 * <b>`distribution`</b>: The base distribution instance to transform. Typically an
   instance of `Distribution`.

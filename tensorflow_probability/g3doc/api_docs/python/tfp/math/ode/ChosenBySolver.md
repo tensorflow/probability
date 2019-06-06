@@ -2,7 +2,6 @@
 <meta itemprop="name" content="tfp.math.ode.ChosenBySolver" />
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="final_time"/>
-<meta itemprop="property" content="__new__"/>
 </div>
 
 # tfp.math.ode.ChosenBySolver
@@ -25,25 +24,14 @@ at which to store the computed state (see `tfp.math.ode.Base.solve`).
 
 #### Properties:
 
+
 * <b>`final_time`</b>: Scalar float `Tensor` specifying the largest time at which to
   store the computed state.
-
-<h2 id="__new__"><code>__new__</code></h2>
-
-``` python
-__new__(
-    _cls,
-    final_time
-)
-```
-
-Create new instance of ChosenBySolver(final_time,)
-
-
 
 ## Properties
 
 <h3 id="final_time"><code>final_time</code></h3>
+
 
 
 

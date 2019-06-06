@@ -146,11 +146,13 @@ __init__(
 ```
 
 Creates the step size adaptation kernel.
+
 The default setter_fn and the getter_fn callbacks assume that the inner
 kernel produces kernel results structurally the same as the
 `HamiltonianMonteCarlo` kernel.
 
 #### Args:
+
 
 * <b>`inner_kernel`</b>: `TransitionKernel`-like object.
 * <b>`num_adaptation_steps`</b>: Scalar `int` `Tensor` number of initial steps to
@@ -199,7 +201,9 @@ kernel produces kernel results structurally the same as the
 
 
 
+
 <h3 id="name"><code>name</code></h3>
+
 
 
 
@@ -207,9 +211,11 @@ kernel produces kernel results structurally the same as the
 
 
 
+
 <h3 id="parameters"><code>parameters</code></h3>
 
 Return `dict` of ``__init__`` arguments and their values.
+
 
 
 
@@ -223,13 +229,16 @@ bootstrap_results(init_state)
 
 Returns an object with the same type as returned by `one_step(...)[1]`.
 
+
 #### Args:
+
 
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   initial state(s) of the Markov chain(s).
 
 
 #### Returns:
+
 
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
   `Tensor`s representing internal calculations made within this function.
@@ -241,6 +250,7 @@ is_calibrated()
 ```
 
 Returns `True` if Markov chain converges to specified distribution.
+
 `TransitionKernel`s which are "uncalibrated" are often calibrated by
 composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp.mcmc.MetropolisHastings</code></a> `TransitionKernel`.
 
@@ -249,6 +259,7 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 ``` python
 log_accept_prob_getter_fn(kernel_results)
 ```
+
 
 
 
@@ -262,9 +273,11 @@ one_step(
 ```
 
 Takes one step of the TransitionKernel.
+
 Must be overridden by subclasses.
 
 #### Args:
+
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   current state(s) of the Markov chain(s).
@@ -274,6 +287,7 @@ Must be overridden by subclasses.
 
 
 #### Returns:
+
 
 * <b>`next_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   next state(s) of the Markov chain(s).
@@ -288,6 +302,7 @@ step_size_getter_fn(kernel_results)
 
 
 
+
 <h3 id="step_size_setter_fn"><code>step_size_setter_fn</code></h3>
 
 ``` python
@@ -296,6 +311,7 @@ step_size_setter_fn(
     new_step_size
 )
 ```
+
 
 
 

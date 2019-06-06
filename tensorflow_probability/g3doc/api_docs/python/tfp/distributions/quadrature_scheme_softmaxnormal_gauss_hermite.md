@@ -35,6 +35,7 @@ than `quadrature_scheme_softmaxnormal_quantiles`.
 
 #### Args:
 
+
 * <b>`normal_loc`</b>: `float`-like `Tensor` with shape `[b1, ..., bB, K-1]`, B>=0.
   The location parameter of the Normal used to construct the SoftmaxNormal.
 * <b>`normal_scale`</b>: `float`-like `Tensor`. Broadcastable with `normal_loc`.
@@ -49,6 +50,7 @@ than `quadrature_scheme_softmaxnormal_quantiles`.
 
 
 #### Returns:
+
 
 * <b>`grid`</b>: Shape `[b1, ..., bB, K, quadrature_size]` `Tensor` representing the
   convex combination of affine parameters for `K` components.

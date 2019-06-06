@@ -45,6 +45,7 @@ this optimizer calls them relatively few times compared with other algorithms.
 
 #### Args:
 
+
 * <b>`grad_and_hessian_loss_fn`</b>: callable that takes as input a (batch of) `Tensor`
   of the same shape and dtype as `x_start` and returns the triple
   `(gradient_unregularized_loss, hessian_unregularized_loss_outer,
@@ -78,6 +79,7 @@ this optimizer calls them relatively few times compared with other algorithms.
 
 
 #### Returns:
+
 
 * <b>`x`</b>: `Tensor` of the same shape and dtype as `x_start`, representing the
   (batches of) computed values of `x` which minimizes `Loss(x)`.

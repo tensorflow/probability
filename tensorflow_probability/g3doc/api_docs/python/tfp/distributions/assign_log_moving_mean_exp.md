@@ -45,6 +45,7 @@ update to the tf.Variable is presumed efficient due to being lock-free.)
 
 #### Args:
 
+
 * <b>`log_mean_exp_var`</b>: `float`-like `Variable` representing the log of the
   exponentially weighted moving mean of the exp. Same shape as `log_value`.
 * <b>`log_value`</b>: `float`-like `Tensor` representing a new (streaming) observation.
@@ -56,11 +57,13 @@ update to the tf.Variable is presumed efficient due to being lock-free.)
 
 #### Returns:
 
+
 * <b>`log_mean_exp_var`</b>: A reference to the input 'Variable' tensor with the
   `log_value`-updated log of the exponentially weighted moving mean of exp.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `log_mean_exp_var` does not have float type `dtype`.
 * <b>`TypeError`</b>: if `log_mean_exp_var`, `log_value`, `decay` have different

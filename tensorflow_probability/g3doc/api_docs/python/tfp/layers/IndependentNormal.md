@@ -99,7 +99,9 @@ __init__(
 
 Initialize the `IndependentNormal` layer.
 
+
 #### Args:
+
 
 * <b>`event_shape`</b>: integer vector `Tensor` representing the shape of single
   draw from this distribution.
@@ -121,7 +123,9 @@ Initialize the `IndependentNormal` layer.
 
 Optional regularizer function for the output of this layer.
 
+
 <h3 id="dtype"><code>dtype</code></h3>
+
 
 
 
@@ -129,24 +133,29 @@ Optional regularizer function for the output of this layer.
 
 
 
+
 <h3 id="input"><code>input</code></h3>
 
 Retrieves the input tensor(s) of a layer.
+
 Only applicable if the layer has exactly one input,
 i.e. if it is connected to one incoming layer.
 
 #### Returns:
+
 Input tensor or list of input tensors.
 
 
 
 #### Raises:
 
+
 * <b>`AttributeError`</b>: if the layer is connected to
 more than one incoming layers.
 
 
 #### Raises:
+
 
 * <b>`RuntimeError`</b>: If called in Eager mode.
 * <b>`AttributeError`</b>: If no inbound nodes are found.
@@ -154,10 +163,12 @@ more than one incoming layers.
 <h3 id="input_mask"><code>input_mask</code></h3>
 
 Retrieves the input mask tensor(s) of a layer.
+
 Only applicable if the layer has exactly one inbound node,
 i.e. if it is connected to one incoming layer.
 
 #### Returns:
+
 Input mask tensor (potentially None) or list of input
 mask tensors.
 
@@ -165,17 +176,20 @@ mask tensors.
 
 #### Raises:
 
+
 * <b>`AttributeError`</b>: if the layer is connected to
 more than one incoming layers.
 
 <h3 id="input_shape"><code>input_shape</code></h3>
 
 Retrieves the input shape(s) of a layer.
+
 Only applicable if the layer has exactly one input,
 i.e. if it is connected to one incoming layer, or if all inputs
 have the same shape.
 
 #### Returns:
+
 Input shape, as an integer shape tuple
 (or list of shape tuples, one tuple per input tensor).
 
@@ -183,17 +197,20 @@ Input shape, as an integer shape tuple
 
 #### Raises:
 
+
 * <b>`AttributeError`</b>: if the layer has no defined input_shape.
 * <b>`RuntimeError`</b>: if called in Eager mode.
 
 <h3 id="losses"><code>losses</code></h3>
 
 Losses which are associated with this `Layer`.
+
 Variable regularization tensors are created when this property is accessed,
 so it is eager safe: accessing `losses` under a `tf.GradientTape` will
 propagate gradients back to the corresponding variables.
 
 #### Returns:
+
 A list of tensors.
 
 
@@ -201,9 +218,11 @@ A list of tensors.
 
 
 
+
 <h3 id="name"><code>name</code></h3>
 
 Returns the name of this module as passed or determined in the ctor.
+
 NOTE: This is not the same as the `self.name_scope.name` which includes
 parent module names.
 
@@ -211,7 +230,9 @@ parent module names.
 
 Returns a `tf.name_scope` instance for this class.
 
+
 <h3 id="non_trainable_variables"><code>non_trainable_variables</code></h3>
+
 
 
 
@@ -219,18 +240,22 @@ Returns a `tf.name_scope` instance for this class.
 
 
 
+
 <h3 id="output"><code>output</code></h3>
 
 Retrieves the output tensor(s) of a layer.
+
 Only applicable if the layer has exactly one output,
 i.e. if it is connected to one incoming layer.
 
 #### Returns:
+
 Output tensor or list of output tensors.
 
 
 
 #### Raises:
+
 
 * <b>`AttributeError`</b>: if the layer is connected to more than one incoming
   layers.
@@ -239,10 +264,12 @@ Output tensor or list of output tensors.
 <h3 id="output_mask"><code>output_mask</code></h3>
 
 Retrieves the output mask tensor(s) of a layer.
+
 Only applicable if the layer has exactly one inbound node,
 i.e. if it is connected to one incoming layer.
 
 #### Returns:
+
 Output mask tensor (potentially None) or list of output
 mask tensors.
 
@@ -250,16 +277,19 @@ mask tensors.
 
 #### Raises:
 
+
 * <b>`AttributeError`</b>: if the layer is connected to
 more than one incoming layers.
 
 <h3 id="output_shape"><code>output_shape</code></h3>
 
 Retrieves the output shape(s) of a layer.
+
 Only applicable if the layer has one output,
 or if all outputs have the same shape.
 
 #### Returns:
+
 Output shape, as an integer shape tuple
 (or list of shape tuples, one tuple per output tensor).
 
@@ -267,12 +297,14 @@ Output shape, as an integer shape tuple
 
 #### Raises:
 
+
 * <b>`AttributeError`</b>: if the layer has no defined output shape.
 * <b>`RuntimeError`</b>: if called in Eager mode.
 
 <h3 id="submodules"><code>submodules</code></h3>
 
 Sequence of all sub-modules.
+
 Submodules are modules which are properties of this module, or found as
 properties of modules which are properties of this module (and so on).
 
@@ -288,6 +320,7 @@ assert list(c.submodules) == []
 ```
 
 #### Returns:
+
 A sequence of all submodules.
 
 
@@ -295,14 +328,17 @@ A sequence of all submodules.
 
 
 
+
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
 Sequence of variables owned by this module and it's submodules.
+
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
 of calling this method if you don't expect the return value to change.
 
 #### Returns:
+
 A sequence of variables for the current module (sorted by attribute
 name) followed by variables from all submodules recursively (breadth
 first).
@@ -312,16 +348,20 @@ first).
 
 
 
+
 <h3 id="updates"><code>updates</code></h3>
+
 
 
 
 <h3 id="variables"><code>variables</code></h3>
 
 Returns the list of all layer variables/weights.
+
 Alias of `self.weights`.
 
 #### Returns:
+
 A list of variables.
 
 
@@ -329,7 +369,9 @@ A list of variables.
 
 Returns the list of all layer variables/weights.
 
+
 #### Returns:
+
 A list of variables.
 
 
@@ -349,7 +391,9 @@ __call__(
 
 Wraps `call`, applying pre- and post-processing steps.
 
+
 #### Arguments:
+
 
 * <b>`inputs`</b>: input tensor(s).
 * <b>`*args`</b>: additional positional arguments to be passed to `self.call`.
@@ -357,11 +401,13 @@ Wraps `call`, applying pre- and post-processing steps.
 
 
 #### Returns:
+
 Output tensor(s).
 
 
 
 #### Note:
+
 - The following optional keyword arguments are reserved for specific uses:
   * `training`: Boolean scalar tensor of Python boolean indicating
     whether the `call` is meant for training or inference.
@@ -376,6 +422,7 @@ Output tensor(s).
 
 #### Raises:
 
+
 * <b>`ValueError`</b>: if the layer's `call` method returns None (an invalid value).
 
 <h3 id="apply"><code>apply</code></h3>
@@ -389,9 +436,11 @@ apply(
 ```
 
 Apply the layer on a input.
+
 This is an alias of `self.__call__`.
 
 #### Arguments:
+
 
 * <b>`inputs`</b>: Input tensor(s).
 * <b>`*args`</b>: additional positional arguments to be passed to `self.call`.
@@ -399,6 +448,7 @@ This is an alias of `self.__call__`.
 
 
 #### Returns:
+
 Output tensor(s).
 
 
@@ -409,6 +459,7 @@ build(input_shape)
 ```
 
 Creates the variables of the layer (optional, for subclass implementers).
+
 This is a method that implementers of subclasses of `Layer` or `Model`
 can override if they need a state-creation step in-between
 layer instantiation and layer call.
@@ -416,6 +467,7 @@ layer instantiation and layer call.
 This is typically used to create the weights of `Layer` subclasses.
 
 #### Arguments:
+
 
 * <b>`input_shape`</b>: Instance of `TensorShape`, or list of instances of
   `TensorShape` if the layer expects a list of inputs
@@ -432,13 +484,16 @@ compute_mask(
 
 Computes an output mask tensor.
 
+
 #### Arguments:
+
 
 * <b>`inputs`</b>: Tensor or list of tensors.
 * <b>`mask`</b>: Tensor or list of tensors.
 
 
 #### Returns:
+
 None or a tensor (or list of tensors,
     one per output tensor of the layer).
 
@@ -454,6 +509,7 @@ compute_output_shape(
 
 
 
+
 <h3 id="count_params"><code>count_params</code></h3>
 
 ``` python
@@ -462,12 +518,15 @@ count_params()
 
 Count the total number of scalars composing the weights.
 
+
 #### Returns:
+
 An integer count.
 
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if the layer isn't yet built
   (in which case its weights aren't yet defined).
@@ -483,6 +542,7 @@ from_config(
 ```
 
 Creates a layer from its config.
+
 This method is the reverse of `get_config`,
 capable of instantiating the same layer from the config
 dictionary. It does not handle layer connectivity
@@ -490,11 +550,13 @@ dictionary. It does not handle layer connectivity
 
 #### Arguments:
 
+
 * <b>`config`</b>: A Python dictionary, typically the
     output of get_config.
 
 
 #### Returns:
+
 A layer instance.
 
 
@@ -505,6 +567,7 @@ get_config()
 ```
 
 Returns the config of this layer.
+
 NOTE: At the moment, this configuration can only be serialized if the
 Layer's `convert_to_tensor_fn` is a serializable Keras object (i.e.,
 implements `get_config`) or one of the standard values:
@@ -522,7 +585,9 @@ get_input_at(node_index)
 
 Retrieves the input tensor(s) of a layer at a given node.
 
+
 #### Arguments:
+
 
 * <b>`node_index`</b>: Integer, index of the node
     from which to retrieve the attribute.
@@ -531,11 +596,13 @@ Retrieves the input tensor(s) of a layer at a given node.
 
 
 #### Returns:
+
 A tensor (or list of tensors if the layer has multiple inputs).
 
 
 
 #### Raises:
+
 
 * <b>`RuntimeError`</b>: If called in Eager mode.
 
@@ -547,7 +614,9 @@ get_input_mask_at(node_index)
 
 Retrieves the input mask tensor(s) of a layer at a given node.
 
+
 #### Arguments:
+
 
 * <b>`node_index`</b>: Integer, index of the node
     from which to retrieve the attribute.
@@ -556,6 +625,7 @@ Retrieves the input mask tensor(s) of a layer at a given node.
 
 
 #### Returns:
+
 A mask tensor
 (or list of tensors if the layer has multiple inputs).
 
@@ -568,7 +638,9 @@ get_input_shape_at(node_index)
 
 Retrieves the input shape(s) of a layer at a given node.
 
+
 #### Arguments:
+
 
 * <b>`node_index`</b>: Integer, index of the node
     from which to retrieve the attribute.
@@ -577,12 +649,14 @@ Retrieves the input shape(s) of a layer at a given node.
 
 
 #### Returns:
+
 A shape tuple
 (or list of shape tuples if the layer has multiple inputs).
 
 
 
 #### Raises:
+
 
 * <b>`RuntimeError`</b>: If called in Eager mode.
 
@@ -594,12 +668,15 @@ get_losses_for(inputs)
 
 Retrieves losses relevant to a specific set of inputs.
 
+
 #### Arguments:
+
 
 * <b>`inputs`</b>: Input tensor or list/tuple of input tensors.
 
 
 #### Returns:
+
 List of loss tensors of the layer that depend on `inputs`.
 
 
@@ -611,7 +688,9 @@ get_output_at(node_index)
 
 Retrieves the output tensor(s) of a layer at a given node.
 
+
 #### Arguments:
+
 
 * <b>`node_index`</b>: Integer, index of the node
     from which to retrieve the attribute.
@@ -620,11 +699,13 @@ Retrieves the output tensor(s) of a layer at a given node.
 
 
 #### Returns:
+
 A tensor (or list of tensors if the layer has multiple outputs).
 
 
 
 #### Raises:
+
 
 * <b>`RuntimeError`</b>: If called in Eager mode.
 
@@ -636,7 +717,9 @@ get_output_mask_at(node_index)
 
 Retrieves the output mask tensor(s) of a layer at a given node.
 
+
 #### Arguments:
+
 
 * <b>`node_index`</b>: Integer, index of the node
     from which to retrieve the attribute.
@@ -645,6 +728,7 @@ Retrieves the output mask tensor(s) of a layer at a given node.
 
 
 #### Returns:
+
 A mask tensor
 (or list of tensors if the layer has multiple outputs).
 
@@ -657,7 +741,9 @@ get_output_shape_at(node_index)
 
 Retrieves the output shape(s) of a layer at a given node.
 
+
 #### Arguments:
+
 
 * <b>`node_index`</b>: Integer, index of the node
     from which to retrieve the attribute.
@@ -666,12 +752,14 @@ Retrieves the output shape(s) of a layer at a given node.
 
 
 #### Returns:
+
 A shape tuple
 (or list of shape tuples if the layer has multiple outputs).
 
 
 
 #### Raises:
+
 
 * <b>`RuntimeError`</b>: If called in Eager mode.
 
@@ -683,12 +771,15 @@ get_updates_for(inputs)
 
 Retrieves updates relevant to a specific set of inputs.
 
+
 #### Arguments:
+
 
 * <b>`inputs`</b>: Input tensor or list/tuple of input tensors.
 
 
 #### Returns:
+
 List of update ops of the layer that depend on `inputs`.
 
 
@@ -700,7 +791,9 @@ get_weights()
 
 Returns the current weights of the layer.
 
+
 #### Returns:
+
 Weights values as a list of numpy arrays.
 
 
@@ -718,6 +811,7 @@ new(
 
 Create the distribution instance from a `params` vector.
 
+
 <h3 id="params_size"><code>params_size</code></h3>
 
 ``` python
@@ -730,6 +824,7 @@ params_size(
 
 The number of `params` needed to create a single distribution.
 
+
 <h3 id="set_weights"><code>set_weights</code></h3>
 
 ``` python
@@ -738,7 +833,9 @@ set_weights(weights)
 
 Sets the weights of the layer, from Numpy arrays.
 
+
 #### Arguments:
+
 
 * <b>`weights`</b>: a list of Numpy arrays. The number
     of arrays and their shape must match
@@ -748,6 +845,7 @@ Sets the weights of the layer, from Numpy arrays.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: If the provided weights list does not match the
     layer's specifications.
@@ -762,6 +860,7 @@ with_name_scope(
 ```
 
 Decorator to automatically enter the module name scope.
+
 ```
 class MyModule(tf.Module):
   @tf.Module.with_name_scope
@@ -784,10 +883,12 @@ mod.w
 
 #### Args:
 
+
 * <b>`method`</b>: The method to wrap.
 
 
 #### Returns:
+
 The original method wrapped such that it enters the module's name scope.
 
 

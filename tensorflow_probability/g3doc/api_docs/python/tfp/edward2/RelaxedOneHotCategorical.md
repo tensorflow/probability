@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See RelaxedOneHotCategorical for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Initialize RelaxedOneHotCategorical using class log-probabilities.
 
 #### Args:
+
 
 * <b>`temperature`</b>: An 0-D `Tensor`, representing the temperature
   of a set of RelaxedOneHotCategorical distributions. The temperature

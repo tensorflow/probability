@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See HalfNormal for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct HalfNormals with scale `scale`.
 
 #### Args:
+
 
 * <b>`scale`</b>: Floating point tensor; the scales of the distribution(s).
   Must contain only positive values.

@@ -18,11 +18,11 @@ Defined in [`python/stats/__init__.py`](https://github.com/tensorflow/probabilit
 
 [`auto_correlation(...)`](../tfp/stats/auto_correlation.md): Auto correlation along one axis.
 
-[`count_integers(...)`](../tfp/stats/count_integers.md): Counts the number of occurrences of each value in an integer array `arr`.
-
 [`cholesky_covariance(...)`](../tfp/stats/cholesky_covariance.md): Cholesky factor of the covariance matrix of vector-variate random samples.
 
 [`correlation(...)`](../tfp/stats/correlation.md): Sample correlation (Pearson) between observations indexed by `event_axis`.
+
+[`count_integers(...)`](../tfp/stats/count_integers.md): Counts the number of occurrences of each value in an integer array `arr`.
 
 [`covariance(...)`](../tfp/stats/covariance.md): Sample covariance between observations indexed by `event_axis`.
 
