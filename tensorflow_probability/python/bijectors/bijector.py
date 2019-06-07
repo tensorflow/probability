@@ -617,6 +617,18 @@ class Bijector(tf.Module):
 
     self._graph_parents = graph_parents or []
 
+    self._is_constant_jacobian = is_constant_jacobian
+    # Keyed by the current graph.
+    self._constant_ildj = {}
+    self._validate_args = validate_args
+    self._dtype = dtype
+    self._from_y = WeakKeyDefaultDict()
+    self._from_x = WeakKeyDefaultDict()
+
+    self._initial_parameter_control_dependencies = tuple(
+        d for d in self._parameter_control_dependencies(is_init=True)
+        if d is not None)
+
     if forward_min_event_ndims is None and inverse_min_event_ndims is None:
       raise ValueError('Must specify at least one of `forward_min_event_ndims` '
                        'and `inverse_min_event_ndims`.')
@@ -644,21 +656,10 @@ class Bijector(tf.Module):
 
     self._forward_min_event_ndims = forward_min_event_ndims
     self._inverse_min_event_ndims = inverse_min_event_ndims
-    self._is_constant_jacobian = is_constant_jacobian
-    # Keyed by the current graph.
-    self._constant_ildj = {}
-    self._validate_args = validate_args
-    self._dtype = dtype
-    self._from_y = WeakKeyDefaultDict()
-    self._from_x = WeakKeyDefaultDict()
 
     for i, t in enumerate(self._graph_parents):
       if t is None or not tf.is_tensor(t):
         raise ValueError('Graph parent item %d is not a Tensor; %s.' % (i, t))
-
-    self._initial_parameter_control_dependencies = tuple(
-        d for d in self._parameter_control_dependencies(is_init=True)
-        if d is not None)
 
   @property
   def graph_parents(self):

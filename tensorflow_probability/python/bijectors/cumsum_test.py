@@ -20,7 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
@@ -32,10 +33,11 @@ class _CumsumBijectorTest(tf.test.TestCase):
   """Tests correctness of the cumsum bijector."""
 
   def testInvalidAxis(self):
-    with self.assertRaisesRegexp(ValueError, "`axis` needs to be negative."):
-      tfb.Cumsum(axis=0)
-    with self.assertRaisesRegexp(TypeError, "`axis` is not an `int`."):
-      tfb.Cumsum(axis=-1.)
+    with self.assertRaisesOpError('Argument `axis` must be negative.'):
+      self.evaluate(tfb.Cumsum(axis=0, validate_args=True).forward([0., 1.]))
+    with self.assertRaisesRegexp(
+        TypeError, r'Argument `axis` is not an `int` type\..*'):
+      tfb.Cumsum(axis=-1., validate_args=True)
 
   def testBijector(self):
     self._checkBijectorInAllDims(np.arange(5.))
@@ -43,7 +45,7 @@ class _CumsumBijectorTest(tf.test.TestCase):
     self._checkBijectorInAllDims(np.reshape([np.arange(5.)] * 4, [5, 2, 2]))
 
   def testBijectiveAndFinite(self):
-    bijector = tfb.Cumsum()
+    bijector = tfb.Cumsum(validate_args=True)
     x = np.linspace(-10, 10, num=10).astype(np.float32)
     y = np.cumsum(x, axis=-1)
     bijector_test_util.assert_bijective_and_finite(
@@ -62,8 +64,8 @@ class _CumsumBijectorTest(tf.test.TestCase):
     """Helper for `testBijector`."""
     x = self._build_tensor(x)
     for axis in range(-self.evaluate(tf.rank(x)), 0):
-      bijector = tfb.Cumsum(axis=axis)
-      self.assertStartsWith(bijector.name, "cumsum")
+      bijector = tfb.Cumsum(axis=axis, validate_args=True)
+      self.assertStartsWith(bijector.name, 'cumsum')
 
       y = tf.cumsum(x, axis=axis)
       self.assertAllClose(y, self.evaluate(bijector.forward(x)))
@@ -71,10 +73,10 @@ class _CumsumBijectorTest(tf.test.TestCase):
 
   def _checkEqualTheoreticalFldj(self, x):
     """Helper for `testJacobian`."""
-    event_ndims = int(self.evaluate(tf.rank(x)) - 1)
+    event_ndims = len(x.shape) - 1
     self.assertGreaterEqual(event_ndims, 1)
 
-    bijector = tfb.Cumsum(axis=-event_ndims)
+    bijector = tfb.Cumsum(axis=-event_ndims, validate_args=True)
     fldj = bijector.forward_log_det_jacobian(
         self._build_tensor(x), event_ndims=event_ndims)
     fldj_theoretical = bijector_test_util.get_fldj_theoretical(
@@ -87,7 +89,7 @@ class _CumsumBijectorTest(tf.test.TestCase):
     # Enforce parameterized dtype and static/dynamic testing.
     ndarray = np.asarray(ndarray).astype(
         dtype if dtype is not None else self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
@@ -103,5 +105,5 @@ class CumsumBijectorTestWithDynamicShape(_CumsumBijectorTest):
 
 del _CumsumBijectorTest  # Don't run tests for the base class.
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

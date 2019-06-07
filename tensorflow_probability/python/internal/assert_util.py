@@ -33,10 +33,10 @@ assert_greater_equal = tf.compat.v1.assert_greater_equal
 assert_integer = tf.compat.v1.assert_integer
 assert_less_equal = tf.compat.v1.assert_less_equal
 assert_near = tf.compat.v1.assert_near
+assert_negative = tf.compat.v1.assert_negative
 assert_non_negative = tf.compat.v1.assert_non_negative
 assert_non_positive = tf.compat.v1.assert_non_positive
 assert_none_equal = tf.compat.v1.assert_none_equal
-assert_positive = tf.compat.v1.assert_positive
 assert_positive = tf.compat.v1.assert_positive
 assert_rank_at_least = tf.compat.v1.assert_rank_at_least
 
