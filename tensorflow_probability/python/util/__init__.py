@@ -13,3 +13,17 @@
 # limitations under the License.
 # ============================================================================
 """TensorFlow Probability python utilities."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+from tensorflow_probability.python.util.transformed_variable import DeferredTensor
+
+from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
+
+_allowed_symbols = [
+    'DeferredTensor',
+]
+
+remove_undocumented(__name__, _allowed_symbols)

@@ -44,6 +44,7 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/util",
     ],
 )
 

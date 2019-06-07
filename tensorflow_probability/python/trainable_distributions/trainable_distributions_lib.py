@@ -27,6 +27,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python import distributions as tfd
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -39,6 +40,11 @@ __all__ = [
 ]
 
 
+@deprecation.deprecated(
+    '2019-09-01',
+    '`softplus_and_shift` is deprecated; '
+    'use `tfp.bijectors.{Chain, AffineScalar, Softplus}`.',
+    warn_once=True)
 def softplus_and_shift(x, shift=1e-5, name=None):
   """Converts (batch of) scalars to (batch of) positive valued scalars.
 
@@ -61,6 +67,11 @@ def softplus_and_shift(x, shift=1e-5, name=None):
     return y
 
 
+@deprecation.deprecated(
+    '2019-09-01',
+    '`softplus_and_shift` is deprecated; '
+    'use `tfp.bijectors.ScaleTriL`.',
+    warn_once=True)
 def tril_with_diag_softplus_and_shift(x, diag_shift=1e-5, name=None):
   """Converts (batch of) vectors to (batch of) lower-triangular scale matrices.
 
@@ -89,6 +100,11 @@ def tril_with_diag_softplus_and_shift(x, diag_shift=1e-5, name=None):
     return x
 
 
+@deprecation.deprecated(
+    '2019-09-01',
+    '`multivariate_normal_tril` is deprecated; '
+    'use `tfp.layers.DistributionLambda` or `tfp.util.DeferredTensor`.',
+    warn_once=True)
 def multivariate_normal_tril(x,
                              dims,
                              layer_fn=tf.compat.v1.layers.dense,
@@ -197,6 +213,11 @@ def multivariate_normal_tril(x,
         scale_tril=scale_fn(x[..., dims:]))
 
 
+@deprecation.deprecated(
+    '2019-09-01',
+    '`multivariate_normal_tril` is deprecated; '
+    'use `tfp.layers.DistributionLambda` or `tfp.util.DeferredTensor`.',
+    warn_once=True)
 def bernoulli(x, layer_fn=tf.compat.v1.layers.dense, name=None):
   """Constructs a trainable `tfd.Bernoulli` distribution.
 
@@ -281,6 +302,11 @@ def bernoulli(x, layer_fn=tf.compat.v1.layers.dense, name=None):
     return tfd.Bernoulli(logits=logits)
 
 
+@deprecation.deprecated(
+    '2019-09-01',
+    '`multivariate_normal_tril` is deprecated; '
+    'use `tfp.layers.DistributionLambda` or `tfp.util.DeferredTensor`.',
+    warn_once=True)
 def normal(x,
            layer_fn=tf.compat.v1.layers.dense,
            loc_fn=lambda x: x,
@@ -387,6 +413,11 @@ def normal(x,
     return tfd.Normal(loc=loc, scale=scale)
 
 
+@deprecation.deprecated(
+    '2019-09-01',
+    '`poisson` is deprecated; '
+    'use `tfp.layers.DistributionLambda` or `tfp.util.DeferredTensor`.',
+    warn_once=True)
 def poisson(x,
             layer_fn=tf.compat.v1.layers.dense,
             log_rate_fn=lambda x: x,

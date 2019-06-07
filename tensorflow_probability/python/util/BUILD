@@ -31,4 +31,31 @@ py_library(
     name = "util",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+    deps = [
+        ":transformed_variable",
+    ],
+)
+
+py_library(
+    name = "transformed_variable",
+    srcs = ["transformed_variable.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:name_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+py_test(
+    name = "transformed_variable_test",
+    size = "small",
+    srcs = ["transformed_variable_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
 )
