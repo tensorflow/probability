@@ -51,3 +51,19 @@ class TestCase(tf.test.TestCase):
     is_nan = np.isnan(self._GetNdArray(a))
     all_true = np.ones_like(is_nan, dtype=np.bool)
     self.assertAllEqual(all_true, is_nan)
+
+  def assertAllNotNone(self, a):
+    """Assert that no entry in a collection is None.
+
+    Args:
+      a: A Python iterable collection, whose entries must be verified as not
+      being `None`.
+    """
+    each_not_none = [x is not None for x in a]
+    if all(each_not_none):
+      return
+
+    msg = (
+        "Expected no entry to be `None` but found `None` in positions {}"
+        .format([i for i, x in enumerate(each_not_none) if not x]))
+    raise AssertionError(msg)

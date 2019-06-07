@@ -112,6 +112,16 @@ class _TestCaseTest(object):
         input=all_nan, shape=all_nan.shape)
     self.assertAllNan(a)
 
+  def test_assert_all_are_not_none(self):
+    no_nones = [1, 2, 3]
+    self.assertAllNotNone(no_nones)
+
+    has_nones = [1, 2, None]
+    with self.assertRaisesRegexp(
+        AssertionError,
+        r"Expected no entry to be `None` but found `None` in positions \[2\]"):
+      self.assertAllNotNone(has_nones)
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class TestCaseTestFloat32(test_case.TestCase, _TestCaseTest):
