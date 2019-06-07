@@ -277,7 +277,7 @@ def transform_log_prob_fn(log_prob_fn: PotentialFn,
     if len(args) == 1:
       args = args[0]
     elif isinstance(bijector_, list):
-      bijector_ = tuple(bijector_)
+      args = list(args)
 
     original_space_args = tf.nest.map_structure(lambda b, x: b.forward(x),
                                                 bijector_, args)
@@ -564,7 +564,7 @@ def metropolis_hastings_step(current_state: State,
             seed=seed))
   is_accepted = log_uniform < log_accept_ratio
 
-  next_state = mcmc_util.choose(
+  next_state = _choose(
       is_accepted, proposed_state, current_state, name='choose_next_state')
   return next_state, is_accepted, log_uniform
 
@@ -590,7 +590,7 @@ class HamiltonianMonteCarloState(
 HamiltonianMonteCarloExtra = collections.namedtuple(
     'HamiltonianMonteCarloExtra',
     'is_accepted, log_accept_ratio, integrator_trace, '
-    'proposed_hmc_state')
+    'proposed_hmc_state, integrator_step_state')
 
 MomentumSampleFn = Union[Callable[[State], State], Callable[..., State]]
 
@@ -770,7 +770,8 @@ def hamiltonian_monte_carlo(
       is_accepted=is_accepted,
       proposed_hmc_state=proposed_state,
       log_accept_ratio=-energy_change,
-      integrator_trace=integrator_trace)
+      integrator_trace=integrator_trace,
+      integrator_step_state=integrator_step_state)
 
 
 def sign_adaptation(control: FloatNest,
@@ -795,9 +796,9 @@ def sign_adaptation(control: FloatNest,
   """
 
   def _get_new_control(control, output, set_point):
-    new_control = mcmc_util.choose(output > set_point,
-                                   control * (1. + adaptation_rate),
-                                   control / (1. + adaptation_rate))
+    new_control = _choose(output > set_point,
+                          control * (1. + adaptation_rate),
+                          control / (1. + adaptation_rate))
     return new_control
 
   output = maybe_broadcast_structure(output, control)
@@ -831,3 +832,31 @@ def transition_kernel_wrapper(current_state: FloatNest,
                                                        kernel_results)
   return (tf.nest.pack_sequence_as(current_state,
                                    flat_current_state), kernel_results), ()
+
+
+def _choose(is_accepted, accepted, rejected, name='choose'):
+  """Helper which expand_dims `is_accepted` then applies tf.where."""
+
+  def _choose_base_case(is_accepted, accepted, rejected, name):
+    """Choose base case for one tensor."""
+
+    def _expand_is_accepted_like(x):
+      """Helper to expand `is_accepted` like the shape of some input arg."""
+      with tf.name_scope('expand_is_accepted_like'):
+        expand_shape = tf.concat([
+            tf.shape(input=is_accepted),
+            tf.ones([tf.rank(x) - tf.rank(is_accepted)], dtype=tf.int32),
+        ],
+                                 axis=0)
+        return tf.reshape(is_accepted, expand_shape)
+
+    with tf.name_scope(name):
+      if accepted is rejected:
+        return accepted
+      accepted = tf.convert_to_tensor(value=accepted, name='accepted')
+      rejected = tf.convert_to_tensor(value=rejected, name='rejected')
+      return tf.where(_expand_is_accepted_like(accepted), accepted, rejected)
+
+  return tf.nest.map_structure(
+      lambda a, r: _choose_base_case(is_accepted, a, r, name=name), accepted,
+      rejected)

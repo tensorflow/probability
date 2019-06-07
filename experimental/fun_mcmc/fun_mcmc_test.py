@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
@@ -28,23 +30,19 @@ import tensorflow_probability as tfp
 from experimental import fun_mcmc
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
 tfb = tfp.bijectors
 tfd = tfp.distributions
+
+tf.enable_v2_behavior()
 
 
 def _no_compile(fn):
   return fn
 
 
-@test_util.run_all_in_graph_and_eager_modes
 class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
 
   def testTraceSingle(self):
-    if not tf.executing_eagerly():
-      return
-
     def fun(x):
       if x is None:
         x = 0.
@@ -57,9 +55,6 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual([0., 2., 4., 6., 8.], e_trace.numpy())
 
   def testTraceNested(self):
-    if not tf.executing_eagerly():
-      return
-
     def fun(x, y):
       if x is None:
         x = 0.
@@ -74,9 +69,6 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual([2., 4., 6., 8., 10.], y_trace)
 
   def testTraceTrace(self):
-    if not tf.executing_eagerly():
-      return
-
     def fun(x):
       return fun_mcmc.trace(x, lambda x: (x + 1., ()), 2, lambda *args: ())
 
@@ -96,18 +88,13 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual(3, fun_mcmc.call_fn(sum_fn, {'a': 1, 'b': 2}))
 
   def testBroadcastStructure(self):
-    if not tf.executing_eagerly():
-      return
     struct = fun_mcmc.maybe_broadcast_structure(1, [1, 2])
     self.assertEqual([1, 1], struct)
 
     struct = fun_mcmc.maybe_broadcast_structure([3, 4], [1, 2])
     self.assertEqual([3, 4], struct)
 
-  @test_util.run_v2_only
   def testTransformLogProbFn(self):
-    if not tf.executing_eagerly():
-      return
 
     def log_prob_fn(x, y):
       return tfd.Normal(0., 1.).log_prob(x) + tfd.Normal(1., 1.).log_prob(y), ()
@@ -118,8 +105,10 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
      transformed_init_state) = fun_mcmc.transform_log_prob_fn(
          log_prob_fn, bijectors, [2., 3.])
 
+    self.assertIsInstance(transformed_init_state, list)
     self.assertAllClose([1., 1.], transformed_init_state)
     tlp, (orig_space, _) = transformed_log_prob_fn(1., 1.)
+    self.assertIsInstance(orig_space, list)
     lp = log_prob_fn(2., 3.)[0] + sum(
         b.forward_log_det_jacobian(1., event_ndims=0) for b in bijectors)
 
@@ -133,8 +122,6 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
       fun_mcmc.blanes_4_stage_step,
   )
   def testIntegratorStep(self, method):
-    if not tf.executing_eagerly():
-      return
 
     def target_log_prob_fn(q):
       return -q**2, 1.
@@ -159,8 +146,6 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(fin_hamiltonian, initial_hamiltonian, atol=0.2)
 
   def testMetropolisHastingsStep(self):
-    if not tf.executing_eagerly():
-      return
     accepted, is_accepted, _ = fun_mcmc.metropolis_hastings_step(
         current_state=0., proposed_state=1., energy_change=-np.inf)
     self.assertAllEqual(1., accepted)
@@ -204,9 +189,18 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
         seed=tfp_test_util.test_seed())
     self.assertAllClose(0.5, tf.reduce_mean(input_tensor=accepted), rtol=0.1)
 
+  def testMetropolisHastingsStepStructure(self):
+    struct_type = collections.namedtuple('Struct', 'a, b')
+
+    current = struct_type([1, 2], (3, [4, [0, 0]]))
+    proposed = struct_type([5, 6], (7, [8, [0, 0]]))
+
+    accepted, is_accepted, _ = fun_mcmc.metropolis_hastings_step(
+        current_state=current, proposed_state=proposed, energy_change=-np.inf)
+    self.assertAllEqual(True, is_accepted)
+    self.assertAllEqual(tf.nest.flatten(proposed), tf.nest.flatten(accepted))
+
   def testBasicHMC(self):
-    if not tf.executing_eagerly():
-      return
     step_size = 0.2
     num_steps = 2000
     num_leapfrog_steps = 10
@@ -256,8 +250,6 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
       (_no_compile, 3)
   )
   def testHMCCountTargetLogProb(self, compile_fn, expected_count):
-    if not tf.executing_eagerly():
-      return
 
     counter = [0]
     @compile_fn
@@ -285,8 +277,6 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual(expected_count, counter[0])
 
   def testHMCCountTargetLogProbEfficient(self):
-    if not tf.executing_eagerly():
-      return
 
     counter = [0]
     def target_log_prob_fn(x):
@@ -317,8 +307,6 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertEqual(2, counter[0])
 
   def testAdaptiveStepSize(self):
-    if not tf.executing_eagerly():
-      return
     step_size = 0.2
     num_steps = 2000
     num_adapt_steps = 1000
@@ -393,8 +381,6 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
         rtol=0.1)
 
   def testSignAdaptation(self):
-    if not tf.executing_eagerly():
-      return
     new_control = fun_mcmc.sign_adaptation(
         control=1., output=0.5, set_point=1., adaptation_rate=0.1)
     self.assertAllClose(new_control, 1. / 1.1)
