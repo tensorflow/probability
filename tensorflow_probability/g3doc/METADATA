@@ -14,7 +14,6 @@
 # ============================================================================
 # Notify docs team for any file changes here
 presubmit: {
-  review_notify: "tf-docs+reviews"
   auto_reviewers: "tf-docs+reviews"
 }
 
