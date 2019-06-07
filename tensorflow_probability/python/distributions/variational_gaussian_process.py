@@ -804,9 +804,8 @@ class VariationalGaussianProcess(
       chol_kzz_inv_kzx = chol_kzz_linop.solve(kzx)
       kzz_inv_kzx = chol_kzz_linop.solve(chol_kzz_inv_kzx, adjoint=True)
 
-      kxx_diag = tf.linalg.diag_part(
-          self.kernel.matrix(
-              observation_index_points, observation_index_points))
+      kxx_diag = self.kernel.apply(
+          observation_index_points, observation_index_points, example_ndims=1)
       ktilde_trace_term = (
           tf.reduce_sum(input_tensor=kxx_diag, axis=-1) -
           tf.reduce_sum(input_tensor=chol_kzz_inv_kzx ** 2, axis=[-2, -1]))
