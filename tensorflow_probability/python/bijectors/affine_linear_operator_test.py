@@ -145,6 +145,12 @@ class AffineLinearOperatorTest(tf.test.TestCase):
         self.evaluate(-affine.inverse_log_det_jacobian(y, event_ndims=2)),
         self.evaluate(affine.forward_log_det_jacobian(x, event_ndims=2)))
 
+  def testVariableGradient(self):
+    b = tfb.AffineLinearOperator(shift=tf.Variable(-1.))
+
+    with tf.GradientTape() as tape:
+      y = b.forward(.1)
+    self.assertIsNotNone(tape.gradient(y, b.shift))
 
 if __name__ == "__main__":
   tf.test.main()

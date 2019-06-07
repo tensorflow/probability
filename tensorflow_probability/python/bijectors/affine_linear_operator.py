@@ -22,10 +22,11 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
-    "AffineLinearOperator",
+    'AffineLinearOperator',
 ]
 
 
@@ -70,7 +71,7 @@ class AffineLinearOperator(bijector.Bijector):
                scale=None,
                adjoint=False,
                validate_args=False,
-               name="affine_linear_operator"):
+               name='affine_linear_operator'):
     """Instantiates the `AffineLinearOperator` bijector.
 
     Args:
@@ -90,24 +91,15 @@ class AffineLinearOperator(bijector.Bijector):
       ValueError: if not `scale.is_non_singular`.
     """
     with tf.name_scope(name) as name:
-      # In the absence of `loc` and `scale`, we'll assume `dtype` is `float32`.
-      dtype = tf.float32
-      if shift is not None:
-        shift = tf.convert_to_tensor(value=shift, name="shift")
-        dtype = dtype_util.base_dtype(shift.dtype)
-      self._shift = shift
+      dtype = dtype_util.common_dtype([shift, scale],
+                                      preferred_dtype=tf.float32)
+      self._shift = tensor_util.convert_immutable_to_tensor(
+          shift, dtype=dtype, name='shift')
       if scale is not None:
-        if (shift is not None and
-            not dtype_util.base_equal(shift.dtype, scale.dtype)):
-          raise TypeError(
-              "shift.dtype({}) is incompatible with scale.dtype({}).".format(
-                  shift.dtype, scale.dtype))
         if not isinstance(scale, tf.linalg.LinearOperator):
-          raise TypeError("scale is not an instance of tf.LinearOperator")
+          raise TypeError('scale is not an instance of tf.LinearOperator')
         if validate_args and not scale.is_non_singular:
-          raise ValueError("Scale matrix must be non-singular.")
-        if scale.dtype is not None:
-          dtype = dtype_util.base_dtype(scale.dtype)
+          raise ValueError('Scale matrix must be non-singular.')
       self._scale = scale
       self._adjoint = adjoint
       super(AffineLinearOperator, self).__init__(
