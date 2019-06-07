@@ -32,13 +32,13 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":transformed_variable",
+        ":deferred_tensor",
     ],
 )
 
 py_library(
-    name = "transformed_variable",
-    srcs = ["transformed_variable.py"],
+    name = "deferred_tensor",
+    srcs = ["deferred_tensor.py"],
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
@@ -49,9 +49,9 @@ py_library(
 )
 
 py_test(
-    name = "transformed_variable_test",
+    name = "deferred_tensor_test",
     size = "small",
-    srcs = ["transformed_variable_test.py"],
+    srcs = ["deferred_tensor_test.py"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

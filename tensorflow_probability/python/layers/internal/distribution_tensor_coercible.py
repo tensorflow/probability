@@ -24,7 +24,7 @@ import six
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import distribution as tfd
-from tensorflow_probability.python.util.transformed_variable import TensorMetaClass
+from tensorflow_probability.python.util.deferred_tensor import TensorMetaClass
 from tensorflow.python.framework import composite_tensor  # pylint: disable=g-direct-tensorflow-import
 
 
