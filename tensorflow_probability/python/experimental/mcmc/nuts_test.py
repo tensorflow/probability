@@ -69,7 +69,7 @@ def run_nuts_chain(
       current_state=[state],
       kernel=kernel,
       parallel_iterations=1)
-  return chain_state, extra.leapfrogs
+  return chain_state, extra.leapfrogs_taken
 
 
 def assert_univariate_target_conservation(
@@ -112,11 +112,11 @@ def assert_univariate_target_conservation(
   check_enough_power = tf.compat.v1.assert_less(
       st.min_discrepancy_of_true_cdfs_detectable_by_dkwm(
           num_samples, false_fail_rate=1e-6, false_pass_rate=1e-6), 0.025)
-  test.assertAllEqual([num_samples], extra.leapfrogs[0].shape)
-  unique, _ = tf.unique(extra.leapfrogs[0])
+  test.assertAllEqual([num_samples], extra.leapfrogs_taken[0].shape)
+  unique, _ = tf.unique(extra.leapfrogs_taken[0])
   check_leapfrogs_vary = tf.compat.v1.assert_greater_equal(
       tf.shape(input=unique)[0], 3)
-  avg_leapfrogs = tf.math.reduce_mean(input_tensor=extra.leapfrogs[0])
+  avg_leapfrogs = tf.math.reduce_mean(input_tensor=extra.leapfrogs_taken[0])
   check_leapfrogs = tf.compat.v1.assert_greater_equal(
       avg_leapfrogs, tf.constant(4, dtype=avg_leapfrogs.dtype))
   movement = tf.abs(answer - initialization)
@@ -183,7 +183,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
         kernel=kernel,
         parallel_iterations=1)
     self.assertEqual([(2**tree_depth - 1) * unrolled_leapfrog_steps],
-                     self.evaluate(extra.leapfrogs))
+                     self.evaluate(extra.leapfrogs_taken))
 
   def testUnivariateNormalTargetConservation(self):
     def mk_normal():

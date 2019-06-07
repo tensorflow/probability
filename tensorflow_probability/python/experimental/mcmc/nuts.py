@@ -205,7 +205,8 @@ class NoUTurnSampler(mcmc.TransitionKernel):
       raise ValueError("Cannot use stackless auto-batching in graph mode.")
     current_target_log_prob = previous_kernel_results.target_log_prob
     current_grads_log_prob = previous_kernel_results.grads_target_log_prob
-    leapfrogs = previous_kernel_results.leapfrogs
+    leapfrogs_taken = previous_kernel_results.leapfrogs_taken
+    leapfrogs_computed = previous_kernel_results.leapfrogs_computed
     with tf.compat.v1.name_scope(
         self.name,
         values=[
@@ -247,7 +248,7 @@ class NoUTurnSampler(mcmc.TransitionKernel):
           log_slice_sample,
           tf.constant([0], dtype=tf.int64),  # depth
           tf.constant([1], dtype=tf.int64),  # num_states
-          leapfrogs,
+          tf.zeros_like(leapfrogs_taken),  # leapfrogs
           tf.constant([True]),
           dry_run=not self.use_auto_batching,
           stackless=self.stackless,
@@ -260,7 +261,9 @@ class NoUTurnSampler(mcmc.TransitionKernel):
       if unwrap_state_list:
         result_state = result_state[0]
       return result_state, NUTSKernelResults(
-          next_.target_log_prob, next_.grads_target_log_prob, new_leapfrogs)
+          next_.target_log_prob, next_.grads_target_log_prob,
+          leapfrogs_taken + new_leapfrogs,
+          leapfrogs_computed + tf.math.reduce_max(input_tensor=new_leapfrogs))
 
   def bootstrap_results(self, init_state):
     """Creates initial `previous_kernel_results` using a supplied `state`."""
@@ -270,14 +273,17 @@ class NoUTurnSampler(mcmc.TransitionKernel):
       batch_size = tf.shape(input=init_state[0])[0]
       (current_target_log_prob,
        current_grads_log_prob) = self.value_and_gradients_fn(*init_state)
+      zeros = tf.dtypes.cast(
+          tf.fill(dims=[batch_size], value=0), dtype=tf.int64)
       return NUTSKernelResults(
           current_target_log_prob, current_grads_log_prob,
-          tf.dtypes.cast(tf.fill(dims=[batch_size], value=0), dtype=tf.int64))
+          leapfrogs_taken=zeros, leapfrogs_computed=zeros)
 
 
 NUTSKernelResults = collections.namedtuple(
     "NUTSKernelResults",
-    ["target_log_prob", "grads_target_log_prob", "leapfrogs"])
+    ["target_log_prob", "grads_target_log_prob",
+     "leapfrogs_taken", "leapfrogs_computed"])
 
 
 def _make_evolve_trajectory(value_and_gradients_fn, max_depth,
