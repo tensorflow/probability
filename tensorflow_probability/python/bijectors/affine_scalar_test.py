@@ -24,6 +24,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -35,9 +36,8 @@ class _AffineScalarBijectorTest(object):
   """Tests correctness of the Y = scale @ x + shift transformation."""
 
   def testProperties(self):
-    mu = -1.
     # scale corresponds to 1.
-    bijector = tfb.AffineScalar(shift=mu)
+    bijector = tfb.AffineScalar(shift=-1.)
     self.assertStartsWith(bijector.name, "affine_scalar")
 
   def testNoBatchScalar(self):
@@ -50,10 +50,8 @@ class _AffineScalarBijectorTest(object):
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
-      mu = -1.
-      # Corresponds to scale = 2
-      bijector = tfb.AffineScalar(shift=mu, scale=2.)
-      x = [1., 2, 3]  # Three scalar samples (no batches).
+      bijector = tfb.AffineScalar(shift=self.dtype(-1.), scale=self.dtype(2.))
+      x = self.dtype([1., 2, 3])  # Three scalar samples (no batches).
       self.assertAllClose([1., 3, 5], run(bijector.forward, x))
       self.assertAllClose([1., 1.5, 2.], run(bijector.inverse, x))
       self.assertAllClose(
@@ -70,10 +68,8 @@ class _AffineScalarBijectorTest(object):
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
-      mu = self.dtype([1.])
-      # One batch, scalar.
-      # Corresponds to scale = 1.
-      bijector = tfb.AffineScalar(shift=mu)
+      # Batched shift
+      bijector = tfb.AffineScalar(shift=self.dtype([1.]))
       x = self.dtype([1.])  # One sample from one batches.
       self.assertAllClose([2.], run(bijector.forward, x))
       self.assertAllClose([0.], run(bijector.inverse, x))
@@ -91,10 +87,8 @@ class _AffineScalarBijectorTest(object):
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
-      multiplier = self.dtype([2.])
-      # One batch, scalar.
-      # Corresponds to scale = 2, shift = 0.
-      bijector = tfb.AffineScalar(scale=multiplier)
+      # Batched scale
+      bijector = tfb.AffineScalar(scale=self.dtype([2.]))
       x = self.dtype([1.])  # One sample from one batches.
       self.assertAllClose([2.], run(bijector.forward, x))
       self.assertAllClose([0.5], run(bijector.inverse, x))
@@ -112,11 +106,9 @@ class _AffineScalarBijectorTest(object):
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
-      mu = [1., -1]
-      # Univariate, two batches.
-      # Corresponds to scale = 1.
-      bijector = tfb.AffineScalar(shift=mu)
-      x = [1., 1]  # One sample from each of two batches.
+      # Batch of 2 shifts
+      bijector = tfb.AffineScalar(shift=self.dtype([1., -1]))
+      x = self.dtype([1., 1])  # One sample from each of two batches.
       self.assertAllClose([2., 0], run(bijector.forward, x))
       self.assertAllClose([0., 2], run(bijector.inverse, x))
       self.assertAllClose(
@@ -133,11 +125,11 @@ class _AffineScalarBijectorTest(object):
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
-      mu = [1., -1]
-      # Univariate, two batches.
-      # Corresponds to scale = 1.
-      bijector = tfb.AffineScalar(shift=mu, scale=[2., 1])
-      x = [1., 1]  # One sample from each of two batches.
+      # Batch of 2 scales and 2 shifts
+      bijector = tfb.AffineScalar(
+          shift=self.dtype([1., -1]),
+          scale=self.dtype([2., 1]))
+      x = self.dtype([1., 1])  # One sample from each of two batches.
       self.assertAllClose([3., 0], run(bijector.forward, x))
       self.assertAllClose([0., 2], run(bijector.inverse, x))
       self.assertAllClose(
@@ -145,16 +137,21 @@ class _AffineScalarBijectorTest(object):
           run(bijector.inverse_log_det_jacobian, x, event_ndims=0))
 
   def testScalarCongruency(self):
-    bijector = tfb.AffineScalar(shift=3.6, scale=0.42)
+    bijector = tfb.AffineScalar(shift=self.dtype(3.6), scale=self.dtype(0.42))
     bijector_test_util.assert_scalar_congruency(
-        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
+        bijector,
+        lower_x=self.dtype(-2.),
+        upper_x=self.dtype(2.),
+        eval_func=self.evaluate)
 
 
-class AffineScalarBijectorTestFloat32(_AffineScalarBijectorTest):
+class AffineScalarBijectorTestFloat32(test_case.TestCase,
+                                      _AffineScalarBijectorTest):
   dtype = np.float32
 
 
-class AffineScalarBijectorTestFloat64(_AffineScalarBijectorTest):
+class AffineScalarBijectorTestFloat64(test_case.TestCase,
+                                      _AffineScalarBijectorTest):
   dtype = np.float64
 
 
