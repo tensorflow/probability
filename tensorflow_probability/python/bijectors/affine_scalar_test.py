@@ -31,7 +31,7 @@ tfb = tfp.bijectors
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AffineScalarBijectorTest(tf.test.TestCase):
+class _AffineScalarBijectorTest(object):
   """Tests correctness of the Y = scale @ x + shift transformation."""
 
   def testProperties(self):
@@ -45,7 +45,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
       return self.evaluate(fun(x, **kwargs))
 
     def dynamic_run(fun, x_value, **kwargs):
-      x_value = np.array(x_value, dtype=np.float32)
+      x_value = np.array(x_value, dtype=self.dtype)
       x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
@@ -60,28 +60,28 @@ class AffineScalarBijectorTest(tf.test.TestCase):
           -np.log(2.),
           run(bijector.inverse_log_det_jacobian, x, event_ndims=0))
 
-  def testOneBatchScalarViaIdentityIn64BitUserProvidesShiftOnly(self):
+  def testOneBatchScalarViaIdentityUserProvidesShiftOnly(self):
     def static_run(fun, x, **kwargs):
       return self.evaluate(fun(x, **kwargs))
 
     def dynamic_run(fun, x_value, **kwargs):
-      x_value = np.array(x_value, dtype=np.float64)
+      x_value = np.array(x_value, dtype=self.dtype)
       x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
-      mu = np.float64([1.])
+      mu = self.dtype([1.])
       # One batch, scalar.
       # Corresponds to scale = 1.
       bijector = tfb.AffineScalar(shift=mu)
-      x = np.float64([1.])  # One sample from one batches.
+      x = self.dtype([1.])  # One sample from one batches.
       self.assertAllClose([2.], run(bijector.forward, x))
       self.assertAllClose([0.], run(bijector.inverse, x))
       self.assertAllClose(
           0.,
           run(bijector.inverse_log_det_jacobian, x, event_ndims=0))
 
-  def testOneBatchScalarViaIdentityIn64BitUserProvidesScaleOnly(self):
+  def testOneBatchScalarViaIdentityUserProvidesScaleOnly(self):
     def static_run(fun, x, **kwargs):
       return self.evaluate(fun(x, **kwargs))
 
@@ -91,11 +91,11 @@ class AffineScalarBijectorTest(tf.test.TestCase):
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
-      multiplier = np.float64([2.])
+      multiplier = self.dtype([2.])
       # One batch, scalar.
       # Corresponds to scale = 2, shift = 0.
       bijector = tfb.AffineScalar(scale=multiplier)
-      x = np.float64([1.])  # One sample from one batches.
+      x = self.dtype([1.])  # One sample from one batches.
       self.assertAllClose([2.], run(bijector.forward, x))
       self.assertAllClose([0.5], run(bijector.inverse, x))
       self.assertAllClose(
@@ -107,7 +107,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
       return self.evaluate(fun(x, **kwargs))
 
     def dynamic_run(fun, x_value, **kwargs):
-      x_value = np.array(x_value, dtype=np.float32)
+      x_value = np.array(x_value, dtype=self.dtype)
       x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
@@ -128,7 +128,7 @@ class AffineScalarBijectorTest(tf.test.TestCase):
       return self.evaluate(fun(x, **kwargs))
 
     def dynamic_run(fun, x_value, **kwargs):
-      x_value = np.array(x_value, dtype=np.float32)
+      x_value = np.array(x_value, dtype=self.dtype)
       x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
@@ -148,6 +148,14 @@ class AffineScalarBijectorTest(tf.test.TestCase):
     bijector = tfb.AffineScalar(shift=3.6, scale=0.42)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
+
+
+class AffineScalarBijectorTestFloat32(_AffineScalarBijectorTest):
+  dtype = np.float32
+
+
+class AffineScalarBijectorTestFloat64(_AffineScalarBijectorTest):
+  dtype = np.float64
 
 
 if __name__ == "__main__":
