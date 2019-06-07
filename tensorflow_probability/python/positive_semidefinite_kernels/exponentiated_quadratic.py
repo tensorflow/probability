@@ -109,17 +109,17 @@ class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
         [] if self.amplitude is None else tf.shape(input=self.amplitude),
         [] if self.length_scale is None else tf.shape(input=self.length_scale))
 
-  def _apply(self, x1, x2, param_expansion_ndims=0):
+  def _apply(self, x1, x2, example_ndims=0):
     exponent = -0.5 * util.sum_rightmost_ndims_preserving_shape(
         tf.math.squared_difference(x1, x2), self.feature_ndims)
     if self.length_scale is not None:
       length_scale = util.pad_shape_with_ones(
-          self.length_scale, param_expansion_ndims)
+          self.length_scale, example_ndims)
       exponent /= length_scale**2
 
     if self.amplitude is not None:
       amplitude = util.pad_shape_with_ones(
-          self.amplitude, param_expansion_ndims)
+          self.amplitude, example_ndims)
       exponent += 2. * tf.math.log(amplitude)
 
     return tf.exp(exponent)

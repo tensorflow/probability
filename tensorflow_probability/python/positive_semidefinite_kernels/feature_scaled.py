@@ -69,11 +69,11 @@ class FeatureScaled(feature_transformed.FeatureTransformed):
           tf.compat.v1.assert_positive(scale_diag)] if validate_args else []):
         self._scale_diag = tf.identity(scale_diag)
 
-    def rescale_input(x, feature_ndims, param_expansion_ndims):
+    def rescale_input(x, feature_ndims, example_ndims):
       """Computes `x / scale_diag`."""
       scale_diag = util.pad_shape_with_ones(
           self.scale_diag,
-          param_expansion_ndims,
+          example_ndims,
           # Start before the first feature dimension. We assume scale_diag has
           # at least as many dimensions as feature_ndims.
           start=-(feature_ndims + 1))

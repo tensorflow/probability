@@ -70,14 +70,14 @@ class TestKernel(tfpk.PositiveSemidefiniteKernel):
     return (tf.TensorShape([]) if self.multiplier is None else
             tf.shape(input=self._multiplier))
 
-  def _apply(self, x1, x2, param_expansion_ndims=0):
+  def _apply(self, x1, x2, example_ndims=0):
     x1 = tf.convert_to_tensor(value=x1)
     x2 = tf.convert_to_tensor(value=x2)
 
     value = tf.reduce_sum(input_tensor=x1 + x2, axis=-1)
     if self.multiplier is not None:
       multiplier = kernels_util.pad_shape_with_ones(
-          self._multiplier, param_expansion_ndims)
+          self._multiplier, example_ndims)
       value *= multiplier
 
     return value

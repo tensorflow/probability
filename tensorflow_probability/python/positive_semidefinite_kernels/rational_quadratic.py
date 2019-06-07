@@ -134,27 +134,27 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
     super(RationalQuadratic, self).__init__(
         feature_ndims, dtype=dtype, name=name)
 
-  def _apply(self, x1, x2, param_expansion_ndims=0):
+  def _apply(self, x1, x2, example_ndims=0):
     difference = util.sum_rightmost_ndims_preserving_shape(
         tf.math.squared_difference(x1, x2), ndims=self.feature_ndims)
     difference /= 2
 
     if self.length_scale is not None:
       length_scale = util.pad_shape_with_ones(
-          self.length_scale, ndims=param_expansion_ndims)
+          self.length_scale, ndims=example_ndims)
       difference /= length_scale ** 2
 
     scale_mixture_rate = 1.
     if self.scale_mixture_rate is not None:
       scale_mixture_rate = util.pad_shape_with_ones(
-          self.scale_mixture_rate, ndims=param_expansion_ndims)
+          self.scale_mixture_rate, ndims=example_ndims)
       difference /= scale_mixture_rate
 
     result = (1. + difference) ** -scale_mixture_rate
 
     if self.amplitude is not None:
       amplitude = util.pad_shape_with_ones(
-          self.amplitude, ndims=param_expansion_ndims)
+          self.amplitude, ndims=example_ndims)
       result *= amplitude ** 2
     return result
 

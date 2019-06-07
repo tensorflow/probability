@@ -104,13 +104,13 @@ class FeatureTransformed(psd_kernel.PositiveSemidefiniteKernel):
         dtype=kernel.dtype,
         name=name)
 
-  def _apply(self, x1, x2, param_expansion_ndims=0):
-    return self._kernel._apply(  # pylint:disable=protected-access
+  def _apply(self, x1, x2, example_ndims=0):
+    return self._kernel.apply(
         self._transformation_fn(
-            x1, self.feature_ndims, param_expansion_ndims),
+            x1, self.feature_ndims, example_ndims),
         self._transformation_fn(
-            x2, self.feature_ndims, param_expansion_ndims),
-        param_expansion_ndims)
+            x2, self.feature_ndims, example_ndims),
+        example_ndims)
 
   @property
   def kernel(self):

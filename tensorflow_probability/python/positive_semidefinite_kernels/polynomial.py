@@ -178,7 +178,7 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
         map(_maybe_shape_dynamic, [self.slope_variance, self.bias_variance,
                                    self.shift, self.exponent]))
 
-  def _apply(self, x1, x2, param_expansion_ndims=0):
+  def _apply(self, x1, x2, example_ndims=0):
     if self.shift is None:
       dot_prod = util.sum_rightmost_ndims_preserving_shape(
           x1 * x2, ndims=self.feature_ndims)
@@ -189,17 +189,17 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
 
     if self.exponent is not None:
       exponent = util.pad_shape_with_ones(
-          self.exponent, param_expansion_ndims)
+          self.exponent, example_ndims)
       dot_prod **= exponent
 
     if self.slope_variance is not None:
       slope_variance = util.pad_shape_with_ones(
-          self.slope_variance, param_expansion_ndims)
+          self.slope_variance, example_ndims)
       dot_prod *= slope_variance ** 2.
 
     if self.bias_variance is not None:
       bias_variance = util.pad_shape_with_ones(
-          self.bias_variance, param_expansion_ndims)
+          self.bias_variance, example_ndims)
       dot_prod += bias_variance ** 2.
 
     return dot_prod

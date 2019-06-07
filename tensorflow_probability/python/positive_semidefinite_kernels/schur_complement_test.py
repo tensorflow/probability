@@ -18,13 +18,37 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from absl.testing import parameterized
 
+import functools
+import itertools
+
+from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability import positive_semidefinite_kernels as tfpk
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
+
+# A shape broadcasting fn
+def broadcast_shapes(*shapes):
+  def _broadcast_ab(a, b):
+    if a == b or a == 1: return b
+    if b == 1: return a
+    raise ValueError("Can't broadcast {} with {}".format(a, b))
+  def _broadcast_2(s1, s2):
+    init_s1 = list(s1)
+    init_s2 = list(s2)
+    if len(s1) > len(s2):
+      return _broadcast_2(s2, s1)
+    # Now len(s1) <= len(s2)
+    s1 = [1] * (len(s2) - len(s1)) + list(s1)
+    try:
+      return [_broadcast_ab(a, b) for a, b in zip(s1, s2)]
+    except ValueError:
+      raise ValueError(
+          "Couldn't broadcast shapes {} and {}".format(init_s1, init_s2))
+  return functools.reduce(_broadcast_2, shapes)
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -96,46 +120,75 @@ class SchurComplementTest(tf.test.TestCase, parameterized.TestCase):
       expected = k_x_y - cov_dec
       self.assertAllClose(expected, self.evaluate(k.apply(x, y)))
 
-  def testShapesAreCorrect(self):
-    base_kernel = tfpk.ExponentiatedQuadratic(np.float64(1.), np.float64(1.))
-    fixed_inputs = np.random.uniform(-1., 1., size=[2, 3])
-    k = tfpk.SchurComplement(base_kernel, fixed_inputs)
+  def testApplyShapesAreCorrect(self):
+    for example_ndims in range(0, 4):
+      # An integer generator.
+      ints = itertools.count(start=2, step=1)
+      feature_shape = [next(ints), next(ints)]
 
-    x = np.ones([4, 3], np.float64)
-    y = np.ones([5, 3], np.float64)
+      x_batch_shape = [next(ints)]
+      z_batch_shape = [next(ints), 1]
+      num_x = [next(ints) for _ in range(example_ndims)]
+      num_z = [next(ints)]
 
-    self.assertAllEqual([4], k.apply(x, x).shape)
-    self.assertAllEqual([5], k.apply(y, y).shape)
-    self.assertAllEqual([4, 5], k.matrix(x, y).shape)
-    self.assertAllEqual(
-        [2, 4, 5], k.matrix(tf.stack([x]*2), tf.stack([y]*2)).shape)
+      x_shape = x_batch_shape + num_x + feature_shape
+      z_shape = z_batch_shape + num_z + feature_shape
 
-    base_kernel = tfpk.ExponentiatedQuadratic(
-        amplitude=np.ones([2, 1, 1], np.float64),
-        length_scale=np.ones([1, 3, 1], np.float64))
-    # Batch these at the outermost shape position
-    fixed_inputs = np.random.uniform(-1., 1., size=[7, 1, 1, 1, 2, 3])
-    k = tfpk.SchurComplement(base_kernel, fixed_inputs)
-    self.assertAllEqual(
-        [7, 2, 3, 1],
-        k.batch_shape)
-    self.assertAllEqual(
-        [7, 2, 3, 1],
-        self.evaluate(k.batch_shape_tensor()))
-    self.assertAllEqual(
-        [7, 2, 3, 4],
-        k.apply(x, x).shape)
-    self.assertAllEqual(
-        [7, 2, 3, 2, 4, 5],
-        #|  `--'  |  `--'
-        #|    |   |    `- matrix shape
-        #|    |   `- from input batch shapes
-        #|    `- from broadcasting kernel params
-        #`- from batch of obs index points
-        k.matrix(
-            tf.stack([x]*2),  # shape [2, 4, 3]
-            tf.stack([y]*2)   # shape [2, 5, 3]
-        ).shape)
+      x = np.ones(x_shape, np.float64)
+      z = np.random.uniform(-1., 1., size=z_shape)
+
+      base_kernel = tfpk.ExponentiatedQuadratic(
+          amplitude=np.ones([next(ints), 1, 1], np.float64),
+          feature_ndims=len(feature_shape))
+
+      k = tfpk.SchurComplement(base_kernel, fixed_inputs=z)
+
+      expected = broadcast_shapes(
+          base_kernel.batch_shape, x_batch_shape, z_batch_shape) + num_x
+      actual = k.apply(x, x, example_ndims=example_ndims).shape
+
+      self.assertAllEqual(expected, actual)
+
+  def testTensorShapesAreCorrect(self):
+    for x1_example_ndims in range(0, 3):
+      for x2_example_ndims in range(0, 3):
+        # An integer generator.
+        ints = itertools.count(start=2, step=1)
+        feature_shape = [next(ints), next(ints)]
+
+        x_batch_shape = [next(ints)]
+        y_batch_shape = [next(ints), 1]
+        z_batch_shape = [next(ints), 1, 1]
+
+        num_x = [next(ints) for _ in range(x1_example_ndims)]
+        num_y = [next(ints) for _ in range(x2_example_ndims)]
+        num_z = [next(ints)]
+
+        x_shape = x_batch_shape + num_x + feature_shape
+        y_shape = y_batch_shape + num_y + feature_shape
+        z_shape = z_batch_shape + num_z + feature_shape
+
+        x = np.ones(x_shape, np.float64)
+        y = np.ones(y_shape, np.float64)
+        z = np.random.uniform(-1., 1., size=z_shape)
+
+        base_kernel = tfpk.ExponentiatedQuadratic(
+            amplitude=np.ones([next(ints), 1, 1, 1], np.float64),
+            feature_ndims=len(feature_shape))
+
+        k = tfpk.SchurComplement(base_kernel, fixed_inputs=z)
+
+        expected = broadcast_shapes(
+            base_kernel.batch_shape,
+            x_batch_shape,
+            y_batch_shape,
+            z_batch_shape) + num_x + num_y
+
+        mat = k.tensor(x, y,
+                       x1_example_ndims=x1_example_ndims,
+                       x2_example_ndims=x2_example_ndims)
+        actual = mat.shape
+        self.assertAllEqual(expected, actual)
 
   def testEmptyFixedInputs(self):
     base_kernel = tfpk.ExponentiatedQuadratic(1., 1.)
@@ -187,3 +240,4 @@ class SchurComplementTest(tf.test.TestCase, parameterized.TestCase):
 
 if __name__ == '__main__':
   tf.test.main()
+

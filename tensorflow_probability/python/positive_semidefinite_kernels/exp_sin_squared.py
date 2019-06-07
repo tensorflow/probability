@@ -100,26 +100,26 @@ class ExpSinSquared(psd_kernel.PositiveSemidefiniteKernel):
           length_scale, tf.compat.v1.assert_positive, validate_args)
     super(ExpSinSquared, self).__init__(feature_ndims, dtype=dtype, name=name)
 
-  def _apply(self, x1, x2, param_expansion_ndims=0):
+  def _apply(self, x1, x2, example_ndims=0):
     difference = np.pi * tf.abs(x1 - x2)
 
     if self.period is not None:
       # period acts as a batch of periods, and hence we must additionally
       # pad the shape with self.feature_ndims number of ones.
       period = util.pad_shape_with_ones(
-          self.period, ndims=(param_expansion_ndims + self.feature_ndims))
+          self.period, ndims=(example_ndims + self.feature_ndims))
       difference /= period
     log_kernel = util.sum_rightmost_ndims_preserving_shape(
         -2 * tf.sin(difference) ** 2, ndims=self.feature_ndims)
 
     if self.length_scale is not None:
       length_scale = util.pad_shape_with_ones(
-          self.length_scale, ndims=param_expansion_ndims)
+          self.length_scale, ndims=example_ndims)
       log_kernel /= length_scale ** 2
 
     if self.amplitude is not None:
       amplitude = util.pad_shape_with_ones(
-          self.amplitude, ndims=param_expansion_ndims)
+          self.amplitude, ndims=example_ndims)
       log_kernel += 2. * tf.math.log(amplitude)
     return tf.exp(log_kernel)
 

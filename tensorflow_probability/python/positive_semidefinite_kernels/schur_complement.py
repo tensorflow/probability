@@ -23,6 +23,7 @@ from tensorflow_probability.python.bijectors import cholesky_outer_product
 from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
+from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
 
 __all__ = [
@@ -216,7 +217,7 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
       self._fixed_inputs = (None if fixed_inputs is None else
                             tf.convert_to_tensor(value=fixed_inputs,
                                                  dtype=dtype))
-      if not self._is_empty_fixed_inputs():
+      if not self._is_fixed_inputs_empty():
         # We create and store this matrix here, so that we get the caching
         # benefit when we later access its cholesky. If we computed the matrix
         # every time we needed the cholesky, the bijector cache wouldn't be hit.
@@ -230,7 +231,7 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
     super(SchurComplement, self).__init__(
         base_kernel.feature_ndims, dtype=dtype, name=name)
 
-  def _is_empty_fixed_inputs(self):
+  def _is_fixed_inputs_empty(self):
     # If fixed_inputs are `None` or have size 0, we consider this empty and fall
     # back to (cheaper) trivial behavior.
     if self._fixed_inputs is None:
@@ -242,7 +243,7 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
     return False
 
   def _batch_shape(self):
-    if self._is_empty_fixed_inputs():
+    if self._is_fixed_inputs_empty():
       return self._base_kernel.batch_shape
     return tf.broadcast_static_shape(
         self._base_kernel.batch_shape,
@@ -250,46 +251,68 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
             :-(self._base_kernel.feature_ndims + 1)])
 
   def _batch_shape_tensor(self):
-    if self._is_empty_fixed_inputs():
+    if self._is_fixed_inputs_empty():
       return self._base_kernel.batch_shape_tensor()
     return tf.broadcast_dynamic_shape(
         self._base_kernel.batch_shape_tensor(),
         tf.shape(input=self._fixed_inputs)[
             :-(self._base_kernel.feature_ndims + 1)])
 
-  def _covariance_decrease(self, x1, x2):
+  def _apply(self, x1, x2, example_ndims):
+    # In the shape annotations below,
+    #
+    #  - x1 has shape B1 + E1 + F  (batch, example, feature),
+    #  - x2 has shape B2 + E2 + F,
+    #  - z refers to self.fixed_inputs, and has shape Bz + [ez] + F, ie its
+    #    example ndims is exactly 1,
+    #  - self.base_kernel has batch shape Bk,
+    #  - bc(A, B, C) means "the result of broadcasting shapes A, B, and C".
+
+    # Shape: bc(Bk, B1, B2) + bc(E1, E2)
+    k12 = self.base_kernel.apply(x1, x2, example_ndims)
+    if self._is_fixed_inputs_empty():
+      return k12
+
+    # Shape: bc(Bk, B1, Bz) + E1 + [ez]
+    k1z = self.base_kernel.tensor(x1, self.fixed_inputs,
+                                  x1_example_ndims=example_ndims,
+                                  x2_example_ndims=1)
+
+    # Shape: bc(Bk, B2, Bz) + E2 + [ez]
+    k2z = self.base_kernel.tensor(x2, self.fixed_inputs,
+                                  x1_example_ndims=example_ndims,
+                                  x2_example_ndims=1)
+
+    # Shape: bc(Bz, Bk) + [ez, ez]
     div_mat_chol = self._cholesky_bijector.forward(self._divisor_matrix)
+
+    # Shape: bc(Bz, Bk) + [1, ..., 1] + [ez, ez]
+    #                      `--------'
+    #                          `-- (example_ndims - 1) ones
+    # This reshape ensures that the batch shapes here align correctly with the
+    # batch shape of k2z, below: `example_ndims` because E2 has rank
+    # `example_ndims`, and "- 1" because one of the ez's here already "pushed"
+    # the batch dims over by one.
+    div_mat_chol = util.pad_shape_with_ones(div_mat_chol, example_ndims - 1, -3)
     div_mat_chol_linop = tf.linalg.LinearOperatorLowerTriangular(div_mat_chol)
 
-    k1z_linop = tf.linalg.LinearOperatorFullMatrix(
-        self._base_kernel.matrix(x1, self._fixed_inputs))
-    k2z = self._base_kernel.matrix(x2, self._fixed_inputs)
+    # Shape: bc(Bz, Bk, B2) + [ez] + E2
+    kzzinv_kz2 = tf.linalg.matrix_transpose(
+        # Shape: bc(Bz, Bk, B2) + E2 + [ez]
+        div_mat_chol_linop.solve(
+            div_mat_chol_linop.solve(k2z, adjoint_arg=True),
+            adjoint=True))
 
-    div_mat_inv_kz2 = div_mat_chol_linop.solve(
-        div_mat_chol_linop.solve(k2z, adjoint_arg=True),
-        adjoint=True)
+    # Shape: bc(Bz, Bk, B2) + bc(E1, E2)
+    k1z_kzzinv_kz2 = tf.reduce_sum(
+        # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2) + [ez]
+        input_tensor=k1z * kzzinv_kz2,
+        axis=-1)  # we can safely always reduce just this one trailing dim,
+                  # since self.fixed_inputs is presumed to have example_ndims
+                  # exactly 1.
 
-    return k1z_linop.matmul(div_mat_inv_kz2)
-
-  def apply(self, x1, x2):
-    # x1, x2 shapes: [b1, ..., bB, f1, ..., fF]
-    # (batch dims need not be identical but broadcast to [b1, .., bB])
-    k12 = self._base_kernel.apply(x1, x2)
-    # => shape: [b1, ..., bB]
-    if self._is_empty_fixed_inputs():
-      return k12
-    x1 = tf.expand_dims(x1, -(self.feature_ndims + 1))
-    x2 = tf.expand_dims(x2, -(self.feature_ndims + 1))
-    # => shapes: [b1, ..., bB, 1, f1, ..., fF]
-    cov_dec = self._covariance_decrease(x1, x2)
-    # => shape: [b1, ..., bB, 1, 1]
-    return k12 - tf.squeeze(cov_dec, axis=[-1, -2])
-
-  def matrix(self, x1, x2):
-    k12 = self._base_kernel.matrix(x1, x2)
-    if self._is_empty_fixed_inputs():
-      return k12
-    return k12 - self._covariance_decrease(x1, x2)
+    # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2)
+    return k12 - k1z_kzzinv_kz2
 
   @property
   def fixed_inputs(self):

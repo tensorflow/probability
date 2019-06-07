@@ -57,15 +57,15 @@ class KumaraswamyTransformed(feature_transformed.FeatureTransformed):
     self._concentration1 = concentration1
     self._concentration0 = concentration0
 
-    def transform_by_kumaraswamy(x, feature_ndims, param_expansion_ndims):
+    def transform_by_kumaraswamy(x, feature_ndims, example_ndims):
       """Apply a Kumaraswamy bijector to features."""
       concentration1 = util.pad_shape_with_ones(
           self.concentration1,
-          param_expansion_ndims,
+          example_ndims,
           start=-(feature_ndims + 1))
       concentration0 = util.pad_shape_with_ones(
           self.concentration0,
-          param_expansion_ndims,
+          example_ndims,
           start=-(feature_ndims + 1))
       bij = bijectors.Kumaraswamy(
           concentration1, concentration0, validate_args=validate_args)
