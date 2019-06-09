@@ -297,35 +297,39 @@ class DualAveragingStepSizeAdaptationStaticBroadcastingTest(tf.test.TestCase,
   use_static_shape = True
 
   @parameterized.parameters(
-      (np.float64(1.), np.float64(1.)),
+      (np.float64(1.), np.float64(9.96974283748709)),
       ([np.float64(1.), np.ones([3, 1])], [
-          np.float64(1.),
-          np.array([[1.], [1.], [1.]])
+          9.96974283748709,
+          np.array([[10.],
+                    [10.27648032],
+                    [ 9.64289579]])
       ]),
       ([np.float64(1.), np.ones([2, 3, 1])], [
-          np.float64(1.),
-          np.array([[[1.], [1.], [1.]],
-                    [[1.], [1.], [1.]]])
+          9.96974283748709,
+          np.array([[[ 9.64289579], [10.18348113], [ 9.64289579]],
+                    [[10.3703288 ], [10.3703288 ], [ 9.64289579]]])
       ]),
       ([np.float64(1.), np.ones([2, 1, 1])], [
-          np.float64(1.),
-          np.array([[[1.]], [[1.]]])
+          9.96974283748709,
+          np.array([[[ 9.81982474]], [[10.12194972]]])
       ]),
       ([np.float64(1.), np.ones([1, 3, 1])], [
-          np.float64(1.),
-          np.array([[[1.], [1.], [1.]]])
+          9.96974283748709,
+          np.array([[[10.],
+                    [10.27648032],
+                    [ 9.64289579]]])
       ]),
       ([np.float64(1.), np.ones([1, 1, 1])], [
-          np.float64(1.),
-          np.array([[[1.]]])
+          9.96974283748709,
+          np.array([[[9.96974284]]])
       ]),
       ([np.float64(1.), np.ones([1, 1])], [
-          np.float64(1.),
-          np.array([[1.]])
+          9.96974283748709,
+          np.array([[9.96974284]])
       ]),
       ([np.float64(1.), np.ones([1])], [
-          np.float64(1.),
-          np.array([1.])
+          9.96974283748709,
+          np.array([9.96974284])
       ]),
   )
   def testBroadcasting(self, old_step_size, new_step_size):
@@ -340,7 +344,6 @@ class DualAveragingStepSizeAdaptationStaticBroadcastingTest(tf.test.TestCase,
         tf.zeros([2, 3], dtype=tf.float64),
         tf.zeros([2, 3, 4], dtype=tf.float64)
     ]
-
     kernel = FakeMHKernel(
         FakeSteppedKernel(step_size=old_step_size),
         log_accept_ratio=log_accept_ratio)
