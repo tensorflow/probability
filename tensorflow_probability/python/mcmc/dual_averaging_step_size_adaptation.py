@@ -317,12 +317,14 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
       error_sum_parts = tf.nest.flatten(previous_kernel_results.error_sum)
       log_averaging_step_parts = tf.nest.flatten(
           previous_kernel_results.log_averaging_step)
-      shrinkage_target_parts = tf.nest.flatten(previous_kernel_results.shrinkage_target)
+      shrinkage_target_parts = tf.nest.flatten(
+          previous_kernel_results.shrinkage_target)
       new_error_sum_parts = []
       new_step_size_parts = []
       new_log_averaging_step_parts = []
-      for step_size_part, state_part, error_sum_part, log_averaging_step_part, shrinkage_target_part in zip(
-            step_size_parts, state_parts, error_sum_parts, log_averaging_step_parts, shrinkage_target_parts):
+      for parts in zip(
+          step_size_parts, state_parts, error_sum_parts,
+          log_averaging_step_parts, shrinkage_target_parts):
         # Compute new step sizes for each step size part. If step size part has
         # smaller rank than the corresponding state part, then the difference is
         # averaged away in the log accept prob.
@@ -358,6 +360,8 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
         # states, and B are the shared dimensions of all the states, which are
         # equal to the step size. When we subtract B, we will always get a
         # number >= L, which means we'll get the full reduction we want.
+        (step_size_part, state_part, error_sum_part,
+         log_averaging_step_part, shrinkage_target_part) = parts
         num_reduce_dims = tf.minimum(
             log_accept_prob_rank,
             tf.rank(state_part) - tf.rank(step_size_part))
@@ -379,9 +383,10 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
         step = tf.cast(previous_kernel_results.step, initial_t.dtype) + 1.
         soft_t = initial_t + step
 
-        new_log_step = (shrinkage_target_part -
-            (tf.reshape(new_error_sum, shrinkage_target_part.shape) * tf.math.sqrt(step)) /
-            (soft_t * previous_kernel_results.exploration_shrinkage))
+        new_log_step = (shrinkage_target_part - (
+            tf.reshape(new_error_sum, shrinkage_target_part.shape) *
+            tf.math.sqrt(step)) / (
+                soft_t * previous_kernel_results.exploration_shrinkage))
 
         eta = tf.math.pow(step, -previous_kernel_results.decay_rate)
         new_log_averaging_step = (eta * new_log_step +
@@ -443,14 +448,17 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
             reduced_log_accept_prob, reduce_indices, keepdims=True)
         error_sum.append(tf.zeros_like(reduced_log_accept_prob, dtype=dtype))
         log_averaging_step.append(tf.zeros_like(step_size_part, dtype=dtype))
-        shrinkage_target.append(tf.math.log(tf.constant(10, dtype=dtype) * step_size_part))
+        shrinkage_target.append(
+            tf.math.log(tf.constant(10, dtype=dtype) * step_size_part))
 
       return DualAveragingStepSizeAdaptationResults(
           inner_results=inner_results,
           step=tf.constant(0, dtype=tf.int32),
-          target_accept_prob=tf.cast(self.parameters['target_accept_prob'], dtype),
+          target_accept_prob=tf.cast(self.parameters['target_accept_prob'],
+                                     dtype),
           shrinkage_target=shrinkage_target,
-          exploration_shrinkage=tf.cast(self.parameters['exploration_shrinkage'], dtype),
+          exploration_shrinkage=tf.cast(
+              self.parameters['exploration_shrinkage'], dtype),
           initial_t=tf.cast(self.parameters['initial_t'], dtype),
           decay_rate=tf.cast(self.parameters['decay_rate'], dtype),
           error_sum=error_sum,

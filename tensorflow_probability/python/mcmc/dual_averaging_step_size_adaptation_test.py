@@ -129,7 +129,8 @@ class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DualAveragingStepSizeAdaptationTest(tf.test.TestCase, parameterized.TestCase):
+class DualAveragingStepSizeAdaptationTest(tf.test.TestCase,
+                                          parameterized.TestCase):
 
   def testTurnOnStoreParametersInKernelResults(self):
     kernel = FakeWrapperKernel(FakeSteppedKernel(step_size=0.5))
@@ -163,7 +164,8 @@ class DualAveragingStepSizeAdaptationTest(tf.test.TestCase, parameterized.TestCa
 
     expected = tf.math.exp(
         tf.math.log(10. * tf.constant([0.1, 0.2, 0.3])) -
-        tf.constant([0.01, -0.01, -0.01]) / ((_INITIAL_T + 1.) * _EXPLORATION_SHRINKAGE))
+        tf.constant([0.01, -0.01, -0.01]) / (
+            (_INITIAL_T + 1.) * _EXPLORATION_SHRINKAGE))
     self.assertAllClose(expected, step_size)
 
   def testWrapped(self):
@@ -211,7 +213,8 @@ class DualAveragingStepSizeAdaptationTest(tf.test.TestCase, parameterized.TestCa
 
     expected = tf.math.exp(
         tf.math.log(10. * init_step) -
-        tf.constant([0.01, -0.01]) / ((_INITIAL_T + 1.) * _EXPLORATION_SHRINKAGE))
+        tf.constant([0.01, -0.01]) / (
+            (_INITIAL_T + 1.) * _EXPLORATION_SHRINKAGE))
     self.assertAllClose(expected, step_size)
 
   def testChainLogProbChainTarget(self):
@@ -237,7 +240,8 @@ class DualAveragingStepSizeAdaptationTest(tf.test.TestCase, parameterized.TestCa
 
     expected = tf.math.exp(
         tf.math.log(10. * init_step) -
-        tf.constant([-0.04, 0.04]) / ((_INITIAL_T + 1.) * _EXPLORATION_SHRINKAGE))
+        tf.constant([-0.04, 0.04]) / (
+            (_INITIAL_T + 1.) * _EXPLORATION_SHRINKAGE))
     self.assertAllClose(expected, step_size)
 
   @parameterized.parameters((-1., '`target_accept_prob` must be > 0.'),
@@ -292,32 +296,33 @@ class DualAveragingStepSizeAdaptationTest(tf.test.TestCase, parameterized.TestCa
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DualAveragingStepSizeAdaptationStaticBroadcastingTest(tf.test.TestCase,
-                                                     parameterized.TestCase):
+class DualAveragingStepSizeAdaptationStaticBroadcastingTest(
+    tf.test.TestCase,
+    parameterized.TestCase):
   use_static_shape = True
 
   @parameterized.parameters(
-      (np.float64(1.), np.float64(9.96974283748709)),
+      (np.float64(1.), 9.96974283748709),
       ([np.float64(1.), np.ones([3, 1])], [
           9.96974283748709,
           np.array([[10.],
                     [10.27648032],
-                    [ 9.64289579]])
+                    [9.64289579]])
       ]),
       ([np.float64(1.), np.ones([2, 3, 1])], [
           9.96974283748709,
-          np.array([[[ 9.64289579], [10.18348113], [ 9.64289579]],
-                    [[10.3703288 ], [10.3703288 ], [ 9.64289579]]])
+          np.array([[[9.64289579], [10.18348113], [9.64289579]],
+                    [[10.3703288], [10.3703288], [9.64289579]]])
       ]),
       ([np.float64(1.), np.ones([2, 1, 1])], [
           9.96974283748709,
-          np.array([[[ 9.81982474]], [[10.12194972]]])
+          np.array([[[9.81982474]], [[10.12194972]]])
       ]),
       ([np.float64(1.), np.ones([1, 3, 1])], [
           9.96974283748709,
           np.array([[[10.],
-                    [10.27648032],
-                    [ 9.64289579]]])
+                     [10.27648032],
+                     [9.64289579]]])
       ]),
       ([np.float64(1.), np.ones([1, 1, 1])], [
           9.96974283748709,
