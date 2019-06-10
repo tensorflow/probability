@@ -31,7 +31,7 @@ stages:
 jobs:
   include:
     - stage: lint
-      python: "3.6"
+      python: "3.5"
       script: ./testing/run_lints.sh
 
 # The below implicitly run under a build stage called "Test". The full matrix
