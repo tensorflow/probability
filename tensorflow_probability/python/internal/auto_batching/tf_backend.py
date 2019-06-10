@@ -493,22 +493,24 @@ class TensorFlowBackend(object):
       return t.numpy()
     return None
 
-  def _empty_value(self, size, dtype, shape, name=None):
-    """Creates a batched, empty value of the given shape and dtype.
+  def fill(self, value, size, dtype, shape, name=None):
+    """Fill a fresh batched Tensor of the given shape and dtype with `value`.
 
     Args:
+      value: Scalar to fill with.
       size: Scalar `int` `Tensor` specifying the number of VM threads.
       dtype: `tf.DType` of the zeros to be returned.
       shape: Rank 1 `int` `Tensor`, the per-thread value shape.
       name: Optional name for the op.
 
     Returns:
-      zeros: `Tensor` of `dtype` zeros with shape `[size, *shape]`
+      result: `Tensor` of `dtype` `value`s with shape `[size, *shape]`
     """
-    with tf.compat.v2.name_scope(name or 'VM.empty_value'):
+    with tf.compat.v2.name_scope(name or 'VM.fill'):
       size = tf.convert_to_tensor(value=size, name='size')
       shape = tf.convert_to_tensor(value=shape, name='shape', dtype=size.dtype)
-      return tf.zeros(shape=tf.concat([[size], shape], axis=0), dtype=dtype)
+      return tf.fill(tf.concat([[size], shape], axis=0),
+                     value=tf.cast(value, dtype=dtype))
 
   def create_variable(self, name, alloc, type_, max_stack_depth, batch_size):
     """Returns an intialized Variable.
@@ -542,7 +544,7 @@ class TensorFlowBackend(object):
           # initializes variables on every function call, rather than just once.
           value = (batch_size, dtype, event_shape)
         else:
-          value = self._empty_value(batch_size, dtype, event_shape)
+          value = self.fill(0, batch_size, dtype, event_shape)
 
         if alloc is instructions.VariableAllocation.REGISTER:
           klass = RegisterTensorFlowVariable
@@ -564,21 +566,6 @@ class TensorFlowBackend(object):
     with tf.compat.v2.name_scope(name or 'VM.full_mask'):
       size = tf.convert_to_tensor(value=size, name='size')
       return tf.ones(size, dtype=tf.bool)
-
-  def initial_program_counter(self, size, dtype, name=None):
-    """Returns a 0-value initializer for the Program Counter variable.
-
-    Args:
-      size: Scalar int `Tensor` specifying the number of VM threads.
-      dtype: Type representing the program counter.
-      name: Optional name for the op.
-
-    Returns:
-      `Tensor` zeroes with shape `[size]` and dtype `dtype`.
-    """
-    with tf.compat.v2.name_scope(name or 'VM.initial_pc'):
-      size = tf.convert_to_tensor(value=size, name='size')
-      return self._empty_value(size, dtype, [], name=name)
 
   def broadcast_to_shape_of(self, val, target, name=None):
     """Broadcasts val to the shape of target.

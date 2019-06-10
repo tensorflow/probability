@@ -777,6 +777,12 @@ def halt_op():
   return GotoOp(halt())
 
 
+def is_return_op(op):
+  halt_op_ = isinstance(op, GotoOp) and op.block is None
+  return_op = isinstance(op, IndirectGotoOp)
+  return halt_op_ or return_op
+
+
 class NullVariable(collections.namedtuple('NullVariable', [])):
   """A Variable that contains no storage and drops writes.
 

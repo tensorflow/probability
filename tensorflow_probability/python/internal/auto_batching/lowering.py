@@ -149,14 +149,14 @@ class ControlFlowGraphBuilder(object):
   def __init__(self):
     self.blocks = []
 
-  def _cur_block(self):
+  def cur_block(self):
     return self.blocks[-1]
 
   def append_block(self, block):
     self.blocks.append(block)
 
   def append_instruction(self, op):
-    self._cur_block().instructions.append(op)
+    self.cur_block().instructions.append(op)
 
   def maybe_add_pop(self, defined, live):
     poppable = defined.difference(live)
@@ -164,7 +164,7 @@ class ControlFlowGraphBuilder(object):
       self.append_instruction(inst.PopOp(list(poppable)))
 
   def split_block(self, target):
-    """Split the current block by inserting jump to the given block.
+    """Split the current block with a returnable jump to the given block.
 
     The terminator of the current block becomes the terminator of the new last
     block.  The current block gets a `PushGotoOp` pushing the new last block and
@@ -175,9 +175,24 @@ class ControlFlowGraphBuilder(object):
     """
     new_block = inst.Block(
         instructions=[],
-        terminator=self._cur_block().terminator)
-    self._cur_block().terminator = inst.PushGotoOp(new_block, target)
+        terminator=self.cur_block().terminator)
+    self.cur_block().terminator = inst.PushGotoOp(new_block, target)
     self.append_block(new_block)
+
+  def end_block_with_tail_call(self, target):
+    """End the current block with a jump to the given block.
+
+    The terminator of the current block becomes a `GotoOp` to the target.
+    No new block is created (as it would be in `split_block`), because
+    by assumption there are no additional instructions to return to.
+
+    Args:
+      target: The block to jump to.
+    """
+    self.cur_block().terminator = inst.GotoOp(target)
+    # Insurance against having only 2 switch arms, which triggers a bug in
+    # tensorflow/compiler/jit/deadness_analysis.
+    self.append_block(inst.Block(instructions=[], terminator=inst.halt_op()))
 
   def maybe_adjust_terminator(self):
     """May change the last block's terminator instruction to a return.
@@ -190,9 +205,9 @@ class ControlFlowGraphBuilder(object):
         exited, because there is no "conditional indirect goto"
         instruction in the target IR.
     """
-    op = self._cur_block().terminator
-    if isinstance(op, inst.GotoOp) and op.block is None:
-      self._cur_block().terminator = inst.IndirectGotoOp()
+    op = self.cur_block().terminator
+    if inst.is_return_op(op):
+      self.cur_block().terminator = inst.IndirectGotoOp()
     if (isinstance(op, inst.BranchOp) and
         (op.true_block is None or op.false_block is None)):
       # Why not?  Because there is no "conditional indirect goto"
@@ -244,10 +259,10 @@ def _lower_function_calls_1(
     builder.maybe_add_pop(
         defined_map[block].defined_into_block,
         liveness_map[block].live_into_block)
-    for op, defined_out, live_out in zip(
+    for op_i, (op, defined_out, live_out) in enumerate(zip(
         old_instructions,
         defined_map[block].defined_out_instructions,
-        liveness_map[block].live_out_instructions):
+        liveness_map[block].live_out_instructions)):
       if isinstance(op, inst.PrimOp):
         for name in inst.pattern_traverse(op.vars_in):
           if name in inst.pattern_flatten(op.vars_out):
@@ -286,17 +301,23 @@ def _lower_function_calls_1(
             # function call.  Can't pop names defined by this call
             # because they haven't been pushed yet.
             defined_out.difference(names_pushed_here), live_out)
-        builder.split_block(op.function.graph.block(0))
-        builder.append_instruction(
-            # These extra levels of list protect me (I hope) from the
-            # auto-unpacking in the implementation of push_op, in the case of a
-            # function returning exactly one Tensor.
-            inst.push_op([op.function.vars_out], [op.vars_out]))
-        builder.append_instruction(
-            inst.PopOp(inst.pattern_flatten(op.function.vars_out)))
-        # The only way this would actually add a pop is if some name written by
-        # this call was a dummy variable.
-        builder.maybe_add_pop(frozenset(names_pushed_here), live_out)
+        if (op_i == len(old_instructions) - 1
+            and _optimizable_tail_call(op, builder.cur_block())):
+          builder.end_block_with_tail_call(op.function.graph.block(0))
+          # The check that the tail call is optimizable is equivalent to
+          # checking that the push-pop pair below would do nothing.
+        else:
+          builder.split_block(op.function.graph.block(0))
+          builder.append_instruction(
+              # These extra levels of list protect me (I hope) from the
+              # auto-unpacking in the implementation of push_op, in the case of
+              # a function returning exactly one Tensor.
+              inst.push_op([op.function.vars_out], [op.vars_out]))
+          builder.append_instruction(
+              inst.PopOp(inst.pattern_flatten(op.function.vars_out)))
+          # The only way this would actually add a pop is if some name written
+          # by this call was a dummy variable.
+          builder.maybe_add_pop(frozenset(names_pushed_here), live_out)
       elif isinstance(op, (inst.PopOp)):
         # Presumably, lowering is applied before any `PopOp`s are present.  That
         # said, simply propagating them is sound.  (But see the `PopOp` case in
@@ -306,6 +327,24 @@ def _lower_function_calls_1(
         raise ValueError('Invalid instruction in block {}.'.format(op))
     if function:
       builder.maybe_adjust_terminator()
+
+
+def _is_indirect_return_op(op):
+  return (inst.is_return_op(op)
+          or (isinstance(op, inst.GotoOp) and _is_return_block(op.block)))
+
+
+def _is_return_block(block):
+  return (not block.instructions) and _is_indirect_return_op(block.terminator)
+
+
+def _optimizable_tail_call(op, block):
+  # A tail call is OK if no translation of the value is needed.  This requires
+  # the function being tail-called to write its result into the same variable as
+  # the caller's caller expects, which we check here.  Generally, this will tend
+  # to happen with self-tail-calls.
+  return (_is_indirect_return_op(block.terminator)
+          and op.vars_out == op.function.vars_out)
 
 
 def lower_function_calls(program):

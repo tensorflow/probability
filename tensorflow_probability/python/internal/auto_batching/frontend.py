@@ -678,6 +678,12 @@ class Context(object):
     self._lowering_cache = ((module, main, sig, backend), result)
     return result
 
+  def lowered_for_args(self, name, args, backend):
+    """Helper for calling program_lowered that computes the type signature."""
+    sig = ab_type_inference.signature(self.program(main=name), args, backend)
+    lowered = self.program_lowered(main=name, sig=sig, backend=backend)
+    return lowered
+
 
 def _environment(function, names_to_omit=()):
   """Yields the names and values visible from the function's scope."""

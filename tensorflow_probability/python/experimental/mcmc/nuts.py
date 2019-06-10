@@ -254,7 +254,7 @@ class NoUTurnSampler(mcmc.TransitionKernel):
           stackless=self.stackless,
           backend=(ab.TensorFlowBackend()
                    if self.backend is None else self.backend),
-          max_stack_depth=(self.max_tree_depth + 1) * 2,
+          max_stack_depth=self.max_tree_depth + 3,
           block_code_cache=self._block_code_cache)
 
       result_state = next_.state

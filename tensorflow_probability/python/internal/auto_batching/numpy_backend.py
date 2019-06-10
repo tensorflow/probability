@@ -347,6 +347,22 @@ class NumpyBackend(object):
     """Gets the eager/immediate value of `t`."""
     return t
 
+  def fill(self, value, size, dtype, shape, name=None):
+    """Fill a fresh batched Tensor of the given shape and dtype with `value`.
+
+    Args:
+      value: Scalar to fill with.
+      size: Scalar `int` `Tensor` specifying the number of VM threads.
+      dtype: `tf.DType` of the zeros to be returned.
+      shape: Rank 1 `int` `Tensor`, the per-thread value shape.
+      name: Optional name for the op.
+
+    Returns:
+      result: `Tensor` of `dtype` `value`s with shape `[size, *shape]`
+    """
+    del name
+    return np.full(shape=[size] + shape, fill_value=value, dtype=dtype)
+
   def create_variable(self, name, alloc, type_, max_stack_depth, batch_size):
     """Returns an intialized Variable.
 
@@ -378,20 +394,6 @@ class NumpyBackend(object):
     """Returns an all-True mask `np.ndarray` with shape `[size]`."""
     del name
     return np.ones(size, dtype=np.bool)
-
-  def initial_program_counter(self, size, dtype, name=None):
-    """Returns a 0-value initializer for the Program Counter variable.
-
-    Args:
-      size: Scalar int `np.ndarray` specifying the number of VM threads.
-      dtype: Type representing the program counter.
-      name: Optional name for the op.
-
-    Returns:
-      `np.ndarray` int64 zeroes with shape `[size]`.
-    """
-    del name
-    return np.zeros([size], dtype=dtype)
 
   def broadcast_to_shape_of(self, val, target, name=None):
     """Broadcasts val to the shape of target.
@@ -499,4 +501,3 @@ class NumpyBackend(object):
   def wrap_straightline_callable(self, f):
     """Method exists solely to be stubbed, i.e. for defun or XLA compile."""
     return f
-

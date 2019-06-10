@@ -147,6 +147,8 @@ def _optimize_1(graph, live_out, alloc):
             _variable_crosses_function_call_boundary(varname, alloc)
           else:
             _variable_crosses_block_boundary(varname, alloc)
+        # TODO(axch): Actually, the PC only needs a stack at this site if this
+        # is not a tail call.
         _variable_crosses_function_call_boundary(inst.pc_var, alloc)
     if isinstance(block.terminator, inst.BranchOp):
       # TODO(axch): Actually, being read by BranchOp only implies

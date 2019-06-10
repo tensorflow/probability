@@ -63,9 +63,6 @@ class AutoGraphFrontendTest(tf.test.TestCase):
 
     @ab.batch(type_inference=pred_type)
     def even(n):
-      # TODO(axch): Support True or False.  The problem is that in Python 2,
-      # they appear as Name nodes in the AST, but have to be treated differently
-      # from the other Name nodes, which denote variable references.
       if n <= 0:
         return True
       else:
@@ -414,6 +411,37 @@ class AutoGraphFrontendTest(tf.test.TestCase):
     sig2 = [instructions.TensorType(np.int32, ())]
     prog3 = ctx.program_lowered('function', sig2, NP_BACKEND)
     self.assertNotEqual(prog1, prog3)
+
+  def testSelfTailCallOptimization(self):
+    def my_type(args):
+      return args[0]
+    ab = frontend.Context()
+
+    @ab.batch(type_inference=my_type)
+    def iota_sum(n, acc):
+      if n <= 0:
+        return acc
+      else:
+        return iota_sum(n - 1, acc + n)
+
+    inputs = [np.array([12, -13, 100], dtype=np.int32),
+              np.array([0, 0, 0], dtype=np.int32)]
+    result = ab.lowered_for_args('iota_sum', inputs, backend=TF_BACKEND)
+    # Check no pushes
+    for i in range(result.graph.exit_index()):
+      block = result.graph.block(i)
+      if isinstance(block.terminator, instructions.PushGotoOp):
+        assert False, 'iota_sum is tail-recursive: should not push the PC'
+    for var, alloc in result.var_alloc.items():
+      if alloc == instructions.VariableAllocation.FULL:
+        if var != instructions.pc_var:
+          assert False, 'iota_sum should not push any data'
+    # pylint: disable=unexpected-keyword-arg
+    # The `max_stack_depth` and `backend` keyword arguments to `caller`
+    # are introduced by the `@ctx.batch` decorator, confusing pylint.
+    self.assertAllEqual(
+        [78, 0, 5050],
+        self.evaluate(iota_sum(*inputs, max_stack_depth=3, backend=TF_BACKEND)))
 
 
 class _TestHidingTFBatchSize(object):

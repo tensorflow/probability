@@ -70,7 +70,7 @@ def execute(program, args, max_stack_depth, backend, block_code_cache=None):
   assert len(program.vars_in) == len(args)
   init_vals = dict(zip(program.vars_in, args))
   environment = _initialize_environment(
-      program.var_alloc, program.var_defs, init_vals, max_stack_depth, backend)
+      program, init_vals, max_stack_depth, backend)
   next_block_index = _choose_next_op(environment, backend)
 
   if block_code_cache is None:
@@ -226,7 +226,7 @@ def _choose_next_op(environment, backend):
 
 
 def _initialize_environment(
-    var_alloc, var_defs, init_vals, max_stack_depth, backend):
+    program, init_vals, max_stack_depth, backend):
   """Construct initial environment.
 
   This pre-allocates Tensors (in the form of the backend's
@@ -235,14 +235,7 @@ def _initialize_environment(
   their input initial values.
 
   Args:
-    var_alloc: A Python dict mapping variable to `VariableAllocation`
-      objects.
-    var_defs: Python dict mapping `str` to `instruction.Type` objects.
-      These are the type and shape declarations for all the variables in
-      the program to stage.  The shape component is the event shape
-      `[e1, ... eE]` alone, without the batch dimension.  It is an
-      error if the program to be staged references a variable that
-      does not appear in `var_defs`.
+    program: The `Program` to be executed.
     init_vals: A dict mapping input variable names to patterns of Tensors of
       shape `[batch_size, e1, ..., eE]`.  These are the initial input
       values. Note that batch size is currently inferred from
@@ -256,6 +249,8 @@ def _initialize_environment(
     environment: The initial variable environment (including an initial program
       counter at instruction 0).
   """
+  var_alloc = program.var_alloc
+  var_defs = program.var_defs
   _check_initial_dtypes(var_defs, init_vals, backend)
   batch_size = inst.detect_batch_size(var_defs, init_vals, backend)
   environment = inst.Environment.initialize(
@@ -263,10 +258,44 @@ def _initialize_environment(
   mask = backend.full_mask(batch_size)
   for name, val in six.iteritems(init_vals):
     environment[name] = environment.push(name, val, mask)
-  program_counter = backend.initial_program_counter(
-      batch_size, dtype=var_defs[inst.pc_var].tensors.dtype)
-  environment[inst.pc_var] = environment.push(
-      inst.pc_var, program_counter, mask)
+  return _initialize_pc(environment, program, batch_size, mask, backend)
+
+
+def _initialize_pc(environment, program, batch_size, mask, backend):
+  """Write the requisite initial values to the program counter."""
+  # Initializing the program counter is a bit subtle.  The initial function call
+  # to main is a tail call, so doesn't change the PC's stack depth.  However,
+  # main will try to "return" by executing IndirectGotoOp when it's done.  This
+  # should have the effect of setting that thread's (top) PC to the halt index,
+  # so the VM knows not to keep executing it.
+  #
+  # We arrange this effect here by initializing the PC to depth 2: the bottom
+  # row is the halt index, and the top row is the initial PC, i.e., 0.  This
+  # way, when main pops the PC at the end, the current value will become the
+  # halt index, as desired.
+  #
+  # This solution may appear somewhat unfortunate, because it forces the PC to
+  # have a stack, i.e., be allocated as a FULL variable.  However, if the
+  # program has any IndirectGotoOp in it, we need a stack for the PC anyway; and
+  # if it doesn't, then it's ok to allocate the PC as a REGISTER and drop the
+  # halt index on the floor, because there won't be any IndirectGotoOp to read
+  # it.
+  #
+  # Other alternatives considered:
+  # - Define a REGISTER_WITH_DEFAULT variable allocation strategy, which is
+  #   a register that writes a default value into itself when popped.
+  # - Separate the PC into an explicit register holding the current PC, together
+  #   with a Variable for the PC stack.  Then the latter could itself be a
+  #   register (holding the halt index) if no other PC pushes are needed in the
+  #   program.
+  var_defs = program.var_defs
+  halt_pc = backend.fill(
+      program.graph.exit_index(), batch_size,
+      dtype=var_defs[inst.pc_var].tensors.dtype, shape=[])
+  environment[inst.pc_var] = environment.push(inst.pc_var, halt_pc, mask)
+  start_pc = backend.fill(
+      0, batch_size, dtype=var_defs[inst.pc_var].tensors.dtype, shape=[])
+  environment[inst.pc_var] = environment.push(inst.pc_var, start_pc, mask)
   return environment
 
 
