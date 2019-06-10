@@ -476,7 +476,7 @@ class GaussianProcess(distribution.Distribution):
   def _variance(self, index_points=None):
     index_points = self._get_index_points(index_points)
 
-    kernel_diag = self.kernel.apply(index_points, index_points)
+    kernel_diag = self.kernel.apply(index_points, index_points, example_ndims=1)
     if self._is_univariate_marginal(index_points):
       return (tf.squeeze(kernel_diag, axis=[-1]) +
               self.observation_noise_variance)

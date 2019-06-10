@@ -68,6 +68,8 @@ class _GaussianProcessTest(object):
       self.assertAllEqual(gp.event_shape, event_shape)
       self.assertAllEqual(samples.shape,
                           sample_shape + batch_shape + event_shape)
+      self.assertAllEqual(gp.mean().shape, batch_shape + event_shape)
+      self.assertAllEqual(gp.variance().shape, batch_shape + event_shape)
     else:
       self.assertAllEqual(self.evaluate(gp.batch_shape_tensor()), batch_shape)
       self.assertAllEqual(self.evaluate(gp.event_shape_tensor()), event_shape)
@@ -79,6 +81,10 @@ class _GaussianProcessTest(object):
       self.assertEqual(tensorshape_util.rank(gp.event_shape), 1)
       self.assertIsNone(
           tf.compat.dimension_value(tensorshape_util.dims(gp.event_shape)[0]))
+      self.assertAllEqual(
+          self.evaluate(tf.shape(input=gp.mean())), batch_shape + event_shape)
+      self.assertAllEqual(self.evaluate(
+          tf.shape(input=gp.variance())), batch_shape + event_shape)
 
   def testVarianceAndCovarianceMatrix(self):
     amp = np.float64(.5)
