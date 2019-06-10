@@ -21,7 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from experimental.mcmc import elliptical_slice_sampler as elliptical
+from discussion.mcmc import elliptical_slice_sampler as elliptical
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 

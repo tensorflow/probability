@@ -18,6 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from experimental.neutra.neutra_kernel import NeuTra
+from discussion.neutra.neutra_kernel import NeuTra
 
 __all__ = ['NeuTra']

@@ -34,7 +34,7 @@ import scipy.stats
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from experimental import no_u_turn_sampler
+from discussion import no_u_turn_sampler
 
 tfb = tfp.bijectors
 tfd = tfp.distributions

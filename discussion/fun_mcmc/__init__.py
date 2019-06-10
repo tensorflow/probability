@@ -18,27 +18,27 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from experimental.fun_mcmc.fun_mcmc_lib import blanes_3_stage_step
-from experimental.fun_mcmc.fun_mcmc_lib import blanes_4_stage_step
-from experimental.fun_mcmc.fun_mcmc_lib import call_and_grads
-from experimental.fun_mcmc.fun_mcmc_lib import call_fn
-from experimental.fun_mcmc.fun_mcmc_lib import hamiltonian_monte_carlo
-from experimental.fun_mcmc.fun_mcmc_lib import hamiltonian_monte_carlo_init
-from experimental.fun_mcmc.fun_mcmc_lib import HamiltonianMonteCarloExtra
-from experimental.fun_mcmc.fun_mcmc_lib import HamiltonianMonteCarloState
-from experimental.fun_mcmc.fun_mcmc_lib import IntegratorStepState
-from experimental.fun_mcmc.fun_mcmc_lib import leapfrog_step
-from experimental.fun_mcmc.fun_mcmc_lib import maybe_broadcast_structure
-from experimental.fun_mcmc.fun_mcmc_lib import metropolis_hastings_step
-from experimental.fun_mcmc.fun_mcmc_lib import PotentialFn
-from experimental.fun_mcmc.fun_mcmc_lib import ruth4_step
-from experimental.fun_mcmc.fun_mcmc_lib import sign_adaptation
-from experimental.fun_mcmc.fun_mcmc_lib import State
-from experimental.fun_mcmc.fun_mcmc_lib import symmetric_spliting_integrator_step
-from experimental.fun_mcmc.fun_mcmc_lib import trace
-from experimental.fun_mcmc.fun_mcmc_lib import transform_log_prob_fn
-from experimental.fun_mcmc.fun_mcmc_lib import transition_kernel_wrapper
-from experimental.fun_mcmc.fun_mcmc_lib import TransitionOperator
+from discussion.fun_mcmc.fun_mcmc_lib import blanes_3_stage_step
+from discussion.fun_mcmc.fun_mcmc_lib import blanes_4_stage_step
+from discussion.fun_mcmc.fun_mcmc_lib import call_and_grads
+from discussion.fun_mcmc.fun_mcmc_lib import call_fn
+from discussion.fun_mcmc.fun_mcmc_lib import hamiltonian_monte_carlo
+from discussion.fun_mcmc.fun_mcmc_lib import hamiltonian_monte_carlo_init
+from discussion.fun_mcmc.fun_mcmc_lib import HamiltonianMonteCarloExtra
+from discussion.fun_mcmc.fun_mcmc_lib import HamiltonianMonteCarloState
+from discussion.fun_mcmc.fun_mcmc_lib import IntegratorStepState
+from discussion.fun_mcmc.fun_mcmc_lib import leapfrog_step
+from discussion.fun_mcmc.fun_mcmc_lib import maybe_broadcast_structure
+from discussion.fun_mcmc.fun_mcmc_lib import metropolis_hastings_step
+from discussion.fun_mcmc.fun_mcmc_lib import PotentialFn
+from discussion.fun_mcmc.fun_mcmc_lib import ruth4_step
+from discussion.fun_mcmc.fun_mcmc_lib import sign_adaptation
+from discussion.fun_mcmc.fun_mcmc_lib import State
+from discussion.fun_mcmc.fun_mcmc_lib import symmetric_spliting_integrator_step
+from discussion.fun_mcmc.fun_mcmc_lib import trace
+from discussion.fun_mcmc.fun_mcmc_lib import transform_log_prob_fn
+from discussion.fun_mcmc.fun_mcmc_lib import transition_kernel_wrapper
+from discussion.fun_mcmc.fun_mcmc_lib import TransitionOperator
 
 __all__ = [
     'blanes_3_stage_step',

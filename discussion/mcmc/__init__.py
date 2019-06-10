@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from experimental.mcmc.elliptical_slice_sampler import EllipticalSliceSampler
+from discussion.mcmc.elliptical_slice_sampler import EllipticalSliceSampler
 
 __all__ = [
     'EllipticalSliceSampler',

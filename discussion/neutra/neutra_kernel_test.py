@@ -24,7 +24,7 @@ from absl.testing import parameterized
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from experimental import neutra
+from discussion import neutra
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
