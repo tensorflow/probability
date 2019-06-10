@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import warnings
 
 # Dependency imports
@@ -27,6 +28,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
@@ -219,11 +221,11 @@ class GaussianProcess(distribution.Distribution):
         shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
         broadcastable with `[b1, ..., bB]`. Default value: `None` implies
         constant zero function.
-      observation_noise_variance: `float` `Tensor` representing the variance
-        of the noise in the Normal likelihood distribution of the model. May be
-        batched, in which case the batch shape must be broadcastable with the
-        shapes of all other batched parameters (`kernel.batch_shape`,
-        `index_points`, etc.).
+      observation_noise_variance: `float` `Tensor` representing (batch of)
+        scalar variance(s) of the noise in the Normal likelihood
+        distribution of the model. If batched, the batch shape must be
+        broadcastable with the shapes of all other batched parameters
+        (`kernel.batch_shape`, `index_points`, etc.).
         Default value: `0.`
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
         matrix to ensure positive definiteness of the covariance matrix.
@@ -314,8 +316,18 @@ class GaussianProcess(distribution.Distribution):
       return (tf.squeeze(kernel_matrix, axis=[-2, -1]) +
               self.observation_noise_variance)
     else:
+      # We are compute K + obs_noise_variance * I. The shape of this matrix
+      # is going to be a broadcast of the shapes of K and obs_noise_variance *
+      # I.
+      broadcast_shape = distribution_util.get_broadcast_shape(
+          kernel_matrix,
+          # We pad with two single dimension since this represents a batch of
+          # scaled identity matrices.
+          self.observation_noise_variance[..., tf.newaxis, tf.newaxis])
+
+      kernel_matrix = tf.broadcast_to(kernel_matrix, broadcast_shape)
       return _add_diagonal_shift(
-          kernel_matrix, self.observation_noise_variance)
+          kernel_matrix, self.observation_noise_variance[..., tf.newaxis])
 
   def get_marginal_distribution(self, index_points=None):
     """Compute the marginal of this GP over function values at `index_points`.
@@ -417,15 +429,19 @@ class GaussianProcess(distribution.Distribution):
 
   def _batch_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
-    return tf.broadcast_dynamic_shape(
-        tf.shape(index_points)[:-(self.kernel.feature_ndims + 1)],
-        self.kernel.batch_shape_tensor())
+    return functools.reduce(
+        tf.broadcast_dynamic_shape,
+        [tf.shape(index_points)[:-(self.kernel.feature_ndims + 1)],
+         self.kernel.batch_shape_tensor(),
+         tf.shape(input=self.observation_noise_variance)])
 
   def _batch_shape(self, index_points=None):
     index_points = self._get_index_points(index_points)
-    return tf.broadcast_static_shape(
-        index_points.shape[:-(self.kernel.feature_ndims + 1)],
-        self.kernel.batch_shape)
+    return functools.reduce(
+        tf.broadcast_static_shape,
+        [index_points.shape[:-(self.kernel.feature_ndims + 1)],
+         self.kernel.batch_shape,
+         self.observation_noise_variance.shape])
 
   def _event_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
@@ -481,7 +497,12 @@ class GaussianProcess(distribution.Distribution):
       return (tf.squeeze(kernel_diag, axis=[-1]) +
               self.observation_noise_variance)
     else:
-      return kernel_diag + self.observation_noise_variance
+      # We are computing diag(K + obs_noise_variance * I) = diag(K) +
+      # obs_noise_variance. We pad obs_noise_variance with a dimension in order
+      # to broadcast batch shapes of kernel_diag and obs_noise_variance (since
+      # kernel_diag has an extra dimension corresponding to the number of index
+      # points).
+      return kernel_diag + self.observation_noise_variance[..., tf.newaxis]
 
   def _covariance(self, index_points=None):
     # Using the result of get_marginal_distribution would involve an extra

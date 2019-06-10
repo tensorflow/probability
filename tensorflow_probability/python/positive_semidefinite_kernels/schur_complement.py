@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import cholesky_outer_product
 from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
@@ -223,6 +224,10 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
         # every time we needed the cholesky, the bijector cache wouldn't be hit.
         self._divisor_matrix = base_kernel.matrix(fixed_inputs, fixed_inputs)
         if diag_shift is not None:
+          broadcast_shape = distribution_util.get_broadcast_shape(
+              self._divisor_matrix, diag_shift[..., tf.newaxis])
+          self._divisor_matrix = tf.broadcast_to(
+              self._divisor_matrix, broadcast_shape)
           self._divisor_matrix = _add_diagonal_shift(
               self._divisor_matrix, diag_shift)
 

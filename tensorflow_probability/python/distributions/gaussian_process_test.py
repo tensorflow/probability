@@ -36,9 +36,11 @@ class _GaussianProcessTest(object):
     index_points = np.reshape(index_points, [-1, 2])
     # ==> shape = [25, 2]
 
-    # Kernel with batch_shape [2, 4, 1]
-    amplitude = np.array([1., 2.], np.float32).reshape([2, 1, 1])
-    length_scale = np.array([1., 2., 3., 4.], np.float32).reshape([1, 4, 1])
+    # Kernel with batch_shape [2, 4, 3, 1]
+    amplitude = np.array([1., 2.], np.float32).reshape([2, 1, 1, 1])
+    length_scale = np.array([1., 2., 3., 4.], np.float32).reshape([1, 4, 1, 1])
+    observation_noise_variance = np.array(
+        [1e-5, 1e-6, 1e-5], np.float32).reshape([1, 1, 3, 1])
     batched_index_points = np.stack([index_points]*6)
     # ==> shape = [6, 25, 2]
     if not self.is_static:
@@ -51,9 +53,10 @@ class _GaussianProcessTest(object):
     gp = tfd.GaussianProcess(
         kernel,
         batched_index_points,
+        observation_noise_variance=observation_noise_variance,
         jitter=1e-5)
 
-    batch_shape = [2, 4, 6]
+    batch_shape = [2, 4, 3, 6]
     event_shape = [25]
     sample_shape = [5, 3]
 

@@ -47,12 +47,14 @@ class _GaussianProcessRegressionModelTest(object):
     batched_index_points = np.expand_dims(np.stack([index_points]*6), -3)
     # ==> shape = [6, 1, 25, 2]
 
-    # Kernel with batch_shape [2, 4, 1, 1]
+    # Kernel with batch_shape [2, 4, 1, 3]
     amplitude = np.array([1., 2.], np.float64).reshape([2, 1, 1, 1])
-    length_scale = np.array([.1, .2, .3, .4], np.float64).reshape([1, 4, 1, 1])
+    length_scale = np.array([.1, .2, .3, .4], np.float64).reshape(
+        [1, 4, 1, 1])
+    observation_noise_variance = np.array(
+        [1e-5, 1e-6, 1e-9], np.float64).reshape([1, 1, 1, 3])
 
     jitter = np.float64(1e-6)
-    observation_noise_variance = np.float64(1e-2)
     observation_index_points = (
         np.random.uniform(-1., 1., (3, 7, 2)).astype(np.float64))
     observations = np.random.uniform(-1., 1., (3, 7)).astype(np.float64)

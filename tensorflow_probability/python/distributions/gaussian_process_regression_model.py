@@ -31,11 +31,6 @@ __all__ = [
 ]
 
 
-def _add_diagonal_shift(matrix, shift):
-  diag_plus_shift = tf.linalg.diag_part(matrix) + shift
-  return tf.linalg.set_diag(matrix, diag_plus_shift)
-
-
 def _is_empty_observation_data(
     feature_ndims, observation_index_points, observations):
   """Returns `True` if given observation data is empty.
@@ -363,8 +358,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
       index_points=index_points,
       observation_index_points=observation_index_points,
       observations=observations,
-      # We reshape this to align batch dimensions.
-      observation_noise_variance=observation_noise_variances[..., np.newaxis])
+      observation_noise_variance=observation_noise_variances)
   samples = gprm.sample()
 
   with tf.Session() as sess:
@@ -527,7 +521,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
         conditional_kernel = tfpk.SchurComplement(
             base_kernel=kernel,
             fixed_inputs=observation_index_points,
-            diag_shift=jitter + observation_noise_variance)
+            diag_shift=jitter + observation_noise_variance[..., tf.newaxis])
 
         # Special logic for mean_fn only; SchurComplement already handles the
         # case of empty observations (ie, falls back to base_kernel).
