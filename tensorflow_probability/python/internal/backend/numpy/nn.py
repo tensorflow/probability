@@ -23,15 +23,15 @@ import numpy as np
 
 import tensorflow as tf
 
-from tensorflow_probability.python.internal.backend.numpy import array
+from tensorflow_probability.python.internal.backend.numpy import numpy_array
 
 from tensorflow_probability.python.internal.backend.numpy.internal import utils
-from tensorflow_probability.python.internal.backend.numpy.math import l2_normalize
-from tensorflow_probability.python.internal.backend.numpy.math import log_softmax
-from tensorflow_probability.python.internal.backend.numpy.math import reduce_logsumexp
-from tensorflow_probability.python.internal.backend.numpy.math import softmax
-from tensorflow_probability.python.internal.backend.numpy.math import softplus
-from tensorflow_probability.python.internal.backend.numpy.math import top_k
+from tensorflow_probability.python.internal.backend.numpy.numpy_math import l2_normalize
+from tensorflow_probability.python.internal.backend.numpy.numpy_math import log_softmax
+from tensorflow_probability.python.internal.backend.numpy.numpy_math import reduce_logsumexp
+from tensorflow_probability.python.internal.backend.numpy.numpy_math import softmax
+from tensorflow_probability.python.internal.backend.numpy.numpy_math import softplus
+from tensorflow_probability.python.internal.backend.numpy.numpy_math import top_k
 
 
 __all__ = [
@@ -66,7 +66,7 @@ def _sparse_softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,u
   logits = np.reshape(logits, [-1, num_classes])
   labels = np.reshape(labels, [-1])
 
-  labels = array.one_hot(labels, num_classes)
+  labels = numpy_array.one_hot(labels, num_classes)
 
   cost = -np.sum(
       labels * (logits - reduce_logsumexp(logits, axis=-1, keepdims=True)),
@@ -100,4 +100,3 @@ sigmoid_cross_entropy_with_logits = utils.copy_docstring(
 sparse_softmax_cross_entropy_with_logits = utils.copy_docstring(
     tf.nn.sparse_softmax_cross_entropy_with_logits,
     _sparse_softmax_cross_entropy_with_logits)
-
