@@ -14,8 +14,6 @@
 # ============================================================================
 language: python
 dist: xenial
-python:
-  - "3.6"
 
 git:
   depth: 20
@@ -41,7 +39,7 @@ jobs:
 # of python versions x SHARD will be expanded and run in parallel.
 python:
   - "2.7"
-  - "3.6"
+  - "3.5"
 env:
   global:
     - NUM_SHARDS=3
