@@ -20,6 +20,9 @@ from __future__ import print_function
 
 import functools
 # import logging
+import sys
+print('***', sys.path)
+print('---', sys.meta_path)
 
 # Dependency imports
 
