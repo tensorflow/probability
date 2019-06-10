@@ -32,8 +32,8 @@ def constant_program():
   """
   constant_block = instructions.Block(
       [
-          instructions.PrimOp([], "answer", lambda: 1),
-          instructions.PrimOp([], "answer", lambda: 2),
+          instructions.prim_op([], "answer", lambda: 1),
+          instructions.prim_op([], "answer", lambda: 2),
       ],
       instructions.halt_op())
 
@@ -62,15 +62,15 @@ def single_if_program():
   then_ = instructions.Block()
   else_ = instructions.Block()
   entry.assign_instructions([
-      instructions.PrimOp(["input"], "cond", lambda n: n > 1),
+      instructions.prim_op(["input"], "cond", lambda n: n > 1),
       instructions.BranchOp("cond", then_, else_),
   ])
   then_.assign_instructions([
-      instructions.PrimOp([], "answer", lambda: 2),
+      instructions.prim_op([], "answer", lambda: 2),
       instructions.halt_op(),
   ])
   else_.assign_instructions([
-      instructions.PrimOp([], "answer", lambda: 0),
+      instructions.prim_op([], "answer", lambda: 0),
       instructions.halt_op(),
   ])
 
@@ -95,9 +95,9 @@ def synthetic_pattern_program():
   """
   block = instructions.Block(
       [
-          instructions.PrimOp(
+          instructions.prim_op(
               [], ("one", ("five", "three")), lambda: (1, (2, 3))),
-          instructions.PrimOp(
+          instructions.prim_op(
               [], (("four", "five"), "six"), lambda: ((4, 5), 6)),
       ],
       instructions.halt_op())
@@ -127,9 +127,9 @@ def synthetic_pattern_variable_program(include_types=True):
   """
   block = instructions.Block(
       [
-          instructions.PrimOp(
+          instructions.prim_op(
               ["inp"], "many", lambda x: (x + 1, (x + 2, x + 3))),
-          instructions.PrimOp(["many"], ["one", "two"], lambda x: x),
+          instructions.prim_op(["many"], ["one", "two"], lambda x: x),
       ],
       instructions.halt_op())
 
@@ -166,7 +166,7 @@ def fibonacci_program():
   ])
   # Definition of fibonacci function starts here
   enter_fib.assign_instructions([
-      instructions.PrimOp(
+      instructions.prim_op(
           ["n"], "cond",
           lambda n: n > 1),                      # cond = n > 1
       instructions.BranchOp(
@@ -174,7 +174,7 @@ def fibonacci_program():
   ])
   recur1.assign_instructions([
       instructions.PopOp(["cond"]),              #   done with cond now
-      instructions.PrimOp(
+      instructions.prim_op(
           ["n"], "nm1",
           lambda n: n - 1),                      #   nm1 = n - 1
       instructions.push_op(["nm1"], ["n"]),      #   fibm1 = fibonacci(nm1)
@@ -184,7 +184,7 @@ def fibonacci_program():
   recur2.assign_instructions([
       instructions.push_op(["ans"], ["fibm1"]),  #     ...
       instructions.PopOp(["ans"]),               #     pop callee's "ans"
-      instructions.PrimOp(
+      instructions.prim_op(
           ["n"], "nm2",
           lambda n: n - 2),                      #   nm2 = n - 2
       instructions.PopOp(["n"]),                 #   done with n
@@ -195,7 +195,7 @@ def fibonacci_program():
   recur3.assign_instructions([
       instructions.push_op(["ans"], ["fibm2"]),  #     ...
       instructions.PopOp(["ans"]),               #     pop callee's "ans"
-      instructions.PrimOp(
+      instructions.prim_op(
           ["fibm1", "fibm2"], "ans",
           lambda x, y: x + y),                   #   ans = fibm1 + fibm2
       instructions.PopOp(["fibm1", "fibm2"]),    #   done with fibm1, fibm2
@@ -203,7 +203,7 @@ def fibonacci_program():
   ])
   finish.assign_instructions([                   # else:
       instructions.PopOp(["n", "cond"]),         #   done with n, cond
-      instructions.PrimOp(
+      instructions.prim_op(
           [], "ans",
           lambda : 1),                           #   ans = 1
       instructions.IndirectGotoOp(),             #   return ans
@@ -261,20 +261,20 @@ def is_even_function_calls(include_types=True, dtype=np.int64):
   # pylint: disable=bad-whitespace
   # Definition of is_even function
   enter_is_even.assign_instructions([
-      instructions.PrimOp(
+      instructions.prim_op(
           ["n"], "cond", lambda n: n < 1),         # cond = n < 1
       instructions.BranchOp(
           "cond", finish_is_even, recur_is_even),  # if cond
   ])
   finish_is_even.assign_instructions([
       instructions.PopOp(["n", "cond"]),           #   done with n, cond
-      instructions.PrimOp(
+      instructions.prim_op(
           [], "ans", lambda : True),               #   ans = True
       instructions.halt_op(),                      #   return ans
   ])
   recur_is_even.assign_instructions([              # else
       instructions.PopOp(["cond"]),                #   done with cond now
-      instructions.PrimOp(
+      instructions.prim_op(
           ["n"], "nm1", lambda n: n - 1),          #   nm1 = n - 1
       instructions.PopOp(["n"]),                   #   done with n
       instructions.FunctionCallOp(
@@ -291,20 +291,20 @@ def is_even_function_calls(include_types=True, dtype=np.int64):
   # pylint: disable=bad-whitespace
   # Definition of is_odd function
   enter_is_odd.assign_instructions([
-      instructions.PrimOp(
+      instructions.prim_op(
           ["n"], "cond", lambda n: n < 1),         # cond = n < 1
       instructions.BranchOp(
           "cond", finish_is_odd, recur_is_odd),    # if cond
   ])
   finish_is_odd.assign_instructions([
       instructions.PopOp(["n", "cond"]),           #   done with n, cond
-      instructions.PrimOp(
+      instructions.prim_op(
           [], "ans", lambda : False),              #   ans = False
       instructions.halt_op(),                      #   return ans
   ])
   recur_is_odd.assign_instructions([               # else
       instructions.PopOp(["cond"]),                #   done with cond now
-      instructions.PrimOp(
+      instructions.prim_op(
           ["n"], "nm1", lambda n: n - 1),          #   nm1 = n - 1
       instructions.PopOp(["n"]),                   #   done with n
       instructions.FunctionCallOp(
@@ -362,30 +362,30 @@ def fibonacci_function_calls(include_types=True, dtype=np.int64):
   # pylint: disable=bad-whitespace
   # Definition of fibonacci function
   enter_fib.assign_instructions([
-      instructions.PrimOp(
+      instructions.prim_op(
           ["n"], "cond",
           lambda n: n > 1),                      # cond = n > 1
       instructions.BranchOp(
           "cond", recur, finish),                # if cond
   ])
   recur.assign_instructions([
-      instructions.PrimOp(
+      instructions.prim_op(
           ["n"], "nm1",
           lambda n: n - 1),                      #   nm1 = n - 1
       instructions.FunctionCallOp(
           fibonacci_func, ["nm1"], "fibm1"),     #   fibm1 = fibonacci(nm1)
-      instructions.PrimOp(
+      instructions.prim_op(
           ["n"], "nm2",
           lambda n: n - 2),                      #   nm2 = n - 2
       instructions.FunctionCallOp(
           fibonacci_func, ["nm2"], "fibm2"),     #   fibm2 = fibonacci(nm2)
-      instructions.PrimOp(
+      instructions.prim_op(
           ["fibm1", "fibm2"], "ans",
           lambda x, y: x + y),                   #   ans = fibm1 + fibm2
       instructions.halt_op(),                    #   return ans
   ])
   finish.assign_instructions([                   # else:
-      instructions.PrimOp(
+      instructions.prim_op(
           [], "ans",
           lambda : 1),                           #   ans = 1
       instructions.halt_op(),                    #   return ans
@@ -474,7 +474,7 @@ def pea_nuts_program(latent_shape, choose_depth, step_state):
   recur_base_case = instructions.Block()
   # pylint: disable=bad-whitespace
   entry.assign_instructions([
-      instructions.PrimOp(
+      instructions.prim_op(
           ["count"], "cond",
           lambda count: count > 0),          # cond = count > 0
       instructions.BranchOp(
@@ -483,14 +483,14 @@ def pea_nuts_program(latent_shape, choose_depth, step_state):
   ])
   top_body.assign_instructions([
       instructions.PopOp(["cond"]),          #   done with cond now
-      instructions.PrimOp(
+      instructions.prim_op(
           ["count"], "ctm1",
           lambda count: count - 1),          #   ctm1 = count - 1
       instructions.PopOp(["count"]),         #   done with count now
       instructions.push_op(
           ["ctm1"], ["count"]),              #   count = ctm1
       instructions.PopOp(["ctm1"]),          #   done with ctm1
-      instructions.PrimOp(
+      instructions.prim_op(
           ["count"], "depth",
           choose_depth),                     #   depth = choose_depth(count)
       instructions.push_op(
@@ -509,7 +509,7 @@ def pea_nuts_program(latent_shape, choose_depth, step_state):
   ])
   # Definition of recur begins here
   enter_recur.assign_instructions([
-      instructions.PrimOp(
+      instructions.prim_op(
           ["depth"], "cond1",
           lambda depth: depth > 0),          # cond1 = depth > 0
       instructions.BranchOp(
@@ -518,7 +518,7 @@ def pea_nuts_program(latent_shape, choose_depth, step_state):
   ])
   recur_body_1.assign_instructions([
       instructions.PopOp(["cond1"]),         #   done with cond1 now
-      instructions.PrimOp(
+      instructions.prim_op(
           ["depth"], "dm1",
           lambda depth: depth - 1),          #   dm1 = depth - 1
       instructions.PopOp(["depth"]),         #   done with depth
@@ -533,7 +533,7 @@ def pea_nuts_program(latent_shape, choose_depth, step_state):
       instructions.push_op(
           ["ans"], ["state1"]),              #     ...
       instructions.PopOp(["ans"]),           #     pop callee's "ans"
-      instructions.PrimOp(
+      instructions.prim_op(
           ["state1"], "state2",
           lambda state: state + 1),          #   state2 = state1 + 1
       instructions.PopOp(["state1"]),        #   done with state1
@@ -549,7 +549,7 @@ def pea_nuts_program(latent_shape, choose_depth, step_state):
       instructions.push_op(
           ["ans"], ["state3"]),              #     ...
       instructions.PopOp(["ans"]),           #     pop callee's "ans"
-      instructions.PrimOp(
+      instructions.prim_op(
           ["state3"], "ans",
           lambda state: state + 1),          #   ans = state3 + 1
       instructions.PopOp(["state3"]),        #   done with state3
@@ -558,7 +558,7 @@ def pea_nuts_program(latent_shape, choose_depth, step_state):
   recur_base_case.assign_instructions([
       instructions.PopOp(
           ["cond1", "depth"]),               #   done with cond1, depth
-      instructions.PrimOp(
+      instructions.prim_op(
           ["state"], "ans", step_state),     #   ans = step_state(state)
       instructions.PopOp(["state"]),         #   done with state
       instructions.IndirectGotoOp(),         #   return ans

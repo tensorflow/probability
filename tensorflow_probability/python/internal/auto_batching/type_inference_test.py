@@ -61,7 +61,7 @@ def shape_sequence_program(shape_sequence):
   for shape in shape_sequence:
     # We use a partial instead of a lambda in order to capture a copy of shape.
     block_ops.append(
-        instructions.PrimOp(['ans'], ['ans'], functools.partial(op, shape)))
+        instructions.prim_op(['ans'], ['ans'], functools.partial(op, shape)))
   shape_seq_block = instructions.Block(block_ops, instructions.halt_op())
   shape_seq_vars = {
       'ans': instructions.Type(None),

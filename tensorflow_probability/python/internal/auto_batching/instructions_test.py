@@ -225,7 +225,7 @@ class PrettyPrintingTest(tf.test.TestCase):
   def verify_program_pretty_print(self, expected_text, program, **kwargs):
     actual_text = str(program.__str__(**kwargs))
     if expected_text != actual_text:
-      print(fibonacci_functions_narrow_pretty_print)
+      print(expected_text)
       print(actual_text)
     self.assertEqual(expected_text, actual_text)
 

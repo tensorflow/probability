@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal.auto_batching import allocation_stra
 from tensorflow_probability.python.internal.auto_batching import dsl
 from tensorflow_probability.python.internal.auto_batching import instructions
 from tensorflow_probability.python.internal.auto_batching import lowering
+from tensorflow_probability.python.internal.auto_batching import stack_optimization as stack
 from tensorflow_probability.python.internal.auto_batching import stackless as st
 from tensorflow_probability.python.internal.auto_batching import tf_backend
 from tensorflow_probability.python.internal.auto_batching import type_inference as ab_type_inference
@@ -674,7 +675,8 @@ class Context(object):
         prog = module.program(main)
     typed = ab_type_inference.infer_types_from_signature(prog, sig, backend)
     alloc = allocation_strategy.optimize(typed)
-    result = lowering.lower_function_calls(alloc)
+    lowered = lowering.lower_function_calls(alloc)
+    result = stack.fuse_pop_push(lowered)
     self._lowering_cache = ((module, main, sig, backend), result)
     return result
 

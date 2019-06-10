@@ -154,7 +154,12 @@ def _run_block(graph, index, env_dict, backend):
                 for var_pat in op.vars_in]
       with _vm_staging():
         outputs = op.function(*inputs)
-      new_vars = [(varname, environment.push(varname, output, mask))
+      def doit(varname, output, skip_push_mask):
+        if varname in skip_push_mask:
+          return environment.update(varname, output, mask)
+        else:
+          return environment.push(varname, output, mask)
+      new_vars = [(varname, doit(varname, output, op.skip_push_mask))
                   for varname, output in inst.pattern_zip(op.vars_out, outputs)]
     elif isinstance(op, inst.PopOp):
       new_vars = [(varname, environment.pop(varname, mask))

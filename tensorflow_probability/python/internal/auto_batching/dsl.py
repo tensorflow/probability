@@ -325,7 +325,7 @@ class ProgramBuilder(object):
     for var in vars_in:
       if var not in self._var_defs:
         raise ValueError('Referencing undefined variable {}.'.format(var))
-    prim = inst.PrimOp(_str_list(vars_in), inst.pattern_map(str, vars_out), f)
+    prim = inst.prim_op(_str_list(vars_in), inst.pattern_map(str, vars_out), f)
     self._blocks[-1].instructions.append(prim)
     for var in inst.pattern_traverse(vars_out):
       self._mark_defined(var)

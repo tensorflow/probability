@@ -26,6 +26,8 @@ from tensorflow_probability.python.internal.auto_batching import instructions
 from tensorflow_probability.python.internal.auto_batching import liveness
 from tensorflow_probability.python.internal.auto_batching import lowering
 from tensorflow_probability.python.internal.auto_batching import numpy_backend
+from tensorflow_probability.python.internal.auto_batching import stack_optimization
+from tensorflow_probability.python.internal.auto_batching import stackless
 from tensorflow_probability.python.internal.auto_batching import tf_backend
 from tensorflow_probability.python.internal.auto_batching import type_inference
 from tensorflow_probability.python.internal.auto_batching import virtual_machine
@@ -52,6 +54,8 @@ _allowed_symbols = [
     'liveness',
     'lowering',
     'numpy_backend',
+    'stack_optimization',
+    'stackless',
     'tf_backend',
     'truthy',
     'type_inference',

@@ -546,7 +546,7 @@ class FunctionCallOp(collections.namedtuple(
 # Inheriting from `namedtuple` as a compact way to make a value class:
 # structural equality and hashing.
 class PrimOp(collections.namedtuple(
-    'PrimOp', ['vars_in', 'vars_out', 'function'])):
+    'PrimOp', ['vars_in', 'vars_out', 'function', 'skip_push_mask'])):
   """An arbitrary already-batched computation, a 'primitive operation'.
 
   These are the items of work on which auto-batching is applied.  The
@@ -600,6 +600,8 @@ class PrimOp(collections.namedtuple(
     vars_out: Pattern of strings.  The names of the VM variables
       where to save the results returned from `function`.
     function: Python callable implementing the computation.
+    skip_push_mask: Set of strings, a subset of `vars_out`.  These VM variables
+      will be updated in place rather than pushed.
   """
   __slots__ = ()
 
@@ -612,7 +614,10 @@ class PrimOp(collections.namedtuple(
     # needed.  Neither the function source nor the list of returned
     # values are ever broken across lines.
     if self.vars_out:
-      prefix = _render_pattern(self.vars_out) + ' = prim('
+      def name(v):
+        return v + ('!' if v in self.skip_push_mask else '')
+      vars_written = pattern_map(name, self.vars_out)
+      prefix = _render_pattern(vars_written) + ' = prim('
     else:
       prefix = 'prim('
     header = _render_comma_list(prefix, self.vars_in, ') by', indent, width)
@@ -624,7 +629,7 @@ class PrimOp(collections.namedtuple(
     """Return a copy of `self` with `vars_out` replaced."""
     if vars_out is None:
       raise ValueError('Nothing to replace')
-    return PrimOp(self.vars_in, vars_out, self.function)
+    return PrimOp(self.vars_in, vars_out, self.function, self.skip_push_mask)
 
 
 # Inheriting from `namedtuple` as a compact way to make a value class:
@@ -750,6 +755,12 @@ class IndirectGotoOp(collections.namedtuple('IndirectGotoOp', [])):
 pc_var = '__program_counter__'
 
 
+def prim_op(vars_in, vars_out, function, skip_push_mask=None):
+  if skip_push_mask is None:
+    skip_push_mask = set()
+  return PrimOp(vars_in, vars_out, function, skip_push_mask)
+
+
 def push_op(vars_in, vars_out):
   """Returns an `Op` that pushes values from `vars_in` into `vars_out`.
 
@@ -764,7 +775,7 @@ def push_op(vars_in, vars_out):
   def assign(*x):
     return x
 
-  return PrimOp(vars_in, vars_out, assign)
+  return prim_op(vars_in, vars_out, assign)
 
 
 def halt():
@@ -1002,17 +1013,51 @@ class Environment(object):
     Returns:
       new_var: An updated `Variable` incorporating the push.
     """
-    # Could check dtypes and shapes here.  However, since they are
-    # only needed for preallocating Tensor stacks, leaving the check
-    # off generalizes this interpreter.  Which may not be quite the
-    # right thing to do, since the generalization may make this a
-    # worse model of the VM's real behavior.
+    # Could check dtypes and shapes here.  However, since they are only needed
+    # for preallocating Tensor stacks, leaving the check off generalizes the
+    # resulting interpreter.  Which may not be quite the right thing to do,
+    # since the generalization may make this a worse model of the VM's real
+    # behavior.
     if name not in self._env:
       raise ValueError('Pushing undeclared variable {}.'.format(name))
     def do_push(var, val):
       return var.push(*args, **kwargs).update(val, *args, **kwargs)
     return pattern_map2(
         do_push, self._env[name], value, leaf_type=self.backend.variable_class)
+
+  def update(self, name, value, *args, **kwargs):
+    """Writes value to the variable of the given name without pushing.
+
+    Does not mutate the `Environment`.
+
+    Args:
+      name: A Python `string` giving the name of the
+        variable to update.
+      value: A object giving the value to update with.
+      *args: Additional arguments to pass to the `Variable`'s
+        methods, if any.
+      **kwargs: Additional keyword arguments to pass to the `Variable`'s
+        methods, if any.
+
+    Raises:
+      ValueError: If `name` refers to a variable that was not part of
+        the `var_defs` with which this Environment was created.
+
+    Returns:
+      new_var: An updated `Variable` incorporating the update.
+    """
+    # Could check dtypes and shapes here.  However, since they are only needed
+    # for preallocating Tensor stacks, leaving the check off generalizes the
+    # resulting interpreter.  Which may not be quite the right thing to do,
+    # since the generalization may make this a worse model of the VM's real
+    # behavior.
+    if name not in self._env:
+      raise ValueError('Pushing undeclared variable {}.'.format(name))
+    def do_update(var, val):
+      return var.update(val, *args, **kwargs)
+    return pattern_map2(
+        do_update, self._env[name], value,
+        leaf_type=self.backend.variable_class)
 
   def pop(self, name, *args, **kwargs):
     """Pops a value off the stack of the given variable.

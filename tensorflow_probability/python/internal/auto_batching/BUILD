@@ -38,6 +38,7 @@ py_library(
         ":instructions",
         ":lowering",
         ":numpy_backend",
+        ":stack_optimization",
         ":tf_backend",
         ":type_inference",
         ":virtual_machine",
@@ -123,6 +124,17 @@ py_library(
 )
 
 py_library(
+    name = "stack_optimization",
+    srcs = [
+        "stack_optimization.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":instructions",
+    ],
+)
+
+py_library(
     name = "allocation_strategy",
     srcs = [
         "allocation_strategy.py",
@@ -166,6 +178,7 @@ py_library(
         ":instructions",
         ":lowering",
         ":stackless",
+        ":stack_optimization",
         ":tf_backend",
         ":type_inference",
         ":virtual_machine",
@@ -294,6 +307,17 @@ py_test(
         ":stackless",
         ":test_programs",
         ":tf_backend",
+    ],
+)
+
+py_test(
+    name = "stack_optimization_test",
+    size = "small",
+    srcs = ["stack_optimization_test.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":stack_optimization",
+        ":test_programs",
     ],
 )
 
