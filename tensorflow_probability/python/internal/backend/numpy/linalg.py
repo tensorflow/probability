@@ -76,7 +76,7 @@ def _eye(num_rows, num_columns=None, batch_shape=None,
   dt = utils.numpy_dtype(dtype)
   x = np.eye(num_rows, num_columns).astype(dt)
   if batch_shape is not None:
-    x *= np.ones(np.concatenate([batch_shape, [1, 1]], axis=0)).astype(dt)
+    x = x * np.ones(np.concatenate([batch_shape, [1, 1]], axis=0)).astype(dt)
   return x
 
 

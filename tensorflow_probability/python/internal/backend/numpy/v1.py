@@ -27,6 +27,8 @@ import tensorflow as tf
 from tensorflow_probability.python.internal.backend.numpy import initializers
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
 from tensorflow_probability.python.internal.backend.numpy.internal import utils
+from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.ops import Module
 from tensorflow_probability.python.internal.backend.numpy.ops import name_scope
 from tensorflow_probability.python.internal.backend.numpy.ops import Variable
 
@@ -39,6 +41,7 @@ __all__ = [
     'assert_less',
     'assert_less_equal',
     'assert_near',
+    'assert_negative',
     'assert_non_negative',
     'assert_non_positive',
     'assert_none_equal',
@@ -54,6 +57,7 @@ __all__ = [
     'logging',
     'name_scope',
     'placeholder_with_default',
+    'Module',
     'Session',
     'set_random_seed',
 ]
@@ -92,6 +96,10 @@ def _assert_less_equal(*_, **__):  # pylint: disable=unused-argument
 
 
 def _assert_near(*_, **__):  # pylint: disable=unused-argument
+  pass
+
+
+def _assert_negative(*_, **__):  # pylint: disable=unused-argument
   pass
 
 
@@ -180,6 +188,10 @@ assert_less_equal = utils.copy_docstring(
 assert_near = utils.copy_docstring(
     tf.compat.v1.assert_near,
     _assert_near)
+
+assert_negative = utils.copy_docstring(
+    tf.compat.v1.assert_negative,
+    _assert_negative)
 
 assert_non_negative = utils.copy_docstring(
     tf.compat.v1.assert_non_negative,

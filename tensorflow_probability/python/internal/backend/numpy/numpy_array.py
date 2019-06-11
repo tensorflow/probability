@@ -49,6 +49,7 @@ __all__ = [
     'searchsorted',
     'shape',
     'size',
+    'slice',
     'split',
     'squeeze',
     'stack',
@@ -137,6 +138,14 @@ def _pad(  # pylint: disable=unused-argument
   raise NotImplementedError
 
 
+def _reverse(tensor, axis, name=None):  # pylint: disable=unused-argument
+  if np.array(axis).ndim == 0:
+    return np.flip(tensor, axis)
+  for ax in axis:
+    tensor = np.flip(tensor, ax)
+  return tensor
+
+
 def _searchsorted(  # pylint: disable=unused-argument
     sorted_sequence,
     values,
@@ -153,6 +162,30 @@ def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bu
 
 def _size(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin, unused-argument
   return np.prod(np.array(input).shape).astype(utils.numpy_dtype(out_type))
+
+
+builtin_slice = slice  # pylint: disable=invalid-name
+
+
+def _slice(input_, begin, size, name=None):  # pylint: disable=unused-argument,redefined-outer-name
+  slices = tuple(
+      builtin_slice(b, b + s if s != -1 else -1) for b, s in zip(begin, size))
+  return input_[slices]
+
+
+def _split(value, num_or_size_splits, axis=0, num=None, name='split'):  # pylint: disable=unused-argument
+  """Map tf.split -> np.split."""
+  indices_or_sections = num_or_size_splits
+  if np.array(indices_or_sections).ndim == 1:
+    if any(idx == -1 for idx in indices_or_sections):
+      # Numpy parameterizes by split indices and returns nsplits+1 arrays.
+      total_splits = sum(idx for idx in indices_or_sections if idx != -1)
+      remainder = max(0, np.array(value).shape[axis] - total_splits)
+      indices_or_sections = [
+          idx if idx != -1 else remainder for idx in indices_or_sections
+      ]
+    indices_or_sections = np.cumsum(indices_or_sections)[:-1]
+  return np.split(value, indices_or_sections, axis)
 
 
 def _transpose(a, perm=None, conjugate=False, name='transpose'):  # pylint: disable=unused-argument
@@ -194,9 +227,7 @@ gather_nd = utils.copy_docstring(
     tf.gather_nd,
     _gather_nd)
 
-reverse = utils.copy_docstring(
-    tf.reverse,
-    lambda tensor, axis, name=None: np.flip(tensor, axis))
+reverse = utils.copy_docstring(tf.reverse, _reverse)
 
 linspace = utils.copy_docstring(
     tf.linspace,
@@ -257,18 +288,17 @@ size = utils.copy_docstring(
     tf.size,
     _size)
 
-split = utils.copy_docstring(
-    tf.split,
-    lambda value, num_or_size_splits, axis=0, num=None, name='split': (  # pylint: disable=g-long-lambda
-        np.split(value, num_or_size_splits, axis)))
+slice = utils.copy_docstring(  # pylint: disable=redefined-builtin
+    tf.slice, _slice)
+
+split = utils.copy_docstring(tf.split, _split)
 
 squeeze = utils.copy_docstring(
     tf.squeeze,
     lambda input, axis=None, name=None: np.squeeze(input, axis))
 
 stack = utils.copy_docstring(
-    tf.stack,
-    lambda values, axis, name=None: np.stack(values, axis))
+    tf.stack, lambda values, axis=0, name=None: np.stack(values, axis))
 
 tile = utils.copy_docstring(
     tf.tile,

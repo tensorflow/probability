@@ -46,10 +46,7 @@ def _to_ndarray(x):
 
 
 def _adjoint(x):
-  x = np.array(x)
-  x_rank = len(x.shape)
-  return np.conjugate(
-      np.transpose(x, list(range(x_rank - 2)) + [x_rank - 1, x_rank - 2]))
+  return np.conj(np.transpose(x, axes=[-1, -2]))
 
 
 def _matmul_with_broadcast(a,
@@ -888,7 +885,7 @@ class LinearOperator(object):
     n = self.domain_dimension
 
     eye = np.eye(n, dtype=self.dtype)
-    eye *= np.ones(batch_shape, dtype=self.dtype)[..., None]
+    eye = eye * np.ones(batch_shape, dtype=self.dtype)[..., None]
 
     return self.matmul(eye)
 
@@ -1271,14 +1268,13 @@ class LinearOperatorLowerTriangular(LinearOperatorFullMatrix):
 # LinearOperators that definitely don't work are below.
 ################################################################################
 class LinearOperatorBlockDiag(LinearOperatorFullMatrix):
-  pass
+
+  def __new__(cls, *args, **kwargs):
+    raise NotImplementedError
 
 
 class LinearOperatorLowRankUpdate(LinearOperatorFullMatrix):
 
   def __new__(cls, *args, **kwargs):
-    kwargs.pop("diag_update", None)
-    kwargs.pop("is_diag_update_positive", None)
-    kwargs.pop("u", None)
-    return LinearOperatorFullMatrix(*args, **kwargs)
+    raise NotImplementedError
 

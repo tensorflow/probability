@@ -20,6 +20,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.internal.backend.numpy import compat
 from tensorflow_probability.python.internal.backend.numpy import debugging
+from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy import keras
 from tensorflow_probability.python.internal.backend.numpy import linalg
@@ -42,6 +43,7 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 eye = linalg.eye
 function = compat.function
 matmul = linalg.matmul
+Module = compat.v2.Module
 Variable = compat.v2.Variable
 Assert = debugging.Assert
 check_numerics = debugging.check_numerics

@@ -45,6 +45,7 @@ __all__ = [
     'newaxis',
     'stop_gradient',
     'GradientTape',
+    'Module',
     'TensorShape',
     'Variable',
     # 'gradients',
@@ -71,7 +72,7 @@ def _broadcast_static_shape(shape_x, shape_y):
 
 
 def _constant(value, dtype=None, shape=None, name='Const'):  # pylint: disable=unused-argument
-  x = np.array(value, dtype=utils.numpy_dtype(dtype or np.float))
+  x = np.array(value, dtype=None if dtype is None else utils.numpy_dtype(dtype))
   if shape is None:
     return x
   return np.reshape(x, shape)
@@ -86,7 +87,7 @@ def _control_dependencies(control_inputs):
 
 
 def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint: disable=unused-argument
-  assert not tf.is_tensor(value)
+  assert not tf.is_tensor(value), value
   return np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
 
 
@@ -228,3 +229,9 @@ def Variable(initial_value=None, trainable=True, validate_shape=True,  # pylint:
              import_scope=None, constraint=None):  # pylint: disable=unused-argument
   assert constraint is None
   return np.array(initial_value, dtype=dtype or np.float32)
+
+
+class Module(object):
+
+  def __init__(self, name):
+    self._name = name
