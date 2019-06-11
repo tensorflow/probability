@@ -26,7 +26,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal.backend.numpy.internal import utils
-from tensorflow_probability.python.internal.backend.numpy.math import softmax as _softmax
+from tensorflow_probability.python.internal.backend.numpy.numpy_math import softmax as _softmax
 
 
 __all__ = [

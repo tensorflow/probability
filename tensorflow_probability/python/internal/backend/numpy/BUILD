@@ -31,7 +31,6 @@ py_library(
     name = "numpy",
     srcs = ["__init__.py"],
     deps = [
-        ":array",
         ":compat",
         ":control_flow",
         ":debugging",
@@ -40,24 +39,15 @@ py_library(
         ":functional_ops",
         ":keras",
         ":linalg",
-        ":math",
         ":misc",
         ":nn",
+        ":numpy_array",
         ":numpy_logging",
+        ":numpy_math",
         ":ops",
         ":random_generators",
-        ":test",
+        ":test_lib",
         # tensorflow dep,
-    ],
-)
-
-py_library(
-    name = "array",
-    srcs = ["array.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -175,17 +165,6 @@ py_library(
 )
 
 py_library(
-    name = "math",
-    srcs = ["math.py"],
-    deps = [
-        # numpy dep,
-        # scipy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
-    ],
-)
-
-py_library(
     name = "misc",
     srcs = ["misc.py"],
     deps = [
@@ -199,7 +178,17 @@ py_library(
     name = "nn",
     srcs = ["nn.py"],
     deps = [
-        ":math",
+        ":numpy_math",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
+    name = "numpy_array",
+    srcs = ["numpy_array.py"],
+    deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
@@ -211,6 +200,17 @@ py_library(
     srcs = ["numpy_logging.py"],
     deps = [
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
+    name = "numpy_math",
+    srcs = ["numpy_math.py"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
@@ -230,7 +230,7 @@ py_library(
     name = "random_generators",
     srcs = ["random_generators.py"],
     deps = [
-        ":math",
+        ":numpy_math",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
@@ -238,8 +238,8 @@ py_library(
 )
 
 py_library(
-    name = "test",
-    srcs = ["test.py"],
+    name = "test_lib",
+    srcs = ["test_lib.py"],
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",

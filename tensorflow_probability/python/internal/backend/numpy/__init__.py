@@ -23,17 +23,18 @@ from tensorflow_probability.python.internal.backend.numpy import debugging
 from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy import keras
 from tensorflow_probability.python.internal.backend.numpy import linalg
-from tensorflow_probability.python.internal.backend.numpy import math
 from tensorflow_probability.python.internal.backend.numpy import nn
+from tensorflow_probability.python.internal.backend.numpy import numpy_array as array
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
+from tensorflow_probability.python.internal.backend.numpy import numpy_math as math
 from tensorflow_probability.python.internal.backend.numpy import random_generators as random
-from tensorflow_probability.python.internal.backend.numpy import test
-from tensorflow_probability.python.internal.backend.numpy.array import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy import test_lib as test
 from tensorflow_probability.python.internal.backend.numpy.control_flow import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.dtype import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.functional_ops import *  # pylint: disable=wildcard-import
-from tensorflow_probability.python.internal.backend.numpy.math import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.misc import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.numpy_math import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import *  # pylint: disable=wildcard-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
