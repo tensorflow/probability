@@ -39,8 +39,6 @@ jobs:
 python:
   - "2.7"
   - "3.5"
-virtualenv:
-  system_site_packages: true
 env:
   global:
     - NUM_SHARDS=3
