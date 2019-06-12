@@ -35,7 +35,6 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.training.tracking import data_structures  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -281,12 +280,12 @@ class _DistributionMeta(abc.ABCMeta):
         # this has nearly zero overhead. However, failing to do this, we will
         # resolve the input arguments dynamically and only when needed.
         dummy_self = tuple()
-        self_._parameters = data_structures.NoDependency(lambda: (  # pylint: disable=g-long-lambda
+        self_._parameters = self_._no_dependency(lambda: (  # pylint: disable=g-long-lambda
             _remove_dict_keys_with_value(
                 inspect.getcallargs(default_init, dummy_self, *args, **kwargs),
                 dummy_self)))
       elif hasattr(self_._parameters, 'pop'):
-        self_._parameters = data_structures.NoDependency(
+        self_._parameters = self_._no_dependency(
             _remove_dict_keys_with_value(self_._parameters, self_))
     # pylint: enable=protected-access
 
@@ -487,7 +486,7 @@ class Distribution(_BaseDistribution):
     self._reparameterization_type = reparameterization_type
     self._allow_nan_stats = allow_nan_stats
     self._validate_args = validate_args
-    self._parameters = data_structures.NoDependency(parameters)
+    self._parameters = self._no_dependency(parameters)
     self._parameters_sanitized = False
     self._graph_parents = graph_parents
     self._initial_parameter_control_dependencies = tuple(
@@ -576,7 +575,7 @@ class Distribution(_BaseDistribution):
     if (not hasattr(self, '_parameters_sanitized') or
         not self._parameters_sanitized):
       p = self._parameters() if callable(self._parameters) else self._parameters
-      self._parameters = data_structures.NoDependency({
+      self._parameters = self._no_dependency({
           k: v for k, v in p.items()
           if not k.startswith('__') and v is not self})
       self._parameters_sanitized = True

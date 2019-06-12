@@ -27,7 +27,6 @@ from tensorflow_probability.python.distributions import joint_distribution as jo
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.training.tracking import data_structures  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -195,7 +194,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       # Since we rely on `type(model)` and because `tf.Module` redefines
       # lists, tuples, dicts, we create two aliases of `model`.
       self._model_trackable = model
-      self._model = data_structures.NoDependency(model)
+      self._model = self._no_dependency(model)
       self._build(model)
       self._most_recently_built_distributions = [
           None if a else d() for d, a

@@ -560,6 +560,14 @@ class Bijector(tf.Module):
 
   """
 
+  _TF_MODULE_IGNORED_PROPERTIES = tf.Module._TF_MODULE_IGNORED_PROPERTIES.union(
+      (
+          '_graph_parents',
+          '_is_constant_jacobian',
+          '_from_y',
+          '_from_x',
+      ))
+
   @abc.abstractmethod
   def __init__(self,
                graph_parents=None,
@@ -615,15 +623,16 @@ class Bijector(tf.Module):
     super(Bijector, self).__init__(name=name)
     self._name = name
 
-    self._graph_parents = graph_parents or []
+    self._graph_parents = self._no_dependency(graph_parents or [])
 
     self._is_constant_jacobian = is_constant_jacobian
     # Keyed by the current graph.
-    self._constant_ildj = {}
+    self._constant_ildj = self._no_dependency({})
     self._validate_args = validate_args
     self._dtype = dtype
-    self._from_y = WeakKeyDefaultDict()
-    self._from_x = WeakKeyDefaultDict()
+
+    self._from_y = self._no_dependency(WeakKeyDefaultDict())
+    self._from_x = self._no_dependency(WeakKeyDefaultDict())
 
     self._initial_parameter_control_dependencies = tuple(
         d for d in self._parameter_control_dependencies(is_init=True)

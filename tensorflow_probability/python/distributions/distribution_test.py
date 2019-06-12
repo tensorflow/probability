@@ -20,7 +20,8 @@ import collections
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
@@ -39,7 +40,7 @@ class TupleDistribution(tfd.Distribution):
 
   @property
   def name(self):
-    return "TupleDistribution"
+    return 'TupleDistribution'
 
   @property
   def dtype(self):
@@ -63,7 +64,7 @@ class DictDistribution(tfd.Distribution):
 
   @property
   def name(self):
-    return "DictDistribution"
+    return 'DictDistribution'
 
   @property
   def dtype(self):
@@ -80,7 +81,7 @@ class DictDistribution(tfd.Distribution):
 
 class NamedTupleDistribution(tfd.Distribution):
 
-  class MyType(collections.namedtuple("MyType", "a b c")):
+  class MyType(collections.namedtuple('MyType', 'a b c')):
     __slots__ = ()
 
   def __init__(self):
@@ -90,7 +91,7 @@ class NamedTupleDistribution(tfd.Distribution):
 
   @property
   def name(self):
-    return "NamedTupleDistribution"
+    return 'NamedTupleDistribution'
 
   @property
   def dtype(self):
@@ -114,20 +115,20 @@ class DistributionStrReprTest(tf.test.TestCase):
     normal = tfd.Normal(loc=np.float16(0), scale=1)
     self.assertEqual(
         str(normal),
-        "tfp.distributions.Normal("
-        "\"Normal\", "
-        "batch_shape=[], "
-        "event_shape=[], "
-        "dtype=float16)")
+        'tfp.distributions.Normal('
+        '"Normal", '
+        'batch_shape=[], '
+        'event_shape=[], '
+        'dtype=float16)')
 
-    chi2 = tfd.Chi2(df=np.float32([1., 2.]), name="silly")
+    chi2 = tfd.Chi2(df=np.float32([1., 2.]), name='silly')
     self.assertEqual(
         str(chi2),
-        "tfp.distributions.Chi2("
-        "\"silly\", "  # What a silly name that is!
-        "batch_shape=[2], "
-        "event_shape=[], "
-        "dtype=float32)")
+        'tfp.distributions.Chi2('
+        '"silly", '  # What a silly name that is!
+        'batch_shape=[2], '
+        'event_shape=[], '
+        'dtype=float32)')
 
     # There's no notion of partially known shapes in eager mode, so exit
     # early.
@@ -135,24 +136,24 @@ class DistributionStrReprTest(tf.test.TestCase):
       return
 
     exp = tfd.Exponential(
-        rate=tf.compat.v1.placeholder_with_default(input=1., shape=None))
+        rate=tf1.placeholder_with_default(input=1., shape=None))
     self.assertEqual(
         str(exp),
-        "tfp.distributions.Exponential(\"Exponential\", "
+        'tfp.distributions.Exponential("Exponential", '
         # No batch shape.
-        "event_shape=[], "
-        "dtype=float32)")
+        'event_shape=[], '
+        'dtype=float32)')
 
   def testStrWorksCorrectlyMultivariate(self):
     mvn_static = tfd.MultivariateNormalDiag(
-        loc=np.zeros([2, 2]), name="MVN")
+        loc=np.zeros([2, 2]), name='MVN')
     self.assertEqual(
         str(mvn_static),
-        "tfp.distributions.MultivariateNormalDiag("
-        "\"MVN\", "
-        "batch_shape=[2], "
-        "event_shape=[2], "
-        "dtype=float64)")
+        'tfp.distributions.MultivariateNormalDiag('
+        '"MVN", '
+        'batch_shape=[2], '
+        'event_shape=[2], '
+        'dtype=float64)')
 
     # There's no notion of partially known shapes in eager mode, so exit
     # early.
@@ -160,35 +161,35 @@ class DistributionStrReprTest(tf.test.TestCase):
       return
 
     mvn_dynamic = tfd.MultivariateNormalDiag(
-        loc=tf.compat.v1.placeholder_with_default(
+        loc=tf1.placeholder_with_default(
             input=np.ones((3, 3), dtype=np.float32), shape=[None, 3]),
-        name="MVN2")
+        name='MVN2')
     self.assertEqual(
         str(mvn_dynamic),
-        "tfp.distributions.MultivariateNormalDiag("
-        "\"MVN2\", "
-        "batch_shape=[?], "  # Partially known.
-        "event_shape=[3], "
-        "dtype=float32)")
+        'tfp.distributions.MultivariateNormalDiag('
+        '"MVN2", '
+        'batch_shape=[?], '  # Partially known.
+        'event_shape=[3], '
+        'dtype=float32)')
 
   def testReprWorksCorrectlyScalar(self):
     normal = tfd.Normal(loc=np.float16(0), scale=np.float16(1))
     self.assertEqual(
         repr(normal),
-        "<tfp.distributions.Normal"
-        " 'Normal'"
-        " batch_shape=[]"
-        " event_shape=[]"
-        " dtype=float16>")
+        '<tfp.distributions.Normal'
+        ' \'Normal\''
+        ' batch_shape=[]'
+        ' event_shape=[]'
+        ' dtype=float16>')
 
-    chi2 = tfd.Chi2(df=np.float32([1., 2.]), name="silly")
+    chi2 = tfd.Chi2(df=np.float32([1., 2.]), name='silly')
     self.assertEqual(
         repr(chi2),
-        "<tfp.distributions.Chi2"
-        " 'silly'"  # What a silly name that is!
-        " batch_shape=[2]"
-        " event_shape=[]"
-        " dtype=float32>")
+        '<tfp.distributions.Chi2'
+        ' \'silly\''  # What a silly name that is!
+        ' batch_shape=[2]'
+        ' event_shape=[]'
+        ' dtype=float32>')
 
     # There's no notion of partially known shapes in eager mode, so exit
     # early.
@@ -196,25 +197,25 @@ class DistributionStrReprTest(tf.test.TestCase):
       return
 
     exp = tfd.Exponential(
-        rate=tf.compat.v1.placeholder_with_default(input=1., shape=None))
+        rate=tf1.placeholder_with_default(input=1., shape=None))
     self.assertEqual(
         repr(exp),
-        "<tfp.distributions.Exponential"
-        " 'Exponential'"
-        " batch_shape=?"
-        " event_shape=[]"
-        " dtype=float32>")
+        '<tfp.distributions.Exponential'
+        ' \'Exponential\''
+        ' batch_shape=?'
+        ' event_shape=[]'
+        ' dtype=float32>')
 
   def testReprWorksCorrectlyMultivariate(self):
     mvn_static = tfd.MultivariateNormalDiag(
-        loc=np.zeros([2, 2]), name="MVN")
+        loc=np.zeros([2, 2]), name='MVN')
     self.assertEqual(
         repr(mvn_static),
-        "<tfp.distributions.MultivariateNormalDiag"
-        " 'MVN'"
-        " batch_shape=[2]"
-        " event_shape=[2]"
-        " dtype=float64>")
+        '<tfp.distributions.MultivariateNormalDiag'
+        ' \'MVN\''
+        ' batch_shape=[2]'
+        ' event_shape=[2]'
+        ' dtype=float64>')
 
     # There's no notion of partially known shapes in eager mode, so exit
     # early.
@@ -222,64 +223,64 @@ class DistributionStrReprTest(tf.test.TestCase):
       return
 
     mvn_dynamic = tfd.MultivariateNormalDiag(
-        loc=tf.compat.v1.placeholder_with_default(
+        loc=tf1.placeholder_with_default(
             input=np.ones((3, 3), dtype=np.float32), shape=[None, 3]),
-        name="MVN2")
+        name='MVN2')
     self.assertEqual(
         repr(mvn_dynamic),
-        "<tfp.distributions.MultivariateNormalDiag"
-        " 'MVN2'"
-        " batch_shape=[?]"  # Partially known.
-        " event_shape=[3]"
-        " dtype=float32>")
+        '<tfp.distributions.MultivariateNormalDiag'
+        ' \'MVN2\''
+        ' batch_shape=[?]'  # Partially known.
+        ' event_shape=[3]'
+        ' dtype=float32>')
 
   def testStrWorksCorrectlyTupleDistribution(self):
     self.assertEqual(
         str(TupleDistribution()),
-        "tfp.distributions.TupleDistribution(\"TupleDistribution\","
-        " batch_shape=(?, ?, [?, 2]),"
-        " event_shape=(?, [3, ?], ?),"
-        " dtype=(float16, ?, int32))")
+        'tfp.distributions.TupleDistribution("TupleDistribution",'
+        ' batch_shape=(?, ?, [?, 2]),'
+        ' event_shape=(?, [3, ?], ?),'
+        ' dtype=(float16, ?, int32))')
 
   def testReprWorksCorrectlyTupleDistribution(self):
     self.assertEqual(
         repr(TupleDistribution()),
-        "<tfp.distributions.TupleDistribution 'TupleDistribution'"
-        " batch_shape=(?, ?, [?, 2])"
-        " event_shape=(?, [3, ?], ?)"
-        " dtype=(float16, ?, int32)>")
+        '<tfp.distributions.TupleDistribution \'TupleDistribution\''
+        ' batch_shape=(?, ?, [?, 2])'
+        ' event_shape=(?, [3, ?], ?)'
+        ' dtype=(float16, ?, int32)>')
 
   def testStrWorksCorrectlyDictDistribution(self):
     self.assertEqual(
         str(DictDistribution()),
-        "tfp.distributions.DictDistribution(\"DictDistribution\","
-        " batch_shape={a: ?, b: ?, c: [?, 2]},"
-        " event_shape={a: ?, b: [3, ?], c: ?},"
-        " dtype={a: float16, b: ?, c: int32})")
+        'tfp.distributions.DictDistribution("DictDistribution",'
+        ' batch_shape={a: ?, b: ?, c: [?, 2]},'
+        ' event_shape={a: ?, b: [3, ?], c: ?},'
+        ' dtype={a: float16, b: ?, c: int32})')
 
   def testReprWorksCorrectlyDictDistribution(self):
     self.assertEqual(
         repr(DictDistribution()),
-        "<tfp.distributions.DictDistribution 'DictDistribution'"
-        " batch_shape={a: ?, b: ?, c: [?, 2]}"
-        " event_shape={a: ?, b: [3, ?], c: ?}"
-        " dtype={a: float16, b: ?, c: int32}>")
+        '<tfp.distributions.DictDistribution \'DictDistribution\''
+        ' batch_shape={a: ?, b: ?, c: [?, 2]}'
+        ' event_shape={a: ?, b: [3, ?], c: ?}'
+        ' dtype={a: float16, b: ?, c: int32}>')
 
   def testStrWorksCorrectlyNamedTupleDistribution(self):
     self.assertEqual(
         str(NamedTupleDistribution()),
-        "tfp.distributions.NamedTupleDistribution(\"NamedTupleDistribution\","
-        " batch_shape=MyType(a=?, b=?, c=[?, 2]),"
-        " event_shape=MyType(a=?, b=[3, ?], c=?),"
-        " dtype=MyType(a=float16, b=?, c=int32))")
+        'tfp.distributions.NamedTupleDistribution("NamedTupleDistribution",'
+        ' batch_shape=MyType(a=?, b=?, c=[?, 2]),'
+        ' event_shape=MyType(a=?, b=[3, ?], c=?),'
+        ' dtype=MyType(a=float16, b=?, c=int32))')
 
   def testReprWorksCorrectlyNamedTupleDistribution(self):
     self.assertEqual(
         repr(NamedTupleDistribution()),
-        "<tfp.distributions.NamedTupleDistribution 'NamedTupleDistribution'"
-        " batch_shape=MyType(a=?, b=?, c=[?, 2])"
-        " event_shape=MyType(a=?, b=[3, ?], c=?)"
-        " dtype=MyType(a=float16, b=?, c=int32)>")
+        '<tfp.distributions.NamedTupleDistribution \'NamedTupleDistribution\''
+        ' batch_shape=MyType(a=?, b=?, c=[?, 2])'
+        ' event_shape=MyType(a=?, b=[3, ?], c=?)'
+        ' dtype=MyType(a=float16, b=?, c=int32)>')
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -327,7 +328,7 @@ class DistributionTest(tf.test.TestCase):
     base_params = normal.parameters.copy()
     copy_params = normal.copy(validate_args=False).parameters.copy()
     self.assertNotEqual(
-        base_params.pop("validate_args"), copy_params.pop("validate_args"))
+        base_params.pop('validate_args'), copy_params.pop('validate_args'))
     self.assertEqual(base_params, copy_params)
 
   def testIsScalar(self):
@@ -354,14 +355,14 @@ class DistributionTest(tf.test.TestCase):
     # function.
 
     # Test case 1, 2.
-    x = tf.compat.v1.placeholder_with_default(input=1, shape=[])
+    x = tf1.placeholder_with_default(input=1, shape=[])
     # None would fire an exception were it actually executed.
     self.assertTrue(normal._is_scalar_helper(x.shape, lambda: None))
     self.assertTrue(
         normal._is_scalar_helper(
             tf.TensorShape(None), lambda: tf.shape(input=x)))
 
-    x = tf.compat.v1.placeholder_with_default(input=[1], shape=[1])
+    x = tf1.placeholder_with_default(input=[1], shape=[1])
     # None would fire an exception were it actually executed.
     self.assertFalse(normal._is_scalar_helper(x.shape, lambda: None))
     self.assertFalse(
@@ -374,11 +375,11 @@ class DistributionTest(tf.test.TestCase):
       return
 
     # Test case 3.
-    x = tf.compat.v1.placeholder_with_default(input=1, shape=None)
+    x = tf1.placeholder_with_default(input=1, shape=None)
     is_scalar = normal._is_scalar_helper(x.shape, lambda: tf.shape(input=x))
     self.assertTrue(self.evaluate(is_scalar))
 
-    x = tf.compat.v1.placeholder_with_default(input=[1], shape=None)
+    x = tf1.placeholder_with_default(input=[1], shape=None)
     is_scalar = normal._is_scalar_helper(x.shape, lambda: tf.shape(input=x))
     self.assertFalse(self.evaluate(is_scalar))
 
@@ -394,7 +395,7 @@ class DistributionTest(tf.test.TestCase):
             reparameterization_type=tfd.NOT_REPARAMETERIZED,
             validate_args=True,
             allow_nan_stats=True,
-            name="DummyDistribution")
+            name='DummyDistribution')
 
       def _batch_shape(self):
         return self._static_batch_shape
@@ -413,7 +414,7 @@ class DistributionTest(tf.test.TestCase):
     fake_distribution = self._GetFakeDistribution()
 
     # Make a new session since we're playing with static shapes. [And below.]
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[2, 3], event_shape=[5])
     sample_shape = tf.convert_to_tensor(value=[6, 7], dtype=tf.int32)
@@ -422,14 +423,14 @@ class DistributionTest(tf.test.TestCase):
     # unknown values, ie, Dimension(None).
     self.assertAllEqual([6, 7, 2, 3, 5], tensorshape_util.as_list(y.shape))
 
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[None, 3], event_shape=[5])
     sample_shape = tf.convert_to_tensor(value=[6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
     self.assertAllEqual([6, 7, None, 3, 5], tensorshape_util.as_list(y.shape))
 
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[None, 3], event_shape=[None])
     sample_shape = tf.convert_to_tensor(value=[6, 7], dtype=tf.int32)
@@ -437,14 +438,14 @@ class DistributionTest(tf.test.TestCase):
     self.assertAllEqual([6, 7, None, 3, None],
                         tensorshape_util.as_list(y.shape))
 
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=None, event_shape=None)
     sample_shape = tf.convert_to_tensor(value=[6, 7], dtype=tf.int32)
     y = dist._set_sample_static_shape(x, sample_shape)
     self.assertIsNone(tensorshape_util.rank(y.shape))
 
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         input=np.ones((6, 7, 2, 3, 5), dtype=np.float32), shape=None)
     dist = fake_distribution(batch_shape=[None, 3], event_shape=None)
     # There's no notion of partially known shapes in eager mode, so exit
@@ -454,28 +455,28 @@ class DistributionTest(tf.test.TestCase):
     self.assertIsNone(tensorshape_util.rank(y.shape))
 
   def testNameScopeWorksCorrectly(self):
-    x = tfd.Normal(loc=0., scale=1., name="x")
-    x_duplicate = tfd.Normal(loc=0., scale=1., name="x")
-    with tf.compat.v2.name_scope("y") as name:
+    x = tfd.Normal(loc=0., scale=1., name='x')
+    x_duplicate = tfd.Normal(loc=0., scale=1., name='x')
+    with tf.name_scope('y') as name:
       y = tfd.Bernoulli(logits=0., name=name)
-    x_sample = x.sample(name="custom_sample")
-    x_sample_duplicate = x.sample(name="custom_sample")
-    x_log_prob = x.log_prob(0., name="custom_log_prob")
-    x_duplicate_sample = x_duplicate.sample(name="custom_sample")
+    x_sample = x.sample(name='custom_sample')
+    x_sample_duplicate = x.sample(name='custom_sample')
+    x_log_prob = x.log_prob(0., name='custom_log_prob')
+    x_duplicate_sample = x_duplicate.sample(name='custom_sample')
 
-    self.assertStartsWith(x.name, "x")
-    self.assertStartsWith(y.name, "y")
+    self.assertStartsWith(x.name, 'x')
+    self.assertStartsWith(y.name, 'y')
 
     # There's no notion of graph, hence the same name will be reused.
     # Tensors also do not have names in eager mode, so exit early.
     if tf.executing_eagerly():
       return
-    self.assertStartsWith(x_sample.name, "x_2/custom_sample")
-    self.assertStartsWith(x_log_prob.name, "x_4/custom_log_prob")
+    self.assertStartsWith(x_sample.name, 'x_2/custom_sample')
+    self.assertStartsWith(x_log_prob.name, 'x_4/custom_log_prob')
 
-    self.assertStartsWith(x_duplicate.name, "x_1")
-    self.assertStartsWith(x_duplicate_sample.name, "x_1_1/custom_sample")
-    self.assertStartsWith(x_sample_duplicate.name, "x_3/custom_sample")
+    self.assertStartsWith(x_duplicate.name, 'x_1')
+    self.assertStartsWith(x_duplicate_sample.name, 'x_1_1/custom_sample')
+    self.assertStartsWith(x_sample_duplicate.name, 'x_3/custom_sample')
 
   def testUnimplemtnedProbAndLogProbExceptions(self):
     class TerribleDistribution(tfd.Distribution):
@@ -489,30 +490,30 @@ class DistributionTest(tf.test.TestCase):
 
     terrible_distribution = TerribleDistribution()
     with self.assertRaisesRegexp(
-        NotImplementedError, "prob is not implemented"):
+        NotImplementedError, 'prob is not implemented'):
       terrible_distribution.prob(1.)
     with self.assertRaisesRegexp(
-        NotImplementedError, "log_prob is not implemented"):
+        NotImplementedError, 'log_prob is not implemented'):
       terrible_distribution.log_prob(1.)
     with self.assertRaisesRegexp(
-        NotImplementedError, "cdf is not implemented"):
+        NotImplementedError, 'cdf is not implemented'):
       terrible_distribution.cdf(1.)
     with self.assertRaisesRegexp(
-        NotImplementedError, "log_cdf is not implemented"):
+        NotImplementedError, 'log_cdf is not implemented'):
       terrible_distribution.log_cdf(1.)
 
   def testNotIterable(self):
     normal = tfd.Normal(loc=0., scale=1.)
     with self.assertRaisesRegexp(
         TypeError,
-        "'Normal' object is not iterable"
+        '\'Normal\' object is not iterable'
     ):
       list(normal)
 
 
 class Dummy(tfd.Distribution):
 
-  # To ensure no code is keying on the unspecial name "self", we use "me".
+  # To ensure no code is keying on the unspecial name 'self', we use 'me'.
   def __init__(me, arg1, arg2, arg3=None, **named):  # pylint: disable=no-self-argument
     super(Dummy, me).__init__(
         dtype=tf.float32,
@@ -530,7 +531,7 @@ class ParametersTest(tf.test.TestCase):
   def testParameters(self):
     d = Dummy(1., arg2=2.)
     actual_d_parameters = d.parameters
-    self.assertEqual({"arg1": 1., "arg2": 2., "arg3": None, "named": {}},
+    self.assertEqual({'arg1': 1., 'arg2': 2., 'arg3': None, 'named': {}},
                      actual_d_parameters)
     self.assertEqual(actual_d_parameters, d.parameters)
 
@@ -559,6 +560,16 @@ class TfModuleTest(tf.test.TestCase):
     self.assertIsInstance(normal, tf.Module)
     self.assertEqual((scale,), normal.trainable_variables)
 
+  def test_gradient(self):
+    scale = tf.Variable(1.)
+    normal = tfd.Normal(loc=0, scale=scale, validate_args=True)
+    self.assertEqual((scale,), normal.trainable_variables)
+    with tf.GradientTape() as tape:
+      loss = -normal.log_prob(0.)
+    g = tape.gradient(loss, normal.trainable_variables)
+    self.evaluate(tf1.global_variables_initializer())
+    self.assertEqual((1.,), self.evaluate(g))
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
   tf.test.main()
