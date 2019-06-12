@@ -622,9 +622,9 @@ class _HiddenMarkovModelTest(
 
     observations = tf.constant([1, 0, 3, 1, 3, 0, 2, 1, 2, 1, 3, 0, 0, 1, 1, 2])
     observations_permuted = tf.transpose(
-        a=tf.compat.v1.batch_gather(tf.expand_dims(tf.transpose(a=permutations),
-                                                   axis=-1),
-                                    observations)[..., 0])
+        a=tf.gather(tf.transpose(a=permutations)[..., tf.newaxis],
+                    observations,
+                    batch_dims=observations.shape.ndims-1)[..., 0])
 
     model = tfd.HiddenMarkovModel(
         tfd.Categorical(probs=initial_prob),

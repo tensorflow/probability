@@ -28,7 +28,6 @@ from tensorflow_probability.python.internal.backend.numpy.linalg import norm
 
 
 __all__ = [
-    'batch_gather',
     'concat',
     'expand_dims',
     'fill',
@@ -65,13 +64,6 @@ __all__ = [
     # 'foldr',
     # 'tensordot',
 ]
-
-
-def _batch_gather(  # pylint: disable=unused-argument
-    params,
-    indices,
-    name=None):
-  raise NotImplementedError
 
 
 def _gather(  # pylint: disable=unused-argument
@@ -202,10 +194,6 @@ def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-buil
 
 # --- Begin Public Functions --------------------------------------------------
 
-
-batch_gather = utils.copy_docstring(
-    tf.compat.v1.batch_gather,
-    _gather)
 
 concat = utils.copy_docstring(
     tf.concat,

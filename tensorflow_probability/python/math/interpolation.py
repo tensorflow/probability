@@ -47,11 +47,9 @@ def _interp_regular_1d_grid_impl(x,
                                  grid_regularizing_transform=None,
                                  name=None):
   """1-D interpolation that works with/without batching."""
-  # To understand the implemention differences between the batch/no-batch
-  # versions of this function, you should probably understand the difference
-  # between tf.gather and tf.batch_gather.  In particular, we do *not* make the
-  # no-batch version a special case of the batch version, because that would
-  # an inefficient use of batch_gather with unnecessarily broadcast args.
+  # Note: we do *not* make the no-batch version a special case of the batch
+  # version, because that would an inefficient use of batch_gather with
+  # unnecessarily broadcast args.
   with tf.compat.v1.name_scope(
       name,
       values=[
@@ -953,7 +951,7 @@ def _batch_gather_with_broadcast(params, indices, axis):
   indices += tf.zeros(
       tf.concat((leading_bcast_shape, tf.shape(input=indices)[-1:]), axis=0),
       dtype=indices.dtype)
-  return tf.compat.v1.batch_gather(params, indices)
+  return tf.gather(params, indices, batch_dims=indices.shape.ndims-1)
 
 
 def _binary_count(n):

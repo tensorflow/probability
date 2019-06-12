@@ -105,7 +105,7 @@ py_library(
 
 py_test(
     name = "interpolation_test",
-    size = "small",
+    size = "medium",
     srcs = ["interpolation_test.py"],
     deps = [
         # numpy dep,
