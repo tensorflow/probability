@@ -100,7 +100,7 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
   import matplotlib.pyplot as plt
   import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
-  from tensorflow_probability.python.mcmc.hmc.internal import leapfrog_integrator as leapfrog_impl
+  from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
   tf.enable_v2_behavior()
 
   dims = 10
@@ -109,7 +109,7 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
   target_fn = tfp.distributions.MultivariateNormalDiag(
       loc=tf.zeros(dims, dtype)).log_prob
 
-  integrator = leapfrog_impl.LeapfrogIntegrator(
+  integrator = leapfrog_impl.SimpleLeapfrogIntegrator(
       target_fn,
       step_sizes=[0.1],
       num_steps=3)
@@ -124,7 +124,7 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
   for i in range(num_iter):
     [momentum, position, target, target_grad_parts] = integrator(
         momentum, position, target, target_grad_parts)
-    positions[i] = position[0]
+    positions = tf.tensor_scatter_nd_update(positions, [[i]], position)
 
   plt.plot(positions[:, 0]);  # Sinusoidal.
   ```
