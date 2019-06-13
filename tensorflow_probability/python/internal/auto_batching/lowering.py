@@ -190,9 +190,6 @@ class ControlFlowGraphBuilder(object):
       target: The block to jump to.
     """
     self.cur_block().terminator = inst.GotoOp(target)
-    # Insurance against having only 2 switch arms, which triggers a bug in
-    # tensorflow/compiler/jit/deadness_analysis.
-    self.append_block(inst.Block(instructions=[], terminator=inst.halt_op()))
 
   def maybe_adjust_terminator(self):
     """May change the last block's terminator instruction to a return.
