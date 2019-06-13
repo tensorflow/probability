@@ -140,7 +140,6 @@ def _run_block(graph, index, env_dict, backend):
   block = graph.block(index)
   logging.debug('Staging block %d:\n%s', index, block)
   mask = backend.equal(program_counter, index)
-  environment[inst.pc_var] = environment.pop(inst.pc_var, mask)
   def as_index(block):
     return backend.broadcast_to_shape_of(
         graph.block_index(block), program_counter)
@@ -175,23 +174,19 @@ def _run_block(graph, index, env_dict, backend):
     condition = environment.read(op.cond_var)
     next_index = backend.where(
         condition, as_index(op.true_block), as_index(op.false_block))
-    new_vars = []
+    environment[inst.pc_var] = environment.update(inst.pc_var, next_index, mask)
   elif isinstance(op, inst.GotoOp):
-    new_vars = []
-    next_index = as_index(op.block)
+    environment[inst.pc_var] = environment.update(
+        inst.pc_var, as_index(op.block), mask)
   elif isinstance(op, inst.PushGotoOp):
-    push_index = as_index(op.push_block)
-    new_vars = [(inst.pc_var, environment.push(
-        inst.pc_var, push_index, mask))]
-    next_index = as_index(op.goto_block)
+    environment[inst.pc_var] = environment.update(
+        inst.pc_var, as_index(op.push_block), mask)
+    environment[inst.pc_var] = environment.push(
+        inst.pc_var, as_index(op.goto_block), mask)
   elif isinstance(op, inst.IndirectGotoOp):
-    next_index = environment.read(inst.pc_var)
-    new_vars = [(inst.pc_var, environment.pop(inst.pc_var, mask))]
+    environment[inst.pc_var] = environment.pop(inst.pc_var, mask)
   else:
     raise TypeError('Unexpected op type: {}'.format(type(op)))
-  environment = inst.Environment(
-      environment.env_dict, environment.backend, update=new_vars)
-  environment[inst.pc_var] = environment.push(inst.pc_var, next_index, mask)
   return environment.env_dict
 
 
