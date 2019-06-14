@@ -804,13 +804,14 @@ py_library(
     name = "multinomial",
     srcs = ["multinomial.py"],
     deps = [
+        ":categorical",
         ":distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
-        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1821,6 +1822,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

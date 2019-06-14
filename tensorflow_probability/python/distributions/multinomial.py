@@ -20,16 +20,17 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.distributions import categorical as categorical_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
-    "Multinomial",
+    'Multinomial',
 ]
 
 
@@ -149,7 +150,7 @@ class Multinomial(distribution.Distribution):
                probs=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="Multinomial"):
+               name='Multinomial'):
     """Initialize a batch of Multinomial distributions.
 
     Args:
@@ -172,36 +173,31 @@ class Multinomial(distribution.Distribution):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
-        (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+        (e.g., mean, mode, variance) use the value '`NaN`' to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
+
+    if (probs is None) == (logits is None):
+      raise ValueError('Must pass probs or logits, but not both.')
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
-      self._total_count = tf.convert_to_tensor(
-          value=total_count, name="total_count", dtype=dtype)
-      if validate_args:
-        self._total_count = (
-            distribution_util.embed_check_nonnegative_integer_form(
-                self._total_count))
-      self._logits, self._probs = distribution_util.get_logits_and_probs(
-          logits=logits,
-          probs=probs,
-          multidimensional=True,
+      dtype = dtype_util.common_dtype([total_count, logits, probs],
+                                      preferred_dtype=tf.float32)
+      self._total_count = tensor_util.convert_immutable_to_tensor(
+          total_count, name='total_count', dtype=dtype)
+      self._probs = tensor_util.convert_immutable_to_tensor(
+          probs, dtype=dtype, name='probs')
+      self._logits = tensor_util.convert_immutable_to_tensor(
+          logits, dtype=dtype, name='logits')
+      super(Multinomial, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
-          name=name,
-          dtype=dtype)
-      self._mean_val = self._total_count[..., tf.newaxis] * self._probs
-    super(Multinomial, self).__init__(
-        dtype=dtype,
-        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._total_count, self._logits, self._probs],
-        name=name)
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -219,67 +215,103 @@ class Multinomial(distribution.Distribution):
 
   @property
   def probs(self):
-    """Probability of drawing a `1` in that coordinate."""
+    """Vector of coordinatewise probabilities."""
     return self._probs
 
+  def logits_tensor(self, name=None):
+    """Vector of coordinatewise logits."""
+    with self._name_and_control_scope(name or 'logits_tensor'):
+      if self.logits is None:
+        return tf.math.log(self.probs, name='logits')
+      return tf.identity(self.logits, name='logits')
+
+  def probs_tensor(self, name=None):
+    """Vector of coordinatewise probabilities."""
+    with self._name_and_control_scope(name or 'probs_tensor'):
+      if self.logits is None:
+        return tf.identity(self.probs, name='probs')
+      return tf.nn.softmax(self.logits, name='probs')
+
+  def log_probs(self, name=None):
+    """Vector of coordinatewise log-probabilities."""
+    with self._name_and_control_scope(name or 'probs_tensor'):
+      if self.logits is None:
+        return tf.math.log(self.probs, name='log_probs')
+      return tf.nn.log_softmax(self.logits, name='log_probs')
+
   def _batch_shape_tensor(self):
-    return tf.shape(input=self._mean_val)[:-1]
+    return tf.broadcast_dynamic_shape(
+        tf.shape(self.probs if self.logits is None else self.logits)[:-1],
+        tf.shape(self.total_count))
 
   def _batch_shape(self):
-    return tensorshape_util.with_rank_at_least(self._mean_val.shape, 1)[:-1]
+    return tf.broadcast_static_shape(
+        (self.probs if self.logits is None else self.logits).shape[:-1],
+        self.total_count.shape)
 
   def _event_shape_tensor(self):
-    return tf.shape(input=self._mean_val)[-1:]
+    # We will never broadcast the num_categories with total_count.
+    return tf.shape(self.probs if self.logits is None else self.logits)[-1:]
 
   def _event_shape(self):
-    return tensorshape_util.with_rank_at_least(self._mean_val.shape, 1)[-1:]
+    # We will never broadcast the num_categories with total_count.
+    return (self.probs if self.logits is None else self.logits).shape[-1:]
 
   def _sample_n(self, n, seed=None):
     n_draws = tf.cast(self.total_count, dtype=tf.int32)
-    k = self.event_shape_tensor()[0]
-
-    return draw_sample(n, k, self.logits, n_draws, self.dtype, seed)
+    logits = self.logits_tensor()
+    k = tf.compat.dimension_value(logits.shape[-1])
+    if k is None:
+      k = tf.shape(logits)[-1]
+    return draw_sample(n, k, logits, n_draws, self.dtype, seed)
 
   @distribution_util.AppendDocstring(_multinomial_sample_note)
   def _log_prob(self, counts):
-    return self._log_unnormalized_prob(counts) - self._log_normalization(counts)
-
-  def _log_unnormalized_prob(self, counts):
-    counts = self._maybe_assert_valid_sample(counts)
-    return tf.reduce_sum(
-        input_tensor=counts * tf.nn.log_softmax(self.logits), axis=-1)
-
-  def _log_normalization(self, counts):
-    counts = self._maybe_assert_valid_sample(counts)
-    return -distribution_util.log_combinations(self.total_count, counts)
+    with tf.control_dependencies(self._maybe_assert_valid_sample(counts)):
+      log_p = self.log_probs()
+      k = tf.convert_to_tensor(self.total_count)
+      return (
+          tf.reduce_sum(counts * log_p, axis=-1) +        # log_unnorm_prob
+          distribution_util.log_combinations(k, counts))  # -log_normalization
 
   def _mean(self):
-    return tf.identity(self._mean_val)
+    p = self.probs_tensor()
+    k = tf.convert_to_tensor(self.total_count)
+    return k[..., tf.newaxis] * p
 
   def _covariance(self):
-    p = self.probs * tf.ones_like(
-        self.total_count)[..., tf.newaxis]
+    p = self.probs_tensor()
+    k = tf.convert_to_tensor(self.total_count)
     return tf.linalg.set_diag(
-        -tf.matmul(self._mean_val[..., tf.newaxis],
-                   p[..., tf.newaxis, :]),  # outer product
-        self._variance())
+        (-k[..., tf.newaxis, tf.newaxis] *
+         (p[..., :, tf.newaxis] * p[..., tf.newaxis, :])),  # Outer product.
+        k[..., tf.newaxis] * p * (1. - p))
 
   def _variance(self):
-    p = self.probs * tf.ones_like(
-        self.total_count)[..., tf.newaxis]
-    return self._mean_val - self._mean_val * p
+    p = self.probs_tensor()
+    k = tf.convert_to_tensor(self.total_count)
+    return k[..., tf.newaxis] * p * (1. - p)
 
   def _maybe_assert_valid_sample(self, counts):
     """Check counts for proper shape, values, then return tensor version."""
     if not self.validate_args:
-      return counts
-    counts = distribution_util.embed_check_nonnegative_integer_form(counts)
-    return distribution_util.with_dependencies([
-        assert_util.assert_equal(
-            self.total_count,
-            tf.reduce_sum(input_tensor=counts, axis=-1),
-            message="counts must sum to `self.total_count`"),
-    ], counts)
+      return []
+    assertions = distribution_util.assert_nonnegative_integer_form(counts)
+    assertions.append(assert_util.assert_equal(
+        self.total_count,
+        tf.reduce_sum(counts, axis=-1),
+        message='counts must sum to `self.total_count`'))
+    return assertions
+
+  def _parameter_control_dependencies(self, is_init):
+    assertions = categorical_lib.maybe_assert_categorical_param_correctness(
+        is_init, self.validate_args, self.probs, self.logits)
+    if not self.validate_args:
+      return assertions
+    if is_init != tensor_util.is_mutable(self.total_count):
+      assertions.extend(distribution_util.assert_nonnegative_integer_form(
+          self.total_count))
+    return assertions
 
 
 def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
@@ -302,7 +334,7 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
   Returns:
     samples: Tensor of given dtype and shape [n] + batch_shape + [k].
   """
-  with tf.name_scope("multinomial.draw_sample"):
+  with tf.name_scope('draw_sample'):
     # broadcast the num_trials and logits to same shape
     num_trials = tf.ones_like(
         logits[..., 0], dtype=num_trials.dtype) * num_trials
