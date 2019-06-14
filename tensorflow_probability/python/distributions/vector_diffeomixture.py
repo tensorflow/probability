@@ -34,7 +34,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.ops.linalg import linear_operator_addition as linop_add_lib
+from tensorflow.python.ops.linalg import linear_operator_addition as linop_add_lib  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -421,7 +421,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
                   k, dtype_util.name(scale_.dtype), dtype_util.name(dtype)))
 
       self._endpoint_affine = [
-          affine_linear_operator_bijector.AffineLinearOperator(
+          affine_linear_operator_bijector.AffineLinearOperator(  # pylint: disable=g-complex-comprehension
               shift=loc_, scale=scale_,
               validate_args=validate_args,
               name="endpoint_affine_{}".format(k))
@@ -459,7 +459,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
       self._distribution = distribution
 
       self._interpolated_affine = [
-          affine_linear_operator_bijector.AffineLinearOperator(
+          affine_linear_operator_bijector.AffineLinearOperator(  # pylint: disable=g-complex-comprehension
               shift=loc_, scale=scale_,
               validate_args=validate_args,
               name="interpolated_affine_{}".format(k))
@@ -494,7 +494,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
           graph_parents=(
               distribution._graph_parents  # pylint: disable=protected-access
               + [loc_ for loc_ in loc if loc_ is not None] +
-              [p for scale_ in scale for p in scale_.graph_parents]),
+              [p for scale_ in scale for p in scale_.graph_parents]),  # pylint: disable=g-complex-comprehension
           name=name)
 
   @property
@@ -654,7 +654,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
         self._covariance_of_mean_given_quadrature_component(diag_only=True))
 
   def _mean_of_covariance_given_quadrature_component(self, diag_only):
-    p = self.mixture_distribution.probs
+    p = self.mixture_distribution.probs_tensor()
 
     # To compute E[Cov(Z|V)], we'll add matrices within three categories:
     # scaled-identity, diagonal, and full. Then we'll combine these at the end.
@@ -688,11 +688,11 @@ class VectorDiffeomixture(distribution_lib.Distribution):
     # samples from a scalar-event distribution.
     v = self.distribution.variance()
     if scale_identity_multiplier is not None:
-      scale_identity_multiplier *= v
+      scale_identity_multiplier = scale_identity_multiplier * v
     if diag is not None:
-      diag *= v[..., tf.newaxis]
+      diag = diag * v[..., tf.newaxis]
     if full is not None:
-      full *= v[..., tf.newaxis]
+      full = full * v[..., tf.newaxis]
 
     if diag_only:
       # Apparently we don't need the full matrix, just the diagonal.
@@ -756,7 +756,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
     return m
 
   def _expand_mix_distribution_probs(self):
-    p = self.mixture_distribution.probs  # [B, deg]
+    p = self.mixture_distribution.probs_tensor()  # [B, deg]
     deg = tf.compat.dimension_value(
         tensorshape_util.with_rank_at_least(p.shape, 1)[-1])
     if deg is None:
@@ -891,7 +891,7 @@ def interpolate_scale(grid, scale):
     raise ValueError("Num quadrature grid points must be known prior "
                      "to graph execution.")
   with tf.name_scope("interpolate_scale"):
-    return [linop_add_lib.add_operators([
+    return [linop_add_lib.add_operators([  # pylint: disable=g-complex-comprehension
         linop_scale(grid[..., k, q], s)
         for k, s in enumerate(scale)
     ])[0] for q in range(deg)]
@@ -939,7 +939,7 @@ def concat_vectors(*args):
   args_ = [tf.get_static_value(x) for x in args]
   if any(vec is None for vec in args_):
     return tf.concat(args, axis=0)
-  return [val for vec in args_ for val in vec]
+  return [val for vec in args_ for val in vec]  # pylint: disable=g-complex-comprehension
 
 
 def add(x, y):

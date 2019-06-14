@@ -151,7 +151,7 @@ class Mixture(distribution.Distribution):
 
     # Ensure that all batch and event ndims are consistent.
     with tf.name_scope(name) as name:
-      num_components = cat.event_size
+      num_components = cat._num_categories()
       static_num_components = tf.get_static_value(num_components)
       if static_num_components is None:
         raise ValueError(
@@ -496,7 +496,5 @@ class Mixture(distribution.Distribution):
 
   def _cat_probs(self, log_probs):
     """Get a list of num_components batchwise probabilities."""
-    which_softmax = tf.nn.log_softmax if log_probs else tf.nn.softmax
-    cat_probs = which_softmax(self.cat.logits)
-    cat_probs = tf.unstack(cat_probs, num=self.num_components, axis=-1)
-    return cat_probs
+    cat_probs = self.cat.log_probs() if log_probs else self.cat.probs_tensor()
+    return tf.unstack(cat_probs, num=self.num_components, axis=-1)
