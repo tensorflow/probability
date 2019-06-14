@@ -671,6 +671,13 @@ class TensorFlowBackend(object):
   def while_loop(self, cond, body, loop_vars, name=None):
     """Implements while loops for TF backend."""
     with tf.compat.v2.name_scope('VM.while_loop'):
+      if tf.executing_eagerly():
+        # The reg. variable optimization (see create_variable) may change loop
+        # structure across iterations, which now triggers an exception for eager
+        # tf.while_loop.
+        while cond(*loop_vars):
+          loop_vars = body(*loop_vars)
+        return loop_vars
       with _control_flow_v2():
         return tf.while_loop(
             cond=cond,
