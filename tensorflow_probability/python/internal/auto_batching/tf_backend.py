@@ -373,21 +373,21 @@ class TensorFlowBackend(object):
             RegisterTensorFlowVariable,
             FullTensorFlowVariable)
 
-  def type_of(self, t, preferred_dtype=None):
+  def type_of(self, t, dtype_hint=None):
     """Returns the `instructions.Type` of `t`.
 
     Args:
       t: `tf.Tensor` or a Python or numpy constant.
-      preferred_dtype: dtype to prefer, if `t` is a constant.
+      dtype_hint: dtype to prefer, if `t` is a constant.
 
     Returns:
       vm_type: `instructions.TensorType` describing `t`.
     """
     if tf.executing_eagerly():
-      new_t = tf.convert_to_tensor(value=t, dtype=preferred_dtype)
+      new_t = tf.convert_to_tensor(value=t, dtype=dtype_hint)
     else:
       with tf.Graph().as_default():  # Use a scratch graph.
-        new_t = tf.convert_to_tensor(value=t, dtype=preferred_dtype)
+        new_t = tf.convert_to_tensor(value=t, dtype=dtype_hint)
     dtype = new_t.dtype.base_dtype.as_numpy_dtype
     shape = None if new_t.shape.ndims is None else tuple(new_t.shape.as_list())
     return instructions.TensorType(dtype, shape)

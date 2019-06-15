@@ -96,7 +96,7 @@ class Poisson(distribution.Distribution):
         rate = tf.convert_to_tensor(
             value=rate,
             name="rate",
-            dtype=dtype_util.common_dtype([rate], preferred_dtype=tf.float32))
+            dtype=dtype_util.common_dtype([rate], dtype_hint=tf.float32))
         if not dtype_util.is_floating(rate.dtype):
           raise TypeError("rate.dtype ({}) is a not a float-type.".format(
               dtype_util.name(rate.dtype)))

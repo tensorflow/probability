@@ -184,7 +184,7 @@ class Multinomial(distribution.Distribution):
       raise ValueError('Must pass probs or logits, but not both.')
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs],
-                                      preferred_dtype=tf.float32)
+                                      dtype_hint=tf.float32)
       self._total_count = tensor_util.convert_immutable_to_tensor(
           total_count, name='total_count', dtype=dtype)
       self._probs = tensor_util.convert_immutable_to_tensor(

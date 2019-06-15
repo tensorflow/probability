@@ -65,7 +65,7 @@ class Kumaraswamy(bijector.Bijector):
     """
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration0, concentration1],
-                                      preferred_dtype=tf.float32)
+                                      dtype_hint=tf.float32)
       self._concentration0 = tensor_util.convert_immutable_to_tensor(
           concentration0, dtype=dtype, name="concentration0")
       self._concentration1 = tensor_util.convert_immutable_to_tensor(

@@ -50,9 +50,9 @@ class MatvecLU(bijector.Bijector):
     with tf.name_scope(name, 'trainable_lu_factorization',
                        [event_size, batch_shape]):
       event_size = tf.convert_to_tensor(
-          event_size, preferred_dtype=tf.int32, name='event_size')
+          event_size, dtype_hint=tf.int32, name='event_size')
       batch_shape = tf.convert_to_tensor(
-          batch_shape, preferred_dtype=event_size.dtype, name='batch_shape')
+          batch_shape, dtype_hint=event_size.dtype, name='batch_shape')
       random_matrix = tf.random_uniform(
           shape=tf.concat([batch_shape, [event_size, event_size]], axis=0),
           dtype=dtype,

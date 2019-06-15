@@ -238,7 +238,7 @@ class NeuTra(tfp.mcmc.TransitionKernel):
             tf.nest.map_structure(lambda s: s.num_elements(),
                                   self.state_shape)))
 
-    dtype = dtype_util.common_dtype([learning_rate], preferred_dtype=tf.float32)
+    dtype = dtype_util.common_dtype([learning_rate], dtype_hint=tf.float32)
     self._dtype = dtype
 
     trainable_bijector = trainable_bijector_fn(

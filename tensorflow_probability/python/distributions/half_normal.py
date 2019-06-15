@@ -107,7 +107,7 @@ class HalfNormal(distribution.Distribution):
       scale = tf.convert_to_tensor(
           value=scale,
           name="scale",
-          dtype=dtype_util.common_dtype([scale], preferred_dtype=tf.float32))
+          dtype=dtype_util.common_dtype([scale], dtype_hint=tf.float32))
       with tf.control_dependencies(
           [assert_util.assert_positive(scale)] if validate_args else []):
         self._scale = tf.identity(scale, name="scale")

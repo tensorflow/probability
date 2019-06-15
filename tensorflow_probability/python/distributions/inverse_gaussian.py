@@ -103,7 +103,7 @@ class InverseGaussian(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name):
       dtype = dtype_util.common_dtype([loc, concentration],
-                                      preferred_dtype=tf.float32)
+                                      dtype_hint=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)

@@ -77,7 +77,7 @@ def _interp_regular_1d_grid_impl(x,
       fill_value_below = fill_value
 
     dtype = dtype_util.common_dtype([x, x_ref_min, x_ref_max, y_ref],
-                                    preferred_dtype=tf.float32)
+                                    dtype_hint=tf.float32)
     x = tf.convert_to_tensor(value=x, name='x', dtype=dtype)
 
     x_ref_min = tf.convert_to_tensor(
@@ -598,7 +598,7 @@ def batch_interp_regular_nd_grid(x,
       default_name='interp_regular_nd_grid',
       values=[x, x_ref_min, x_ref_max, y_ref, fill_value]):
     dtype = dtype_util.common_dtype([x, x_ref_min, x_ref_max, y_ref],
-                                    preferred_dtype=tf.float32)
+                                    dtype_hint=tf.float32)
 
     # Arg checking.
     if isinstance(fill_value, str):

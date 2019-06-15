@@ -42,13 +42,13 @@ class DtypeUtilTest(tf.test.TestCase):
   def testCommonDtypeFromLinop(self):
     x = tf.linalg.LinearOperatorDiag(tf.ones(3, tf.float16))
     self.assertEqual(
-        tf.float16, dtype_util.common_dtype([x], preferred_dtype=tf.float32))
+        tf.float16, dtype_util.common_dtype([x], dtype_hint=tf.float32))
 
   def testCommonDtypeFromEdRV(self):
     # As in tensorflow_probability github issue #221
     x = ed.Dirichlet(np.ones(3, dtype='float64'))
     self.assertEqual(
-        tf.float64, dtype_util.common_dtype([x], preferred_dtype=tf.float32))
+        tf.float64, dtype_util.common_dtype([x], dtype_hint=tf.float32))
 
 
 class FloatDTypeTest(tf.test.TestCase):
