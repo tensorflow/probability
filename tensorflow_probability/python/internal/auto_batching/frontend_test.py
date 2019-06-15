@@ -21,6 +21,7 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
+from absl import logging
 import numpy as np
 
 import tensorflow as tf
@@ -437,11 +438,46 @@ class AutoGraphFrontendTest(tf.test.TestCase):
         if var != instructions.pc_var:
           assert False, 'iota_sum should not push any data'
     # pylint: disable=unexpected-keyword-arg
-    # The `max_stack_depth` and `backend` keyword arguments to `caller`
+    # The `max_stack_depth` and `backend` keyword arguments to `iota_sum`
     # are introduced by the `@ctx.batch` decorator, confusing pylint.
     self.assertAllEqual(
         [78, 0, 5050],
         self.evaluate(iota_sum(*inputs, max_stack_depth=3, backend=TF_BACKEND)))
+
+  def testParameterSwapping(self):
+    # The thing that's interesting about this test program is that it contains a
+    # self-call that writes variables to themselves, but misaligned.  To
+    # implement this correctly, it is necessary to introduce a temporary
+    # variable so that `a` and `b` can be swapped (b/135275883).
+    def trace(x):
+      logging.info(x)
+      return x
+    ab = frontend.Context()
+
+    def gcd_type(args):
+      return args[0]
+
+    @ab.batch(type_inference=gcd_type)
+    def gcd(a, b):
+      if trace(a) == 0:
+        return b
+      elif a <= b:
+        return gcd(a, b - a)
+      else:
+        # TODO(b/135275883): Remove these temporaries and check that this
+        # program still works.
+        a_tmp = a
+        b_tmp = b
+        return gcd(b_tmp, a_tmp)
+
+    input_a = np.array([7, 12, 49], dtype=np.int32)
+    input_b = np.array([9, 9, 56], dtype=np.int32)
+    # pylint: disable=unexpected-keyword-arg
+    # The `max_stack_depth` and `backend` keyword arguments to `gcd`
+    # are introduced by the `@ab.batch` decorator, confusing pylint.
+    self.assertAllEqual(
+        [1, 3, 7],
+        gcd(input_a, input_b, max_stack_depth=3, backend=NP_BACKEND))
 
 
 class _TestHidingTFBatchSize(object):
