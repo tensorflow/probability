@@ -62,7 +62,7 @@ def base_equal(a, b):
   return base_dtype(a) == base_dtype(b)
 
 
-def common_dtype(args_list, dtype_hint=None):
+def common_dtype(args_list, preferred_dtype=None):
   """Returns explict dtype from `args_list` if there is one."""
   dtype = None
   for a in tf.nest.flatten(args_list):
@@ -74,7 +74,7 @@ def common_dtype(args_list, dtype_hint=None):
       dtype = dt
     elif dtype != dt:
       raise TypeError('Found incompatible dtypes, {} and {}.'.format(dtype, dt))
-  return dtype_hint if dtype is None else tf.as_dtype(dtype)
+  return preferred_dtype if dtype is None else tf.as_dtype(dtype)
 
 
 def is_bool(dtype):

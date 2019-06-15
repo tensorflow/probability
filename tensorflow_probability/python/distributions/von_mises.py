@@ -127,7 +127,7 @@ class VonMises(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, concentration],
-                                      dtype_hint=tf.float32)
+                                      preferred_dtype=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)

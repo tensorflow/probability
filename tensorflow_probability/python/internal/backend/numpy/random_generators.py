@@ -75,7 +75,7 @@ def _categorical(logits, num_samples, dtype=None, seed=None, name=None):  # pyli
 def _gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None,
            name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
-  dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
+  dtype = utils.common_dtype([alpha, beta], preferred_dtype=dtype)
   scale = 1. if beta is None else (1. / beta)
   shape = _shape([alpha, scale], shape)
   return rng.gamma(shape=alpha, scale=scale, size=shape).astype(dtype)
@@ -84,7 +84,7 @@ def _gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None,
 def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
             name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
-  dtype = utils.common_dtype([mean, stddev], dtype_hint=dtype)
+  dtype = utils.common_dtype([mean, stddev], preferred_dtype=dtype)
   shape = _shape([mean, stddev], shape)
   return rng.normal(loc=mean, scale=stddev, size=shape).astype(dtype)
 
@@ -92,7 +92,7 @@ def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
 def _poisson(shape, lam, dtype=tf.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
-  dtype = utils.common_dtype([lam], dtype_hint=dtype)
+  dtype = utils.common_dtype([lam], preferred_dtype=dtype)
   shape = _shape([lam], shape)
   return rng.poisson(lam=lam, size=shape).astype(dtype)
 
@@ -100,7 +100,7 @@ def _poisson(shape, lam, dtype=tf.float32, seed=None,
 def _uniform(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
-  dtype = utils.common_dtype([minval, maxval], dtype_hint=dtype)
+  dtype = utils.common_dtype([minval, maxval], preferred_dtype=dtype)
   maxval = 1 if maxval is None else maxval
   shape = _shape([minval, maxval], shape)
   return rng.uniform(low=minval, high=maxval, size=shape).astype(dtype)

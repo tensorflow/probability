@@ -254,17 +254,17 @@ class NumpyBackend(object):
             RegisterNumpyVariable,
             FullNumpyVariable)
 
-  def type_of(self, t, dtype_hint=None):
+  def type_of(self, t, preferred_dtype=None):
     """Returns the `instructions.Type` of `t`.
 
     Args:
       t: `np.ndarray` or a Python constant.
-      dtype_hint: dtype to prefer, if `t` is a constant.
+      preferred_dtype: dtype to prefer, if `t` is a constant.
 
     Returns:
       vm_type: `instructions.TensorType` describing `t`
     """
-    t = np.array(t, dtype=dtype_hint)
+    t = np.array(t, dtype=preferred_dtype)
     return instructions.TensorType(t.dtype, t.shape)
 
   def run_on_dummies(

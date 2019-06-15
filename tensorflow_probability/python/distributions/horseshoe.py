@@ -140,7 +140,7 @@ class Horseshoe(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([scale],
-                                      dtype_hint=tf.float32)
+                                      preferred_dtype=tf.float32)
       scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
       with tf.control_dependencies(
           [assert_util.assert_positive(scale)] if validate_args else []):

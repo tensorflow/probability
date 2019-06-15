@@ -123,7 +123,7 @@ class GammaGamma(distribution.Distribution):
     with tf.name_scope(name):
       dtype = dtype_util.common_dtype(
           [concentration, mixing_concentration, mixing_rate],
-          dtype_hint=tf.float32)
+          preferred_dtype=tf.float32)
       concentration = tf.convert_to_tensor(
           value=concentration, name="concentration", dtype=dtype)
       mixing_concentration = tf.convert_to_tensor(

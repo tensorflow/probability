@@ -139,7 +139,7 @@ class LKJ(distribution.Distribution):
           value=concentration,
           name='concentration',
           dtype=dtype_util.common_dtype([concentration],
-                                        dtype_hint=tf.float32))
+                                        preferred_dtype=tf.float32))
       with tf.control_dependencies([
           # concentration >= 1
           # TODO(b/111451422) Generalize to concentration > 0.
