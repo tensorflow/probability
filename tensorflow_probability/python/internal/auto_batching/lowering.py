@@ -275,6 +275,7 @@ def _lower_function_calls_1(
             # instruction, or orchestrating the pushes and pops
             # directly in the interpreter, but for now the simplest
             # thing is to just forbid this situation.
+            # Fixing this is b/118884528.
             msg = 'Cannot lower PrimOp that writes to its own input {}.'
             raise ValueError(msg.format(name))
         builder.append_instruction(op)
@@ -284,20 +285,16 @@ def _lower_function_calls_1(
         for name in inst.pattern_traverse(op.vars_in):
           if name in names_pushed_here:
             # For the same reason as above.
+            # Fixing this is b/118884528.
             msg = 'Cannot lower FunctionCallOp that writes to its own input {}.'
             raise ValueError(msg.format(name))
-        builder.append_instruction(
-            # Some of the pushees (op.function.vars_in) may be in scope if this
-            # is a self-call.  They may therefore overlap with op.vars_in.  If
-            # so, those values will be copied and/or duplicated.  Insofar as
-            # op.vars_in become dead, some of this will be undone by the
-            # following pop.  This is wasteful but sound.
-            inst.push_op(op.vars_in, op.function.vars_in))
-        builder.maybe_add_pop(
-            # Pop names defined on entry now, to save a stack frame in the
-            # function call.  Can't pop names defined by this call
-            # because they haven't been pushed yet.
-            defined_out.difference(names_pushed_here), live_out)
+        # The variables that were defined on entry to this instruction (i.e.,
+        # not pushed here) but are not live out don't need to remain on their
+        # stacks when the callee is entered.
+        defined_in = defined_out.difference(names_pushed_here)
+        to_pop = defined_in.difference(live_out)
+        for new_op in _function_entry_stack_ops(op, to_pop):
+          builder.append_instruction(new_op)
         if (op_i == len(old_instructions) - 1
             and _optimizable_tail_call(op, builder.cur_block())):
           builder.end_block_with_tail_call(op.function.graph.block(0))
@@ -342,6 +339,68 @@ def _optimizable_tail_call(op, block):
   # to happen with self-tail-calls.
   return (_is_indirect_return_op(block.terminator)
           and op.vars_out == op.function.vars_out)
+
+
+def _function_entry_stack_ops(op, to_pop):
+  """Computes a set of stack operations for the entry to a FunctionCallOp.
+
+  The function calling convention is
+  - Push the arguments to the formal parameters
+  - Pop any now-dead arguments so they're not on the stack during the call
+  - Jump to the beginning of the function body
+
+  This can be a little tricky for a self-call, because then the arguments and
+  the formal parameters live in the same name space and can collide.  This
+  helper does something reasonable, and errors out when it can't.
+
+  Args:
+    op: FunctionCallOp instance giving the call to make stack operations for.
+    to_pop: Set of names to make sure are popped before entering.
+
+  Returns:
+    ops: List of instruction objects that accomplish the goal.
+  """
+  push_from = []
+  push_to = []
+  caller_side_vars = inst.pattern_flatten(op.vars_in)
+  callee_side_vars = inst.pattern_flatten(op.function.vars_in)
+  for caller_side, callee_side in inst.pattern_zip(
+      caller_side_vars, callee_side_vars):
+    if caller_side == callee_side:
+      # This can happen if this is a self-call and we're just passing the
+      # variable through to itself
+      if caller_side in to_pop:
+        # The top of the stack is already correct, and the callee will pop our
+        # unneeded value off it for us: skip the push and the pop.
+        to_pop = to_pop.difference([caller_side])
+      else:
+        # The top of the stack is correct, but we need to push it anyway because
+        # the callee will (eventually) pop but we still need the current value
+        # when the callee returns.
+        push_from.append(caller_side)
+        push_to.append(callee_side)
+    elif callee_side in caller_side_vars:
+      # If the graph of transfers turns out not to be a DAG, can't implement it
+      # without temporary space; and don't want to bother computing a safe order
+      # even if it does.
+      # Fixing this is b/135275883.
+      msg = ('Cannot lower FunctionCallOp that reuses its own input {}'
+             ' as a formal parameter.')
+      raise ValueError(msg.format(caller_side))
+    # Checking `elif caller_side in callee_side_vars` is redundant because
+    # the callee_side check will trigger on that pair sooner or later.
+    else:
+      # Ordinary transfer: push now and then pop if needed.  The pop will not
+      # interfere with the push because only caller-side variables can possibly
+      # be popped.
+      assert callee_side not in to_pop
+      push_from.append(caller_side)
+      push_to.append(callee_side)
+  push_inst = inst.push_op(push_from, push_to)
+  if to_pop:
+    return [push_inst, inst.PopOp(list(to_pop))]
+  else:
+    return [push_inst]
 
 
 def lower_function_calls(program):
