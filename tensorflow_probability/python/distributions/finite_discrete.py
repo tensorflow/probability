@@ -132,6 +132,9 @@ class FiniteDiscrete(distribution.Distribution):
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
+        graph_parents=[
+            self._outcomes, self._categorical.logits, self._categorical.probs
+        ],
         name=name)
 
   @classmethod
@@ -230,7 +233,7 @@ class FiniteDiscrete(distribution.Distribution):
             sample_shape=[n], seed=seed, **distribution_kwargs))
 
   def _variance(self):
-    probs = self._categorical.probs_tensor()
+    probs = self._categorical.probs
     outcomes = tf.broadcast_to(
         self.outcomes, shape=dist_util.prefer_static_shape(probs))
     if dtype_util.is_integer(outcomes.dtype):

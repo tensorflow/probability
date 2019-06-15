@@ -903,104 +903,6 @@ def _is_integer_like_by_dtype(dt):
   return dt.is_integer or dt.base_dtype == tf.bool
 
 
-def assert_categorical_event_shape(
-    categorical_param, name="embed_check_categorical_event_shape"):
-  """Embeds checks that categorical distributions don't have too many classes.
-
-  A categorical-type distribution is one which, e.g., returns the class label
-  rather than a one-hot encoding.  E.g., `Categorical(probs)`.
-
-  Since distributions output samples in the same dtype as the parameters, we
-  must ensure that casting doesn't lose precision. That is, the
-  `parameter.dtype` implies a maximum number of classes. However, since shape is
-  `int32` and categorical variables are presumed to be indexes into a `Tensor`,
-  we must also ensure that the number of classes is no larger than the largest
-  possible `int32` index, i.e., `2**31-1`.
-
-  In other words the number of classes, `K`, must satisfy the following
-  condition:
-
-  ```python
-  K <= min(
-      int(2**31 - 1),  # Largest float as an index.
-      {
-          tf.float16: int(2**11),   # Largest int as a float16.
-          tf.float32: int(2**24),
-          tf.float64: int(2**53),
-      }.get(dtype_util.base_dtype(categorical_param.dtype), 0))
-  ```
-
-  Args:
-    categorical_param: Floating-point `Tensor` representing parameters of
-      distribution over categories. The rightmost shape is presumed to be the
-      number of categories.
-    name: A name for this operation (optional).
-
-  Returns:
-    assertions: Python `list` of assertions.
-
-  Raises:
-    TypeError: if `categorical_param` has an unknown `dtype`.
-    ValueError: if we can statically identify `categorical_param` as being too
-      large (for being closed under int32/float casting).
-  """
-  with tf.name_scope(name):
-    x = tf.convert_to_tensor(value=categorical_param, name="categorical_param")
-    # The size must not exceed both of:
-    # - The largest possible int32 (since categorical values are presumed to be
-    #   indexes into a Tensor).
-    # - The largest possible integer exactly representable under the given
-    #   floating-point dtype (since we need to cast to/from).
-    #
-    # The chosen floating-point thresholds are 2**(1 + mantissa_bits).
-    # For more details, see:
-    # https://en.wikipedia.org/wiki/Floating-point_arithmetic#Internal_representation
-    x_dtype = dtype_util.base_dtype(x.dtype)
-    max_event_size = (
-        _largest_integer_by_dtype(x_dtype)
-        if dtype_util.is_floating(x_dtype) else 0)
-    if max_event_size == 0:
-      raise TypeError("Unable to validate size of unrecognized dtype "
-                      "({}).".format(dtype_util.name(x_dtype)))
-    try:
-      x_shape_static = tensorshape_util.with_rank_at_least(x.shape, 1)
-    except ValueError:
-      raise ValueError("A categorical-distribution parameter must have "
-                       "at least 1 dimension.")
-    event_size = tf.compat.dimension_value(x_shape_static[-1])
-
-    if event_size is not None:
-      if event_size < 2:
-        raise ValueError("A categorical-distribution parameter must have at "
-                         "least 2 events.")
-      if event_size > max_event_size:
-        raise ValueError("Number of classes exceeds `dtype` precision, i.e., "
-                         "{} implies shape ({}) cannot exceed {}.".format(
-                             dtype_util.name(x_dtype), event_size,
-                             max_event_size))
-      return []
-
-    event_size = tf.shape(input=x, out_type=tf.int64, name="x_shape")[-1]
-    return [
-        assert_util.assert_rank_at_least(
-            x,
-            1,
-            message=("A categorical-distribution parameter must have "
-                     "at least 1 dimension.")),
-        assert_util.assert_greater_equal(
-            tf.shape(input=x)[-1],
-            2,
-            message=("A categorical-distribution parameter must have at "
-                     "least 2 events.")),
-        assert_util.assert_less_equal(
-            event_size,
-            tf.convert_to_tensor(max_event_size, dtype=tf.int64),
-            message="Number of classes exceeds `dtype` precision, "
-            "i.e., {} dtype cannot exceed {} shape.".format(
-                dtype_util.name(x_dtype), max_event_size)),
-    ]
-
-
 def embed_check_categorical_event_shape(
     categorical_param, name="embed_check_categorical_event_shape"):
   """Embeds checks that categorical distributions don't have too many classes.
@@ -1044,10 +946,58 @@ def embed_check_categorical_event_shape(
   """
   with tf.name_scope(name):
     x = tf.convert_to_tensor(value=categorical_param, name="categorical_param")
-    assertions = assert_categorical_event_shape(x)
-    if not assertions:
+    # The size must not exceed both of:
+    # - The largest possible int32 (since categorical values are presumed to be
+    #   indexes into a Tensor).
+    # - The largest possible integer exactly representable under the given
+    #   floating-point dtype (since we need to cast to/from).
+    #
+    # The chosen floating-point thresholds are 2**(1 + mantissa_bits).
+    # For more details, see:
+    # https://en.wikipedia.org/wiki/Floating-point_arithmetic#Internal_representation
+    x_dtype = dtype_util.base_dtype(x.dtype)
+    max_event_size = (
+        _largest_integer_by_dtype(x_dtype)
+        if dtype_util.is_floating(x_dtype) else 0)
+    if max_event_size == 0:
+      raise TypeError("Unable to validate size of unrecognized dtype "
+                      "({}).".format(dtype_util.name(x_dtype)))
+    try:
+      x_shape_static = tensorshape_util.with_rank_at_least(x.shape, 1)
+    except ValueError:
+      raise ValueError("A categorical-distribution parameter must have "
+                       "at least 1 dimension.")
+    event_size = tf.compat.dimension_value(x_shape_static[-1])
+    if event_size is not None:
+      if event_size < 2:
+        raise ValueError("A categorical-distribution parameter must have at "
+                         "least 2 events.")
+      if event_size > max_event_size:
+        raise ValueError("Number of classes exceeds `dtype` precision, i.e., "
+                         "{} implies shape ({}) cannot exceed {}.".format(
+                             dtype_util.name(x_dtype), event_size,
+                             max_event_size))
       return x
-    return with_dependencies(assertions, x)
+    else:
+      event_size = tf.shape(input=x, out_type=tf.int64, name="x_shape")[-1]
+      return with_dependencies([
+          assert_util.assert_rank_at_least(
+              x,
+              1,
+              message=("A categorical-distribution parameter must have "
+                       "at least 1 dimension.")),
+          assert_util.assert_greater_equal(
+              tf.shape(input=x)[-1],
+              2,
+              message=("A categorical-distribution parameter must have at "
+                       "least 2 events.")),
+          assert_util.assert_less_equal(
+              event_size,
+              tf.convert_to_tensor(max_event_size, dtype=tf.int64),
+              message="Number of classes exceeds `dtype` precision, "
+              "i.e., {} dtype cannot exceed {} shape.".format(
+                  dtype_util.name(x_dtype), max_event_size)),
+      ], x)
 
 
 def embed_check_integer_casting_closed(x,

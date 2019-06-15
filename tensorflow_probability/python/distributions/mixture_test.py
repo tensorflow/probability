@@ -382,10 +382,9 @@ class MixtureTest(tf.test.TestCase):
       self.assertAllClose(manual_dev, dev_value)
 
   def testSpecificStddevValue(self):
-    # TODO(b/135281612): Remove explicit float32 casting.
-    cat_probs = np.float32([0.5, 0.5])
-    component_means = np.float32([-10, 0.1])
-    component_devs = np.float32([0.05, 2.33])
+    cat_probs = np.array([0.5, 0.5])
+    component_means = np.array([-10, 0.1])
+    component_devs = np.array([0.05, 2.33])
     ground_truth_stddev = 5.3120805
 
     mixture_dist = tfd.Mixture(
