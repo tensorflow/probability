@@ -690,7 +690,7 @@ def assert_symmetric(matrix):
       [assert_util.assert_near(matrix, matrix_t)], matrix)
 
 
-def assert_nonnegative_integer_form(
+def embed_check_nonnegative_integer_form(
     x, name="embed_check_nonnegative_integer_form"):
   """Assert x is a non-negative tensor, and optionally of integers."""
   with tf.name_scope(name):
@@ -705,15 +705,7 @@ def assert_nonnegative_integer_form(
               x,
               message="'{}' cannot contain fractional components.".format(x)),
       ]
-    return assertions
-
-
-def embed_check_nonnegative_integer_form(
-    x, name="embed_check_nonnegative_integer_form"):
-  """Assert x is a non-negative tensor, and optionally of integers."""
-  with tf.name_scope(name):
-    x = tf.convert_to_tensor(value=x, name="x")
-    return with_dependencies(assert_nonnegative_integer_form(x), x)
+    return with_dependencies(assertions, x)
 
 
 def same_dynamic_shape(a, b):

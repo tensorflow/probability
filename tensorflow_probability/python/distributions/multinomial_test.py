@@ -18,11 +18,9 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow.compat.v1 as tf1
-import tensorflow.compat.v2 as tf
+import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint:disable=g-direct-tensorflow-import
 
@@ -30,7 +28,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MultinomialTest(test_case.TestCase):
+class MultinomialTest(tf.test.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -63,18 +61,18 @@ class MultinomialTest(test_case.TestCase):
   def testP(self):
     p = [[0.1, 0.2, 0.7]]
     dist = tfd.Multinomial(total_count=3., probs=p)
-    self.assertEqual((1, 3), dist.probs_tensor().shape)
-    self.assertEqual((1, 3), dist.logits_tensor().shape)
+    self.assertEqual((1, 3), dist.probs.shape)
+    self.assertEqual((1, 3), dist.logits.shape)
     self.assertAllClose(p, self.evaluate(dist.probs))
 
   def testLogits(self):
     p = np.array([[0.1, 0.2, 0.7]], dtype=np.float32)
     logits = np.log(p) - 50.
     multinom = tfd.Multinomial(total_count=3., logits=logits)
-    self.assertEqual((1, 3), multinom.probs_tensor().shape)
-    self.assertEqual((1, 3), multinom.logits_tensor().shape)
-    self.assertAllClose(p, self.evaluate(multinom.probs_tensor()))
-    self.assertAllClose(logits, self.evaluate(multinom.logits_tensor()))
+    self.assertEqual((1, 3), multinom.probs.shape)
+    self.assertEqual((1, 3), multinom.logits.shape)
+    self.assertAllClose(p, self.evaluate(multinom.probs))
+    self.assertAllClose(logits, self.evaluate(multinom.logits))
 
   def testPmfUnderflow(self):
     logits = np.array([[-200, 0]], dtype=np.float32)
@@ -88,9 +86,9 @@ class MultinomialTest(test_case.TestCase):
     dist = tfd.Multinomial(total_count=n, probs=p, validate_args=True)
     self.evaluate(dist.prob([2., 3, 0]))
     self.evaluate(dist.prob([3., 0, 2]))
-    with self.assertRaisesOpError('must be non-negative'):
+    with self.assertRaisesOpError("must be non-negative"):
       self.evaluate(dist.prob([-1., 4, 2]))
-    with self.assertRaisesOpError('counts must sum to `self.total_count`'):
+    with self.assertRaisesOpError("counts must sum to `self.total_count`"):
       self.evaluate(dist.prob([3., 3, 0]))
 
   def testPmfNonIntegerCounts(self):
@@ -102,12 +100,12 @@ class MultinomialTest(test_case.TestCase):
     self.evaluate(multinom.prob([2., 1, 2]))
     self.evaluate(multinom.prob([3., 0, 2]))
     # Counts don't sum to n.
-    with self.assertRaisesOpError('counts must sum to `self.total_count`'):
+    with self.assertRaisesOpError("counts must sum to `self.total_count`"):
       self.evaluate(multinom.prob([2., 3, 2]))
     # Counts are non-integers.
-    x = tf1.placeholder_with_default([1., 2.5, 1.5], shape=None)
+    x = tf.compat.v1.placeholder_with_default([1., 2.5, 1.5], shape=None)
     with self.assertRaisesOpError(
-        'cannot contain fractional components.'):
+        "cannot contain fractional components."):
       self.evaluate(multinom.prob(x))
 
     multinom = tfd.Multinomial(
@@ -338,42 +336,5 @@ class MultinomialTest(test_case.TestCase):
     self.assertIsNone(grad_probs)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultinomialFromVariableTest(test_case.TestCase):
-
-  def testGradientLogits(self):
-    x = tf.Variable([-1., 0., 1])
-    d = tfd.Multinomial(total_count=2., logits=x, validate_args=True)
-    with tf.GradientTape() as tape:
-      loss = -d.log_prob([0, 0, 2])
-    g = tape.gradient(loss, d.trainable_variables)
-    self.assertLen(g, 1)
-    self.assertAllNotNone(g)
-
-  def testGradientProbs(self):
-    x = tf.Variable([0.1, 0.7, 0.2])
-    d = tfd.Multinomial(total_count=2., logits=x, validate_args=True)
-    with tf.GradientTape() as tape:
-      loss = -d.log_prob([0, 1, 1])
-    g = tape.gradient(loss, d.trainable_variables)
-    self.assertLen(g, 1)
-    self.assertAllNotNone(g)
-
-  def testAssertionsProbs(self):
-    x = tf.Variable([0.1, 0.7, 0.0])
-    self.evaluate(tf1.global_variables_initializer())
-    with self.assertRaisesOpError('Argument `probs` must sum to 1.'):
-      d = tfd.Multinomial(total_count=2., probs=x, validate_args=True)
-      self.evaluate(d.mean())
-
-  def testAssertionsLogits(self):
-    x = tfp.util.DeferredTensor(tf.identity, tf.Variable(0.), shape=None)
-    self.evaluate(tf1.global_variables_initializer())
-    with self.assertRaisesRegexp(
-        ValueError, 'Argument `logits` must have rank at least 1.'):
-      d = tfd.Multinomial(total_count=2., logits=x, validate_args=True)
-      self.evaluate(d.mean())
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
   tf.test.main()
