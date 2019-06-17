@@ -102,8 +102,7 @@ class _BaseDeterministic(distribution.Distribution):
       ValueError:  If `loc` is a scalar.
     """
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([loc, atol, rtol],
-                                      preferred_dtype=tf.float32)
+      dtype = dtype_util.common_dtype([loc, atol, rtol], dtype_hint=tf.float32)
       loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
       if is_vector and validate_args:
         msg = "Argument loc must be at least rank 1."

@@ -119,7 +119,7 @@ def cholesky_concat(chol, cols, name=None):
       ```
   """
   with tf.compat.v2.name_scope(name or 'cholesky_extend'):
-    dtype = dtype_util.common_dtype([chol, cols], preferred_dtype=tf.float32)
+    dtype = dtype_util.common_dtype([chol, cols], dtype_hint=tf.float32)
     chol = tf.convert_to_tensor(value=chol, name='chol', dtype=dtype)
     cols = tf.convert_to_tensor(value=cols, name='cols', dtype=dtype)
     n = prefer_static.shape(chol)[-1]
@@ -224,7 +224,7 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
   """
   with tf.compat.v2.name_scope(name or 'pivoted_cholesky'):
     dtype = dtype_util.common_dtype([matrix, diag_rtol],
-                                    preferred_dtype=tf.float32)
+                                    dtype_hint=tf.float32)
     matrix = tf.convert_to_tensor(value=matrix, name='matrix', dtype=dtype)
     if tensorshape_util.rank(matrix.shape) is None:
       raise NotImplementedError('Rank of `matrix` must be known statically')

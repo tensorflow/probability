@@ -56,11 +56,10 @@ def numpy_dtype(dtype):
   return dtype
 
 
-def common_dtype(args_list, preferred_dtype=None):
-  """Returns explict dtype from `args_list` if exists, else preferred_dtype."""
+def common_dtype(args_list, dtype_hint=None):
+  """Returns explict dtype from `args_list` if exists, else dtype_hint."""
   dtype = None
-  preferred_dtype = (None if preferred_dtype is None
-                     else tf.as_dtype(preferred_dtype))
+  dtype_hint = None if dtype_hint is None else tf.as_dtype(dtype_hint)
   for a in tf.nest.flatten(args_list):
     if hasattr(a, 'dtype'):
       dt = tf.as_dtype(a.dtype)
@@ -70,9 +69,9 @@ def common_dtype(args_list, preferred_dtype=None):
       dtype = dt
     elif dtype != dt:
       raise TypeError('Found incompatible dtypes, {} and {}.'.format(dtype, dt))
-  if dtype is None and preferred_dtype is None:
+  if dtype is None and dtype_hint is None:
     return None
-  return (preferred_dtype if dtype is None else dtype).as_numpy_dtype
+  return (dtype_hint if dtype is None else dtype).as_numpy_dtype
 
 
 def is_complex(dtype):

@@ -143,7 +143,7 @@ def make_tril_scale(loc=None,
 
     dtype = dtype_util.common_dtype(
         [loc, scale_tril, scale_diag, scale_identity_multiplier],
-        preferred_dtype=tf.float32)
+        dtype_hint=tf.float32)
     loc = _convert_to_tensor(loc, name="loc", dtype=dtype)
     scale_tril = _convert_to_tensor(scale_tril, name="scale_tril", dtype=dtype)
     scale_diag = _convert_to_tensor(scale_diag, name="scale_diag", dtype=dtype)
@@ -234,7 +234,7 @@ def make_diag_scale(loc=None,
     if dtype is None:
       dtype = dtype_util.common_dtype(
           [loc, scale_diag, scale_identity_multiplier],
-          preferred_dtype=tf.float32)
+          dtype_hint=tf.float32)
     loc = _convert_to_tensor(loc, name="loc", dtype=dtype)
     scale_diag = _convert_to_tensor(scale_diag, name="scale_diag", dtype=dtype)
     scale_identity_multiplier = _convert_to_tensor(
@@ -598,7 +598,7 @@ def move_dimension(x, source_idx, dest_idx):
   """
   ndims = prefer_static_rank(x)
   dtype = dtype_util.common_dtype([source_idx, dest_idx],
-                                  preferred_dtype=tf.int32)
+                                  dtype_hint=tf.int32)
   source_idx = tf.convert_to_tensor(value=source_idx, dtype=dtype)
   dest_idx = tf.convert_to_tensor(value=dest_idx, dtype=dtype)
 
@@ -793,7 +793,7 @@ def get_logits_and_probs(logits=None,
     ValueError: if neither `probs` nor `logits` were passed in, or both were.
   """
   if dtype is None:
-    dtype = dtype_util.common_dtype([probs, logits], preferred_dtype=tf.float32)
+    dtype = dtype_util.common_dtype([probs, logits], dtype_hint=tf.float32)
   with tf.name_scope(name):
     if (probs is None) == (logits is None):
       raise ValueError("Must pass probs or logits, but not both.")

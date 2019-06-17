@@ -110,8 +110,8 @@ class SinhArcsinh(bijector.Bijector):
     with tf.name_scope(name) as name:
       tailweight = 1. if tailweight is None else tailweight
       skewness = 0. if skewness is None else skewness
-      dtype = dtype_util.common_dtype(
-          [tailweight, skewness], preferred_dtype=tf.float32)
+      dtype = dtype_util.common_dtype([tailweight, skewness],
+                                      dtype_hint=tf.float32)
       self._skewness = tensor_util.convert_immutable_to_tensor(
           skewness, dtype=dtype, name="skewness")
       self._tailweight = tensor_util.convert_immutable_to_tensor(

@@ -155,8 +155,7 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
       raise ValueError("`scale` must be positive definite.")
 
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([df, loc, scale],
-                                      preferred_dtype=tf.float32)
+      dtype = dtype_util.common_dtype([df, loc, scale], dtype_hint=tf.float32)
 
       with tf.control_dependencies([
           assert_util.assert_positive(df, message="`df` must be positive.")

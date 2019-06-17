@@ -105,7 +105,7 @@ class Zipf(distribution.Distribution):
       power = tf.convert_to_tensor(
           value=power,
           name="power",
-          dtype=dtype_util.common_dtype([power], preferred_dtype=tf.float32))
+          dtype=dtype_util.common_dtype([power], dtype_hint=tf.float32))
       if (not dtype_util.is_floating(power.dtype) or
           dtype_util.base_equal(power.dtype, tf.float16)):
         raise TypeError(

@@ -228,8 +228,7 @@ def find_bins(x,
   #    for all 5 events, so the index of the bin should not be in the event dim.
   with tf.compat.v1.name_scope(
       name, default_name='find_bins', values=[x, edges]):
-    in_type = dtype_util.common_dtype([x, edges],
-                                      preferred_dtype=tf.float32)
+    in_type = dtype_util.common_dtype([x, edges], dtype_hint=tf.float32)
     edges = tf.convert_to_tensor(value=edges, name='edges', dtype=in_type)
     x = tf.convert_to_tensor(value=x, name='x', dtype=in_type)
 
@@ -357,7 +356,7 @@ def histogram(x,
   with tf.compat.v1.name_scope(name, 'histogram', values=[x, edges, axis]):
 
     # Tensor conversions.
-    in_dtype = dtype_util.common_dtype([x, edges], preferred_dtype=tf.float32)
+    in_dtype = dtype_util.common_dtype([x, edges], dtype_hint=tf.float32)
 
     x = tf.convert_to_tensor(value=x, name='x', dtype=in_dtype)
     edges = tf.convert_to_tensor(value=edges, name='edges', dtype=in_dtype)

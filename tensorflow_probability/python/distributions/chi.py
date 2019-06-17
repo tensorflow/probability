@@ -84,7 +84,7 @@ class Chi(transformed_distribution.TransformedDistribution):
       df = tf.convert_to_tensor(
           value=df,
           name="df",
-          dtype=dtype_util.common_dtype([df], preferred_dtype=tf.float32))
+          dtype=dtype_util.common_dtype([df], dtype_hint=tf.float32))
       validation_assertions = (
           [assert_util.assert_positive(df)] if validate_args else [])
       with tf.control_dependencies(validation_assertions):

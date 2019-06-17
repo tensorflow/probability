@@ -93,7 +93,7 @@ class Exponential(gamma.Gamma):
       self._rate = tf.convert_to_tensor(
           value=rate,
           name="rate",
-          dtype=dtype_util.common_dtype([rate], preferred_dtype=tf.float32))
+          dtype=dtype_util.common_dtype([rate], dtype_hint=tf.float32))
     super(Exponential, self).__init__(
         concentration=1.,
         rate=self._rate,

@@ -103,7 +103,7 @@ class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
       self._burnin = tf.convert_to_tensor(
           value=burnin,
           name='burnin',
-          dtype=dtype_util.common_dtype([burnin], preferred_dtype=tf.int64))
+          dtype=dtype_util.common_dtype([burnin], dtype_hint=tf.int64))
       self._burnin_max_learning_rate = tf.convert_to_tensor(
           value=burnin_max_learning_rate, name='burnin_max_learning_rate')
       self._max_learning_rate = tf.convert_to_tensor(

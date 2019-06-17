@@ -185,7 +185,7 @@ class Dirichlet(distribution.Distribution):
               value=concentration,
               name="concentration",
               dtype=dtype_util.common_dtype([concentration],
-                                            preferred_dtype=tf.float32)),
+                                            dtype_hint=tf.float32)),
           validate_args)
       self._total_concentration = tf.reduce_sum(
           input_tensor=self._concentration, axis=-1)
