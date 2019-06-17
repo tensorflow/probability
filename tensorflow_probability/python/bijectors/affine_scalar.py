@@ -22,8 +22,8 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
@@ -79,21 +79,13 @@ class AffineScalar(bijector.Bijector):
       name: Python `str` name given to ops managed by this object.
     """
     with tf.name_scope(name) as name:
-      self._shift = shift
-      self._scale = scale
+      dtype = dtype_util.common_dtype(
+          [shift, scale], dtype_hint=tf.float32)
 
-      if self._shift is not None:
-        self._shift = tf.convert_to_tensor(value=shift, name="shift")
-
-      if self._scale is not None:
-        self._scale = tf.convert_to_tensor(value=scale, name="scale")
-        if validate_args:
-          self._scale = distribution_util.with_dependencies([
-              assert_util.assert_none_equal(
-                  self._scale, tf.zeros([], dtype=self._scale.dtype))
-          ], self._scale)
-
-      dtype = dtype_util.common_dtype([self._shift, self._scale])
+      self._shift = tensor_util.convert_immutable_to_tensor(
+          shift, dtype=dtype, name="shift")
+      self._scale = tensor_util.convert_immutable_to_tensor(
+          scale, dtype=dtype, name="scale")
 
       super(AffineScalar, self).__init__(
           forward_min_event_ndims=0,
@@ -136,3 +128,14 @@ class AffineScalar(bijector.Bijector):
       return tf.constant(0., dtype=dtype_util.base_dtype(x.dtype))
 
     return tf.math.log(tf.abs(self.scale))
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_mutable(self.scale):
+      assertions.append(assert_util.assert_none_equal(
+          self.scale,
+          tf.zeros([], dtype=self._scale.dtype),
+          message="Argument `scale` must be non-zero."))
+    return assertions

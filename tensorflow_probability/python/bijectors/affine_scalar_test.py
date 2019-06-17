@@ -20,7 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.bijectors import bijector_test_util
@@ -46,7 +47,7 @@ class _AffineScalarBijectorTest(object):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=self.dtype)
-      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
+      x = tf1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -64,7 +65,7 @@ class _AffineScalarBijectorTest(object):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=self.dtype)
-      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
+      x = tf1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -83,7 +84,7 @@ class _AffineScalarBijectorTest(object):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value)
-      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
+      x = tf1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -102,7 +103,7 @@ class _AffineScalarBijectorTest(object):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=self.dtype)
-      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
+      x = tf1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -121,7 +122,7 @@ class _AffineScalarBijectorTest(object):
 
     def dynamic_run(fun, x_value, **kwargs):
       x_value = np.array(x_value, dtype=self.dtype)
-      x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
+      x = tf1.placeholder_with_default(x_value, shape=None)
       return self.evaluate(fun(x, **kwargs))
 
     for run in (static_run, dynamic_run):
@@ -143,6 +144,35 @@ class _AffineScalarBijectorTest(object):
         lower_x=self.dtype(-2.),
         upper_x=self.dtype(2.),
         eval_func=self.evaluate)
+
+  def testVariableGradients(self):
+    b = tfb.AffineScalar(
+        shift=tf.Variable(1.),
+        scale=tf.Variable(2.))
+
+    with tf.GradientTape() as tape:
+      y = b.forward(.1)
+    self.assertAllNotNone(tape.gradient(y, [b.shift, b.scale]))
+
+  def testImmutableScaleAssertion(self):
+    with self.assertRaisesOpError("Argument `scale` must be non-zero"):
+      b = tfb.AffineScalar(scale=0., validate_args=True)
+      _ = self.evaluate(b.forward(1.))
+
+  def testVariableScaleAssertion(self):
+    v = tf.Variable(0.)
+    self.evaluate(tf1.global_variables_initializer())
+    b = tfb.AffineScalar(scale=v, validate_args=True)
+    with self.assertRaisesOpError("Argument `scale` must be non-zero"):
+      _ = self.evaluate(b.forward(1.))
+
+  def testModifiedVariableScaleAssertion(self):
+    v = tf.Variable(1.)
+    self.evaluate(tf1.global_variables_initializer())
+    b = tfb.AffineScalar(scale=v, validate_args=True)
+    with self.assertRaisesOpError("Argument `scale` must be non-zero"):
+      with tf.control_dependencies([v.assign(0.)]):
+        _ = self.evaluate(b.forward(1.))
 
 
 class AffineScalarBijectorTestFloat32(test_case.TestCase,
