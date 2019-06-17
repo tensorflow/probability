@@ -57,7 +57,7 @@ class NegativeBinomial(distribution.Distribution):
                probs=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="NegativeBinomial"):
+               name='NegativeBinomial'):
     """Construct NegativeBinomial distributions.
 
     Args:
@@ -97,10 +97,10 @@ class NegativeBinomial(distribution.Distribution):
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits, probs, validate_args=validate_args, name=name, dtype=dtype)
       total_count = tf.convert_to_tensor(
-          value=total_count, name="total_count", dtype=dtype)
+          value=total_count, name='total_count', dtype=dtype)
       with tf.control_dependencies(
           [assert_util.assert_positive(total_count)] if validate_args else []):
-        self._total_count = tf.identity(total_count, name="total_count")
+        self._total_count = tf.identity(total_count, name='total_count')
 
     super(NegativeBinomial, self).__init__(
         dtype=self._probs.dtype,
@@ -122,12 +122,12 @@ class NegativeBinomial(distribution.Distribution):
 
   @property
   def logits(self):
-    """Log-odds of a `1` outcome (vs `0`)."""
+    """Input argument `logits`."""
     return self._logits
 
   @property
   def probs(self):
-    """Probability of a `1` outcome (vs `0`)."""
+    """Input argument `probs`."""
     return self._probs
 
   def _batch_shape_tensor(self):
@@ -148,7 +148,7 @@ class NegativeBinomial(distribution.Distribution):
     # Here we use the fact that if:
     # lam ~ Gamma(concentration=total_count, rate=(1-probs)/probs)
     # then X ~ Poisson(lam) is Negative Binomially distributed.
-    stream = seed_stream.SeedStream(seed, salt="NegativeBinomial")
+    stream = seed_stream.SeedStream(seed, salt='NegativeBinomial')
     rate = tf.random.gamma(
         shape=[n],
         alpha=self.total_count,
@@ -189,3 +189,17 @@ class NegativeBinomial(distribution.Distribution):
 
   def _variance(self):
     return self._mean() / tf.sigmoid(-self.logits)
+
+  def logits_parameter(self, name=None):
+    """Logits computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'logits_parameter'):
+      if self.logits is None:
+        return tf.math.log(self.probs) - tf.math.log1p(-self.probs)
+      return tf.identity(self.logits)
+
+  def probs_parameter(self, name=None):
+    """Probs computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'probs_parameter'):
+      if self.logits is None:
+        return tf.identity(self.probs)
+      return tf.nn.sigmoid(self.logits)

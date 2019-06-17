@@ -114,9 +114,9 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
   def testEntropy(self):
     outcomes = self._build_tensor([1, 2, 3, 4])
     probs = np.array([0.125, 0.125, 0.25, 0.5])
-    probs_tensor = self._build_tensor(probs)
+    outcome_probs = self._build_tensor(probs)
     dist = finite_discrete.FiniteDiscrete(
-        outcomes, probs=probs_tensor, validate_args=True)
+        outcomes, probs=outcome_probs, validate_args=True)
     entropy = dist.entropy()
     self.assertAllEqual((), self._get_shape(entropy))
     self.assertAllClose(np.sum(-probs * np.log(probs)), entropy)
@@ -292,9 +292,9 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
   def testEntropy(self):
     outcomes = self._build_tensor([1, 2, 3, 4])
     probs = np.array([[0.125, 0.125, 0.25, 0.5], [0.25, 0.25, 0.25, 0.25]])
-    probs_tensor = self._build_tensor(probs)
+    outcome_probs = self._build_tensor(probs)
     dist = finite_discrete.FiniteDiscrete(
-        outcomes, probs=probs_tensor, validate_args=True)
+        outcomes, probs=outcome_probs, validate_args=True)
     entropy = dist.entropy()
     self.assertAllEqual((2,), self._get_shape(entropy))
     self.assertAllClose(np.sum(-probs * np.log(probs), axis=1), entropy)
@@ -349,6 +349,28 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
     self.assertAllEqual((6, 2), self._get_shape(cdf))
     self.assertAllClose([[0.0, 0.0], [0.0, 0.5], [0.1, 0.8], [0.3, 1.0],
                          [1.0, 1.0], [1.0, 1.0]], cdf)
+
+  def testParamTensorFromLogits(self):
+    outcomes = self._build_tensor([0.1, 0.2, 0.4])
+    x = tf.constant([-1., 0.5, 1.])
+    d = finite_discrete.FiniteDiscrete(outcomes, logits=x, validate_args=True)
+    self.assertAllClose(
+        *self.evaluate([x, d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([tf.nn.softmax(x), d.probs_parameter()]),
+        atol=0, rtol=1e-4)
+
+  def testParamTensorFromProbs(self):
+    outcomes = self._build_tensor([0.1, 0.2, 0.4])
+    x = tf.constant([0.1, 0.5, 0.4])
+    d = finite_discrete.FiniteDiscrete(outcomes, probs=x, validate_args=True)
+    self.assertAllClose(
+        *self.evaluate([tf.math.log(x), d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([x, d.probs_parameter()]),
+        atol=0, rtol=1e-4)
 
 
 class FiniteDiscreteValidateArgsStaticShapeTest(FiniteDiscreteValidateArgsTest,

@@ -29,7 +29,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
-    "Multinomial",
+    'Multinomial',
 ]
 
 
@@ -149,7 +149,7 @@ class Multinomial(distribution.Distribution):
                probs=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="Multinomial"):
+               name='Multinomial'):
     """Initialize a batch of Multinomial distributions.
 
     Args:
@@ -181,7 +181,7 @@ class Multinomial(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = tf.convert_to_tensor(
-          value=total_count, name="total_count", dtype=dtype)
+          value=total_count, name='total_count', dtype=dtype)
       if validate_args:
         self._total_count = (
             distribution_util.embed_check_nonnegative_integer_form(
@@ -214,12 +214,12 @@ class Multinomial(distribution.Distribution):
 
   @property
   def logits(self):
-    """Vector of coordinatewise logits."""
+    """Input argument `logits`."""
     return self._logits
 
   @property
   def probs(self):
-    """Probability of drawing a `1` in that coordinate."""
+    """Input argument `probs`."""
     return self._probs
 
   def _batch_shape_tensor(self):
@@ -269,6 +269,20 @@ class Multinomial(distribution.Distribution):
         self.total_count)[..., tf.newaxis]
     return self._mean_val - self._mean_val * p
 
+  def logits_parameter(self, name=None):
+    """Logits vec computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'logits_parameter'):
+      if self.logits is None:
+        return tf.math.log(self.probs)
+      return tf.identity(self.logits)
+
+  def probs_parameter(self, name=None):
+    """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'probs_parameter'):
+      if self.logits is None:
+        return tf.identity(self.probs)
+      return tf.nn.softmax(self.logits)
+
   def _maybe_assert_valid_sample(self, counts):
     """Check counts for proper shape, values, then return tensor version."""
     if not self.validate_args:
@@ -278,7 +292,7 @@ class Multinomial(distribution.Distribution):
         assert_util.assert_equal(
             self.total_count,
             tf.reduce_sum(input_tensor=counts, axis=-1),
-            message="counts must sum to `self.total_count`"),
+            message='counts must sum to `self.total_count`'),
     ], counts)
 
 
@@ -302,7 +316,7 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
   Returns:
     samples: Tensor of given dtype and shape [n] + batch_shape + [k].
   """
-  with tf.name_scope("multinomial.draw_sample"):
+  with tf.name_scope('multinomial.draw_sample'):
     # broadcast the num_trials and logits to same shape
     num_trials = tf.ones_like(
         logits[..., 0], dtype=num_trials.dtype) * num_trials

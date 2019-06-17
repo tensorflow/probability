@@ -130,7 +130,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
       probs=None,
       validate_args=False,
       allow_nan_stats=True,
-      name="ExpRelaxedOneHotCategorical"):
+      name='ExpRelaxedOneHotCategorical'):
     """Initialize ExpRelaxedOneHotCategorical using class log-probabilities.
 
     Args:
@@ -172,9 +172,9 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
       with tf.control_dependencies(
           [assert_util.assert_positive(temperature)] if validate_args else []):
         self._temperature = tf.convert_to_tensor(
-            value=temperature, name="temperature", dtype=dtype)
+            value=temperature, name='temperature', dtype=dtype)
         self._temperature_2d = tf.reshape(
-            self._temperature, [-1, 1], name="temperature_2d")
+            self._temperature, [-1, 1], name='temperature_2d')
 
       logits_shape_static = tensorshape_util.with_rank_at_least(
           self._logits.shape, 1)
@@ -182,12 +182,12 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         self._batch_rank = tf.convert_to_tensor(
             value=tensorshape_util.rank(logits_shape_static) - 1,
             dtype=tf.int32,
-            name="batch_rank")
+            name='batch_rank')
       else:
-        with tf.name_scope("batch_rank"):
+        with tf.name_scope('batch_rank'):
           self._batch_rank = tf.rank(self._logits) - 1
 
-      with tf.name_scope("event_size"):
+      with tf.name_scope('event_size'):
         self._event_size = tf.shape(input=self._logits)[-1]
 
     super(ExpRelaxedOneHotCategorical, self).__init__(
@@ -215,12 +215,12 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
 
   @property
   def logits(self):
-    """Vector of coordinatewise logits."""
+    """Input argument `logits`."""
     return self._logits
 
   @property
   def probs(self):
-    """Vector of probabilities summing to one."""
+    """Input argument `probs`."""
     return self._probs
 
   def _batch_shape_tensor(self):
@@ -242,7 +242,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
     # than `[0, 1)`. To do so, we use
     # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny` because it is the
-    # smallest, positive, "normal" number. A "normal" number is such that the
+    # smallest, positive, 'normal' number. A 'normal' number is such that the
     # mantissa has an implicit leading 1. Normal, positive numbers x, y have the
     # reasonable property that, `x + y >= max(x, y)`. In this case, a subnormal
     # number (i.e., np.nextafter) can cause us to sample 0.
@@ -278,6 +278,20 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         input_tensor=log_softmax, axis=[-1], keepdims=False)
     # combine unnormalized density with normalization constant
     return log_norm_const + log_unnorm_prob
+
+  def logits_parameter(self, name=None):
+    """Logits vec computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'logits_parameter'):
+      if self.logits is None:
+        return tf.math.log(self.probs)
+      return tf.identity(self.logits)
+
+  def probs_parameter(self, name=None):
+    """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'probs_parameter'):
+      if self.logits is None:
+        return tf.identity(self.probs)
+      return tf.nn.softmax(self.logits)
 
   def _assert_valid_sample(self, x):
     if not self.validate_args:
@@ -369,7 +383,7 @@ class RelaxedOneHotCategorical(
       probs=None,
       validate_args=False,
       allow_nan_stats=True,
-      name="RelaxedOneHotCategorical"):
+      name='RelaxedOneHotCategorical'):
     """Initialize RelaxedOneHotCategorical using class log-probabilities.
 
     Args:

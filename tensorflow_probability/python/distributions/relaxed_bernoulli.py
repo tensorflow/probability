@@ -134,7 +134,7 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
                probs=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="RelaxedBernoulli"):
+               name='RelaxedBernoulli'):
     """Construct RelaxedBernoulli distributions.
 
     Args:
@@ -166,7 +166,7 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([logits, probs, temperature], tf.float32)
       self._temperature = tf.convert_to_tensor(
-          value=temperature, name="temperature", dtype=dtype)
+          value=temperature, name='temperature', dtype=dtype)
       if validate_args:
         with tf.control_dependencies(
             [assert_util.assert_positive(temperature)]):
@@ -179,7 +179,7 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
               1. / self._temperature,
               validate_args=validate_args,
               allow_nan_stats=allow_nan_stats,
-              name=name + "/Logistic"),
+              name=name + '/Logistic'),
           bijector=sigmoid_bijector.Sigmoid(validate_args=validate_args),
           validate_args=validate_args,
           name=name)
@@ -187,7 +187,7 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {"logits": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
+    return {'logits': tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
 
   @classmethod
   def _params_event_ndims(cls):
@@ -200,10 +200,24 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
 
   @property
   def logits(self):
-    """Log-odds of `1`."""
+    """Input argument `logits`."""
     return self._logits
 
   @property
   def probs(self):
-    """Probability of `1`."""
+    """Input argument `probs`."""
     return self._probs
+
+  def logits_parameter(self, name=None):
+    """Logits computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'logits_parameter'):
+      if self.logits is None:
+        return tf.math.log(self.probs) - tf.math.log1p(-self.probs)
+      return tf.identity(self.logits)
+
+  def probs_parameter(self, name=None):
+    """Probs computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'probs_parameter'):
+      if self.logits is None:
+        return tf.identity(self.probs)
+      return tf.nn.sigmoid(self.logits)

@@ -291,7 +291,7 @@ class BernoulliTest(tf.test.TestCase):
 
   def testBernoulliBernoulliKL(self):
     batch_size = 6
-    a_p = np.array([0.5] * batch_size, dtype=np.float32)
+    a_p = np.array([0.6] * batch_size, dtype=np.float32)
     b_p = np.array([0.4] * batch_size, dtype=np.float32)
 
     a = tfd.Bernoulli(probs=a_p)
@@ -305,6 +305,28 @@ class BernoulliTest(tf.test.TestCase):
 
     self.assertEqual(kl.shape, (batch_size,))
     self.assertAllClose(kl_val, kl_expected)
+
+  def testParamTensorFromLogits(self):
+    x = tf.constant([-1., 0.5, 1.])
+    d = tfd.Bernoulli(logits=x, validate_args=True)
+    logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
+    self.assertAllClose(
+        *self.evaluate([logit(d.prob(1.)), d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([d.prob(1.), d.probs_parameter()]),
+        atol=0, rtol=1e-4)
+
+  def testParamTensorFromProbs(self):
+    x = tf.constant([0.1, 0.5, 0.4])
+    d = tfd.Bernoulli(probs=x, validate_args=True)
+    logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
+    self.assertAllClose(
+        *self.evaluate([logit(d.prob(1.)), d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([d.prob(1.), d.probs_parameter()]),
+        atol=0, rtol=1e-4)
 
 
 class _MakeSlicer(object):

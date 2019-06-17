@@ -335,6 +335,26 @@ class MultinomialTest(tf.test.TestCase):
     self.assertIsNone(grad_total_count)
     self.assertIsNone(grad_probs)
 
+  def testParamTensorFromLogits(self):
+    x = tf.constant([-1., 0.5, 1.])
+    d = tfd.Multinomial(total_count=1, logits=x, validate_args=True)
+    self.assertAllClose(
+        *self.evaluate([x, d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([tf.nn.softmax(x), d.probs_parameter()]),
+        atol=0, rtol=1e-4)
+
+  def testParamTensorFromProbs(self):
+    x = tf.constant([0.1, 0.5, 0.4])
+    d = tfd.Multinomial(total_count=1, probs=x, validate_args=True)
+    self.assertAllClose(
+        *self.evaluate([tf.math.log(x), d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([x, d.probs_parameter()]),
+        atol=0, rtol=1e-4)
+
 
 if __name__ == "__main__":
   tf.test.main()

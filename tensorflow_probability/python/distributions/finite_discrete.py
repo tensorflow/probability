@@ -19,7 +19,9 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import distribution_util as dist_util
@@ -105,8 +107,7 @@ class FiniteDiscrete(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(
-        name, values=[outcomes, logits, probs]) as name:
+    with tf1.name_scope(name) as name:
       self._outcomes = tf.convert_to_tensor(value=outcomes, name='outcomes')
       if validate_args:
         assertions = _maybe_validate_args(self._outcomes, logits, probs,
@@ -132,9 +133,6 @@ class FiniteDiscrete(distribution.Distribution):
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
-        graph_parents=[
-            self._outcomes, self._categorical.logits, self._categorical.probs
-        ],
         name=name)
 
   @classmethod
@@ -148,10 +146,12 @@ class FiniteDiscrete(distribution.Distribution):
 
   @property
   def logits(self):
+    """Input argument `logits`."""
     return self._categorical.logits
 
   @property
   def probs(self):
+    """Input argument `probs`."""
     return self._categorical.probs
 
   def _batch_shape_tensor(self):
@@ -176,8 +176,7 @@ class FiniteDiscrete(distribution.Distribution):
                            dist_util.prefer_static_shape(self.outcomes)[-1] -
                            1))
     should_use_upper_bound = self._is_equal_or_close(flat_x, values_at_ub)
-    indices = tf.compat.v1.where(should_use_upper_bound, upper_bound,
-                                 upper_bound - 1)
+    indices = tf1.where(should_use_upper_bound, upper_bound, upper_bound - 1)
     return self._categorical.cdf(
         tf.reshape(indices, shape=dist_util.prefer_static_shape(x)))
 
@@ -203,11 +202,11 @@ class FiniteDiscrete(distribution.Distribution):
     use_left_indices = self._is_equal_or_close(
         x, tf.gather(self.outcomes, indices=left_indices))
     log_probs = self._categorical.log_prob(
-        tf.compat.v1.where(use_left_indices, left_indices, right_indices))
+        tf1.where(use_left_indices, left_indices, right_indices))
     should_be_neg_inf = tf.broadcast_to(
         tf.logical_not(use_left_indices | use_right_indices),
         shape=dist_util.prefer_static_shape(log_probs))
-    return tf.compat.v1.where(
+    return tf1.where(
         should_be_neg_inf,
         tf.fill(
             dist_util.prefer_static_shape(should_be_neg_inf),
@@ -233,7 +232,7 @@ class FiniteDiscrete(distribution.Distribution):
             sample_shape=[n], seed=seed, **distribution_kwargs))
 
   def _variance(self):
-    probs = self._categorical.probs
+    probs = self._categorical.probs_parameter()
     outcomes = tf.broadcast_to(
         self.outcomes, shape=dist_util.prefer_static_shape(probs))
     if dtype_util.is_integer(outcomes.dtype):
@@ -243,7 +242,17 @@ class FiniteDiscrete(distribution.Distribution):
       outcomes = tf.cast(outcomes, dtype=probs.dtype)
     square_d = tf.math.squared_difference(outcomes,
                                           tf.expand_dims(self.mean(), axis=-1))
-    return tf.reduce_sum(input_tensor=probs * square_d, axis=-1)
+    return tf.reduce_sum(probs * square_d, axis=-1)
+
+  def logits_parameter(self, name=None):
+    """Logits vec computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'logits_parameter'):
+      return self._categorical.logits_parameter()
+
+  def probs_parameter(self, name=None):
+    """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'probs_parameter'):
+      return self._categorical.probs_parameter()
 
 
 def _maybe_validate_args(outcomes, logits, probs, validate_args):
@@ -256,7 +265,7 @@ def _maybe_validate_args(outcomes, logits, probs, validate_args):
         raise ValueError(message)
     elif validate_args:
       assertions.append(
-          tf.compat.v1.assert_equal(
+          tf1.assert_equal(
               tf.shape(input=tensor_a)[-1],
               tf.shape(input=tensor_b)[-1],
               message=message))
@@ -277,7 +286,7 @@ def _maybe_validate_args(outcomes, logits, probs, validate_args):
     if outcomes.shape.ndims != 1:
       raise ValueError(message)
   elif validate_args:
-    assertions.append(tf.compat.v1.assert_rank(outcomes, 1, message=message))
+    assertions.append(tf1.assert_rank(outcomes, 1, message=message))
 
   message = 'Size of outcomes must be greater than 0.'
   if outcomes.shape.num_elements() is not None:
@@ -285,12 +294,12 @@ def _maybe_validate_args(outcomes, logits, probs, validate_args):
       raise ValueError(message)
   elif validate_args:
     assertions.append(
-        tf.compat.v1.assert_greater(
+        tf1.assert_greater(
             tf.size(input=outcomes), 0, message=message))
 
   if validate_args:
     assertions.append(
-        tf.compat.v1.assert_equal(
+        tf1.assert_equal(
             tf.math.is_strictly_increasing(outcomes),
             True,
             message='outcomes is not strictly increasing.'))

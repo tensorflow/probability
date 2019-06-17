@@ -141,6 +141,27 @@ class RelaxedBernoulliTest(tf.test.TestCase):
     frac_ones_like = np.sum(sample_values >= 0.5, axis=0) / n
     self.assertAllClose(p, frac_ones_like, atol=1e-2)
 
+  def testParamTensorFromLogits(self):
+    x = tf.constant([-1., 0.5, 1.])
+    d = tfd.RelaxedBernoulli(temperature=1., logits=x, validate_args=True)
+    self.assertAllClose(
+        *self.evaluate([x, d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([tf.nn.sigmoid(x), d.probs_parameter()]),
+        atol=0, rtol=1e-4)
+
+  def testParamTensorFromProbs(self):
+    x = tf.constant([0.1, 0.5, 0.4])
+    d = tfd.RelaxedBernoulli(temperature=1., probs=x, validate_args=True)
+    logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
+    self.assertAllClose(
+        *self.evaluate([logit(x), d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([x, d.probs_parameter()]),
+        atol=0, rtol=1e-4)
+
 
 if __name__ == "__main__":
   tf.test.main()

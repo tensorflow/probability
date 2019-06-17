@@ -40,7 +40,7 @@ class Bernoulli(distribution.Distribution):
                dtype=tf.int32,
                validate_args=False,
                allow_nan_stats=True,
-               name="Bernoulli"):
+               name='Bernoulli'):
     """Construct Bernoulli distributions.
 
     Args:
@@ -84,7 +84,7 @@ class Bernoulli(distribution.Distribution):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {"logits": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
+    return {'logits': tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
 
   @classmethod
   def _params_event_ndims(cls):
@@ -92,12 +92,12 @@ class Bernoulli(distribution.Distribution):
 
   @property
   def logits(self):
-    """Log-odds of a `1` outcome (vs `0`)."""
+    """Input argument `logits`."""
     return self._logits
 
   @property
   def probs(self):
-    """Probability of a `1` outcome (vs `0`)."""
+    """Input argument `probs`."""
     return self._probs
 
   def _batch_shape_tensor(self):
@@ -154,6 +154,20 @@ class Bernoulli(distribution.Distribution):
     """Returns `1` if `prob > 0.5` and `0` otherwise."""
     return tf.cast(self.probs > 0.5, self.dtype)
 
+  def logits_parameter(self, name=None):
+    """Logits computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'logits_parameter'):
+      if self.logits is None:
+        return tf.math.log(self.probs) - tf.math.log1p(-self.probs)
+      return tf.identity(self.logits)
+
+  def probs_parameter(self, name=None):
+    """Probs computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'probs_parameter'):
+      if self.logits is None:
+        return tf.identity(self.probs)
+      return tf.nn.sigmoid(self.logits)
+
 
 @kullback_leibler.RegisterKL(Bernoulli, Bernoulli)
 def _kl_bernoulli_bernoulli(a, b, name=None):
@@ -162,14 +176,17 @@ def _kl_bernoulli_bernoulli(a, b, name=None):
   Args:
     a: instance of a Bernoulli distribution object.
     b: instance of a Bernoulli distribution object.
-    name: (optional) Name to use for created operations.
-      default is "kl_bernoulli_bernoulli".
+    name: Python `str` name to use for created operations.
+      Default value: `None` (i.e., `'kl_bernoulli_bernoulli'`).
 
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name or "kl_bernoulli_bernoulli"):
-    delta_probs0 = tf.nn.softplus(-b.logits) - tf.nn.softplus(-a.logits)
-    delta_probs1 = tf.nn.softplus(b.logits) - tf.nn.softplus(a.logits)
-    return (tf.sigmoid(a.logits) * delta_probs0
-            + tf.sigmoid(-a.logits) * delta_probs1)
+  with tf.name_scope(name or 'kl_bernoulli_bernoulli'):
+    a_logits = a.logits_parameter()
+    b_logits = b.logits_parameter()
+    return (
+        tf.sigmoid(a_logits) * (
+            tf.nn.softplus(-b_logits) - tf.nn.softplus(-a_logits)) +
+        tf.sigmoid(-a_logits) * (
+            tf.nn.softplus(b_logits) - tf.nn.softplus(a_logits)))

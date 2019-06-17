@@ -86,7 +86,7 @@ class OneHotCategorical(distribution.Distribution):
                dtype=tf.int32,
                validate_args=False,
                allow_nan_stats=True,
-               name="OneHotCategorical"):
+               name='OneHotCategorical'):
     """Initialize OneHotCategorical distributions using class log-probabilities.
 
     Args:
@@ -123,12 +123,12 @@ class OneHotCategorical(distribution.Distribution):
         self._batch_rank = tf.convert_to_tensor(
             value=tensorshape_util.rank(logits_shape_static) - 1,
             dtype=tf.int32,
-            name="batch_rank")
+            name='batch_rank')
       else:
-        with tf.name_scope("batch_rank"):
+        with tf.name_scope('batch_rank'):
           self._batch_rank = tf.rank(self._logits) - 1
 
-      with tf.name_scope("event_size"):
+      with tf.name_scope('event_size'):
         self._event_size = tf.shape(input=self._logits)[-1]
 
     super(OneHotCategorical, self).__init__(
@@ -151,12 +151,12 @@ class OneHotCategorical(distribution.Distribution):
 
   @property
   def logits(self):
-    """Vector of coordinatewise logits."""
+    """Input argument `logits`."""
     return self._logits
 
   @property
   def probs(self):
-    """Vector of coordinatewise probabilities."""
+    """Input argument `probs`."""
     return self._probs
 
   def _batch_shape_tensor(self):
@@ -226,6 +226,20 @@ class OneHotCategorical(distribution.Distribution):
   def _variance(self):
     return self.probs * (1. - self.probs)
 
+  def logits_parameter(self, name=None):
+    """Logits vec computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'logits_parameter'):
+      if self.logits is None:
+        return tf.math.log(self.probs)
+      return tf.identity(self.logits)
+
+  def probs_parameter(self, name=None):
+    """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'probs_parameter'):
+      if self.logits is None:
+        return tf.identity(self.probs)
+      return tf.nn.softmax(self.logits)
+
   def _assert_valid_sample(self, x):
     if not self.validate_args:
       return x
@@ -244,15 +258,17 @@ def _kl_categorical_categorical(a, b, name=None):
   Args:
     a: instance of a OneHotCategorical distribution object.
     b: instance of a OneHotCategorical distribution object.
-    name: (optional) Name to use for created operations.
-      default is "kl_categorical_categorical".
+    name: Python `str` name to use for created operations.
+      Default value: `None` (i.e., `'kl_categorical_categorical'`).
 
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name or "kl_categorical_categorical"):
+  with tf.name_scope(name or 'kl_categorical_categorical'):
     # sum(p ln(p / q))
+    a_logits = a.logits_parameter()
+    b_logits = b.logits_parameter()
     return tf.reduce_sum(
-        input_tensor=tf.nn.softmax(a.logits) *
-        (tf.nn.log_softmax(a.logits) - tf.nn.log_softmax(b.logits)),
+        (tf.nn.softmax(a_logits) *
+         (tf.nn.log_softmax(a_logits) - tf.nn.log_softmax(b_logits))),
         axis=-1)

@@ -235,6 +235,28 @@ class BinomialTest(tf.test.TestCase):
     self.assertAllClose(
         stats.binom.var(counts, probs), sample_variance_, atol=0., rtol=0.20)
 
+  def testParamTensorFromLogits(self):
+    x = tf.constant([-1., 0.5, 1.])
+    d = tfd.Binomial(total_count=1, logits=x, validate_args=True)
+    logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
+    self.assertAllClose(
+        *self.evaluate([logit(d.prob(1.)), d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([d.prob(1.), d.probs_parameter()]),
+        atol=0, rtol=1e-4)
+
+  def testParamTensorFromProbs(self):
+    x = tf.constant([0.1, 0.5, 0.4])
+    d = tfd.Binomial(total_count=1, probs=x, validate_args=True)
+    logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
+    self.assertAllClose(
+        *self.evaluate([logit(d.prob(1.)), d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([d.prob(1.), d.probs_parameter()]),
+        atol=0, rtol=1e-4)
+
 
 if __name__ == "__main__":
   tf.test.main()

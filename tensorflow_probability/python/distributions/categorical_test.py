@@ -22,7 +22,8 @@ from __future__ import print_function
 from absl.testing import parameterized
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
@@ -105,8 +106,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
       self.assertEqual(dist.dtype, dist.sample(5).dtype)
 
   def testUnknownShape(self):
-    logits = lambda l: tf.compat.v1.placeholder_with_default(
-        np.float32(l), shape=None)
+    logits = lambda l: tf1.placeholder_with_default(np.float32(l), shape=None)
     sample = lambda l: tfd.Categorical(logits=logits(l)).sample()
     # Will sample class 1.
     sample_value = self.evaluate(sample([-1000.0, 1000.0]))
@@ -130,7 +130,7 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
   def testCDFWithDynamicEventShapeKnownNdims(self):
     """Test that dynamically-sized events with unknown shape work."""
     batch_size = 2
-    make_ph = tf.compat.v1.placeholder_with_default
+    make_ph = tf1.placeholder_with_default
     histograms = lambda h: make_ph(np.float32(h), shape=(batch_size, None))
     event = lambda e: make_ph(np.float32(e), shape=(batch_size,))
     dist = lambda h: tfd.Categorical(probs=histograms(h))
@@ -163,8 +163,8 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
   def testCDFWithDynamicEventShapeUnknownNdims(
       self, events, histograms, expected_cdf):
     """Test that dynamically-sized events with unknown shape work."""
-    event_ph = tf.compat.v1.placeholder_with_default(events, shape=None)
-    histograms_ph = tf.compat.v1.placeholder_with_default(
+    event_ph = tf1.placeholder_with_default(events, shape=None)
+    histograms_ph = tf1.placeholder_with_default(
         histograms, shape=None)
     dist = tfd.Categorical(probs=histograms_ph)
     cdf_op = dist.cdf(event_ph)
@@ -469,6 +469,26 @@ class CategoricalTest(tf.test.TestCase, parameterized.TestCase):
         self.assertEqual(kl.shape, (batch_size,))
         self.assertAllClose(kl_val, kl_expected)
         self.assertAllClose(kl_same, np.zeros_like(kl_expected))
+
+  def testParamTensorFromLogits(self):
+    x = tf.constant([-1., 0.5, 1.])
+    d = tfd.Categorical(logits=x, validate_args=True)
+    self.assertAllClose(
+        *self.evaluate([x, d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([tf.nn.softmax(x), d.probs_parameter()]),
+        atol=0, rtol=1e-4)
+
+  def testParamTensorFromProbs(self):
+    x = tf.constant([0.1, 0.5, 0.4])
+    d = tfd.Categorical(probs=x, validate_args=True)
+    self.assertAllClose(
+        *self.evaluate([tf.math.log(x), d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([x, d.probs_parameter()]),
+        atol=0, rtol=1e-4)
 
 
 if __name__ == "__main__":
