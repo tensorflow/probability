@@ -113,7 +113,7 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
     x = gm.sample(10, seed=tfp_test_util.test_seed())
     actual_log_cdf = gm.log_cdf(x)
     expected_log_cdf = tf.reduce_logsumexp(
-        input_tensor=(gm.mixture_distribution.logits +
+        input_tensor=(gm.mixture_distribution.logits_parameter() +
                       gm.components_distribution.log_cdf(x[..., tf.newaxis])),
         axis=1)
     actual_log_cdf_, expected_log_cdf_ = self.evaluate(

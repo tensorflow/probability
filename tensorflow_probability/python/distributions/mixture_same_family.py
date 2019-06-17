@@ -167,8 +167,8 @@ class MixtureSameFamily(distribution.Distribution):
       s = components_distribution.event_shape_tensor()
       self._event_ndims = tf.compat.dimension_value(s.shape[0])
       if self._event_ndims is None:
-        self._event_ndims = tf.size(input=s)
-      self._event_size = tf.reduce_prod(input_tensor=s)
+        self._event_ndims = tf.size(s)
+      self._event_size = tf.reduce_prod(s)
 
       if not dtype_util.is_integer(mixture_distribution.dtype):
         raise ValueError(
@@ -181,7 +181,7 @@ class MixtureSameFamily(distribution.Distribution):
       elif validate_args:
         self._runtime_assertions += [
             assert_util.assert_equal(
-                tf.size(input=mixture_distribution.event_shape_tensor()),
+                tf.size(mixture_distribution.event_shape_tensor()),
                 0,
                 message="`mixture_distribution` must have scalar `event_dim`s"),
         ]
@@ -211,9 +211,11 @@ class MixtureSameFamily(distribution.Distribution):
                     "compatible with `components_distribution.batch_shape`"))
         ]
 
+      mixture_dist_param = (
+          mixture_distribution.probs if mixture_distribution.logits is None
+          else mixture_distribution.logits)
       km = tf.compat.dimension_value(
-          tensorshape_util.with_rank_at_least(mixture_distribution.logits.shape,
-                                              1)[-1])
+          tensorshape_util.with_rank_at_least(mixture_dist_param.shape, 1)[-1])
       kc = tf.compat.dimension_value(
           tensorshape_util.with_rank_at_least(
               components_distribution.batch_shape, 1)[-1])
@@ -222,7 +224,7 @@ class MixtureSameFamily(distribution.Distribution):
                          "equal `components_distribution.batch_shape[-1]` "
                          "({})".format(km, kc))
       elif validate_args:
-        km = tf.shape(input=mixture_distribution.logits)[-1]
+        km = tf.shape(mixture_dist_param)[-1]
         kc = components_distribution.batch_shape_tensor()[-1]
         self._runtime_assertions += [
             assert_util.assert_equal(
@@ -232,7 +234,7 @@ class MixtureSameFamily(distribution.Distribution):
                          "`components_distribution.batch_shape[-1:]`")),
         ]
       elif km is None:
-        km = tf.shape(input=mixture_distribution.logits)[-1]
+        km = tf.shape(mixture_dist_param)[-1]
 
       self._num_components = km
 
@@ -323,8 +325,7 @@ class MixtureSameFamily(distribution.Distribution):
       mask = distribution_utils.pad_mixture_dimensions(
           mask, self, self.mixture_distribution,
           self._event_ndims)                         # [n, B, k, [1]*e]
-      x = tf.reduce_sum(
-          input_tensor=x * mask, axis=-1 - self._event_ndims)  # [n, B, E]
+      x = tf.reduce_sum(x * mask, axis=-1 - self._event_ndims)  # [n, B, E]
       if self._reparameterize:
         x = self._reparameterize_sample(x)
       return x
@@ -334,40 +335,41 @@ class MixtureSameFamily(distribution.Distribution):
       x = self._pad_sample_dims(x)
       log_prob_x = self.components_distribution.log_prob(x)  # [S, B, k]
       log_mix_prob = tf.nn.log_softmax(
-          self.mixture_distribution.logits, axis=-1)  # [B, k]
-      return tf.reduce_logsumexp(
-          input_tensor=log_prob_x + log_mix_prob, axis=-1)  # [S, B]
+          self.mixture_distribution.logits_parameter(), axis=-1)  # [B, k]
+      return tf.reduce_logsumexp(log_prob_x + log_mix_prob, axis=-1)  # [S, B]
 
   def _mean(self):
     with tf.control_dependencies(self._runtime_assertions):
       probs = distribution_utils.pad_mixture_dimensions(
-          self.mixture_distribution.probs, self, self.mixture_distribution,
+          self.mixture_distribution.probs_parameter(),
+          self,
+          self.mixture_distribution,
           self._event_ndims)                         # [B, k, [1]*e]
-      return tf.reduce_sum(
-          input_tensor=probs * self.components_distribution.mean(),
-          axis=-1 - self._event_ndims)  # [B, E]
+      return tf.reduce_sum(probs * self.components_distribution.mean(),
+                           axis=-1 - self._event_ndims)  # [B, E]
 
   def _log_cdf(self, x):
     x = self._pad_sample_dims(x)
     log_cdf_x = self.components_distribution.log_cdf(x)      # [S, B, k]
     log_mix_prob = tf.nn.log_softmax(
-        self.mixture_distribution.logits, axis=-1)  # [B, k]
-    return tf.reduce_logsumexp(
-        input_tensor=log_cdf_x + log_mix_prob, axis=-1)  # [S, B]
+        self.mixture_distribution.logits_parameter(), axis=-1)  # [B, k]
+    return tf.reduce_logsumexp(log_cdf_x + log_mix_prob, axis=-1)  # [S, B]
 
   def _variance(self):
     with tf.control_dependencies(self._runtime_assertions):
       # Law of total variance: Var(Y) = E[Var(Y|X)] + Var(E[Y|X])
       probs = distribution_utils.pad_mixture_dimensions(
-          self.mixture_distribution.probs, self, self.mixture_distribution,
+          self.mixture_distribution.probs_parameter(),
+          self,
+          self.mixture_distribution,
           self._event_ndims)                         # [B, k, [1]*e]
       mean_cond_var = tf.reduce_sum(
-          input_tensor=probs * self.components_distribution.variance(),
+          probs * self.components_distribution.variance(),
           axis=-1 - self._event_ndims)  # [B, E]
       var_cond_mean = tf.reduce_sum(
-          input_tensor=probs *
-          tf.math.squared_difference(self.components_distribution.mean(),
-                                     self._pad_sample_dims(self._mean())),
+          probs * tf.math.squared_difference(
+              self.components_distribution.mean(),
+              self._pad_sample_dims(self._mean())),
           axis=-1 - self._event_ndims)  # [B, E]
       return mean_cond_var + var_cond_mean                   # [B, E]
 
@@ -381,17 +383,19 @@ class MixtureSameFamily(distribution.Distribution):
       # Law of total variance: Var(Y) = E[Var(Y|X)] + Var(E[Y|X])
       probs = distribution_utils.pad_mixture_dimensions(
           distribution_utils.pad_mixture_dimensions(
-              self.mixture_distribution.probs, self, self.mixture_distribution,
+              self.mixture_distribution.probs_parameter(),
+              self,
+              self.mixture_distribution,
               self._event_ndims),
           self, self.mixture_distribution,
           self._event_ndims)                         # [B, k, 1, 1]
       mean_cond_var = tf.reduce_sum(
-          input_tensor=probs * self.components_distribution.covariance(),
+          probs * self.components_distribution.covariance(),
           axis=-3)  # [B, e, e]
       var_cond_mean = tf.reduce_sum(
-          input_tensor=probs *
-          _outer_squared_difference(self.components_distribution.mean(),
-                                    self._pad_sample_dims(self._mean())),
+          probs * _outer_squared_difference(
+              self.components_distribution.mean(),
+              self._pad_sample_dims(self._mean())),
           axis=-3)  # [B, e, e]
       return mean_cond_var + var_cond_mean                   # [B, e, e]
 
@@ -399,7 +403,7 @@ class MixtureSameFamily(distribution.Distribution):
     with tf.name_scope("pad_sample_dims"):
       ndims = tensorshape_util.rank(
           x.shape) if tensorshape_util.rank(x.shape) is not None else tf.rank(x)
-      shape = tf.shape(input=x)
+      shape = tf.shape(x)
       d = ndims - self._event_ndims
       x = tf.reshape(x, shape=tf.concat([shape[:d], [1], shape[d:]], axis=0))
       return x
@@ -442,7 +446,7 @@ class MixtureSameFamily(distribution.Distribution):
     # but have Jacobian of size [S*prod(B), prod(E), prod(E)].
     def reshaped_distributional_transform(x_2d):
       return tf.reshape(
-          self._distributional_transform(tf.reshape(x_2d, tf.shape(input=x))),
+          self._distributional_transform(tf.reshape(x_2d, tf.shape(x))),
           x_2d_shape)
 
     # transform_2d: [S*prod(B), prod(E)]
@@ -461,7 +465,7 @@ class MixtureSameFamily(distribution.Distribution):
     surrogate_x_2d = -tf.linalg.triangular_solve(
         tf.stop_gradient(jacobian), tf.expand_dims(transform_2d, axis=-1),
         lower=True)  # [S*prod(B), prod(E), 1]
-    surrogate_x = tf.reshape(surrogate_x_2d, tf.shape(input=x))
+    surrogate_x = tf.reshape(surrogate_x_2d, tf.shape(x))
 
     # Replace gradients of x with gradients of surrogate_x, but keep the value.
     return x + (surrogate_x - tf.stop_gradient(surrogate_x))
@@ -517,10 +521,12 @@ class MixtureSameFamily(distribution.Distribution):
               tf.reshape(log_prob_x, [-1, self._event_size]),
               exclusive=True,
               axis=-1),
-          tf.shape(input=log_prob_x))  # [S, B, k, E]
+          tf.shape(log_prob_x))  # [S, B, k, E]
 
       logits_mix_prob = distribution_utils.pad_mixture_dimensions(
-          self.mixture_distribution.logits, self, self.mixture_distribution,
+          self.mixture_distribution.logits_parameter(),
+          self,
+          self.mixture_distribution,
           self._event_ndims)  # [B, k, 1]
 
       # Logits of the posterior weights: log w_k + log prob_k (x_1, ..., x_i-1)
@@ -529,8 +535,7 @@ class MixtureSameFamily(distribution.Distribution):
       component_axis = tensorshape_util.rank(x.shape) - self._event_ndims
       posterior_weights_x = tf.nn.softmax(log_posterior_weights_x,
                                           axis=component_axis)
-      return tf.reduce_sum(
-          input_tensor=posterior_weights_x * cdf_x, axis=component_axis)
+      return tf.reduce_sum(posterior_weights_x * cdf_x, axis=component_axis)
 
 
 def _outer_squared_difference(x, y):

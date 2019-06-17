@@ -391,7 +391,8 @@ class _HiddenMarkovModelTest(
 
     observations = [0, 1, 1, 1, 1, 1, 2]
 
-    probs = model.posterior_marginals(observations).probs
+    probs = self.evaluate(
+        model.posterior_marginals(observations).probs_parameter())
     expected_probs = np.eye(9)[[0, 1, 2, 3, 4, 6, 8]]
 
     self.assertAllClose(probs, expected_probs, rtol=1e-4, atol=0.0)
@@ -453,7 +454,8 @@ class _HiddenMarkovModelTest(
         num_steps=8,
         validate_args=True)
 
-    inferred_probs = model.posterior_marginals(observations).probs
+    inferred_probs = self.evaluate(
+        model.posterior_marginals(observations).probs_parameter())
     rank_e = max(rank_o, rank_t, rank_i, rank_s)
     expected_probs = increase_rank(rank_e,
                                    [[0.99994, 0.00000, 0.00006, 0.00000],
@@ -790,7 +792,8 @@ class _HiddenMarkovModelTest(
     observations = tf.constant([0, 1, 2, 3, 2, 1, 0])
     mask = tf.constant([False, True, True, True, True, True, False])
 
-    marginals = model.posterior_marginals(observations, mask).probs
+    marginals = self.evaluate(
+        model.posterior_marginals(observations, mask).probs_parameter())
     expected_marginals = [[1., 0., 0., 0.],
                           [21./26, 5./26, 0., 0.],
                           [105./143, 35./143, 3./143, 0.],
@@ -851,9 +854,10 @@ class _HiddenMarkovModelTest(
                                   tfd.Categorical(probs=observation_probs),
                                   num_steps=1)
 
-    inferred_marginals = model.posterior_marginals(
-        observations=[[[0]], [[1]]],
-        mask=[[[[True]]], [[[False]]]]).probs
+    inferred_marginals = self.evaluate(
+        model.posterior_marginals(
+            observations=[[[0]], [[1]]],
+            mask=[[[[True]]], [[[False]]]]).probs_parameter())
 
     # Result is a [2,2,2] batch of sequences of length 1 of
     # [2]-vectors of probabilities.

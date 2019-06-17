@@ -18,16 +18,18 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.compat.v1 as tf1
+import numpy as np
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -47,10 +49,10 @@ def _broadcast_cat_event_and_params(event, params, base_dtype):
       tensorshape_util.is_fully_defined(params.shape[:-1]) and
       tensorshape_util.is_fully_defined(event.shape))
   if not shape_known_statically or params.shape[:-1] != event.shape:
-    params *= tf.ones_like(event[..., tf.newaxis],
-                           dtype=params.dtype)
+    params = params * tf.ones_like(event[..., tf.newaxis],
+                                   dtype=params.dtype)
     params_shape = tf.shape(input=params)[:-1]
-    event *= tf.ones(params_shape, dtype=event.dtype)
+    event = event * tf.ones(params_shape, dtype=event.dtype)
     if tensorshape_util.rank(params.shape) is not None:
       tensorshape_util.set_shape(event, params.shape[:-1])
 
@@ -180,55 +182,20 @@ class Categorical(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
+    if (probs is None) == (logits is None):
+      raise ValueError('Must pass probs or logits, but not both.')
     with tf.name_scope(name) as name:
-      self._logits, self._probs = distribution_util.get_logits_and_probs(
-          logits=logits,
-          probs=probs,
+      self._probs = tensor_util.convert_immutable_to_tensor(
+          probs, dtype_hint=tf.float32, name='probs')
+      self._logits = tensor_util.convert_immutable_to_tensor(
+          logits, dtype_hint=tf.float32, name='logits')
+      super(Categorical, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
-          multidimensional=True,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
           name=name)
-
-      if validate_args:
-        self._logits = distribution_util.embed_check_categorical_event_shape(
-            self._logits)
-
-      logits_shape_static = tensorshape_util.with_rank_at_least(
-          self._logits.shape, 1)
-      if tensorshape_util.rank(logits_shape_static) is not None:
-        self._batch_rank = tf.convert_to_tensor(
-            value=tensorshape_util.rank(logits_shape_static) - 1,
-            dtype=tf.int32,
-            name='batch_rank')
-      else:
-        with tf.name_scope('batch_rank'):
-          self._batch_rank = tf.rank(self._logits) - 1
-
-      logits_shape = tf.shape(input=self._logits, name='logits_shape')
-      num_categories = tf.compat.dimension_value(logits_shape_static[-1])
-      if num_categories is not None:
-        self._num_categories = tf.convert_to_tensor(
-            value=num_categories, dtype=tf.int32, name='num_categories')
-      else:
-        with tf.name_scope('num_categories'):
-          self._num_categories = logits_shape[self._batch_rank]
-
-      if tensorshape_util.is_fully_defined(logits_shape_static[:-1]):
-        self._batch_shape_val = tf.constant(
-            logits_shape_static[:-1].as_list(),
-            dtype=tf.int32,
-            name='batch_shape')
-      else:
-        with tf.name_scope('batch_shape'):
-          self._batch_shape_val = logits_shape[:-1]
-    super(Categorical, self).__init__(
-        dtype=dtype,
-        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._logits,
-                       self._probs],
-        name=name)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -236,33 +203,42 @@ class Categorical(distribution.Distribution):
 
   @property
   @deprecation.deprecated(
-      '2019-05-19', 'The `event_size` property is deprecated.  Use '
-      '`num_categories` instead.  They have the same value, but `event_size` '
-      'is misnamed.')
-  def event_size(self):
-    """Scalar `int32` tensor: the number of categories."""
-    return self._num_categories
-
-  @property
+      '2019-10-01', 'The `num_categories` property is deprecated.  Use '
+      '`tf.shape(self.probs if self.logits is None else self.logits)[-1]` '
+      'instead.')
+  # Note this function has graph side-effects which is why it must be
+  # deprecated.
   def num_categories(self):
     """Scalar `int32` tensor: the number of categories."""
-    return self._num_categories
+    with self._name_and_control_scope('num_categories'):
+      # Note: its safe to use `convert_to_tensor` because either
+      # `self._num_categories()` has no graph side-effects or already hit our
+      # assertions checks. Ideally we'd use tf.identity but cannot because of
+      # its failure to preserve static value; b/135200956.
+      return tf.convert_to_tensor(
+          self._num_categories(), dtype_hint=tf.int32, name='num_categories')
 
   @property
   def logits(self):
     """Input argument `logits`."""
+    if self._logits is None:
+      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
+    if self._probs is None:
+      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self):
-    return tf.identity(self._batch_shape_val)
+    x = self._probs if self._logits is None else self._logits
+    return tf.shape(x)[:-1]
 
   def _batch_shape(self):
-    return self.logits.shape[:-1]
+    x = self._probs if self._logits is None else self._logits
+    return x.shape[:-1]
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -271,29 +247,30 @@ class Categorical(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    if tensorshape_util.rank(self.logits.shape) == 2:
-      logits_2d = self.logits
-    else:
-      logits_2d = tf.reshape(self.logits, [-1, self.num_categories])
+    logits = self.logits_parameter()
+    logits_2d = tf.reshape(logits, [-1, self._num_categories()])
     sample_dtype = tf.int64 if dtype_util.size(self.dtype) > 4 else tf.int32
     draws = tf.random.categorical(
         logits_2d, n, dtype=sample_dtype, seed=seed)
-    draws = tf.reshape(
-        tf.transpose(a=draws), tf.concat([[n], self.batch_shape_tensor()], 0))
-    return tf.cast(draws, self.dtype)
+    draws = tf.cast(draws, self.dtype)
+    return tf.reshape(
+        tf.transpose(draws),
+        shape=tf.concat([[n], self.batch_shape_tensor()], axis=0))
 
   def _cdf(self, k):
-    k = tf.convert_to_tensor(value=k, name='k')
+    # TODO(b/135263541): Improve numerical precision of categorical.cdf.
+    probs = self.probs_parameter()
+    num_categories = self._num_categories()
 
     k, probs = _broadcast_cat_event_and_params(
-        k, self.probs, base_dtype=dtype_util.base_dtype(self.dtype))
+        k, probs, base_dtype=dtype_util.base_dtype(self.dtype))
 
     # Since the lowest number in the support is 0, any k < 0 should be zero in
     # the output.
     should_be_zero = k < 0
 
     # Will use k as an index in the gather below, so clip it to {0,...,K-1}.
-    k = tf.clip_by_value(tf.cast(k, tf.int32), 0, self.num_categories - 1)
+    k = tf.clip_by_value(tf.cast(k, tf.int32), 0, num_categories - 1)
 
     batch_shape = tf.shape(input=k)
 
@@ -302,7 +279,7 @@ class Categorical(distribution.Distribution):
     # dims (so we know batch_dims=1).
     k_flat_batch = tf.reshape(k, [-1])
     probs_flat_batch = tf.reshape(
-        probs, tf.concat(([-1], [self.num_categories]), axis=0))
+        probs, tf.concat(([-1], [num_categories]), axis=0))
 
     cdf_flat = tf.gather(
         tf.cumsum(probs_flat_batch, axis=-1),
@@ -311,43 +288,137 @@ class Categorical(distribution.Distribution):
 
     cdf = tf.reshape(cdf_flat, shape=batch_shape)
 
-    return tf1.where(should_be_zero, tf.zeros_like(cdf), cdf)
+    zero = np.array(0, dtype=dtype_util.as_numpy_dtype(cdf.dtype))
+    return tf.where(should_be_zero, zero, cdf)
 
   def _log_prob(self, k):
-    k = tf.convert_to_tensor(value=k, name='k')
+    logits = self.logits_parameter()
     if self.validate_args:
       k = distribution_util.embed_check_integer_casting_closed(
           k, target_dtype=tf.int32)
     k, logits = _broadcast_cat_event_and_params(
-        k, self.logits, base_dtype=dtype_util.base_dtype(self.dtype))
-
-    return -tf.nn.sparse_softmax_cross_entropy_with_logits(labels=k,
-                                                           logits=logits)
+        k, logits, base_dtype=dtype_util.base_dtype(self.dtype))
+    return -tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=k, logits=logits)
 
   def _entropy(self):
-    return -tf.reduce_sum(
-        input_tensor=tf.math.multiply_no_nan(
-            tf.nn.log_softmax(self.logits), self.probs), axis=-1)
+    if self._logits is None:
+      # If we only have probs, there's not much we can do to ensure numerical
+      # precision.
+      return -tf.reduce_sum(
+          tf.math.multiply_no_nan(tf.math.log(self._probs), self._probs),
+          axis=-1)
+    # The following result can be derived as follows. Write log(p[i]) as:
+    # s[i]-m-lse(s[i]-m) where m=max(s), then you have:
+    #   sum_i exp(s[i]-m-lse(s-m)) (s[i] - m - lse(s-m))
+    #   = -m - lse(s-m) + sum_i s[i] exp(s[i]-m-lse(s-m))
+    #   = -m - lse(s-m) + (1/exp(lse(s-m))) sum_i s[i] exp(s[i]-m)
+    #   = -m - lse(s-m) + (1/sumexp(s-m)) sum_i s[i] exp(s[i]-m)
+    # Write x[i]=s[i]-m then you have:
+    #   = -m - lse(x) + (1/sum_exp(x)) sum_i s[i] exp(x[i])
+    # Negating all of this result is the Shanon (discrete) entropy.
+    m = tf.reduce_max(self._logits, axis=-1, keepdims=True)
+    x = self._logits - m
+    sum_exp_x = tf.reduce_sum(tf.math.exp(x), axis=-1)
+    lse_logits = m[..., 0] + tf.math.log(sum_exp_x)
+    return lse_logits - tf.reduce_sum(
+        self._logits * tf.math.exp(x), axis=-1) / sum_exp_x
 
   def _mode(self):
-    ret = tf.argmax(input=self.logits, axis=self._batch_rank)
-    ret = tf.cast(ret, self.dtype)
-    tensorshape_util.set_shape(ret, self.batch_shape)
-    return ret
+    x = self._probs if self._logits is None else self._logits
+    mode = tf.cast(tf.argmax(x, axis=-1), self.dtype)
+    tensorshape_util.set_shape(mode, x.shape[:-1])
+    return mode
 
   def logits_parameter(self, name=None):
     """Logits vec computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'logits_parameter'):
-      if self.logits is None:
-        return tf.math.log(self.probs)
-      return tf.identity(self.logits)
+      if self._logits is None:
+        return tf.math.log(self._probs)
+      return tf.identity(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'probs_parameter'):
-      if self.logits is None:
-        return tf.identity(self.probs)
-      return tf.nn.softmax(self.logits)
+      if self._logits is None:
+        return tf.identity(self._probs)
+      return tf.nn.softmax(self._logits)
+
+  def _num_categories(self):
+    """Scalar `int32` tensor: the number of categories."""
+    with tf.name_scope('num_categories'):
+      x = self._probs if self._logits is None else self._logits
+      num_categories = tf.compat.dimension_value(x.shape[-1])
+      if num_categories is not None:
+        return num_categories
+      return tf.shape(x)[-1]
+
+  @deprecation.deprecated(
+      '2019-10-01',
+      ('The `logits` property will return `None` when the distribution is '
+       'parameterized with `logits=None`. Use `logits_parameter()` instead.'),
+      warn_once=True)
+  def _logits_deprecated_behavior(self):
+    return self.logits_parameter()
+
+  @deprecation.deprecated(
+      '2019-10-01',
+      ('The `probs` property will return `None` when the distribution is '
+       'parameterized with `probs=None`. Use `probs_parameter()` instead.'),
+      warn_once=True)
+  def _probs_deprecated_behavior(self):
+    return self.probs_parameter()
+
+  def _parameter_control_dependencies(self, is_init):
+    return maybe_assert_categorical_param_correctness(
+        is_init, self.validate_args, self._probs, self._logits)
+
+
+def maybe_assert_categorical_param_correctness(
+    is_init, validate_args, probs, logits):
+  """Return assertions for `Categorical`-type distributions."""
+  if is_init:
+    x, name = (probs, 'probs') if logits is None else (logits, 'logits')
+    if not dtype_util.is_floating(x.dtype):
+      raise TypeError(
+          'Argument `{}` must having floating type.'.format(name))
+    ndims = tensorshape_util.rank(x.shape)
+    if ndims is not None and ndims < 1:
+      raise ValueError(
+          'Argument `{}` must have rank at least 1.'.format(name))
+
+  if not validate_args:
+    return []
+
+  assertions = []
+
+  if logits is not None:
+    if is_init != tensor_util.is_mutable(logits):
+      if tensorshape_util.rank(logits.shape) is None:
+        assertions.append(assert_util.assert_rank_at_least(
+            logits, 1,
+            message='Argument `logits` must have rank at least 1.'))
+      assertions.extend(
+          distribution_util.assert_categorical_event_shape(logits))
+
+  if probs is not None:
+    if is_init != tensor_util.is_mutable(probs):
+      if tensorshape_util.rank(probs.shape) is None:
+        assertions.append(assert_util.assert_rank_at_least(
+            probs, 1,
+            message='Argument `probs` must have rank at least 1.'))
+      one = np.array(1, dtype=dtype_util.as_numpy_dtype(probs.dtype))
+      assertions.extend([
+          assert_util.assert_non_negative(probs),
+          assert_util.assert_near(
+              tf.reduce_sum(probs, axis=-1),
+              one,
+              message='Argument `probs` must sum to 1.')
+      ])
+      assertions.extend(
+          distribution_util.assert_categorical_event_shape(probs))
+
+  return assertions
 
 
 @kullback_leibler.RegisterKL(Categorical, Categorical)
