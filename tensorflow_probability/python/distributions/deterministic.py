@@ -27,29 +27,15 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     "Deterministic",
     "VectorDeterministic",
 ]
-
-
-def _get_tol(tol, dtype, validate_args):
-  """Gets a Tensor of type `dtype`, 0 if `tol` is None, validation optional."""
-  if tol is None:
-    return tf.convert_to_tensor(value=0, dtype=dtype)
-
-  tol = tf.convert_to_tensor(value=tol, dtype=dtype)
-  if validate_args:
-    tol = distribution_util.with_dependencies([
-        assert_util.assert_non_negative(
-            tol, message="Argument 'tol' must be non-negative")
-    ], tol)
-  return tol
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -103,18 +89,13 @@ class _BaseDeterministic(distribution.Distribution):
     """
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, atol, rtol], dtype_hint=tf.float32)
-      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
-      if is_vector and validate_args:
-        msg = "Argument loc must be at least rank 1."
-        if tensorshape_util.rank(loc.shape) is not None:
-          if tensorshape_util.rank(loc.shape) < 1:
-            raise ValueError(msg)
-        else:
-          loc = distribution_util.with_dependencies(
-              [assert_util.assert_rank_at_least(loc, 1, message=msg)], loc)
-      self._loc = loc
-      self._atol = _get_tol(atol, self._loc.dtype, validate_args)
-      self._rtol = _get_tol(rtol, self._loc.dtype, validate_args)
+      self._loc = tensor_util.convert_immutable_to_tensor(
+          loc, dtype_hint=dtype, name="loc")
+      self._atol = tensor_util.convert_immutable_to_tensor(
+          0 if atol is None else atol, dtype=dtype, name="atol")
+      self._rtol = tensor_util.convert_immutable_to_tensor(
+          0 if rtol is None else rtol, dtype=dtype, name="rtol")
+      self._is_vector = is_vector
 
       super(_BaseDeterministic, self).__init__(
           dtype=self._loc.dtype,
@@ -125,11 +106,12 @@ class _BaseDeterministic(distribution.Distribution):
           graph_parents=[self._loc, self._atol, self._rtol],
           name=name)
 
-      # Avoid using the large broadcast with self.loc if possible.
-      if rtol is None:
-        self._slack = self.atol
-      else:
-        self._slack = self.atol + self.rtol * tf.abs(self.loc)
+  def _slack(self, loc):
+    # Avoid using the large broadcast with self.loc if possible.
+    if self.parameters["rtol"] is None:
+      return self.atol
+    else:
+      return self.atol + self.rtol * tf.abs(loc)
 
   @property
   def loc(self):
@@ -164,6 +146,31 @@ class _BaseDeterministic(distribution.Distribution):
         self.loc,
         tf.concat([[n], self.batch_shape_tensor(), self.event_shape_tensor()],
                   axis=0))
+
+  def _parameter_control_dependencies(self, is_init):
+    msg = "Argument loc must be at least rank 1."
+    if is_init:
+      if self._is_vector and tensorshape_util.rank(self.loc.shape) is not None:
+        if tensorshape_util.rank(self.loc.shape) < 1:
+          raise ValueError(msg)
+
+    if not self.validate_args:
+      return []
+
+    assertions = []
+
+    if is_init != tensor_util.is_mutable(self.loc) and self._is_vector:
+      assertions.append(
+          assert_util.assert_rank_at_least(self.loc, 1, message=msg))
+    if is_init != tensor_util.is_mutable(self.atol):
+      assertions.append(
+          assert_util.assert_non_negative(
+              self.atol, message="Argument 'atol' must be non-negative"))
+    if is_init != tensor_util.is_mutable(self.rtol):
+      assertions.append(
+          assert_util.assert_non_negative(
+              self.rtol, message="Argument 'rtol' must be non-negative"))
+    return assertions
 
 
 class Deterministic(_BaseDeterministic):
@@ -258,10 +265,13 @@ class Deterministic(_BaseDeterministic):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.loc), tf.shape(input=self._slack))
+        tf.shape(self.loc),
+        tf.broadcast_dynamic_shape(tf.shape(self.atol), tf.shape(self.rtol)))
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(self.loc.shape, self._slack.shape)
+    return tf.broadcast_static_shape(
+        self.loc.shape,
+        tf.broadcast_static_shape(self.atol.shape, self.rtol.shape))
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -270,12 +280,14 @@ class Deterministic(_BaseDeterministic):
     return tf.TensorShape([])
 
   def _prob(self, x):
+    loc = tf.identity(self.loc)
     # Enforces dtype of probability to be float, when self.dtype is not.
     prob_dtype = self.dtype if self.dtype.is_floating else tf.float32
-    return tf.cast(tf.abs(x - self.loc) <= self._slack, dtype=prob_dtype)
+    return tf.cast(tf.abs(x - loc) <= self._slack(loc), dtype=prob_dtype)
 
   def _cdf(self, x):
-    return tf.cast(x >= self.loc - self._slack, dtype=self.dtype)
+    loc = tf.identity(self.loc)
+    return tf.cast(x >= loc - self._slack(loc), dtype=self.dtype)
 
 
 class VectorDeterministic(_BaseDeterministic):
@@ -375,13 +387,17 @@ class VectorDeterministic(_BaseDeterministic):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.loc), tf.shape(input=self._slack))[:-1]
+        tf.shape(self.loc),
+        tf.broadcast_dynamic_shape(tf.shape(self.atol),
+                                   tf.shape(self.rtol)))[:-1]
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(self.loc.shape, self._slack.shape)[:-1]
+    return tf.broadcast_static_shape(
+        self.loc.shape,
+        tf.broadcast_static_shape(self.atol.shape, self.rtol.shape))[:-1]
 
   def _event_shape_tensor(self):
-    return tf.shape(input=self.loc)[-1:]
+    return tf.shape(self.loc)[-1:]
 
   def _event_shape(self):
     return self.loc.shape[-1:]
@@ -391,16 +407,17 @@ class VectorDeterministic(_BaseDeterministic):
       is_vector_check = assert_util.assert_rank_at_least(x, 1)
       right_vec_space_check = assert_util.assert_equal(
           self.event_shape_tensor(),
-          tf.gather(tf.shape(input=x),
+          tf.gather(tf.shape(x),
                     tf.rank(x) - 1),
           message="Argument 'x' not defined in the same space R^k as this distribution"
       )
       with tf.control_dependencies([is_vector_check]):
         with tf.control_dependencies([right_vec_space_check]):
           x = tf.identity(x)
+    loc = tf.identity(self.loc)
     return tf.cast(
         tf.reduce_all(
-            input_tensor=tf.abs(x - self.loc) <= self._slack, axis=-1),
+            input_tensor=tf.abs(x - loc) <= self._slack(loc), axis=-1),
         dtype=self.dtype)
 
 

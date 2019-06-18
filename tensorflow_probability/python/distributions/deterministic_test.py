@@ -18,17 +18,19 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-tfd = tfp.distributions
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 rng = np.random.RandomState(0)
+tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DeterministicTest(tf.test.TestCase):
+class DeterministicTest(test_case.TestCase):
 
   def testShape(self):
     loc = rng.rand(2, 3, 4)
@@ -178,11 +180,11 @@ class DeterministicTest(tf.test.TestCase):
           self.evaluate(sample))
 
   def testSampleDynamicWithBatchDims(self):
-    loc = tf.compat.v1.placeholder_with_default(input=[0., 0], shape=[2])
+    loc = tf1.placeholder_with_default(input=[0., 0], shape=[2])
 
     deterministic = tfd.Deterministic(loc)
     for sample_shape_ in [(), (4,)]:
-      sample_shape = tf.compat.v1.placeholder_with_default(
+      sample_shape = tf1.placeholder_with_default(
           input=np.array(sample_shape_, dtype=np.int32), shape=None)
       sample_ = self.evaluate(deterministic.sample(sample_shape))
       self.assertAllClose(
@@ -220,8 +222,37 @@ class DeterministicTest(tf.test.TestCase):
     expected_kl_, actual_kl_ = self.evaluate([expected_kl, actual_kl])
     self.assertAllEqual(expected_kl_, actual_kl_)
 
+  def testVariableGradients(self):
+    loc = tf.Variable(1.)
+    deterministic = tfd.Deterministic(loc=loc)
+    with tf.GradientTape() as tape:
+      s = deterministic.sample()
+    g = tape.gradient(s, deterministic.trainable_variables)
+    self.assertLen(g, 1)
+    self.assertAllNotNone(g)
 
-class VectorDeterministicTest(tf.test.TestCase):
+  def testVariableAssertions(self):
+    atol = tf.Variable(0.1)
+    rtol = tf.Variable(0.1)
+    deterministic = tfd.Deterministic(
+        loc=0.1, atol=atol, rtol=rtol, validate_args=True)
+
+    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(deterministic.log_prob(1.))
+
+    self.evaluate(atol.assign(-1.))
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "Condition x >= 0"):
+      self.evaluate(deterministic.log_prob(1.))
+
+    self.evaluate(atol.assign(0.1))
+    self.evaluate(rtol.assign(-1.))
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "Condition x >= 0"):
+      self.evaluate(deterministic.log_prob(1.))
+
+
+class VectorDeterministicTest(test_case.TestCase):
 
   def testParamBroadcasts(self):
     loc = rng.rand(2, 1, 4)
@@ -246,7 +277,7 @@ class VectorDeterministicTest(tf.test.TestCase):
     self.assertEqual(deterministic.event_shape, tf.TensorShape([4]))
 
   def testShapeUknown(self):
-    loc = tf.compat.v1.placeholder_with_default(np.float32([0]), shape=[None])
+    loc = tf1.placeholder_with_default(np.float32([0]), shape=[None])
     deterministic = tfd.VectorDeterministic(loc)
     self.assertAllEqual(deterministic.event_shape_tensor().shape, [1])
 
@@ -344,12 +375,11 @@ class VectorDeterministicTest(tf.test.TestCase):
           self.evaluate(sample))
 
   def testSampleDynamicWithBatchDims(self):
-    loc = tf.compat.v1.placeholder_with_default(
-        input=[[0.], [0.]], shape=[2, 1])
+    loc = tf1.placeholder_with_default(input=[[0.], [0.]], shape=[2, 1])
 
     deterministic = tfd.VectorDeterministic(loc)
     for sample_shape_ in [(), (4,)]:
-      sample_shape = tf.compat.v1.placeholder_with_default(
+      sample_shape = tf1.placeholder_with_default(
           input=np.array(sample_shape_, dtype=np.int32), shape=None)
       sample_ = self.evaluate(deterministic.sample(sample_shape))
       self.assertAllClose(
@@ -388,6 +418,35 @@ class VectorDeterministicTest(tf.test.TestCase):
     actual_kl = tfd.kl_divergence(a, b)
     expected_kl_, actual_kl_ = self.evaluate([expected_kl, actual_kl])
     self.assertAllEqual(expected_kl_, actual_kl_)
+
+  def testVariableGradients(self):
+    loc = tf.Variable([1., 2.])
+    deterministic = tfd.VectorDeterministic(loc=loc)
+    with tf.GradientTape() as tape:
+      s = deterministic.sample()
+    g = tape.gradient(s, deterministic.trainable_variables)
+    self.assertLen(g, 1)
+    self.assertAllNotNone(g)
+
+  def testVariableAssertions(self):
+    atol = tf.Variable(0.1)
+    rtol = tf.Variable(0.1)
+    deterministic = tfd.VectorDeterministic(
+        loc=[0.1], atol=atol, rtol=rtol, validate_args=True)
+
+    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(deterministic.log_prob([1.]))
+
+    self.evaluate(atol.assign(-1.))
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "Condition x >= 0"):
+      self.evaluate(deterministic.log_prob([1.]))
+
+    self.evaluate(atol.assign(0.1))
+    self.evaluate(rtol.assign(-1.))
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "Condition x >= 0"):
+      self.evaluate(deterministic.log_prob([1.]))
 
 
 if __name__ == "__main__":
