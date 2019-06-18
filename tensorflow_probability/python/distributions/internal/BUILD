@@ -142,5 +142,6 @@ py_test(
     deps = [
         ":slicing",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )

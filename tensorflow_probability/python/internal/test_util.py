@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import inspect
 import os
 
 # Dependency imports
@@ -34,6 +35,7 @@ from tensorflow_probability.python.internal import dtype_util
 __all__ = [
     'broadcasting_shapes',
     'derandomize_hypothesis',
+    'numpy_disable',
     'test_seed',
     'test_seed_stream',
     'DiscreteScalarDistributionTestHelpers',
@@ -55,6 +57,16 @@ flags.DEFINE_bool('vary_seed', False,
 flags.DEFINE_string('fixed_seed', None,
                     ('PRNG seed to initialize every test with.  '
                      'Takes precedence over --vary-seed when both appear.'))
+
+
+def numpy_disable(test_fn):
+
+  def new_test(self, *args, **kwargs):
+    if not inspect.isclass(tf.Variable):
+      self.skipTest('test disabled for numpy')
+    return test_fn(self, *args, **kwargs)
+
+  return new_test
 
 
 def _compute_rank_and_fullsize_reqd(draw, target_shape, current_shape, is_last):

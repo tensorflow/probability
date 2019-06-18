@@ -233,5 +233,10 @@ def Variable(initial_value=None, trainable=True, validate_shape=True,  # pylint:
 
 class Module(object):
 
+  _TF_MODULE_IGNORED_PROPERTIES = frozenset()
+
   def __init__(self, name):
     self._name = name
+
+  def _no_dependency(self, x):
+    return x

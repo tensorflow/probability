@@ -107,17 +107,17 @@ class AffineScalar(bijector.Bijector):
   def _forward(self, x):
     y = tf.identity(x)
     if self.scale is not None:
-      y *= self.scale
+      y = y * self.scale
     if self.shift is not None:
-      y += self.shift
+      y = y + self.shift
     return y
 
   def _inverse(self, y):
     x = tf.identity(y)
     if self.shift is not None:
-      x -= self.shift
+      x = x - self.shift
     if self.scale is not None:
-      x /= self.scale
+      x = x / self.scale
     return x
 
   def _forward_log_det_jacobian(self, x):

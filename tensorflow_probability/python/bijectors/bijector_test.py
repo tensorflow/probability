@@ -362,7 +362,7 @@ class BijectorCompositionTest(test_case.TestCase):
     ])
     self.assertTrue(isinstance(sigmoid, tfb.Chain))
     self.assertAllClose(
-        *self.evaluate([tf.nn.sigmoid(x), sigmoid.forward(x)]),
+        *self.evaluate([tf.math.sigmoid(x), sigmoid.forward(x)]),
         atol=0, rtol=1e-3)
 
   def testComposeFromTransformedDistribution(self):

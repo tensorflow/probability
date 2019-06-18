@@ -41,6 +41,9 @@ __all__ = [
 ]
 
 
+SKIP_DTYPE_CHECKS = False
+
+
 def as_numpy_dtype(dtype):
   """Returns a `np.dtype` based on this `dtype`."""
   dtype = tf.as_dtype(dtype)
@@ -73,7 +76,11 @@ def common_dtype(args_list, dtype_hint=None):
     if dtype is None:
       dtype = dt
     elif dtype != dt:
-      raise TypeError('Found incompatible dtypes, {} and {}.'.format(dtype, dt))
+      if SKIP_DTYPE_CHECKS:
+        dtype = (np.ones([2], dtype) + np.ones([2], dt)).dtype
+      else:
+        raise TypeError(
+            'Found incompatible dtypes, {} and {}.'.format(dtype, dt))
   return dtype_hint if dtype is None else tf.as_dtype(dtype)
 
 
@@ -186,6 +193,8 @@ def _assert_same_base_type(items, expected_type=None):
           expected_type = item_type
           original_item_str = get_name(item)
         elif expected_type != item_type:
+          if SKIP_DTYPE_CHECKS:
+            return (np.ones([2], expected_type) + np.ones([2], item_type)).dtype
           raise ValueError(
               '{}, type={}, must be of the same type ({}){}.'.format(
                   get_name(item),

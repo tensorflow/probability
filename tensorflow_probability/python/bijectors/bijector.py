@@ -42,6 +42,9 @@ __all__ = [
 ]
 
 
+SKIP_DTYPE_CHECKS = False
+
+
 def _get_current_graph():
   if tf.executing_eagerly():
     return None
@@ -112,12 +115,13 @@ class _Mapping(
 
   def _merge(self, old, new, use_equals=False):
     """Helper to merge which handles merging one value."""
+    generic_to_array = lambda x: np.array(x) if isinstance(x, np.generic) else x
     if old is None:
-      return new
+      return generic_to_array(new)
     if new is None:
-      return old
+      return generic_to_array(old)
     if (old == new) if use_equals else (old is new):
-      return old
+      return generic_to_array(old)
     raise ValueError('Incompatible values: %s != %s' % (old, new))
 
   def _deep_tuple(self, x):
@@ -180,6 +184,8 @@ class HashableWeakRef(weakref.ref):
     x = self()
     if not isinstance(x, np.ndarray):
       return hash(x)
+    if isinstance(x, np.generic):
+      raise ValueError('Unable to weakref np.generic')
     # Note: The following logic can never be reached by the public API because
     # the bijector base class always calls `convert_to_tensor` before accessing
     # the cache.
@@ -199,6 +205,8 @@ class HashableWeakRef(weakref.ref):
       return (isinstance(y, np.ndarray) and
               x.__array_interface__ == y.__array_interface__ and
               id(x) == id(y))
+    if isinstance(x, np.generic):
+      raise ValueError('Unable to weakref np.generic')
     return super(HashableWeakRef, self).__eq__(other)
 
 
@@ -1332,6 +1340,8 @@ class Bijector(tf.Module):
 
   def _maybe_assert_dtype(self, x):
     """Helper to check dtype when self.dtype is known."""
+    if SKIP_DTYPE_CHECKS:
+      return
     if (self.dtype is not None and
         not dtype_util.base_equal(self.dtype, x.dtype)):
       raise TypeError(
