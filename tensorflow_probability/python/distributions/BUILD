@@ -2294,6 +2294,7 @@ py_library(
     deps = [
         # absl/flags dep,
         # absl/logging dep,
+        # absl/testing:parameterized dep,
         # hypothesis dep,
         # numpy dep,
         # six dep,
@@ -2301,6 +2302,7 @@ py_library(
         "//tensorflow_probability",
         "//tensorflow_probability/python/bijectors:hypothesis_testlib",
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -2312,6 +2314,7 @@ py_test(
     srcs = ["distribution_properties_test.py"],
     args = ["--tf_mode=eager"],
     main = "distribution_properties_test.py",
+    shard_count = 3,
     tags = ["hypothesis"],
     deps = [":distribution_properties_testlib"],
 )
@@ -2322,6 +2325,7 @@ py_test(
     srcs = ["distribution_properties_test.py"],
     args = ["--tf_mode=graph"],
     main = "distribution_properties_test.py",
+    shard_count = 3,
     tags = ["hypothesis"],
     deps = [":distribution_properties_testlib"],
 )
