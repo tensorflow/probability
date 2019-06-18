@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.keras import testing_utils
 
@@ -100,7 +101,7 @@ class MockKLDivergence(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DenseVariational(tf.test.TestCase):
+class DenseVariational(test_case.TestCase):
 
   def _testKerasLayer(self, layer_class):
     def kernel_posterior_fn(dtype, shape, name, trainable, add_variable_fn):
@@ -515,6 +516,18 @@ class DenseVariational(tf.test.TestCase):
       outputs_ = sess.run(outputs)
 
     self.assertAllEqual(outputs_.shape, [batch_size, out_size])
+
+  def testGradients(self):
+    net = tf.keras.Sequential([
+        tfp.layers.DenseReparameterization(1),
+        tfp.layers.DenseFlipout(1),
+        tfp.layers.DenseLocalReparameterization(1)
+    ])
+    with tf.GradientTape() as tape:
+      y = net(tf.zeros([1, 1]))
+    grads = tape.gradient(y, net.trainable_variables)
+    self.assertLen(grads, 9)
+    self.assertAllNotNone(grads)
 
 if __name__ == '__main__':
   tf.test.main()

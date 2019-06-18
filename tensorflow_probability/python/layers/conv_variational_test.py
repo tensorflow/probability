@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.keras import testing_utils
 from tensorflow.python.layers import utils as tf_layers_util
@@ -710,14 +711,26 @@ class ConvVariational(object):
   def testSequentialConvolution3DFlipout(self):
     self._testLayerInSequential(tfp.layers.Convolution3DFlipout)
 
+  def testGradients(self):
+    net = tf.keras.Sequential([
+        tfp.layers.Convolution1DFlipout(1, 1, data_format=self.data_format),
+        tfp.layers.Convolution1DReparameterization(
+            1, 1, data_format=self.data_format),
+    ])
+    with tf.GradientTape() as tape:
+      y = net(tf.zeros([1, 1, 1]))
+    grads = tape.gradient(y, net.trainable_variables)
+    self.assertLen(grads, 6)
+    self.assertAllNotNone(grads)
+
 
 @test_util.run_all_in_graph_and_eager_modes
-class ConvVariationalTestChannelsFirst(tf.test.TestCase, ConvVariational):
+class ConvVariationalTestChannelsFirst(test_case.TestCase, ConvVariational):
   data_format = 'channels_first'
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ConvVariationalTestChannelsLast(tf.test.TestCase, ConvVariational):
+class ConvVariationalTestChannelsLast(test_case.TestCase, ConvVariational):
   data_format = 'channels_last'
 
 if __name__ == '__main__':

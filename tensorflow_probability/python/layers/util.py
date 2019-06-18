@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import util as util
 from tensorflow.python.keras.utils import generic_utils
 
 
@@ -110,8 +111,9 @@ def default_loc_scale_fn(
         constraint=untransformed_scale_constraint,
         dtype=dtype,
         trainable=trainable)
-    scale = (np.finfo(dtype.as_numpy_dtype).eps +
-             tf.nn.softplus(untransformed_scale))
+    scale = util.DeferredTensor(
+        lambda x: (np.finfo(dtype.as_numpy_dtype).eps + tf.nn.softplus(x)),
+        untransformed_scale)
     return loc, scale
   return _fn
 
