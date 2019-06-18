@@ -21,9 +21,11 @@ import importlib
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -35,16 +37,16 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf1.logging.warning('Could not import %s: %s' % (name, str(e)))
   return module
 
 
-special = try_import("scipy.special")
-stats = try_import("scipy.stats")
+special = try_import('scipy.special')
+stats = try_import('scipy.stats')
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DirichletTest(tf.test.TestCase):
+class DirichletTest(test_case.TestCase):
 
   def testSimpleShapes(self):
     alpha = np.random.rand(3)
@@ -74,11 +76,11 @@ class DirichletTest(tf.test.TestCase):
     self.evaluate(dist.prob([.1, .3, .6]))
     self.evaluate(dist.prob([.2, .3, .5]))
     # Either condition can trigger.
-    with self.assertRaisesOpError("samples must be positive"):
+    with self.assertRaisesOpError('samples must be positive'):
       self.evaluate(dist.prob([-1., 1.5, 0.5]))
-    with self.assertRaisesOpError("samples must be positive"):
+    with self.assertRaisesOpError('samples must be positive'):
       self.evaluate(dist.prob([0., .1, .9]))
-    with self.assertRaisesOpError("sample last-dimension must sum to `1`"):
+    with self.assertRaisesOpError('sample last-dimension must sum to `1`'):
       self.evaluate(dist.prob([.1, .2, .8]))
 
   def testLogPdfOnBoundaryIsFiniteWhenAlphaIsOne(self):
@@ -223,7 +225,7 @@ class DirichletTest(tf.test.TestCase):
     alpha = np.array([1., 2, 3])
     dirichlet = tfd.Dirichlet(
         concentration=alpha, allow_nan_stats=False)
-    with self.assertRaisesOpError("Condition x < y.*"):
+    with self.assertRaisesOpError('Condition x < y.*'):
       self.evaluate(dirichlet.mode())
 
   def testModeEnableAllowNanStats(self):
@@ -294,7 +296,7 @@ class DirichletTest(tf.test.TestCase):
         + np.sum((conc1 - conc2) * (special.digamma(conc1) - special.digamma(
             np.sum(conc1, -1, keepdims=True))), -1))
 
-    self.assertAllClose(kl_expected, kl_actual_val, atol=0., rtol=1e-6)
+    self.assertAllClose(kl_expected, kl_actual_val, atol=0., rtol=1e-5)
     self.assertAllClose(kl_sample_val, kl_actual_val, atol=0., rtol=1e-1)
 
     # Make sure KL(d1||d1) is 0
@@ -310,5 +312,29 @@ class DirichletTest(tf.test.TestCase):
                         d[1:0].batch_shape)
 
 
-if __name__ == "__main__":
+@test_util.run_all_in_graph_and_eager_modes
+class DirichletFromVariableTest(test_case.TestCase):
+
+  def testGradients(self):
+    x = tf.Variable([1., 1.1, 1.2])
+    d = tfd.Dirichlet(concentration=x, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([0.1, 0.2, 0.7])
+    g = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(g, 1)
+    self.assertAllNotNone(g)
+
+  def testAssertions(self):
+    x = tfp.util.DeferredTensor(
+        tf.exp,
+        tf.Variable(-1.),
+        shape=None)
+    self.evaluate(tf1.global_variables_initializer())
+    with self.assertRaisesRegexp(
+        ValueError, 'Argument `concentration` must have rank at least 1.'):
+      d = tfd.Dirichlet(concentration=x, validate_args=True)
+      self.evaluate(d.entropy())
+
+
+if __name__ == '__main__':
   tf.test.main()

@@ -20,7 +20,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -29,11 +28,13 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
-    "Dirichlet",
+    'Dirichlet',
 ]
 
 
@@ -158,7 +159,7 @@ class Dirichlet(distribution.Distribution):
                concentration,
                validate_args=False,
                allow_nan_stats=True,
-               name="Dirichlet"):
+               name='Dirichlet'):
     """Initialize a batch of Dirichlet distributions.
 
     Args:
@@ -180,24 +181,16 @@ class Dirichlet(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      self._concentration = self._maybe_assert_valid_concentration(
-          tf.convert_to_tensor(
-              value=concentration,
-              name="concentration",
-              dtype=dtype_util.common_dtype([concentration],
-                                            dtype_hint=tf.float32)),
-          validate_args)
-      self._total_concentration = tf.reduce_sum(
-          input_tensor=self._concentration, axis=-1)
-    super(Dirichlet, self).__init__(
-        dtype=self._concentration.dtype,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        parameters=parameters,
-        graph_parents=[self._concentration,
-                       self._total_concentration],
-        name=name)
+      dtype = dtype_util.common_dtype([concentration], dtype_hint=tf.float32)
+      self._concentration = tensor_util.convert_immutable_to_tensor(
+          concentration, dtype=dtype, name='concentration')
+      super(Dirichlet, self).__init__(
+          dtype=self._concentration.dtype,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          parameters=parameters,
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -209,27 +202,32 @@ class Dirichlet(distribution.Distribution):
     return self._concentration
 
   @property
+  @deprecation.deprecated(
+      '2019-10-01',
+      ('The `total_concentration` property is deprecated; instead use '
+       '`tf.reduce_sum(dist.concentration, axis=-1)`.'),
+      warn_once=True)
   def total_concentration(self):
     """Sum of last dim of concentration parameter."""
-    return self._total_concentration
+    with self._name_and_control_scope('total_concentration'):
+      return tf.reduce_sum(self.concentration, axis=-1)
 
   def _batch_shape_tensor(self):
-    return tf.shape(input=self.total_concentration)
+    return tf.shape(self.concentration)[:-1]
 
   def _batch_shape(self):
-    return self.total_concentration.shape
+    return self.concentration.shape[:-1]
 
   def _event_shape_tensor(self):
-    return tf.shape(input=self.concentration)[-1:]
+    return tf.shape(self.concentration)[-1:]
 
   def _event_shape(self):
-    return tensorshape_util.with_rank_at_least(self.concentration.shape, 1)[-1:]
+    return self.concentration.shape[-1:]
 
   def _sample_n(self, n, seed=None):
     gamma_sample = tf.random.gamma(
         shape=[n], alpha=self.concentration, dtype=self.dtype, seed=seed)
-    return gamma_sample / tf.reduce_sum(
-        input_tensor=gamma_sample, axis=-1, keepdims=True)
+    return gamma_sample / tf.reduce_sum(gamma_sample, axis=-1, keepdims=True)
 
   @distribution_util.AppendDocstring(_dirichlet_sample_note)
   def _log_prob(self, x):
@@ -240,24 +238,26 @@ class Dirichlet(distribution.Distribution):
     return tf.exp(self._log_prob(x))
 
   def _log_unnormalized_prob(self, x):
-    x = self._maybe_assert_valid_sample(x)
-    return tf.reduce_sum(
-        input_tensor=tf.math.xlogy(self.concentration - 1., x), axis=-1)
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
+      return tf.reduce_sum(
+          tf.math.xlogy(self.concentration - 1., x), axis=-1)
 
   def _log_normalization(self):
     return tf.math.lbeta(self.concentration)
 
   def _entropy(self):
     k = tf.cast(self.event_shape_tensor()[0], self.dtype)
+    total_concentration = tf.reduce_sum(self.concentration, axis=-1)
     return (self._log_normalization() +
-            ((self.total_concentration - k) *
-             tf.math.digamma(self.total_concentration)) - tf.reduce_sum(
-                 input_tensor=(self.concentration - 1.) *
+            ((total_concentration - k) *
+             tf.math.digamma(total_concentration)) - tf.reduce_sum(
+                 (self.concentration - 1.) *
                  tf.math.digamma(self.concentration),
                  axis=-1))
 
   def _mean(self):
-    return self.concentration / self.total_concentration[..., tf.newaxis]
+    total_concentration = tf.reduce_sum(self.concentration, axis=-1)
+    return self.concentration / total_concentration[..., tf.newaxis]
 
   def _covariance(self):
     x = self._variance_scale_term() * self._mean()
@@ -272,7 +272,8 @@ class Dirichlet(distribution.Distribution):
 
   def _variance_scale_term(self):
     """Helper to `_covariance` and `_variance` which computes a shared scale."""
-    return tf.math.rsqrt(1. + self.total_concentration[..., tf.newaxis])
+    total_concentration = tf.reduce_sum(self.concentration, axis=-1)
+    return tf.math.rsqrt(1. + total_concentration[..., tf.newaxis])
 
   @distribution_util.AppendDocstring(
       """Note: The mode is undefined when any `concentration <= 1`. If
@@ -281,51 +282,70 @@ class Dirichlet(distribution.Distribution):
       modes are undefined.""")
   def _mode(self):
     k = tf.cast(self.event_shape_tensor()[0], self.dtype)
+    total_concentration = tf.reduce_sum(self.concentration, axis=-1)
     mode = (self.concentration - 1.) / (
-        self.total_concentration[..., tf.newaxis] - k)
+        total_concentration[..., tf.newaxis] - k)
     if self.allow_nan_stats:
-      nan = tf.fill(
-          tf.shape(input=mode),
-          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
-          name="nan")
-      return tf1.where(
-          tf.reduce_all(input_tensor=self.concentration > 1., axis=-1), mode,
-          nan)
-    return distribution_util.with_dependencies([
+      return tf.where(
+          tf.reduce_all(self.concentration > 1., axis=-1),
+          mode,
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan))
+    assertions = [
         assert_util.assert_less(
             tf.ones([], self.dtype),
             self.concentration,
-            message="Mode undefined when any concentration <= 1"),
-    ], mode)
-
-  def _maybe_assert_valid_concentration(self, concentration, validate_args):
-    """Checks the validity of the concentration parameter."""
-    if not validate_args:
-      return concentration
-    return distribution_util.with_dependencies([
-        assert_util.assert_positive(
-            concentration, message="Concentration parameter must be positive."),
-        assert_util.assert_rank_at_least(
-            concentration,
-            1,
-            message="Concentration parameter must have >=1 dimensions."),
-        assert_util.assert_less(
-            1,
-            tf.shape(input=concentration)[-1],
-            message="Concentration parameter must have event_size >= 2."),
-    ], concentration)
+            message='Mode undefined when any concentration <= 1')
+    ]
+    with tf.control_dependencies(assertions):
+      return tf.identity(mode)
 
   def _maybe_assert_valid_sample(self, x):
     """Checks the validity of a sample."""
     if not self.validate_args:
-      return x
-    return distribution_util.with_dependencies([
-        assert_util.assert_positive(x, message="samples must be positive"),
+      return []
+    return [
+        assert_util.assert_positive(x, message='samples must be positive'),
         assert_util.assert_near(
             tf.ones([], dtype=self.dtype),
-            tf.reduce_sum(input_tensor=x, axis=-1),
-            message="sample last-dimension must sum to `1`"),
-    ], x)
+            tf.reduce_sum(x, axis=-1),
+            message='sample last-dimension must sum to `1`'),
+    ]
+
+  def _parameter_control_dependencies(self, is_init):
+    """Checks the validity of the concentration parameter."""
+    assertions = []
+
+    if is_init:
+      if not dtype_util.is_floating(self.concentration.dtype):
+        raise TypeError('Argument `concentration` must be float type.')
+
+      msg = 'Argument `concentration` must have rank at least 1.'
+      ndims = tensorshape_util.rank(self.concentration.shape)
+      if ndims is not None:
+        if ndims < 1:
+          raise ValueError(msg)
+      elif self.validate_args:
+        assertions.append(assert_util.assert_rank_at_least(
+            self.concentration, 1, message=msg))
+
+      msg = 'Argument `concentration` must have `event_size` at least 2.'
+      event_size = tf.compat.dimension_value(self.concentration.shape[-1])
+      if event_size is not None:
+        if event_size < 2:
+          raise ValueError(msg)
+      elif self.validate_args:
+        assertions.append(assert_util.assert_less(
+            1,
+            tf.shape(self.concentration)[-1],
+            message=msg))
+
+    if (self.validate_args and
+        is_init != tensor_util.is_mutable(self.concentration)):
+      assertions.append(assert_util.assert_positive(
+          self.concentration,
+          message='Argument `concentration` must be positive.'))
+
+    return assertions
 
 
 @kullback_leibler.RegisterKL(Dirichlet, Dirichlet)
@@ -335,13 +355,13 @@ def _kl_dirichlet_dirichlet(d1, d2, name=None):
   Args:
     d1: instance of a Dirichlet distribution object.
     d2: instance of a Dirichlet distribution object.
-    name: (optional) Name to use for created operations.
-      default is "kl_dirichlet_dirichlet".
+    name: Python `str` name to use for created operations.
+      Default value: `None` (i.e., `'kl_dirichlet_dirichlet'`).
 
   Returns:
-    Batchwise KL(d1 || d2)
+    kl_div: Batchwise KL(d1 || d2)
   """
-  with tf.name_scope(name or "kl_dirichlet_dirichlet"):
+  with tf.name_scope(name or 'kl_dirichlet_dirichlet'):
     # The KL between Dirichlet distributions can be derived as follows. We have
     #
     #   Dir(x; a) = 1 / B(a) * prod_i[x[i]^(a[i] - 1)]
@@ -395,10 +415,10 @@ def _kl_dirichlet_dirichlet(d1, d2, name=None):
     #          - lbeta(a) + lbeta(b))
 
     digamma_sum_d1 = tf.math.digamma(
-        tf.reduce_sum(input_tensor=d1.concentration, axis=-1, keepdims=True))
+        tf.reduce_sum(d1.concentration, axis=-1, keepdims=True))
     digamma_diff = tf.math.digamma(d1.concentration) - digamma_sum_d1
     concentration_diff = d1.concentration - d2.concentration
 
     return (
-        tf.reduce_sum(input_tensor=concentration_diff * digamma_diff, axis=-1) -
+        tf.reduce_sum(concentration_diff * digamma_diff, axis=-1) -
         tf.math.lbeta(d1.concentration) + tf.math.lbeta(d2.concentration))
