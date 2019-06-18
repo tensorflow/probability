@@ -415,3 +415,13 @@ class RelaxedOneHotCategorical(
     super(RelaxedOneHotCategorical, self).__init__(dist,
                                                    exp_bijector.Exp(),
                                                    name=name)
+
+    @property
+    def probs(self):
+      """Input argument `probs`."""
+      return self.distribution.probs
+
+    @property
+    def logits(self):
+      """Input argument `logits`"""
+      return self.distribution.logits
