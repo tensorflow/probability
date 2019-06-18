@@ -305,7 +305,7 @@ class _DenseVariational(tf.keras.layers.Layer):
         divergence_fn(
             posterior, prior, posterior_tensor),
         name=name)
-    self.add_loss(lambda: divergence)
+    self.add_loss(divergence)
 
   def _matmul(self, inputs, kernel):
     if inputs.shape.ndims <= 2:
