@@ -313,6 +313,8 @@ class Dirichlet(distribution.Distribution):
     """Checks the validity of the concentration parameter."""
     assertions = []
 
+    # In init, we can always build shape and dtype checks because
+    # we assume shape doesn't change for Variable backed args.
     if is_init:
       if not dtype_util.is_floating(self.concentration.dtype):
         raise TypeError('Argument `concentration` must be float type.')
@@ -337,8 +339,11 @@ class Dirichlet(distribution.Distribution):
             tf.shape(self.concentration)[-1],
             message=msg))
 
-    if (self.validate_args and
-        is_init != tensor_util.is_mutable(self.concentration)):
+    if not self.validate_args:
+      assert not assertions  # Should never happen.
+      return []
+
+    if is_init != tensor_util.is_mutable(self.concentration):
       assertions.append(assert_util.assert_positive(
           self.concentration,
           message='Argument `concentration` must be positive.'))
