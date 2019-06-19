@@ -24,7 +24,7 @@ _PATCH_VERSION = '0'
 # stable release (indicated by `_VERSION_SUFFIX = ''`). Outside the context of a
 # release branch, the current version is by default assumed to be a
 # 'development' version, labeled 'dev'.
-_VERSION_SUFFIX = 'rc0'
+_VERSION_SUFFIX = ''
 
 # Example, '0.4.0-dev'
 __version__ = '.'.join([
@@ -34,3 +34,4 @@ __version__ = '.'.join([
 ])
 if _VERSION_SUFFIX:
   __version__ = '{}-{}'.format(__version__, _VERSION_SUFFIX)
+if __version__.endswith('dev'): __version__ += '20190613'
