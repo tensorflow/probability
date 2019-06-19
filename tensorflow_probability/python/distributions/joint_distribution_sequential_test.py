@@ -337,8 +337,8 @@ class JointDistributionSequentialTest(
     u = tfd.Uniform(low=-1., high=1.)
     alpha = tfp.util.DeferredTensor(
         tf.nn.softplus,
-        tf.Variable(u.sample([num_topics], seed=42), name='raw_alpha'))
-    beta = tf.Variable(u.sample([num_topics, num_words], seed=43), name='beta')
+        tf.Variable(u.sample([num_topics]), name='raw_alpha'))
+    beta = tf.Variable(u.sample([num_topics, num_words]), name='beta')
 
     # LDA Model.
     # Note near 1:1 with mathematical specification. The main distinction is the
@@ -346,7 +346,7 @@ class JointDistributionSequentialTest(
     # topics (and in any "shape" of documents).
     lda = tfd.JointDistributionSequential([
         tfd.Poisson(rate=avg_doc_length),                              # n
-        tfd.Dirichlet(alpha),                                          # theta
+        tfd.Dirichlet(concentration=alpha),                            # theta
         lambda theta, n: tfd.Multinomial(total_count=n, probs=theta),  # z
         lambda z: tfd.Independent(                                     # x  pylint: disable=g-long-lambda
             tfd.Multinomial(total_count=z, logits=beta),
