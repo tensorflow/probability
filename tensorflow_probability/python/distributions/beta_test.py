@@ -16,10 +16,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 
 # Dependency imports
 import numpy as np
+from scipy import special as sp_special
+from scipy import stats as sp_stats
 
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -28,19 +29,6 @@ from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
-
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-
-special = try_import("scipy.special")
-stats = try_import("scipy.stats")
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -174,9 +162,7 @@ class BetaTest(tf.test.TestCase):
     b = [2., 4, 1.2]
     dist = tfd.Beta(a, b)
     self.assertEqual(dist.mean().shape, (3,))
-    if not stats:
-      return
-    expected_mean = stats.beta.mean(a, b)
+    expected_mean = sp_stats.beta.mean(a, b)
     self.assertAllClose(expected_mean, self.evaluate(dist.mean()))
 
   def testBetaVariance(self):
@@ -184,9 +170,7 @@ class BetaTest(tf.test.TestCase):
     b = [2., 4, 1.2]
     dist = tfd.Beta(a, b)
     self.assertEqual(dist.variance().shape, (3,))
-    if not stats:
-      return
-    expected_variance = stats.beta.var(a, b)
+    expected_variance = sp_stats.beta.var(a, b)
     self.assertAllClose(expected_variance, self.evaluate(dist.variance()))
 
   def testBetaMode(self):
@@ -234,9 +218,7 @@ class BetaTest(tf.test.TestCase):
     b = [2., 4, 1.2]
     dist = tfd.Beta(a, b)
     self.assertEqual(dist.entropy().shape, (3,))
-    if not stats:
-      return
-    expected_entropy = stats.beta.entropy(a, b)
+    expected_entropy = sp_stats.beta.entropy(a, b)
     self.assertAllClose(expected_entropy, self.evaluate(dist.entropy()))
 
   def testBetaSample(self):
@@ -248,19 +230,17 @@ class BetaTest(tf.test.TestCase):
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000,))
     self.assertFalse(np.any(sample_values < 0.0))
-    if not stats:
-      return
     self.assertLess(
-        stats.kstest(
+        sp_stats.kstest(
             # Beta is a univariate distribution.
             sample_values,
-            stats.beta(a=1., b=2.).cdf)[0],
+            sp_stats.beta(a=1., b=2.).cdf)[0],
         0.01)
     # The standard error of the sample mean is 1 / (sqrt(18 * n))
     self.assertAllClose(
-        sample_values.mean(axis=0), stats.beta.mean(a, b), atol=1e-2)
+        sample_values.mean(axis=0), sp_stats.beta.mean(a, b), atol=1e-2)
     self.assertAllClose(
-        np.cov(sample_values, rowvar=0), stats.beta.var(a, b), atol=1e-1)
+        np.cov(sample_values, rowvar=0), sp_stats.beta.var(a, b), atol=1e-1)
 
   def testBetaFullyReparameterized(self):
     a = tf.constant(1.0)
@@ -298,11 +278,9 @@ class BetaTest(tf.test.TestCase):
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000, 3, 2, 2))
     self.assertFalse(np.any(sample_values < 0.0))
-    if not stats:
-      return
     self.assertAllClose(
         sample_values[:, 1, :].mean(axis=0),
-        stats.beta.mean(a, b)[1, :],
+        sp_stats.beta.mean(a, b)[1, :],
         atol=1e-1)
 
   def testBetaCdf(self):
@@ -314,9 +292,7 @@ class BetaTest(tf.test.TestCase):
       actual = self.evaluate(tfd.Beta(a, b).cdf(x))
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 0. <= x)
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
-      if not stats:
-        return
-      self.assertAllClose(stats.beta.cdf(x, a, b), actual, rtol=1e-4, atol=0)
+      self.assertAllClose(sp_stats.beta.cdf(x, a, b), actual, rtol=1e-4, atol=0)
 
   def testBetaLogCdf(self):
     shape = (30, 40, 50)
@@ -327,9 +303,7 @@ class BetaTest(tf.test.TestCase):
       actual = self.evaluate(tf.exp(tfd.Beta(a, b).log_cdf(x)))
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 0. <= x)
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
-      if not stats:
-        return
-      self.assertAllClose(stats.beta.cdf(x, a, b), actual, rtol=1e-4, atol=0)
+      self.assertAllClose(sp_stats.beta.cdf(x, a, b), actual, rtol=1e-4, atol=0)
 
   def testBetaBetaKL(self):
     for shape in [(10,), (4, 5)]:
@@ -341,12 +315,10 @@ class BetaTest(tf.test.TestCase):
       d1 = tfd.Beta(concentration1=a1, concentration0=b1)
       d2 = tfd.Beta(concentration1=a2, concentration0=b2)
 
-      if not special:
-        return
-      kl_expected = (special.betaln(a2, b2) - special.betaln(a1, b1) +
-                     (a1 - a2) * special.digamma(a1) +
-                     (b1 - b2) * special.digamma(b1) +
-                     (a2 - a1 + b2 - b1) * special.digamma(a1 + b1))
+      kl_expected = (sp_special.betaln(a2, b2) - sp_special.betaln(a1, b1) +
+                     (a1 - a2) * sp_special.digamma(a1) +
+                     (b1 - b2) * sp_special.digamma(b1) +
+                     (a2 - a1 + b2 - b1) * sp_special.digamma(a1 + b1))
 
       kl = tfd.kl_divergence(d1, d2)
       kl_val = self.evaluate(kl)

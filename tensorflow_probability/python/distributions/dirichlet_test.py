@@ -16,10 +16,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 
 # Dependency imports
 import numpy as np
+from scipy import special as sp_special
+from scipy import stats as sp_stats
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -30,19 +31,6 @@ from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
-
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf1.logging.warning('Could not import %s: %s' % (name, str(e)))
-  return module
-
-
-special = try_import('scipy.special')
-stats = try_import('scipy.stats')
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -158,9 +146,7 @@ class DirichletTest(test_case.TestCase):
     alpha = [1., 2, 3]
     dirichlet = tfd.Dirichlet(concentration=alpha)
     self.assertEqual(dirichlet.mean().shape, [3])
-    if not stats:
-      return
-    expected_mean = stats.dirichlet.mean(alpha)
+    expected_mean = sp_stats.dirichlet.mean(alpha)
     self.assertAllClose(self.evaluate(dirichlet.mean()), expected_mean)
 
   def testCovarianceFromSampling(self):
@@ -206,9 +192,7 @@ class DirichletTest(test_case.TestCase):
     denominator = np.sum(alpha)**2 * (np.sum(alpha) + 1)
     dirichlet = tfd.Dirichlet(concentration=alpha)
     self.assertEqual(dirichlet.covariance().shape, (3, 3))
-    if not stats:
-      return
-    expected_covariance = np.diag(stats.dirichlet.var(alpha))
+    expected_covariance = np.diag(sp_stats.dirichlet.var(alpha))
     expected_covariance += [[0., -2, -3], [-2, 0, -6], [-3, -6, 0]
                            ] / denominator
     self.assertAllClose(
@@ -241,9 +225,7 @@ class DirichletTest(test_case.TestCase):
     alpha = [1., 2, 3]
     dirichlet = tfd.Dirichlet(concentration=alpha)
     self.assertEqual(dirichlet.entropy().shape, ())
-    if not stats:
-      return
-    expected_entropy = stats.dirichlet.entropy(alpha)
+    expected_entropy = sp_stats.dirichlet.entropy(alpha)
     self.assertAllClose(self.evaluate(dirichlet.entropy()), expected_entropy)
 
   def testSample(self):
@@ -254,13 +236,11 @@ class DirichletTest(test_case.TestCase):
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000, 2))
     self.assertTrue(np.all(sample_values > 0.0))
-    if not stats:
-      return
     self.assertLess(
-        stats.kstest(
+        sp_stats.kstest(
             # Beta is a univariate distribution.
             sample_values[:, 0],
-            stats.beta(a=1., b=2.).cdf)[0],
+            sp_stats.beta(a=1., b=2.).cdf)[0],
         0.01)
 
   def testDirichletFullyReparameterized(self):
@@ -286,15 +266,13 @@ class DirichletTest(test_case.TestCase):
 
     self.assertEqual(conc1.shape[:-1], kl_actual.shape)
 
-    if not special:
-      return
-
     kl_expected = (
-        special.gammaln(np.sum(conc1, -1))
-        - special.gammaln(np.sum(conc2, -1))
-        - np.sum(special.gammaln(conc1) - special.gammaln(conc2), -1)
-        + np.sum((conc1 - conc2) * (special.digamma(conc1) - special.digamma(
-            np.sum(conc1, -1, keepdims=True))), -1))
+        sp_special.gammaln(np.sum(conc1, -1))
+        - sp_special.gammaln(np.sum(conc2, -1))
+        - np.sum(sp_special.gammaln(conc1) - sp_special.gammaln(conc2), -1)
+        + np.sum((conc1 - conc2) * (sp_special.digamma(conc1) -
+                                    sp_special.digamma(
+                                        np.sum(conc1, -1, keepdims=True))), -1))
 
     self.assertAllClose(kl_expected, kl_actual_val, atol=0., rtol=1e-5)
     self.assertAllClose(kl_sample_val, kl_actual_val, atol=0., rtol=1e-1)

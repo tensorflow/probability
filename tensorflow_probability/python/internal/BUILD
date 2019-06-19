@@ -112,6 +112,7 @@ py_test(
         ":distribution_util",
         ":tensorshape_util",
         # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/math:gradient",
@@ -200,6 +201,7 @@ py_test(
     deps = [
         ":special_math",
         # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/math:gradient",
     ],

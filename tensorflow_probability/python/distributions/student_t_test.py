@@ -18,11 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 import math
 
 # Dependency imports
 import numpy as np
+from scipy import stats as sp_stats
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -30,18 +31,6 @@ from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
-
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-
-stats = try_import("scipy.stats")
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -65,11 +54,8 @@ class StudentTTest(tf.test.TestCase):
     self.assertEquals(pdf.shape, (6,))
     pdf_values = self.evaluate(pdf)
 
-    if not stats:
-      return
-
-    expected_log_pdf = stats.t.logpdf(t, df_v, loc=mu_v, scale=sigma_v)
-    expected_pdf = stats.t.pdf(t, df_v, loc=mu_v, scale=sigma_v)
+    expected_log_pdf = sp_stats.t.logpdf(t, df_v, loc=mu_v, scale=sigma_v)
+    expected_pdf = sp_stats.t.pdf(t, df_v, loc=mu_v, scale=sigma_v)
     self.assertAllClose(expected_log_pdf, log_pdf_values)
     self.assertAllClose(np.log(expected_pdf), log_pdf_values)
     self.assertAllClose(expected_pdf, pdf_values)
@@ -93,10 +79,8 @@ class StudentTTest(tf.test.TestCase):
     pdf_values = self.evaluate(pdf)
     self.assertEqual(pdf.shape, (6, 2))
 
-    if not stats:
-      return
-    expected_log_pdf = stats.t.logpdf(t, df_v, loc=mu_v, scale=sigma_v)
-    expected_pdf = stats.t.pdf(t, df_v, loc=mu_v, scale=sigma_v)
+    expected_log_pdf = sp_stats.t.logpdf(t, df_v, loc=mu_v, scale=sigma_v)
+    expected_pdf = sp_stats.t.pdf(t, df_v, loc=mu_v, scale=sigma_v)
     self.assertAllClose(expected_log_pdf, log_pdf_values)
     self.assertAllClose(np.log(expected_pdf), log_pdf_values)
     self.assertAllClose(expected_pdf, pdf_values)
@@ -120,10 +104,8 @@ class StudentTTest(tf.test.TestCase):
     self.assertEquals(cdf.shape, (6,))
     cdf_values = self.evaluate(cdf)
 
-    if not stats:
-      return
-    expected_log_cdf = stats.t.logcdf(t, df_v, loc=mu_v, scale=sigma_v)
-    expected_cdf = stats.t.cdf(t, df_v, loc=mu_v, scale=sigma_v)
+    expected_log_cdf = sp_stats.t.logcdf(t, df_v, loc=mu_v, scale=sigma_v)
+    expected_cdf = sp_stats.t.cdf(t, df_v, loc=mu_v, scale=sigma_v)
     self.assertAllClose(expected_log_cdf, log_cdf_values, atol=0., rtol=1e-5)
     self.assertAllClose(
         np.log(expected_cdf), log_cdf_values, atol=0., rtol=1e-5)
@@ -144,9 +126,7 @@ class StudentTTest(tf.test.TestCase):
     sigma_bc = np.abs(sigma_v) * ones
     mu_bc = ones.T * mu_v
     df_bc = ones.T * df_v
-    if not stats:
-      return
-    expected_entropy = stats.t.entropy(
+    expected_entropy = sp_stats.t.entropy(
         np.reshape(df_bc, [-1]),
         loc=np.reshape(mu_bc, [-1]),
         scale=np.reshape(sigma_bc, [-1]))
@@ -234,11 +214,9 @@ class StudentTTest(tf.test.TestCase):
   def _checkKLApprox(self, df, mu, sigma, samples):
     n = samples.size
     np.random.seed(137)
-    if not stats:
-      return
-    sample_scipy = stats.t.rvs(df, loc=mu, scale=sigma, size=n)
+    sample_scipy = sp_stats.t.rvs(df, loc=mu, scale=sigma, size=n)
     covg = 0.99
-    r = stats.t.interval(covg, df, loc=mu, scale=sigma)
+    r = sp_stats.t.interval(covg, df, loc=mu, scale=sigma)
     bins = 100
     hist, _ = np.histogram(samples, bins=bins, range=r)
     hist_scipy, _ = np.histogram(sample_scipy, bins=bins, range=r)
@@ -345,7 +323,7 @@ class StudentTTest(tf.test.TestCase):
     # straddling both versions, we just override our expectation for the
     # undefined case.
     expected_var = [
-        stats.t.var(d, loc=m, scale=s) for (d, m, s) in zip(df, mu, sigma)
+        sp_stats.t.var(d, loc=m, scale=s) for (d, m, s) in zip(df, mu, sigma)
     ]
     expected_var[0] = np.nan
     self.assertAllClose(expected_var, var)
@@ -359,10 +337,8 @@ class StudentTTest(tf.test.TestCase):
     student = tfd.StudentT(df=df, loc=mu, scale=sigma)
     var = self.evaluate(student.variance())
 
-    if not stats:
-      return
     expected_var = [
-        stats.t.var(d, loc=m, scale=s) for (d, m, s) in zip(df, mu, sigma)
+        sp_stats.t.var(d, loc=m, scale=s) for (d, m, s) in zip(df, mu, sigma)
     ]
     self.assertAllClose(expected_var, var)
 
@@ -388,10 +364,8 @@ class StudentTTest(tf.test.TestCase):
     stddev = self.evaluate(student.stddev())
     mu *= len(df)
 
-    if not stats:
-      return
     expected_stddev = [
-        stats.t.std(d, loc=m, scale=s) for (d, m, s) in zip(df, mu, sigma)
+        sp_stats.t.std(d, loc=m, scale=s) for (d, m, s) in zip(df, mu, sigma)
     ]
     self.assertAllClose(expected_stddev, stddev)
 
@@ -421,9 +395,8 @@ class StudentTTest(tf.test.TestCase):
     # Verify integral over sample*pdf ~= 1.
     # Tolerance increased since eager was getting a value of 1.002041.
     self._assertIntegral(sample_vals, pdf_vals, err=5e-2)
-    if not stats:
-      return
-    self.assertNear(stats.t.pdf(np.pi, 3., loc=np.pi), mean_pdf_val, err=1e-6)
+    self.assertNear(
+        sp_stats.t.pdf(np.pi, 3., loc=np.pi), mean_pdf_val, err=1e-6)
 
   def testFullyReparameterized(self):
     df = tf.constant(2.0)
@@ -454,14 +427,12 @@ class StudentTTest(tf.test.TestCase):
     self._assertIntegral(sample_vals[:, 0, 1], pdf_vals[:, 0, 1], err=0.05)
     self._assertIntegral(sample_vals[:, 1, 0], pdf_vals[:, 1, 0], err=0.05)
     self._assertIntegral(sample_vals[:, 1, 1], pdf_vals[:, 1, 1], err=0.05)
-    if not stats:
-      return
     self.assertNear(
-        stats.t.var(7., loc=0., scale=3.),  # loc d.n. effect var
+        sp_stats.t.var(7., loc=0., scale=3.),  # loc d.n. effect var
         np.var(sample_vals[:, :, 0]),
         err=1.0)
     self.assertNear(
-        stats.t.var(11., loc=0., scale=3.),  # loc d.n. effect var
+        sp_stats.t.var(11., loc=0., scale=3.),  # loc d.n. effect var
         np.var(sample_vals[:, :, 1]),
         err=1.0)
 

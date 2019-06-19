@@ -18,10 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 
 # Dependency imports
 import numpy as np
+from scipy import special as sp_special
 
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -31,18 +31,6 @@ from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
-
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-
-special = try_import("scipy.special")
 
 
 def make_bernoulli(batch_shape, dtype=tf.int32):
@@ -68,15 +56,11 @@ class BernoulliTest(tf.test.TestCase):
     logits = [-42., 42.]
     dist = tfd.Bernoulli(logits=logits)
     self.assertAllClose(logits, self.evaluate(dist.logits))
-
-    if not special:
-      return
-
-    self.assertAllClose(special.expit(logits), self.evaluate(dist.probs))
+    self.assertAllClose(sp_special.expit(logits), self.evaluate(dist.probs))
 
     p = [0.01, 0.99, 0.42]
     dist = tfd.Bernoulli(probs=p)
-    self.assertAllClose(special.logit(p), self.evaluate(dist.logits))
+    self.assertAllClose(sp_special.logit(p), self.evaluate(dist.logits))
 
   def testInvalidP(self):
     invalid_ps = [1.01, 2.]
@@ -168,9 +152,7 @@ class BernoulliTest(tf.test.TestCase):
   def testPmfWithP(self):
     p = [[0.2, 0.4], [0.3, 0.6]]
     self._testPmf(probs=p)
-    if not special:
-      return
-    self._testPmf(logits=special.logit(p))
+    self._testPmf(logits=sp_special.logit(p))
 
   def testPmfWithFloatArgReturnsXEntropy(self):
     p = [[0.2], [0.4], [0.3], [0.6]]

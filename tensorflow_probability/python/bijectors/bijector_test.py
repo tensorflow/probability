@@ -19,10 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
-import importlib
 import weakref
 
 # Dependency imports
+import mock
 import numpy as np
 
 import tensorflow.compat.v1 as tf1
@@ -35,18 +35,6 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-
-
-def try_import(name):
-  try:
-    return importlib.import_module(name)
-  except ImportError as e:
-    tf1.logging.warning(
-        'Could not import {}: {}.'.format(name, str(e)))
-    return None
-
-
-mock = try_import('mock')
 
 
 @test_util.run_all_in_graph_and_eager_modes
