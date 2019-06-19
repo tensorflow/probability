@@ -416,12 +416,12 @@ class RelaxedOneHotCategorical(
                                                    exp_bijector.Exp(),
                                                    name=name)
 
-    @property
-    def probs(self):
-      """Input argument `probs`."""
-      return self.distribution.probs
+  @property
+  def probs(self):
+    """Input argument `probs`."""
+    return self.distribution.probs
 
-    @property
-    def logits(self):
-      """Input argument `logits`"""
-      return self.distribution.logits
+  @property
+  def logits(self):
+    """Input argument `logits`"""
+    return self.distribution.logits
