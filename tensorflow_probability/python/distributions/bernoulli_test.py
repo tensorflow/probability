@@ -23,10 +23,12 @@ from __future__ import print_function
 import numpy as np
 from scipy import special as sp_special
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -45,7 +47,7 @@ def entropy(p):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BernoulliTest(tf.test.TestCase):
+class BernoulliTest(test_case.TestCase):
 
   def testP(self):
     p = [0.2, 0.4]
@@ -65,15 +67,15 @@ class BernoulliTest(tf.test.TestCase):
   def testInvalidP(self):
     invalid_ps = [1.01, 2.]
     for p in invalid_ps:
-      with self.assertRaisesOpError("probs has components greater than 1"):
+      with self.assertRaisesOpError('probs has components greater than 1'):
         dist = tfd.Bernoulli(probs=p, validate_args=True)
-        self.evaluate(dist.probs)
+        self.evaluate(dist.probs_parameter())
 
     invalid_ps = [-0.01, -3.]
     for p in invalid_ps:
-      with self.assertRaisesOpError("Condition x >= 0"):
+      with self.assertRaisesOpError('x >= 0 did not hold'):
         dist = tfd.Bernoulli(probs=p, validate_args=True)
-        self.evaluate(dist.probs)
+        self.evaluate(dist.probs_parameter())
 
     valid_ps = [0.0, 0.5, 1.0]
     for p in valid_ps:
@@ -108,6 +110,10 @@ class BernoulliTest(tf.test.TestCase):
     self.assertEqual(dist64.dtype, dist64.sample(5).dtype)
     self.assertEqual(dist64.dtype, dist64.mode().dtype)
 
+  def testFloatMode(self):
+    dist = tfd.Bernoulli(probs=.6, dtype=tf.float32)
+    self.assertEqual(np.float32(1), self.evaluate(dist.mode()))
+
   def _testPmf(self, **kwargs):
     dist = tfd.Bernoulli(**kwargs)
     # pylint: disable=bad-continuation
@@ -132,7 +138,7 @@ class BernoulliTest(tf.test.TestCase):
       self.assertAllClose(self.evaluate(dist.log_prob(x)), np.log(expected_pmf))
 
   def testPmfCorrectBroadcastDynamicShape(self):
-    p = tf.compat.v1.placeholder_with_default([0.2, 0.3, 0.4], shape=None)
+    p = tf1.placeholder_with_default([0.2, 0.3, 0.4], shape=None)
     dist = tfd.Bernoulli(probs=p)
     event1 = [1, 0, 1]
     event2 = [[1, 0, 1]]
@@ -144,9 +150,9 @@ class BernoulliTest(tf.test.TestCase):
   def testPmfInvalid(self):
     p = [0.1, 0.2, 0.7]
     dist = tfd.Bernoulli(probs=p, validate_args=True)
-    with self.assertRaisesOpError("must be non-negative."):
+    with self.assertRaisesOpError('must be non-negative.'):
       self.evaluate(dist.prob([1, 1, -1]))
-    with self.assertRaisesOpError("Elements cannot exceed 1."):
+    with self.assertRaisesOpError('Elements cannot exceed 1.'):
       self.evaluate(dist.prob([2, 0, 1]))
 
   def testPmfWithP(self):
@@ -164,7 +170,7 @@ class BernoulliTest(tf.test.TestCase):
             tfd.Bernoulli(probs=p, validate_args=False).log_prob(samps)))
 
   def testBroadcasting(self):
-    probs = lambda p: tf.compat.v1.placeholder_with_default(p, shape=None)
+    probs = lambda p: tf1.placeholder_with_default(p, shape=None)
     dist = lambda p: tfd.Bernoulli(probs=probs(p))
     self.assertAllClose(np.log(0.5), self.evaluate(dist(0.5).log_prob(1)))
     self.assertAllClose(
@@ -173,7 +179,7 @@ class BernoulliTest(tf.test.TestCase):
                         self.evaluate(dist([0.5, 0.5, 0.5]).log_prob(1)))
 
   def testPmfShapes(self):
-    probs = lambda p: tf.compat.v1.placeholder_with_default(p, shape=None)
+    probs = lambda p: tf1.placeholder_with_default(p, shape=None)
     dist = lambda p: tfd.Bernoulli(probs=probs(p))
     self.assertEqual(
         2, len(self.evaluate(dist([[0.5], [0.5]]).log_prob(1)).shape))
@@ -240,13 +246,13 @@ class BernoulliTest(tf.test.TestCase):
     n = 1000
     def _maybe_seed():
       if tf.executing_eagerly():
-        tf.compat.v1.set_random_seed(42)
+        tf1.set_random_seed(42)
         return None
       return 42
     self.assertAllEqual(
         self.evaluate(dist.sample(n, _maybe_seed())),
         self.evaluate(dist.sample([n], _maybe_seed())))
-    n = tf.compat.v1.placeholder_with_default(np.int32(1000), shape=None)
+    n = tf1.placeholder_with_default(np.int32(1000), shape=None)
     sample1 = dist.sample(n, _maybe_seed())
     sample2 = dist.sample([n], _maybe_seed())
     sample1, sample2 = self.evaluate([sample1, sample2])
@@ -335,7 +341,7 @@ class BernoulliSlicingTest(tf.test.TestCase):
     dist = tfd.Bernoulli(logits=logits)
     batch_shape = tensorshape_util.as_list(dist.batch_shape)
     dist_noshape = tfd.Bernoulli(
-        logits=tf.compat.v1.placeholder_with_default(logits, shape=None))
+        logits=tf1.placeholder_with_default(logits, shape=None))
 
     def check(*slicers):
       for ds, assert_static_shape in (dist, True), (dist_noshape, False):
@@ -372,14 +378,14 @@ class BernoulliSlicingTest(tf.test.TestCase):
           make_slicer[::2])
     if tf.executing_eagerly(): return
     with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 "Index out of range.*input has only 4 dims"):
+                                 'Index out of range.*input has only 4 dims'):
       check(make_slicer[19, tf.newaxis, 2, ..., :, 0, 4])
     with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 "slice index.*out of bounds"):
+                                 'slice index.*out of bounds'):
       check(make_slicer[..., 2, :])  # ...,1,5 -> 2 is oob.
 
   def testSliceSequencePreservesOrigVarGradLinkage(self):
-    logits = tf.compat.v2.Variable(tf.random.normal([20, 3, 1, 5]))
+    logits = tf.Variable(tf.random.normal([20, 3, 1, 5]))
     self.evaluate(logits.initializer)
     dist = tfd.Bernoulli(logits=logits)
     for slicer in [make_slicer[:5], make_slicer[..., -1], make_slicer[:, 1::2]]:
@@ -389,51 +395,51 @@ class BernoulliSlicingTest(tf.test.TestCase):
       dlpdlogits = tape.gradient(lp, logits)
       self.assertIsNotNone(dlpdlogits)
       self.assertGreater(
-          self.evaluate(tf.reduce_sum(input_tensor=tf.abs(dlpdlogits))), 0)
+          self.evaluate(tf.reduce_sum(tf.abs(dlpdlogits))), 0)
 
   def testSliceThenCopyPreservesOrigVarGradLinkage(self):
-    logits = tf.compat.v2.Variable(tf.random.normal([20, 3, 1, 5]))
+    logits = tf.Variable(tf.random.normal([20, 3, 1, 5]))
     self.evaluate(logits.initializer)
     dist = tfd.Bernoulli(logits=logits)
     dist = dist[:5]
     with tf.GradientTape() as tape:
-      dist = dist.copy(name="bern2")
+      dist = dist.copy(name='bern2')
       lp = dist.log_prob(0)
     dlpdlogits = tape.gradient(lp, logits)
-    self.assertIn("bern2", dist.name)
+    self.assertIn('bern2', dist.name)
     self.assertIsNotNone(dlpdlogits)
     self.assertGreater(
-        self.evaluate(tf.reduce_sum(input_tensor=tf.abs(dlpdlogits))), 0)
+        self.evaluate(tf.reduce_sum(tf.abs(dlpdlogits))), 0)
     with tf.GradientTape() as tape:
       dist = dist[:3]
       lp = dist.log_prob(0)
     dlpdlogits = tape.gradient(lp, logits)
-    self.assertIn("bern2", dist.name)
+    self.assertIn('bern2', dist.name)
     self.assertIsNotNone(dlpdlogits)
     self.assertGreater(
-        self.evaluate(tf.reduce_sum(input_tensor=tf.abs(dlpdlogits))), 0)
+        self.evaluate(tf.reduce_sum(tf.abs(dlpdlogits))), 0)
 
   def testCopyUnknownRank(self):
-    logits = tf.compat.v1.placeholder_with_default(
+    logits = tf1.placeholder_with_default(
         tf.random.normal([20, 3, 1, 5]), shape=None)
-    dist = tfd.Bernoulli(logits=logits, name="b1")
-    self.assertIn("b1", dist.name)
-    dist = dist.copy(name="b2")
-    self.assertIn("b2", dist.name)
+    dist = tfd.Bernoulli(logits=logits, name='b1')
+    self.assertIn('b1', dist.name)
+    dist = dist.copy(name='b2')
+    self.assertIn('b2', dist.name)
 
   def testSliceCopyOverrideNameSliceAgainCopyOverrideLogitsSliceAgain(self):
     logits = tf.random.normal([20, 3, 2, 5])
-    dist = tfd.Bernoulli(logits=logits, name="b1")
-    self.assertIn("b1", dist.name)
-    dist = dist[:10].copy(name="b2")
+    dist = tfd.Bernoulli(logits=logits, name='b1')
+    self.assertIn('b1', dist.name)
+    dist = dist[:10].copy(name='b2')
     self.assertAllEqual((10, 3, 2, 5), dist.batch_shape)
-    self.assertIn("b2", dist.name)
-    dist = dist.copy(name="b3")[..., 1]
+    self.assertIn('b2', dist.name)
+    dist = dist.copy(name='b3')[..., 1]
     self.assertAllEqual((10, 3, 2), dist.batch_shape)
-    self.assertIn("b3", dist.name)
+    self.assertIn('b3', dist.name)
     dist = dist.copy(logits=tf.random.normal([2]))
     self.assertAllEqual((2,), dist.batch_shape)
-    self.assertIn("b3", dist.name)
+    self.assertIn('b3', dist.name)
 
   def testDocstrSliceExample(self):
     b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]))  # batch shape [3, 5, 7, 9]
@@ -442,5 +448,38 @@ class BernoulliSlicingTest(tf.test.TestCase):
     self.assertAllEqual((3, 1, 5, 2, 4), b2.batch_shape)
 
 
-if __name__ == "__main__":
+@test_util.run_all_in_graph_and_eager_modes
+class BernoulliFromVariableTest(test_case.TestCase):
+
+  def testGradientLogits(self):
+    x = tf.Variable([-1., 1])
+    self.evaluate(x.initializer)
+    d = tfd.Bernoulli(logits=x, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([0, 1])
+    g = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(g, 1)
+    self.assertAllNotNone(g)
+
+  def testGradientProbs(self):
+    x = tf.Variable([0.1, 0.7])
+    self.evaluate(x.initializer)
+    d = tfd.Bernoulli(probs=x, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([0, 1])
+    g = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(g, 1)
+    self.assertAllNotNone(g)
+
+  def testAssertionsProbs(self):
+    x = tf.Variable([0.1, 0.7, 0.0])
+    d = tfd.Bernoulli(probs=x, validate_args=True)
+    self.evaluate(x.initializer)
+    self.evaluate(d.entropy())
+    with tf.control_dependencies([x.assign([0.1, -0.7, 0.0])]):
+      with self.assertRaisesOpError('x >= 0 did not hold'):
+        self.evaluate(d.entropy())
+
+
+if __name__ == '__main__':
   tf.test.main()

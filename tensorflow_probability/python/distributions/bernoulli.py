@@ -22,9 +22,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 class Bernoulli(distribution.Distribution):
@@ -67,24 +70,24 @@ class Bernoulli(distribution.Distribution):
       ValueError: If p and logits are passed, or if neither are passed.
     """
     parameters = dict(locals())
+    if (probs is None) == (logits is None):
+      raise ValueError('Must pass probs or logits, but not both.')
     with tf.name_scope(name) as name:
-      self._logits, self._probs = distribution_util.get_logits_and_probs(
-          logits=logits,
-          probs=probs,
-          validate_args=validate_args,
-          name=name)
+      self._probs = tensor_util.convert_immutable_to_tensor(
+          probs, dtype_hint=tf.float32, name='probs')
+      self._logits = tensor_util.convert_immutable_to_tensor(
+          logits, dtype_hint=tf.float32, name='logits')
     super(Bernoulli, self).__init__(
         dtype=dtype,
         reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
-        graph_parents=[self._logits, self._probs],
         name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {'logits': tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
+    return {'logits': tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
 
   @classmethod
   def _params_event_ndims(cls):
@@ -93,18 +96,24 @@ class Bernoulli(distribution.Distribution):
   @property
   def logits(self):
     """Input argument `logits`."""
+    if self._logits is None:
+      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
+    if self._probs is None:
+      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self):
-    return tf.shape(input=self._logits)
+    x = self._probs if self._logits is None else self._logits
+    return tf.shape(x)
 
   def _batch_shape(self):
-    return self._logits.shape
+    x = self._probs if self._logits is None else self._logits
+    return x.shape
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -113,9 +122,10 @@ class Bernoulli(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
+    probs = self.probs_parameter()
     new_shape = tf.concat([[n], self.batch_shape_tensor()], 0)
-    uniform = tf.random.uniform(new_shape, seed=seed, dtype=self.probs.dtype)
-    sample = tf.less(uniform, self.probs)
+    uniform = tf.random.uniform(new_shape, seed=seed, dtype=probs.dtype)
+    sample = tf.less(uniform, probs)
     return tf.cast(sample, self.dtype)
 
   def _log_prob(self, event):
@@ -123,50 +133,93 @@ class Bernoulli(distribution.Distribution):
       event = distribution_util.embed_check_integer_casting_closed(
           event, target_dtype=tf.bool)
 
-    # TODO(jaana): The current sigmoid_cross_entropy_with_logits has
-    # inconsistent behavior for logits = inf/-inf.
-    event = tf.cast(event, self.logits.dtype)
-    logits = self.logits
-    # sigmoid_cross_entropy_with_logits doesn't broadcast shape,
-    # so we do this here.
+    log_probs0, log_probs1 = self._outcome_log_probs()
+    event = tf.cast(event, log_probs0.dtype)
+    return event * (log_probs1 - log_probs0) + log_probs0
 
-    def _broadcast(logits, event):
-      return (tf.ones_like(event) * logits,
-              tf.ones_like(logits) * event)
-
-    if not (tensorshape_util.is_fully_defined(event.shape) and
-            tensorshape_util.is_fully_defined(logits.shape) and
-            event.shape == logits.shape):
-      logits, event = _broadcast(logits, event)
-    return -tf.nn.sigmoid_cross_entropy_with_logits(labels=event, logits=logits)
+  def _outcome_log_probs(self):
+    if self._logits is None:
+      p = tf.convert_to_tensor(self._probs)
+      return tf.math.log1p(-p), tf.math.log(p)
+    s = tf.convert_to_tensor(self._logits)
+    return -tf.nn.softplus(s), -tf.nn.softplus(-s)
 
   def _entropy(self):
-    return (-self.logits * (tf.sigmoid(self.logits) - 1) +
-            tf.nn.softplus(-self.logits))
+    logits = self.logits_parameter()
+    return -logits * (tf.sigmoid(logits) - 1) + tf.math.softplus(-logits)
 
   def _mean(self):
-    return tf.identity(self.probs)
+    return self.probs_parameter()
 
   def _variance(self):
-    return self._mean() * (1. - self.probs)
+    mean = self._mean()
+    return mean * (1. - mean)
 
   def _mode(self):
     """Returns `1` if `prob > 0.5` and `0` otherwise."""
-    return tf.cast(self.probs > 0.5, self.dtype)
+    return tf.cast(self.probs_parameter() > 0.5, self.dtype)
 
   def logits_parameter(self, name=None):
     """Logits computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'logits_parameter'):
-      if self.logits is None:
-        return tf.math.log(self.probs) - tf.math.log1p(-self.probs)
-      return tf.identity(self.logits)
+      if self._logits is None:
+        probs = tf.convert_to_tensor(self._probs)
+        return tf.math.log(probs) - tf.math.log1p(-probs)
+      return tf.identity(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'probs_parameter'):
-      if self.logits is None:
-        return tf.identity(self.probs)
-      return tf.nn.sigmoid(self.logits)
+      if self._logits is None:
+        return tf.identity(self._probs)
+      return tf.math.sigmoid(self._logits)
+
+  @deprecation.deprecated(
+      '2019-10-01',
+      'The `logits` property will return `None` when the distribution is '
+      'parameterized with `logits=None`. Use `logits_parameter()` instead.',
+      warn_once=True)
+  def _logits_deprecated_behavior(self):
+    return self.logits_parameter()
+
+  @deprecation.deprecated(
+      '2019-10-01',
+      'The `probs` property will return `None` when the distribution is '
+      'parameterized with `probs=None`. Use `probs_parameter()` instead.',
+      warn_once=True)
+  def _probs_deprecated_behavior(self):
+    return self.probs_parameter()
+
+  def _parameter_control_dependencies(self, is_init):
+    return maybe_assert_bernoulli_param_correctness(
+        is_init, self.validate_args, self._probs, self._logits)
+
+
+def maybe_assert_bernoulli_param_correctness(
+    is_init, validate_args, probs, logits):
+  """Return assertions for `Categorical`-type distributions."""
+  if is_init:
+    x, name = (probs, 'probs') if logits is None else (logits, 'logits')
+    if not dtype_util.is_floating(x.dtype):
+      raise TypeError(
+          'Argument `{}` must having floating type.'.format(name))
+
+  if not validate_args:
+    return []
+
+  assertions = []
+
+  if probs is not None:
+    if is_init != tensor_util.is_mutable(probs):
+      one = tf.constant(1., probs.dtype)
+      assertions += [
+          assert_util.assert_non_negative(
+              probs, message='probs has components less than 0.'),
+          assert_util.assert_less_equal(
+              probs, one, message='probs has components greater than 1.')
+      ]
+
+  return assertions
 
 
 @kullback_leibler.RegisterKL(Bernoulli, Bernoulli)
@@ -187,6 +240,6 @@ def _kl_bernoulli_bernoulli(a, b, name=None):
     b_logits = b.logits_parameter()
     return (
         tf.sigmoid(a_logits) * (
-            tf.nn.softplus(-b_logits) - tf.nn.softplus(-a_logits)) +
+            tf.math.softplus(-b_logits) - tf.math.softplus(-a_logits)) +
         tf.sigmoid(-a_logits) * (
-            tf.nn.softplus(b_logits) - tf.nn.softplus(a_logits)))
+            tf.math.softplus(b_logits) - tf.math.softplus(a_logits)))
