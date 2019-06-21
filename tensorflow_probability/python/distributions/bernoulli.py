@@ -123,7 +123,7 @@ class Bernoulli(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     probs = self._probs_parameter_no_checks()
-    new_shape = tf.concat([[n], self._batch_shape_tensor()], 0)
+    new_shape = tf.concat([[n], tf.shape(probs)], 0)
     uniform = tf.random.uniform(new_shape, seed=seed, dtype=probs.dtype)
     sample = tf.less(uniform, probs)
     return tf.cast(sample, self.dtype)
