@@ -22,7 +22,8 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats as sp_stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -45,9 +46,14 @@ class HalfNormalTest(test_case.TestCase):
     all_true = np.ones_like(is_finite, dtype=np.bool)
     self.assertAllEqual(all_true, is_finite)
 
+  def assertRaisesError(self, msg):
+    if tf.executing_eagerly():
+      return self.assertRaisesRegexp(Exception, msg)
+    return self.assertRaisesOpError(msg)
+
   def _testParamShapes(self, sample_shape, expected):
     param_shapes = tfd.HalfNormal.param_shapes(sample_shape)
-    scale_shape = param_shapes["scale"]
+    scale_shape = param_shapes['scale']
     self.assertAllEqual(expected, self.evaluate(scale_shape))
     scale = tf.ones(scale_shape)
     self.assertAllEqual(
@@ -55,7 +61,7 @@ class HalfNormalTest(test_case.TestCase):
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.HalfNormal.param_static_shapes(sample_shape)
-    scale_shape = param_shapes["scale"]
+    scale_shape = param_shapes['scale']
     self.assertEqual(expected, scale_shape)
 
   def _testBatchShapes(self, dist, tensor):
@@ -153,17 +159,17 @@ class HalfNormalTest(test_case.TestCase):
 
   def testFiniteGradients(self):
     for dtype in [np.float32, np.float64]:
-      scale = tf.compat.v2.Variable(dtype(3.0))
+      scale = tf.Variable(dtype(3.0))
       x = np.array([0.01, 0.1, 1., 5., 10.]).astype(dtype)
       def half_normal_function(name, x):
         def half_normal(scale):
           return getattr(tfd.HalfNormal(scale=scale), name)(x)
         return half_normal
 
-      self.evaluate(tf.compat.v1.global_variables_initializer())
+      self.evaluate(tf1.global_variables_initializer())
       for func_name in [
-          "cdf", "log_cdf", "survival_function",
-          "log_prob", "prob", "log_survival_function",
+          'cdf', 'log_cdf', 'survival_function',
+          'log_prob', 'prob', 'log_survival_function',
       ]:
         print(func_name)
         value, grads = self.evaluate(tfp.math.value_and_gradient(
@@ -263,8 +269,8 @@ class HalfNormalTest(test_case.TestCase):
     self.assertAllEqual(expected_shape_static, self.evaluate(sample).shape)
 
   def testNegativeSigmaFails(self):
-    with self.assertRaisesOpError("Condition x > 0 did not hold"):
-      halfnorm = tfd.HalfNormal(scale=[-5.], validate_args=True, name="G")
+    with self.assertRaisesError('Argument `scale` must be positive.'):
+      halfnorm = tfd.HalfNormal(scale=[-5.], validate_args=True, name='G')
       self.evaluate(halfnorm.mean())
 
   def testHalfNormalShape(self):
@@ -279,10 +285,10 @@ class HalfNormalTest(test_case.TestCase):
   def testHalfNormalShapeWithPlaceholders(self):
     if tf.executing_eagerly():
       return
-    scale = tf.compat.v1.placeholder_with_default(input=[1., 2], shape=None)
+    scale = tf1.placeholder_with_default(input=[1., 2], shape=None)
     halfnorm = tfd.HalfNormal(scale=scale)
 
-    # get_batch_shape should return an "<unknown>" tensor.
+    # get_batch_shape should return an '<unknown>' tensor.
     self.assertEqual(halfnorm.batch_shape, tf.TensorShape(None))
     self.assertEqual(halfnorm.event_shape, ())
     self.assertAllEqual(self.evaluate(halfnorm.event_shape_tensor()), [])
@@ -316,5 +322,29 @@ class HalfNormalTest(test_case.TestCase):
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
-if __name__ == "__main__":
+  def testGradientThroughScale(self):
+    scale = tf.Variable(2.)
+    d = tfd.HalfNormal(scale=scale, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([1., 2., 3.])
+    grad = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
+
+  def testAssertsPositiveScale(self):
+    scale = tf.Variable([1., 2., -3.])
+    self.evaluate(tf1.global_variables_initializer())
+    with self.assertRaisesError('Argument `scale` must be positive.'):
+      d = tfd.HalfNormal(scale=scale, validate_args=True)
+      self.evaluate(d.sample())
+
+  def testAssertsPositiveScaleAfterMutation(self):
+    scale = tf.Variable([1., 2., 3.])
+    self.evaluate(tf1.global_variables_initializer())
+    d = tfd.HalfNormal(scale=scale, validate_args=True)
+    with self.assertRaisesError('Argument `scale` must be positive.'):
+      with tf.control_dependencies([scale.assign([1., 2., -3.])]):
+        self.evaluate(d.sample())
+
+if __name__ == '__main__':
   tf.test.main()

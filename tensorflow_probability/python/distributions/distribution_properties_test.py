@@ -54,8 +54,15 @@ def hypothesis_max_examples():
   return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', 20))
 
 
-TF2_FRIENDLY_DISTS = ('Bernoulli', 'Categorical', 'Deterministic', 'Dirichlet',
-                      'Normal', 'Multinomial')
+TF2_FRIENDLY_DISTS = (
+    'Bernoulli',
+    'Categorical',
+    'Deterministic',
+    'Dirichlet',
+    'HalfNormal',
+    'Normal',
+    'Multinomial'
+)
 
 NO_LOG_PROB_PARAM_GRADS = ('Deterministic',)
 

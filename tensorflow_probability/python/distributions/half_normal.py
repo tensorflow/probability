@@ -28,10 +28,11 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
-    "HalfNormal",
+    'HalfNormal',
 ]
 
 
@@ -86,7 +87,7 @@ class HalfNormal(distribution.Distribution):
                scale,
                validate_args=False,
                allow_nan_stats=True,
-               name="HalfNormal"):
+               name='HalfNormal'):
     """Construct HalfNormals with scale `scale`.
 
     Args:
@@ -97,32 +98,27 @@ class HalfNormal(distribution.Distribution):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`,
-        statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+        statistics (e.g., mean, mode, variance) use the value '`NaN`' to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      scale = tf.convert_to_tensor(
-          value=scale,
-          name="scale",
-          dtype=dtype_util.common_dtype([scale], dtype_hint=tf.float32))
-      with tf.control_dependencies(
-          [assert_util.assert_positive(scale)] if validate_args else []):
-        self._scale = tf.identity(scale, name="scale")
-    super(HalfNormal, self).__init__(
-        dtype=self._scale.dtype,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._scale],
-        name=name)
+      dtype = dtype_util.common_dtype([scale], dtype_hint=tf.float32)
+      self._scale = tensor_util.convert_immutable_to_tensor(
+          scale, name='scale', dtype=dtype)
+      super(HalfNormal, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {"scale": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
+    return {'scale': tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
 
   @classmethod
   def _params_event_ndims(cls):
@@ -134,7 +130,7 @@ class HalfNormal(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self):
-    return tf.shape(input=self.scale)
+    return tf.shape(self.scale)
 
   def _batch_shape(self):
     return self.scale.shape
@@ -152,8 +148,9 @@ class HalfNormal(distribution.Distribution):
     return tf.abs(sampled * self.scale)
 
   def _prob(self, x):
-    coeff = np.sqrt(2) / self.scale / np.sqrt(np.pi)
-    pdf = coeff * tf.exp(-0.5 * (x / self.scale)**2)
+    scale = tf.convert_to_tensor(self.scale)
+    coeff = np.sqrt(2) / scale / np.sqrt(np.pi)
+    pdf = coeff * tf.exp(-0.5 * (x / scale)**2)
     return pdf * tf.cast(x >= 0, self.dtype)
 
   def _cdf(self, x):
@@ -175,6 +172,15 @@ class HalfNormal(distribution.Distribution):
   def _variance(self):
     return self.scale ** 2.0 * (1.0 - 2.0 / np.pi)
 
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_mutable(self._scale):
+      assertions.append(assert_util.assert_positive(
+          self._scale, message='Argument `scale` must be positive.'))
+    return assertions
+
 
 @kullback_leibler.RegisterKL(HalfNormal, HalfNormal)
 def _kl_half_normal_half_normal(a, b, name=None):
@@ -183,14 +189,16 @@ def _kl_half_normal_half_normal(a, b, name=None):
   Args:
     a: Instance of a `HalfNormal` distribution object.
     b: Instance of a `HalfNormal` distribution object.
-    name: (optional) Name to use for created operations.
-      default is "kl_half_normal_half_normal".
+    name: Python `str` name to use for created operations.
+      Default value: `None` (i.e., `'kl_half_normal_half_normal'`).
 
   Returns:
-    Batchwise KL(a || b)
+    kl_div: Batchwise KL(a || b)
   """
-  with tf.name_scope(name or "kl_half_normal_half_normal"):
+  with tf.name_scope(name or 'kl_half_normal_half_normal'):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 119
-    return (tf.math.log(b.scale) - tf.math.log(a.scale) +
-            (a.scale**2 - b.scale**2) / (2 * b.scale**2))
+    a_scale = tf.convert_to_tensor(a.scale)
+    b_scale = tf.convert_to_tensor(b.scale)
+    return (tf.math.log(b_scale) - tf.math.log(a_scale) +
+            (a_scale**2 - b_scale**2) / (2. * b_scale**2))
