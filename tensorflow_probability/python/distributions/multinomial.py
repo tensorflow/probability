@@ -243,7 +243,7 @@ class Multinomial(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     n_draws = tf.cast(self.total_count, dtype=tf.int32)
-    logits = self.logits_parameter()
+    logits = self._logits_parameter_no_checks()
     k = tf.compat.dimension_value(logits.shape[-1])
     if k is None:
       k = tf.shape(logits)[-1]
@@ -260,12 +260,12 @@ class Multinomial(distribution.Distribution):
           distribution_util.log_combinations(k, counts))  # -log_normalization
 
   def _mean(self):
-    p = self.probs_parameter()
+    p = self._probs_parameter_no_checks()
     k = tf.convert_to_tensor(self.total_count)
     return k[..., tf.newaxis] * p
 
   def _covariance(self):
-    p = self.probs_parameter()
+    p = self._probs_parameter_no_checks()
     k = tf.convert_to_tensor(self.total_count)
     return tf.linalg.set_diag(
         (-k[..., tf.newaxis, tf.newaxis] *
@@ -273,23 +273,29 @@ class Multinomial(distribution.Distribution):
         k[..., tf.newaxis] * p * (1. - p))
 
   def _variance(self):
-    p = self.probs_parameter()
+    p = self._probs_parameter_no_checks()
     k = tf.convert_to_tensor(self.total_count)
     return k[..., tf.newaxis] * p * (1. - p)
 
   def logits_parameter(self, name=None):
     """Logits vec computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'logits_parameter'):
-      if self._logits is None:
-        return tf.math.log(self._probs)
-      return tf.identity(self._logits)
+      return self._logits_parameter_no_checks()
+
+  def _logits_parameter_no_checks(self):
+    if self._logits is None:
+      return tf.math.log(self._probs)
+    return tf.identity(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'probs_parameter'):
-      if self._logits is None:
-        return tf.identity(self._probs)
-      return tf.nn.softmax(self._logits)
+      return self._probs_parameter_no_checks()
+
+  def _probs_parameter_no_checks(self):
+    if self._logits is None:
+      return tf.identity(self._probs)
+    return tf.nn.softmax(self._logits)
 
   @deprecation.deprecated(
       '2019-10-01',
