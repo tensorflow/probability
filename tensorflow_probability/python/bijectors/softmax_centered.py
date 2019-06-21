@@ -61,12 +61,11 @@ class SoftmaxCentered(bijector.Bijector):
   def __init__(self,
                validate_args=False,
                name="softmax_centered"):
-    self._graph_parents = []
-    self._name = name
-    super(SoftmaxCentered, self).__init__(
-        forward_min_event_ndims=1,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(SoftmaxCentered, self).__init__(
+          forward_min_event_ndims=1,
+          validate_args=validate_args,
+          name=name)
 
   def _forward_event_shape(self, input_shape):
     if not input_shape[-1:].is_fully_defined():
@@ -88,8 +87,8 @@ class SoftmaxCentered(bijector.Bijector):
       # It is not possible for a negative shape so we need only check <= 1.
       is_greater_one = assert_util.assert_greater(
           output_shape[-1], 1, message="Need last dimension greater than 1.")
-      output_shape = distribution_util.with_dependencies(
-          [is_greater_one], output_shape)
+      with tf.control_dependencies([is_greater_one]):
+        output_shape = tf.identity(output_shape)
     return tf.concat([output_shape[:-1], [output_shape[-1] - 1]], axis=0)
 
   def _forward(self, x):

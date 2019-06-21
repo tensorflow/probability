@@ -31,10 +31,11 @@ class Sigmoid(bijector.Bijector):
   """Bijector which computes `Y = g(X) = 1 / (1 + exp(-X))`."""
 
   def __init__(self, validate_args=False, name="sigmoid"):
-    super(Sigmoid, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(Sigmoid, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
     return tf.sigmoid(x)

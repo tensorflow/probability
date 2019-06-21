@@ -25,7 +25,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import special_math
 
 __all__ = [
@@ -57,32 +57,30 @@ class NormalCDF(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._graph_parents = []
-    self._name = name
-    self._validate_args = validate_args
-
-    super(NormalCDF, self).__init__(
-        validate_args=validate_args,
-        forward_min_event_ndims=0,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(NormalCDF, self).__init__(
+          validate_args=validate_args,
+          forward_min_event_ndims=0,
+          name=name)
 
   def _forward(self, x):
     return special_math.ndtr(x)
 
   def _inverse(self, y):
-    y = self._maybe_assert_valid_y(y)
-    return special_math.ndtri(y)
+    with tf.control_dependencies(self._assertions(y)):
+      return special_math.ndtri(y)
 
   def _forward_log_det_jacobian(self, x):
     return -0.5 * np.log(2 * np.pi) - tf.square(x) / 2.
 
-  def _maybe_assert_valid_y(self, y):
+  def _assertions(self, t):
     if not self.validate_args:
-      return y
-    is_positive = assert_util.assert_non_negative(
-        y, message="Inverse transformation input must be greater than 0.")
-    less_than_one = assert_util.assert_less_equal(
-        y,
-        tf.constant(1., y.dtype),
-        message="Inverse transformation input must be less than or equal to 1.")
-    return distribution_util.with_dependencies([is_positive, less_than_one], y)
+      return []
+    return [
+        assert_util.assert_non_negative(
+            t, message="Inverse transformation input must be greater than 0."),
+        assert_util.assert_less_equal(
+            t,
+            dtype_util.as_numpy_dtype(t.dtype)(1.),
+            message="Inverse transformation input must be less than or equal "
+            "to 1.")]

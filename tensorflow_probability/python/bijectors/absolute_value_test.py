@@ -32,7 +32,7 @@ class AbsoluteValueTest(tf.test.TestCase):
     bijector = tfb.AbsoluteValue(validate_args=True)
     self.assertStartsWith(bijector.name, "absolute_value")
     x = tf.constant([[0., 1., -1], [0., -5., 3.]])  # Shape [2, 3]
-    y = tf.abs(x)
+    y = tf.math.abs(x)
 
     y_ = self.evaluate(y)
 

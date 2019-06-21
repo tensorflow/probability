@@ -58,16 +58,17 @@ class CholeskyToInvCholesky(bijector.Bijector):
   matrices.
   """
 
-  def __init__(self, validate_args=False, name=None):
-    super(CholeskyToInvCholesky, self).__init__(
-        forward_min_event_ndims=2,
-        validate_args=validate_args,
-        name=name or "cholesky_to_inv_cholesky")
-    self._cholesky = CholeskyOuterProduct()
+  def __init__(self, validate_args=False, name="cholesky_to_inv_cholesky"):
+    with tf.name_scope(name) as name:
+      self._cholesky = CholeskyOuterProduct()
+      super(CholeskyToInvCholesky, self).__init__(
+          forward_min_event_ndims=2,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):
-      x_shape = tf.shape(input=x)
+      x_shape = tf.shape(x)
       identity_matrix = tf.eye(
           x_shape[-1],
           batch_shape=x_shape[:-2],
@@ -94,7 +95,7 @@ class CholeskyToInvCholesky(bijector.Bijector):
     # For step 3,
     #   |Jac(Cholesky(N))| = -|Jac(outerprod(Y)|
     #                      = 2^p prod_{j=0}^{p-1} Y[j,j]^{p-j}
-    n = tf.cast(tf.shape(input=x)[-1], x.dtype)
+    n = tf.cast(tf.shape(x)[-1], x.dtype)
     y = self._forward(x)
     return ((self._cholesky.forward_log_det_jacobian(x, event_ndims=2) -
              (n + 1.) * tf.reduce_sum(
@@ -108,7 +109,7 @@ class CholeskyToInvCholesky(bijector.Bijector):
   def _assertions(self, x):
     if not self.validate_args:
       return []
-    x_shape = tf.shape(input=x)
+    x_shape = tf.shape(x)
     is_matrix = assert_util.assert_rank_at_least(
         x, 2, message="Input must have rank at least 2.")
     is_square = assert_util.assert_equal(

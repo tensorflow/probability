@@ -61,16 +61,15 @@ class MatrixInverseTriL(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._graph_parents = []
-    self._name = name
-    super(MatrixInverseTriL, self).__init__(
-        forward_min_event_ndims=2,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(MatrixInverseTriL, self).__init__(
+          forward_min_event_ndims=2,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):
-      shape = tf.shape(input=x)
+      shape = tf.shape(x)
       return tf.linalg.triangular_solve(
           x,
           tf.eye(shape[-1], batch_shape=shape[:-2], dtype=x.dtype),
@@ -84,7 +83,7 @@ class MatrixInverseTriL(bijector.Bijector):
     # sections leading up to it, for context) in
     # http://neutrino.aquaphoenix.com/ReactionDiffusion/SERC5chap7.pdf
     with tf.control_dependencies(self._assertions(x)):
-      matrix_dim = tf.cast(tf.shape(input=x)[-1],
+      matrix_dim = tf.cast(tf.shape(x)[-1],
                            dtype_util.base_dtype(x.dtype))
       return -(matrix_dim + 1) * tf.reduce_sum(
           input_tensor=tf.math.log(tf.abs(tf.linalg.diag_part(x))),
@@ -93,7 +92,7 @@ class MatrixInverseTriL(bijector.Bijector):
   def _assertions(self, x):
     if not self.validate_args:
       return []
-    shape = tf.shape(input=x)
+    shape = tf.shape(x)
     is_matrix = assert_util.assert_rank_at_least(
         x, 2, message="Input must have rank at least 2.")
     is_square = assert_util.assert_equal(

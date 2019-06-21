@@ -22,7 +22,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
 
@@ -54,37 +53,36 @@ class Softsign(bijector.Bijector):
   """
 
   def __init__(self, validate_args=False, name="softsign"):
-    super(Softsign, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(Softsign, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
-    return x / (1. + tf.abs(x))
+    return x / (1. + tf.math.abs(x))
 
   def _inverse(self, y):
-    y = self._maybe_assert_valid_y(y)
-    return y / (1. - tf.abs(y))
+    with tf.control_dependencies(self._assertions(y)):
+      return y / (1. - tf.math.abs(y))
 
   def _forward_log_det_jacobian(self, x):
-    return -2. * tf.math.log1p(tf.abs(x))
+    return -2. * tf.math.log1p(tf.math.abs(x))
 
   def _inverse_log_det_jacobian(self, y):
-    y = self._maybe_assert_valid_y(y)
-    return -2. * tf.math.log1p(-tf.abs(y))
+    with tf.control_dependencies(self._assertions(y)):
+      return -2. * tf.math.log1p(-tf.math.abs(y))
 
-  def _maybe_assert_valid_y(self, y):
+  def _assertions(self, t):
     if not self.validate_args:
-      return y
-    is_valid = [
+      return []
+    return [
         assert_util.assert_greater(
-            y,
-            dtype_util.as_numpy_dtype(y.dtype)(-1),
+            t,
+            dtype_util.as_numpy_dtype(t.dtype)(-1),
             message="Inverse transformation input must be greater than -1."),
         assert_util.assert_less(
-            y,
-            dtype_util.as_numpy_dtype(y.dtype)(1),
+            t,
+            dtype_util.as_numpy_dtype(t.dtype)(1),
             message="Inverse transformation input must be less than 1.")
     ]
-
-    return distribution_util.with_dependencies(is_valid, y)

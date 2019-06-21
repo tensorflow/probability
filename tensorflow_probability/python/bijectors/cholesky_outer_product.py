@@ -77,22 +77,17 @@ class CholeskyOuterProduct(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._graph_parents = []
-    self._name = name
-    super(CholeskyOuterProduct, self).__init__(
-        forward_min_event_ndims=2,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(CholeskyOuterProduct, self).__init__(
+          forward_min_event_ndims=2,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
-    if self.validate_args:
-      is_matrix = assert_util.assert_rank_at_least(x, 2)
-      shape = tf.shape(input=x)
-      is_square = assert_util.assert_equal(shape[-2], shape[-1])
-      x = distribution_util.with_dependencies([is_matrix, is_square], x)
-    # For safety, explicitly zero-out the upper triangular part.
-    x = tf.linalg.band_part(x, -1, 0)
-    return tf.matmul(x, x, adjoint_b=True)
+    with tf.control_dependencies(self._assertions(x)):
+      # For safety, explicitly zero-out the upper triangular part.
+      x = tf.linalg.band_part(x, -1, 0)
+      return tf.matmul(x, x, adjoint_b=True)
 
   def _inverse(self, y):
     return tf.linalg.cholesky(y)
@@ -145,47 +140,34 @@ class CholeskyOuterProduct(bijector.Bijector):
     # output is unchanged.
     diag = self._make_columnar(diag)
 
-    if self.validate_args:
-      is_matrix = assert_util.assert_rank_at_least(
-          x, 2, message="Input must be a (batch of) matrix.")
-      shape = tf.shape(input=x)
-      is_square = assert_util.assert_equal(
-          shape[-2],
-          shape[-1],
-          message="Input must be a (batch of) square matrix.")
-      # Assuming lower-triangular means we only need check diag>0.
-      is_positive_definite = assert_util.assert_positive(
-          diag, message="Input must be positive definite.")
-      x = distribution_util.with_dependencies(
-          [is_matrix, is_square, is_positive_definite], x)
+    with tf.control_dependencies(self._assertions(x)):
+      # Create a vector equal to: [p, p-1, ..., 2, 1].
+      if tf.compat.dimension_value(x.shape[-1]) is None:
+        p_int = tf.shape(x)[-1]
+        p_float = tf.cast(p_int, dtype=x.dtype)
+      else:
+        p_int = tf.compat.dimension_value(x.shape[-1])
+        p_float = dtype_util.as_numpy_dtype(x.dtype)(p_int)
+      exponents = tf.linspace(p_float, 1., p_int)
 
-    # Create a vector equal to: [p, p-1, ..., 2, 1].
-    if tf.compat.dimension_value(x.shape[-1]) is None:
-      p_int = tf.shape(input=x)[-1]
-      p_float = tf.cast(p_int, dtype=x.dtype)
-    else:
-      p_int = tf.compat.dimension_value(x.shape[-1])
-      p_float = dtype_util.as_numpy_dtype(x.dtype)(p_int)
-    exponents = tf.linspace(p_float, 1., p_int)
+      sum_weighted_log_diag = tf.squeeze(
+          tf.matmul(tf.math.log(diag), exponents[..., tf.newaxis]), axis=-1)
+      fldj = p_float * np.log(2.) + sum_weighted_log_diag
 
-    sum_weighted_log_diag = tf.squeeze(
-        tf.matmul(tf.math.log(diag), exponents[..., tf.newaxis]), axis=-1)
-    fldj = p_float * np.log(2.) + sum_weighted_log_diag
+      # We finally need to undo adding an extra column in non-scalar cases
+      # where there is a single matrix as input.
+      if tensorshape_util.rank(x.shape) is not None:
+        if tensorshape_util.rank(x.shape) == 2:
+          fldj = tf.squeeze(fldj, axis=-1)
+        return fldj
 
-    # We finally need to undo adding an extra column in non-scalar cases
-    # where there is a single matrix as input.
-    if tensorshape_util.rank(x.shape) is not None:
-      if tensorshape_util.rank(x.shape) == 2:
-        fldj = tf.squeeze(fldj, axis=-1)
-      return fldj
-
-    shape = tf.shape(input=fldj)
-    maybe_squeeze_shape = tf.concat([
-        shape[:-1],
-        distribution_util.pick_vector(
-            tf.equal(tf.rank(x), 2),
-            np.array([], dtype=np.int32), shape[-1:])], 0)
-    return tf.reshape(fldj, maybe_squeeze_shape)
+      shape = tf.shape(fldj)
+      maybe_squeeze_shape = tf.concat([
+          shape[:-1],
+          distribution_util.pick_vector(
+              tf.equal(tf.rank(x), 2),
+              np.array([], dtype=np.int32), shape[-1:])], 0)
+      return tf.reshape(fldj, maybe_squeeze_shape)
 
   def _make_columnar(self, x):
     """Ensures non-scalar input has at least one column.
@@ -207,7 +189,7 @@ class CholeskyOuterProduct(bijector.Bijector):
       if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, :]
       return x
-    shape = tf.shape(input=x)
+    shape = tf.shape(x)
     maybe_expanded_shape = tf.concat([
         shape[:-1],
         distribution_util.pick_vector(
@@ -215,3 +197,13 @@ class CholeskyOuterProduct(bijector.Bijector):
         shape[-1:],
     ], 0)
     return tf.reshape(x, maybe_expanded_shape)
+
+  def _assertions(self, t):
+    if self.validate_args:
+      return []
+    is_matrix = assert_util.assert_rank_at_least(t, 2)
+    is_square = assert_util.assert_equal(tf.shape(t)[-2], tf.shape(t)[-1])
+    is_positive_definite = assert_util.assert_positive(
+        tf.linalg.diag_part(t), message="Input must be positive definite.")
+    return [is_matrix, is_square, is_positive_definite]
+

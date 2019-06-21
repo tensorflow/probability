@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.bijectors import bijector_test_util
@@ -63,8 +64,8 @@ class OrderedBijectorTest(tf.test.TestCase):
     x_ = np.asarray([[2., 3, 4], [4., 8, 13]], dtype=np.float32)
     y_ = np.asarray(
         [[2., 0, 0], [4., np.log(4.), np.log(5.)]], dtype=np.float32)
-    x = tf.compat.v1.placeholder_with_default(x_, shape=[2, None])
-    y = tf.compat.v1.placeholder_with_default(y_, shape=[2, None])
+    x = tf1.placeholder_with_default(x_, shape=[2, None])
+    y = tf1.placeholder_with_default(y_, shape=[2, None])
     self.assertAllClose(y_, self.evaluate(ordered.forward(x)))
     self.assertAllClose(x_, self.evaluate(ordered.inverse(y)))
     self.assertAllClose(

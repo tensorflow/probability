@@ -20,7 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
@@ -58,8 +59,8 @@ class _IteratedSigmoidCenteredBijectorTest(object):
     self.assertStartsWith(iterated_sigmoid.name, "iterated_sigmoid")
     x_ = self.dtype([[0., 0., 0.], -np.log([1 / 3., 1 / 2., 1.])])
     y_ = self.dtype([[0.25, 0.25, 0.25, 0.25], [0.5, 0.25, 0.125, 0.125]])
-    x = tf.compat.v1.placeholder_with_default(x_, shape=[2, None])
-    y = tf.compat.v1.placeholder_with_default(y_, shape=[2, None])
+    x = tf1.placeholder_with_default(x_, shape=[2, None])
+    y = tf1.placeholder_with_default(y_, shape=[2, None])
     self.assertAllClose(y_, self.evaluate(iterated_sigmoid.forward(x)))
     self.assertAllClose(x_, self.evaluate(iterated_sigmoid.inverse(y)))
     self.assertAllClose(

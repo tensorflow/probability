@@ -80,7 +80,7 @@ class CholeskyToInvCholeskyTest(tf.test.TestCase):
       evaluated at x.
     """
     x_vector = input_to_vector.forward(x)                         # [B, n]
-    n = tf.shape(input=x_vector)[-1]
+    n = tf.shape(x_vector)[-1]
     x_plus_eps_vector = (
         x_vector[..., tf.newaxis, :] +
         eps * tf.eye(n, dtype=x_vector.dtype))                    # [B, n, n]

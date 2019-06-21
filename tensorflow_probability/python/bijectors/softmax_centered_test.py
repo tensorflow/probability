@@ -20,7 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
@@ -59,8 +60,8 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
     x_ = np.log([[2., 3, 4], [4., 8, 12]]).astype(np.float32)
     y_ = np.array(
         [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]], dtype=np.float32)
-    x = tf.compat.v1.placeholder_with_default(x_, shape=[2, None])
-    y = tf.compat.v1.placeholder_with_default(y_, shape=[2, None])
+    x = tf1.placeholder_with_default(x_, shape=[2, None])
+    y = tf1.placeholder_with_default(y_, shape=[2, None])
     self.assertAllClose(y_, self.evaluate(softmax.forward(x)))
     self.assertAllClose(x_, self.evaluate(softmax.inverse(y)))
     self.assertAllClose(
@@ -105,8 +106,8 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
             bijector.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
   def testShapeGettersWithDynamicShape(self):
-    x = tf.compat.v1.placeholder_with_default(input=[2, 4], shape=None)
-    y = tf.compat.v1.placeholder_with_default(input=[2, 5], shape=None)
+    x = tf1.placeholder_with_default(input=[2, 4], shape=None)
+    y = tf1.placeholder_with_default(input=[2, 5], shape=None)
     bijector = tfb.SoftmaxCentered(validate_args=True)
     self.assertAllEqual(
         [2, 5], self.evaluate(bijector.forward_event_shape_tensor(x)))

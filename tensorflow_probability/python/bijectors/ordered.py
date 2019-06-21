@@ -22,7 +22,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -62,11 +61,11 @@ class Ordered(bijector.Bijector):
           name=name)
 
   def _forward(self, x):
-    x = self._maybe_assert_valid_x(x)
-    y0 = x[..., 0, tf.newaxis]
-    yk = tf.math.log(x[..., 1:] - x[..., :-1])
-    y = tf.concat([y0, yk], axis=-1)
-    return y
+    with tf.control_dependencies(self._assertions(x)):
+      y0 = x[..., 0, tf.newaxis]
+      yk = tf.math.log(x[..., 1:] - x[..., :-1])
+      y = tf.concat([y0, yk], axis=-1)
+      return y
 
   def _inverse(self, y):
     x0 = y[..., 0, tf.newaxis]
@@ -86,14 +85,13 @@ class Ordered(bijector.Bijector):
     return tf.reduce_sum(input_tensor=y[..., 1:], axis=-1)
 
   def _forward_log_det_jacobian(self, x):
-    x = self._maybe_assert_valid_x(x)
-    return -tf.reduce_sum(
-        input_tensor=tf.math.log(x[..., 1:] - x[..., :-1]), axis=-1)
+    with tf.control_dependencies(self._assertions(x)):
+      return -tf.reduce_sum(
+          input_tensor=tf.math.log(x[..., 1:] - x[..., :-1]), axis=-1)
 
-  def _maybe_assert_valid_x(self, x):
+  def _assertions(self, t):
     if not self.validate_args:
-      return x
-    is_valid = assert_util.assert_positive(
-        x[..., 1:] - x[..., :-1],
-        message="Forward transformation input must be strictly increasing.")
-    return distribution_util.with_dependencies([is_valid], x)
+      return []
+    return [assert_util.assert_positive(
+        t[..., 1:] - t[..., :-1],
+        message="Forward transformation input must be strictly increasing.")]
