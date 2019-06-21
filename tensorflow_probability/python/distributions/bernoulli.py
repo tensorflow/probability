@@ -122,8 +122,8 @@ class Bernoulli(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    probs = self.probs_parameter()
-    new_shape = tf.concat([[n], self.batch_shape_tensor()], 0)
+    probs = self._probs_parameter_no_checks()
+    new_shape = tf.concat([[n], self._batch_shape_tensor()], 0)
     uniform = tf.random.uniform(new_shape, seed=seed, dtype=probs.dtype)
     sample = tf.less(uniform, probs)
     return tf.cast(sample, self.dtype)
@@ -145,11 +145,11 @@ class Bernoulli(distribution.Distribution):
     return -tf.nn.softplus(s), -tf.nn.softplus(-s)
 
   def _entropy(self):
-    logits = self.logits_parameter()
+    logits = self._logits_parameter_no_checks()
     return -logits * (tf.sigmoid(logits) - 1) + tf.math.softplus(-logits)
 
   def _mean(self):
-    return self.probs_parameter()
+    return self._probs_parameter_no_checks()
 
   def _variance(self):
     mean = self._mean()
@@ -157,22 +157,28 @@ class Bernoulli(distribution.Distribution):
 
   def _mode(self):
     """Returns `1` if `prob > 0.5` and `0` otherwise."""
-    return tf.cast(self.probs_parameter() > 0.5, self.dtype)
+    return tf.cast(self._probs_parameter_no_checks() > 0.5, self.dtype)
 
   def logits_parameter(self, name=None):
     """Logits computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'logits_parameter'):
-      if self._logits is None:
-        probs = tf.convert_to_tensor(self._probs)
-        return tf.math.log(probs) - tf.math.log1p(-probs)
-      return tf.identity(self._logits)
+      return self._logits_parameter_no_checks()
+
+  def _logits_parameter_no_checks(self):
+    if self._logits is None:
+      probs = tf.convert_to_tensor(self._probs)
+      return tf.math.log(probs) - tf.math.log1p(-probs)
+    return tf.identity(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'probs_parameter'):
-      if self._logits is None:
-        return tf.identity(self._probs)
-      return tf.math.sigmoid(self._logits)
+      return self._probs_parameter_no_checks()
+
+  def _probs_parameter_no_checks(self):
+    if self._logits is None:
+      return tf.identity(self._probs)
+    return tf.math.sigmoid(self._logits)
 
   @deprecation.deprecated(
       '2019-10-01',
@@ -211,6 +217,7 @@ def maybe_assert_bernoulli_param_correctness(
 
   if probs is not None:
     if is_init != tensor_util.is_mutable(probs):
+      probs = tf.convert_to_tensor(probs)
       one = tf.constant(1., probs.dtype)
       assertions += [
           assert_util.assert_non_negative(
