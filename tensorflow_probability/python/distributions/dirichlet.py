@@ -242,7 +242,7 @@ class Dirichlet(distribution.Distribution):
 
   def _entropy(self):
     concentration = tf.convert_to_tensor(self.concentration)
-    k = tf.cast(self.event_shape_tensor()[0], self.dtype)
+    k = tf.cast(tf.shape(concentration)[-1], self.dtype)
     total_concentration = tf.reduce_sum(concentration, axis=-1)
     return (tf.math.lbeta(concentration) +
             ((total_concentration - k) * tf.math.digamma(total_concentration)) -
@@ -280,12 +280,12 @@ class Dirichlet(distribution.Distribution):
       modes are undefined.""")
   def _mode(self):
     concentration = tf.convert_to_tensor(self.concentration)
-    k = tf.cast(self.event_shape_tensor()[0], self.dtype)
+    k = tf.cast(tf.shape(concentration)[-1], self.dtype)
     total_concentration = tf.reduce_sum(concentration, axis=-1)
     mode = (concentration - 1.) / (total_concentration[..., tf.newaxis] - k)
     if self.allow_nan_stats:
       return tf.where(
-          tf.reduce_all(concentration > 1., axis=-1),
+          tf.reduce_all(concentration > 1., axis=-1, keepdims=True),
           mode,
           dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     assertions = [
