@@ -310,7 +310,7 @@ class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
 
   def testInputOutputMismatchOpError(self):
     self._testInputOutputMismatchOpError(
-        "(Input to reshape|Cannot reshape a tensor with)")
+        "(Input to reshape|Cannot reshape a tensor with|cannot reshape array)")
 
 
 class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
@@ -358,7 +358,7 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
 
   def testInputOutputMismatchOpError(self):
     self._testInputOutputMismatchOpError(
-        "(Input to reshape|Cannot reshape a tensor with)")
+        "(Input to reshape|Cannot reshape a tensor with|cannot reshape array)")
 
   def testMultipleUnspecifiedDimensionsOpError(self):
     with self.assertRaisesError("must have at most one `-1`."):

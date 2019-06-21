@@ -20,6 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+from scipy import special as sp_special
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -41,12 +43,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
                       lambda: self.evaluate(_bessel_ive(1.5, 0.0)))
     z = np.logspace(-6, 2, 20).astype(np.float64)
     for v in np.float64([-0.5, 0, 0.5, 1, 1.5]):
-      try:
-        from scipy import special  # pylint:disable=g-import-not-at-top
-      except ImportError:
-        tf.compat.v1.logging.warn('Skipping scipy-dependent tests')
-        return
-      self.assertAllClose(special.ive(v, z), _bessel_ive(v, z))
+      self.assertAllClose(sp_special.ive(v, z), _bessel_ive(v, z))
 
   def testSampleMeanDir2d(self):
     mean_dirs = tf.nn.l2_normalize([[1., 1],
@@ -158,22 +155,16 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     samples = self.evaluate(samples)
     log_prob = vmf.log_prob(samples)
     log_prob = tf.debugging.check_numerics(log_prob, 'log_prob')
-    try:
-      from scipy.special import gammaln  # pylint: disable=g-import-not-at-top
-      from scipy.special import ive  # pylint: disable=g-import-not-at-top
-    except ImportError:
-      tf.compat.v1.logging.warn('Unable to use scipy in tests')
-      return
     conc = self.evaluate(vmf.concentration)
     mean_dir = self.evaluate(vmf.mean_direction)
     log_true_sphere_surface_area = (
-        np.log(2) + (dim / 2) * np.log(np.pi) - gammaln(dim / 2))
+        np.log(2) + (dim / 2) * np.log(np.pi) - sp_special.gammaln(dim / 2))
     expected = (
         conc * np.sum(samples * mean_dir, axis=-1) +
         np.where(conc > 0,
                  (dim / 2 - 1) * np.log(conc) -
                  (dim / 2) * np.log(2 * np.pi) -
-                 np.log(ive(dim / 2 - 1, conc)) -
+                 np.log(sp_special.ive(dim / 2 - 1, conc)) -
                  np.abs(conc),
                  -log_true_sphere_surface_area))
     self.assertAllClose(expected, self.evaluate(log_prob),

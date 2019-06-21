@@ -18,9 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 # Dependency imports
 import numpy as np
+from scipy import stats as sp_stats
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -28,17 +29,6 @@ from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-
-stats = try_import("scipy.stats")
 
 tfd = tfp.distributions
 
@@ -105,10 +95,8 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(cauchy.batch_shape, pdf.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(pdf).shape)
 
-    if not stats:
-      return
-    expected_log_pdf = stats.cauchy(self.evaluate(loc),
-                                    self.evaluate(scale)).logpdf(x)
+    expected_log_pdf = sp_stats.cauchy(self.evaluate(loc),
+                                       self.evaluate(scale)).logpdf(x)
     self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
     self.assertAllClose(np.exp(expected_log_pdf), self.evaluate(pdf))
 
@@ -141,10 +129,8 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(cauchy.batch_shape, pdf.shape)
     self.assertAllEqual(cauchy.batch_shape, pdf_values.shape)
 
-    if not stats:
-      return
-    expected_log_pdf = stats.cauchy(self.evaluate(loc),
-                                    self.evaluate(scale)).logpdf(x)
+    expected_log_pdf = sp_stats.cauchy(self.evaluate(loc),
+                                       self.evaluate(scale)).logpdf(x)
     self.assertAllClose(expected_log_pdf, log_pdf_values)
     self.assertAllClose(np.exp(expected_log_pdf), pdf_values)
 
@@ -162,9 +148,7 @@ class CauchyTest(test_case.TestCase):
         self.evaluate(cdf).shape)
     self.assertAllEqual(cauchy.batch_shape, cdf.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(cdf).shape)
-    if not stats:
-      return
-    expected_cdf = stats.cauchy(loc, scale).cdf(x)
+    expected_cdf = sp_stats.cauchy(loc, scale).cdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0)
 
   def testCauchySurvivalFunction(self):
@@ -182,9 +166,7 @@ class CauchyTest(test_case.TestCase):
         self.evaluate(sf).shape)
     self.assertAllEqual(cauchy.batch_shape, sf.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(sf).shape)
-    if not stats:
-      return
-    expected_sf = stats.cauchy(loc, scale).sf(x)
+    expected_sf = sp_stats.cauchy(loc, scale).sf(x)
     self.assertAllClose(expected_sf, self.evaluate(sf), atol=0)
 
   def testCauchyLogCDF(self):
@@ -203,9 +185,7 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(cauchy.batch_shape, cdf.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(cdf).shape)
 
-    if not stats:
-      return
-    expected_cdf = stats.cauchy(loc, scale).logcdf(x)
+    expected_cdf = sp_stats.cauchy(loc, scale).logcdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0, rtol=1e-5)
 
   def testFiniteGradientAtDifficultPoints(self):
@@ -246,9 +226,7 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(cauchy.batch_shape, sf.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(sf).shape)
 
-    if not stats:
-      return
-    expected_sf = stats.cauchy(loc, scale).logsf(x)
+    expected_sf = sp_stats.cauchy(loc, scale).logsf(x)
     self.assertAllClose(expected_sf, self.evaluate(sf), atol=0, rtol=1e-5)
 
   def testCauchyEntropy(self):
@@ -265,9 +243,7 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(cauchy.batch_shape, entropy.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(entropy).shape)
 
-    if not stats:
-      return
-    expected_entropy = stats.cauchy(loc, scale[0]).entropy().reshape((1, 3))
+    expected_entropy = sp_stats.cauchy(loc, scale[0]).entropy().reshape((1, 3))
     self.assertAllClose(expected_entropy, self.evaluate(entropy))
 
   def testCauchyMode(self):
@@ -312,9 +288,7 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(cauchy.batch_shape, x.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(x).shape)
 
-    if not stats:
-      return
-    expected_x = stats.cauchy(loc, scale).ppf(p)
+    expected_x = sp_stats.cauchy(loc, scale).ppf(p)
     self.assertAllClose(expected_x, self.evaluate(x), atol=0.)
 
   def testCauchyVariance(self):

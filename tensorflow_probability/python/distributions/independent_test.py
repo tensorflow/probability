@@ -18,9 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 # Dependency imports
 import numpy as np
+from scipy import stats as sp_stats
 
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -29,16 +29,6 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-stats = try_import("scipy.stats")
 
 tfd = tfp.distributions
 
@@ -65,7 +55,7 @@ class IndependentDistributionTest(tf.test.TestCase):
     self.assertEqual([4, 5, 2], x.shape)
     self.assertEqual([4, 5], log_prob_x.shape)
 
-    expected_log_prob_x = stats.norm(loc, scale).logpdf(x_).sum(-1)
+    expected_log_prob_x = sp_stats.norm(loc, scale).logpdf(x_).sum(-1)
     self.assertAllClose(
         expected_log_prob_x, actual_log_prob_x, rtol=1e-5, atol=0.)
 
@@ -86,8 +76,8 @@ class IndependentDistributionTest(tf.test.TestCase):
     self.assertEqual([4, 5, 2, 2], x.shape)
     self.assertEqual([4, 5], log_prob_x.shape)
 
-    expected_log_prob_x = stats.norm(loc,
-                                     scale[:, None]).logpdf(x_).sum(-1).sum(-1)
+    expected_log_prob_x = sp_stats.norm(
+        loc, scale[:, None]).logpdf(x_).sum(-1).sum(-1)
     self.assertAllClose(
         expected_log_prob_x, actual_log_prob_x, rtol=1e-6, atol=0.)
 

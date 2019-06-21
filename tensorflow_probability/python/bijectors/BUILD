@@ -588,6 +588,7 @@ py_library(
     deps = [
         ":reshape",
         # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -629,6 +630,7 @@ py_test(
     deps = [
         # mock dep,
         # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",

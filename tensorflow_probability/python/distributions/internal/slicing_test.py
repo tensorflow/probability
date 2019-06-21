@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions.internal import slicing
+from tensorflow_probability.python.internal import tensorshape_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -162,9 +163,9 @@ class SlicingTest(tf.test.TestCase):
         param_event_ndims=1,
         slices=make_slices[tf.newaxis, ..., tf.newaxis, 2:, tf.newaxis],
         dist_batch_shape=tf.constant([7, 4, 3]))
-    expected = (
+    expected = tensorshape_util.as_list((
         tf.zeros([1, 4, 3])[tf.newaxis, ..., tf.newaxis, 2:, tf.newaxis]
-        ).shape.as_list() + [1]
+        ).shape) + [1]
     self.assertAllEqual(expected, self.evaluate(sliced).shape)
 
   def test_single_param_multi_ellipsis(self):
@@ -176,7 +177,8 @@ class SlicingTest(tf.test.TestCase):
           dist_batch_shape=tf.constant([7, 6, 5]))
 
   def test_single_param_too_many_slices(self):
-    with self.assertRaises((ValueError, tf.errors.InvalidArgumentError)):
+    with self.assertRaises(
+        (IndexError, ValueError, tf.errors.InvalidArgumentError)):
       slicing._slice_single_param(
           tf.zeros([7, 6, 5, 4, 3]),
           param_event_ndims=2,

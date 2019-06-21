@@ -156,9 +156,9 @@ def make_tril_scale(loc=None,
     scale_tril = tf.linalg.band_part(scale_tril, -1, 0)  # Zero out TriU.
     tril_diag = tf.linalg.diag_part(scale_tril)
     if scale_diag is not None:
-      tril_diag += scale_diag
+      tril_diag = tril_diag + scale_diag
     if scale_identity_multiplier is not None:
-      tril_diag += scale_identity_multiplier[..., tf.newaxis]
+      tril_diag = tril_diag + scale_identity_multiplier[..., tf.newaxis]
 
     scale_tril = tf.linalg.set_diag(scale_tril, tril_diag)
 
@@ -244,7 +244,7 @@ def make_diag_scale(loc=None,
 
     if scale_diag is not None:
       if scale_identity_multiplier is not None:
-        scale_diag += scale_identity_multiplier[..., tf.newaxis]
+        scale_diag = scale_diag + scale_identity_multiplier[..., tf.newaxis]
       return tf.linalg.LinearOperatorDiag(
           diag=_maybe_attach_assertion(scale_diag),
           is_non_singular=True,
@@ -1568,7 +1568,7 @@ def fill_triangular(x, upper=False, name=None):
         raise ValueError("Input right-most shape ({}) does not "
                          "correspond to a triangular matrix.".format(m))
       n = np.int32(n)
-      static_final_shape = x.shape[:-1].concatenate([n, n])
+      static_final_shape = tensorshape_util.concatenate(x.shape[:-1], [n, n])
     else:
       m = tf.shape(input=x)[-1]
       # For derivation, see above. Casting automatically lops off the 0.5, so we
@@ -1576,8 +1576,8 @@ def fill_triangular(x, upper=False, name=None):
       # graph-execution cost; an error will be thrown from the reshape, below.
       n = tf.cast(
           tf.sqrt(0.25 + tf.cast(2 * m, dtype=tf.float32)), dtype=tf.int32)
-      static_final_shape = tensorshape_util.with_rank_at_least(
-          x.shape, 1)[:-1].concatenate([None, None])
+      static_final_shape = tensorshape_util.concatenate(
+          tensorshape_util.with_rank_at_least(x.shape, 1)[:-1], [None, None])
 
     # Try it out in numpy:
     #  n = 3
@@ -1663,12 +1663,12 @@ def fill_triangular_inverse(x, upper=False, name=None):
     if n is not None:
       n = np.int32(n)
       m = np.int32((n * (n + 1)) // 2)
-      static_final_shape = x.shape[:-2].concatenate([m])
+      static_final_shape = tensorshape_util.concatenate(x.shape[:-2], [m])
     else:
       n = tf.shape(input=x)[-1]
       m = (n * (n + 1)) // 2
-      static_final_shape = tensorshape_util.with_rank_at_least(
-          x.shape, 2)[:-2].concatenate([None])
+      static_final_shape = tensorshape_util.concatenate(
+          tensorshape_util.with_rank_at_least(x.shape, 2)[:-2], [None])
     ndims = prefer_static_rank(x)
     if upper:
       initial_elements = x[..., 0, :]
@@ -1735,7 +1735,7 @@ def tridiag(below=None, diag=None, above=None, name=None):
       elif s is None:
         s = y
       else:
-        s += y
+        s = s + y
     if s is None:
       raise ValueError("Must specify at least one of `below`, `diag`, `above`.")
     return s
@@ -2039,7 +2039,8 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
         else:
           middle = tf.TensorShape(mid_dim_value + count_ * (front + back))
         tail = x.shape[axis + 1:]
-        final_shape = head.concatenate(middle.concatenate(tail))
+        final_shape = tensorshape_util.concatenate(
+            head, tensorshape_util.concatenate(middle, tail))
       else:
         final_shape = None
     else:

@@ -18,9 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 # Dependency imports
 import numpy as np
+from scipy import stats as sp_stats
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -29,16 +30,6 @@ from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-stats = try_import("scipy.stats")
 
 tfd = tfp.distributions
 
@@ -96,9 +87,7 @@ class HalfNormalTest(test_case.TestCase):
     pdf = halfnorm.prob(x)
     self._testBatchShapes(halfnorm, pdf)
 
-    if not stats:
-      return
-    expected_log_pdf = stats.halfnorm(scale=self.evaluate(scale)).logpdf(x)
+    expected_log_pdf = sp_stats.halfnorm(scale=self.evaluate(scale)).logpdf(x)
     self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
     self.assertAllClose(np.exp(expected_log_pdf), self.evaluate(pdf))
 
@@ -114,9 +103,7 @@ class HalfNormalTest(test_case.TestCase):
     pdf = halfnorm.prob(x)
     self._testBatchShapes(halfnorm, pdf)
 
-    if not stats:
-      return
-    expected_log_pdf = stats.halfnorm(scale=self.evaluate(scale)).logpdf(x)
+    expected_log_pdf = sp_stats.halfnorm(scale=self.evaluate(scale)).logpdf(x)
     self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
     self.assertAllClose(np.exp(expected_log_pdf), self.evaluate(pdf))
 
@@ -132,9 +119,7 @@ class HalfNormalTest(test_case.TestCase):
     log_cdf = halfnorm.log_cdf(x)
     self._testBatchShapes(halfnorm, log_cdf)
 
-    if not stats:
-      return
-    expected_logcdf = stats.halfnorm(scale=scale).logcdf(x)
+    expected_logcdf = sp_stats.halfnorm(scale=scale).logcdf(x)
     self.assertAllClose(expected_logcdf, self.evaluate(log_cdf), atol=0)
     self.assertAllClose(np.exp(expected_logcdf), self.evaluate(cdf), atol=0)
 
@@ -150,9 +135,7 @@ class HalfNormalTest(test_case.TestCase):
     log_sf = halfnorm.log_survival_function(x)
     self._testBatchShapes(halfnorm, log_sf)
 
-    if not stats:
-      return
-    expected_logsf = stats.halfnorm(scale=scale).logsf(x)
+    expected_logsf = sp_stats.halfnorm(scale=scale).logsf(x)
     self.assertAllClose(expected_logsf, self.evaluate(log_sf), atol=0)
     self.assertAllClose(np.exp(expected_logsf), self.evaluate(sf), atol=0)
 
@@ -165,9 +148,7 @@ class HalfNormalTest(test_case.TestCase):
     x = halfnorm.quantile(p)
     self._testBatchShapes(halfnorm, x)
 
-    if not stats:
-      return
-    expected_x = stats.halfnorm(scale=scale).ppf(p)
+    expected_x = sp_stats.halfnorm(scale=scale).ppf(p)
     self.assertAllClose(expected_x, self.evaluate(x), atol=0)
 
   def testFiniteGradients(self):

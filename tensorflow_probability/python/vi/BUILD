@@ -44,6 +44,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/monte_carlo",
     ],
 )

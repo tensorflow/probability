@@ -613,38 +613,44 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
     self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
                         rtol=0.14, atol=0.)
 
-  def test_kl_jd(self):
-    # By convolution, this two distributions should be the same after
-    # normalization
-    p = tfd.JointDistributionSequential([
-        tfd.Normal(0., 1.),
-        lambda mu: tfd.Normal(mu, 1.)
-    ])
+  def test_kl_with_joint_q(self):
 
-    q = tfd.JointDistributionSequential([
+    # Target distribution: equiv to MVNFullCovariance(cov=[[1., 1.], [1., 2.]])
+    def p_log_prob(z, x):
+      return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
+
+    # Factored q distribution: equiv to MVNDiag(scale_diag=[1., sqrt(2)])
+    q_sequential = tfd.JointDistributionSequential([  # Should pass as *args.
         tfd.Normal(0., 1.),
         tfd.Normal(0., tf.sqrt(2.))
     ])
+    q_named = tfd.JointDistributionNamed({  # Should pass as **kwargs.
+        'x': tfd.Normal(0., tf.sqrt(2.)),
+        'z': tfd.Normal(0., 1.)
+    })
 
     seed = tfp_test_util.test_seed()
 
-    forward_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=lambda logu: tfp.vi.kl_forward(logu, self_normalized=True),
-        p_log_prob=p.log_prob,
-        q=q,
+    reverse_kl_sequential = tfp.vi.monte_carlo_csiszar_f_divergence(
+        f=tfp.vi.kl_reverse,
+        p_log_prob=p_log_prob,
+        q=q_sequential,
         num_draws=int(3e5),
         seed=seed)
 
-    reverse_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
-        p_log_prob=p.log_prob,
-        q=q,
+    reverse_kl_named = tfp.vi.monte_carlo_csiszar_f_divergence(
+        f=tfp.vi.kl_reverse,
+        p_log_prob=p_log_prob,
+        q=q_named,
         num_draws=int(3e5),
         seed=seed)
 
-    [forward_kl_, reverse_kl_] = self.evaluate([forward_kl, reverse_kl])
+    reverse_kl_sequential_, reverse_kl_named_, = self.evaluate(
+        [reverse_kl_sequential, reverse_kl_named])
 
-    self.assertAllClose(forward_kl_+reverse_kl_, 1., rtol=0.07, atol=0.)
+    # Compare to analytic MVN.kl[q|p] == 0.6534264.
+    self.assertAllClose(reverse_kl_sequential_, 0.6534264, rtol=0.07, atol=0.)
+    self.assertAllClose(reverse_kl_named_, 0.6534264, rtol=0.07, atol=0.)
 
   def test_score_trick(self):
     d = 5  # Dimension
@@ -1002,6 +1008,43 @@ class CsiszarVIMCOTest(test_case.TestCase):
 
     self.assertAllClose(np_grad_vimco, grad_vimco_, rtol=0.03, atol=1e-3)
 
+  def test_vimco_with_joint_q(self):
 
-if __name__ == "__main__":
+    # Target distribution: equiv to MVNFullCovariance(cov=[[1., 1.], [1., 2.]])
+    def p_log_prob(z, x):
+      return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
+
+    # Factored q distribution: equiv to MVNDiag(scale_diag=[1., sqrt(2)])
+    q_sequential = tfd.JointDistributionSequential([  # Should pass as *args.
+        tfd.Normal(0., 1.),
+        tfd.Normal(0., tf.sqrt(2.))
+    ])
+    q_named = tfd.JointDistributionNamed({  # Should pass as **kwargs.
+        'x': tfd.Normal(0., tf.sqrt(2.)),
+        'z': tfd.Normal(0., 1.)
+    })
+
+    seed = tfp_test_util.test_seed()
+
+    reverse_kl_sequential = tfp.vi.csiszar_vimco(
+        f=tfp.vi.kl_reverse,
+        p_log_prob=p_log_prob,
+        q=q_sequential,
+        num_draws=int(3e5),
+        seed=seed)
+
+    reverse_kl_named = tfp.vi.csiszar_vimco(
+        f=tfp.vi.kl_reverse,
+        p_log_prob=p_log_prob,
+        q=q_named,
+        num_draws=int(3e5),
+        seed=seed)
+
+    [reverse_kl_sequential_, reverse_kl_named_
+    ] = self.evaluate([reverse_kl_sequential, reverse_kl_named])
+
+    self.assertAllClose(reverse_kl_sequential_, reverse_kl_named_, atol=0.02)
+
+
+if __name__ == '__main__':
   tf.test.main()

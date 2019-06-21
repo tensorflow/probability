@@ -26,6 +26,7 @@ import traceback
 
 from absl import flags
 from absl import logging
+from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
 from hypothesis.extra import numpy as hpnp
@@ -35,6 +36,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -51,6 +53,11 @@ def hypothesis_max_examples():
   # Use --test_env=TFP_HYPOTHESIS_MAX_EXAMPLES=1000 to get fuller coverage.
   return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', 20))
 
+
+TF2_FRIENDLY_DISTS = ('Bernoulli', 'Categorical', 'Deterministic', 'Dirichlet',
+                      'Normal', 'Multinomial')
+
+NO_LOG_PROB_PARAM_GRADS = ('Deterministic',)
 
 MUTEX_PARAMS = [
     set(['logits', 'probs']),
@@ -252,7 +259,11 @@ def single_param(constraint_fn, param_shape):
 
 
 @hps.composite
-def broadcasting_params(draw, dist_name, batch_shape, event_dim=None):
+def broadcasting_params(draw,
+                        dist_name,
+                        batch_shape,
+                        event_dim=None,
+                        enable_vars=False):
   """Draws a dict of parameters which should yield the given batch shape."""
   _, params_event_ndims = INSTANTIABLE_DISTS[dist_name]
   if event_dim is None:
@@ -279,12 +290,19 @@ def broadcasting_params(draw, dist_name, batch_shape, event_dim=None):
                 constraint_for(dist_name, param),
                 (tensorshape_util.as_list(param_batch_shape) +
                  [event_dim] * param_event_rank))),
-        dtype=tf.float32)
+        dtype=tf.float32,
+        name=param)
+    if enable_vars and draw(hps.booleans()):
+      params_kwargs[param] = tf.compat.v2.Variable(
+          params_kwargs[param], name=param)
+      if draw(hps.booleans()):
+        params_kwargs[param] = tfp.util.DeferredTensor(tf.identity,
+                                                       params_kwargs[param])
   return params_kwargs
 
 
 @hps.composite
-def independents(draw, batch_shape=None, event_dim=None):
+def independents(draw, batch_shape=None, event_dim=None, enable_vars=False):
   reinterpreted_batch_ndims = draw(hps.integers(min_value=0, max_value=2))
   if batch_shape is None:
     batch_shape = draw(batch_shapes(min_ndims=reinterpreted_batch_ndims))
@@ -295,10 +313,12 @@ def independents(draw, batch_shape=None, event_dim=None):
             batch_shapes(
                 min_ndims=reinterpreted_batch_ndims,
                 max_ndims=reinterpreted_batch_ndims)))
-  underlying, batch_shape = draw(distributions(
-      batch_shape=batch_shape,
-      event_dim=event_dim,
-      eligibility_filter=lambda name: name != 'Independent'))
+  underlying, batch_shape = draw(
+      distributions(
+          batch_shape=batch_shape,
+          event_dim=event_dim,
+          enable_vars=enable_vars,
+          eligibility_filter=lambda name: name != 'Independent'))
   logging.info(
       'underlying distribution: %s; parameters used: %s', underlying,
       [k for k, v in six.iteritems(underlying.parameters) if v is not None])
@@ -310,7 +330,10 @@ def independents(draw, batch_shape=None, event_dim=None):
 
 
 @hps.composite
-def transformed_distributions(draw, batch_shape=None, event_dim=None):
+def transformed_distributions(draw,
+                              batch_shape=None,
+                              event_dim=None,
+                              enable_vars=False):
   bijector = draw(bijector_hps.unconstrained_bijectors())
   logging.info('TD bijector: %s', bijector)
   if batch_shape is None:
@@ -322,7 +345,9 @@ def transformed_distributions(draw, batch_shape=None, event_dim=None):
     underlying_batch_shape = tf.TensorShape([])  # scalar underlying batch
     batch_shape_arg = batch_shape
   underlyings = distributions(
-      batch_shape=underlying_batch_shape, event_dim=event_dim).map(
+      batch_shape=underlying_batch_shape,
+      event_dim=event_dim,
+      enable_vars=enable_vars).map(
           lambda dist_and_batch_shape: dist_and_batch_shape[0]).filter(
               bijector_hps.distribution_filter_for(bijector))
   to_transform = draw(underlyings)
@@ -337,7 +362,10 @@ def transformed_distributions(draw, batch_shape=None, event_dim=None):
 
 
 @hps.composite
-def mixtures_same_family(draw, batch_shape=None, event_dim=None):
+def mixtures_same_family(draw,
+                         batch_shape=None,
+                         event_dim=None,
+                         enable_vars=False):
   if batch_shape is None:
     # Ensure the components dist has at least one batch dim (a component dim).
     batch_shape = draw(batch_shapes(min_ndims=1, min_lastdimsize=2))
@@ -346,10 +374,12 @@ def mixtures_same_family(draw, batch_shape=None, event_dim=None):
         batch_shape,
         draw(batch_shapes(min_ndims=1, max_ndims=1, min_lastdimsize=2)))
 
-  component_dist, _ = draw(distributions(
-      batch_shape=batch_shape,
-      event_dim=event_dim,
-      eligibility_filter=lambda name: name != 'MixtureSameFamily'))
+  component_dist, _ = draw(
+      distributions(
+          batch_shape=batch_shape,
+          event_dim=event_dim,
+          enable_vars=enable_vars,
+          eligibility_filter=lambda name: name != 'MixtureSameFamily'))
   logging.info(
       'component distribution: %s; parameters used: %s', component_dist,
       [k for k, v in six.iteritems(component_dist.parameters) if v is not None])
@@ -381,6 +411,7 @@ def distributions(draw,
                   dist_name=None,
                   batch_shape=None,
                   event_dim=None,
+                  enable_vars=False,
                   eligibility_filter=lambda name: True):
   """Samples one a set of supported distributions."""
   if dist_name is None:
@@ -393,17 +424,18 @@ def distributions(draw,
 
   dist_cls, _ = INSTANTIABLE_DISTS[dist_name]
   if dist_name == 'Independent':
-    return draw(independents(batch_shape, event_dim))
+    return draw(independents(batch_shape, event_dim, enable_vars))
   if dist_name == 'MixtureSameFamily':
-    return draw(mixtures_same_family(batch_shape, event_dim))
+    return draw(mixtures_same_family(batch_shape, event_dim, enable_vars))
   if dist_name == 'TransformedDistribution':
-    return draw(transformed_distributions(batch_shape, event_dim))
+    return draw(transformed_distributions(batch_shape, event_dim, enable_vars))
 
   if batch_shape is None:
     batch_shape = draw(batch_shapes())
 
-  params_kwargs = draw(broadcasting_params(
-      dist_name, batch_shape, event_dim=event_dim))
+  params_kwargs = draw(
+      broadcasting_params(
+          dist_name, batch_shape, event_dim=event_dim, enable_vars=enable_vars))
   params_constrained = constraint_for(dist_name)(params_kwargs)
   assert_shapes_unchanged(params_kwargs, params_constrained)
   params_constrained['validate_args'] = True
@@ -411,8 +443,66 @@ def distributions(draw,
 
 
 def maybe_seed(seed):
-  seed = int(seed)  # TODO(b/129287396): drop the int(..)
   return tf.compat.v1.set_random_seed(seed) if tf.executing_eagerly() else seed
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
+
+  @parameterized.parameters((dname,) for dname in TF2_FRIENDLY_DISTS)
+  @hp.given(hps.data())
+  @hp.settings(
+      deadline=None,
+      max_examples=hypothesis_max_examples(),
+      suppress_health_check=[hp.HealthCheck.too_slow],
+      derandomize=tfp_test_util.derandomize_hypothesis())
+  def testDistribution(self, dist_name, data):
+    if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
+      return
+    tf.compat.v1.set_random_seed(
+        data.draw(
+            hpnp.arrays(dtype=np.int64, shape=[]).filter(lambda x: x != 0)))
+    dist, batch_shape = data.draw(
+        distributions(dist_name=dist_name, enable_vars=True))
+    del batch_shape
+    logging.info(
+        'distribution: %s; parameters used: %s', dist,
+        [k for k, v in six.iteritems(dist.parameters) if v is not None])
+    self.evaluate([var.initializer for var in dist.variables])
+    for k, v in six.iteritems(dist.parameters):
+      if not tensor_util.is_mutable(v):
+        continue
+      try:
+        self.assertIs(getattr(dist, k), v)
+      except AssertionError as e:
+        raise AssertionError(
+            'No attr found for parameter {} of distribution {}: \n{}'.format(
+                k, dist_name, e))
+    if dist.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
+      with tf.GradientTape() as tape:
+        samp = dist.sample()
+      grads = tape.gradient(samp, dist.variables)
+      for grad, var in zip(grads, dist.variables):
+        try:
+          self.assertIsNotNone(grad)
+        except AssertionError as e:
+          raise AssertionError(
+              'Missing sample -> {} grad for distribution {}:\n{}'.format(
+                  var, dist_name, e))
+
+    if dist_name not in NO_LOG_PROB_PARAM_GRADS:
+      # Turn off validations, since log_prob can choke on dist's own samples.
+      dist = dist.copy(validate_args=False)
+      with tf.GradientTape() as tape:
+        lp = dist.log_prob(tf.stop_gradient(dist.sample()))
+      grads = tape.gradient(lp, dist.variables)
+      for grad, var in zip(grads, dist.variables):
+        try:
+          self.assertIsNotNone(grad)
+        except AssertionError as e:
+          raise AssertionError(
+              'Missing log_prob -> {} grad for distribution {}:\n{}'.format(
+                  var, dist_name, e))
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -494,11 +584,9 @@ class DistributionSlicingTest(tf.test.TestCase):
         possibly_nonpacket_lp, possibly_nonpacket_sliced_lp, rtol=rtol)
 
   def _run_test(self, data):
-    tf.compat.v1.set_random_seed(  # TODO(b/129287396): drop the int(..)
-        int(
-            data.draw(
-                hpnp.arrays(dtype=np.int64,
-                            shape=[]).filter(lambda x: x != 0))))
+    tf.compat.v1.set_random_seed(
+        data.draw(
+            hpnp.arrays(dtype=np.int64, shape=[]).filter(lambda x: x != 0)))
     dist, batch_shape = data.draw(distributions())
     logging.info(
         'distribution: %s; parameters used: %s', dist,

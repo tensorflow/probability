@@ -16,10 +16,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
-
 # Dependency imports
 import numpy as np
+from scipy import special as sp_special
+from scipy import stats as sp_stats
 
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -27,18 +27,6 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-
-special = try_import("scipy.special")
-stats = try_import("scipy.stats")
 
 tfd = tfp.distributions
 
@@ -52,12 +40,12 @@ def _kumaraswamy_mode(a, b):
 def _kumaraswamy_moment(a, b, n):
   a = np.asarray(a)
   b = np.asarray(b)
-  return b * special.beta(1.0 + n / a, b)
+  return b * sp_special.beta(1.0 + n / a, b)
 
 
 def _harmonic_number(b):
   b = np.asarray(b)
-  return special.psi(b + 1) - special.psi(1)
+  return sp_special.psi(b + 1) - sp_special.psi(1)
 
 
 def _kumaraswamy_cdf(a, b, x):
@@ -204,8 +192,6 @@ class KumaraswamyTest(tf.test.TestCase):
       b = [2., 4, 1.2]
       dist = tfd.Kumaraswamy(a, b)
       self.assertEqual(dist.mean().shape, (3,))
-      if not stats:
-        return
       expected_mean = _kumaraswamy_moment(a, b, 1)
       self.assertAllClose(expected_mean, self.evaluate(dist.mean()))
 
@@ -215,8 +201,6 @@ class KumaraswamyTest(tf.test.TestCase):
       b = [2., 4, 1.2]
       dist = tfd.Kumaraswamy(a, b)
       self.assertEqual(dist.variance().shape, (3,))
-      if not stats:
-        return
       expected_variance = _kumaraswamy_moment(a, b, 2) - _kumaraswamy_moment(
           a, b, 1)**2
       self.assertAllClose(expected_variance, self.evaluate(dist.variance()))
@@ -270,8 +254,6 @@ class KumaraswamyTest(tf.test.TestCase):
       b = np.array([2., 4, 1.2])
       dist = tfd.Kumaraswamy(a, b)
       self.assertEqual(dist.entropy().shape, (3,))
-      if not stats:
-        return
       expected_entropy = (1 - 1. / b) + (
           1 - 1. / a) * _harmonic_number(b) - np.log(a * b)
       self.assertAllClose(expected_entropy, self.evaluate(dist.entropy()))
@@ -285,10 +267,8 @@ class KumaraswamyTest(tf.test.TestCase):
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000,))
     self.assertFalse(np.any(sample_values < 0.0))
-    if not stats:
-      return
     self.assertLess(
-        stats.kstest(
+        sp_stats.kstest(
             # Kumaraswamy is a univariate distribution.
             sample_values,
             lambda x: _kumaraswamy_cdf(1., 2., x))[0],
@@ -329,8 +309,6 @@ class KumaraswamyTest(tf.test.TestCase):
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000, 3, 2, 2))
     self.assertFalse(np.any(sample_values < 0.0))
-    if not stats:
-      return
     self.assertAllClose(
         sample_values[:, 1, :].mean(axis=0),
         _kumaraswamy_moment(a, b, 1)[1, :],
@@ -345,8 +323,6 @@ class KumaraswamyTest(tf.test.TestCase):
       actual = self.evaluate(tfd.Kumaraswamy(a, b).cdf(x))
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 0. <= x)
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
-      if not stats:
-        return
       self.assertAllClose(_kumaraswamy_cdf(a, b, x), actual, rtol=1e-4, atol=0)
 
   def testKumaraswamyLogCdf(self):
@@ -358,8 +334,6 @@ class KumaraswamyTest(tf.test.TestCase):
       actual = self.evaluate(tf.exp(tfd.Kumaraswamy(a, b).log_cdf(x)))
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 0. <= x)
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
-      if not stats:
-        return
       self.assertAllClose(_kumaraswamy_cdf(a, b, x), actual, rtol=1e-4, atol=0)
 
 
