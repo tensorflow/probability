@@ -147,20 +147,23 @@ class _BaseDeterministic(distribution.Distribution):
                   axis=0))
 
   def _parameter_control_dependencies(self, is_init):
-    msg = "Argument loc must be at least rank 1."
-    if is_init:
-      if self._is_vector and tensorshape_util.rank(self.loc.shape) is not None:
-        if tensorshape_util.rank(self.loc.shape) < 1:
-          raise ValueError(msg)
-
-    if not self.validate_args:
-      return []
-
     assertions = []
 
-    if is_init != tensor_util.is_mutable(self.loc) and self._is_vector:
-      assertions.append(
-          assert_util.assert_rank_at_least(self.loc, 1, message=msg))
+    # In init, we can always build shape and dtype checks because
+    # we assume shape doesn't change for Variable backed args.
+    if is_init and self._is_vector:
+      msg = "Argument `loc` must be at least rank 1."
+      if tensorshape_util.rank(self.loc.shape) is not None:
+        if tensorshape_util.rank(self.loc.shape) < 1:
+          raise ValueError(msg)
+      elif self.validate_args:
+        assertions.append(
+            assert_util.assert_rank_at_least(self.loc, 1, message=msg))
+
+    if not self.validate_args:
+      assert not assertions  # Should never happen
+      return []
+
     if is_init != tensor_util.is_mutable(self.atol):
       assertions.append(
           assert_util.assert_non_negative(
