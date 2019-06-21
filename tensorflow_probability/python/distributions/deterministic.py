@@ -141,9 +141,11 @@ class _BaseDeterministic(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     del seed  # unused
+    loc = tf.convert_to_tensor(self.loc)
     return tf.broadcast_to(
-        self.loc,
-        tf.concat([[n], self.batch_shape_tensor(), self.event_shape_tensor()],
+        loc,
+        tf.concat([[n], self._batch_shape_tensor(loc=loc),
+                   self._event_shape_tensor(loc=loc)],
                   axis=0))
 
   def _parameter_control_dependencies(self, is_init):
@@ -265,9 +267,9 @@ class Deterministic(_BaseDeterministic):
   def _params_event_ndims(cls):
     return dict(loc=0, atol=0, rtol=0)
 
-  def _batch_shape_tensor(self):
+  def _batch_shape_tensor(self, loc=None):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc),
+        tf.shape(self.loc if loc is None else loc),
         tf.broadcast_dynamic_shape(tf.shape(self.atol), tf.shape(self.rtol)))
 
   def _batch_shape(self):
@@ -275,7 +277,8 @@ class Deterministic(_BaseDeterministic):
         self.loc.shape,
         tf.broadcast_static_shape(self.atol.shape, self.rtol.shape))
 
-  def _event_shape_tensor(self):
+  def _event_shape_tensor(self, loc=None):
+    del loc
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
@@ -387,9 +390,9 @@ class VectorDeterministic(_BaseDeterministic):
   def _params_event_ndims(cls):
     return dict(loc=1, atol=1, rtol=1)
 
-  def _batch_shape_tensor(self):
+  def _batch_shape_tensor(self, loc=None):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc),
+        tf.shape(self.loc if loc is None else loc),
         tf.broadcast_dynamic_shape(tf.shape(self.atol),
                                    tf.shape(self.rtol)))[:-1]
 
@@ -398,8 +401,8 @@ class VectorDeterministic(_BaseDeterministic):
         self.loc.shape,
         tf.broadcast_static_shape(self.atol.shape, self.rtol.shape))[:-1]
 
-  def _event_shape_tensor(self):
-    return tf.shape(self.loc)[-1:]
+  def _event_shape_tensor(self, loc=None):
+    return tf.shape(self.loc if loc is None else loc)[-1:]
 
   def _event_shape(self):
     return self.loc.shape[-1:]
