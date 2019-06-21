@@ -45,7 +45,7 @@ __all__ = [
 
 def derandomize_hypothesis():
   # Use --test_env=TFP_DERANDOMIZE_HYPOTHESIS=0 to get random coverage.
-  return os.environ.get('TFP_DERANDOMIZE_HYPOTHESIS', 1) in (0, '0')
+  return bool(int(os.environ.get('TFP_DERANDOMIZE_HYPOTHESIS', 1)))
 
 
 FLAGS = flags.FLAGS
