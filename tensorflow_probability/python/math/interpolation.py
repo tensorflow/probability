@@ -25,8 +25,8 @@ import numpy as np
 
 import tensorflow as tf
 
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 
 __all__ = [
     'interp_regular_1d_grid',
@@ -101,7 +101,7 @@ def _interp_regular_1d_grid_impl(x,
       x_ref_max = x_ref_max[..., tf.newaxis]
 
     axis = tf.convert_to_tensor(value=axis, name='axis', dtype=tf.int32)
-    axis = distribution_util.make_non_negative_axis(axis, tf.rank(y_ref))
+    axis = prefer_static.non_negative_axis(axis, tf.rank(y_ref))
     _assert_ndims_statically(axis, expect_ndims=0)
 
     ny = tf.cast(tf.shape(input=y_ref)[axis], dtype)
@@ -637,7 +637,7 @@ def batch_interp_regular_nd_grid(x,
 
     # Convert axis and check it statically.
     axis = tf.convert_to_tensor(value=axis, dtype=tf.int32, name='axis')
-    axis = distribution_util.make_non_negative_axis(axis, tf.rank(y_ref))
+    axis = prefer_static.non_negative_axis(axis, tf.rank(y_ref))
     axis.shape.assert_has_rank(0)
     axis_ = tf.get_static_value(axis)
     y_ref_rank_ = tf.get_static_value(tf.rank(y_ref))

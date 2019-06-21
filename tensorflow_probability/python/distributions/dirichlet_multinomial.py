@@ -19,6 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multinomial
 from tensorflow_probability.python.distributions import seed_stream
@@ -278,7 +280,7 @@ class DirichletMultinomial(distribution.Distribution):
     ordered_prob = (
         tf.math.lbeta(self.concentration + counts) -
         tf.math.lbeta(self.concentration))
-    return ordered_prob + distribution_util.log_combinations(
+    return ordered_prob + tfp_math.log_combinations(
         self.total_count, counts)
 
   @distribution_util.AppendDocstring(_dirichlet_multinomial_sample_note)

@@ -291,3 +291,30 @@ def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-buil
     return np.zeros(s, _numpy_dtype(dtype or input.dtype))
   return tf.zeros(s, dtype or s.dtype, name)
 zeros_like = _copy_docstring(tf.zeros_like, _zeros_like)
+
+
+def non_negative_axis(axis, rank, name=None):  # pylint:disable=redefined-outer-name
+  """Make (possibly negatively indexed) `axis` argument non-negative."""
+  with tf.name_scope(name or 'non_negative_axis'):
+    axis = tf.convert_to_tensor(value=axis, name='axis')
+    rank = tf.convert_to_tensor(value=rank, name='rank')
+    axis_ = tf.get_static_value(axis)
+    rank_ = tf.get_static_value(rank)
+
+    # Dynamic case.
+    if axis_ is None or rank_ is None:
+      return tf.where(axis < 0, rank + axis, axis)
+
+    # Static case.
+    is_scalar = axis_.ndim == 0
+    if is_scalar:
+      axis_ = [axis_]
+    positive_axis = []
+    for a_ in axis_:
+      if a_ < 0:
+        positive_axis.append(rank_ + a_)
+      else:
+        positive_axis.append(a_)
+    if is_scalar:
+      positive_axis = positive_axis[0]
+    return tf.convert_to_tensor(positive_axis, dtype=axis.dtype)

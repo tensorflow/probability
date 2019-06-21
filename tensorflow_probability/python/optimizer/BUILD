@@ -188,6 +188,7 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math:generic",
     ],
 )
 

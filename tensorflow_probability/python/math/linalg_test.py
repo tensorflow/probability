@@ -25,7 +25,8 @@ from hypothesis import strategies as hps
 from hypothesis.extra import numpy as hpnp
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
@@ -53,8 +54,8 @@ class _PinvTest(object):
                      [.4, .2, .25],
                      [.5, .25, .35]])
     a_ = np.stack([a_ + 1., a_], axis=0)  # Batch of matrices.
-    a = tf.compat.v1.placeholder_with_default(
-        input=a_, shape=a_.shape if self.use_static_shape else None)
+    a = tf1.placeholder_with_default(
+        a_, shape=a_.shape if self.use_static_shape else None)
     if self.use_default_rcond:
       rcond = None
     else:
@@ -73,8 +74,8 @@ class _PinvTest(object):
                      [.4, .2, .25, 2.],
                      [.5, .25, .35, 3.]])
     a_ = np.stack([a_ + 0.5, a_], axis=0)  # Batch of matrices.
-    a = tf.compat.v1.placeholder_with_default(
-        input=a_, shape=a_.shape if self.use_static_shape else None)
+    a = tf1.placeholder_with_default(
+        a_, shape=a_.shape if self.use_static_shape else None)
     if self.use_default_rcond:
       rcond = None
     else:
@@ -122,14 +123,14 @@ class _CholeskyExtend(tf.test.TestCase):
 
   def testCholeskyExtension(self):
     xs = np.random.random(7).astype(self.dtype)[:, tf.newaxis]
-    xs = tf.compat.v1.placeholder_with_default(
+    xs = tf1.placeholder_with_default(
         xs, shape=xs.shape if self.use_static_shape else None)
     k = tfp.positive_semidefinite_kernels.MaternOneHalf()
     mat = k.matrix(xs, xs)
     chol = tf.linalg.cholesky(mat)
 
     ys = np.random.random(3).astype(self.dtype)[:, tf.newaxis]
-    ys = tf.compat.v1.placeholder_with_default(
+    ys = tf1.placeholder_with_default(
         ys, shape=ys.shape if self.use_static_shape else None)
 
     xsys = tf.concat([xs, ys], 0)
@@ -160,7 +161,7 @@ class _CholeskyExtend(tf.test.TestCase):
     data.draw(hps.just(xs))
     xs = (xs + np.zeros(prev_bs.as_list() + [n]))[..., np.newaxis]
     xs = xs.astype(self.dtype)
-    xs = tf.compat.v1.placeholder_with_default(
+    xs = tf1.placeholder_with_default(
         xs, shape=xs.shape if self.use_static_shape else None)
 
     k = tfp.positive_semidefinite_kernels.MaternOneHalf()
@@ -171,7 +172,7 @@ class _CholeskyExtend(tf.test.TestCase):
     data.draw(hps.just(ys))
     ys = (ys + np.zeros(new_bs.as_list() + [m]))[..., np.newaxis]
     ys = ys.astype(self.dtype)
-    ys = tf.compat.v1.placeholder_with_default(
+    ys = tf1.placeholder_with_default(
         ys, shape=ys.shape if self.use_static_shape else None)
 
     xsys = tf.concat([xs + tf.zeros(target_bs + (n, 1), dtype=self.dtype),
@@ -206,7 +207,7 @@ class _PivotedCholesky(tf.test.TestCase, parameterized.TestCase):
     matrix = (matrix + np.diag(np.arange(dim) * .1)).astype(self.dtype)
     masked_shape = (
         matrix.shape if self.use_static_shape else [None] * len(matrix.shape))
-    matrix = tf.compat.v1.placeholder_with_default(matrix, shape=masked_shape)
+    matrix = tf1.placeholder_with_default(matrix, shape=masked_shape)
     return matrix
 
   def testPivotedCholesky(self):
@@ -225,7 +226,7 @@ class _PivotedCholesky(tf.test.TestCase, parameterized.TestCase):
       zeros_per_col = dim - tf.math.count_nonzero(pchol, axis=-2)
       mat = tf.matmul(pchol, pchol, transpose_b=True)
       pchol_shp, diag_diff, diff_norm, zeros_per_col = self.evaluate([
-          tf.shape(input=pchol),
+          tf.shape(pchol),
           tf.abs(tf.linalg.diag_part(mat) - true_diag),
           tf.linalg.norm(tensor=mat - matrix, ord='fro', axis=[-1, -2]),
           zeros_per_col
@@ -334,7 +335,7 @@ def make_tensor_hiding_attributes(value, hide_shape, hide_value=True):
     return tf.convert_to_tensor(value=value)
 
   shape = None if hide_shape else getattr(value, 'shape', None)
-  return tf.compat.v1.placeholder_with_default(input=value, shape=shape)
+  return tf1.placeholder_with_default(value, shape=shape)
 
 
 class _LUReconstruct(object):
@@ -345,7 +346,7 @@ class _LUReconstruct(object):
     x_ = np.array(
         [[3, 4], [1, 2]],
         dtype=self.dtype)
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
     y = tfp.math.lu_reconstruct(*tf.linalg.lu(x), validate_args=True)
@@ -362,7 +363,7 @@ class _LUReconstruct(object):
             [[7, 8], [3, 4]],
         ],
         dtype=self.dtype)
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
     y = tfp.math.lu_reconstruct(*tf.linalg.lu(x), validate_args=True)
@@ -389,7 +390,7 @@ class _LUMatrixInverse(object):
 
   def test_non_batch(self):
     x_ = np.array([[1, 2], [3, 4]], dtype=self.dtype)
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
     y = tfp.math.lu_matrix_inverse(*tf.linalg.lu(x), validate_args=True)
@@ -410,7 +411,7 @@ class _LUMatrixInverse(object):
              [0.75, -2.]],
         ],
         dtype=self.dtype)
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
     y = tfp.math.lu_matrix_inverse(*tf.linalg.lu(x), validate_args=True)
@@ -440,10 +441,10 @@ class _LUSolve(object):
         [[1, 2],
          [3, 4]],
         dtype=self.dtype)
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
     rhs_ = np.array([[1, 1]], dtype=self.dtype).T
-    rhs = tf.compat.v1.placeholder_with_default(
+    rhs = tf1.placeholder_with_default(
         rhs_, shape=rhs_.shape if self.use_static_shape else None)
 
     lower_upper, perm = tf.linalg.lu(x)
@@ -467,10 +468,10 @@ class _LUSolve(object):
              [0.75, -2.]],
         ],
         dtype=self.dtype)
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
     rhs_ = np.array([[1, 1]], dtype=self.dtype).T
-    rhs = tf.compat.v1.placeholder_with_default(
+    rhs = tf1.placeholder_with_default(
         rhs_, shape=rhs_.shape if self.use_static_shape else None)
 
     lower_upper, perm = tf.linalg.lu(x)
@@ -502,8 +503,8 @@ class _SparseOrDenseMatmul(object):
   use_sparse_tensor = False
 
   def _make_placeholder(self, x):
-    return tf.compat.v1.placeholder_with_default(
-        input=x, shape=(x.shape if self.use_static_shape else None))
+    return tf1.placeholder_with_default(
+        x, shape=(x.shape if self.use_static_shape else None))
 
   def _make_sparse_placeholder(self, x):
     indices_placeholder = self._make_placeholder(x.indices)
@@ -630,7 +631,7 @@ class _MatrixRankTest(object):
                     [0, 1, 0],
                     [0, 0, 1]]],
                   self.dtype)
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
     self.assertAllEqual([2, 1, 3], self.evaluate(tfp.math.matrix_rank(x)))
 
@@ -649,7 +650,7 @@ class _MatrixRankTest(object):
                     [0, 1, 0, 3],
                     [0, 3, 0, 9]]],  # = 3*row2
                   self.dtype)
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
     self.assertAllEqual([2, 1], self.evaluate(tfp.math.matrix_rank(x)))
 
@@ -664,6 +665,120 @@ class MatrixRankStatic32Test(tf.test.TestCase, _MatrixRankTest):
 class MatrixRankDynamic64Test(tf.test.TestCase, _MatrixRankTest):
   dtype = np.float64
   use_static_shape = False
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class FillTriangularTest(tf.test.TestCase):
+
+  def _fill_triangular(self, x, upper=False):
+    """Numpy implementation of `fill_triangular`."""
+    x = np.asarray(x)
+    # Formula derived by solving for n: m = n(n+1)/2.
+    m = np.int32(x.shape[-1])
+    n = np.sqrt(0.25 + 2. * m) - 0.5
+    if n != np.floor(n):
+      raise ValueError('Invalid shape.')
+    n = np.int32(n)
+    # We can't do: `x[..., -(n**2-m):]` because this doesn't correctly handle
+    # `m == n == 1`. Hence, we do absolute indexing.
+    x_tail = x[..., (m - (n * n - m)):]
+    y = np.concatenate(
+        [x, x_tail[..., ::-1]] if upper else [x_tail, x[..., ::-1]],
+        axis=-1)
+    y = y.reshape(np.concatenate([
+        np.int32(x.shape[:-1]),
+        np.int32([n, n]),
+    ], axis=0))
+    return np.triu(y) if upper else np.tril(y)
+
+  def _run_test(self, x_, use_deferred_shape=False, **kwargs):
+    x_ = np.asarray(x_)
+    static_shape = None if use_deferred_shape else x_.shape
+    x_pl = tf1.placeholder_with_default(x_, shape=static_shape)
+    # Add `zeros_like(x)` such that x's value and gradient are identical. We
+    # do this so we can ensure each gradient value is mapped to the right
+    # gradient location.  (Not doing this means the gradient wrt `x` is simple
+    # `ones_like(x)`.)
+    # Note:
+    #   zeros_like_x_pl == zeros_like(x_pl)
+    #   gradient(zeros_like_x_pl, x_pl) == x_pl - 1
+    def _zeros_like(x):
+      return x * tf.stop_gradient(x - 1.) - tf.stop_gradient(x * (x - 1.))
+    actual, grad_actual = tfp.math.value_and_gradient(
+        lambda x: tfp.math.fill_triangular(  # pylint: disable=g-long-lambda
+            x + _zeros_like(x), **kwargs),
+        x_pl)
+    actual_, grad_actual_ = self.evaluate([actual, grad_actual])
+    expected = self._fill_triangular(x_, **kwargs)
+    if use_deferred_shape and not tf.executing_eagerly():
+      self.assertEqual(None, actual.shape)
+    else:
+      self.assertAllEqual(expected.shape, actual.shape)
+    self.assertAllClose(expected, actual_, rtol=1e-8, atol=1e-9)
+    self.assertAllClose(x_, grad_actual_, rtol=1e-8, atol=1e-9)
+
+  def testCorrectlyMakes1x1TriLower(self):
+    self._run_test(np.random.randn(3, int(1*2/2)))
+
+  def testCorrectlyMakesNoBatchTriLower(self):
+    self._run_test(np.random.randn(int(4*5/2)))
+
+  def testCorrectlyMakesBatchTriLower(self):
+    self._run_test(np.random.randn(2, 3, int(3*4/2)))
+
+  def testCorrectlyMakesBatchTriLowerUnknownShape(self):
+    self._run_test(np.random.randn(2, 3, int(3*4/2)), use_deferred_shape=True)
+
+  def testCorrectlyMakesBatch7x7TriLowerUnknownShape(self):
+    self._run_test(np.random.randn(2, 3, int(7*8/2)), use_deferred_shape=True)
+
+  def testCorrectlyMakesBatch7x7TriLower(self):
+    self._run_test(np.random.randn(2, 3, int(7*8/2)))
+
+  def testCorrectlyMakes1x1TriUpper(self):
+    self._run_test(np.random.randn(3, int(1*2/2)), upper=True)
+
+  def testCorrectlyMakesNoBatchTriUpper(self):
+    self._run_test(np.random.randn(int(4*5/2)), upper=True)
+
+  def testCorrectlyMakesBatchTriUpper(self):
+    self._run_test(np.random.randn(2, 2, int(3*4/2)), upper=True)
+
+  def testCorrectlyMakesBatchTriUpperUnknownShape(self):
+    self._run_test(np.random.randn(2, 2, int(3*4/2)),
+                   use_deferred_shape=True,
+                   upper=True)
+
+  def testCorrectlyMakesBatch7x7TriUpperUnknownShape(self):
+    self._run_test(np.random.randn(2, 3, int(7*8/2)),
+                   use_deferred_shape=True,
+                   upper=True)
+
+  def testCorrectlyMakesBatch7x7TriUpper(self):
+    self._run_test(np.random.randn(2, 3, int(7*8/2)), upper=True)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class FillTriangularInverseTest(FillTriangularTest):
+
+  def _run_test(self, x_, use_deferred_shape=False, **kwargs):
+    x_ = np.asarray(x_)
+    static_shape = None if use_deferred_shape else x_.shape
+    x_pl = tf1.placeholder_with_default(x_, shape=static_shape)
+
+    zeros_like_x_pl = (x_pl * tf.stop_gradient(x_pl - 1.)
+                       - tf.stop_gradient(x_pl * (x_pl - 1.)))
+    x = x_pl + zeros_like_x_pl
+    actual = tfp.math.fill_triangular(x, **kwargs)
+    inverse_actual = tfp.math.fill_triangular_inverse(actual, **kwargs)
+
+    inverse_actual_ = self.evaluate(inverse_actual)
+
+    if use_deferred_shape and not tf.executing_eagerly():
+      self.assertEqual(None, inverse_actual.shape)
+    else:
+      self.assertAllEqual(x_.shape, inverse_actual.shape)
+    self.assertAllEqual(x_, inverse_actual_)
 
 
 if __name__ == '__main__':

@@ -34,6 +34,7 @@ py_library(
     deps = [
         ":custom_gradient",
         ":diag_jacobian",
+        ":generic",
         ":gradient",
         ":interpolation",
         ":linalg",
@@ -69,6 +70,31 @@ py_test(
 )
 
 py_library(
+    name = "generic",
+    srcs = [
+        "generic.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "generic_test",
+    size = "small",
+    srcs = ["generic_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_library(
     name = "gradient",
     srcs = [
         "gradient.py",
@@ -100,6 +126,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -121,10 +148,11 @@ py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
-        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
@@ -135,8 +163,8 @@ py_test(
     srcs = ["linalg_test.py"],
     shard_count = 5,
     deps = [
-        # hypothesis dep,
         # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
@@ -152,6 +180,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -161,10 +190,9 @@ py_test(
         "numeric_test.py",
     ],
     deps = [
-        ":gradient",
-        ":numeric",
         # absl/testing:parameterized dep,
         # numpy dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
     ],
 )

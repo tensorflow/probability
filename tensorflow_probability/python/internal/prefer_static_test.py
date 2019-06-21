@@ -296,5 +296,28 @@ class PreferStaticShapeTest(tf.test.TestCase):
       self.assertEqual(self.evaluate(rank), expected_rank)
 
 
+@test_util.run_all_in_graph_and_eager_modes
+class TestNonNegativeAxis(tf.test.TestCase):
+
+  def test_static_scalar_positive_index(self):
+    positive_axis = prefer_static.non_negative_axis(axis=2, rank=4)
+    self.assertAllEqual(2, self.evaluate(positive_axis))
+
+  def test_static_scalar_negative_index(self):
+    positive_axis = prefer_static.non_negative_axis(axis=-1, rank=4)
+    self.assertAllEqual(3, self.evaluate(positive_axis))
+
+  def test_static_vector_index(self):
+    positive_axis = prefer_static.non_negative_axis(
+        axis=[0, -2], rank=4)
+    self.assertAllEqual([0, 2], self.evaluate(positive_axis))
+
+  def test_dynamic_vector_index(self):
+    positive_axis = prefer_static.non_negative_axis(
+        axis=tf.compat.v1.placeholder_with_default(input=[0, -2], shape=None),
+        rank=4)
+    self.assertAllEqual([0, 2], self.evaluate(positive_axis))
+
+
 if __name__ == '__main__':
   tf.test.main()

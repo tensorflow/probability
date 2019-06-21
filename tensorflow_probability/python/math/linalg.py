@@ -21,19 +21,22 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.ops.linalg import linear_operator_util
+from tensorflow.python.ops.linalg import linear_operator_util  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     'cholesky_concat',
+    'fill_triangular',
+    'fill_triangular_inverse',
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_solve',
@@ -51,30 +54,30 @@ def matrix_rank(a, tol=None, validate_args=False, name=None):
   Arguments:
     a: (Batch of) `float`-like matrix-shaped `Tensor`(s) which are to be
       pseudo-inverted.
-    tol: Threshold below which the singular value is counted as "zero".
+    tol: Threshold below which the singular value is counted as 'zero'.
       Default value: `None` (i.e., `eps * max(rows, cols) * max(singular_val)`).
     validate_args: When `True`, additional assertions might be embedded in the
       graph.
       Default value: `False` (i.e., no graph assertions are added).
     name: Python `str` prefixed to ops created by this function.
-      Default value: "matrix_rank".
+      Default value: 'matrix_rank'.
 
   Returns:
     matrix_rank: (Batch of) `int32` scalars representing the number of non-zero
       singular values.
   """
-  with tf.compat.v1.name_scope(name, 'matrix_rank', [a, tol]):
-    a = tf.convert_to_tensor(value=a, dtype_hint=tf.float32, name='a')
+  with tf.name_scope(name or 'matrix_rank'):
+    a = tf.convert_to_tensor(a, dtype_hint=tf.float32, name='a')
     assertions = _maybe_validate_matrix(a, validate_args)
     if assertions:
       with tf.control_dependencies(assertions):
         a = tf.identity(a)
     s = tf.linalg.svd(a, compute_uv=False)
     if tol is None:
-      if a.shape[-2:].is_fully_defined():
+      if tensorshape_util.is_fully_defined(a.shape[-2:]):
         m = np.max(a.shape[-2:].as_list())
       else:
-        m = tf.reduce_max(input_tensor=tf.shape(input=a)[-2:])
+        m = tf.reduce_max(input_tensor=tf.shape(a)[-2:])
       eps = np.finfo(a.dtype.as_numpy_dtype).eps
       tol = (eps * tf.cast(m, a.dtype) *
              tf.reduce_max(input_tensor=s, axis=-1, keepdims=True))
@@ -118,10 +121,10 @@ def cholesky_concat(chol, cols, name=None):
         [   conj(cols.T)   ] ]
       ```
   """
-  with tf.compat.v2.name_scope(name or 'cholesky_extend'):
+  with tf.name_scope(name or 'cholesky_extend'):
     dtype = dtype_util.common_dtype([chol, cols], dtype_hint=tf.float32)
-    chol = tf.convert_to_tensor(value=chol, name='chol', dtype=dtype)
-    cols = tf.convert_to_tensor(value=cols, name='cols', dtype=dtype)
+    chol = tf.convert_to_tensor(chol, name='chol', dtype=dtype)
+    cols = tf.convert_to_tensor(cols, name='cols', dtype=dtype)
     n = prefer_static.shape(chol)[-1]
     mat_nm, mat_mm = cols[..., :n, :], cols[..., n:, :]
     solved_nm = linear_operator_util.matrix_triangular_solve_with_broadcast(
@@ -155,15 +158,15 @@ def _swap_m_with_i(vecs, m, i):
   Returns:
     vecs: The updated vectors.
   """
-  vecs = tf.convert_to_tensor(value=vecs, dtype=tf.int64, name='vecs')
-  m = tf.convert_to_tensor(value=m, dtype=tf.int64, name='m')
-  i = tf.convert_to_tensor(value=i, dtype=tf.int64, name='i')
+  vecs = tf.convert_to_tensor(vecs, dtype=tf.int64, name='vecs')
+  m = tf.convert_to_tensor(m, dtype=tf.int64, name='m')
+  i = tf.convert_to_tensor(i, dtype=tf.int64, name='i')
   trailing_elts = tf.broadcast_to(
       tf.range(m + 1,
                prefer_static.shape(vecs, out_type=tf.int64)[-1]),
       prefer_static.shape(vecs[..., m + 1:]))
   shp = prefer_static.shape(trailing_elts)
-  trailing_elts = tf.compat.v1.where(
+  trailing_elts = tf1.where(
       tf.equal(trailing_elts, tf.broadcast_to(i, shp)),
       tf.broadcast_to(tf.gather(vecs, [m], axis=-1), shp),
       tf.broadcast_to(vecs[..., m + 1:], shp))
@@ -222,19 +225,19 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
   [2]: K. A. Wang et al. Exact Gaussian Processes on a Million Data Points.
        _arXiv preprint arXiv:1903.08114_, 2019. https://arxiv.org/abs/1903.08114
   """
-  with tf.compat.v2.name_scope(name or 'pivoted_cholesky'):
+  with tf.name_scope(name or 'pivoted_cholesky'):
     dtype = dtype_util.common_dtype([matrix, diag_rtol],
                                     dtype_hint=tf.float32)
-    matrix = tf.convert_to_tensor(value=matrix, name='matrix', dtype=dtype)
+    matrix = tf.convert_to_tensor(matrix, name='matrix', dtype=dtype)
     if tensorshape_util.rank(matrix.shape) is None:
       raise NotImplementedError('Rank of `matrix` must be known statically')
 
     max_rank = tf.convert_to_tensor(
-        value=max_rank, name='max_rank', dtype=tf.int64)
+        max_rank, name='max_rank', dtype=tf.int64)
     max_rank = tf.minimum(max_rank,
                           prefer_static.shape(matrix, out_type=tf.int64)[-1])
     diag_rtol = tf.convert_to_tensor(
-        value=diag_rtol, dtype=dtype, name='diag_rtol')
+        diag_rtol, dtype=dtype, name='diag_rtol')
     matrix_diag = tf.linalg.diag_part(matrix)
     # matrix is P.D., therefore all matrix_diag > 0, so we don't need abs.
     orig_error = tf.reduce_max(input_tensor=matrix_diag, axis=-1)
@@ -269,7 +272,7 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
       # Steps 1, 2 above.
       permuted_diag = batch_gather(matrix_diag, perm[..., m:])
       maxi = tf.argmax(
-          input=permuted_diag, axis=-1, output_type=tf.int64)[..., tf.newaxis]
+          permuted_diag, axis=-1, output_type=tf.int64)[..., tf.newaxis]
       maxval = batch_gather(permuted_diag, maxi)
       maxi = maxi + m
       maxval = maxval[..., 0]
@@ -327,8 +330,8 @@ def pinv(a, rcond=None, validate_args=False, name=None):
   https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse) using its
   singular-value decomposition (SVD) and including all large singular values.
 
-  The pseudo-inverse of a matrix `A`, is defined as: "the matrix that 'solves'
-  [the least-squares problem] `A @ x = b`," i.e., if `x_hat` is a solution, then
+  The pseudo-inverse of a matrix `A`, is defined as: 'the matrix that 'solves'
+  [the least-squares problem] `A @ x = b`,' i.e., if `x_hat` is a solution, then
   `A_pinv` is the matrix such that `x_hat = A_pinv @ b`. It can be shown that if
   `U @ Sigma @ V.T = A` is the singular value decomposition of `A`, then
   `A_pinv = V @ inv(Sigma) U^T`. [(Strang, 1980)][1]
@@ -350,7 +353,7 @@ def pinv(a, rcond=None, validate_args=False, name=None):
       graph.
       Default value: `False` (i.e., no graph assertions are added).
     name: Python `str` prefixed to ops created by this function.
-      Default value: "pinv".
+      Default value: 'pinv'.
 
   Returns:
     a_pinv: The pseudo-inverse of input `a`. Has same shape as `a` except
@@ -386,11 +389,11 @@ def pinv(a, rcond=None, validate_args=False, name=None):
 
   #### References
 
-  [1]: G. Strang. "Linear Algebra and Its Applications, 2nd Ed." Academic Press,
+  [1]: G. Strang. 'Linear Algebra and Its Applications, 2nd Ed.' Academic Press,
        Inc., 1980, pp. 139-142.
   """
-  with tf.compat.v1.name_scope(name, 'pinv', [a, rcond]):
-    a = tf.convert_to_tensor(value=a, name='a')
+  with tf.name_scope(name or 'pinv'):
+    a = tf.convert_to_tensor(a, name='a')
 
     assertions = _maybe_validate_matrix(a, validate_args)
     if assertions:
@@ -403,7 +406,7 @@ def pinv(a, rcond=None, validate_args=False, name=None):
       def get_dim_size(dim):
         if tf.compat.dimension_value(a.shape[dim]) is not None:
           return tf.compat.dimension_value(a.shape[dim])
-        return tf.shape(input=a)[dim]
+        return tf.shape(a)[dim]
 
       num_rows = get_dim_size(-2)
       num_cols = get_dim_size(-1)
@@ -413,7 +416,7 @@ def pinv(a, rcond=None, validate_args=False, name=None):
         max_rows_cols = tf.cast(tf.maximum(num_rows, num_cols), dtype)
       rcond = 10. * max_rows_cols * np.finfo(dtype).eps
 
-    rcond = tf.convert_to_tensor(value=rcond, dtype=dtype, name='rcond')
+    rcond = tf.convert_to_tensor(rcond, dtype=dtype, name='rcond')
 
     # Calculate pseudo inverse via SVD.
     # Note: if a is symmetric then u == v. (We might observe additional
@@ -427,13 +430,13 @@ def pinv(a, rcond=None, validate_args=False, name=None):
     # Saturate small singular values to inf. This has the effect of make
     # `1. / s = 0.` while not resulting in `NaN` gradients.
     cutoff = rcond * tf.reduce_max(input_tensor=singular_values, axis=-1)
-    singular_values = tf.compat.v1.where(
+    singular_values = tf1.where(
         singular_values > cutoff[..., tf.newaxis], singular_values,
-        tf.fill(tf.shape(input=singular_values), np.array(np.inf, dtype)))
+        tf.fill(tf.shape(singular_values), np.array(np.inf, dtype)))
 
     # Although `a == tf.matmul(u, s * v, transpose_b=True)` we swap
     # `u` and `v` here so that `tf.matmul(pinv(A), A) = tf.eye()`, i.e.,
-    # a matrix inverse has "transposed" semantics.
+    # a matrix inverse has 'transposed' semantics.
     a_pinv = tf.matmul(
         right_singular_vectors / singular_values[..., tf.newaxis, :],
         left_singular_vectors,
@@ -466,7 +469,7 @@ def lu_solve(lower_upper, perm, rhs,
       actually invertible, even when `validate_args=True`.
       Default value: `False` (i.e., don't validate arguments).
     name: Python `str` name given to ops managed by this object.
-      Default value: `None` (i.e., "lu_solve").
+      Default value: `None` (i.e., 'lu_solve').
 
   Returns:
     x: The `X` in `A @ X = RHS`.
@@ -489,12 +492,12 @@ def lu_solve(lower_upper, perm, rhs,
 
   """
 
-  with tf.compat.v1.name_scope(name, 'lu_solve', [lower_upper, perm, rhs]):
+  with tf.name_scope(name or 'lu_solve'):
     lower_upper = tf.convert_to_tensor(
-        value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
-    perm = tf.convert_to_tensor(value=perm, dtype_hint=tf.int32, name='perm')
+        lower_upper, dtype_hint=tf.float32, name='lower_upper')
+    perm = tf.convert_to_tensor(perm, dtype_hint=tf.int32, name='perm')
     rhs = tf.convert_to_tensor(
-        value=rhs, dtype_hint=lower_upper.dtype, name='rhs')
+        rhs, dtype_hint=lower_upper.dtype, name='rhs')
 
     assertions = _lu_solve_assertions(lower_upper, perm, rhs, validate_args)
     if assertions:
@@ -509,10 +512,10 @@ def lu_solve(lower_upper, perm, rhs,
     else:
       # Either rhs or perm have non-scalar batch_shape or we can't determine
       # this information statically.
-      rhs_shape = tf.shape(input=rhs)
+      rhs_shape = tf.shape(rhs)
       broadcast_batch_shape = tf.broadcast_dynamic_shape(
           rhs_shape[:-2],
-          tf.shape(input=perm)[:-1])
+          tf.shape(perm)[:-1])
       d, m = rhs_shape[-2], rhs_shape[-1]
       rhs_broadcast_shape = tf.concat([broadcast_batch_shape, [d, m]], axis=0)
 
@@ -535,7 +538,7 @@ def lu_solve(lower_upper, perm, rhs,
 
     lower = tf.linalg.set_diag(
         tf.linalg.band_part(lower_upper, num_lower=-1, num_upper=0),
-        tf.ones(tf.shape(input=lower_upper)[:-1], dtype=lower_upper.dtype))
+        tf.ones(tf.shape(lower_upper)[:-1], dtype=lower_upper.dtype))
     return linear_operator_util.matrix_triangular_solve_with_broadcast(
         lower_upper,  # Only upper is accessed.
         linear_operator_util.matrix_triangular_solve_with_broadcast(
@@ -567,7 +570,7 @@ def lu_matrix_inverse(lower_upper, perm, validate_args=False, name=None):
       actually invertible, even when `validate_args=True`.
       Default value: `False` (i.e., don't validate arguments).
     name: Python `str` name given to ops managed by this object.
-      Default value: `None` (i.e., "lu_matrix_inverse").
+      Default value: `None` (i.e., 'lu_matrix_inverse').
 
   Returns:
     inv_x: The matrix_inv, i.e.,
@@ -589,16 +592,16 @@ def lu_matrix_inverse(lower_upper, perm, validate_args=False, name=None):
 
   """
 
-  with tf.compat.v1.name_scope(name, 'lu_matrix_inverse', [lower_upper, perm]):
+  with tf.name_scope(name or 'lu_matrix_inverse'):
     lower_upper = tf.convert_to_tensor(
-        value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
-    perm = tf.convert_to_tensor(value=perm, dtype_hint=tf.int32, name='perm')
+        lower_upper, dtype_hint=tf.float32, name='lower_upper')
+    perm = tf.convert_to_tensor(perm, dtype_hint=tf.int32, name='perm')
     assertions = _lu_reconstruct_assertions(lower_upper, perm, validate_args)
     if assertions:
       with tf.control_dependencies(assertions):
         lower_upper = tf.identity(lower_upper)
         perm = tf.identity(perm)
-    shape = tf.shape(input=lower_upper)
+    shape = tf.shape(lower_upper)
     return lu_solve(
         lower_upper, perm,
         rhs=tf.eye(shape[-1], batch_shape=shape[:-2], dtype=lower_upper.dtype),
@@ -617,7 +620,7 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
       for correctness.
       Default value: `False` (i.e., don't validate arguments).
     name: Python `str` name given to ops managed by this object.
-      Default value: `None` (i.e., "lu_reconstruct").
+      Default value: `None` (i.e., 'lu_reconstruct').
 
   Returns:
     x: The original input to `tf.linalg.lu`, i.e., `x` as in,
@@ -638,10 +641,10 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
   ```
 
   """
-  with tf.compat.v1.name_scope(name, 'lu_reconstruct', [lower_upper, perm]):
+  with tf.name_scope(name or 'lu_reconstruct'):
     lower_upper = tf.convert_to_tensor(
-        value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
-    perm = tf.convert_to_tensor(value=perm, dtype_hint=tf.int32, name='perm')
+        lower_upper, dtype_hint=tf.float32, name='lower_upper')
+    perm = tf.convert_to_tensor(perm, dtype_hint=tf.int32, name='perm')
 
     assertions = _lu_reconstruct_assertions(lower_upper, perm, validate_args)
     if assertions:
@@ -649,7 +652,7 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
         lower_upper = tf.identity(lower_upper)
         perm = tf.identity(perm)
 
-    shape = tf.shape(input=lower_upper)
+    shape = tf.shape(lower_upper)
 
     lower = tf.linalg.set_diag(
         tf.linalg.band_part(lower_upper, num_lower=-1, num_upper=0),
@@ -686,7 +689,7 @@ def _lu_reconstruct_assertions(lower_upper, perm, validate_args):
       raise ValueError(message)
   elif validate_args:
     assertions.append(
-        tf.compat.v1.assert_rank_at_least(lower_upper, rank=2, message=message))
+        assert_util.assert_rank_at_least(lower_upper, rank=2, message=message))
 
   message = '`rank(lower_upper)` must equal `rank(perm) + 1`'
   if lower_upper.shape.ndims is not None and perm.shape.ndims is not None:
@@ -694,16 +697,16 @@ def _lu_reconstruct_assertions(lower_upper, perm, validate_args):
       raise ValueError(message)
   elif validate_args:
     assertions.append(
-        tf.compat.v1.assert_rank(
+        assert_util.assert_rank(
             lower_upper, rank=tf.rank(perm) + 1, message=message))
 
   message = '`lower_upper` must be square.'
-  if lower_upper.shape[:-2].is_fully_defined():
+  if tensorshape_util.is_fully_defined(lower_upper.shape[:-2]):
     if lower_upper.shape[-2] != lower_upper.shape[-1]:
       raise ValueError(message)
   elif validate_args:
-    m, n = tf.split(tf.shape(input=lower_upper)[-2:], num_or_size_splits=2)
-    assertions.append(tf.compat.v1.assert_equal(m, n, message=message))
+    m, n = tf.split(tf.shape(lower_upper)[-2:], num_or_size_splits=2)
+    assertions.append(assert_util.assert_equal(m, n, message=message))
 
   return assertions
 
@@ -718,7 +721,7 @@ def _lu_solve_assertions(lower_upper, perm, rhs, validate_args):
       raise ValueError(message)
   elif validate_args:
     assertions.append(
-        tf.compat.v1.assert_rank_at_least(rhs, rank=2, message=message))
+        assert_util.assert_rank_at_least(rhs, rank=2, message=message))
 
   message = '`lower_upper.shape[-1]` must equal `rhs.shape[-1]`.'
   if (tf.compat.dimension_value(lower_upper.shape[-1]) is not None and
@@ -727,9 +730,9 @@ def _lu_solve_assertions(lower_upper, perm, rhs, validate_args):
       raise ValueError(message)
   elif validate_args:
     assertions.append(
-        tf.compat.v1.assert_equal(
-            tf.shape(input=lower_upper)[-1],
-            tf.shape(input=rhs)[-2],
+        assert_util.assert_equal(
+            tf.shape(lower_upper)[-1],
+            tf.shape(rhs)[-2],
             message=message))
 
   return assertions
@@ -752,7 +755,7 @@ def sparse_or_dense_matmul(sparse_or_dense_a,
       graph.
       Default value: `False` (i.e., no graph assertions are added).
     name: Python `str` prefixed to ops created by this function.
-      Default value: "sparse_or_dense_matmul".
+      Default value: 'sparse_or_dense_matmul'.
     **kwargs: Keyword arguments to `tf.sparse_tensor_dense_matmul` or
       `tf.matmul`.
 
@@ -762,17 +765,16 @@ def sparse_or_dense_matmul(sparse_or_dense_a,
     `dense_b` is adjointed through `kwargs` then the shape is adjusted
     accordingly.
   """
-  with tf.compat.v1.name_scope(name, 'sparse_or_dense_matmul',
-                               [sparse_or_dense_a, dense_b]):
+  with tf.name_scope(name or 'sparse_or_dense_matmul'):
     dense_b = tf.convert_to_tensor(
-        value=dense_b, dtype_hint=tf.float32, name='dense_b')
+        dense_b, dtype_hint=tf.float32, name='dense_b')
 
     if validate_args:
-      assert_a_rank_at_least_2 = tf.compat.v1.assert_rank_at_least(
+      assert_a_rank_at_least_2 = assert_util.assert_rank_at_least(
           sparse_or_dense_a,
           rank=2,
           message='Input `sparse_or_dense_a` must have at least 2 dimensions.')
-      assert_b_rank_at_least_2 = tf.compat.v1.assert_rank_at_least(
+      assert_b_rank_at_least_2 = assert_util.assert_rank_at_least(
           dense_b,
           rank=2,
           message='Input `dense_b` must have at least 2 dimensions.')
@@ -781,8 +783,7 @@ def sparse_or_dense_matmul(sparse_or_dense_a,
         sparse_or_dense_a = tf.identity(sparse_or_dense_a)
         dense_b = tf.identity(dense_b)
 
-    if isinstance(sparse_or_dense_a,
-                  (tf.SparseTensor, tf.compat.v1.SparseTensorValue)):
+    if isinstance(sparse_or_dense_a, (tf.SparseTensor, tf1.SparseTensorValue)):
       return _sparse_tensor_dense_matmul(sparse_or_dense_a, dense_b, **kwargs)
     else:
       return tf.matmul(sparse_or_dense_a, dense_b, **kwargs)
@@ -805,7 +806,7 @@ def sparse_or_dense_matvecmul(sparse_or_dense_matrix,
       graph.
       Default value: `False` (i.e., no graph assertions are added).
     name: Python `str` prefixed to ops created by this function.
-      Default value: "sparse_or_dense_matvecmul".
+      Default value: 'sparse_or_dense_matvecmul'.
     **kwargs: Keyword arguments to `tf.sparse_tensor_dense_matmul` or
       `tf.matmul`.
 
@@ -813,10 +814,9 @@ def sparse_or_dense_matvecmul(sparse_or_dense_matrix,
     product: A dense (batch of) vector-shaped Tensor of the same batch shape and
     dtype as `sparse_or_dense_matrix` and `dense_vector`.
   """
-  with tf.compat.v1.name_scope(name, 'sparse_or_dense_matvecmul',
-                               [sparse_or_dense_matrix, dense_vector]):
+  with tf.name_scope(name or 'sparse_or_dense_matvecmul'):
     dense_vector = tf.convert_to_tensor(
-        value=dense_vector, dtype_hint=tf.float32, name='dense_vector')
+        dense_vector, dtype_hint=tf.float32, name='dense_vector')
     return tf.squeeze(
         sparse_or_dense_matmul(
             sparse_or_dense_matrix,
@@ -826,12 +826,230 @@ def sparse_or_dense_matvecmul(sparse_or_dense_matrix,
         axis=[-1])
 
 
+def fill_triangular(x, upper=False, name=None):
+  """Creates a (batch of) triangular matrix from a vector of inputs.
+
+  Created matrix can be lower- or upper-triangular. (It is more efficient to
+  create the matrix as upper or lower, rather than transpose.)
+
+  Triangular matrix elements are filled in a clockwise spiral. See example,
+  below.
+
+  If `x.shape` is `[b1, b2, ..., bB, d]` then the output shape is
+  `[b1, b2, ..., bB, n, n]` where `n` is such that `d = n(n+1)/2`, i.e.,
+  `n = int(np.sqrt(0.25 + 2. * m) - 0.5)`.
+
+  Example:
+
+  ```python
+  fill_triangular([1, 2, 3, 4, 5, 6])
+  # ==> [[4, 0, 0],
+  #      [6, 5, 0],
+  #      [3, 2, 1]]
+
+  fill_triangular([1, 2, 3, 4, 5, 6], upper=True)
+  # ==> [[1, 2, 3],
+  #      [0, 5, 6],
+  #      [0, 0, 4]]
+  ```
+
+  The key trick is to create an upper triangular matrix by concatenating `x`
+  and a tail of itself, then reshaping.
+
+  Suppose that we are filling the upper triangle of an `n`-by-`n` matrix `M`
+  from a vector `x`. The matrix `M` contains n**2 entries total. The vector `x`
+  contains `n * (n+1) / 2` entries. For concreteness, we'll consider `n = 5`
+  (so `x` has `15` entries and `M` has `25`). We'll concatenate `x` and `x` with
+  the first (`n = 5`) elements removed and reversed:
+
+  ```python
+  x = np.arange(15) + 1
+  xc = np.concatenate([x, x[5:][::-1]])
+  # ==> array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 15, 14, 13,
+  #            12, 11, 10, 9, 8, 7, 6])
+
+  # (We add one to the arange result to disambiguate the zeros below the
+  # diagonal of our upper-triangular matrix from the first entry in `x`.)
+
+  # Now, when reshapedlay this out as a matrix:
+  y = np.reshape(xc, [5, 5])
+  # ==> array([[ 1,  2,  3,  4,  5],
+  #            [ 6,  7,  8,  9, 10],
+  #            [11, 12, 13, 14, 15],
+  #            [15, 14, 13, 12, 11],
+  #            [10,  9,  8,  7,  6]])
+
+  # Finally, zero the elements below the diagonal:
+  y = np.triu(y, k=0)
+  # ==> array([[ 1,  2,  3,  4,  5],
+  #            [ 0,  7,  8,  9, 10],
+  #            [ 0,  0, 13, 14, 15],
+  #            [ 0,  0,  0, 12, 11],
+  #            [ 0,  0,  0,  0,  6]])
+  ```
+
+  From this example we see that the resuting matrix is upper-triangular, and
+  contains all the entries of x, as desired. The rest is details:
+  - If `n` is even, `x` doesn't exactly fill an even number of rows (it fills
+    `n / 2` rows and half of an additional row), but the whole scheme still
+    works.
+  - If we want a lower triangular matrix instead of an upper triangular,
+    we remove the first `n` elements from `x` rather than from the reversed
+    `x`.
+
+  For additional comparisons, a pure numpy version of this function can be found
+  in `distribution_util_test.py`, function `_fill_triangular`.
+
+  Args:
+    x: `Tensor` representing lower (or upper) triangular elements.
+    upper: Python `bool` representing whether output matrix should be upper
+      triangular (`True`) or lower triangular (`False`, default).
+    name: Python `str`. The name to give this op.
+
+  Returns:
+    tril: `Tensor` with lower (or upper) triangular elements filled from `x`.
+
+  Raises:
+    ValueError: if `x` cannot be mapped to a triangular matrix.
+  """
+
+  with tf.name_scope(name or 'fill_triangular'):
+    x = tf.convert_to_tensor(x, name='x')
+    m = tf.compat.dimension_value(
+        tensorshape_util.with_rank_at_least(x.shape, 1)[-1])
+    if m is not None:
+      # Formula derived by solving for n: m = n(n+1)/2.
+      m = np.int32(m)
+      n = np.sqrt(0.25 + 2. * m) - 0.5
+      if n != np.floor(n):
+        raise ValueError('Input right-most shape ({}) does not '
+                         'correspond to a triangular matrix.'.format(m))
+      n = np.int32(n)
+      static_final_shape = tensorshape_util.concatenate(x.shape[:-1], [n, n])
+    else:
+      m = tf.shape(x)[-1]
+      # For derivation, see above. Casting automatically lops off the 0.5, so we
+      # omit it.  We don't validate n is an integer because this has
+      # graph-execution cost; an error will be thrown from the reshape, below.
+      n = tf.cast(
+          tf.sqrt(0.25 + tf.cast(2 * m, dtype=tf.float32)), dtype=tf.int32)
+      static_final_shape = tensorshape_util.concatenate(
+          tensorshape_util.with_rank_at_least(x.shape, 1)[:-1], [None, None])
+
+    # Try it out in numpy:
+    #  n = 3
+    #  x = np.arange(n * (n + 1) / 2)
+    #  m = x.shape[0]
+    #  n = np.int32(np.sqrt(.25 + 2 * m) - .5)
+    #  x_tail = x[(m - (n**2 - m)):]
+    #  np.concatenate([x_tail, x[::-1]], 0).reshape(n, n)  # lower
+    #  # ==> array([[3, 4, 5],
+    #               [5, 4, 3],
+    #               [2, 1, 0]])
+    #  np.concatenate([x, x_tail[::-1]], 0).reshape(n, n)  # upper
+    #  # ==> array([[0, 1, 2],
+    #               [3, 4, 5],
+    #               [5, 4, 3]])
+    #
+    # Note that we can't simply do `x[..., -(n**2 - m):]` because this doesn't
+    # correctly handle `m == n == 1`. Hence, we do nonnegative indexing.
+    # Furthermore observe that:
+    #   m - (n**2 - m)
+    #   = n**2 / 2 + n / 2 - (n**2 - n**2 / 2 + n / 2)
+    #   = 2 (n**2 / 2 + n / 2) - n**2
+    #   = n**2 + n - n**2
+    #   = n
+    ndims = prefer_static.rank(x)
+    if upper:
+      x_list = [x, tf.reverse(x[..., n:], axis=[ndims - 1])]
+    else:
+      x_list = [x[..., n:], tf.reverse(x, axis=[ndims - 1])]
+    new_shape = (
+        tensorshape_util.as_list(static_final_shape)
+        if tensorshape_util.is_fully_defined(static_final_shape) else tf.concat(
+            [tf.shape(x)[:-1], [n, n]], axis=0))
+    x = tf.reshape(tf.concat(x_list, axis=-1), new_shape)
+    x = tf.linalg.band_part(
+        x, num_lower=(0 if upper else -1), num_upper=(-1 if upper else 0))
+    tensorshape_util.set_shape(x, static_final_shape)
+    return x
+
+
+def fill_triangular_inverse(x, upper=False, name=None):
+  """Creates a vector from a (batch of) triangular matrix.
+
+  The vector is created from the lower-triangular or upper-triangular portion
+  depending on the value of the parameter `upper`.
+
+  If `x.shape` is `[b1, b2, ..., bB, n, n]` then the output shape is
+  `[b1, b2, ..., bB, d]` where `d = n (n + 1) / 2`.
+
+  Example:
+
+  ```python
+  fill_triangular_inverse(
+    [[4, 0, 0],
+     [6, 5, 0],
+     [3, 2, 1]])
+
+  # ==> [1, 2, 3, 4, 5, 6]
+
+  fill_triangular_inverse(
+    [[1, 2, 3],
+     [0, 5, 6],
+     [0, 0, 4]], upper=True)
+
+  # ==> [1, 2, 3, 4, 5, 6]
+  ```
+
+  Args:
+    x: `Tensor` representing lower (or upper) triangular elements.
+    upper: Python `bool` representing whether output matrix should be upper
+      triangular (`True`) or lower triangular (`False`, default).
+    name: Python `str`. The name to give this op.
+
+  Returns:
+    flat_tril: (Batch of) vector-shaped `Tensor` representing vectorized lower
+      (or upper) triangular elements from `x`.
+  """
+
+  with tf.name_scope(name or 'fill_triangular_inverse'):
+    x = tf.convert_to_tensor(x, name='x')
+    n = tf.compat.dimension_value(
+        tensorshape_util.with_rank_at_least(x.shape, 2)[-1])
+    if n is not None:
+      n = np.int32(n)
+      m = np.int32((n * (n + 1)) // 2)
+      static_final_shape = tensorshape_util.concatenate(x.shape[:-2], [m])
+    else:
+      n = tf.shape(x)[-1]
+      m = (n * (n + 1)) // 2
+      static_final_shape = tensorshape_util.concatenate(
+          tensorshape_util.with_rank_at_least(x.shape, 2)[:-2], [None])
+    ndims = prefer_static.rank(x)
+    if upper:
+      initial_elements = x[..., 0, :]
+      triangular_portion = x[..., 1:, :]
+    else:
+      initial_elements = tf.reverse(x[..., -1, :], axis=[ndims - 2])
+      triangular_portion = x[..., :-1, :]
+    rotated_triangular_portion = tf.reverse(
+        tf.reverse(triangular_portion, axis=[ndims - 1]), axis=[ndims - 2])
+    consolidated_matrix = triangular_portion + rotated_triangular_portion
+    end_sequence = tf.reshape(
+        consolidated_matrix,
+        tf.concat([tf.shape(x)[:-2], [n * (n - 1)]], axis=0))
+    y = tf.concat([initial_elements, end_sequence[..., :m - n]], axis=-1)
+    tensorshape_util.set_shape(y, static_final_shape)
+    return y
+
+
 def _get_shape(x, out_type=tf.int32):
   # Return the shape of a Tensor or a SparseTensor as an np.array if its shape
   # is known statically. Otherwise return a Tensor representing the shape.
-  if x.shape.is_fully_defined():
+  if tensorshape_util.is_fully_defined(x.shape):
     return np.array(x.shape.as_list(), dtype=out_type.as_numpy_dtype)
-  return tf.shape(input=x, out_type=out_type)
+  return tf.shape(x, out_type=out_type)
 
 
 def _sparse_tensor_dense_matmul(sp_a, b, **kwargs):
@@ -887,7 +1105,7 @@ def _sparse_block_diag(sp_a):
   # matrix of dense shape [B * M, B * N].
   # Note that this transformation doesn't increase the number of non-zero
   # entries in the SparseTensor.
-  sp_a_shape = tf.convert_to_tensor(value=_get_shape(sp_a, tf.int64))
+  sp_a_shape = tf.convert_to_tensor(_get_shape(sp_a, tf.int64))
   ind_mat = tf.concat([[sp_a_shape[-2:]], tf.eye(2, dtype=tf.int64)], axis=0)
   indices = tf.matmul(sp_a.indices, ind_mat)
   dense_shape = sp_a_shape[0] * sp_a_shape[1:]
@@ -898,7 +1116,7 @@ def _sparse_block_diag(sp_a):
 def _maybe_validate_matrix(a, validate_args):
   """Checks that input is a `float` matrix."""
   assertions = []
-  if not a.dtype.is_floating:
+  if not dtype_util.is_floating(a.dtype):
     raise TypeError('Input `a` must have `float`-like `dtype` '
                     '(saw {}).'.format(a.dtype.name))
   if a.shape.ndims is not None:
@@ -906,6 +1124,6 @@ def _maybe_validate_matrix(a, validate_args):
       raise ValueError('Input `a` must have at least 2 dimensions '
                        '(saw: {}).'.format(a.shape.ndims))
   elif validate_args:
-    assertions.append(tf.compat.v1.assert_rank_at_least(
+    assertions.append(assert_util.assert_rank_at_least(
         a, rank=2, message='Input `a` must have at least 2 dimensions.'))
   return assertions

@@ -22,7 +22,6 @@ import itertools
 
 # Dependency imports
 import numpy as np
-from scipy import special as sp_special
 
 import tensorflow as tf
 
@@ -33,10 +32,8 @@ from tensorflow_probability.python.distributions import MultivariateNormalDiag
 from tensorflow_probability.python.distributions import Normal
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.math.gradient import value_and_gradient
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
 
 
 def _logit(x):
@@ -109,12 +106,12 @@ class MakeTrilScaleTest(tf.test.TestCase):
       args = dict(args)
 
       scale_args = dict({
-          "loc": loc,
-          "shape_hint": shape_hint}, **args)
+          'loc': loc,
+          'shape_hint': shape_hint}, **args)
       expected_scale = _make_tril_scale(**scale_args)
       if expected_scale is None:
         # Not enough shape information was specified.
-        with self.assertRaisesRegexp(ValueError, ("is specified.")):
+        with self.assertRaisesRegexp(ValueError, ('is specified.')):
           scale = distribution_util.make_tril_scale(**scale_args)
           self.evaluate(scale.to_dense())
       else:
@@ -126,9 +123,9 @@ class MakeTrilScaleTest(tf.test.TestCase):
         loc=np.array([-1., -1.], dtype=np.float32),
         shape_hint=2,
         scale_params={
-            "scale_identity_multiplier": 2.,
-            "scale_diag": [2., 3.],
-            "scale_tril": [[1., 0.],
+            'scale_identity_multiplier': 2.,
+            'scale_diag': [2., 3.],
+            'scale_tril': [[1., 0.],
                            [-3., 3.]],
         })
 
@@ -137,9 +134,9 @@ class MakeTrilScaleTest(tf.test.TestCase):
         loc=np.array([[[-1., -1., 2.], [-2., -3., 4.]]], dtype=np.float32),
         shape_hint=3,
         scale_params={
-            "scale_identity_multiplier": 2.,
-            "scale_diag": [[[2., 3., 4.], [3., 4., 5.]]],
-            "scale_tril": [[[[1., 0., 0.],
+            'scale_identity_multiplier': 2.,
+            'scale_diag': [[[2., 3., 4.], [3., 4., 5.]]],
+            'scale_tril': [[[[1., 0., 0.],
                              [-3., 3., 0.],
                              [1., -2., 1.]],
                             [[2., 1., 0.],
@@ -152,13 +149,13 @@ class MakeTrilScaleTest(tf.test.TestCase):
     self.assertAllClose([[1., 0], [1., 1.]], self.evaluate(scale.to_dense()))
 
   def testValidateArgs(self):
-    with self.assertRaisesOpError("diagonal part must be non-zero"):
+    with self.assertRaisesOpError('diagonal part must be non-zero'):
       scale = distribution_util.make_tril_scale(
           scale_tril=[[0., 1], [1., 1.]], validate_args=True)
       self.evaluate(scale.to_dense())
 
   def testAssertPositive(self):
-    with self.assertRaisesOpError("diagonal part must be positive"):
+    with self.assertRaisesOpError('diagonal part must be positive'):
       scale = distribution_util.make_tril_scale(
           scale_tril=[[-1., 1], [1., 1.]],
           validate_args=True,
@@ -175,12 +172,12 @@ class MakeDiagScaleTest(tf.test.TestCase):
       args = dict(args)
 
       scale_args = dict({
-          "loc": loc,
-          "shape_hint": shape_hint}, **args)
+          'loc': loc,
+          'shape_hint': shape_hint}, **args)
       expected_scale = _make_diag_scale(**scale_args)
       if expected_scale is None:
         # Not enough shape information was specified.
-        with self.assertRaisesRegexp(ValueError, ("is specified.")):
+        with self.assertRaisesRegexp(ValueError, ('is specified.')):
           scale = distribution_util.make_diag_scale(**scale_args)
           self.evaluate(scale.to_dense())
       else:
@@ -192,8 +189,8 @@ class MakeDiagScaleTest(tf.test.TestCase):
         loc=np.array([-1., -1.], dtype=np.float32),
         shape_hint=2,
         scale_params={
-            "scale_identity_multiplier": 2.,
-            "scale_diag": [2., 3.]
+            'scale_identity_multiplier': 2.,
+            'scale_diag': [2., 3.]
         })
 
   def testLegalInputsMultidimensional(self):
@@ -201,18 +198,18 @@ class MakeDiagScaleTest(tf.test.TestCase):
         loc=np.array([[[-1., -1., 2.], [-2., -3., 4.]]], dtype=np.float32),
         shape_hint=3,
         scale_params={
-            "scale_identity_multiplier": 2.,
-            "scale_diag": [[[2., 3., 4.], [3., 4., 5.]]]
+            'scale_identity_multiplier': 2.,
+            'scale_diag': [[[2., 3., 4.], [3., 4., 5.]]]
         })
 
   def testValidateArgs(self):
-    with self.assertRaisesOpError("diagonal part must be non-zero"):
+    with self.assertRaisesOpError('diagonal part must be non-zero'):
       scale = distribution_util.make_diag_scale(
           scale_diag=[[0., 1], [1., 1.]], validate_args=True)
       self.evaluate(scale.to_dense())
 
   def testAssertPositive(self):
-    with self.assertRaisesOpError("diagonal part must be positive"):
+    with self.assertRaisesOpError('diagonal part must be positive'):
       scale = distribution_util.make_diag_scale(
           scale_diag=[[-1., 1], [1., 1.]],
           validate_args=True,
@@ -226,7 +223,7 @@ class ShapesFromLocAndScaleTest(tf.test.TestCase):
   def test_static_loc_static_scale_non_matching_event_size_raises(self):
     loc = tf.zeros([2, 4])
     diag = tf.ones([5, 1, 3])
-    with self.assertRaisesRegexp(ValueError, "could not be broadcast"):
+    with self.assertRaisesRegexp(ValueError, 'could not be broadcast'):
       distribution_util.shapes_from_loc_and_scale(
           loc, tf.linalg.LinearOperatorDiag(diag))
 
@@ -618,29 +615,6 @@ class PickScalarConditionTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestNonNegativeAxis(tf.test.TestCase):
-
-  def test_static_scalar_positive_index(self):
-    positive_axis = distribution_util.make_non_negative_axis(axis=2, rank=4)
-    self.assertAllEqual(2, self.evaluate(positive_axis))
-
-  def test_static_scalar_negative_index(self):
-    positive_axis = distribution_util.make_non_negative_axis(axis=-1, rank=4)
-    self.assertAllEqual(3, self.evaluate(positive_axis))
-
-  def test_static_vector_index(self):
-    positive_axis = distribution_util.make_non_negative_axis(
-        axis=[0, -2], rank=4)
-    self.assertAllEqual([0, 2], self.evaluate(positive_axis))
-
-  def test_dynamic_vector_index(self):
-    positive_axis = distribution_util.make_non_negative_axis(
-        axis=tf.compat.v1.placeholder_with_default(input=[0, -2], shape=None),
-        rank=4)
-    self.assertAllEqual([0, 2], self.evaluate(positive_axis))
-
-
-@test_util.run_all_in_graph_and_eager_modes
 class TestMoveDimension(tf.test.TestCase):
 
   def test_move_dimension_static_shape(self):
@@ -748,24 +722,24 @@ class AssertCloseTest(tf.test.TestCase):
     # First component isn't less than float32.eps = 1e-7
     z = tf.compat.v1.placeholder_with_default(
         np.array([1.0001, 5, 10, 15, 20], dtype=np.float32), shape=None)
-    # This shouldn"t be detected as an integer.
+    # This shouldn't be detected as an integer.
     w = tf.compat.v1.placeholder_with_default(
         np.array([1e-8, 5, 10, 15, 20], dtype=np.float32), shape=None)
 
     with tf.control_dependencies([distribution_util.assert_integer_form(x)]):
       self.evaluate(tf.identity(x))
 
-    with self.assertRaisesOpError("has non-integer components"):
+    with self.assertRaisesOpError('has non-integer components'):
       with tf.control_dependencies(
           [distribution_util.assert_integer_form(y)]):
         self.evaluate(tf.identity(y))
 
-    with self.assertRaisesOpError("has non-integer components"):
+    with self.assertRaisesOpError('has non-integer components'):
       with tf.control_dependencies(
           [distribution_util.assert_integer_form(z)]):
         self.evaluate(tf.identity(z))
 
-    with self.assertRaisesOpError("has non-integer components"):
+    with self.assertRaisesOpError('has non-integer components'):
       with tf.control_dependencies(
           [distribution_util.assert_integer_form(w)]):
         self.evaluate(tf.identity(w))
@@ -864,7 +838,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
         probs=p, validate_args=True)
     self.evaluate(prob)
 
-    with self.assertRaisesOpError("Condition x >= 0"):
+    with self.assertRaisesOpError('Condition x >= 0'):
       _, prob = distribution_util.get_logits_and_probs(
           probs=p2, validate_args=True)
       self.evaluate(prob)
@@ -873,7 +847,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
         probs=p2, validate_args=False)
     self.evaluate(prob)
 
-    with self.assertRaisesOpError("probs has components greater than 1"):
+    with self.assertRaisesOpError('probs has components greater than 1'):
       _, prob = distribution_util.get_logits_and_probs(
           probs=p3, validate_args=True)
       self.evaluate(prob)
@@ -895,7 +869,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
         probs=p, multidimensional=True)
     self.evaluate(prob)
 
-    with self.assertRaisesOpError("Condition x >= 0"):
+    with self.assertRaisesOpError('Condition x >= 0'):
       _, prob = distribution_util.get_logits_and_probs(
           probs=p2, multidimensional=True, validate_args=True)
       self.evaluate(prob)
@@ -905,7 +879,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
     self.evaluate(prob)
 
     with self.assertRaisesOpError(
-        "(probs has components greater than 1|probs does not sum to 1)"):
+        '(probs has components greater than 1|probs does not sum to 1)'):
       _, prob = distribution_util.get_logits_and_probs(
           probs=p3, multidimensional=True, validate_args=True)
       self.evaluate(prob)
@@ -914,7 +888,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
         probs=p3, multidimensional=True, validate_args=False)
     self.evaluate(prob)
 
-    with self.assertRaisesOpError("probs does not sum to 1"):
+    with self.assertRaisesOpError('probs does not sum to 1'):
       _, prob = distribution_util.get_logits_and_probs(
           probs=p4, multidimensional=True, validate_args=True)
       self.evaluate(prob)
@@ -932,7 +906,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
     if tf.executing_eagerly(): return
 
     with self.assertRaisesOpError(
-        "Number of classes exceeds `dtype` precision"):
+        'Number of classes exceeds `dtype` precision'):
       p = np.ones([int(2**11+1)], dtype=np.float16)
       p = tf.compat.v1.placeholder_with_default(p, shape=None)
       self.evaluate(distribution_util.get_logits_and_probs(
@@ -947,7 +921,7 @@ class GetLogitsAndProbsTest(tf.test.TestCase):
     if tf.executing_eagerly(): return
 
     with self.assertRaisesOpError(
-        "Number of classes exceeds `dtype` precision"):
+        'Number of classes exceeds `dtype` precision'):
       l = np.ones([int(2**11+1)], dtype=np.float16)
       l = tf.compat.v1.placeholder_with_default(l, shape=None)
       logit, _ = distribution_util.get_logits_and_probs(
@@ -966,7 +940,7 @@ class EmbedCheckCategoricalEventShapeTest(tf.test.TestCase):
 
     if tf.executing_eagerly(): return
     with self.assertRaisesOpError(
-        "must have at least 2 events"):
+        'must have at least 2 events'):
       param = tf.compat.v1.placeholder_with_default(
           np.ones([1], dtype=np.float16), shape=None)
       checked_param = distribution_util.embed_check_categorical_event_shape(
@@ -981,7 +955,7 @@ class EmbedCheckCategoricalEventShapeTest(tf.test.TestCase):
 
     if tf.executing_eagerly(): return
     with self.assertRaisesOpError(
-        "Number of classes exceeds `dtype` precision"):
+        'Number of classes exceeds `dtype` precision'):
       param = tf.compat.v1.placeholder_with_default(
           np.ones([int(2**11+1)], dtype=np.float16), shape=None)
       checked_param = distribution_util.embed_check_categorical_event_shape(
@@ -1000,7 +974,7 @@ class EmbedCheckCategoricalEventShapeTest(tf.test.TestCase):
 class EmbedCheckIntegerCastingClosedTest(tf.test.TestCase):
 
   def testCorrectlyAssertsNonnegative(self):
-    with self.assertRaisesOpError("Elements must be non-negative"):
+    with self.assertRaisesOpError('Elements must be non-negative'):
       x = tf.compat.v1.placeholder_with_default(
           np.array([1, -1], dtype=np.float16), shape=None)
       x_checked = distribution_util.embed_check_integer_casting_closed(
@@ -1008,7 +982,7 @@ class EmbedCheckIntegerCastingClosedTest(tf.test.TestCase):
       self.evaluate(x_checked)
 
   def testCorrectlyAssertsPositive(self):
-    with self.assertRaisesOpError("Elements must be positive"):
+    with self.assertRaisesOpError('Elements must be positive'):
       x = tf.compat.v1.placeholder_with_default(
           np.array([1, 0], dtype=np.float16), shape=None)
       x_checked = distribution_util.embed_check_integer_casting_closed(
@@ -1016,7 +990,7 @@ class EmbedCheckIntegerCastingClosedTest(tf.test.TestCase):
       self.evaluate(x_checked)
 
   def testCorrectlyAssersIntegerForm(self):
-    with self.assertRaisesOpError("Elements must be int16-equivalent."):
+    with self.assertRaisesOpError('Elements must be int16-equivalent.'):
       x = tf.compat.v1.placeholder_with_default(
           np.array([1, 1.5], dtype=np.float16), shape=None)
       x_checked = distribution_util.embed_check_integer_casting_closed(
@@ -1024,7 +998,7 @@ class EmbedCheckIntegerCastingClosedTest(tf.test.TestCase):
       self.evaluate(x_checked)
 
   def testCorrectlyAssertsLargestPossibleInteger(self):
-    with self.assertRaisesOpError("Elements cannot exceed 32767."):
+    with self.assertRaisesOpError('Elements cannot exceed 32767.'):
       x = tf.compat.v1.placeholder_with_default(
           np.array([1, 2**15], dtype=np.int32), shape=None)
       x_checked = distribution_util.embed_check_integer_casting_closed(
@@ -1032,38 +1006,12 @@ class EmbedCheckIntegerCastingClosedTest(tf.test.TestCase):
       self.evaluate(x_checked)
 
   def testCorrectlyAssertsSmallestPossibleInteger(self):
-    with self.assertRaisesOpError("Elements cannot be smaller than 0."):
+    with self.assertRaisesOpError('Elements cannot be smaller than 0.'):
       x = tf.compat.v1.placeholder_with_default(
           np.array([1, -1], dtype=np.int32), shape=None)
       x_checked = distribution_util.embed_check_integer_casting_closed(
           x, target_dtype=tf.uint16, assert_nonnegative=False)
       self.evaluate(x_checked)
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class LogCombinationsTest(tf.test.TestCase):
-
-  def testLogCombinationsBinomial(self):
-    n = [2, 5, 12, 15]
-    k = [1, 2, 4, 11]
-
-    log_combs = np.log(sp_special.binom(n, k))
-
-    n = np.array(n, dtype=np.float32)
-    counts = [[1., 1], [2., 3], [4., 8], [11, 4]]
-    log_binom = distribution_util.log_combinations(n, counts)
-    self.assertEqual([4], log_binom.shape)
-    self.assertAllClose(log_combs, self.evaluate(log_binom))
-
-  def testLogCombinationsShape(self):
-    # Shape [2, 2]
-    n = [[2, 5], [12, 15]]
-
-    n = np.array(n, dtype=np.float32)
-    # Shape [2, 2, 4]
-    counts = [[[1., 1, 0, 0], [2., 2, 1, 0]], [[4., 4, 1, 3], [10, 1, 1, 4]]]
-    log_binom = distribution_util.log_combinations(n, counts)
-    self.assertEqual([2, 2], log_binom.shape)
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -1148,9 +1096,9 @@ class RotateTransposeTest(tf.test.TestCase):
 
   def testRollStatic(self):
     if tf.executing_eagerly():
-      error_message = r"Attempt to convert a value \(None\)"
+      error_message = r'Attempt to convert a value \(None\)'
     else:
-      error_message = "None values not supported."
+      error_message = 'None values not supported.'
     with self.assertRaisesRegexp(ValueError, error_message):
       distribution_util.rotate_transpose(None, 1)
     for x in (np.ones(1), np.ones((2, 1)), np.ones((3, 2, 1))):
@@ -1325,350 +1273,12 @@ class PreferStaticValueTest(tf.test.TestCase):
     self.assertAllEqual(np.array(1), self.evaluate(value))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class FillTriangularTest(tf.test.TestCase):
-
-  def setUp(self):
-    self._rng = np.random.RandomState(42)
-
-  def _fill_triangular(self, x, upper=False):
-    """Numpy implementation of `fill_triangular`."""
-    x = np.asarray(x)
-    # Formula derived by solving for n: m = n(n+1)/2.
-    m = np.int32(x.shape[-1])
-    n = np.sqrt(0.25 + 2. * m) - 0.5
-    if n != np.floor(n):
-      raise ValueError("Invalid shape.")
-    n = np.int32(n)
-    # We can't do: `x[..., -(n**2-m):]` because this doesn't correctly handle
-    # `m == n == 1`. Hence, we do absolute indexing.
-    x_tail = x[..., (m - (n * n - m)):]
-    y = np.concatenate(
-        [x, x_tail[..., ::-1]] if upper else [x_tail, x[..., ::-1]],
-        axis=-1)
-    y = y.reshape(np.concatenate([
-        np.int32(x.shape[:-1]),
-        np.int32([n, n]),
-    ], axis=0))
-    return np.triu(y) if upper else np.tril(y)
-
-  def _run_test(self, x_, use_deferred_shape=False, **kwargs):
-    x_ = np.asarray(x_)
-    static_shape = None if use_deferred_shape else x_.shape
-    x_pl = tf.compat.v1.placeholder_with_default(x_, shape=static_shape)
-    # Add `zeros_like(x)` such that x's value and gradient are identical. We
-    # do this so we can ensure each gradient value is mapped to the right
-    # gradient location.  (Not doing this means the gradient wrt `x` is simple
-    # `ones_like(x)`.)
-    # Note:
-    #   zeros_like_x_pl == zeros_like(x_pl)
-    #   gradient(zeros_like_x_pl, x_pl) == x_pl - 1
-    def _zeros_like(x):
-      return x * tf.stop_gradient(x - 1.) - tf.stop_gradient(x * (x - 1.))
-    actual, grad_actual = value_and_gradient(
-        lambda x: distribution_util.fill_triangular(  # pylint: disable=g-long-lambda
-            x + _zeros_like(x), **kwargs),
-        x_pl)
-    actual_, grad_actual_ = self.evaluate([actual, grad_actual])
-    expected = self._fill_triangular(x_, **kwargs)
-    if use_deferred_shape and not tf.executing_eagerly():
-      self.assertEqual(None, actual.shape)
-    else:
-      self.assertAllEqual(expected.shape, actual.shape)
-    self.assertAllClose(expected, actual_, rtol=1e-8, atol=1e-9)
-    self.assertAllClose(x_, grad_actual_, rtol=1e-8, atol=1e-9)
-
-  def testCorrectlyMakes1x1TriLower(self):
-    self._run_test(self._rng.randn(3, int(1*2/2)))
-
-  def testCorrectlyMakesNoBatchTriLower(self):
-    self._run_test(self._rng.randn(int(4*5/2)))
-
-  def testCorrectlyMakesBatchTriLower(self):
-    self._run_test(self._rng.randn(2, 3, int(3*4/2)))
-
-  def testCorrectlyMakesBatchTriLowerUnknownShape(self):
-    self._run_test(self._rng.randn(2, 3, int(3*4/2)), use_deferred_shape=True)
-
-  def testCorrectlyMakesBatch7x7TriLowerUnknownShape(self):
-    self._run_test(self._rng.randn(2, 3, int(7*8/2)), use_deferred_shape=True)
-
-  def testCorrectlyMakesBatch7x7TriLower(self):
-    self._run_test(self._rng.randn(2, 3, int(7*8/2)))
-
-  def testCorrectlyMakes1x1TriUpper(self):
-    self._run_test(self._rng.randn(3, int(1*2/2)), upper=True)
-
-  def testCorrectlyMakesNoBatchTriUpper(self):
-    self._run_test(self._rng.randn(int(4*5/2)), upper=True)
-
-  def testCorrectlyMakesBatchTriUpper(self):
-    self._run_test(self._rng.randn(2, 2, int(3*4/2)), upper=True)
-
-  def testCorrectlyMakesBatchTriUpperUnknownShape(self):
-    self._run_test(self._rng.randn(2, 2, int(3*4/2)),
-                   use_deferred_shape=True,
-                   upper=True)
-
-  def testCorrectlyMakesBatch7x7TriUpperUnknownShape(self):
-    self._run_test(self._rng.randn(2, 3, int(7*8/2)),
-                   use_deferred_shape=True,
-                   upper=True)
-
-  def testCorrectlyMakesBatch7x7TriUpper(self):
-    self._run_test(self._rng.randn(2, 3, int(7*8/2)), upper=True)
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class FillTriangularInverseTest(FillTriangularTest):
-
-  def _run_test(self, x_, use_deferred_shape=False, **kwargs):
-    x_ = np.asarray(x_)
-    static_shape = None if use_deferred_shape else x_.shape
-    x_pl = tf.compat.v1.placeholder_with_default(x_, shape=static_shape)
-
-    zeros_like_x_pl = (x_pl * tf.stop_gradient(x_pl - 1.)
-                       - tf.stop_gradient(x_pl * (x_pl - 1.)))
-    x = x_pl + zeros_like_x_pl
-    actual = distribution_util.fill_triangular(x, **kwargs)
-    inverse_actual = distribution_util.fill_triangular_inverse(
-        actual, **kwargs)
-
-    inverse_actual_ = self.evaluate(inverse_actual)
-
-    if use_deferred_shape and not tf.executing_eagerly():
-      self.assertEqual(None, inverse_actual.shape)
-    else:
-      self.assertAllEqual(x_.shape, inverse_actual.shape)
-    self.assertAllEqual(x_, inverse_actual_)
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class ReduceWeightedLogSumExp(tf.test.TestCase):
-
-  def _reduce_weighted_logsumexp(self, logx, w, axis, keep_dims=False):
-    m = np.max(logx, axis=axis, keepdims=True)
-    sum_ = np.sum(w * np.exp(logx - m), axis=axis, keepdims=keep_dims)
-    sgn = np.sign(sum_)
-    if not keep_dims:
-      m = np.squeeze(m, axis=axis)
-    return m + np.log(sgn * sum_), sgn
-
-  def testNoWeights(self):
-    logx_ = np.array([[0., -1, 1000.],
-                      [0, 1, -1000.],
-                      [-5, 0, 5]])
-    logx = tf.constant(logx_)
-    with tf.GradientTape() as tape:
-      tape.watch(logx)
-      expected = tf.reduce_logsumexp(input_tensor=logx, axis=-1)
-    grad_expected = tape.gradient(expected, logx)
-    with tf.GradientTape() as tape:
-      tape.watch(logx)
-      actual, actual_sgn = distribution_util.reduce_weighted_logsumexp(
-          logx, axis=-1, return_sign=True)
-    grad_actual = tape.gradient(actual, logx)
-    [
-        actual_,
-        actual_sgn_,
-        grad_actual_,
-        expected_,
-        grad_expected_,
-    ] = self.evaluate([
-        actual,
-        actual_sgn,
-        grad_actual,
-        expected,
-        grad_expected,
-    ])
-    self.assertAllEqual(expected_, actual_)
-    self.assertAllEqual(grad_expected_, grad_actual_)
-    self.assertAllEqual([1., 1, 1], actual_sgn_)
-
-  def testNegativeWeights(self):
-    logx_ = np.array([[0., -1, 1000.],
-                      [0, 1, -1000.],
-                      [-5, 0, 5]])
-    w_ = np.array([[1., 1, -1],
-                   [1, -2, 1],
-                   [1, 0, 1]])
-    expected, _ = self._reduce_weighted_logsumexp(logx_, w_, axis=-1)
-    logx = tf.constant(logx_)
-    w = tf.constant(w_)
-    actual, actual_sgn = distribution_util.reduce_weighted_logsumexp(
-        logx, w, axis=-1, return_sign=True)
-    actual_, actual_sgn_ = self.evaluate([actual, actual_sgn])
-    self.assertAllEqual(expected, actual_)
-    self.assertAllEqual([-1., -1, 1], actual_sgn_)
-
-  def testKeepDims(self):
-    logx_ = np.array([[0., -1, 1000.],
-                      [0, 1, -1000.],
-                      [-5, 0, 5]])
-    w_ = np.array([[1., 1, -1],
-                   [1, -2, 1],
-                   [1, 0, 1]])
-    expected, _ = self._reduce_weighted_logsumexp(
-        logx_, w_, axis=-1, keep_dims=True)
-    logx = tf.constant(logx_)
-    w = tf.constant(w_)
-    actual, actual_sgn = distribution_util.reduce_weighted_logsumexp(
-        logx, w, axis=-1, return_sign=True, keep_dims=True)
-    actual_, actual_sgn_ = self.evaluate([actual, actual_sgn])
-    self.assertAllEqual(expected, actual_)
-    self.assertAllEqual([[-1.], [-1], [1]], actual_sgn_)
-
-  def testDocString(self):
-    """This test verifies the correctness of the docstring examples."""
-
-    x = tf.constant([[0., 0, 0],
-                     [0, 0, 0]])
-
-    w = tf.constant([[-1., 1, 1],
-                     [1, 1, 1]])
-
-    self.assertAllClose(
-        np.log(4),
-        self.evaluate(distribution_util.reduce_weighted_logsumexp(x, w)))
-
-    with np.errstate(divide="ignore"):
-      self.assertAllClose(
-          np.log([0, 2, 2]),
-          self.evaluate(
-              distribution_util.reduce_weighted_logsumexp(x, w, axis=0)))
-
-    self.assertAllClose(
-        np.log([1, 3]),
-        self.evaluate(
-            distribution_util.reduce_weighted_logsumexp(x, w, axis=1)))
-
-    self.assertAllClose(
-        np.log([[1], [3]]),
-        self.evaluate(
-            distribution_util.reduce_weighted_logsumexp(
-                x, w, axis=1, keep_dims=True)))
-
-    self.assertAllClose(
-        np.log(4),
-        self.evaluate(
-            distribution_util.reduce_weighted_logsumexp(x, w, axis=[0, 1])))
-
-
 # No need for eager tests; this function doesn't depend on TF.
 class GenNewSeedTest(tf.test.TestCase):
 
   def testOnlyNoneReturnsNone(self):
-    self.assertIsNotNone(distribution_util.gen_new_seed(0, "salt"))
-    self.assertIsNone(distribution_util.gen_new_seed(None, "salt"))
-
-
-# TODO(jvdillon): Merge this test back into:
-# tensorflow/python/kernel_tests/softplus_op_test.py
-# once TF core is accepting new ops.
-@test_util.run_all_in_graph_and_eager_modes
-class SoftplusTest(tf.test.TestCase):
-
-  def _npSoftplus(self, np_features):
-    np_features = np.asarray(np_features)
-    zero = np.asarray(0).astype(np_features.dtype)
-    return np.logaddexp(zero, np_features)
-
-  def _testSoftplus(self, np_features, use_gpu=False):
-    np_features = np.asarray(np_features)
-    np_softplus = self._npSoftplus(np_features)
-    softplus = tf.nn.softplus(np_features)
-    softplus_inverse = distribution_util.softplus_inverse(softplus)
-    [tf_softplus, tf_softplus_inverse] = self.evaluate([
-        softplus, softplus_inverse])
-    self.assertAllCloseAccordingToType(np_softplus, tf_softplus)
-    rtol = {"float16": 0.07, "float32": 0.003, "float64": 0.002}.get(
-        str(np_features.dtype), 1e-6)
-    # This will test that we correctly computed the inverse by verifying we
-    # recovered the original input.
-    self.assertAllCloseAccordingToType(
-        np_features, tf_softplus_inverse,
-        atol=0., rtol=rtol)
-    self.assertAllEqual(np.ones_like(tf_softplus).astype(np.bool),
-                        tf_softplus > 0)
-
-    self.assertShapeEqual(np_softplus, softplus)
-    self.assertShapeEqual(np_softplus, softplus_inverse)
-
-    self.assertAllEqual(np.ones_like(tf_softplus).astype(np.bool),
-                        np.isfinite(tf_softplus))
-    self.assertAllEqual(np.ones_like(tf_softplus_inverse).astype(np.bool),
-                        np.isfinite(tf_softplus_inverse))
-
-  def testNumbers(self):
-    for t in [np.float16, np.float32, np.float64]:
-      lower = {np.float16: -15, np.float32: -50, np.float64: -50}.get(t, -100)
-      upper = {np.float16: 50, np.float32: 50, np.float64: 50}.get(t, 100)
-      self._testSoftplus(
-          np.array(np.linspace(lower, upper, int(1e3)).astype(t)).reshape(
-              [2, -1]),
-          use_gpu=False)
-      self._testSoftplus(
-          np.array(np.linspace(lower, upper, int(1e3)).astype(t)).reshape(
-              [2, -1]),
-          use_gpu=True)
-      log_eps = np.log(np.finfo(t).eps)
-      one = t(1)
-      ten = t(10)
-      self._testSoftplus(
-          [
-              log_eps,
-              log_eps - one,
-              log_eps + one,
-              log_eps - ten,
-              log_eps + ten,
-              -log_eps,
-              -log_eps - one,
-              -log_eps + one,
-              -log_eps - ten,
-              -log_eps + ten,
-          ],
-          use_gpu=False)
-      self._testSoftplus(
-          [
-              log_eps,
-              log_eps - one,
-              log_eps + one,
-              log_eps - ten,
-              log_eps + ten - log_eps,
-              -log_eps - one,
-              -log_eps + one,
-              -log_eps - ten,
-              -log_eps + ten,
-          ],
-          use_gpu=True)
-
-  def testGradient(self):
-    x = tf.constant(
-        [-0.9, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 0.9],
-        shape=[2, 5],
-        name="x")
-    err = gradient_checker_v2.max_error(
-        *gradient_checker_v2.compute_gradient(tf.nn.softplus, [x]))
-    tf.compat.v1.logging.vlog(2, "softplus (float) gradient err = ", err)
-    self.assertLess(err, 1e-4)
-
-  def testInverseSoftplusGradientNeverNan(self):
-    # Note that this range contains both zero and inf.
-    x = tf.constant(np.logspace(-8, 6).astype(np.float16))
-    _, grads = self.evaluate(value_and_gradient(
-        distribution_util.softplus_inverse, x))
-    # Equivalent to `assertAllFalse` (if it existed).
-    self.assertAllEqual(np.zeros_like(grads).astype(np.bool), np.isnan(grads))
-
-  def testInverseSoftplusGradientFinite(self):
-    # This range of x is all finite, and so is 1 / x.  So the
-    # gradient and its approximations should be finite as well.
-    x = tf.constant(np.logspace(-4.8, 4.5).astype(np.float16))
-    _, grads = self.evaluate(value_and_gradient(
-        distribution_util.softplus_inverse, x))
-    # Equivalent to `assertAllTrue` (if it existed).
-    self.assertAllEqual(
-        np.ones_like(grads).astype(np.bool), np.isfinite(grads))
+    self.assertIsNotNone(distribution_util.gen_new_seed(0, 'salt'))
+    self.assertIsNone(distribution_util.gen_new_seed(None, 'salt'))
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -1684,7 +1294,7 @@ class ArgumentsTest(tf.test.TestCase):
     def foo(a, b, c, d):  # pylint: disable=unused-argument
       return distribution_util.parent_frame_arguments()
 
-    self.assertEqual({"a": 1, "b": 2, "c": 3, "d": 4}, foo(1, 2, 3, 4))
+    self.assertEqual({'a': 1, 'b': 2, 'c': 3, 'd': 4}, foo(1, 2, 3, 4))
 
     # Tests that it does not matter where this function is called, and
     # no other local variables are returned back.
@@ -1693,7 +1303,7 @@ class ArgumentsTest(tf.test.TestCase):
       unused_y = c * 3
       return distribution_util.parent_frame_arguments()
 
-    self.assertEqual({"a": 1, "b": 2, "c": 3}, bar(1, 2, 3))
+    self.assertEqual({'a': 1, 'b': 2, 'c': 3}, bar(1, 2, 3))
 
   def testOverloadedArgumentValues(self):
     def foo(a, b, c):  # pylint: disable=unused-argument
@@ -1701,31 +1311,31 @@ class ArgumentsTest(tf.test.TestCase):
       b = 31
       c = 42
       return distribution_util.parent_frame_arguments()
-    self.assertEqual({"a": 42, "b": 31, "c": 42}, foo(1, 2, 3))
+    self.assertEqual({'a': 42, 'b': 31, 'c': 42}, foo(1, 2, 3))
 
   def testKeywordArguments(self):
     def foo(**kwargs):  # pylint: disable=unused-argument
       return distribution_util.parent_frame_arguments()
 
-    self.assertEqual({"a": 1, "b": 2, "c": 3, "d": 4}, foo(a=1, b=2, c=3, d=4))
+    self.assertEqual({'a': 1, 'b': 2, 'c': 3, 'd': 4}, foo(a=1, b=2, c=3, d=4))
 
   def testPositionalKeywordArgs(self):
     def foo(a, b, c, **kwargs):  # pylint: disable=unused-argument
       return distribution_util.parent_frame_arguments()
 
-    self.assertEqual({"a": 1, "b": 2, "c": 3}, foo(a=1, b=2, c=3))
-    self.assertEqual({"a": 1, "b": 2, "c": 3, "unicorn": None},
+    self.assertEqual({'a': 1, 'b': 2, 'c': 3}, foo(a=1, b=2, c=3))
+    self.assertEqual({'a': 1, 'b': 2, 'c': 3, 'unicorn': None},
                      foo(a=1, b=2, c=3, unicorn=None))
 
   def testNoVarargs(self):
     def foo(a, b, c, *varargs, **kwargs):  # pylint: disable=unused-argument
       return distribution_util.parent_frame_arguments()
 
-    self.assertEqual({"a": 1, "b": 2, "c": 3}, foo(a=1, b=2, c=3))
-    self.assertEqual({"a": 1, "b": 2, "c": 3}, foo(1, 2, 3, *[1, 2, 3]))
-    self.assertEqual({"a": 1, "b": 2, "c": 3, "unicorn": None},
+    self.assertEqual({'a': 1, 'b': 2, 'c': 3}, foo(a=1, b=2, c=3))
+    self.assertEqual({'a': 1, 'b': 2, 'c': 3}, foo(1, 2, 3, *[1, 2, 3]))
+    self.assertEqual({'a': 1, 'b': 2, 'c': 3, 'unicorn': None},
                      foo(1, 2, 3, unicorn=None))
-    self.assertEqual({"a": 1, "b": 2, "c": 3, "unicorn": None},
+    self.assertEqual({'a': 1, 'b': 2, 'c': 3, 'unicorn': None},
                      foo(1, 2, 3, *[1, 2, 3], unicorn=None))
 
 
@@ -1774,7 +1384,7 @@ class ExpandToVectorTest(tf.test.TestCase):
     # Helper to construct a const Tensor and call expand_to_tensor on it.
     def _expand_tensor(x, dtype=tf.int32):
       return distribution_util.expand_to_vector(
-          tf.convert_to_tensor(value=x, dtype=dtype), op_name="test")
+          tf.convert_to_tensor(value=x, dtype=dtype), op_name='test')
 
     self._check_static([], _expand_tensor([]))
     self._check_static([], _expand_tensor(()))
@@ -1797,7 +1407,7 @@ class ExpandToVectorTest(tf.test.TestCase):
       return distribution_util.expand_to_vector(
           tf.compat.v1.placeholder_with_default(
               np.array(x, dtype=dtype), shape=shape),
-          tensor_name="name_for_tensor",
+          tensor_name='name_for_tensor',
           validate_args=validate_args)
 
     for dtype in [np.int64, np.float32, np.float64, np.int64]:
@@ -1833,7 +1443,7 @@ class ExpandToVectorTest(tf.test.TestCase):
 class WithDependenciesTestCase(test_util.TensorFlowTestCase):
 
   def testTupleDependencies(self):
-    counter = tf.compat.v2.Variable(0, name="my_counter")
+    counter = tf.compat.v2.Variable(0, name='my_counter')
     const_with_dep = distribution_util.with_dependencies(
         (tf.compat.v1.assign_add(counter, 1), tf.constant(42)),
         tf.constant(7))
@@ -1845,7 +1455,7 @@ class WithDependenciesTestCase(test_util.TensorFlowTestCase):
     self.assertEqual(1, self.evaluate(counter))
 
   def testListDependencies(self):
-    counter = tf.compat.v2.Variable(0, name="my_counter")
+    counter = tf.compat.v2.Variable(0, name='my_counter')
     const_with_dep = distribution_util.with_dependencies(
         [tf.compat.v1.assign_add(counter, 1), tf.constant(42)],
         tf.constant(7))
@@ -1857,5 +1467,5 @@ class WithDependenciesTestCase(test_util.TensorFlowTestCase):
     self.assertEqual(1, self.evaluate(counter))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

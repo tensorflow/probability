@@ -23,9 +23,9 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -84,10 +84,10 @@ class FillTriangular(bijector.Bijector):
         name=name)
 
   def _forward(self, x):
-    return distribution_util.fill_triangular(x, upper=self._upper)
+    return tfp_math.fill_triangular(x, upper=self._upper)
 
   def _inverse(self, y):
-    return distribution_util.fill_triangular_inverse(y, upper=self._upper)
+    return tfp_math.fill_triangular_inverse(y, upper=self._upper)
 
   def _forward_log_det_jacobian(self, x):
     return tf.zeros_like(x[..., 0])

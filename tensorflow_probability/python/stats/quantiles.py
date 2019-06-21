@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 
 __all__ = [
     'count_integers',
@@ -829,7 +830,7 @@ def _make_static_axis_non_negative_list(axis, ndims):
   Raises:
     ValueError: If `axis` is not statically defined.
   """
-  axis = distribution_util.make_non_negative_axis(axis, ndims)
+  axis = prefer_static.non_negative_axis(axis, ndims)
 
   axis_const = tf.get_static_value(axis)
   if axis_const is None:

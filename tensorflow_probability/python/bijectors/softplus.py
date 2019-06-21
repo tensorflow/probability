@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -109,14 +110,14 @@ class Softplus(bijector.Bijector):
 
   def _inverse(self, y):
     if self.hinge_softness is None:
-      return distribution_util.softplus_inverse(y)
+      return tfp_math.softplus_inverse(y)
     hinge_softness = tf.cast(self.hinge_softness, y.dtype)
-    return hinge_softness * distribution_util.softplus_inverse(
+    return hinge_softness * tfp_math.softplus_inverse(
         y / hinge_softness)
 
   def _inverse_log_det_jacobian(self, y):
     # Could also do:
-    #   ildj = tf.reduce_sum(y - distribution_util.softplus_inverse(y),
+    #   ildj = tf.reduce_sum(y - tfp.math.softplus_inverse(y),
     #                              axis=event_dims)
     # but the following is more numerically stable. Ie,
     # Y = Log[1 + exp{X}] ==> X = Log[exp{Y} - 1]

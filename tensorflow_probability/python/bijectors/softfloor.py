@@ -19,6 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -120,9 +122,9 @@ class Softfloor(bijector.Bijector):
     # the logit function satisfies 1 - sigma(-x) = sigma(x), we have that
     # the derivative is symmetric around the center of the interval (a + 0.5),
     # and hence is continuous at the endpoints.
-    x -= 0.5
+    x = x - 0.5
     fractional_part = x - tf.math.floor(x)
-    cyclic_part = tf.nn.sigmoid((fractional_part - 0.5) / self.temperature)
+    cyclic_part = tf.math.sigmoid((fractional_part - 0.5) / self.temperature)
     # Rescale so the left tail is 0., and the right tail is 1. This
     # will also guarantee us continuity. Differentiability comes from the
     # fact that the derivative of the sigmoid is symmetric, and hence
@@ -149,15 +151,17 @@ class Softfloor(bijector.Bijector):
     return tf.math.floor(y) + new_fractional_part
 
   def _forward_log_det_jacobian(self, x):
-    x -= 0.5
+    x = x - 0.5
     fractional_part = x - tf.math.floor(x)
     inner_part = (fractional_part - 0.5) / self.temperature
 
-    offset = (tf.math.log(self.temperature) - tf.nn.softplus(
-        0.5 / self.temperature) + distribution_util.softplus_inverse(
+    offset = (tf.math.log(self.temperature) - tf.math.softplus(
+        0.5 / self.temperature) + tfp_math.softplus_inverse(
             0.5 / self.temperature))
 
-    return -tf.nn.softplus(-inner_part) - tf.nn.softplus(inner_part) - offset
+    return (-tf.math.softplus(-inner_part) -
+            tf.math.softplus(inner_part) -
+            offset)
 
   @property
   def temperature(self):

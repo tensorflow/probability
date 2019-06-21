@@ -27,8 +27,8 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.math.generic import soft_threshold
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
-from tensorflow_probability.python.math.numeric import soft_threshold
 
 __all__ = [
     'minimize',

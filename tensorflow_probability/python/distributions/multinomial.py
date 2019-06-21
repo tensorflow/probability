@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import categorical as categorical_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -257,7 +258,7 @@ class Multinomial(distribution.Distribution):
       k = tf.convert_to_tensor(self.total_count)
       return (
           tf.reduce_sum(counts * log_p, axis=-1) +        # log_unnorm_prob
-          distribution_util.log_combinations(k, counts))  # -log_normalization
+          tfp_math.log_combinations(k, counts))  # -log_normalization
 
   def _mean(self):
     p = self._probs_parameter_no_checks()

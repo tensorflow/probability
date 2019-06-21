@@ -101,6 +101,7 @@ py_library(
         ":tensorshape_util",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/math",
     ],
 )
 
@@ -112,7 +113,6 @@ py_test(
         ":distribution_util",
         ":tensorshape_util",
         # numpy dep,
-        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/math:gradient",
