@@ -49,6 +49,14 @@ flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
 FLAGS = flags.FLAGS
 
 
+VAR_USAGES = {}
+
+
+def usage_counting_identity(var):
+  VAR_USAGES[var] = VAR_USAGES.get(var, []) + [traceback.format_stack(limit=15)]
+  return tf.identity(var)
+
+
 def hypothesis_max_examples():
   # Use --test_env=TFP_HYPOTHESIS_MAX_EXAMPLES=1000 to get fuller coverage.
   return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', 20))
@@ -303,7 +311,7 @@ def broadcasting_params(draw,
       params_kwargs[param] = tf.compat.v2.Variable(
           params_kwargs[param], name=param)
       if draw(hps.booleans()):
-        params_kwargs[param] = tfp.util.DeferredTensor(tf.identity,
+        params_kwargs[param] = tfp.util.DeferredTensor(usage_counting_identity,
                                                        params_kwargs[param])
   return params_kwargs
 
@@ -485,17 +493,39 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
         raise AssertionError(
             'No attr found for parameter {} of distribution {}: \n{}'.format(
                 k, dist_name, e))
+      stat = data.draw(
+          hps.one_of(
+              map(hps.just,
+                  ['mean', 'mode', 'variance', 'covariance', 'entropy'])))
+      try:
+        VAR_USAGES.clear()
+        getattr(dist, stat)()
+        var_nusages = {var: len(usages) for var, usages in VAR_USAGES.items()}
+        max_permissible = 2  # TODO(jvdillon): Reduce this to 1.
+        if any(len(usages) > max_permissible for usages in VAR_USAGES.values()):
+          for var, usages in six.iteritems(VAR_USAGES):
+            if len(usages) > max_permissible:
+              print('While executing statistic `{}` of `{}`, detected {} '
+                    'Tensor conversions for `{}`:'.format(
+                        stat, dist, len(usages), var))
+              for i, usage in enumerate(usages):
+                print('Conversion {} of {}:\n{}'.format(i + 1, len(usages),
+                                                        ''.join(usage)))
+          raise AssertionError(
+              'Excessive tensor conversions detected for {} {}: {}'.format(
+                  dist_name, stat, var_nusages))
+      except NotImplementedError:
+        pass
+
     if dist.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
       with tf.GradientTape() as tape:
         samp = dist.sample()
       grads = tape.gradient(samp, dist.variables)
       for grad, var in zip(grads, dist.variables):
-        try:
-          self.assertIsNotNone(grad)
-        except AssertionError as e:
+        if grad is None:
           raise AssertionError(
-              'Missing sample -> {} grad for distribution {}:\n{}'.format(
-                  var, dist_name, e))
+              'Missing sample -> {} grad for distribution {}'.format(
+                  var, dist_name))
 
     if dist_name not in NO_LOG_PROB_PARAM_GRADS:
       # Turn off validations, since log_prob can choke on dist's own samples.
@@ -504,12 +534,10 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
         lp = dist.log_prob(tf.stop_gradient(dist.sample()))
       grads = tape.gradient(lp, dist.variables)
       for grad, var in zip(grads, dist.variables):
-        try:
-          self.assertIsNotNone(grad)
-        except AssertionError as e:
+        if grad is None:
           raise AssertionError(
-              'Missing log_prob -> {} grad for distribution {}:\n{}'.format(
-                  var, dist_name, e))
+              'Missing log_prob -> {} grad for distribution {}'.format(
+                  var, dist_name))
 
 
 @test_util.run_all_in_graph_and_eager_modes
