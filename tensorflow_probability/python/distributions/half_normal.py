@@ -142,10 +142,11 @@ class HalfNormal(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    shape = tf.concat([[n], self.batch_shape_tensor()], 0)
+    scale = tf.convert_to_tensor(self.scale)
+    shape = tf.concat([[n], tf.shape(scale)], 0)
     sampled = tf.random.normal(
         shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=seed)
-    return tf.abs(sampled * self.scale)
+    return tf.abs(sampled * scale)
 
   def _prob(self, x):
     scale = tf.convert_to_tensor(self.scale)
