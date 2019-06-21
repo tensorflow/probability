@@ -232,8 +232,9 @@ class Categorical(distribution.Distribution):
       return self._probs_deprecated_behavior()
     return self._probs
 
-  def _batch_shape_tensor(self):
-    x = self._probs if self._logits is None else self._logits
+  def _batch_shape_tensor(self, x=None):
+    if x is None:
+      x = self._probs if self._logits is None else self._logits
     return tf.shape(x)[:-1]
 
   def _batch_shape(self):
@@ -247,20 +248,20 @@ class Categorical(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    logits = self.logits_parameter()
-    logits_2d = tf.reshape(logits, [-1, self._num_categories()])
+    logits = self._logits_parameter_no_checks()
+    logits_2d = tf.reshape(logits, [-1, self._num_categories(logits)])
     sample_dtype = tf.int64 if dtype_util.size(self.dtype) > 4 else tf.int32
     draws = tf.random.categorical(
         logits_2d, n, dtype=sample_dtype, seed=seed)
     draws = tf.cast(draws, self.dtype)
     return tf.reshape(
         tf.transpose(draws),
-        shape=tf.concat([[n], self.batch_shape_tensor()], axis=0))
+        shape=tf.concat([[n], self._batch_shape_tensor(logits)], axis=0))
 
   def _cdf(self, k):
     # TODO(b/135263541): Improve numerical precision of categorical.cdf.
     probs = self.probs_parameter()
-    num_categories = self._num_categories()
+    num_categories = self._num_categories(probs)
 
     k, probs = _broadcast_cat_event_and_params(
         k, probs, base_dtype=dtype_util.base_dtype(self.dtype))
@@ -335,21 +336,28 @@ class Categorical(distribution.Distribution):
   def logits_parameter(self, name=None):
     """Logits vec computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'logits_parameter'):
-      if self._logits is None:
-        return tf.math.log(self._probs)
-      return tf.identity(self._logits)
+      return self._logits_parameter_no_checks()
+
+  def _logits_parameter_no_checks(self):
+    if self._logits is None:
+      return tf.math.log(self._probs)
+    return tf.identity(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'probs_parameter'):
-      if self._logits is None:
-        return tf.identity(self._probs)
-      return tf.nn.softmax(self._logits)
+      return self._probs_parameter_no_checks()
 
-  def _num_categories(self):
+  def _probs_parameter_no_checks(self):
+    if self._logits is None:
+      return tf.identity(self._probs)
+    return tf.nn.softmax(self._logits)
+
+  def _num_categories(self, x=None):
     """Scalar `int32` tensor: the number of categories."""
     with tf.name_scope('num_categories'):
-      x = self._probs if self._logits is None else self._logits
+      if x is None:
+        x = self._probs if self._logits is None else self._logits
       num_categories = tf.compat.dimension_value(x.shape[-1])
       if num_categories is not None:
         return num_categories
