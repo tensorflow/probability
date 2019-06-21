@@ -305,8 +305,9 @@ class Categorical(distribution.Distribution):
     if self._logits is None:
       # If we only have probs, there's not much we can do to ensure numerical
       # precision.
+      probs = tf.convert_to_tensor(self._probs)
       return -tf.reduce_sum(
-          tf.math.multiply_no_nan(tf.math.log(self._probs), self._probs),
+          tf.math.multiply_no_nan(tf.math.log(probs), probs),
           axis=-1)
     # The following result can be derived as follows. Write log(p[i]) as:
     # s[i]-m-lse(s[i]-m) where m=max(s), then you have:
@@ -317,12 +318,13 @@ class Categorical(distribution.Distribution):
     # Write x[i]=s[i]-m then you have:
     #   = -m - lse(x) + (1/sum_exp(x)) sum_i s[i] exp(x[i])
     # Negating all of this result is the Shanon (discrete) entropy.
-    m = tf.reduce_max(self._logits, axis=-1, keepdims=True)
-    x = self._logits - m
+    logits = tf.convert_to_tensor(self._logits)
+    m = tf.reduce_max(logits, axis=-1, keepdims=True)
+    x = logits - m
     sum_exp_x = tf.reduce_sum(tf.math.exp(x), axis=-1)
     lse_logits = m[..., 0] + tf.math.log(sum_exp_x)
     return lse_logits - tf.reduce_sum(
-        self._logits * tf.math.exp(x), axis=-1) / sum_exp_x
+        logits * tf.math.exp(x), axis=-1) / sum_exp_x
 
   def _mode(self):
     x = self._probs if self._logits is None else self._logits
@@ -393,6 +395,9 @@ def maybe_assert_categorical_param_correctness(
       if ndims < 1:
         raise ValueError(msg)
     elif validate_args:
+      x = tf.convert_to_tensor(x)
+      probs = x if logits is None else None  # Retain tensor conversion.
+      logits = x if probs is None else None
       assertions.append(assert_util.assert_rank_at_least(x, 1, message=msg))
 
   if not validate_args:
@@ -401,11 +406,13 @@ def maybe_assert_categorical_param_correctness(
 
   if logits is not None:
     if is_init != tensor_util.is_mutable(logits):
+      logits = tf.convert_to_tensor(logits)
       assertions.extend(
           distribution_util.assert_categorical_event_shape(logits))
 
   if probs is not None:
     if is_init != tensor_util.is_mutable(probs):
+      probs = tf.convert_to_tensor(probs)
       assertions.extend([
           assert_util.assert_non_negative(probs),
           assert_util.assert_near(
