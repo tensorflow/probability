@@ -22,9 +22,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import stats
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import prefer_static
 
 __all__ = [
     'effective_sample_size',
@@ -253,6 +256,8 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
 
 def potential_scale_reduction(chains_states,
                               independent_chain_ndims=1,
+                              split_chains=False,
+                              validate_args=False,
                               name=None):
   """Gelman and Rubin (1992)'s potential scale reduction for chain convergence.
 
@@ -289,6 +294,11 @@ def potential_scale_reduction(chains_states,
     independent_chain_ndims: Integer type `Tensor` with value `>= 1` giving the
       number of dimensions, from `dim = 1` to `dim = D`, holding independent
       chain results to be tested for convergence.
+    split_chains: Python `bool`. If `True`, divide samples from each chain into
+      first and second halves, treating these as separate chains.  This makes
+      R-hat more robust to non-stationary chains, and is recommended in [3].
+    validate_args: Whether to add runtime checks of argument validity. If False,
+      and arguments are incorrect, correct behavior is not guaranteed.
     name: `String` name to prepend to created tf.  Default:
       `potential_scale_reduction`.
 
@@ -355,6 +365,8 @@ def potential_scale_reduction(chains_states,
 
   [2]: Andrew Gelman and Donald B. Rubin. Inference from Iterative Simulation
        Using Multiple Sequences. _Statistical Science_, 7(4):457-472, 1992.
+  [3]: Vehtari et al.  Rank-normalization, folding, and localization: An
+       improved Rhat for assessing convergence of MCMC.
   """
   chains_states_was_list = _is_list_like(chains_states)
   if not chains_states_was_list:
@@ -374,7 +386,8 @@ def potential_scale_reduction(chains_states,
 
   with tf.name_scope('potential_scale_reduction' if name is None else name):
     rhat_list = [
-        _potential_scale_reduction_single_state(s, independent_chain_ndims)
+        _potential_scale_reduction_single_state(s, independent_chain_ndims,
+                                                split_chains, validate_args)
         for s in chains_states
     ]
 
@@ -383,13 +396,66 @@ def potential_scale_reduction(chains_states,
   return rhat_list[0]
 
 
-def _potential_scale_reduction_single_state(state, independent_chain_ndims):
+def _potential_scale_reduction_single_state(state, independent_chain_ndims,
+                                            split_chains, validate_args):
   """potential_scale_reduction for one single state `Tensor`."""
   with tf.name_scope('potential_scale_reduction_single_state'):
     # We assume exactly one leading dimension indexes e.g. correlated samples
     # from each Markov chain.
     state = tf.convert_to_tensor(value=state, name='state')
+
+    n_samples_ = tf.compat.dimension_value(state.shape[0])
+    if n_samples_ is not None:  # If available statically.
+      if split_chains and n_samples_ < 4:
+        raise ValueError(
+            'Must provide at least 4 samples when splitting chains. '
+            'Found {}'.format(n_samples_))
+      if not split_chains and n_samples_ < 2:
+        raise ValueError(
+            'Must provide at least 2 samples.  Found {}'.format(n_samples_))
+    elif validate_args:
+      if split_chains:
+        state = distribution_util.with_dependencies([
+            tf1.assert_greater(
+                tf.shape(state)[0], 4,
+                message='Must provide at least 4 samples when splitting chains.'
+            )], state)
+      else:
+        state = distribution_util.with_dependencies([
+            tf1.assert_greater(
+                tf.shape(state)[0], 2,
+                message='Must provide at least 2 samples.')], state)
+
+    # Define so it's not a magic number.
+    # Warning!  `if split_chains` logic assumes this is 1!
     sample_ndims = 1
+
+    if split_chains:
+      # Split the sample dimension in half, doubling the number of
+      # independent chains.
+
+      # For odd number of samples, keep all but the last sample.
+      state_shape = prefer_static.shape(state)
+      n_samples = state_shape[0]
+      state = state[:n_samples - n_samples % 2]
+
+      # Suppose state = [0, 1, 2, 3, 4, 5]
+      # Step 1: reshape into [[0, 1, 2], [3, 4, 5]]
+      # E.g. reshape states of shape [a, b] into [2, a//2, b].
+      state = tf.reshape(
+          state,
+          prefer_static.concat([[2, n_samples // 2], state_shape[1:]], axis=0)
+      )
+      # Step 2: Put the size `2` dimension in the right place to be treated as a
+      # chain, changing [[0, 1, 2], [3, 4, 5]] into [[0, 3], [1, 4], [2, 5]],
+      # reshaping [2, a//2, b] into [a//2, 2, b].
+      state = tf.transpose(
+          a=state,
+          perm=prefer_static.concat(
+              [[1, 0], tf.range(2, tf.rank(state))], axis=0))
+
+      # We're treating the new dim as indexing 2 chains, so increment.
+      independent_chain_ndims += 1
 
     sample_axis = tf.range(0, sample_ndims)
     chain_axis = tf.range(sample_ndims,

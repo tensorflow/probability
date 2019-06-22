@@ -231,49 +231,47 @@ class Dirichlet(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_dirichlet_sample_note)
   def _log_prob(self, x):
-    return self._log_unnormalized_prob(x) - self._log_normalization()
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
+      concentration = tf.convert_to_tensor(self.concentration)
+      return (tf.reduce_sum(tf.math.xlogy(concentration - 1., x), axis=-1) -
+              tf.math.lbeta(concentration))
 
   @distribution_util.AppendDocstring(_dirichlet_sample_note)
   def _prob(self, x):
     return tf.exp(self._log_prob(x))
 
-  def _log_unnormalized_prob(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      return tf.reduce_sum(
-          tf.math.xlogy(self.concentration - 1., x), axis=-1)
-
-  def _log_normalization(self):
-    return tf.math.lbeta(self.concentration)
-
   def _entropy(self):
+    concentration = tf.convert_to_tensor(self.concentration)
     k = tf.cast(self.event_shape_tensor()[0], self.dtype)
-    total_concentration = tf.reduce_sum(self.concentration, axis=-1)
-    return (self._log_normalization() +
-            ((total_concentration - k) *
-             tf.math.digamma(total_concentration)) - tf.reduce_sum(
-                 (self.concentration - 1.) *
-                 tf.math.digamma(self.concentration),
-                 axis=-1))
+    total_concentration = tf.reduce_sum(concentration, axis=-1)
+    return (tf.math.lbeta(concentration) +
+            ((total_concentration - k) * tf.math.digamma(total_concentration)) -
+            tf.reduce_sum((concentration - 1.) * tf.math.digamma(concentration),
+                          axis=-1))
 
   def _mean(self):
-    total_concentration = tf.reduce_sum(self.concentration, axis=-1)
-    return self.concentration / total_concentration[..., tf.newaxis]
+    concentration = tf.convert_to_tensor(self.concentration)
+    total_concentration = tf.reduce_sum(concentration, axis=-1, keepdims=True)
+    return concentration / total_concentration
 
   def _covariance(self):
-    x = self._variance_scale_term() * self._mean()
+    concentration = tf.convert_to_tensor(self.concentration)
+    total_concentration = tf.reduce_sum(concentration, axis=-1, keepdims=True)
+    mean = concentration / total_concentration
+    scale = tf.math.rsqrt(1. + total_concentration)
+    x = scale * mean
+    variance = x * (scale - x)
     return tf.linalg.set_diag(
-        -tf.matmul(x[..., tf.newaxis], x[..., tf.newaxis, :]),  # outer prod
-        self._variance())
+        tf.matmul(-x[..., tf.newaxis], x[..., tf.newaxis, :]),
+        variance)
 
   def _variance(self):
-    scale = self._variance_scale_term()
-    x = scale * self._mean()
+    concentration = tf.convert_to_tensor(self.concentration)
+    total_concentration = tf.reduce_sum(concentration, axis=-1, keepdims=True)
+    mean = concentration / total_concentration
+    scale = tf.math.rsqrt(1. + total_concentration)
+    x = scale * mean
     return x * (scale - x)
-
-  def _variance_scale_term(self):
-    """Helper to `_covariance` and `_variance` which computes a shared scale."""
-    total_concentration = tf.reduce_sum(self.concentration, axis=-1)
-    return tf.math.rsqrt(1. + total_concentration[..., tf.newaxis])
 
   @distribution_util.AppendDocstring(
       """Note: The mode is undefined when any `concentration <= 1`. If
@@ -281,19 +279,19 @@ class Dirichlet(distribution.Distribution):
       `self.allow_nan_stats` is `False` an exception is raised when one or more
       modes are undefined.""")
   def _mode(self):
+    concentration = tf.convert_to_tensor(self.concentration)
     k = tf.cast(self.event_shape_tensor()[0], self.dtype)
-    total_concentration = tf.reduce_sum(self.concentration, axis=-1)
-    mode = (self.concentration - 1.) / (
-        total_concentration[..., tf.newaxis] - k)
+    total_concentration = tf.reduce_sum(concentration, axis=-1)
+    mode = (concentration - 1.) / (total_concentration[..., tf.newaxis] - k)
     if self.allow_nan_stats:
       return tf.where(
-          tf.reduce_all(self.concentration > 1., axis=-1),
+          tf.reduce_all(concentration > 1., axis=-1),
           mode,
           dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     assertions = [
         assert_util.assert_less(
             tf.ones([], self.dtype),
-            self.concentration,
+            concentration,
             message='Mode undefined when any concentration <= 1')
     ]
     with tf.control_dependencies(assertions):
@@ -315,6 +313,8 @@ class Dirichlet(distribution.Distribution):
     """Checks the validity of the concentration parameter."""
     assertions = []
 
+    # In init, we can always build shape and dtype checks because
+    # we assume shape doesn't change for Variable backed args.
     if is_init:
       if not dtype_util.is_floating(self.concentration.dtype):
         raise TypeError('Argument `concentration` must be float type.')
@@ -339,8 +339,11 @@ class Dirichlet(distribution.Distribution):
             tf.shape(self.concentration)[-1],
             message=msg))
 
-    if (self.validate_args and
-        is_init != tensor_util.is_mutable(self.concentration)):
+    if not self.validate_args:
+      assert not assertions  # Should never happen.
+      return []
+
+    if is_init != tensor_util.is_mutable(self.concentration):
       assertions.append(assert_util.assert_positive(
           self.concentration,
           message='Argument `concentration` must be positive.'))

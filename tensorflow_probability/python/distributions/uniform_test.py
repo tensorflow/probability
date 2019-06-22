@@ -18,10 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 
 # Dependency imports
 import numpy as np
+from scipy import stats as sp_stats
 
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -30,18 +30,6 @@ from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
-
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-
-stats = try_import("scipy.stats")
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -203,27 +191,21 @@ class UniformTest(tf.test.TestCase):
     a = 10.0
     b = 100.0
     uniform = tfd.Uniform(low=a, high=b)
-    if not stats:
-      return
-    s_uniform = stats.uniform(loc=a, scale=b - a)
+    s_uniform = sp_stats.uniform(loc=a, scale=b - a)
     self.assertAllClose(self.evaluate(uniform.mean()), s_uniform.mean())
 
   def testUniformVariance(self):
     a = 10.0
     b = 100.0
     uniform = tfd.Uniform(low=a, high=b)
-    if not stats:
-      return
-    s_uniform = stats.uniform(loc=a, scale=b - a)
+    s_uniform = sp_stats.uniform(loc=a, scale=b - a)
     self.assertAllClose(self.evaluate(uniform.variance()), s_uniform.var())
 
   def testUniformStd(self):
     a = 10.0
     b = 100.0
     uniform = tfd.Uniform(low=a, high=b)
-    if not stats:
-      return
-    s_uniform = stats.uniform(loc=a, scale=b - a)
+    s_uniform = sp_stats.uniform(loc=a, scale=b - a)
     self.assertAllClose(self.evaluate(uniform.stddev()), s_uniform.std())
 
   def testUniformNans(self):

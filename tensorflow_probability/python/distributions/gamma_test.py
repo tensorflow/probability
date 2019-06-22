@@ -16,10 +16,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 
 # Dependency imports
 import numpy as np
+from scipy import special as sp_special
+from scipy import stats as sp_stats
 
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -28,19 +29,6 @@ from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 tfd = tfp.distributions
-
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-
-special = try_import("scipy.special")
-stats = try_import("scipy.stats")
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -68,9 +56,7 @@ class GammaTest(tf.test.TestCase):
     self.assertEqual(log_pdf.shape, (6,))
     pdf = gamma.prob(x)
     self.assertEqual(pdf.shape, (6,))
-    if not stats:
-      return
-    expected_log_pdf = stats.gamma.logpdf(x, alpha_v, scale=1 / beta_v)
+    expected_log_pdf = sp_stats.gamma.logpdf(x, alpha_v, scale=1 / beta_v)
     self.assertAllClose(self.evaluate(log_pdf), expected_log_pdf)
     self.assertAllClose(self.evaluate(pdf), np.exp(expected_log_pdf))
 
@@ -96,9 +82,7 @@ class GammaTest(tf.test.TestCase):
     pdf = gamma.prob(x)
     pdf_values = self.evaluate(pdf)
     self.assertEqual(pdf.shape, (6, 2))
-    if not stats:
-      return
-    expected_log_pdf = stats.gamma.logpdf(x, alpha_v, scale=1 / beta_v)
+    expected_log_pdf = sp_stats.gamma.logpdf(x, alpha_v, scale=1 / beta_v)
     self.assertAllClose(log_pdf_values, expected_log_pdf)
     self.assertAllClose(pdf_values, np.exp(expected_log_pdf))
 
@@ -117,9 +101,7 @@ class GammaTest(tf.test.TestCase):
     pdf_values = self.evaluate(pdf)
     self.assertEqual(pdf.shape, (6, 2))
 
-    if not stats:
-      return
-    expected_log_pdf = stats.gamma.logpdf(x, alpha_v, scale=1 / beta_v)
+    expected_log_pdf = sp_stats.gamma.logpdf(x, alpha_v, scale=1 / beta_v)
     self.assertAllClose(log_pdf_values, expected_log_pdf)
     self.assertAllClose(pdf_values, np.exp(expected_log_pdf))
 
@@ -134,9 +116,7 @@ class GammaTest(tf.test.TestCase):
     gamma = tfd.Gamma(concentration=alpha, rate=beta)
     cdf = gamma.cdf(x)
     self.assertEqual(cdf.shape, (6,))
-    if not stats:
-      return
-    expected_cdf = stats.gamma.cdf(x, alpha_v, scale=1 / beta_v)
+    expected_cdf = sp_stats.gamma.cdf(x, alpha_v, scale=1 / beta_v)
     self.assertAllClose(self.evaluate(cdf), expected_cdf)
 
   def testGammaMean(self):
@@ -144,9 +124,7 @@ class GammaTest(tf.test.TestCase):
     beta_v = np.array([1.0, 4.0, 5.0])
     gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v)
     self.assertEqual(gamma.mean().shape, (3,))
-    if not stats:
-      return
-    expected_means = stats.gamma.mean(alpha_v, scale=1 / beta_v)
+    expected_means = sp_stats.gamma.mean(alpha_v, scale=1 / beta_v)
     self.assertAllClose(self.evaluate(gamma.mean()), expected_means)
 
   def testGammaModeAllowNanStatsIsFalseWorksWhenAllBatchMembersAreDefined(self):
@@ -182,9 +160,7 @@ class GammaTest(tf.test.TestCase):
     beta_v = np.array([1.0, 4.0, 5.0])
     gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v)
     self.assertEqual(gamma.variance().shape, (3,))
-    if not stats:
-      return
-    expected_variances = stats.gamma.var(alpha_v, scale=1 / beta_v)
+    expected_variances = sp_stats.gamma.var(alpha_v, scale=1 / beta_v)
     self.assertAllClose(self.evaluate(gamma.variance()), expected_variances)
 
   def testGammaStd(self):
@@ -192,9 +168,7 @@ class GammaTest(tf.test.TestCase):
     beta_v = np.array([1.0, 4.0, 5.0])
     gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v)
     self.assertEqual(gamma.stddev().shape, (3,))
-    if not stats:
-      return
-    expected_stddev = stats.gamma.std(alpha_v, scale=1. / beta_v)
+    expected_stddev = sp_stats.gamma.std(alpha_v, scale=1. / beta_v)
     self.assertAllClose(self.evaluate(gamma.stddev()), expected_stddev)
 
   def testGammaEntropy(self):
@@ -202,9 +176,7 @@ class GammaTest(tf.test.TestCase):
     beta_v = np.array([1.0, 4.0, 5.0])
     gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v)
     self.assertEqual(gamma.entropy().shape, (3,))
-    if not stats:
-      return
-    expected_entropy = stats.gamma.entropy(alpha_v, scale=1 / beta_v)
+    expected_entropy = sp_stats.gamma.entropy(alpha_v, scale=1 / beta_v)
     self.assertAllClose(self.evaluate(gamma.entropy()), expected_entropy)
 
   def testGammaSampleSmallAlpha(self):
@@ -219,15 +191,13 @@ class GammaTest(tf.test.TestCase):
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
     self.assertTrue(self._kstest(alpha_v, beta_v, sample_values))
-    if not stats:
-      return
     self.assertAllClose(
         sample_values.mean(),
-        stats.gamma.mean(alpha_v, scale=1 / beta_v),
+        sp_stats.gamma.mean(alpha_v, scale=1 / beta_v),
         atol=.01)
     self.assertAllClose(
         sample_values.var(),
-        stats.gamma.var(alpha_v, scale=1 / beta_v),
+        sp_stats.gamma.var(alpha_v, scale=1 / beta_v),
         atol=.15)
 
   def testGammaSample(self):
@@ -242,15 +212,13 @@ class GammaTest(tf.test.TestCase):
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
     self.assertTrue(self._kstest(alpha_v, beta_v, sample_values))
-    if not stats:
-      return
     self.assertAllClose(
         sample_values.mean(),
-        stats.gamma.mean(alpha_v, scale=1 / beta_v),
+        sp_stats.gamma.mean(alpha_v, scale=1 / beta_v),
         atol=.01)
     self.assertAllClose(
         sample_values.var(),
-        stats.gamma.var(alpha_v, scale=1 / beta_v),
+        sp_stats.gamma.var(alpha_v, scale=1 / beta_v),
         atol=.15)
 
   def testGammaFullyReparameterized(self):
@@ -274,16 +242,14 @@ class GammaTest(tf.test.TestCase):
     zeros = np.zeros_like(alpha_v + beta_v)  # 10 x 100
     alpha_bc = alpha_v + zeros
     beta_bc = beta_v + zeros
-    if not stats:
-      return
     self.assertAllClose(
         sample_values.mean(axis=0),
-        stats.gamma.mean(alpha_bc, scale=1 / beta_bc),
+        sp_stats.gamma.mean(alpha_bc, scale=1 / beta_bc),
         atol=0.,
         rtol=.05)
     self.assertAllClose(
         sample_values.var(axis=0),
-        stats.gamma.var(alpha_bc, scale=1 / beta_bc),
+        sp_stats.gamma.var(alpha_bc, scale=1 / beta_bc),
         atol=10.0,
         rtol=0.)
     fails = 0
@@ -297,9 +263,7 @@ class GammaTest(tf.test.TestCase):
 
   def _kstest(self, alpha, beta, samples):
     # Uses the Kolmogorov-Smirnov test for goodness of fit.
-    if not stats:
-      return True  # If we can't test, return that the test passes.
-    ks, _ = stats.kstest(samples, stats.gamma(alpha, scale=1 / beta).cdf)
+    ks, _ = sp_stats.kstest(samples, sp_stats.gamma(alpha, scale=1 / beta).cdf)
     # Return True when the test passes.
     return ks < 0.02
 
@@ -315,16 +279,14 @@ class GammaTest(tf.test.TestCase):
     self._assertIntegral(sample_vals[:, 0, 1], pdf_vals[:, 0, 1], err=0.02)
     self._assertIntegral(sample_vals[:, 1, 0], pdf_vals[:, 1, 0], err=0.02)
     self._assertIntegral(sample_vals[:, 1, 1], pdf_vals[:, 1, 1], err=0.02)
-    if not stats:
-      return
     self.assertAllClose(
-        stats.gamma.mean([[7., 11.], [7., 11.]],
-                         scale=1 / np.array([[5., 5.], [6., 6.]])),
+        sp_stats.gamma.mean([[7., 11.], [7., 11.]],
+                            scale=1 / np.array([[5., 5.], [6., 6.]])),
         sample_vals.mean(axis=0),
         atol=.1)
     self.assertAllClose(
-        stats.gamma.var([[7., 11.], [7., 11.]],
-                        scale=1 / np.array([[5., 5.], [6., 6.]])),
+        sp_stats.gamma.var([[7., 11.], [7., 11.]],
+                           scale=1 / np.array([[5., 5.], [6., 6.]])),
         sample_vals.var(axis=0),
         atol=.1)
 
@@ -372,11 +334,9 @@ class GammaTest(tf.test.TestCase):
 
     self.assertEqual(beta0.shape, kl_actual.shape)
 
-    if not special:
-      return
-    kl_expected = ((alpha0 - alpha1) * special.digamma(alpha0)
-                   + special.gammaln(alpha1)
-                   - special.gammaln(alpha0)
+    kl_expected = ((alpha0 - alpha1) * sp_special.digamma(alpha0)
+                   + sp_special.gammaln(alpha1)
+                   - sp_special.gammaln(alpha0)
                    + alpha1 * np.log(beta0)
                    - alpha1 * np.log(beta1)
                    + alpha0 * (beta1 / beta0 - 1.))

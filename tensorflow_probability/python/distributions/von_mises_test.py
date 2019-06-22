@@ -20,6 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+from scipy import special as sp_special
+from scipy import stats as sp_stats
 
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -66,12 +68,8 @@ class _VonMisesTest(object):
     x = np.array([2., 3., 4., 5., 6., 7.])
     von_mises = tfd.VonMises(
         self.make_tensor(locs_v), self.make_tensor(concentrations_v))
-    try:
-      from scipy import stats  # pylint:disable=g-import-not-at-top
-    except ImportError:
-      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
-      return
-    expected_log_prob = stats.vonmises.logpdf(x, concentrations_v, loc=locs_v)
+    expected_log_prob = sp_stats.vonmises.logpdf(
+        x, concentrations_v, loc=locs_v)
     log_prob = von_mises.log_prob(self.make_tensor(x))
     self.assertAllClose(expected_log_prob, self.evaluate(log_prob))
 
@@ -89,12 +87,7 @@ class _VonMisesTest(object):
     von_mises = tfd.VonMises(
         self.make_tensor(locs_v), self.make_tensor(concentrations_v))
     prob = von_mises.prob(self.make_tensor(x))
-    try:
-      from scipy import stats  # pylint:disable=g-import-not-at-top
-    except ImportError:
-      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
-      return
-    expected_prob = stats.vonmises.pdf(x, concentrations_v, loc=locs_v)
+    expected_prob = sp_stats.vonmises.pdf(x, concentrations_v, loc=locs_v)
     self.assertAllClose(expected_prob, self.evaluate(prob))
 
   def testVonMisesPdfUniform(self):
@@ -111,12 +104,7 @@ class _VonMisesTest(object):
     von_mises = tfd.VonMises(
         self.make_tensor(locs_v), self.make_tensor(concentrations_v))
     cdf = von_mises.cdf(self.make_tensor(x))
-    try:
-      from scipy import stats  # pylint:disable=g-import-not-at-top
-    except ImportError:
-      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
-      return
-    expected_cdf = stats.vonmises.cdf(x, concentrations_v, loc=locs_v)
+    expected_cdf = sp_stats.vonmises.cdf(x, concentrations_v, loc=locs_v)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=1e-4, rtol=1e-4)
 
   def testVonMisesCdfUniform(self):
@@ -183,12 +171,7 @@ class _VonMisesTest(object):
     concentrations_v = np.array([0.01, 0.01, 1.0, 10.0]).reshape([1, -1])
     von_mises = tfd.VonMises(
         self.make_tensor(locs_v), self.make_tensor(concentrations_v))
-    try:
-      from scipy import stats  # pylint:disable=g-import-not-at-top
-    except ImportError:
-      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
-      return
-    expected_entropy = stats.vonmises.entropy(concentrations_v, loc=locs_v)
+    expected_entropy = sp_stats.vonmises.entropy(concentrations_v, loc=locs_v)
     self.assertAllClose(expected_entropy, self.evaluate(von_mises.entropy()))
 
   def testVonMisesEntropyUniform(self):
@@ -208,12 +191,7 @@ class _VonMisesTest(object):
     concentrations_v = np.array([0.0, 0.1, 1.0, 2.0, 10.0])
     von_mises = tfd.VonMises(
         self.make_tensor(locs_v), self.make_tensor(concentrations_v))
-    try:
-      from scipy import special  # pylint:disable=g-import-not-at-top
-    except ImportError:
-      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
-      return
-    expected_vars = 1.0 - special.i1(concentrations_v) / special.i0(
+    expected_vars = 1.0 - sp_special.i1(concentrations_v) / sp_special.i0(
         concentrations_v)
     self.assertAllClose(expected_vars, self.evaluate(von_mises.variance()))
 
@@ -222,13 +200,8 @@ class _VonMisesTest(object):
     concentrations_v = np.array([0.0, 0.1, 1.0, 2.0, 10.0]).reshape([-1, 1])
     von_mises = tfd.VonMises(
         self.make_tensor(locs_v), self.make_tensor(concentrations_v))
-    try:
-      from scipy import special  # pylint:disable=g-import-not-at-top
-    except ImportError:
-      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
-      return
-    expected_stddevs = (np.sqrt(1.0 - special.i1(concentrations_v)
-                                / special.i0(concentrations_v))
+    expected_stddevs = (np.sqrt(1.0 - sp_special.i1(concentrations_v)
+                                / sp_special.i0(concentrations_v))
                         + np.zeros_like(locs_v))
     self.assertAllClose(expected_stddevs, self.evaluate(von_mises.stddev()))
 
@@ -321,18 +294,12 @@ class _VonMisesTest(object):
         von_mises.sample(n, seed=tfp_test_util.test_seed()))
     self.assertEqual(sample_values.shape, (n, 50))
 
-    try:
-      from scipy import stats  # pylint:disable=g-import-not-at-top
-    except ImportError:
-      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
-      return
-
     fails = 0
     trials = 0
     for concentrationi, concentration in enumerate(concentrations_v):
       s = sample_values[:, concentrationi]
       trials += 1
-      p = stats.kstest(s, stats.vonmises(concentration).cdf)[1]
+      p = sp_stats.kstest(s, sp_stats.vonmises(concentration).cdf)[1]
       if p <= 0.05:
         fails += 1
     self.assertLess(fails, trials * 0.1)
@@ -345,12 +312,6 @@ class _VonMisesTest(object):
         von_mises.sample(n, seed=tfp_test_util.test_seed(hardcoded_seed=137)))
     self.assertEqual(sample_values.shape, (n, 50))
 
-    try:
-      from scipy import stats  # pylint:disable=g-import-not-at-top
-    except ImportError:
-      tf.compat.v1.logging.warn("Skipping scipy-dependent tests")
-      return
-
     fails = 0
     trials = 0
     for loci, _ in enumerate(locs_v):
@@ -359,7 +320,7 @@ class _VonMisesTest(object):
       s = (s + np.pi) / (2. * np.pi)
       trials += 1
       # Compare to the CDF of Uniform(0, 1) random variable.
-      p = stats.kstest(s, stats.uniform.cdf)[1]
+      p = sp_stats.kstest(s, sp_stats.uniform.cdf)[1]
       if p <= 0.05:
         fails += 1
     self.assertLess(fails, trials * 0.1)

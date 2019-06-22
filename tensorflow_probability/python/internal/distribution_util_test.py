@@ -18,11 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 import itertools
 
 # Dependency imports
 import numpy as np
+from scipy import special as sp_special
+
 import tensorflow as tf
 
 from tensorflow_probability.python.distributions import Categorical
@@ -36,18 +37,6 @@ from tensorflow_probability.python.math.gradient import value_and_gradient
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
-
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-
-special = try_import("scipy.special")
 
 
 def _logit(x):
@@ -1058,10 +1047,7 @@ class LogCombinationsTest(tf.test.TestCase):
     n = [2, 5, 12, 15]
     k = [1, 2, 4, 11]
 
-    if not special:
-      return
-
-    log_combs = np.log(special.binom(n, k))
+    log_combs = np.log(sp_special.binom(n, k))
 
     n = np.array(n, dtype=np.float32)
     counts = [[1., 1], [2., 3], [4., 8], [11, 4]]

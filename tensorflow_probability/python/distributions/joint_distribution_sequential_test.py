@@ -26,6 +26,7 @@ from absl.testing import parameterized
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
@@ -43,7 +44,8 @@ class Dummy(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
+class JointDistributionSequentialTest(
+    test_case.TestCase, parameterized.TestCase):
 
   def test_sample_log_prob(self):
     d = tfd.JointDistributionSequential(
@@ -308,6 +310,69 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
       tfd.JointDistributionSequential(collections.namedtuple('model', 'a b')(
           a=tfd.Normal(0, 1),
           b=tfd.Normal(1, 2)))
+
+  def test_latent_dirichlet_allocation(self):
+    """Tests Latent Dirichlet Allocation joint model.
+
+    The LDA generative process can be written as:
+
+    ```none
+    N[i] ~ Poisson(xi)
+    theta[i] ~ Dirichlet(alpha)
+    Z[i] ~ Multinomial(N[i], theta[i])
+    for k in 1...K:
+      X[i,k] ~ Multinomial(Z[i, k], beta[j])
+    ```
+
+    Typically `xi` is specified and `alpha`, `beta` are fit using type-II
+    maximum likelihood estimators.
+
+    Reference: http://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf
+    """
+
+    # Hyperparameters.
+    num_topics = 3
+    num_words = 10
+    avg_doc_length = 5
+    u = tfd.Uniform(low=-1., high=1.)
+    alpha = tfp.util.DeferredTensor(
+        tf.nn.softplus,
+        tf.Variable(u.sample([num_topics]), name='raw_alpha'))
+    beta = tf.Variable(u.sample([num_topics, num_words]), name='beta')
+
+    # LDA Model.
+    # Note near 1:1 with mathematical specification. The main distinction is the
+    # use of Independent--this lets us easily aggregate multinomials across
+    # topics (and in any "shape" of documents).
+    lda = tfd.JointDistributionSequential([
+        tfd.Poisson(rate=avg_doc_length),                              # n
+        tfd.Dirichlet(concentration=alpha),                            # theta
+        lambda theta, n: tfd.Multinomial(total_count=n, probs=theta),  # z
+        lambda z: tfd.Independent(                                     # x  pylint: disable=g-long-lambda
+            tfd.Multinomial(total_count=z, logits=beta),
+            reinterpreted_batch_ndims=1),
+    ])
+
+    # Now, let's sample some "documents" and compute the log-prob of each.
+    docs_shape = [2, 4]  # That is, 8 docs in the shape of [2, 4].
+    [n, theta, z, x] = lda.sample(docs_shape)
+    log_probs = lda.log_prob([n, theta, z, x])
+    self.assertEqual(docs_shape, log_probs.shape)
+
+    # Verify we correctly track trainable variables.
+    self.assertAllEqual((alpha.pretransformed_input, beta),
+                        lda.trainable_variables)
+
+    # Ensure we can compute gradients.
+    with tf.GradientTape() as tape:
+      # Note: The samples are not taped, hence implicitly "stop_gradient."
+      negloglik = -lda.log_prob([n, theta, z, x])
+    grads = tape.gradient(negloglik, lda.trainable_variables)
+
+    self.assertLen(grads, 2)
+    self.assertAllEqual((alpha.pretransformed_input.shape, beta.shape),
+                        (grads[0].shape, grads[1].shape))
+    self.assertAllNotNone(grads)
 
 
 if __name__ == '__main__':

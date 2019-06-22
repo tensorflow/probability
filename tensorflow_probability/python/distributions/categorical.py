@@ -377,46 +377,43 @@ class Categorical(distribution.Distribution):
 def maybe_assert_categorical_param_correctness(
     is_init, validate_args, probs, logits):
   """Return assertions for `Categorical`-type distributions."""
+  assertions = []
+
+  # In init, we can always build shape and dtype checks because
+  # we assume shape doesn't change for Variable backed args.
   if is_init:
     x, name = (probs, 'probs') if logits is None else (logits, 'logits')
+
     if not dtype_util.is_floating(x.dtype):
-      raise TypeError(
-          'Argument `{}` must having floating type.'.format(name))
+      raise TypeError('Argument `{}` must having floating type.'.format(name))
+
+    msg = 'Argument `{}` must have rank at least 1.'.format(name)
     ndims = tensorshape_util.rank(x.shape)
-    if ndims is not None and ndims < 1:
-      raise ValueError(
-          'Argument `{}` must have rank at least 1.'.format(name))
+    if ndims is not None:
+      if ndims < 1:
+        raise ValueError(msg)
+    elif validate_args:
+      assertions.append(assert_util.assert_rank_at_least(x, 1, message=msg))
 
   if not validate_args:
+    assert not assertions  # Should never happen.
     return []
-
-  assertions = []
 
   if logits is not None:
     if is_init != tensor_util.is_mutable(logits):
-      if tensorshape_util.rank(logits.shape) is None:
-        assertions.append(assert_util.assert_rank_at_least(
-            logits, 1,
-            message='Argument `logits` must have rank at least 1.'))
       assertions.extend(
           distribution_util.assert_categorical_event_shape(logits))
 
   if probs is not None:
     if is_init != tensor_util.is_mutable(probs):
-      if tensorshape_util.rank(probs.shape) is None:
-        assertions.append(assert_util.assert_rank_at_least(
-            probs, 1,
-            message='Argument `probs` must have rank at least 1.'))
-      one = np.array(1, dtype=dtype_util.as_numpy_dtype(probs.dtype))
       assertions.extend([
           assert_util.assert_non_negative(probs),
           assert_util.assert_near(
               tf.reduce_sum(probs, axis=-1),
-              one,
+              np.array(1, dtype=dtype_util.as_numpy_dtype(probs.dtype)),
               message='Argument `probs` must sum to 1.')
       ])
-      assertions.extend(
-          distribution_util.assert_categorical_event_shape(probs))
+      assertions.extend(distribution_util.assert_categorical_event_shape(probs))
 
   return assertions
 

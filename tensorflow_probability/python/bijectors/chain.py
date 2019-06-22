@@ -248,7 +248,7 @@ class Chain(bijector.Bijector):
 
     # TODO(b/129973548): Document and simplify.
     for b in self.bijectors:
-      ildj += b.inverse_log_det_jacobian(
+      ildj = ildj + b.inverse_log_det_jacobian(
           y, event_ndims=event_ndims, **kwargs.get(b.name, {}))
 
       if _use_static_shape(y, event_ndims):
@@ -291,7 +291,7 @@ class Chain(bijector.Bijector):
 
     # TODO(b/129973548): Document and simplify.
     for b in reversed(self.bijectors):
-      fldj += b.forward_log_det_jacobian(
+      fldj = fldj + b.forward_log_det_jacobian(
           x, event_ndims=event_ndims, **kwargs.get(b.name, {}))
       if _use_static_shape(x, event_ndims):
         event_shape = b.forward_event_shape(event_shape)

@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import monte_carlo
+from tensorflow_probability.python.internal import nest_util
 
 __all__ = [
     "amari_alpha",
@@ -898,11 +899,32 @@ def monte_carlo_csiszar_f_divergence(
           "function has a biased gradient.)")
     if not callable(p_log_prob):
       raise TypeError("`p_log_prob` must be a Python `callable` function.")
+
+    def divergence_fn(q_samples):
+      p_log_prob_term = nest_util.call_fn(p_log_prob, q_samples)
+      return f(p_log_prob_term - q.log_prob(q_samples))
+
     return monte_carlo.expectation(
-        f=lambda q_samples: f(p_log_prob(q_samples) - q.log_prob(q_samples)),
+        f=divergence_fn,
         samples=q.sample(num_draws, seed=seed),
         log_prob=q.log_prob,  # Only used if use_reparametrization=False.
         use_reparametrization=use_reparametrization)
+
+
+def _maybe_flatten_joint_sample(q, samples):
+  """Flatten samples from a (joint) distribution into a list."""
+  if hasattr(q, "_model_flatten"):  # q is a tfd.JointDistribution
+    return q._model_flatten(samples)  # pylint: disable=protected-access
+  else:  # `samples` is just a Tensor
+    return [samples]
+
+
+def _maybe_unflatten_joint_sample(q, samples_list):
+  """Rebuild a sample structure from a list. Inverse of `_maybe_flatten`."""
+  if hasattr(q, "_model_unflatten"):  # q is a tfd.JointDistribution
+    return q._model_unflatten(samples_list)  # pylint: disable=protected-access
+  else:
+    return samples_list[0]
 
 
 def csiszar_vimco(f,
@@ -983,11 +1005,15 @@ def csiszar_vimco(f,
     if num_draws < 2:
       raise ValueError("Must specify num_draws > 1.")
     stop = tf.stop_gradient  # For readability.
-    x = stop(q.sample(sample_shape=[num_draws, num_batch_draws],
-                      seed=seed))
+
+    q_sample = q.sample(sample_shape=[num_draws, num_batch_draws], seed=seed)
+    x = _maybe_unflatten_joint_sample(q, [
+        stop(xp) for xp in _maybe_flatten_joint_sample(q, q_sample)])
+
     logqx = q.log_prob(x)
-    logu = p_log_prob(x) - logqx
+    logu = nest_util.call_fn(p_log_prob, x) - logqx
     f_log_avg_u, f_log_sooavg_u = [f(r) for r in csiszar_vimco_helper(logu)]
+
     dotprod = tf.reduce_sum(
         input_tensor=logqx * stop(f_log_avg_u - f_log_sooavg_u),
         axis=0)  # Sum over iid samples.

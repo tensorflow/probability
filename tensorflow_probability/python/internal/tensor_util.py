@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import inspect
+
 import tensorflow.compat.v2 as tf
 
 __all__ = [
@@ -126,6 +128,6 @@ def is_mutable(x):
   # returns True. Note: we'd need to actually create a tf.Module on user's
   # behalf and it would need a `dtype` and `shape`. (I.e., there would be some
   # work to support this.)
-  return (isinstance(x, tf.Variable) or
+  return ((inspect.isclass(tf.Variable) and isinstance(x, tf.Variable)) or
           getattr(x, 'variables', ()) or
           getattr(x, 'trainable_variables', ()))
