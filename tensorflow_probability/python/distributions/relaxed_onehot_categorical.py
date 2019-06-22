@@ -424,7 +424,7 @@ class RelaxedOneHotCategorical(
   def temperature(self):
     """Batchwise temperature tensor of a RelaxedCategorical."""
     return self._temperature
-  
+
   @property
   def probs(self):
     """Input argument `probs`."""
