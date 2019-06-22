@@ -633,6 +633,24 @@ class HMCTest(tf.test.TestCase):
         any('Please consult the docstring' in str(warning.message)
             for warning in triggered))
 
+  def testSoftplusCreatedOutsideKernelDoesNotKillGradients(self):
+    softplus = tfp.bijectors.Softplus()
+    def target_log_prob_fn(x):
+      x = softplus.forward(x)
+      return tf.reduce_sum(input_tensor=-x**2, axis=-1)
+
+    hmc = tfp.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=target_log_prob_fn,
+        step_size=0.5,
+        num_leapfrog_steps=2,
+        seed=_set_seed(1042))
+    x0 = tf.constant([[-1., 0.5], [0., 0.], [1., 1.25]])
+    # Simply calling hmc.bootstrap_results(x0) used to fail with
+    #   ValueError: Encountered `None` gradient.
+    r0 = hmc.bootstrap_results(x0)
+    # Also ensure eval doesn't crash things.
+    self.evaluate(r0)
+
 
 class _LogCorrectionTest(object):
 
