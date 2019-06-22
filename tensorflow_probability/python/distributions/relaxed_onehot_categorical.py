@@ -408,8 +408,6 @@ class RelaxedOneHotCategorical(
       name: A name for this distribution (optional).
     """
 
-  
-
     dist = ExpRelaxedOneHotCategorical(temperature,
                                        logits=logits,
                                        probs=probs,
