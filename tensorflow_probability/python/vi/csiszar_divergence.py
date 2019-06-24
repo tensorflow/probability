@@ -911,22 +911,6 @@ def monte_carlo_csiszar_f_divergence(
         use_reparametrization=use_reparametrization)
 
 
-def _maybe_flatten_joint_sample(q, samples):
-  """Flatten samples from a (joint) distribution into a list."""
-  if hasattr(q, "_model_flatten"):  # q is a tfd.JointDistribution
-    return q._model_flatten(samples)  # pylint: disable=protected-access
-  else:  # `samples` is just a Tensor
-    return [samples]
-
-
-def _maybe_unflatten_joint_sample(q, samples_list):
-  """Rebuild a sample structure from a list. Inverse of `_maybe_flatten`."""
-  if hasattr(q, "_model_unflatten"):  # q is a tfd.JointDistribution
-    return q._model_unflatten(samples_list)  # pylint: disable=protected-access
-  else:
-    return samples_list[0]
-
-
 def csiszar_vimco(f,
                   p_log_prob,
                   q,
@@ -1007,9 +991,7 @@ def csiszar_vimco(f,
     stop = tf.stop_gradient  # For readability.
 
     q_sample = q.sample(sample_shape=[num_draws, num_batch_draws], seed=seed)
-    x = _maybe_unflatten_joint_sample(q, [
-        stop(xp) for xp in _maybe_flatten_joint_sample(q, q_sample)])
-
+    x = tf.nest.map_structure(stop, q_sample)
     logqx = q.log_prob(x)
     logu = nest_util.call_fn(p_log_prob, x) - logqx
     f_log_avg_u, f_log_sooavg_u = [f(r) for r in csiszar_vimco_helper(logu)]

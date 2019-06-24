@@ -125,7 +125,8 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
 
   Args:
     f: Python callable which can return `f(samples)`.
-    samples: `Tensor` of samples used to form the Monte-Carlo approximation of
+    samples: `Tensor` or nested structure (list, dict, etc.) of `Tensor`s,
+      representing samples used to form the Monte-Carlo approximation of
       `E_p[f(X)]`.  A batch of samples should be indexed by `axis` dimensions.
     log_prob: Python callable which can return `log_prob(samples)`. Must
       correspond to the natural-logarithm of the pdf/pmf of each sample. Only
@@ -164,7 +165,7 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       if not callable(log_prob):
         raise ValueError('`log_prob` must be a callable function.')
       stop = tf.stop_gradient  # For readability.
-      x = stop(samples)
+      x = tf.nest.map_structure(stop, samples)
       logpx = log_prob(x)
       fx = f(x)  # Call `f` once in case it has side-effects.
       # To achieve this, we use the fact that:
