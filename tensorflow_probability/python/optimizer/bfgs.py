@@ -274,9 +274,10 @@ def minimize(value_and_gradients_function,
           tolerance, f_relative_tolerance, x_tolerance, stopping_condition)
 
       # Print number of iterations.
-      print_op = tf.case([(tf.equal(state.num_iterations % print_n_iterations, 0), 
-                         lambda: tf.print('Number of iterations:', state.num_iterations + 1))], 
-                         default=lambda: tf.no_op())
+      print_op = tf.case(
+          [(tf.equal(state.num_iterations % print_n_iterations, 0), 
+            lambda: tf.print('Number of iterations:', state.num_iterations + 1))], 
+          default=lambda: tf.no_op())
       with tf.control_dependencies([print_op]):
       # Update the inverse Hessian if needed and continue.
         return [_update_inv_hessian(current_state, next_state)]
