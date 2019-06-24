@@ -400,7 +400,8 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
 
     log_prob = joint.log_prob(z)
 
-    self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
+    self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]),
+                        rtol=1e-5)
 
   def test_log_prob_multiple_roots_and_samples(self):
     # The joint distribution specified below corresponds to this
