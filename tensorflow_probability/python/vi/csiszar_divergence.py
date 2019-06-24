@@ -881,9 +881,18 @@ def monte_carlo_csiszar_f_divergence(
       to parameters) is valid.
     TypeError: if `p_log_prob` is not a Python `callable`.
   """
-  reparameterization_types = tf.nest.flatten(q.reparameterization_type)
   with tf.compat.v1.name_scope(name, "monte_carlo_csiszar_f_divergence",
                                [num_draws]):
+
+    def divergence_fn(q_samples):
+      p_log_prob_term = nest_util.call_fn(p_log_prob, q_samples)
+      return f(p_log_prob_term - q.log_prob(q_samples))
+
+    # If Q is joint, drawing samples forces it to build its components. It's
+    # important to do this *before* checking its reparameterization type.
+    q_samples = q.sample(num_draws, seed=seed)
+
+    reparameterization_types = tf.nest.flatten(q.reparameterization_type)
     if use_reparametrization is None:
       use_reparametrization = all(
           reparameterization_type == tfd.FULLY_REPARAMETERIZED
@@ -900,13 +909,9 @@ def monte_carlo_csiszar_f_divergence(
     if not callable(p_log_prob):
       raise TypeError("`p_log_prob` must be a Python `callable` function.")
 
-    def divergence_fn(q_samples):
-      p_log_prob_term = nest_util.call_fn(p_log_prob, q_samples)
-      return f(p_log_prob_term - q.log_prob(q_samples))
-
     return monte_carlo.expectation(
         f=divergence_fn,
-        samples=q.sample(num_draws, seed=seed),
+        samples=q_samples,
         log_prob=q.log_prob,  # Only used if use_reparametrization=False.
         use_reparametrization=use_reparametrization)
 
