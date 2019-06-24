@@ -98,4 +98,4 @@ echo "${shard_tests}" \
     --action_env=PATH \
     --action_env=LD_LIBRARY_PATH \
     --test_output=errors \
-    ${MAYBE_
+    ${MAYBE_FORCE_PY2_FLAG}
