@@ -72,6 +72,10 @@ call_with_log_folding install_python_packages
 # Get a shard of tests.
 shard_tests=$(bazel query 'tests(//tensorflow_probability/...)' |
   awk -v n=${NUM_SHARDS} -v s=${SHARD} 'NR%n == s' )
+MAYBE_FORCE_PY2_FLAG=""
+if [[ $(python -V 2>&1) =~ Python\ 2.* ]]; then
+  MAYBE_FORCE_PY2_FLAG="--noincompatible_py3_is_default"
+fi
 
 # Run tests. Notes on less obvious options:
 #   --notest_keep_going -- stop running tests as soon as anything fails. This is
@@ -93,4 +97,5 @@ echo "${shard_tests}" \
     --test_timeout 300,450,1200,3600 \
     --action_env=PATH \
     --action_env=LD_LIBRARY_PATH \
-    --test_output=errors
+    --test_output=errors \
+    ${MAYBE_FORCE_PY2_FLAG}
