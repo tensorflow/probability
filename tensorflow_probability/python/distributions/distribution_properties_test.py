@@ -57,6 +57,22 @@ def usage_counting_identity(var):
   return tf.identity(var)
 
 
+def assert_no_excessive_var_usage(dist_and_method, max_permissible=2):
+  # TODO(jvdillon): Reduce max_permissible to 1?
+  var_nusages = {var: len(usages) for var, usages in VAR_USAGES.items()}
+  if any(len(usages) > max_permissible for usages in VAR_USAGES.values()):
+    for var, usages in six.iteritems(VAR_USAGES):
+      if len(usages) > max_permissible:
+        print('While executing {}, saw {} Tensor conversions of {}:'.format(
+            dist_and_method, len(usages), var))
+        for i, usage in enumerate(usages):
+          print('Conversion {} of {}:\n{}'.format(i + 1, len(usages),
+                                                  ''.join(usage)))
+    raise AssertionError(
+        'Excessive tensor conversions detected for {}: {}'.format(
+            dist_and_method, var_nusages))
+
+
 def hypothesis_max_examples():
   # Use --test_env=TFP_HYPOTHESIS_MAX_EXAMPLES=1000 to get fuller coverage.
   return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', 20))
@@ -493,51 +509,57 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
         raise AssertionError(
             'No attr found for parameter {} of distribution {}: \n{}'.format(
                 k, dist_name, e))
-      stat = data.draw(
-          hps.one_of(
-              map(hps.just,
-                  ['mean', 'mode', 'variance', 'covariance', 'entropy'])))
+
+    for stat in data.draw(
+        hps.permutations(
+            ['covariance', 'entropy', 'mean', 'mode', 'stddev',
+             'variance']))[:3]:
+      logging.info('%s.%s', dist_name, stat)
       try:
         VAR_USAGES.clear()
         getattr(dist, stat)()
-        var_nusages = {var: len(usages) for var, usages in VAR_USAGES.items()}
-        max_permissible = 2  # TODO(jvdillon): Reduce this to 1.
-        if any(len(usages) > max_permissible for usages in VAR_USAGES.values()):
-          for var, usages in six.iteritems(VAR_USAGES):
-            if len(usages) > max_permissible:
-              print('While executing statistic `{}` of `{}`, detected {} '
-                    'Tensor conversions for `{}`:'.format(
-                        stat, dist, len(usages), var))
-              for i, usage in enumerate(usages):
-                print('Conversion {} of {}:\n{}'.format(i + 1, len(usages),
-                                                        ''.join(usage)))
-          raise AssertionError(
-              'Excessive tensor conversions detected for {} {}: {}'.format(
-                  dist_name, stat, var_nusages))
+        assert_no_excessive_var_usage('statistic `{}` of `{}`'.format(
+            stat, dist))
       except NotImplementedError:
         pass
 
+    VAR_USAGES.clear()
+    with tf.GradientTape() as tape:
+      sample = dist.sample()
+    assert_no_excessive_var_usage('method `sample` of `{}`'.format(dist))
     if dist.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
-      with tf.GradientTape() as tape:
-        samp = dist.sample()
-      grads = tape.gradient(samp, dist.variables)
+      grads = tape.gradient(sample, dist.variables)
       for grad, var in zip(grads, dist.variables):
         if grad is None:
           raise AssertionError(
               'Missing sample -> {} grad for distribution {}'.format(
                   var, dist_name))
 
+    # Turn off validations, since log_prob can choke on dist's own samples.
+    dist = dist.copy(validate_args=False)
     if dist_name not in NO_LOG_PROB_PARAM_GRADS:
-      # Turn off validations, since log_prob can choke on dist's own samples.
-      dist = dist.copy(validate_args=False)
       with tf.GradientTape() as tape:
-        lp = dist.log_prob(tf.stop_gradient(dist.sample()))
+        lp = dist.log_prob(tf.stop_gradient(sample))
       grads = tape.gradient(lp, dist.variables)
       for grad, var in zip(grads, dist.variables):
         if grad is None:
           raise AssertionError(
               'Missing log_prob -> {} grad for distribution {}'.format(
                   var, dist_name))
+
+    for evaluative in data.draw(
+        hps.permutations([
+            'log_prob', 'prob', 'log_cdf', 'cdf', 'log_survival_function',
+            'survival_function'
+        ]))[:3]:
+      logging.info('%s.%s', dist_name, evaluative)
+      try:
+        VAR_USAGES.clear()
+        getattr(dist, evaluative)(sample)
+        assert_no_excessive_var_usage('evaluative `{}` of `{}`'.format(
+            evaluative, dist), max_permissible=1)  # No validation => 1 convert.
+      except NotImplementedError:
+        pass
 
 
 @test_util.run_all_in_graph_and_eager_modes
