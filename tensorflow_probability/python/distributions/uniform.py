@@ -101,8 +101,8 @@ class Uniform(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([low, high], tf.float32)
-      low = tf.convert_to_tensor(value=low, name="low", dtype=dtype)
-      high = tf.convert_to_tensor(value=high, name="high", dtype=dtype)
+      low = tf.convert_to_tensor(low, name="low", dtype=dtype)
+      high = tf.convert_to_tensor(high, name="high", dtype=dtype)
       with tf.control_dependencies([  # pylint: disable=g-long-ternary
           assert_util.assert_less(
               low, high, message="uniform not defined when low >= high.")
@@ -124,7 +124,7 @@ class Uniform(distribution.Distribution):
   def _param_shapes(sample_shape):
     return dict(
         zip(("low", "high"),
-            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
+            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
   def _params_event_ndims(cls):
@@ -146,8 +146,7 @@ class Uniform(distribution.Distribution):
       return self.high - self.low
 
   def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.low), tf.shape(input=self.high))
+    return tf.broadcast_dynamic_shape(tf.shape(self.low), tf.shape(self.high))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -181,7 +180,7 @@ class Uniform(distribution.Distribution):
 
   def _cdf(self, x):
     broadcast_shape = tf.broadcast_dynamic_shape(
-        tf.shape(input=x), self.batch_shape_tensor())
+        tf.shape(x), self.batch_shape_tensor())
     zeros = tf.zeros(broadcast_shape, dtype=self.dtype)
     ones = tf.ones(broadcast_shape, dtype=self.dtype)
     broadcasted_x = x * ones
@@ -191,7 +190,7 @@ class Uniform(distribution.Distribution):
 
   def _quantile(self, value):
     broadcast_shape = tf.broadcast_dynamic_shape(
-        tf.shape(input=value), self.batch_shape_tensor())
+        tf.shape(value), self.batch_shape_tensor())
     ones = tf.ones(broadcast_shape, dtype=self.dtype)
     broadcasted_value = value * ones
     return (1. - broadcasted_value) * self.low + broadcasted_value * self.high

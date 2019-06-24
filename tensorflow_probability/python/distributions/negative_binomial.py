@@ -97,7 +97,7 @@ class NegativeBinomial(distribution.Distribution):
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits, probs, validate_args=validate_args, name=name, dtype=dtype)
       total_count = tf.convert_to_tensor(
-          value=total_count, name='total_count', dtype=dtype)
+          total_count, name='total_count', dtype=dtype)
       with tf.control_dependencies(
           [assert_util.assert_positive(total_count)] if validate_args else []):
         self._total_count = tf.identity(total_count, name='total_count')
@@ -132,7 +132,7 @@ class NegativeBinomial(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.total_count), tf.shape(input=self.probs))
+        tf.shape(self.total_count), tf.shape(self.probs))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.total_count.shape,

@@ -122,7 +122,7 @@ class Independent(distribution_lib.Distribution):
         reinterpreted_batch_ndims = self._get_default_reinterpreted_batch_ndims(
             distribution)
       reinterpreted_batch_ndims = tf.convert_to_tensor(
-          value=reinterpreted_batch_ndims,
+          reinterpreted_batch_ndims,
           dtype=tf.int32,
           name="reinterpreted_batch_ndims")
       self._reinterpreted_batch_ndims = reinterpreted_batch_ndims
@@ -313,8 +313,7 @@ def _kl_independent(a, b, name="kl_independent"):
         reduce_dims = [-i - 1 for i in range(0, num_reduce_dims)]
 
         return tf.reduce_sum(
-            input_tensor=kullback_leibler.kl_divergence(p, q, name=name),
-            axis=reduce_dims)
+            kullback_leibler.kl_divergence(p, q, name=name), axis=reduce_dims)
       else:
         raise NotImplementedError("KL between Independents with different "
                                   "event shapes not supported.")
@@ -335,5 +334,4 @@ def _kl_independent(a, b, name="kl_independent"):
               p.event_shape_tensor, a.event_shape))
       reduce_dims = prefer_static.range(-num_reduce_dims - 1, -1, 1)
       return tf.reduce_sum(
-          input_tensor=kullback_leibler.kl_divergence(p, q, name=name),
-          axis=reduce_dims)
+          kullback_leibler.kl_divergence(p, q, name=name), axis=reduce_dims)

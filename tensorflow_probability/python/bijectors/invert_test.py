@@ -82,7 +82,7 @@ class InvertBijectorTest(tf.test.TestCase):
             bijector=tfb.Invert(tfb.Exp())))
     self.assertAllEqual([],
                         self.evaluate(
-                            tf.shape(input=exp_gamma_distribution.sample())))
+                            tf.shape(exp_gamma_distribution.sample())))
 
 
 if __name__ == "__main__":

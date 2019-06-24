@@ -160,9 +160,8 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
       with tf.control_dependencies([
           assert_util.assert_positive(df, message="`df` must be positive.")
       ] if validate_args else []):
-        self._df = tf.identity(
-            tf.convert_to_tensor(value=df, dtype=dtype), name="df")
-      self._loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
+        self._df = tf.identity(tf.convert_to_tensor(df, dtype=dtype), name="df")
+      self._loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       self._scale = scale
 
     super(MultivariateStudentTLinearOperator, self).__init__(
@@ -224,8 +223,8 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
   def _batch_shape_tensor(self):
     shape_list = [
         self.scale.batch_shape_tensor(),
-        tf.shape(input=self.df),
-        tf.shape(input=self.loc)[:-1]
+        tf.shape(self.df),
+        tf.shape(self.loc)[:-1]
     ]
     return functools.reduce(tf.broadcast_dynamic_shape, shape_list)
 
@@ -272,7 +271,7 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     value = self.scale.solve(value[..., tf.newaxis])
 
     num_dims = tf.cast(self.event_shape_tensor()[0], self.dtype)
-    mahalanobis = tf.norm(tensor=value, axis=[-1, -2])
+    mahalanobis = tf.norm(value, axis=[-1, -2])
     return -(num_dims + self.df) / 2. * math.log1psquare(
         mahalanobis / tf.sqrt(self.df))
 
@@ -285,12 +284,11 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
       rather than returning `NaN`.""")
   def _mean(self):
     mean = _broadcast_to_shape(self.loc, self._sample_shape())
-    df = _broadcast_to_shape(self.df[..., tf.newaxis], tf.shape(input=mean))
+    df = _broadcast_to_shape(self.df[..., tf.newaxis], tf.shape(mean))
 
     if self.allow_nan_stats:
       nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
-      return tf1.where(df > 1., mean,
-                       tf.fill(tf.shape(input=mean), nan, name="nan"))
+      return tf1.where(df > 1., mean, tf.fill(tf.shape(mean), nan, name="nan"))
     else:
       with tf.control_dependencies([
           assert_util.assert_less(
@@ -308,11 +306,10 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     """Helper to compute stddev, covariance and variance."""
     df = tf.reshape(
         self.df,
-        tf.concat([
-            tf.shape(input=self.df),
-            tf.ones([statistic_ndims], dtype=tf.int32)
-        ], -1))
-    df = _broadcast_to_shape(df, tf.shape(input=statistic))
+        tf.concat(
+            [tf.shape(self.df),
+             tf.ones([statistic_ndims], dtype=tf.int32)], -1))
+    df = _broadcast_to_shape(df, tf.shape(statistic))
     # We need to put the tf.where inside the outer tf1.where to ensure we never
     # hit a NaN in the gradient.
     denom = tf1.where(df > 2., df - 2., tf.ones_like(df))
@@ -320,12 +317,12 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     # When 1 < df <= 2, stddev/variance are infinite.
     inf = dtype_util.as_numpy_dtype(self.dtype)(np.inf)
     result_where_defined = tf1.where(
-        df > 2., statistic, tf.fill(tf.shape(input=statistic), inf, name="inf"))
+        df > 2., statistic, tf.fill(tf.shape(statistic), inf, name="inf"))
 
     if self.allow_nan_stats:
       nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
       return tf1.where(df > 1., result_where_defined,
-                       tf.fill(tf.shape(input=statistic), nan, name="nan"))
+                       tf.fill(tf.shape(statistic), nan, name="nan"))
     else:
       with tf.control_dependencies([
           assert_util.assert_less(

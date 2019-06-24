@@ -159,8 +159,8 @@ class InverseGamma(distribution.Distribution):
       dtype = dtype_util.common_dtype([concentration, scale],
                                       dtype_hint=tf.float32)
       concentration = tf.convert_to_tensor(
-          value=concentration, name="concentration", dtype=dtype)
-      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
+          concentration, name="concentration", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       with tf.control_dependencies([
           assert_util.assert_positive(
               concentration, message="Concentration must be positive."),
@@ -184,7 +184,7 @@ class InverseGamma(distribution.Distribution):
   def _param_shapes(sample_shape):
     return dict(
         zip(("concentration", "scale"),
-            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
+            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
   def _params_event_ndims(cls):
@@ -211,7 +211,7 @@ class InverseGamma(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.concentration), tf.shape(input=self.scale))
+        tf.shape(self.concentration), tf.shape(self.scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.concentration.shape,
@@ -334,9 +334,8 @@ class _InverseGammaWithSoftplusConcentrationScale(InverseGamma):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration, scale])
       concentration = tf.convert_to_tensor(
-          value=concentration, name="softplus_concentration", dtype=dtype)
-      scale = tf.convert_to_tensor(
-          value=scale, name="softplus_scale", dtype=dtype)
+          concentration, name="softplus_concentration", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="softplus_scale", dtype=dtype)
       super(_InverseGammaWithSoftplusConcentrationScale, self).__init__(
           concentration=tf.nn.softplus(
               concentration, name="softplus_concentration"),

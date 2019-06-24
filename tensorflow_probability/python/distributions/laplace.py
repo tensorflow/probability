@@ -96,8 +96,8 @@ class Laplace(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
-      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       with tf.control_dependencies(
           [assert_util.assert_positive(scale)] if validate_args else []):
         self._loc = tf.identity(loc)
@@ -116,7 +116,7 @@ class Laplace(distribution.Distribution):
   def _param_shapes(sample_shape):
     return dict(
         zip(("loc", "scale"),
-            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
+            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
   def _params_event_ndims(cls):
@@ -133,8 +133,7 @@ class Laplace(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.loc), tf.shape(input=self.scale))
+    return tf.broadcast_dynamic_shape(tf.shape(self.loc), tf.shape(self.scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(

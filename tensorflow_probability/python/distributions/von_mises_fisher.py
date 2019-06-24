@@ -37,7 +37,7 @@ __all__ = ['VonMisesFisher']
 def _bessel_ive(v, z, cache=None):
   """Computes I_v(z)*exp(-abs(z)) using a recurrence relation, where z > 0."""
   # TODO(b/67497980): Switch to a more numerically faithful implementation.
-  z = tf.convert_to_tensor(value=z)
+  z = tf.convert_to_tensor(z)
 
   wrap = lambda result: tf.debugging.check_numerics(result, 'besseli{}'.format(v
                                                                               ))
@@ -171,19 +171,19 @@ class VonMisesFisher(distribution.Distribution):
       dtype = dtype_util.common_dtype([mean_direction, concentration],
                                       tf.float32)
       mean_direction = tf.convert_to_tensor(
-          value=mean_direction, name='mean_direction', dtype=dtype)
+          mean_direction, name='mean_direction', dtype=dtype)
       concentration = tf.convert_to_tensor(
-          value=concentration, name='concentration', dtype=dtype)
+          concentration, name='concentration', dtype=dtype)
       assertions = [
           assert_util.assert_non_negative(
               concentration, message='`concentration` must be non-negative'),
           assert_util.assert_greater(
-              tf.shape(input=mean_direction)[-1],
+              tf.shape(mean_direction)[-1],
               1,
               message='`mean_direction` may not have scalar event shape'),
           assert_util.assert_near(
               1.,
-              tf.linalg.norm(tensor=mean_direction, axis=-1),
+              tf.linalg.norm(mean_direction, axis=-1),
               message='`mean_direction` must be unit-length')
       ] if validate_args else []
       static_event_dim = tf.compat.dimension_value(
@@ -193,7 +193,7 @@ class VonMisesFisher(distribution.Distribution):
       elif validate_args:
         assertions += [
             assert_util.assert_less_equal(
-                tf.shape(input=mean_direction)[-1],
+                tf.shape(mean_direction)[-1],
                 5,
                 message='vMF ndims > 5 is not currently supported')
         ]
@@ -233,8 +233,7 @@ class VonMisesFisher(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.mean_direction)[:-1],
-        tf.shape(input=self.concentration))
+        tf.shape(self.mean_direction)[:-1], tf.shape(self.concentration))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -242,7 +241,7 @@ class VonMisesFisher(distribution.Distribution):
         self.concentration.shape)
 
   def _event_shape_tensor(self):
-    return tf.shape(input=self.mean_direction)[-1:]
+    return tf.shape(self.mean_direction)[-1:]
 
   def _event_shape(self):
     s = tensorshape_util.with_rank_at_least(self.mean_direction.shape, 1)
@@ -256,8 +255,7 @@ class VonMisesFisher(distribution.Distribution):
     samples = self._maybe_assert_valid_sample(samples)
     bcast_mean_dir = (self.mean_direction +
                       tf.zeros_like(self.concentration)[..., tf.newaxis])
-    inner_product = tf.reduce_sum(
-        input_tensor=samples * bcast_mean_dir, axis=-1)
+    inner_product = tf.reduce_sum(samples * bcast_mean_dir, axis=-1)
     return self.concentration * inner_product
 
   def _log_normalization(self):
@@ -288,10 +286,10 @@ class VonMisesFisher(distribution.Distribution):
     with tf.control_dependencies([
         assert_util.assert_near(
             1.,
-            tf.linalg.norm(tensor=samples, axis=-1),
+            tf.linalg.norm(samples, axis=-1),
             message='samples must be unit length'),
         assert_util.assert_equal(
-            tf.shape(input=samples)[-1:],
+            tf.shape(samples)[-1:],
             self.event_shape_tensor(),
             message=('samples must have innermost dimension matching that of '
                      '`self.mean_direction`')),
@@ -350,8 +348,7 @@ class VonMisesFisher(distribution.Distribution):
     basis = tf.concat([[1.], tf.zeros([event_dim - 1], dtype=self.dtype)],
                       axis=0),
     u = tf.nn.l2_normalize(basis - self.mean_direction, axis=-1)
-    return samples - 2 * tf.reduce_sum(
-        input_tensor=samples * u, axis=-1, keepdims=True) * u
+    return samples - 2 * tf.reduce_sum(samples * u, axis=-1, keepdims=True) * u
 
   def _sample_3d(self, n, seed=None):
     """Specialized inversion sampler for 3D."""
@@ -367,11 +364,8 @@ class VonMisesFisher(distribution.Distribution):
                           tf.ones_like(self.concentration))
     safe_z = tf1.where(z > 0, z, tf.ones_like(z))
     safe_u = 1 + tf.reduce_logsumexp(
-        input_tensor=[
-            tf.math.log(safe_z),
-            tf.math.log1p(-safe_z) - 2 * safe_conc
-        ],
-        axis=0) / safe_conc
+        [tf.math.log(safe_z),
+         tf.math.log1p(-safe_z) - 2 * safe_conc], axis=0) / safe_conc
     # Limit of the above expression as kappa->0 is 2*z-1
     u = tf1.where(self.concentration > tf.zeros_like(safe_u), safe_u, 2 * z - 1)
     # Limit of the expression as z->0 is -1.
@@ -422,7 +416,7 @@ class VonMisesFisher(distribution.Distribution):
 
       def cond_fn(w, should_continue):
         del w
-        return tf.reduce_any(input_tensor=should_continue)
+        return tf.reduce_any(should_continue)
 
       def body_fn(w, should_continue):
         z = beta.sample(sample_shape=sample_batch_shape, seed=seed())
@@ -472,7 +466,7 @@ class VonMisesFisher(distribution.Distribution):
     # Runtime assert that samples are unit length.
     if not self._allow_nan_stats:
       worst, idx = tf.nn.top_k(
-          tf.reshape(tf.abs(1 - tf.linalg.norm(tensor=samples, axis=-1)), [-1]))
+          tf.reshape(tf.abs(1 - tf.linalg.norm(samples, axis=-1)), [-1]))
       with tf.control_dependencies([
           assert_util.assert_near(
               dtype_util.as_numpy_dtype(self.dtype)(0),
@@ -494,7 +488,7 @@ class VonMisesFisher(distribution.Distribution):
       with tf.control_dependencies([
           assert_util.assert_less(
               tf.linalg.norm(
-                  tensor=self._rotate(basis) - self.mean_direction, axis=-1),
+                  self._rotate(basis) - self.mean_direction, axis=-1),
               dtype_util.as_numpy_dtype(self.dtype)(1e-5))
       ]):
         return self._rotate(samples)

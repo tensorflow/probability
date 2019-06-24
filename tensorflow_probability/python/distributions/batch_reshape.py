@@ -105,7 +105,7 @@ class BatchReshape(distribution_lib.Distribution):
     with tf.name_scope(name) as name:
       # The unexpanded batch shape may contain up to one dimension of -1.
       self._batch_shape_unexpanded = tf.convert_to_tensor(
-          value=batch_shape, dtype=tf.int32, name="batch_shape")
+          batch_shape, dtype=tf.int32, name="batch_shape")
       validate_init_args_statically(distribution, self._batch_shape_unexpanded)
       batch_shape, batch_shape_static, runtime_assertions = calculate_reshape(
           distribution.batch_shape_tensor(), self._batch_shape_unexpanded,
@@ -214,11 +214,11 @@ class BatchReshape(distribution_lib.Distribution):
         tf.rank(x) if tensorshape_util.rank(x.shape) is None else
         tensorshape_util.rank(x.shape))
     event_ndims = (
-        tf.size(input=self.event_shape_tensor())
+        tf.size(self.event_shape_tensor())
         if tensorshape_util.rank(self.event_shape) is None else
         tensorshape_util.rank(self.event_shape))
     batch_ndims = (
-        tf.size(input=self._batch_shape_unexpanded)
+        tf.size(self._batch_shape_unexpanded)
         if tensorshape_util.rank(self.batch_shape) is None else
         tensorshape_util.rank(self.batch_shape))
     sample_ndims = x_ndims - batch_ndims - event_ndims
@@ -229,7 +229,7 @@ class BatchReshape(distribution_lib.Distribution):
     if tensorshape_util.is_fully_defined(static_sample_shape):
       sample_shape = np.int32(static_sample_shape)
     else:
-      sample_shape = tf.shape(input=x)[:sample_ndims]
+      sample_shape = tf.shape(x)[:sample_ndims]
     return sample_shape, static_sample_shape
 
   def _call_reshape_input_output(self, fn, x, extra_kwargs=None):
@@ -299,11 +299,11 @@ class BatchReshape(distribution_lib.Distribution):
           tf.rank(x) if tensorshape_util.rank(x.shape) is None else
           tensorshape_util.rank(x.shape))
       event_ndims = (
-          tf.size(input=self.event_shape_tensor())
+          tf.size(self.event_shape_tensor())
           if tensorshape_util.rank(self.event_shape) is None else
           tensorshape_util.rank(self.event_shape))
       batch_ndims = (
-          tf.size(input=self._batch_shape_unexpanded)
+          tf.size(self._batch_shape_unexpanded)
           if tensorshape_util.rank(self.batch_shape) is None else
           tensorshape_util.rank(self.batch_shape))
       expected_batch_event_ndims = batch_ndims + event_ndims
@@ -345,7 +345,7 @@ class BatchReshape(distribution_lib.Distribution):
         actual_batch_event_shape = np.int32(x.shape[sample_ndims:])
       else:
         sample_ndims = tf.maximum(sample_ndims, 0)
-        actual_batch_event_shape = tf.shape(input=x)[sample_ndims:]
+        actual_batch_event_shape = tf.shape(x)[sample_ndims:]
 
       if (isinstance(expected_batch_event_shape, np.ndarray) and
           isinstance(actual_batch_event_shape, np.ndarray)):
@@ -384,11 +384,11 @@ def calculate_reshape(original_shape, new_shape, validate=False, name=None):
   if tensorshape_util.is_fully_defined(batch_shape_static):
     return np.int32(batch_shape_static), batch_shape_static, []
   with tf.name_scope(name or "calculate_reshape"):
-    original_size = tf.reduce_prod(input_tensor=original_shape)
+    original_size = tf.reduce_prod(original_shape)
     implicit_dim = tf.equal(new_shape, -1)
     size_implicit_dim = (
-        original_size // tf.maximum(1, -tf.reduce_prod(input_tensor=new_shape)))
-    new_ndims = tf.shape(input=new_shape)
+        original_size // tf.maximum(1, -tf.reduce_prod(new_shape)))
+    new_ndims = tf.shape(new_shape)
     expanded_new_shape = tf1.where(  # Assumes exactly one `-1`.
         implicit_dim, tf.fill(new_ndims, size_implicit_dim), new_shape)
     validations = [] if not validate else [  # pylint: disable=g-long-ternary
@@ -403,7 +403,7 @@ def calculate_reshape(original_shape, new_shape, validate=False, name=None):
         assert_util.assert_positive(
             expanded_new_shape, message="Shape elements must be >=-1."),
         assert_util.assert_equal(
-            tf.reduce_prod(input_tensor=expanded_new_shape),
+            tf.reduce_prod(expanded_new_shape),
             original_size,
             message="Shape sizes do not match."),
     ]

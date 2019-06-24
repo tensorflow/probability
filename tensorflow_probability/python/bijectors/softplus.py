@@ -89,7 +89,7 @@ class Softplus(bijector.Bijector):
         self._hinge_softness = None
       else:
         self._hinge_softness = tf.convert_to_tensor(
-            value=hinge_softness, name="hinge_softness")
+            hinge_softness, name="hinge_softness")
         if validate_args:
           nonzero_check = assert_util.assert_none_equal(
               dtype_util.as_numpy_dtype(self._hinge_softness.dtype)(0),

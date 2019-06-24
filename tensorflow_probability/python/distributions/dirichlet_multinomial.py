@@ -203,17 +203,15 @@ class DirichletMultinomial(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, concentration], tf.float32)
       self._total_count = tf.convert_to_tensor(
-          value=total_count, name="total_count", dtype=dtype)
+          total_count, name="total_count", dtype=dtype)
       if validate_args:
         self._total_count = (
             distribution_util.embed_check_nonnegative_integer_form(
                 self._total_count))
       self._concentration = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(
-              value=concentration, name="concentration", dtype=dtype),
-          validate_args)
-      self._total_concentration = tf.reduce_sum(
-          input_tensor=self._concentration, axis=-1)
+              concentration, name="concentration", dtype=dtype), validate_args)
+      self._total_concentration = tf.reduce_sum(self._concentration, axis=-1)
       self._broadcasted_concentration = tf.ones_like(
           self._total_count[..., tf.newaxis]) * self._concentration
     super(DirichletMultinomial, self).__init__(
@@ -245,7 +243,7 @@ class DirichletMultinomial(distribution.Distribution):
     return self._total_concentration
 
   def _batch_shape_tensor(self):
-    return tf.shape(input=self._broadcasted_concentration)[:-1]
+    return tf.shape(self._broadcasted_concentration)[:-1]
 
   def _batch_shape(self):
     return tensorshape_util.with_rank_at_least(
@@ -253,7 +251,7 @@ class DirichletMultinomial(distribution.Distribution):
 
   def _event_shape_tensor(self):
     # Event shape depends only on concentration, not total_count.
-    return tf.shape(input=self.concentration)[-1:]
+    return tf.shape(self.concentration)[-1:]
 
   def _event_shape(self):
     # Event shape depends only on concentration, not total_count.
@@ -347,6 +345,6 @@ class DirichletMultinomial(distribution.Distribution):
     return distribution_util.with_dependencies([
         assert_util.assert_equal(
             self.total_count,
-            tf.reduce_sum(input_tensor=counts, axis=-1),
+            tf.reduce_sum(counts, axis=-1),
             message="counts last-dimension must sum to `self.total_count`"),
     ], counts)

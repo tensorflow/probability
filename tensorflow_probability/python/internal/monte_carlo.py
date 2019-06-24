@@ -313,8 +313,7 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
     if not callable(f):
       raise ValueError('`f` must be a callable function.')
     if use_reparametrization:
-      return tf.math.reduce_mean(
-          input_tensor=f(samples), axis=axis, keepdims=keep_dims)
+      return tf.math.reduce_mean(f(samples), axis=axis, keepdims=keep_dims)
     else:
       if not callable(log_prob):
         raise ValueError('`log_prob` must be a callable function.')
@@ -334,17 +333,17 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       # "Is there a floating point value of x, for which x-x == 0 is false?"
       # http://stackoverflow.com/q/2686644
       fx += stop(fx) * (logpx - stop(logpx))  # Add zeros_like(logpx).
-      return tf.math.reduce_mean(input_tensor=fx, axis=axis, keepdims=keep_dims)
+      return tf.math.reduce_mean(fx, axis=axis, keepdims=keep_dims)
 
 
 def _sample_mean(values):
   """Mean over sample indices.  In this module this is always [0]."""
-  return tf.math.reduce_mean(input_tensor=values, axis=[0])
+  return tf.math.reduce_mean(values, axis=[0])
 
 
 def _sample_max(values):
   """Max over sample indices.  In this module this is always [0]."""
-  return tf.math.reduce_max(input_tensor=values, axis=[0])
+  return tf.math.reduce_max(values, axis=[0])
 
 
 def _get_samples(dist, z, n, seed):
@@ -357,4 +356,4 @@ def _get_samples(dist, z, n, seed):
     if n is not None:
       return dist.sample(n, seed=seed)
     else:
-      return tf.convert_to_tensor(value=z, name='z')
+      return tf.convert_to_tensor(z, name='z')

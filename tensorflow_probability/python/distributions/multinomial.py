@@ -392,7 +392,7 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
       x = tf.reshape(x, shape=[num_samples, -1])  # [num_samples, num_trials]
       x = tf.one_hot(
           x, depth=num_classes)  # [num_samples, num_trials, num_classes]
-      x = tf.reduce_sum(input_tensor=x, axis=-2)  # [num_samples, num_classes]
+      x = tf.reduce_sum(x, axis=-2)  # [num_samples, num_classes]
       return tf.cast(x, dtype=dtype)
 
     x = tf.map_fn(
@@ -401,9 +401,8 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
 
     # reshape the results to proper shape
     x = tf.transpose(a=x, perm=[1, 0, 2])
-    final_shape = tf.concat([[num_samples],
-                             tf.shape(input=num_trials), [num_classes]],
-                            axis=0)
+    final_shape = tf.concat(
+        [[num_samples], tf.shape(num_trials), [num_classes]], axis=0)
     x = tf.reshape(x, final_shape)
 
     return x

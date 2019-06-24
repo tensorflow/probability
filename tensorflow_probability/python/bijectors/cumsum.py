@@ -95,7 +95,7 @@ class Cumsum(bijector.Bijector):
   def _inverse(self, y):
     ndims = prefer_static.rank(y)
     shifted_y = tf.pad(
-        tensor=tf.slice(
+        tf.slice(
             y, tf.zeros(ndims, dtype=tf.int32),
             prefer_static.shape(y) -
             tf.one_hot(ndims + self.axis, ndims, dtype=tf.int32)

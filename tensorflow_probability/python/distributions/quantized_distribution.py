@@ -270,11 +270,9 @@ class QuantizedDistribution(distributions.Distribution):
       self._dist = distribution
 
       if low is not None:
-        low = tf.convert_to_tensor(
-            value=low, name="low", dtype=distribution.dtype)
+        low = tf.convert_to_tensor(low, name="low", dtype=distribution.dtype)
       if high is not None:
-        high = tf.convert_to_tensor(
-            value=high, name="high", dtype=distribution.dtype)
+        high = tf.convert_to_tensor(high, name="high", dtype=distribution.dtype)
       dtype_util.assert_same_float_dtype(
           tensors=[self.distribution, low, high])
 
@@ -339,7 +337,7 @@ class QuantizedDistribution(distributions.Distribution):
     low = self._low
     high = self._high
     with tf.name_scope("transform"):
-      n = tf.convert_to_tensor(value=n, name="n")
+      n = tf.convert_to_tensor(n, name="n")
       x_samps = self.distribution.sample(n, seed=seed)
       ones = tf.ones_like(x_samps)
 
@@ -554,7 +552,7 @@ class QuantizedDistribution(distributions.Distribution):
 
   def _check_integer(self, value):
     with tf.name_scope("check_integer"):
-      value = tf.convert_to_tensor(value=value, name="value")
+      value = tf.convert_to_tensor(value, name="value")
       if not self.validate_args:
         return value
       dependencies = [distribution_util.assert_integer_form(

@@ -82,12 +82,11 @@ class Ordered(bijector.Bijector):
     # |det(Jac)| = prod_{i=1}^{K} exp(y[i]).
     # (1) - Stan Modeling Language User's Guide and Reference Manual
     #       Version 2.17.0 session 35.2
-    return tf.reduce_sum(input_tensor=y[..., 1:], axis=-1)
+    return tf.reduce_sum(y[..., 1:], axis=-1)
 
   def _forward_log_det_jacobian(self, x):
     with tf.control_dependencies(self._assertions(x)):
-      return -tf.reduce_sum(
-          input_tensor=tf.math.log(x[..., 1:] - x[..., :-1]), axis=-1)
+      return -tf.reduce_sum(tf.math.log(x[..., 1:] - x[..., :-1]), axis=-1)
 
   def _assertions(self, t):
     if not self.validate_args:

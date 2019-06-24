@@ -138,15 +138,14 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale, skewness, tailweight],
                                       tf.float32)
-      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       tailweight = 1. if tailweight is None else tailweight
       has_default_skewness = skewness is None
       skewness = 0. if skewness is None else skewness
       tailweight = tf.convert_to_tensor(
-          value=tailweight, name="tailweight", dtype=dtype)
-      skewness = tf.convert_to_tensor(
-          value=skewness, name="skewness", dtype=dtype)
+          tailweight, name="tailweight", dtype=dtype)
+      skewness = tf.convert_to_tensor(skewness, name="skewness", dtype=dtype)
 
       batch_shape = distribution_util.get_broadcast_shape(
           loc, scale, tailweight, skewness)
@@ -178,8 +177,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
             tailweight=tailweight)
 
       # Make the AffineScalar bijector, Z --> loc + scale * Z (2 / F_0(2))
-      c = 2 * scale / f_noskew.forward(
-          tf.convert_to_tensor(value=2, dtype=dtype))
+      c = 2 * scale / f_noskew.forward(tf.convert_to_tensor(2, dtype=dtype))
       affine = affine_scalar_bijector.AffineScalar(
           shift=loc,
           scale=c,

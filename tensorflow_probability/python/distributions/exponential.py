@@ -91,7 +91,7 @@ class Exponential(gamma.Gamma):
     # through to the parent class results in unnecessary asserts.
     with tf.name_scope(name) as name:
       self._rate = tf.convert_to_tensor(
-          value=rate,
+          rate,
           name="rate",
           dtype=dtype_util.common_dtype([rate], dtype_hint=tf.float32))
     super(Exponential, self).__init__(
@@ -105,7 +105,7 @@ class Exponential(gamma.Gamma):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {"rate": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
+    return {"rate": tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
 
   @classmethod
   def _params_event_ndims(cls):
@@ -119,7 +119,7 @@ class Exponential(gamma.Gamma):
     return self._log_prob(value) - tf.math.log(self._rate)
 
   def _sample_n(self, n, seed=None):
-    shape = tf.concat([[n], tf.shape(input=self._rate)], 0)
+    shape = tf.concat([[n], tf.shape(self._rate)], 0)
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
     # than `[0, 1)`. To do so, we use
     # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny`

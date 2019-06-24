@@ -81,10 +81,10 @@ def quadrature_scheme_softmaxnormal_gauss_hermite(
   """
   with tf.name_scope(
       name or "quadrature_scheme_softmaxnormal_gauss_hermite"):
-    normal_loc = tf.convert_to_tensor(value=normal_loc, name="normal_loc")
+    normal_loc = tf.convert_to_tensor(normal_loc, name="normal_loc")
     npdt = dtype_util.as_numpy_dtype(normal_loc.dtype)
     normal_scale = tf.convert_to_tensor(
-        value=normal_scale, dtype=npdt, name="normal_scale")
+        normal_scale, dtype=npdt, name="normal_scale")
 
     normal_scale = maybe_check_quadrature_param(
         normal_scale, "normal_scale", validate_args)
@@ -93,7 +93,7 @@ def quadrature_scheme_softmaxnormal_gauss_hermite(
     grid = grid.astype(npdt)
     probs = probs.astype(npdt)
     probs /= np.linalg.norm(probs, ord=1, keepdims=True)
-    probs = tf.convert_to_tensor(value=probs, name="probs", dtype=npdt)
+    probs = tf.convert_to_tensor(probs, name="probs", dtype=npdt)
 
     grid = softmax(
         -distribution_util.pad(
@@ -139,10 +139,10 @@ def quadrature_scheme_softmaxnormal_quantiles(
       associated with each grid point.
   """
   with tf.name_scope(name or "softmax_normal_grid_and_probs"):
-    normal_loc = tf.convert_to_tensor(value=normal_loc, name="normal_loc")
+    normal_loc = tf.convert_to_tensor(normal_loc, name="normal_loc")
     dt = dtype_util.base_dtype(normal_loc.dtype)
     normal_scale = tf.convert_to_tensor(
-        value=normal_scale, dtype=dt, name="normal_scale")
+        normal_scale, dtype=dt, name="normal_scale")
 
     normal_scale = maybe_check_quadrature_param(
         normal_scale, "normal_scale", validate_args)
@@ -153,7 +153,7 @@ def quadrature_scheme_softmaxnormal_quantiles(
       """Helper to get rank(dist.batch_shape), statically if possible."""
       ndims = tensorshape_util.rank(dist.batch_shape)
       if ndims is None:
-        ndims = tf.shape(input=dist.batch_shape_tensor())[0]
+        ndims = tf.shape(dist.batch_shape_tensor())[0]
       return ndims
     batch_ndims = _get_batch_ndims()
 
@@ -407,7 +407,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
       dtype = dtype_util.base_dtype(scale[0].dtype)
 
       loc = [
-          tf.convert_to_tensor(value=loc_, dtype=dtype, name="loc{}".format(k))
+          tf.convert_to_tensor(loc_, dtype=dtype, name="loc{}".format(k))
           if loc_ is not None else None for k, loc_ in enumerate(loc)
       ]
 
@@ -434,9 +434,9 @@ class VectorDiffeomixture(distribution_lib.Distribution):
         raise NotImplementedError("Currently only bimixtures are supported; "
                                   "len(scale)={} is not 2.".format(len(scale)))
 
-      mix_loc = tf.convert_to_tensor(value=mix_loc, dtype=dtype, name="mix_loc")
+      mix_loc = tf.convert_to_tensor(mix_loc, dtype=dtype, name="mix_loc")
       temperature = tf.convert_to_tensor(
-          value=temperature, dtype=dtype, name="temperature")
+          temperature, dtype=dtype, name="temperature")
       self._grid, probs = tuple(quadrature_fn(
           mix_loc / temperature,
           1. / temperature,
@@ -548,12 +548,12 @@ class VectorDiffeomixture(distribution_lib.Distribution):
     # ids as a [n]-shaped vector.
     batch_size = tensorshape_util.num_elements(self.batch_shape)
     if batch_size is None:
-      batch_size = tf.reduce_prod(input_tensor=self.batch_shape_tensor())
+      batch_size = tf.reduce_prod(self.batch_shape_tensor())
     mix_batch_size = tensorshape_util.num_elements(
         self.mixture_distribution.batch_shape)
     if mix_batch_size is None:
       mix_batch_size = tf.reduce_prod(
-          input_tensor=self.mixture_distribution.batch_shape_tensor())
+          self.mixture_distribution.batch_shape_tensor())
     ids = self.mixture_distribution.sample(
         sample_shape=concat_vectors(
             [n],
@@ -575,7 +575,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
     stride = tensorshape_util.num_elements(
         tensorshape_util.with_rank_at_least(self.grid.shape, 2)[-2:])
     if stride is None:
-      stride = tf.reduce_prod(input_tensor=tf.shape(input=self.grid)[-2:])
+      stride = tf.reduce_prod(tf.shape(self.grid)[-2:])
     offset = tf.range(
         start=0, limit=batch_size * stride, delta=stride, dtype=ids.dtype)
 
@@ -604,8 +604,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
   def _log_prob(self, x):
     # By convention, we always put the grid points right-most.
     y = tf.stack([aff.inverse(x) for aff in self.interpolated_affine], axis=-1)
-    log_prob = tf.reduce_sum(
-        input_tensor=self.distribution.log_prob(y), axis=-2)
+    log_prob = tf.reduce_sum(self.distribution.log_prob(y), axis=-2)
     # Because the affine transformation has a constant Jacobian, it is the case
     # that `affine.fldj(x) = -affine.ildj(x)`. This is not true in general.
     fldj = tf.stack(
@@ -616,8 +615,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
         ],
         axis=-1)
     return tf.reduce_logsumexp(
-        input_tensor=self.mixture_distribution.logits - fldj + log_prob,
-        axis=-1)
+        self.mixture_distribution.logits - fldj + log_prob, axis=-1)
 
   def _mean(self):
     p = self._expand_mix_distribution_probs()
@@ -760,10 +758,10 @@ class VectorDiffeomixture(distribution_lib.Distribution):
     deg = tf.compat.dimension_value(
         tensorshape_util.with_rank_at_least(p.shape, 1)[-1])
     if deg is None:
-      deg = tf.shape(input=p)[-1]
+      deg = tf.shape(p)[-1]
     event_ndims = tensorshape_util.rank(self.event_shape)
     if event_ndims is None:
-      event_ndims = tf.shape(input=self.event_shape_tensor())[0]
+      event_ndims = tf.shape(self.event_shape_tensor())[0]
     expand_shape = tf.concat(
         [
             self.mixture_distribution.batch_shape_tensor(),
@@ -802,7 +800,7 @@ def maybe_check_quadrature_param(param, name, validate_args):
     elif validate_args:
       assertions.append(
           assert_util.assert_equal(
-              tf.shape(input=param)[-1],
+              tf.shape(param)[-1],
               1,
               message=("Currently only bimixtures are supported; "
                        "{}.shape[-1] is not 1.".format(name))))
@@ -818,7 +816,7 @@ def determine_batch_event_shapes(grid, endpoint_affine):
     # grid  # shape: [B, k, q]
     # endpoint_affine     # len=k, shape: [B, d, d]
     batch_shape = grid.shape[:-2]
-    batch_shape_tensor = tf.shape(input=grid)[:-2]
+    batch_shape_tensor = tf.shape(grid)[:-2]
     event_shape = None
     event_shape_tensor = None
 
@@ -834,10 +832,10 @@ def determine_batch_event_shapes(grid, endpoint_affine):
                                                 aff.shift.shape[:-1])
         batch_shape_tensor = tf.broadcast_dynamic_shape(
             batch_shape_tensor,
-            tf.shape(input=aff.shift)[:-1])
+            tf.shape(aff.shift)[:-1])
         event_shape, event_shape_tensor = _set_event_shape(
             aff.shift.shape[-1:],
-            tf.shape(input=aff.shift)[-1:])
+            tf.shape(aff.shift)[-1:])
 
       if aff.scale is not None:
         batch_shape = tf.broadcast_static_shape(batch_shape,
@@ -959,12 +957,12 @@ def vec_osquare(x):
 def softmax(x, axis, name=None):
   """Equivalent to tf.nn.softmax but works around b/70297725."""
   with tf.name_scope(name or "softmax"):
-    x = tf.convert_to_tensor(value=x, name="x")
+    x = tf.convert_to_tensor(x, name="x")
     ndims = (
         tensorshape_util.rank(x.shape)
         if tensorshape_util.rank(x.shape) is not None else tf.rank(
             x, name="ndims"))
-    axis = tf.convert_to_tensor(value=axis, dtype=tf.int32, name="axis")
+    axis = tf.convert_to_tensor(axis, dtype=tf.int32, name="axis")
     axis_ = tf.get_static_value(axis)
     if axis_ is not None:
       axis = np.int(ndims + axis_ if axis_ < 0 else axis_)

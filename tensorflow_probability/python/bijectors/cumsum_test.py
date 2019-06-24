@@ -90,7 +90,7 @@ class _CumsumBijectorTest(tf.test.TestCase):
     ndarray = np.asarray(ndarray).astype(
         dtype if dtype is not None else self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 class CumsumBijectorTestWithStaticShape(_CumsumBijectorTest):

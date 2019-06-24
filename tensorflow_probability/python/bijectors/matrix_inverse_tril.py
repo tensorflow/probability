@@ -86,8 +86,7 @@ class MatrixInverseTriL(bijector.Bijector):
       matrix_dim = tf.cast(tf.shape(x)[-1],
                            dtype_util.base_dtype(x.dtype))
       return -(matrix_dim + 1) * tf.reduce_sum(
-          input_tensor=tf.math.log(tf.abs(tf.linalg.diag_part(x))),
-          axis=-1)
+          tf.math.log(tf.abs(tf.linalg.diag_part(x))), axis=-1)
 
   def _assertions(self, x):
     if not self.validate_args:

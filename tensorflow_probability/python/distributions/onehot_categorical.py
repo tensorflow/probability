@@ -121,7 +121,7 @@ class OneHotCategorical(distribution.Distribution):
           self._logits.shape, 1)
       if tensorshape_util.rank(logits_shape_static) is not None:
         self._batch_rank = tf.convert_to_tensor(
-            value=tensorshape_util.rank(logits_shape_static) - 1,
+            tensorshape_util.rank(logits_shape_static) - 1,
             dtype=tf.int32,
             name='batch_rank')
       else:
@@ -129,7 +129,7 @@ class OneHotCategorical(distribution.Distribution):
           self._batch_rank = tf.rank(self._logits) - 1
 
       with tf.name_scope('event_size'):
-        self._event_size = tf.shape(input=self._logits)[-1]
+        self._event_size = tf.shape(self._logits)[-1]
 
     super(OneHotCategorical, self).__init__(
         dtype=dtype,
@@ -160,19 +160,19 @@ class OneHotCategorical(distribution.Distribution):
     return self._probs
 
   def _batch_shape_tensor(self):
-    return tf.shape(input=self.logits)[:-1]
+    return tf.shape(self.logits)[:-1]
 
   def _batch_shape(self):
     return self.logits.shape[:-1]
 
   def _event_shape_tensor(self):
-    return tf.shape(input=self.logits)[-1:]
+    return tf.shape(self.logits)[-1:]
 
   def _event_shape(self):
     return tensorshape_util.with_rank_at_least(self.logits.shape, 1)[-1:]
 
   def _sample_n(self, n, seed=None):
-    sample_shape = tf.concat([[n], tf.shape(input=self.logits)], 0)
+    sample_shape = tf.concat([[n], tf.shape(self.logits)], 0)
     logits = self.logits
     if tensorshape_util.rank(logits.shape) == 2:
       logits_2d = logits
@@ -195,7 +195,7 @@ class OneHotCategorical(distribution.Distribution):
       logits = tf.ones_like(x, dtype=logits.dtype) * logits
       x = tf.ones_like(logits, dtype=x.dtype) * x
 
-    logits_shape = tf.shape(input=tf.reduce_sum(input_tensor=logits, axis=-1))
+    logits_shape = tf.shape(tf.reduce_sum(logits, axis=-1))
     logits_2d = tf.reshape(logits, [-1, self.event_size])
     x_2d = tf.reshape(x, [-1, self.event_size])
     ret = -tf.nn.softmax_cross_entropy_with_logits(
@@ -206,14 +206,13 @@ class OneHotCategorical(distribution.Distribution):
     return ret
 
   def _entropy(self):
-    return -tf.reduce_sum(
-        input_tensor=tf.nn.log_softmax(self.logits) * self.probs, axis=-1)
+    return -tf.reduce_sum(tf.nn.log_softmax(self.logits) * self.probs, axis=-1)
 
   def _mean(self):
     return self.probs
 
   def _mode(self):
-    ret = tf.argmax(input=self.logits, axis=self._batch_rank)
+    ret = tf.argmax(self.logits, axis=self._batch_rank)
     ret = tf.one_hot(ret, self.event_size, dtype=self.dtype)
     tensorshape_util.set_shape(ret, self.logits.shape)
     return ret
@@ -247,7 +246,7 @@ class OneHotCategorical(distribution.Distribution):
         assert_util.assert_non_positive(x),
         assert_util.assert_near(
             tf.zeros([], dtype=self.logits.dtype),
-            tf.reduce_logsumexp(input_tensor=x, axis=[-1])),
+            tf.reduce_logsumexp(x, axis=[-1])),
     ], x)
 
 

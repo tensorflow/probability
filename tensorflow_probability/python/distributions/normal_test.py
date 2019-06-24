@@ -47,9 +47,8 @@ class NormalTest(test_case.TestCase):
     self.assertAllEqual(expected, self.evaluate(sigma_shape))
     mu = tf.zeros(mu_shape)
     sigma = tf.ones(sigma_shape)
-    self.assertAllEqual(
-        expected,
-        self.evaluate(tf.shape(input=tfd.Normal(mu, sigma).sample())))
+    self.assertAllEqual(expected,
+                        self.evaluate(tf.shape(tfd.Normal(mu, sigma).sample())))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.Normal.param_static_shapes(sample_shape)
@@ -461,8 +460,7 @@ class NormalTest(test_case.TestCase):
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
 
     x = n_a.sample(int(1e5), seed=tfp_test_util.test_seed())
-    kl_sample = tf.reduce_mean(
-        input_tensor=n_a.log_prob(x) - n_b.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(n_a.log_prob(x) - n_b.log_prob(x), axis=0)
     kl_sample_ = self.evaluate(kl_sample)
 
     self.assertEqual(kl.shape, (batch_size,))

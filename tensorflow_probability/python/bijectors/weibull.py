@@ -66,9 +66,9 @@ class Weibull(bijector.Bijector):
       name: Python `str` name given to ops managed by this object.
     """
     with tf.name_scope(name) as name:
-      self._scale = tf.convert_to_tensor(value=scale, name="scale")
+      self._scale = tf.convert_to_tensor(scale, name="scale")
       self._concentration = tf.convert_to_tensor(
-          value=concentration, name="concentration")
+          concentration, name="concentration")
       dtype_util.assert_same_float_dtype([self._scale, self._concentration])
       if validate_args:
         self._scale = distribution_util.with_dependencies([

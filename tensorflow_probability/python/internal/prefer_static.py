@@ -109,12 +109,11 @@ def rank_from_shape(shape_tensor_fn, tensorshape=None):
       ndims_ = tensorshape_util.num_elements(shape_tensor.shape)
     else:
       ndims_ = len(shape_tensor)
-    ndims_fn = lambda: tf.size(input=shape_tensor)
+    ndims_fn = lambda: tf.size(shape_tensor)
   else:
     ndims_ = tensorshape_util.rank(tensorshape)
-    ndims_fn = lambda: tf.size(input=shape_tensor_fn()  # pylint: disable=g-long-lambda
-                               if callable(shape_tensor_fn)
-                               else shape_tensor_fn)
+    ndims_fn = lambda: tf.size(  # pylint: disable=g-long-lambda
+        shape_tensor_fn() if callable(shape_tensor_fn) else shape_tensor_fn)
   return ndims_fn() if ndims_ is None else ndims_
 
 
@@ -239,9 +238,8 @@ range = _prefer_static(  # pylint: disable=redefined-builtin
 rank = _copy_docstring(
     tf.rank,
     lambda input, name=None: (  # pylint: disable=redefined-builtin,g-long-lambda
-        tf.rank(input=input)
-        if tensorshape_util.rank(input.shape) is None
-        else tensorshape_util.rank(input.shape)))
+        tf.rank(input) if tensorshape_util.rank(input.shape) is None else
+        tensorshape_util.rank(input.shape)))
 
 reduce_all = _prefer_static(
     tf.reduce_all,
@@ -267,12 +265,14 @@ reduce_sum = _prefer_static(
 def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin
   if not hasattr(input, 'shape'):
     x = np.array(input)
-    input = tf.convert_to_tensor(value=input) if x.dtype is np.object else x
+    input = tf.convert_to_tensor(input) if x.dtype is np.object else x
   input_shape = tf.TensorShape(input.shape)
   if tensorshape_util.is_fully_defined(input.shape):
     return np.array(tensorshape_util.as_list(input_shape)).astype(
         _numpy_dtype(out_type))
-  return tf.shape(input=input, out_type=out_type, name=name)
+  return tf.shape(input, out_type=out_type, name=name)
+
+
 shape = _copy_docstring(tf.shape, _shape)
 
 where = _prefer_static(
@@ -296,8 +296,8 @@ zeros_like = _copy_docstring(tf.zeros_like, _zeros_like)
 def non_negative_axis(axis, rank, name=None):  # pylint:disable=redefined-outer-name
   """Make (possibly negatively indexed) `axis` argument non-negative."""
   with tf.name_scope(name or 'non_negative_axis'):
-    axis = tf.convert_to_tensor(value=axis, name='axis')
-    rank = tf.convert_to_tensor(value=rank, name='rank')
+    axis = tf.convert_to_tensor(axis, name='axis')
+    rank = tf.convert_to_tensor(rank, name='rank')
     axis_ = tf.get_static_value(axis)
     rank_ = tf.get_static_value(rank)
 

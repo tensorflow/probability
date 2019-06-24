@@ -252,10 +252,10 @@ class GaussianProcess(distribution.Distribution):
           [index_points, observation_noise_variance, jitter], tf.float32)
       if index_points is not None:
         index_points = tf.convert_to_tensor(
-            value=index_points, dtype=dtype, name='index_points')
-      jitter = tf.convert_to_tensor(value=jitter, dtype=dtype, name='jitter')
+            index_points, dtype=dtype, name='index_points')
+      jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
       observation_noise_variance = tf.convert_to_tensor(
-          value=observation_noise_variance,
+          observation_noise_variance,
           dtype=dtype,
           name='observation_noise_variance')
 
@@ -429,11 +429,11 @@ class GaussianProcess(distribution.Distribution):
 
   def _batch_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
-    return functools.reduce(
-        tf.broadcast_dynamic_shape,
-        [tf.shape(index_points)[:-(self.kernel.feature_ndims + 1)],
-         self.kernel.batch_shape_tensor(),
-         tf.shape(input=self.observation_noise_variance)])
+    return functools.reduce(tf.broadcast_dynamic_shape, [
+        tf.shape(index_points)[:-(self.kernel.feature_ndims + 1)],
+        self.kernel.batch_shape_tensor(),
+        tf.shape(self.observation_noise_variance)
+    ])
 
   def _batch_shape(self, index_points=None):
     index_points = self._get_index_points(index_points)

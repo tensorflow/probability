@@ -132,8 +132,9 @@ class Sample(distribution_lib.Distribution):
     name = name or 'Sample' + distribution.name
     self._distribution = distribution
     with tf.name_scope(name) as name:
-      sample_shape = distribution_util.expand_to_vector(tf.convert_to_tensor(
-          value=sample_shape, dtype_hint=tf.int32, name='sample_shape'))
+      sample_shape = distribution_util.expand_to_vector(
+          tf.convert_to_tensor(
+              sample_shape, dtype_hint=tf.int32, name='sample_shape'))
       self._sample_shape = sample_shape
       super(Sample, self).__init__(
           dtype=self._distribution.dtype,
@@ -203,10 +204,12 @@ class Sample(distribution_lib.Distribution):
     ndims = prefer_static.rank(x)
     # (1) Expand x's dims.
     d = ndims - batch_ndims - extra_sample_ndims - event_ndims
-    x = tf.reshape(x, shape=tf.pad(
-        tensor=tf.shape(input=x),
-        paddings=[[prefer_static.maximum(0, -d), 0]],
-        constant_values=1))
+    x = tf.reshape(
+        x,
+        shape=tf.pad(
+            tf.shape(x),
+            paddings=[[prefer_static.maximum(0, -d), 0]],
+            constant_values=1))
     sample_ndims = prefer_static.maximum(0, d)
     # (2) Transpose x's dims.
     sample_dims = prefer_static.range(0, sample_ndims)
@@ -224,7 +227,7 @@ class Sample(distribution_lib.Distribution):
     lp = self.distribution.log_prob(x, **kwargs)
     # (4) Make the final reduction in x.
     axis = prefer_static.range(sample_ndims, sample_ndims + extra_sample_ndims)
-    return tf.reduce_sum(input_tensor=lp, axis=axis)
+    return tf.reduce_sum(lp, axis=axis)
 
   def _entropy(self, **kwargs):
     h = self.distribution.entropy(**kwargs)

@@ -180,12 +180,12 @@ class DeterministicTest(test_case.TestCase):
           self.evaluate(sample))
 
   def testSampleDynamicWithBatchDims(self):
-    loc = tf1.placeholder_with_default(input=[0., 0], shape=[2])
+    loc = tf1.placeholder_with_default([0., 0], shape=[2])
 
     deterministic = tfd.Deterministic(loc)
     for sample_shape_ in [(), (4,)]:
       sample_shape = tf1.placeholder_with_default(
-          input=np.array(sample_shape_, dtype=np.int32), shape=None)
+          np.array(sample_shape_, dtype=np.int32), shape=None)
       sample_ = self.evaluate(deterministic.sample(sample_shape))
       self.assertAllClose(
           np.zeros(sample_shape_ + (2,)).astype(np.float32), sample_)
@@ -375,12 +375,12 @@ class VectorDeterministicTest(test_case.TestCase):
           self.evaluate(sample))
 
   def testSampleDynamicWithBatchDims(self):
-    loc = tf1.placeholder_with_default(input=[[0.], [0.]], shape=[2, 1])
+    loc = tf1.placeholder_with_default([[0.], [0.]], shape=[2, 1])
 
     deterministic = tfd.VectorDeterministic(loc)
     for sample_shape_ in [(), (4,)]:
       sample_shape = tf1.placeholder_with_default(
-          input=np.array(sample_shape_, dtype=np.int32), shape=None)
+          np.array(sample_shape_, dtype=np.int32), shape=None)
       sample_ = self.evaluate(deterministic.sample(sample_shape))
       self.assertAllClose(
           np.zeros(sample_shape_ + (2, 1)).astype(np.float32), sample_)

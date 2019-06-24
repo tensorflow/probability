@@ -284,9 +284,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     with tf.name_scope(self._name):
       if self.batch_shape.is_fully_defined():
         return tf.convert_to_tensor(
-            value=self.batch_shape.as_list(),
-            dtype=tf.int32,
-            name='batch_shape')
+            self.batch_shape.as_list(), dtype=tf.int32, name='batch_shape')
       with tf.name_scope('batch_shape_tensor'):
         return self._batch_shape_tensor()
 
@@ -405,8 +403,8 @@ class PositiveSemidefiniteKernel(tf.Module):
 
     """
     with self._name_scope(self._name, values=[x1, x2]):
-      x1 = tf.convert_to_tensor(value=x1, name='x1')
-      x2 = tf.convert_to_tensor(value=x2, name='x2')
+      x1 = tf.convert_to_tensor(x1, name='x1')
+      x2 = tf.convert_to_tensor(x2, name='x2')
 
       should_expand_dims = (example_ndims == 0)
 
@@ -628,8 +626,8 @@ class PositiveSemidefiniteKernel(tf.Module):
 
     """
     with self._name_scope(self._name, values=[x1, x2]):
-      x1 = tf.convert_to_tensor(value=x1, name='x1')
-      x2 = tf.convert_to_tensor(value=x2, name='x2')
+      x1 = tf.convert_to_tensor(x1, name='x1')
+      x2 = tf.convert_to_tensor(x2, name='x2')
 
       return self.tensor(x1, x2, x1_example_ndims=1, x2_example_ndims=1)
 
@@ -786,8 +784,8 @@ class PositiveSemidefiniteKernel(tf.Module):
 
     """
     with self._name_scope(self._name, values=[x1, x2]):
-      x1 = tf.convert_to_tensor(value=x1, name='x1')
-      x2 = tf.convert_to_tensor(value=x2, name='x2')
+      x1 = tf.convert_to_tensor(x1, name='x1')
+      x2 = tf.convert_to_tensor(x2, name='x2')
 
       x1 = util.pad_shape_with_ones(
           x1,

@@ -150,7 +150,7 @@ class SoftmaxCentered(bijector.Bijector):
     #       or by noting that det{ dX/dY } = 1 / det{ dY/dX } from Bijector
     #       docstring "Tip".
     # (2) - https://en.wikipedia.org/wiki/Matrix_determinant_lemma
-    return -tf.reduce_sum(input_tensor=tf.math.log(y), axis=-1)
+    return -tf.reduce_sum(tf.math.log(y), axis=-1)
 
   def _forward_log_det_jacobian(self, x):
     # This code is similar to tf.nn.log_softmax but different because we have
@@ -160,7 +160,8 @@ class SoftmaxCentered(bijector.Bijector):
     #   log_normalization = 1 + reduce_sum(exp(logits))
     #   -log_normalization + reduce_sum(logits - log_normalization)
     log_normalization = tf.nn.softplus(
-        tf.reduce_logsumexp(input_tensor=x, axis=-1, keepdims=True))
-    return tf.squeeze((-log_normalization + tf.reduce_sum(
-        input_tensor=x - log_normalization, axis=-1, keepdims=True)),
-                      axis=-1)
+        tf.reduce_logsumexp(x, axis=-1, keepdims=True))
+    return tf.squeeze(
+        (-log_normalization +
+         tf.reduce_sum(x - log_normalization, axis=-1, keepdims=True)),
+        axis=-1)

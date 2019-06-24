@@ -135,7 +135,7 @@ def ndtr(x, name="ndtr"):
   """
 
   with tf.name_scope(name):
-    x = tf.convert_to_tensor(value=x, name="x")
+    x = tf.convert_to_tensor(x, name="x")
     if dtype_util.as_numpy_dtype(x.dtype) not in [np.float32, np.float64]:
       raise TypeError(
           "x.dtype=%s is not handled, see docstring for supported types."
@@ -176,7 +176,7 @@ def ndtri(p, name="ndtri"):
   """
 
   with tf.name_scope(name):
-    p = tf.convert_to_tensor(value=p, name="p")
+    p = tf.convert_to_tensor(p, name="p")
     if dtype_util.as_numpy_dtype(p.dtype) not in [np.float32, np.float64]:
       raise TypeError(
           "p.dtype=%s is not handled, see docstring for supported types."
@@ -254,7 +254,7 @@ def _ndtri(p):
   # number that doesn't result in NaNs is fine.
   sanitized_mcp = tf1.where(
       maybe_complement_p <= 0.,
-      tf.fill(tf.shape(input=p),
+      tf.fill(tf.shape(p),
               dtype_util.as_numpy_dtype(p.dtype)(0.5)), maybe_complement_p)
 
   # Compute x for p > exp(-2): x/sqrt(2pi) = w + w**3 P0(w**2)/Q0(w**2).
@@ -283,7 +283,7 @@ def _ndtri(p):
 
   x = tf1.where(p > 1. - np.exp(-2.), x, -x)
   infinity_scalar = tf.constant(np.inf, dtype=p.dtype)
-  infinity = tf.fill(tf.shape(input=p), infinity_scalar)
+  infinity = tf.fill(tf.shape(p), infinity_scalar)
   x_nan_replaced = tf1.where(p <= 0.0, -infinity,
                              tf1.where(p >= 1.0, infinity, x))
   return x_nan_replaced
@@ -347,7 +347,7 @@ def log_ndtr(x, series_order=3, name="log_ndtr"):
     raise ValueError("series_order must be <= 30.")
 
   with tf.name_scope(name):
-    x = tf.convert_to_tensor(value=x, name="x")
+    x = tf.convert_to_tensor(x, name="x")
 
     if dtype_util.base_equal(x.dtype, tf.float64):
       lower_segment = LOGNDTR_FLOAT64_LOWER
@@ -423,7 +423,7 @@ def erfinv(x, name="erfinv"):
   """
 
   with tf.name_scope(name):
-    x = tf.convert_to_tensor(value=x, name="x")
+    x = tf.convert_to_tensor(x, name="x")
     if dtype_util.as_numpy_dtype(x.dtype) not in [np.float32, np.float64]:
       raise TypeError("x.dtype={} is not handled, see docstring for supported "
                       "types.".format(dtype_util.name(x.dtype)))
@@ -465,7 +465,7 @@ def log_cdf_laplace(x, name="log_cdf_laplace"):
   """
 
   with tf.name_scope(name):
-    x = tf.convert_to_tensor(value=x, name="x")
+    x = tf.convert_to_tensor(x, name="x")
 
     # For x < 0, L(x) = 0.5 * exp{x} exactly, so Log[L(x)] = log(0.5) + x.
     lower_solution = -np.log(2.) + x

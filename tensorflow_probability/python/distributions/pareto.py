@@ -84,8 +84,8 @@ class Pareto(distribution.Distribution):
     with tf.name_scope(name):
       dtype = dtype_util.common_dtype([concentration, scale], tf.float32)
       self._concentration = tf.convert_to_tensor(
-          value=concentration, name="concentration", dtype=dtype)
-      self._scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
+          concentration, name="concentration", dtype=dtype)
+      self._scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       with tf.control_dependencies([
           assert_util.assert_positive(self._concentration),
           assert_util.assert_positive(self._scale)
@@ -118,7 +118,7 @@ class Pareto(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.concentration), tf.shape(input=self.scale))
+        tf.shape(self.concentration), tf.shape(self.scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.concentration.shape, self.scale.shape)
@@ -187,7 +187,7 @@ class Pareto(distribution.Distribution):
     broadcasted_concentration = self.concentration + tf.zeros_like(
         self.scale)
     infs = tf.fill(
-        dims=tf.shape(input=broadcasted_concentration),
+        dims=tf.shape(broadcasted_concentration),
         value=dtype_util.as_numpy_dtype(self.dtype)(np.inf))
 
     return tf1.where(broadcasted_concentration > 1.,
@@ -200,7 +200,7 @@ class Pareto(distribution.Distribution):
   def _variance(self):
     broadcasted_concentration = self.concentration + tf.zeros_like(self.scale)
     infs = tf.fill(
-        dims=tf.shape(input=broadcasted_concentration),
+        dims=tf.shape(broadcasted_concentration),
         value=dtype_util.as_numpy_dtype(self.dtype)(np.inf))
     return tf1.where(
         broadcasted_concentration > 2., self.scale**2 * self.concentration /
@@ -238,8 +238,7 @@ class Pareto(distribution.Distribution):
       alt = tf.ones_like(y)
     else:
       alt = tf.fill(
-          dims=tf.shape(input=y),
-          value=dtype_util.as_numpy_dtype(self.dtype)(alt))
+          dims=tf.shape(y), value=dtype_util.as_numpy_dtype(self.dtype)(alt))
     return tf1.where(is_invalid, alt, y)
 
 

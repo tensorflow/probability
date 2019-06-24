@@ -166,8 +166,7 @@ class Binomial(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = self._maybe_assert_valid_total_count(
-          tf.convert_to_tensor(
-              value=total_count, name='total_count', dtype=dtype),
+          tf.convert_to_tensor(total_count, name='total_count', dtype=dtype),
           validate_args)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits=logits,
@@ -205,7 +204,7 @@ class Binomial(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.total_count), tf.shape(input=self.probs))
+        tf.shape(self.total_count), tf.shape(self.probs))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.total_count.shape,

@@ -42,7 +42,7 @@ class SampleDistributionTest(tf.test.TestCase, parameterized.TestCase):
     actual_lp = s.log_prob(x)
     # Sample.log_prob will reduce over event space, ie, dims [0, 2]
     # corresponding to sizes concat([[5], [2]]).
-    expected_lp = tf.reduce_sum(input_tensor=s.distribution.log_prob(x), axis=0)
+    expected_lp = tf.reduce_sum(s.distribution.log_prob(x), axis=0)
     x_, actual_lp_, expected_lp_ = self.evaluate([x, actual_lp, expected_lp])
     self.assertEqual((5,), x_.shape)
     self.assertEqual((), actual_lp_.shape)
@@ -57,8 +57,7 @@ class SampleDistributionTest(tf.test.TestCase, parameterized.TestCase):
     # Sample.log_prob will reduce over event space, ie, dims [2, 3, 5]
     # corresponding to sizes concat([[5, 4], [2]]).
     expected_lp = tf.reduce_sum(
-        input_tensor=s.distribution.log_prob(
-            tf.transpose(a=x, perm=[0, 1, 3, 4, 2, 5])),
+        s.distribution.log_prob(tf.transpose(a=x, perm=[0, 1, 3, 4, 2, 5])),
         axis=[2, 3])
     x_, actual_lp_, expected_lp_ = self.evaluate([x, actual_lp, expected_lp])
     self.assertEqual((6, 1, 3, 5, 4, 2), x_.shape)
@@ -96,7 +95,7 @@ class SampleDistributionTest(tf.test.TestCase, parameterized.TestCase):
     def expected_lp(y):
       x = aff.inverse(y)  # Ie, tf.random.normal([4, 3, 2])
       fldj = aff.forward_log_det_jacobian(x, event_ndims=1)
-      return tf.reduce_sum(input_tensor=mvn.log_prob(x) - fldj, axis=1)
+      return tf.reduce_sum(mvn.log_prob(x) - fldj, axis=1)
 
     # Transform a Sample.
     d = tfd.TransformedDistribution(
@@ -131,7 +130,7 @@ class SampleDistributionTest(tf.test.TestCase, parameterized.TestCase):
     def expected_lp(y):
       x = exp.inverse(y)  # Ie, tf.random.normal([4, 3, 2])
       fldj = exp.forward_log_det_jacobian(x, event_ndims=1)
-      return tf.reduce_sum(input_tensor=mvn.log_prob(x) - fldj, axis=1)
+      return tf.reduce_sum(mvn.log_prob(x) - fldj, axis=1)
 
     # Transform a Sample.
     d = tfd.TransformedDistribution(
@@ -183,9 +182,7 @@ class SampleDistributionTest(tf.test.TestCase, parameterized.TestCase):
     sample_shape = [3, 4]
     mvn = tfd.Independent(tfd.Normal(loc=0, scale=[[0.25, 0.5]]), 1)
     d = tfd.Sample(mvn, sample_shape, validate_args=True)
-    expected_entropy = 12 * tf.reduce_sum(
-        input_tensor=mvn.distribution.entropy(),
-        axis=-1)
+    expected_entropy = 12 * tf.reduce_sum(mvn.distribution.entropy(), axis=-1)
     actual_entropy = d.entropy()
     self.assertAllEqual(*self.evaluate([expected_entropy, actual_entropy]))
 

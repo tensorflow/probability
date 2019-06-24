@@ -94,7 +94,7 @@ class Poisson(distribution.Distribution):
         raise ValueError("Must specify exactly one of `rate` and `log_rate`.")
       elif log_rate is None:
         rate = tf.convert_to_tensor(
-            value=rate,
+            rate,
             name="rate",
             dtype=dtype_util.common_dtype([rate], dtype_hint=tf.float32))
         if not dtype_util.is_floating(rate.dtype):
@@ -106,14 +106,14 @@ class Poisson(distribution.Distribution):
           self._log_rate = tf.math.log(rate, name="log_rate")
       else:
         log_rate = tf.convert_to_tensor(
-            value=log_rate,
+            log_rate,
             name="log_rate",
             dtype=dtype_util.common_dtype([log_rate], tf.float32))
         if not dtype_util.is_floating(log_rate.dtype):
           raise TypeError("log_rate.dtype ({}) is a not a float-type.".format(
               dtype_util.name(log_rate.dtype)))
         self._rate = tf.exp(log_rate, name="rate")
-        self._log_rate = tf.convert_to_tensor(value=log_rate, name="log_rate")
+        self._log_rate = tf.convert_to_tensor(log_rate, name="log_rate")
 
     self._interpolate_nondiscrete = interpolate_nondiscrete
     super(Poisson, self).__init__(
@@ -145,7 +145,7 @@ class Poisson(distribution.Distribution):
     return self._interpolate_nondiscrete
 
   def _batch_shape_tensor(self):
-    return tf.shape(input=self.rate)
+    return tf.shape(self.rate)
 
   def _batch_shape(self):
     return self.rate.shape
@@ -161,8 +161,8 @@ class Poisson(distribution.Distribution):
     if not self.interpolate_nondiscrete:
       # Ensure the gradient wrt `rate` is zero at non-integer points.
       neg_inf = tf.fill(
-          tf.shape(input=log_probs),
-          value=dtype_util.as_numpy_dtype(log_probs.dtype)(-np.inf))
+          tf.shape(log_probs),
+          dtype_util.as_numpy_dtype(log_probs.dtype)(-np.inf))
       log_probs = tf1.where(tf.math.is_inf(log_probs), neg_inf, log_probs)
     return log_probs
 
@@ -177,7 +177,7 @@ class Poisson(distribution.Distribution):
     safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 0.)
     cdf = tf.math.igammac(1. + safe_x, self.rate)
     return tf1.where(
-        tf.broadcast_to(x < 0., tf.shape(input=cdf)), tf.zeros_like(cdf), cdf)
+        tf.broadcast_to(x < 0., tf.shape(cdf)), tf.zeros_like(cdf), cdf)
 
   def _log_normalization(self):
     return self.rate
@@ -187,9 +187,8 @@ class Poisson(distribution.Distribution):
     # Catch such x's and set the output value accordingly.
     safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 0.)
     y = safe_x * self.log_rate - tf.math.lgamma(1. + safe_x)
-    is_supported = tf.broadcast_to(tf.equal(x, safe_x), tf.shape(input=y))
-    neg_inf = tf.fill(
-        tf.shape(input=y), value=dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
+    is_supported = tf.broadcast_to(tf.equal(x, safe_x), tf.shape(y))
+    neg_inf = tf.fill(tf.shape(y), dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
     return tf1.where(is_supported, y, neg_inf)
 
   def _mean(self):

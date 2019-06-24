@@ -39,8 +39,10 @@ def _broadcast_event_and_samples(event, samples, event_ndims):
   # event to get a properly-sized event, then add the singleton dim back at
   # -event_ndims - 1.
   samples_shape = tf.concat(
-      [tf.shape(input=samples)[:-event_ndims - 1],
-       tf.shape(input=samples)[tf.rank(samples) - event_ndims:]],
+      [
+          tf.shape(samples)[:-event_ndims - 1],
+          tf.shape(samples)[tf.rank(samples) - event_ndims:]
+      ],
       axis=0)
   event *= tf.ones(samples_shape, dtype=event.dtype)
   event = tf.expand_dims(event, axis=-event_ndims - 1)
@@ -143,7 +145,7 @@ class Empirical(distribution.Distribution):
 
     parameters = dict(locals())
     with tf.name_scope(name):
-      self._samples = tf.convert_to_tensor(value=samples, name='samples')
+      self._samples = tf.convert_to_tensor(samples, name='samples')
       self._event_ndims = event_ndims
       self._samples_axis = (
           (tensorshape_util.rank(self.samples.shape) or tf.rank(self.samples)) -
@@ -164,7 +166,7 @@ class Empirical(distribution.Distribution):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {'samples': tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
+    return {'samples': tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
 
   def _params_event_ndims(self):
     return dict(samples=self._event_ndims + 1)
@@ -180,7 +182,7 @@ class Empirical(distribution.Distribution):
     return self._num_samples
 
   def _batch_shape_tensor(self):
-    return tf.shape(input=self.samples)[:self._samples_axis]
+    return tf.shape(self.samples)[:self._samples_axis]
 
   def _batch_shape(self):
     if tensorshape_util.rank(self.samples.shape) is None:
@@ -188,7 +190,7 @@ class Empirical(distribution.Distribution):
     return self.samples.shape[:self._samples_axis]
 
   def _event_shape_tensor(self):
-    return tf.shape(input=self.samples)[self._samples_axis + 1:]
+    return tf.shape(self.samples)[self._samples_axis + 1:]
 
   def _event_shape(self):
     if tensorshape_util.rank(self.samples.shape) is None:
@@ -196,11 +198,11 @@ class Empirical(distribution.Distribution):
     return self.samples.shape[self._samples_axis + 1:]
 
   def _mean(self):
-    return tf.reduce_mean(input_tensor=self.samples, axis=self._samples_axis)
+    return tf.reduce_mean(self.samples, axis=self._samples_axis)
 
   def _stddev(self):
     r = self.samples - tf.expand_dims(self.mean(), axis=self._samples_axis)
-    var = tf.reduce_mean(input_tensor=tf.square(r), axis=self._samples_axis)
+    var = tf.reduce_mean(tf.square(r), axis=self._samples_axis)
     return tf.sqrt(var)
 
   def _sample_n(self, n, seed=None):
@@ -221,14 +223,14 @@ class Empirical(distribution.Distribution):
     def _get_mode(samples):
       # TODO(b/123985779): Swith to tf.unique_with_counts_v2 when exposed
       count = gen_array_ops.unique_with_counts_v2(samples, axis=[0]).count
-      return tf.argmax(input=count)
+      return tf.argmax(count)
 
     # Flatten samples for each batch.
     if self._event_ndims == 0:
       samples = tf.reshape(self.samples, [-1, self.num_samples])
       mode_shape = self.batch_shape_tensor()
     else:
-      event_size = tf.reduce_prod(input_tensor=self.event_shape_tensor())
+      event_size = tf.reduce_prod(self.event_shape_tensor())
       samples = tf.reshape(self.samples, [-1, self.num_samples, event_size])
       mode_shape = tf.concat(
           [self.batch_shape_tensor(), self.event_shape_tensor()],
@@ -236,9 +238,8 @@ class Empirical(distribution.Distribution):
 
     indices = tf.map_fn(_get_mode, samples, dtype=tf.int64)
     full_indices = tf.stack(
-        [tf.range(tf.shape(input=indices)[0]),
-         tf.cast(indices, tf.int32)],
-        axis=1)
+        [tf.range(tf.shape(indices)[0]),
+         tf.cast(indices, tf.int32)], axis=1)
 
     mode = tf.gather_nd(samples, full_indices)
     return tf.reshape(mode, mode_shape)
@@ -249,14 +250,14 @@ class Empirical(distribution.Distribution):
       # TODO(b/123985779): Swith to tf.unique_with_counts_v2 when exposed
       count = gen_array_ops.unique_with_counts_v2(samples, axis=[0]).count
       prob = count / self.num_samples
-      entropy = tf.reduce_sum(input_tensor=-prob * tf.math.log(prob))
+      entropy = tf.reduce_sum(-prob * tf.math.log(prob))
       return entropy
 
     # Flatten samples for each batch.
     if self._event_ndims == 0:
       samples = tf.reshape(self.samples, [-1, self.num_samples])
     else:
-      event_size = tf.reduce_prod(input_tensor=self.event_shape_tensor())
+      event_size = tf.reduce_prod(self.event_shape_tensor())
       samples = tf.reshape(self.samples, [-1, self.num_samples, event_size])
 
     entropy = tf.map_fn(_get_entropy, samples)
@@ -266,14 +267,13 @@ class Empirical(distribution.Distribution):
     return tf.reshape(entropy, entropy_shape)
 
   def _cdf(self, event):
-    event = tf.convert_to_tensor(value=event, name='event', dtype=self.dtype)
+    event = tf.convert_to_tensor(event, name='event', dtype=self.dtype)
     event, samples = _broadcast_event_and_samples(event, self.samples,
                                                   event_ndims=self._event_ndims)
     cdf = tf.reduce_sum(
-        input_tensor=tf.cast(
+        tf.cast(
             tf.reduce_all(
-                input_tensor=samples <= event,
-                axis=tf.range(-self._event_ndims, 0)),
+                samples <= event, axis=tf.range(-self._event_ndims, 0)),
             dtype=tf.int32),
         axis=-1) / self.num_samples
     if dtype_util.is_floating(self.dtype):
@@ -281,14 +281,13 @@ class Empirical(distribution.Distribution):
     return cdf
 
   def _prob(self, event):
-    event = tf.convert_to_tensor(value=event, name='event', dtype=self.dtype)
+    event = tf.convert_to_tensor(event, name='event', dtype=self.dtype)
     event, samples = _broadcast_event_and_samples(event, self.samples,
                                                   event_ndims=self._event_ndims)
     prob = tf.reduce_sum(
-        input_tensor=tf.cast(
+        tf.cast(
             tf.reduce_all(
-                input_tensor=tf.equal(samples, event),
-                axis=tf.range(-self._event_ndims, 0)),
+                tf.equal(samples, event), axis=tf.range(-self._event_ndims, 0)),
             dtype=tf.int32),
         axis=-1) / self.num_samples
     if dtype_util.is_floating(self.dtype):

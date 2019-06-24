@@ -52,7 +52,7 @@ class Log1pSquareTest32(test_case.TestCase, parameterized.TestCase):
   # pylint: enable=bad-whitespace
   # pyformat: enable
   def test_log1psquare(self, x, expected_y, expected_dydx):
-    x = tf.convert_to_tensor(value=x, dtype=self.dtype)
+    x = tf.convert_to_tensor(x, dtype=self.dtype)
     y, dydx = tfp.math.value_and_gradient(tfp.math.log1psquare, x)
     y_, dydx_ = self.evaluate([y, dydx])
     self.assertAllClose(expected_y, y_)
@@ -82,7 +82,7 @@ class ClipByValuePreserveGrad32(test_case.TestCase, parameterized.TestCase):
   # pyformat: enable
   def test_clip_by_value_preserve_grad(self, x, lo, hi, expected_y):
     expected_dydx = np.ones_like(x)
-    x = tf.convert_to_tensor(value=x, dtype=self.dtype)
+    x = tf.convert_to_tensor(x, dtype=self.dtype)
     y, dydx = tfp.math.value_and_gradient(
         lambda x_: tfp.math.clip_by_value_preserve_gradient(x_, lo, hi), x)
     y_, dydx_ = self.evaluate([y, dydx])

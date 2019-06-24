@@ -83,9 +83,8 @@ class PoissonTest(test_case.TestCase):
     expected_continuous_log_pmf = (
         x * poisson.log_rate - tf.math.lgamma(1. + x) - poisson.rate)
     neg_inf = tf.fill(
-        tf.shape(input=expected_continuous_log_pmf),
-        value=dtype_util.as_numpy_dtype(
-            expected_continuous_log_pmf.dtype)(-np.inf))
+        tf.shape(expected_continuous_log_pmf),
+        dtype_util.as_numpy_dtype(expected_continuous_log_pmf.dtype)(-np.inf))
     expected_continuous_log_pmf = tf1.where(x >= 0.,
                                             expected_continuous_log_pmf,
                                             neg_inf)

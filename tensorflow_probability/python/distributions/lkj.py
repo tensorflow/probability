@@ -52,7 +52,7 @@ def _uniform_unit_norm(dimension, shape, dtype, seed):
       loc=dtype_util.as_numpy_dtype(dtype)(0),
       scale=dtype_util.as_numpy_dtype(dtype)(1)).sample(
           tf.concat([shape, [dimension]], axis=0), seed=seed())
-  unit_norm = raw / tf.norm(tensor=raw, ord=2, axis=-1)[..., tf.newaxis]
+  unit_norm = raw / tf.norm(raw, ord=2, axis=-1)[..., tf.newaxis]
   return unit_norm
 
 
@@ -136,7 +136,7 @@ class LKJ(distribution.Distribution):
     self._input_output_cholesky = input_output_cholesky
     with tf.name_scope(name):
       concentration = tf.convert_to_tensor(
-          value=concentration,
+          concentration,
           name='concentration',
           dtype=dtype_util.common_dtype([concentration], dtype_hint=tf.float32))
       with tf.control_dependencies([
@@ -175,7 +175,7 @@ class LKJ(distribution.Distribution):
     return self._input_output_cholesky
 
   def _batch_shape_tensor(self):
-    return tf.shape(input=self.concentration)
+    return tf.shape(self.concentration)
 
   def _batch_shape(self):
     return self.concentration.shape
@@ -214,7 +214,7 @@ class LKJ(distribution.Distribution):
             '{}'.format(dtype_util.name(self.concentration.dtype)))
 
       concentration = _replicate(num_samples, self.concentration)
-      concentration_shape = tf.shape(input=concentration)
+      concentration_shape = tf.shape(concentration)
       if self.dimension <= 1:
         # For any dimension <= 1, there is only one possible correlation matrix.
         shape = tf.concat([
@@ -301,8 +301,7 @@ class LKJ(distribution.Distribution):
       # numerical instability the matmul might not achieve that, so manually set
       # these to ones.
       result = tf.linalg.set_diag(
-          result,
-          tf.ones(shape=tf.shape(input=result)[:-1], dtype=result.dtype))
+          result, tf.ones(shape=tf.shape(result)[:-1], dtype=result.dtype))
       # This sampling algorithm can produce near-PSD matrices on which standard
       # algorithms such as `tf.cholesky` or `tf.linalg.self_adjoint_eigvals`
       # fail. Specifically, as documented in b/116828694, around 2% of trials
@@ -312,7 +311,7 @@ class LKJ(distribution.Distribution):
       return result
 
   def _validate_dimension(self, x):
-    x = tf.convert_to_tensor(value=x, name='x')
+    x = tf.convert_to_tensor(x, name='x')
     if tensorshape_util.is_fully_defined(x.shape[-2:]):
       if (tensorshape_util.dims(x.shape)[-2] ==
           tensorshape_util.dims(x.shape)[-1] ==
@@ -324,12 +323,12 @@ class LKJ(distribution.Distribution):
                 self.dimension, self.dimension, tensorshape_util.dims(x.shape)))
     elif self.validate_args:
       msg = 'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
-          self.dimension, self.dimension, tf.shape(input=x))
+          self.dimension, self.dimension, tf.shape(x))
       with tf.control_dependencies([
           assert_util.assert_equal(
-              tf.shape(input=x)[-2], self.dimension, message=msg),
+              tf.shape(x)[-2], self.dimension, message=msg),
           assert_util.assert_equal(
-              tf.shape(input=x)[-1], self.dimension, message=msg)
+              tf.shape(x)[-1], self.dimension, message=msg)
       ]):
         x = tf.identity(x)
     return x
@@ -382,7 +381,7 @@ class LKJ(distribution.Distribution):
         corresponding element of `concentration`.
     """
     with tf.name_scope(name or 'log_unnorm_prob_lkj'):
-      x = tf.convert_to_tensor(value=x, name='x')
+      x = tf.convert_to_tensor(x, name='x')
       # The density is det(matrix) ** (concentration - 1).
       # Computing the determinant with `logdet` is usually fine, since
       # correlation matrices are Hermitian and PSD. But in some cases, for a
@@ -402,7 +401,7 @@ class LKJ(distribution.Distribution):
       # a PSD matrix.
       if self.input_output_cholesky:
         logdet = 2.0 * tf.reduce_sum(
-            input_tensor=tf.math.log(tf.linalg.diag_part(x)), axis=[-1])
+            tf.math.log(tf.linalg.diag_part(x)), axis=[-1])
       else:
         _, logdet = tf.linalg.slogdet(x)
       answer = (self.concentration - 1.) * logdet
@@ -441,7 +440,7 @@ class LKJ(distribution.Distribution):
     return self._identity()
 
   def _identity(self):
-    batch = tf.shape(input=self.concentration)
+    batch = tf.shape(self.concentration)
     answer = tf.eye(
         num_rows=self.dimension, batch_shape=batch,
         dtype=self.concentration.dtype)

@@ -119,9 +119,8 @@ class IteratedSigmoidCentered(bijector.Bijector):
             dtype=dtype_util.base_dtype(x.dtype)))
     z = tf.nn.sigmoid(x + offset)
     y = z * tf.math.cumprod(1 - z, axis=-1, exclusive=True)
-    return tf.concat(
-        [y, 1. - tf.reduce_sum(input_tensor=y, axis=-1, keepdims=True)],
-        axis=-1)
+    return tf.concat([y, 1. - tf.reduce_sum(y, axis=-1, keepdims=True)],
+                     axis=-1)
 
   def _inverse(self, y):
     # As specified in the Stan reference manual, the procedure is as follows:
@@ -137,5 +136,5 @@ class IteratedSigmoidCentered(bijector.Bijector):
 
   def _inverse_log_det_jacobian(self, y):
     z = y / (1. - tf.math.cumsum(y, axis=-1, exclusive=True))
-    return tf.reduce_sum(input_tensor=(
-        -tf.math.log(y[..., :-1]) - tf.math.log1p(-z[..., :-1])), axis=-1)
+    return tf.reduce_sum(
+        (-tf.math.log(y[..., :-1]) - tf.math.log1p(-z[..., :-1])), axis=-1)

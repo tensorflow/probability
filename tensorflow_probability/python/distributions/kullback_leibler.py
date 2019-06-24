@@ -103,13 +103,10 @@ def kl_divergence(distribution_a, distribution_b,
 
     with tf.control_dependencies([
         tf.Assert(
-            tf.logical_not(tf.reduce_any(input_tensor=tf.math.is_nan(kl_t))),
-            [
-                ("KL calculation between {} and {} returned NaN values "
-                 "(and was called with allow_nan_stats=False). Values:".format(
-                     distribution_a.name, distribution_b.name)),
-                kl_t
-            ])
+            tf.logical_not(tf.reduce_any(tf.math.is_nan(kl_t))),
+            [("KL calculation between {} and {} returned NaN values "
+              "(and was called with allow_nan_stats=False). Values:".format(
+                  distribution_a.name, distribution_b.name)), kl_t])
     ]):
       return tf.identity(kl_t, name="checked_kl")
 

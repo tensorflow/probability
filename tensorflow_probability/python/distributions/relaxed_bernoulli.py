@@ -166,7 +166,7 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([logits, probs, temperature], tf.float32)
       self._temperature = tf.convert_to_tensor(
-          value=temperature, name='temperature', dtype=dtype)
+          temperature, name='temperature', dtype=dtype)
       if validate_args:
         with tf.control_dependencies(
             [assert_util.assert_positive(temperature)]):
@@ -187,7 +187,7 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {'logits': tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
+    return {'logits': tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
 
   @classmethod
   def _params_event_ndims(cls):

@@ -233,10 +233,10 @@ class StudentTProcess(
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [df, index_points, jitter], tf.float32)
-      df = tf.convert_to_tensor(value=df, dtype=dtype, name='df')
+      df = tf.convert_to_tensor(df, dtype=dtype, name='df')
       index_points = tf.convert_to_tensor(
-          value=index_points, dtype=dtype, name='index_points')
-      jitter = tf.convert_to_tensor(value=jitter, dtype=dtype, name='jitter')
+          index_points, dtype=dtype, name='index_points')
+      jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
 
       with tf.control_dependencies([
           assert_util.assert_greater(
