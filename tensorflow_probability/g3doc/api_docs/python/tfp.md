@@ -24,8 +24,6 @@ Defined in [`__init__.py`](https://github.com/tensorflow/probability/tree/master
 
 [`edward2`](./tfp/edward2.md) module: Edward2 probabilistic programming language.
 
-[`experimental`](./tfp/experimental.md) module: TensorFlow Probability API-unstable package.
-
 [`glm`](./tfp/glm.md) module: TensorFlow Probability GLM python package.
 
 [`layers`](./tfp/layers.md) module: Probabilistic Layers.

@@ -1,11 +1,11 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.debugging.benchmarking" />
 <meta itemprop="path" content="Stable" />
-<meta itemprop="property" content="HARDWARE_CPU"/>
-<meta itemprop="property" content="HARDWARE_GPU"/>
 <meta itemprop="property" content="RUNTIME_EAGER"/>
 <meta itemprop="property" content="RUNTIME_FUNCTION"/>
 <meta itemprop="property" content="RUNTIME_XLA"/>
+<meta itemprop="property" content="HARDWARE_CPU"/>
+<meta itemprop="property" content="HARDWARE_GPU"/>
 </div>
 
 # Module: tfp.debugging.benchmarking
@@ -31,8 +31,13 @@ Defined in [`python/debugging/benchmarking/__init__.py`](https://github.com/tens
 
 ## Other Members
 
-* `HARDWARE_CPU = 'cpu'` <a id="HARDWARE_CPU"></a>
-* `HARDWARE_GPU = 'gpu'` <a id="HARDWARE_GPU"></a>
-* `RUNTIME_EAGER = 'eager'` <a id="RUNTIME_EAGER"></a>
-* `RUNTIME_FUNCTION = 'function/graph'` <a id="RUNTIME_FUNCTION"></a>
-* `RUNTIME_XLA = 'function/xla'` <a id="RUNTIME_XLA"></a>
+<h3 id="RUNTIME_EAGER"><code>RUNTIME_EAGER</code></h3>
+
+<h3 id="RUNTIME_FUNCTION"><code>RUNTIME_FUNCTION</code></h3>
+
+<h3 id="RUNTIME_XLA"><code>RUNTIME_XLA</code></h3>
+
+<h3 id="HARDWARE_CPU"><code>HARDWARE_CPU</code></h3>
+
+<h3 id="HARDWARE_GPU"><code>HARDWARE_GPU</code></h3>
+

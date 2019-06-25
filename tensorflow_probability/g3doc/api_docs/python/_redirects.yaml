@@ -1,0 +1,79 @@
+# Copyright 2018 The TensorFlow Probability Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+redirects:
+- from: /probability/api_docs/python/tfp/layers/conv_variational/Convolution1DFlipout
+  to: /probability/api_docs/python/tfp/layers/Convolution1DFlipout
+- from: /probability/api_docs/python/tfp/layers/conv_variational/Convolution1DReparameterization
+  to: /probability/api_docs/python/tfp/layers/Convolution1DReparameterization
+- from: /probability/api_docs/python/tfp/layers/conv_variational/Convolution2DFlipout
+  to: /probability/api_docs/python/tfp/layers/Convolution2DFlipout
+- from: /probability/api_docs/python/tfp/layers/conv_variational/Convolution2DReparameterization
+  to: /probability/api_docs/python/tfp/layers/Convolution2DReparameterization
+- from: /probability/api_docs/python/tfp/layers/conv_variational/Convolution3DFlipout
+  to: /probability/api_docs/python/tfp/layers/Convolution3DFlipout
+- from: /probability/api_docs/python/tfp/layers/conv_variational/Convolution3DReparameterization
+  to: /probability/api_docs/python/tfp/layers/Convolution3DReparameterization
+- from: /probability/api_docs/python/tfp/layers/dense_variational/DenseFlipout
+  to: /probability/api_docs/python/tfp/layers/DenseFlipout
+- from: /probability/api_docs/python/tfp/layers/dense_variational/DenseLocalReparameterization
+  to: /probability/api_docs/python/tfp/layers/DenseLocalReparameterization
+- from: /probability/api_docs/python/tfp/layers/dense_variational/DenseReparameterization
+  to: /probability/api_docs/python/tfp/layers/DenseReparameterization
+- from: /probability/api_docs/python/tfp/layers/dense_variational_v2/DenseVariational
+  to: /probability/api_docs/python/tfp/layers/DenseVariational
+- from: /probability/api_docs/python/tfp/layers/dense_variational_v2/kullback_leibler/RegisterKL
+  to: /probability/api_docs/python/tfp/distributions/RegisterKL
+- from: /probability/api_docs/python/tfp/layers/dense_variational_v2/kullback_leibler/kl_divergence
+  to: /probability/api_docs/python/tfp/distributions/kl_divergence
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/CategoricalMixtureOfOneHotCategorical
+  to: /probability/api_docs/python/tfp/layers/CategoricalMixtureOfOneHotCategorical
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/DistributionLambda
+  to: /probability/api_docs/python/tfp/layers/DistributionLambda
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/IndependentBernoulli
+  to: /probability/api_docs/python/tfp/layers/IndependentBernoulli
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/IndependentLogistic
+  to: /probability/api_docs/python/tfp/layers/IndependentLogistic
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/IndependentNormal
+  to: /probability/api_docs/python/tfp/layers/IndependentNormal
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/IndependentPoisson
+  to: /probability/api_docs/python/tfp/layers/IndependentPoisson
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/KLDivergenceAddLoss
+  to: /probability/api_docs/python/tfp/layers/KLDivergenceAddLoss
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/KLDivergenceRegularizer
+  to: /probability/api_docs/python/tfp/layers/KLDivergenceRegularizer
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/MixtureLogistic
+  to: /probability/api_docs/python/tfp/layers/MixtureLogistic
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/MixtureNormal
+  to: /probability/api_docs/python/tfp/layers/MixtureNormal
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/MixtureSameFamily
+  to: /probability/api_docs/python/tfp/layers/MixtureSameFamily
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/MultivariateNormalTriL
+  to: /probability/api_docs/python/tfp/layers/MultivariateNormalTriL
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/OneHotCategorical
+  to: /probability/api_docs/python/tfp/layers/OneHotCategorical
+- from: /probability/api_docs/python/tfp/layers/distribution_layer/VariationalGaussianProcess
+  to: /probability/api_docs/python/tfp/layers/VariationalGaussianProcess
+- from: /probability/api_docs/python/tfp/layers/initializers/BlockwiseInitializer
+  to: /probability/api_docs/python/tfp/layers/BlockwiseInitializer
+- from: /probability/api_docs/python/tfp/layers/masked_autoregressive/AutoregressiveTransform
+  to: /probability/api_docs/python/tfp/layers/AutoregressiveTransform
+- from: /probability/api_docs/python/tfp/layers/util/default_loc_scale_fn
+  to: /probability/api_docs/python/tfp/layers/default_loc_scale_fn
+- from: /probability/api_docs/python/tfp/layers/util/default_mean_field_normal_fn
+  to: /probability/api_docs/python/tfp/layers/default_mean_field_normal_fn
+- from: /probability/api_docs/python/tfp/layers/util/default_multivariate_normal_fn
+  to: /probability/api_docs/python/tfp/layers/default_multivariate_normal_fn
+- from: /probability/api_docs/python/tfp/layers/variable_input/VariableLayer
+  to: /probability/api_docs/python/tfp/layers/VariableLayer
