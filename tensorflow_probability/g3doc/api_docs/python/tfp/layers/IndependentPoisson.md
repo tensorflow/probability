@@ -7,6 +7,7 @@
 <meta itemprop="property" content="input"/>
 <meta itemprop="property" content="input_mask"/>
 <meta itemprop="property" content="input_shape"/>
+<meta itemprop="property" content="input_spec"/>
 <meta itemprop="property" content="losses"/>
 <meta itemprop="property" content="metrics"/>
 <meta itemprop="property" content="name"/>
@@ -25,7 +26,6 @@
 <meta itemprop="property" content="weights"/>
 <meta itemprop="property" content="__call__"/>
 <meta itemprop="property" content="__init__"/>
-<meta itemprop="property" content="apply"/>
 <meta itemprop="property" content="build"/>
 <meta itemprop="property" content="compute_mask"/>
 <meta itemprop="property" content="compute_output_shape"/>
@@ -166,13 +166,6 @@ Input tensor or list of input tensors.
 #### Raises:
 
 
-* <b>`AttributeError`</b>: if the layer is connected to
-more than one incoming layers.
-
-
-#### Raises:
-
-
 * <b>`RuntimeError`</b>: If called in Eager mode.
 * <b>`AttributeError`</b>: If no inbound nodes are found.
 
@@ -216,6 +209,11 @@ Input shape, as an integer shape tuple
 
 * <b>`AttributeError`</b>: if the layer has no defined input_shape.
 * <b>`RuntimeError`</b>: if called in Eager mode.
+
+<h3 id="input_spec"><code>input_spec</code></h3>
+
+
+
 
 <h3 id="losses"><code>losses</code></h3>
 
@@ -440,33 +438,6 @@ Output tensor(s).
 
 
 * <b>`ValueError`</b>: if the layer's `call` method returns None (an invalid value).
-
-<h3 id="apply"><code>apply</code></h3>
-
-``` python
-apply(
-    inputs,
-    *args,
-    **kwargs
-)
-```
-
-Apply the layer on a input.
-
-This is an alias of `self.__call__`.
-
-#### Arguments:
-
-
-* <b>`inputs`</b>: Input tensor(s).
-* <b>`*args`</b>: additional positional arguments to be passed to `self.call`.
-* <b>`**kwargs`</b>: additional keyword arguments to be passed to `self.call`.
-
-
-#### Returns:
-
-Output tensor(s).
-
 
 <h3 id="build"><code>build</code></h3>
 

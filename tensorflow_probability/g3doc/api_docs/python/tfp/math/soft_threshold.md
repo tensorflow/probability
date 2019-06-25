@@ -17,7 +17,7 @@ tfp.math.soft_threshold(
 
 
 
-Defined in [`python/math/numeric.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/numeric.py).
+Defined in [`python/math/generic.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/generic.py).
 
 <!-- Placeholder for "Used in" -->
 

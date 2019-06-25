@@ -34,9 +34,15 @@ Defined in [`python/math/__init__.py`](https://github.com/tensorflow/probability
 
 [`diag_jacobian(...)`](../tfp/math/diag_jacobian.md): Computes diagonal of the Jacobian matrix of `ys=fn(xs)` wrt `xs`.
 
+[`fill_triangular(...)`](../tfp/math/fill_triangular.md): Creates a (batch of) triangular matrix from a vector of inputs.
+
+[`fill_triangular_inverse(...)`](../tfp/math/fill_triangular_inverse.md): Creates a vector from a (batch of) triangular matrix.
+
 [`interp_regular_1d_grid(...)`](../tfp/math/interp_regular_1d_grid.md): Linear `1-D` interpolation on a regular (constant spacing) grid.
 
 [`log1psquare(...)`](../tfp/math/log1psquare.md): Numerically stable calculation of `log(1 + x**2)` for small or large `|x|`.
+
+[`log_combinations(...)`](../tfp/math/log_combinations.md): Multinomial coefficient.
 
 [`lu_matrix_inverse(...)`](../tfp/math/lu_matrix_inverse.md): Computes a matrix inverse given the matrix's LU decomposition.
 
@@ -54,9 +60,13 @@ Defined in [`python/math/__init__.py`](https://github.com/tensorflow/probability
 
 [`random_rayleigh(...)`](../tfp/math/random_rayleigh.md): Generates `Tensor` of positive reals drawn from a Rayleigh distributions.
 
+[`reduce_weighted_logsumexp(...)`](../tfp/math/reduce_weighted_logsumexp.md): Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`.
+
 [`secant_root(...)`](../tfp/math/secant_root.md): Finds root(s) of a function of single variable using the secant method.
 
 [`soft_threshold(...)`](../tfp/math/soft_threshold.md): Soft Thresholding operator.
+
+[`softplus_inverse(...)`](../tfp/math/softplus_inverse.md): Computes the inverse softplus, i.e., x = softplus_inverse(softplus(x)).
 
 [`sparse_or_dense_matmul(...)`](../tfp/math/sparse_or_dense_matmul.md): Returns (batched) matmul of a SparseTensor (or Tensor) with a Tensor.
 

@@ -102,6 +102,8 @@ toc:
       path: /probability/api_docs/python/tfp/bijectors/Sigmoid
     - title: SinhArcsinh
       path: /probability/api_docs/python/tfp/bijectors/SinhArcsinh
+    - title: Softfloor
+      path: /probability/api_docs/python/tfp/bijectors/Softfloor
     - title: SoftmaxCentered
       path: /probability/api_docs/python/tfp/bijectors/SoftmaxCentered
     - title: Softplus
@@ -522,6 +524,152 @@ toc:
       path: /probability/api_docs/python/tfp/edward2/Wishart
     - title: Zipf
       path: /probability/api_docs/python/tfp/edward2/Zipf
+  - title: tfp.experimental
+    section:
+    - title: Overview
+      path: /probability/api_docs/python/tfp/experimental
+    - title: auto_batching
+      section:
+      - title: Overview
+        path: /probability/api_docs/python/tfp/experimental/auto_batching
+      - title: Context
+        path: /probability/api_docs/python/tfp/experimental/auto_batching/Context
+      - title: NumpyBackend
+        path: /probability/api_docs/python/tfp/experimental/auto_batching/NumpyBackend
+      - title: TensorFlowBackend
+        path: /probability/api_docs/python/tfp/experimental/auto_batching/TensorFlowBackend
+      - title: TensorType
+        path: /probability/api_docs/python/tfp/experimental/auto_batching/TensorType
+      - title: truthy
+        path: /probability/api_docs/python/tfp/experimental/auto_batching/truthy
+      - title: Type
+        path: /probability/api_docs/python/tfp/experimental/auto_batching/Type
+      - title: allocation_strategy
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/allocation_strategy
+        - title: optimize
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/allocation_strategy/optimize
+      - title: dsl
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/dsl
+        - title: ProgramBuilder
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/dsl/ProgramBuilder
+      - title: frontend
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/frontend
+      - title: instructions
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions
+        - title: Block
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/Block
+        - title: BranchOp
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/BranchOp
+        - title: ControlFlowGraph
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/ControlFlowGraph
+        - title: extract_referenced_variables
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/extract_referenced_variables
+        - title: Function
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/Function
+        - title: FunctionCallOp
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/FunctionCallOp
+        - title: GotoOp
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/GotoOp
+        - title: halt_op
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/halt_op
+        - title: IndirectGotoOp
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/IndirectGotoOp
+        - title: interpret
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/interpret
+        - title: PopOp
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/PopOp
+        - title: PrimOp
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/PrimOp
+        - title: Program
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/Program
+        - title: PushGotoOp
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/PushGotoOp
+        - title: push_op
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/push_op
+        - title: VariableAllocation
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/instructions/VariableAllocation
+      - title: liveness
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/liveness
+        - title: liveness_analysis
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/liveness/liveness_analysis
+      - title: lowering
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/lowering
+        - title: lower_function_calls
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/lowering/lower_function_calls
+      - title: numpy_backend
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/numpy_backend
+      - title: stackless
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/stackless
+        - title: execute
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/stackless/execute
+        - title: ExecutionQueue
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/stackless/ExecutionQueue
+        - title: is_running
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/stackless/is_running
+      - title: stack_optimization
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/stack_optimization
+        - title: fuse_pop_push
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/stack_optimization/fuse_pop_push
+      - title: tf_backend
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/tf_backend
+      - title: type_inference
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/type_inference
+        - title: infer_types
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/type_inference/infer_types
+        - title: infer_types_from_signature
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/type_inference/infer_types_from_signature
+        - title: is_inferring
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/type_inference/is_inferring
+        - title: signature
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/type_inference/signature
+        - title: type_of_pattern
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/type_inference/type_of_pattern
+      - title: virtual_machine
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/virtual_machine
+        - title: execute
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/virtual_machine/execute
+        - title: is_staging
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/virtual_machine/is_staging
+      - title: xla
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/xla
+        - title: compile_nested_output
+          path: /probability/api_docs/python/tfp/experimental/auto_batching/xla/compile_nested_output
+    - title: mcmc
+      section:
+      - title: Overview
+        path: /probability/api_docs/python/tfp/experimental/mcmc
+      - title: NoUTurnSampler
+        path: /probability/api_docs/python/tfp/experimental/mcmc/NoUTurnSampler
+      - title: nuts
+        section:
+        - title: Overview
+          path: /probability/api_docs/python/tfp/experimental/mcmc/nuts
   - title: tfp.glm
     section:
     - title: Overview
@@ -698,10 +846,16 @@ toc:
       path: /probability/api_docs/python/tfp/math/dense_to_sparse
     - title: diag_jacobian
       path: /probability/api_docs/python/tfp/math/diag_jacobian
+    - title: fill_triangular
+      path: /probability/api_docs/python/tfp/math/fill_triangular
+    - title: fill_triangular_inverse
+      path: /probability/api_docs/python/tfp/math/fill_triangular_inverse
     - title: interp_regular_1d_grid
       path: /probability/api_docs/python/tfp/math/interp_regular_1d_grid
     - title: log1psquare
       path: /probability/api_docs/python/tfp/math/log1psquare
+    - title: log_combinations
+      path: /probability/api_docs/python/tfp/math/log_combinations
     - title: lu_matrix_inverse
       path: /probability/api_docs/python/tfp/math/lu_matrix_inverse
     - title: lu_reconstruct
@@ -718,8 +872,12 @@ toc:
       path: /probability/api_docs/python/tfp/math/random_rademacher
     - title: random_rayleigh
       path: /probability/api_docs/python/tfp/math/random_rayleigh
+    - title: reduce_weighted_logsumexp
+      path: /probability/api_docs/python/tfp/math/reduce_weighted_logsumexp
     - title: secant_root
       path: /probability/api_docs/python/tfp/math/secant_root
+    - title: softplus_inverse
+      path: /probability/api_docs/python/tfp/math/softplus_inverse
     - title: soft_threshold
       path: /probability/api_docs/python/tfp/math/soft_threshold
     - title: sparse_or_dense_matmul
@@ -964,12 +1122,8 @@ toc:
     section:
     - title: Overview
       path: /probability/api_docs/python/tfp/util
-    - title: docstring
-      section:
-      - title: Overview
-        path: /probability/api_docs/python/tfp/util/docstring
-      - title: expand_docstring
-        path: /probability/api_docs/python/tfp/util/docstring/expand_docstring
+    - title: DeferredTensor
+      path: /probability/api_docs/python/tfp/util/DeferredTensor
   - title: tfp.vi
     section:
     - title: Overview

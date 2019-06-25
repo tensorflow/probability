@@ -49,11 +49,11 @@ Instantiate a GaussianProcess Distribution.
   shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
   broadcastable with `[b1, ..., bB]`. Default value: `None` implies
   constant zero function.
-* <b>`observation_noise_variance`</b>: `float` `Tensor` representing the variance
-  of the noise in the Normal likelihood distribution of the model. May be
-  batched, in which case the batch shape must be broadcastable with the
-  shapes of all other batched parameters (`kernel.batch_shape`,
-  `index_points`, etc.).
+* <b>`observation_noise_variance`</b>: `float` `Tensor` representing (batch of)
+  scalar variance(s) of the noise in the Normal likelihood
+  distribution of the model. If batched, the batch shape must be
+  broadcastable with the shapes of all other batched parameters
+  (`kernel.batch_shape`, `index_points`, etc.).
   Default value: `0.`
 * <b>`jitter`</b>: `float` scalar `Tensor` added to the diagonal of the covariance
   matrix to ensure positive definiteness of the covariance matrix.

@@ -36,7 +36,7 @@ Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/t
   graph.
   Default value: `False` (i.e., no graph assertions are added).
 * <b>`name`</b>: Python `str` prefixed to ops created by this function.
-  Default value: "sparse_or_dense_matmul".
+  Default value: 'sparse_or_dense_matmul'.
 * <b>`**kwargs`</b>: Keyword arguments to `tf.sparse_tensor_dense_matmul` or
   `tf.matmul`.
 

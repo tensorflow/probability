@@ -26,8 +26,8 @@ Calculate the [generalized inverse of a matrix](
 https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse) using its
 singular-value decomposition (SVD) and including all large singular values.
 
-The pseudo-inverse of a matrix `A`, is defined as: "the matrix that 'solves'
-[the least-squares problem] `A @ x = b`," i.e., if `x_hat` is a solution, then
+The pseudo-inverse of a matrix `A`, is defined as: 'the matrix that 'solves'
+[the least-squares problem] `A @ x = b`,' i.e., if `x_hat` is a solution, then
 `A_pinv` is the matrix such that `x_hat = A_pinv @ b`. It can be shown that if
 `U @ Sigma @ V.T = A` is the singular value decomposition of `A`, then
 `A_pinv = V @ inv(Sigma) U^T`. [(Strang, 1980)][1]
@@ -51,7 +51,7 @@ default `rcond` is `1e-15`. Here the default is
   graph.
   Default value: `False` (i.e., no graph assertions are added).
 * <b>`name`</b>: Python `str` prefixed to ops created by this function.
-  Default value: "pinv".
+  Default value: 'pinv'.
 
 
 #### Returns:
@@ -93,5 +93,5 @@ tf.matmul(tfp.math.pinv(a), a)
 
 #### References
 
-[1]: G. Strang. "Linear Algebra and Its Applications, 2nd Ed." Academic Press,
+[1]: G. Strang. 'Linear Algebra and Its Applications, 2nd Ed.' Academic Press,
      Inc., 1980, pp. 139-142.

@@ -34,7 +34,7 @@ Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/t
   for correctness.
   Default value: `False` (i.e., don't validate arguments).
 * <b>`name`</b>: Python `str` name given to ops managed by this object.
-  Default value: `None` (i.e., "lu_reconstruct").
+  Default value: `None` (i.e., 'lu_reconstruct').
 
 
 #### Returns:

@@ -14,7 +14,7 @@ Defined in [`python/util/__init__.py`](https://github.com/tensorflow/probability
 <!-- Placeholder for "Used in" -->
 
 
-## Modules
+## Classes
 
-[`docstring`](../tfp/util/docstring.md) module: Utilities for programmable docstrings.
+[`class DeferredTensor`](../tfp/util/DeferredTensor.md): Variable tracking object which applies function upon `convert_to_tensor`.
 

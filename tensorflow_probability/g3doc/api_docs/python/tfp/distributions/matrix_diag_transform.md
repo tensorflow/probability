@@ -52,7 +52,7 @@ mu = tf.contrib.layers.fully_connected(activations, 2)
 # This is a fully trainable multivariate normal!
 dist = tfd.MultivariateNormalTriL(mu, chol)
 
-# Standard log loss. Minimizing this will "train" mu and chol, and then dist
+# Standard log loss. Minimizing this will 'train' mu and chol, and then dist
 # will be a distribution predicting labels as multivariate Gaussians.
 loss = -1 * tf.reduce_mean(dist.log_prob(labels))
 ```
@@ -65,7 +65,7 @@ loss = -1 * tf.reduce_mean(dist.log_prob(labels))
 * <b>`transform`</b>:  Element-wise function mapping `Tensors` to `Tensors`. To be
   applied to the diagonal of `matrix`. If `None`, `matrix` is returned
   unchanged. Defaults to `None`.
-* <b>`name`</b>:  A name to give created ops. Defaults to "matrix_diag_transform".
+* <b>`name`</b>:  A name to give created ops. Defaults to 'matrix_diag_transform'.
 
 
 #### Returns:

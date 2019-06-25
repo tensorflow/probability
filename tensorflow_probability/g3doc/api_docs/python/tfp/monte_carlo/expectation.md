@@ -124,7 +124,8 @@ approx_kl_p_q = bf.monte_carlo_csiszar_f_divergence(
 
 
 * <b>`f`</b>: Python callable which can return `f(samples)`.
-* <b>`samples`</b>: `Tensor` of samples used to form the Monte-Carlo approximation of
+* <b>`samples`</b>: `Tensor` or nested structure (list, dict, etc.) of `Tensor`s,
+  representing samples used to form the Monte-Carlo approximation of
   `E_p[f(X)]`.  A batch of samples should be indexed by `axis` dimensions.
 * <b>`log_prob`</b>: Python callable which can return `log_prob(samples)`. Must
   correspond to the natural-logarithm of the pdf/pmf of each sample. Only
