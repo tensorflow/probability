@@ -22,9 +22,10 @@ import numpy as np
 from scipy import special as sp_special
 from scipy import stats as sp_stats
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -32,7 +33,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GammaTest(tf.test.TestCase):
+class GammaTest(test_case.TestCase):
 
   def testGammaShape(self):
     alpha = tf.constant([3.0] * 5)
@@ -141,7 +142,8 @@ class GammaTest(tf.test.TestCase):
     beta_v = np.array([1.0, 4.0, 5.0])
     gamma = tfd.Gamma(
         concentration=alpha_v, rate=beta_v, allow_nan_stats=False)
-    with self.assertRaisesOpError("x < y"):
+    with self.assertRaisesOpError(
+        "Mode not defined when any concentration <= 1."):
       self.evaluate(gamma.mode())
 
   def testGammaModeAllowNanStatsIsTrueReturnsNaNforUndefinedBatchMembers(self):
@@ -303,13 +305,13 @@ class GammaTest(tf.test.TestCase):
   def testGammaNonPositiveInitializationParamsRaises(self):
     alpha_v = tf.constant(0.0, name="alpha")
     beta_v = tf.constant(1.0, name="beta")
-    with self.assertRaisesOpError("x > 0"):
+    with self.assertRaisesOpError("Argument `concentration` must be positive."):
       gamma = tfd.Gamma(
           concentration=alpha_v, rate=beta_v, validate_args=True)
       self.evaluate(gamma.mean())
     alpha_v = tf.constant(1.0, name="alpha")
     beta_v = tf.constant(0.0, name="beta")
-    with self.assertRaisesOpError("x > 0"):
+    with self.assertRaisesOpError("Argument `rate` must be positive."):
       gamma = tfd.Gamma(
           concentration=alpha_v, rate=beta_v, validate_args=True)
       self.evaluate(gamma.mean())
@@ -325,8 +327,7 @@ class GammaTest(tf.test.TestCase):
     g0 = tfd.Gamma(concentration=alpha0, rate=beta0)
     g1 = tfd.Gamma(concentration=alpha1, rate=beta1)
     x = g0.sample(int(1e4), seed=tfp_test_util.test_seed())
-    kl_sample = tf.reduce_mean(
-        input_tensor=g0.log_prob(x) - g1.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(g0.log_prob(x) - g1.log_prob(x), axis=0)
     kl_actual = tfd.kl_divergence(g0, g1)
 
     # Execute graph.
@@ -344,6 +345,54 @@ class GammaTest(tf.test.TestCase):
     self.assertAllClose(kl_expected, kl_actual_, atol=0., rtol=1e-6)
     self.assertAllClose(kl_sample_, kl_actual_, atol=0., rtol=1e-1)
 
+  def testGradientThroughConcentration(self):
+    concentration = tf.Variable(3.)
+    d = tfd.Gamma(concentration=concentration, rate=5.)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([1., 2., 4.])
+    grad = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
+
+  def testAssertsPositiveConcentration(self):
+    concentration = tf.Variable([1., 2., -3.])
+    self.evaluate(concentration.initializer)
+    with self.assertRaisesOpError("Argument `concentration` must be positive."):
+      d = tfd.Gamma(concentration=concentration, rate=[5.], validate_args=True)
+      self.evaluate(d.sample())
+
+  def testAssertsPositiveConcentrationAfterMutation(self):
+    concentration = tf.Variable([1., 2., 3.])
+    self.evaluate(concentration.initializer)
+    d = tfd.Gamma(concentration=concentration, rate=[5.], validate_args=True)
+    with self.assertRaisesOpError("Argument `concentration` must be positive."):
+      with tf.control_dependencies([concentration.assign([1., 2., -3.])]):
+        self.evaluate(d.sample())
+
+  def testGradientThroughRate(self):
+    rate = tf.Variable(3.)
+    d = tfd.Gamma(concentration=1., rate=rate)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([1., 2., 4.])
+    grad = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
+
+  def testAssertsPositiveRate(self):
+    rate = tf.Variable([1., 2., -3.])
+    self.evaluate(rate.initializer)
+    with self.assertRaisesOpError("Argument `rate` must be positive."):
+      d = tfd.Gamma(concentration=[5.], rate=rate, validate_args=True)
+      self.evaluate(d.sample())
+
+  def testAssertsPositiveRateAfterMutation(self):
+    rate = tf.Variable([1., 2., 3.])
+    self.evaluate(rate.initializer)
+    d = tfd.Gamma(concentration=[3.], rate=rate, validate_args=True)
+    self.evaluate(d.mean())
+    with self.assertRaisesOpError("Argument `rate` must be positive."):
+      with tf.control_dependencies([rate.assign([1., 2., -3.])]):
+        self.evaluate(d.sample())
 
 if __name__ == "__main__":
   tf.test.main()
