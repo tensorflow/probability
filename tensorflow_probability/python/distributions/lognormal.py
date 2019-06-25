@@ -23,11 +23,10 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
-from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
-    "LogNormal",
+    'LogNormal',
 ]
 
 
@@ -39,7 +38,7 @@ class LogNormal(transformed_distribution.TransformedDistribution):
                scale,
                validate_args=False,
                allow_nan_stats=True,
-               name="LogNormal"):
+               name='LogNormal'):
     """Construct a log-normal distribution.
 
     The LogNormal distribution models positive-valued random variables
@@ -63,11 +62,8 @@ class LogNormal(transformed_distribution.TransformedDistribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       super(LogNormal, self).__init__(
-          distribution=normal.Normal(
-              loc=tf.convert_to_tensor(loc, name="loc", dtype=dtype),
-              scale=tf.convert_to_tensor(scale, name="scale", dtype=dtype)),
+          distribution=normal.Normal(loc=loc, scale=scale),
           bijector=exp_bijector.Exp(),
           validate_args=validate_args,
           parameters=parameters,

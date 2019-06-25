@@ -117,6 +117,32 @@ def rank_from_shape(shape_tensor_fn, tensorshape=None):
   return ndims_fn() if ndims_ is None else ndims_
 
 
+def broadcast_shape(x_shape, y_shape):
+  """Computes the shape of a broadcast.
+
+  When both arguments are statically-known, the broadcasted shape will be
+  computed statically and returned as a `TensorShape`.  Otherwise, a rank-1
+  `Tensor` will be returned.
+
+  Arguments:
+    x_shape: A `TensorShape` or rank-1 integer `Tensor`.  The input `Tensor` is
+      broadcast against this shape.
+    y_shape: A `TensorShape` or rank-1 integer `Tensor`.  The input `Tensor` is
+      broadcast against this shape.
+
+  Returns:
+    shape: A `TensorShape` or rank-1 integer `Tensor` representing the
+      broadcasted shape.
+  """
+  x_shape_static = tf.get_static_value(x_shape)
+  y_shape_static = tf.get_static_value(y_shape)
+  if (x_shape_static is None) or (y_shape_static is None):
+    return tf.broadcast_dynamic_shape(x_shape, y_shape)
+
+  return tf.broadcast_static_shape(
+      tf.TensorShape(x_shape), tf.TensorShape(y_shape))
+
+
 def cond(pred, true_fn=None, false_fn=None, name=None):
   """Return either `true_fn()` if predicate `pred` is true else `false_fn()`.
 

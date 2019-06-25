@@ -1271,8 +1271,13 @@ class Distribution(_BaseDistribution):
         representing `n` different calculations of the Kullback-Leibler
         divergence.
     """
-    with self._name_and_control_scope(name):
-      return self._kl_divergence(other)
+    # NOTE: We do not enter a `self._name_and_control_scope` here.  We rely on
+    # `tfd.kl_divergence(self, other)` to use `_name_and_control_scope` to apply
+    # assertions on both Distributions.
+    #
+    # Subclasses that override `Distribution.kl_divergence` or `_kl_divergence`
+    # must ensure that assertions are applied for both `self` and `other`.
+    return self._kl_divergence(other)
 
   def __str__(self):
     if self.batch_shape:

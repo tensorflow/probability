@@ -84,6 +84,9 @@ TF2_FRIENDLY_DISTS = (
     'Deterministic',
     'Dirichlet',
     'HalfNormal',
+    'Laplace',
+    'LogNormal',
+    'Logistic',
     'Normal',
     'Multinomial'
 )
