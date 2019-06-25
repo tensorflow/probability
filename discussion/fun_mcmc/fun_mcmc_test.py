@@ -468,5 +468,20 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(get_slice(state_1, 1, 0), get_slice(state_1_2, 1, 0))
     self.assertAllClose(get_slice(state_2, 2, 0), get_slice(state_1_2, 2, 1))
 
+  def testAdam(self):
+    def loss_fn(x, y):
+      return tf.square(x - 1.) + tf.square(y - 2.), []
+
+    _, [(x, y), loss] = fun_mcmc.trace(
+        fun_mcmc.adam_init([tf.zeros([]), tf.zeros([])]),
+        lambda adam_state: fun_mcmc.adam_step(  # pylint: disable=g-long-lambda
+            adam_state, loss_fn, learning_rate=0.01),
+        num_steps=1000,
+        trace_fn=lambda state, extra: [state.state, extra.loss])
+
+    self.assertAllClose(1., x[-1], atol=1e-3)
+    self.assertAllClose(2., y[-1], atol=1e-3)
+    self.assertAllClose(0., loss[-1], atol=1e-3)
+
 if __name__ == '__main__':
   tf.test.main()

@@ -51,6 +51,10 @@ tfb = tfp.bijectors
 mcmc_util = tfp.mcmc.internal.util
 
 __all__ = [
+    'adam_init',
+    'adam_step',
+    'AdamExtra',
+    'AdamState',
     'blanes_3_stage_step',
     'blanes_4_stage_step',
     'call_and_grads',
@@ -1013,3 +1017,82 @@ def _choose(is_accepted, accepted, rejected, name='choose'):
   return tf.nest.map_structure(
       lambda a, r: _choose_base_case(is_accepted, a, r, name=name), accepted,
       rejected)
+
+AdamState = collections.namedtuple('AdamState', 'state, m, v, t')
+AdamExtra = collections.namedtuple('AdamExtra', 'loss, loss_extra')
+
+
+def adam_init(state: FloatNest) -> AdamState:
+  state = tf.nest.map_structure(tf.convert_to_tensor, state)
+  return AdamState(
+      state=state,
+      m=tf.nest.map_structure(tf.zeros_like, state),
+      v=tf.nest.map_structure(tf.zeros_like, state),
+      t=tf.constant(0, dtype=tf.int32))
+
+
+def adam_step(adam_state: AdamState,
+              loss_fn: PotentialFn,
+              learning_rate: FloatNest,
+              beta_1: FloatNest = 0.9,
+              beta_2: FloatNest = 0.999,
+              epsilon: FloatNest = 1e-8) -> Tuple[AdamState, AdamExtra]:
+  """Perform one step of the Adam optimization method.
+
+  Args:
+    adam_state: Current `AdamState`.
+    loss_fn: A function whose output will be minimized.
+    learning_rate: Learning rate, broadcastable with the state.
+    beta_1: Adaptation rate for the first order gradient statistics,
+      broadcastable with the state.
+    beta_2: Adaptation rate for the second order gradient statistics,
+      broadcastable with the state.
+    epsilon: Epsilon to stabilize the algorithm, broadcastable with the state.
+
+  Note that the `epsilon` is actually the `epsilon_hat` from introduction to
+  Section 2 in [1].
+
+  Returns:
+    adam_state: `AdamState`
+    adam_extra: `AdamExtra`
+
+
+  #### References:
+
+  [1]: Kingma, D. P., & Ba, J. L. (2015). Adam: a Method for Stochastic
+       Optimization. International Conference on Learning Representations
+       2015, 1-15.
+  """
+  if any(e is None for e in tf.nest.flatten(adam_state)):
+    adam_state = adam_init(adam_state.state)
+  state = adam_state.state
+  m = adam_state.m
+  v = adam_state.v
+  learning_rate = maybe_broadcast_structure(learning_rate, state)
+  beta_1 = maybe_broadcast_structure(beta_1, state)
+  beta_2 = maybe_broadcast_structure(beta_2, state)
+  epsilon = maybe_broadcast_structure(epsilon, state)
+  t = tf.cast(adam_state.t + 1, tf.float32)
+
+  def _one_part(state, g, m, v, learning_rate, beta_1, beta_2, epsilon):
+    lr_t = learning_rate * (
+        tf.math.sqrt(1. - tf.math.pow(beta_2, t)) /
+        (1. - tf.math.pow(beta_1, t)))
+
+    m_t = beta_1 * m + (1. - beta_1) * g
+    v_t = beta_2 * v + (1. - beta_2) * tf.square(g)
+    state = state - lr_t * m_t / (tf.math.sqrt(v_t) + epsilon)
+    return state, m_t, v_t
+
+  loss, loss_extra, grads = call_and_grads(loss_fn, state)
+
+  state_m_v = tf.nest.map_structure(_one_part, state, grads, m, v,
+                                    learning_rate, beta_1, beta_2, epsilon)
+
+  adam_state = AdamState(
+      state=nest.map_structure_up_to(state, lambda x: x[0], state_m_v),
+      m=nest.map_structure_up_to(state, lambda x: x[1], state_m_v),
+      v=nest.map_structure_up_to(state, lambda x: x[2], state_m_v),
+      t=adam_state.t + 1)
+
+  return adam_state, AdamExtra(loss_extra=loss_extra, loss=loss)

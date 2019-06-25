@@ -18,6 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from discussion.fun_mcmc.fun_mcmc_lib import adam_init
+from discussion.fun_mcmc.fun_mcmc_lib import adam_step
+from discussion.fun_mcmc.fun_mcmc_lib import AdamExtra
+from discussion.fun_mcmc.fun_mcmc_lib import AdamState
 from discussion.fun_mcmc.fun_mcmc_lib import blanes_3_stage_step
 from discussion.fun_mcmc.fun_mcmc_lib import blanes_4_stage_step
 from discussion.fun_mcmc.fun_mcmc_lib import call_and_grads
@@ -47,6 +51,10 @@ from discussion.fun_mcmc.fun_mcmc_lib import transition_kernel_wrapper
 from discussion.fun_mcmc.fun_mcmc_lib import TransitionOperator
 
 __all__ = [
+    'adam_init',
+    'adam_step',
+    'AdamExtra',
+    'AdamState',
     'blanes_3_stage_step',
     'blanes_4_stage_step',
     'call_and_grads',
