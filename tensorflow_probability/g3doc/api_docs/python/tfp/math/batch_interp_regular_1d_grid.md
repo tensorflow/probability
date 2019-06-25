@@ -48,6 +48,7 @@ with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
 
 #### Args:
 
+
 * <b>`x`</b>: Numeric `Tensor` The x-coordinates of the interpolated output values for
   each batch.  Shape broadcasts with `[A1, ..., AN, D]`, `N >= 0`.
 * <b>`x_ref_min`</b>:  `Tensor` of same `dtype` as `x`.  The minimum value of the each
@@ -80,11 +81,13 @@ with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
 
 #### Returns:
 
+
 * <b>`y_interp`</b>:  Interpolation between members of `y_ref`, at points `x`.
   `Tensor` of same `dtype` as `x`, and shape `[A1, ..., AN, D, B1, ..., BM]`
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>:  If `fill_value` is not an allowed string.
 * <b>`ValueError`</b>:  If `axis` is not a scalar.

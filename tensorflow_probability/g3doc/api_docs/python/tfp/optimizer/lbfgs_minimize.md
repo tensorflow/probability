@@ -70,6 +70,7 @@ http://pages.mtu.edu/~struther/Courses/OLD/Sp2013/5630/Jorge_Nocedal_Numerical_o
 
 #### Args:
 
+
 * <b>`value_and_gradients_function`</b>:  A Python callable that accepts a point as a
   real `Tensor` and returns a tuple of `Tensor`s of real dtype containing
   the value of the function and its gradient at that point. The function
@@ -111,6 +112,7 @@ http://pages.mtu.edu/~struther/Courses/OLD/Sp2013/5630/Jorge_Nocedal_Numerical_o
 
 
 #### Returns:
+
 
 * <b>`optimizer_results`</b>: A namedtuple containing the following items:
   converged: Scalar boolean tensor indicating whether the minimum was

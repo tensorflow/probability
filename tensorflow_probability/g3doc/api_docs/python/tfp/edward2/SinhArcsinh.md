@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See SinhArcsinh for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -34,6 +35,7 @@ Arguments `(loc, scale, skewness, tailweight)` must have broadcastable shape
 (indexing batch dimensions).  They must all have the same `dtype`.
 
 #### Args:
+
 
 * <b>`loc`</b>: Floating-point `Tensor`.
 * <b>`scale`</b>:  `Tensor` of same `dtype` as `loc`.

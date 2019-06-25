@@ -35,6 +35,7 @@ handles the `condition_kwargs`.
 
 #### Arguments:
 
+
 * <b>`hidden_layers`</b>: Python `list`-like of non-negative integer, scalars
   indicating the number of units in each hidden layer. Default: `[512, 512].
 * <b>`shift_only`</b>: Python `bool` indicating if only the `shift` term shall be
@@ -49,6 +50,7 @@ handles the `condition_kwargs`.
 
 #### Returns:
 
+
 * <b>`shift`</b>: `Float`-like `Tensor` of shift terms ("mu" in
   [Papamakarios et al.  (2016)][1]).
 * <b>`log_scale`</b>: `Float`-like `Tensor` of log(scale) terms ("alpha" in
@@ -56,6 +58,7 @@ handles the `condition_kwargs`.
 
 
 #### Raises:
+
 
 * <b>`NotImplementedError`</b>: if rightmost dimension of `inputs` is unknown prior to
   graph execution, or if `condition_kwargs` is not empty.

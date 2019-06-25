@@ -1,7 +1,6 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp" />
 <meta itemprop="path" content="Stable" />
-<meta itemprop="property" content="__version__"/>
 </div>
 
 # Module: tfp
@@ -18,6 +17,8 @@ Defined in [`__init__.py`](https://github.com/tensorflow/probability/tree/master
 ## Modules
 
 [`bijectors`](./tfp/bijectors.md) module: Bijective transformations.
+
+[`debugging`](./tfp/debugging.md) module: TensorFlow Probability debugging package.
 
 [`distributions`](./tfp/distributions.md) module: Statistical distributions.
 
@@ -46,8 +47,4 @@ Defined in [`__init__.py`](https://github.com/tensorflow/probability/tree/master
 [`util`](./tfp/util.md) module: TensorFlow Probability python utilities.
 
 [`vi`](./tfp/vi.md) module: Methods and objectives for variational inference.
-
-## Other Members
-
-<h3 id="__version__"><code>__version__</code></h3>
 

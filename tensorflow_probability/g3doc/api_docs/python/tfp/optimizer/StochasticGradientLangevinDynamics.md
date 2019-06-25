@@ -4,7 +4,6 @@
 <meta itemprop="property" content="iterations"/>
 <meta itemprop="property" content="variable_scope"/>
 <meta itemprop="property" content="weights"/>
-<meta itemprop="property" content="__getattribute__"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="add_slot"/>
 <meta itemprop="property" content="add_weight"/>
@@ -135,6 +134,7 @@ Args:
 
 #### Raises:
 
+
 * <b>`InvalidArgumentError`</b>: If preconditioner_decay_rate is a `Tensor` not in
   `(0,1]`.
 * <b>`NotImplementedError`</b>: If eager execution is enabled.
@@ -161,6 +161,7 @@ __init__(
 ```
 
 Create a new Optimizer.
+
 This must be called by the constructors of subclasses.
 Note that Optimizer instances should not bind to a single graph,
 and so shouldn't keep Tensors as member variables. Generally
@@ -170,6 +171,7 @@ facility instead.
 This class in stateful and thread-compatible.
 
 #### Args:
+
 
 * <b>`name`</b>: A non-empty string.  The name to use for accumulators created
   for the optimizer.
@@ -181,6 +183,7 @@ This class in stateful and thread-compatible.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: If name is malformed.
 * <b>`RuntimeError`</b>: If _create_slots has been overridden instead of
@@ -194,9 +197,11 @@ This class in stateful and thread-compatible.
 
 Variable. The number of training steps this Optimizer has run.
 
+
 <h3 id="variable_scope"><code>variable_scope</code></h3>
 
 Variable scope of all calls to `tf.get_variable`.
+
 
 <h3 id="weights"><code>weights</code></h3>
 
@@ -204,15 +209,8 @@ Returns variables of this Optimizer based on the order created.
 
 
 
+
 ## Methods
-
-<h3 id="__getattribute__"><code>__getattribute__</code></h3>
-
-``` python
-__getattribute__(name)
-```
-
-Overridden to support hyperparameter access.
 
 <h3 id="add_slot"><code>add_slot</code></h3>
 
@@ -225,6 +223,7 @@ add_slot(
 ```
 
 Add a new slot variable for `var`.
+
 
 <h3 id="add_weight"><code>add_weight</code></h3>
 
@@ -242,6 +241,7 @@ add_weight(
 
 
 
+
 <h3 id="apply_gradients"><code>apply_gradients</code></h3>
 
 ``` python
@@ -252,10 +252,12 @@ apply_gradients(
 ```
 
 Apply gradients to variables.
+
 This is the second part of `minimize()`. It returns an `Operation` that
 applies gradients.
 
 #### Args:
+
 
 * <b>`grads_and_vars`</b>: List of (gradient, variable) pairs.
 * <b>`name`</b>: Optional name for the returned operation.  Default to the name
@@ -263,12 +265,14 @@ applies gradients.
 
 
 #### Returns:
+
 An `Operation` that applies the specified gradients. If `global_step`
 was not None, that operation also increments `global_step`.
 
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: If `grads_and_vars` is malformed.
 * <b>`ValueError`</b>: If none of the variables have gradients.
@@ -284,11 +288,13 @@ from_config(
 ```
 
 Creates an optimizer from its config.
+
 This method is the reverse of `get_config`,
 capable of instantiating the same optimizer from the config
 dictionary.
 
 #### Arguments:
+
 
 * <b>`config`</b>: A Python dictionary, typically the output of get_config.
 * <b>`custom_objects`</b>: A Python dictionary mapping names to additional Python
@@ -297,6 +303,7 @@ dictionary.
 
 
 #### Returns:
+
 An optimizer instance.
 
 
@@ -307,12 +314,14 @@ get_config()
 ```
 
 Returns the config of the optimimizer.
+
 An optimizer config is a Python dictionary (serializable)
 containing the configuration of an optimizer.
 The same optimizer can be reinstantiated later
 (without any saved state) from this configuration.
 
 #### Returns:
+
 Python dictionary.
 
 
@@ -327,18 +336,22 @@ get_gradients(
 
 Returns gradients of `loss` with respect to `params`.
 
+
 #### Arguments:
+
 
 * <b>`loss`</b>: Loss tensor.
 * <b>`params`</b>: List of variables.
 
 
 #### Returns:
+
 List of gradient tensors.
 
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: In case any gradient cannot be computed (e.g. if gradient
   function not implemented).
@@ -354,6 +367,7 @@ get_slot(
 
 
 
+
 <h3 id="get_slot_names"><code>get_slot_names</code></h3>
 
 ``` python
@@ -361,6 +375,7 @@ get_slot_names()
 ```
 
 A list of names for this optimizer's slots.
+
 
 <h3 id="get_updates"><code>get_updates</code></h3>
 
@@ -373,11 +388,13 @@ get_updates(
 
 
 
+
 <h3 id="get_weights"><code>get_weights</code></h3>
 
 ``` python
 get_weights()
 ```
+
 
 
 
@@ -393,12 +410,14 @@ minimize(
 ```
 
 Minimize `loss` by updating `var_list`.
+
 This method simply computes gradient using `tf.GradientTape` and calls
 `apply_gradients()`. If you want to process the gradient before applying
 then call `tf.GradientTape` and `apply_gradients()` explicitly instead
 of using this function.
 
 #### Args:
+
 
 * <b>`loss`</b>: A callable taking no arguments which returns the value to minimize.
 * <b>`var_list`</b>: list or tuple of `Variable` objects to update to minimize
@@ -411,12 +430,14 @@ of using this function.
 
 
 #### Returns:
+
 An Operation that updates the variables in `var_list`.  If `global_step`
 was not `None`, that operation also increments `global_step`.
 
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: If some of the variables are not `Variable` objects.
 
@@ -428,6 +449,7 @@ set_weights(weights)
 
 
 
+
 <h3 id="variables"><code>variables</code></h3>
 
 ``` python
@@ -435,6 +457,7 @@ variables()
 ```
 
 Returns variables of this Optimizer based on the order created.
+
 
 
 

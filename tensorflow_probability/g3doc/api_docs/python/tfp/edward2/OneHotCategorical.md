@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See OneHotCategorical for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Initialize OneHotCategorical distributions using class log-probabilities.
 
 #### Args:
+
 
 * <b>`logits`</b>: An N-D `Tensor`, `N >= 1`, representing the log probabilities of a
   set of Categorical distributions. The first `N - 1` dimensions index

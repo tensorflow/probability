@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See StudentTProcess for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Instantiate a StudentTProcess Distribution.
 
 #### Args:
+
 
 * <b>`df`</b>: Positive Floating-point `Tensor` representing the degrees of freedom.
   Must be greater than 2.
@@ -67,5 +69,6 @@ Instantiate a StudentTProcess Distribution.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `mean_fn` is not `None` and is not callable.

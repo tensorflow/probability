@@ -65,7 +65,9 @@ __init__(
 
 Specify an autoregressive model.
 
+
 #### Args:
+
 
 * <b>`order`</b>: scalar Python positive `int` specifying the number of past
   timesteps to regress on.
@@ -110,7 +112,9 @@ Specify an autoregressive model.
 
 Static batch shape of models represented by this component.
 
+
 #### Returns:
+
 
 * <b>`batch_shape`</b>: A `tf.TensorShape` giving the broadcast batch shape of
   all model parameters. This should match the batch shape of
@@ -122,17 +126,21 @@ Static batch shape of models represented by this component.
 
 
 
+
 <h3 id="latent_size"><code>latent_size</code></h3>
 
 Python `int` dimensionality of the latent space in this model.
+
 
 <h3 id="name"><code>name</code></h3>
 
 Name of this model component.
 
+
 <h3 id="parameters"><code>parameters</code></h3>
 
 List of Parameter(name, prior, bijector) namedtuples for this model.
+
 
 
 
@@ -146,7 +154,9 @@ batch_shape_tensor()
 
 Runtime batch shape of models represented by this component.
 
+
 #### Returns:
+
 
 * <b>`batch_shape`</b>: `int` `Tensor` giving the broadcast batch shape of
   all model parameters. This should match the batch shape of
@@ -161,7 +171,9 @@ joint_log_prob(observed_time_series)
 
 Build the joint density `log p(params) + log p(y|params)` as a callable.
 
+
 #### Args:
+
 
 * <b>`observed_time_series`</b>: Observed `Tensor` trajectories of shape
   `sample_shape + batch_shape + [num_timesteps, 1]` (the trailing
@@ -174,6 +186,7 @@ Build the joint density `log p(params) + log p(y|params)` as a callable.
 
 
 #### Returns:
+
 
 * <b>`log_joint_fn`</b>: A function taking a `Tensor` argument for each model
   parameter, in canonical order, and returning a `Tensor` log probability
@@ -197,7 +210,9 @@ make_state_space_model(
 
 Instantiate this model as a Distribution over specified `num_timesteps`.
 
+
 #### Args:
+
 
 * <b>`num_timesteps`</b>: Python `int` number of timesteps to model.
 * <b>`param_vals`</b>: a list of `Tensor` parameter values in order corresponding to
@@ -211,6 +226,7 @@ Instantiate this model as a Distribution over specified `num_timesteps`.
 
 
 #### Returns:
+
 
 * <b>`dist`</b>: a `LinearGaussianStateSpaceModel` Distribution object.
 
@@ -228,7 +244,9 @@ prior_sample(
 
 Sample from the joint prior over model parameters and trajectories.
 
+
 #### Args:
+
 
 * <b>`num_timesteps`</b>: Scalar `int` `Tensor` number of timesteps to model.
 * <b>`initial_step`</b>: Optional scalar `int` `Tensor` specifying the starting
@@ -248,6 +266,7 @@ Sample from the joint prior over model parameters and trajectories.
 
 
 #### Returns:
+
 
 * <b>`trajectories`</b>: `float` `Tensor` of shape
   `trajectories_sample_shape + params_sample_shape + [num_timesteps, 1]`

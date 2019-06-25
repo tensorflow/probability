@@ -27,6 +27,7 @@ through time `T-1`.
 
 #### Args:
 
+
 * <b>`model`</b>: An instance of `StructuralTimeSeries` representing a
   time-series model. This represents a joint distribution over
   time-series and their parameters with batch shape `[b1, ..., bN]`.
@@ -44,6 +45,7 @@ through time `T-1`.
 
 
 #### Returns:
+
 
 * <b>`forecast_dist`</b>: a `tfd.MixtureSameFamily` instance with event shape
   [num_timesteps] and

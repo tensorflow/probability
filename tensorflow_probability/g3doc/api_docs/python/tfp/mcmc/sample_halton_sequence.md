@@ -103,6 +103,7 @@ print ("Leaped Estimated: %f, True Value: %f" % values)
 
 #### Args:
 
+
 * <b>`dim`</b>: Positive Python `int` representing each sample's `event_size.` Must
   not be greater than 1000.
 * <b>`num_results`</b>: (Optional) Positive scalar `Tensor` of dtype int32. The number
@@ -136,6 +137,7 @@ print ("Leaped Estimated: %f, True Value: %f" % values)
 
 #### Returns:
 
+
 * <b>`halton_elements`</b>: Elements of the Halton sequence. `Tensor` of supplied dtype
   and `shape` `[num_results, dim]` if `num_results` was specified or shape
   `[s, dim]` where s is the size of `sequence_indices` if `sequence_indices`
@@ -143,6 +145,7 @@ print ("Leaped Estimated: %f, True Value: %f" % values)
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if both `sequence_indices` and `num_results` were specified or
   if dimension `dim` is less than 1 or greater than 1000.

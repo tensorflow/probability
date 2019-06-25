@@ -42,7 +42,9 @@ __init__(
 
 Creates the `BlockwiseInitializer`.
 
+
 #### Arguments:
+
 
 * <b>`initializers`</b>: `list` of Keras initializers, e.g., `"glorot_uniform"` or
   `tf.keras.initializers.Constant(0.5413)`.
@@ -59,11 +61,14 @@ Creates the `BlockwiseInitializer`.
 
 
 
+
 <h3 id="sizes"><code>sizes</code></h3>
 
 
 
+
 <h3 id="validate_args"><code>validate_args</code></h3>
+
 
 
 
@@ -82,7 +87,9 @@ __call__(
 
 Returns a tensor object initialized as specified by the initializer.
 
+
 #### Args:
+
 
 * <b>`shape`</b>: Shape of the tensor.
 * <b>`dtype`</b>: Optional dtype of the tensor. If not provided will return tensor
@@ -100,6 +107,7 @@ from_config(
 
 Instantiates an initializer from a configuration dictionary.
 
+
 <h3 id="get_config"><code>get_config</code></h3>
 
 ``` python
@@ -107,6 +115,7 @@ get_config()
 ```
 
 Returns initializer configuration as a JSON-serializable dict.
+
 
 
 

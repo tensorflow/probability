@@ -32,6 +32,7 @@ X = Normal(normal_loc, normal_scale)
 
 #### Args:
 
+
 * <b>`normal_loc`</b>: `float`-like `Tensor` with shape `[b1, ..., bB, K-1]`, B>=0.
   The location parameter of the Normal used to construct the SoftmaxNormal.
 * <b>`normal_scale`</b>: `float`-like `Tensor`. Broadcastable with `normal_loc`.
@@ -46,6 +47,7 @@ X = Normal(normal_loc, normal_scale)
 
 
 #### Returns:
+
 
 * <b>`grid`</b>: Shape `[b1, ..., bB, K, quadrature_size]` `Tensor` representing the
   convex combination of affine parameters for `K` components.

@@ -95,7 +95,9 @@ __init__(
 
 Instantiates this object.
 
+
 #### Args:
+
 
 * <b>`inner_kernel`</b>: `TransitionKernel`-like object which has
   `collections.namedtuple` `kernel_results` and which contains a
@@ -108,6 +110,7 @@ Instantiates this object.
 
 #### Returns:
 
+
 * <b>`metropolis_hastings_kernel`</b>: Instance of `TransitionKernel` which wraps the
   input transition kernel with the Metropolis-Hastings algorithm.
 
@@ -119,9 +122,11 @@ Instantiates this object.
 
 
 
+
 <h3 id="is_calibrated"><code>is_calibrated</code></h3>
 
 Returns `True` if Markov chain converges to specified distribution.
+
 `TransitionKernel`s which are "uncalibrated" are often calibrated by
 composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp.mcmc.MetropolisHastings</code></a> `TransitionKernel`.
 
@@ -129,11 +134,14 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 
 
+
 <h3 id="parameters"><code>parameters</code></h3>
 
 Return `dict` of ``__init__`` arguments and their values.
 
+
 <h3 id="seed"><code>seed</code></h3>
+
 
 
 
@@ -149,7 +157,9 @@ bootstrap_results(init_state)
 
 Returns an object with the same type as returned by `one_step`.
 
+
 #### Args:
+
 
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   initial state(s) of the Markov chain(s).
@@ -157,11 +167,13 @@ Returns an object with the same type as returned by `one_step`.
 
 #### Returns:
 
+
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
   `Tensor`s representing internal calculations made within this function.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `inner_kernel` results doesn't contain the member
   "target_log_prob".
@@ -177,7 +189,9 @@ one_step(
 
 Takes one step of the TransitionKernel.
 
+
 #### Args:
+
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   current state(s) of the Markov chain(s).
@@ -188,6 +202,7 @@ Takes one step of the TransitionKernel.
 
 #### Returns:
 
+
 * <b>`next_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   next state(s) of the Markov chain(s).
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
@@ -195,6 +210,7 @@ Takes one step of the TransitionKernel.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `inner_kernel` results doesn't contain the member
   "target_log_prob".

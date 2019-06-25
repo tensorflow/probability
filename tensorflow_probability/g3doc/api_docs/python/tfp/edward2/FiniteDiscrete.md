@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See FiniteDiscrete for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct a finite discrete contribution.
 
 #### Args:
+
 
 * <b>`outcomes`</b>: A 1-D floating or integer `Tensor`, representing a list of
   possible outcomes in strictly ascending order.

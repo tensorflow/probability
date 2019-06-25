@@ -20,9 +20,11 @@ Defined in [`python/util/docstring.py`](https://github.com/tensorflow/probabilit
 
 #### Args:
 
+
 * <b>`**kwargs`</b>: Keyword arguments to set. For each key-value pair `k` and `v`,
   the key is found as `${k}` in the docstring and replaced with `v`.
 
 
 #### Returns:
+
 Decorated function.

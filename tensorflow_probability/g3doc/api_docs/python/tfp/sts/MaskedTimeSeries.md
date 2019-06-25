@@ -3,7 +3,6 @@
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="time_series"/>
 <meta itemprop="property" content="is_missing"/>
-<meta itemprop="property" content="__new__"/>
 </div>
 
 # tfp.sts.MaskedTimeSeries
@@ -88,27 +87,15 @@ forecast_dist = tfp.sts.forecast(
   model, observed_time_series, num_steps_forecast=5)
 ```
 
-<h2 id="__new__"><code>__new__</code></h2>
-
-``` python
-__new__(
-    _cls,
-    time_series,
-    is_missing
-)
-```
-
-Create new instance of MaskedTimeSeries(time_series, is_missing)
-
-
-
 ## Properties
 
 <h3 id="time_series"><code>time_series</code></h3>
 
 
 
+
 <h3 id="is_missing"><code>is_missing</code></h3>
+
 
 
 

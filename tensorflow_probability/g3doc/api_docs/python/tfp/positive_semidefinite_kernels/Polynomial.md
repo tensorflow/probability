@@ -10,8 +10,6 @@
 <meta itemprop="property" content="shift"/>
 <meta itemprop="property" content="slope_variance"/>
 <meta itemprop="property" content="__add__"/>
-<meta itemprop="property" content="__iadd__"/>
-<meta itemprop="property" content="__imul__"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="__mul__"/>
 <meta itemprop="property" content="apply"/>
@@ -68,7 +66,9 @@ __init__(
 
 Construct a Polynomial kernel instance.
 
+
 #### Args:
+
 
 * <b>`bias_variance`</b>: Positive floating point `Tensor` that controls the
   variance from the origin. If bias = 0, there is no variance and the
@@ -111,6 +111,7 @@ Construct a Polynomial kernel instance.
 <h3 id="batch_shape"><code>batch_shape</code></h3>
 
 The batch_shape property of a PositiveSemidefiniteKernel.
+
 This property describes the fully broadcast shape of all kernel parameters.
 For example, consider an ExponentiatedQuadratic kernel, which is
 parameterized by an amplitude and length_scale:
@@ -133,6 +134,7 @@ Note that this property defers to the private _batch_shape method, which
 concrete implementation sub-classes are obliged to provide.
 
 #### Returns:
+
 `TensorShape` instance describing the fully broadcast shape of all
 kernel parameters.
 
@@ -141,17 +143,21 @@ kernel parameters.
 
 Variance on bias parameter.
 
+
 <h3 id="dtype"><code>dtype</code></h3>
 
 DType over which the kernel operates.
+
 
 <h3 id="exponent"><code>exponent</code></h3>
 
 Exponent of the polynomial term.
 
+
 <h3 id="feature_ndims"><code>feature_ndims</code></h3>
 
 The number of feature dimensions.
+
 Kernel functions generally act on pairs of inputs from some space like
 
 ```none
@@ -164,6 +170,7 @@ might consider kernels over matrices, tensors, or even more general spaces,
 like strings or graphs.
 
 #### Returns:
+
 The number of feature dimensions (feature rank) of this kernel.
 
 
@@ -171,13 +178,16 @@ The number of feature dimensions (feature rank) of this kernel.
 
 Name prepended to all ops created by this class.
 
+
 <h3 id="shift"><code>shift</code></h3>
 
 Shift of linear function that is exponentiated.
 
+
 <h3 id="slope_variance"><code>slope_variance</code></h3>
 
 Variance on slope parameter.
+
 
 
 
@@ -191,27 +201,13 @@ __add__(k)
 
 
 
-<h3 id="__iadd__"><code>__iadd__</code></h3>
-
-``` python
-__iadd__(k)
-```
-
-
-
-<h3 id="__imul__"><code>__imul__</code></h3>
-
-``` python
-__imul__(k)
-```
-
-
 
 <h3 id="__mul__"><code>__mul__</code></h3>
 
 ``` python
 __mul__(k)
 ```
+
 
 
 
@@ -226,7 +222,9 @@ apply(
 
 Apply the kernel function to a pair of (batches of) inputs.
 
+
 #### Args:
+
 
 * <b>`x1`</b>: `Tensor` input to the first positional parameter of the kernel, of
   shape `[b1, ..., bB, f1, ..., fF]`, where `B` may be zero (ie, no
@@ -241,6 +239,7 @@ Apply the kernel function to a pair of (batches of) inputs.
 
 
 #### Returns:
+
 `Tensor` containing the (batch of) results of applying the kernel function
 to inputs `x1` and `x2`. If the kernel parameters' batch shape is
 `[k1, ..., kK]` then the shape of the `Tensor` resulting from this method
@@ -320,7 +319,9 @@ batch_shape_tensor()
 
 The batch_shape property of a PositiveSemidefiniteKernel as a `Tensor`.
 
+
 #### Returns:
+
 `Tensor` which evaluates to a vector of integers which are the
 fully-broadcast shapes of the kernel parameters.
 
@@ -336,7 +337,9 @@ matrix(
 
 Construct (batched) matrices from (batches of) collections of inputs.
 
+
 #### Args:
+
 
 * <b>`x1`</b>: `Tensor` input to the first positional parameter of the kernel, of
   shape `[b1, ..., bB, e1, f1, ..., fF]`, where `B` may be zero (ie, no
@@ -355,6 +358,7 @@ Construct (batched) matrices from (batches of) collections of inputs.
 
 
 #### Returns:
+
 `Tensor containing (batch of) matrices of kernel applications to pairs
 from inputs `x1` and `x2`. If the kernel parameters' batch shape is
 `[k1, ..., kK]`, then the shape of the resulting `Tensor` is

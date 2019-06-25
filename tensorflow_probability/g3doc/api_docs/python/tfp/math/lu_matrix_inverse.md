@@ -35,6 +35,7 @@ nor is this condition checked even when `validate_args=True`.
 
 #### Args:
 
+
 * <b>`lower_upper`</b>: `lu` as returned by `tf.linalg.lu`, i.e., if
   `matmul(P, matmul(L, U)) = X` then `lower_upper = L + U - eye`.
 * <b>`perm`</b>: `p` as returned by `tf.linag.lu`, i.e., if
@@ -48,6 +49,7 @@ nor is this condition checked even when `validate_args=True`.
 
 
 #### Returns:
+
 
 * <b>`inv_x`</b>: The matrix_inv, i.e.,
   `tf.matrix_inverse(tfp.math.lu_reconstruct(lu, perm))`.

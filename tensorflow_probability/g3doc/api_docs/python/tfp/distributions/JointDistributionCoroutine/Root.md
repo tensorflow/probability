@@ -2,7 +2,6 @@
 <meta itemprop="name" content="tfp.distributions.JointDistributionCoroutine.Root" />
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="distribution"/>
-<meta itemprop="property" content="__new__"/>
 </div>
 
 # tfp.distributions.JointDistributionCoroutine.Root
@@ -20,22 +19,10 @@ Defined in [`python/distributions/joint_distribution_coroutine.py`](https://gith
 <!-- Placeholder for "Used in" -->
 
 
-<h2 id="__new__"><code>__new__</code></h2>
-
-``` python
-__new__(
-    _cls,
-    distribution
-)
-```
-
-Create new instance of Root(distribution,)
-
-
-
 ## Properties
 
 <h3 id="distribution"><code>distribution</code></h3>
+
 
 
 

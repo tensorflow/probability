@@ -45,6 +45,7 @@ with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
 
 #### Args:
 
+
 * <b>`x`</b>: Numeric `Tensor` The x-coordinates of the interpolated output values for
   each batch.  Shape `[..., D, nd]`, designating [a batch of] `D`
   coordinates in `nd` space.  `D` must be `>= 1` and is not a batch dim.
@@ -70,11 +71,13 @@ with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
 
 #### Returns:
 
+
 * <b>`y_interp`</b>:  Interpolation between members of `y_ref`, at points `x`.
   `Tensor` of same `dtype` as `x`, and shape `[..., D, B1, ..., BM].`
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>:  If `rank(x) < 2` is determined statically.
 * <b>`ValueError`</b>:  If `axis` is not a scalar is determined statically.

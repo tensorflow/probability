@@ -50,6 +50,11 @@
 *  <a href="./tfp/bijectors/masked_autoregressive_default_template.md"><code>tfp.bijectors.masked_autoregressive_default_template</code></a>
 *  <a href="./tfp/bijectors/masked_dense.md"><code>tfp.bijectors.masked_dense</code></a>
 *  <a href="./tfp/bijectors/real_nvp_default_template.md"><code>tfp.bijectors.real_nvp_default_template</code></a>
+*  <a href="./tfp/debugging.md"><code>tfp.debugging</code></a>
+*  <a href="./tfp/debugging/benchmarking.md"><code>tfp.debugging.benchmarking</code></a>
+*  <a href="./tfp/debugging/benchmarking/BenchmarkTfFunctionConfig.md"><code>tfp.debugging.benchmarking.BenchmarkTfFunctionConfig</code></a>
+*  <a href="./tfp/debugging/benchmarking/benchmark_tf_function.md"><code>tfp.debugging.benchmarking.benchmark_tf_function</code></a>
+*  <a href="./tfp/debugging/benchmarking/default_benchmark_config.md"><code>tfp.debugging.benchmarking.default_benchmark_config</code></a>
 *  <a href="./tfp/distributions.md"><code>tfp.distributions</code></a>
 *  <a href="./tfp/distributions/Autoregressive.md"><code>tfp.distributions.Autoregressive</code></a>
 *  <a href="./tfp/distributions/BatchReshape.md"><code>tfp.distributions.BatchReshape</code></a>
@@ -413,6 +418,9 @@
 *  <a href="./tfp/positive_semidefinite_kernels.md"><code>tfp.positive_semidefinite_kernels</code></a>
 *  <a href="./tfp/positive_semidefinite_kernels/ExpSinSquared.md"><code>tfp.positive_semidefinite_kernels.ExpSinSquared</code></a>
 *  <a href="./tfp/positive_semidefinite_kernels/ExponentiatedQuadratic.md"><code>tfp.positive_semidefinite_kernels.ExponentiatedQuadratic</code></a>
+*  <a href="./tfp/positive_semidefinite_kernels/FeatureScaled.md"><code>tfp.positive_semidefinite_kernels.FeatureScaled</code></a>
+*  <a href="./tfp/positive_semidefinite_kernels/FeatureTransformed.md"><code>tfp.positive_semidefinite_kernels.FeatureTransformed</code></a>
+*  <a href="./tfp/positive_semidefinite_kernels/KumaraswamyTransformed.md"><code>tfp.positive_semidefinite_kernels.KumaraswamyTransformed</code></a>
 *  <a href="./tfp/positive_semidefinite_kernels/Linear.md"><code>tfp.positive_semidefinite_kernels.Linear</code></a>
 *  <a href="./tfp/positive_semidefinite_kernels/MaternFiveHalves.md"><code>tfp.positive_semidefinite_kernels.MaternFiveHalves</code></a>
 *  <a href="./tfp/positive_semidefinite_kernels/MaternOneHalf.md"><code>tfp.positive_semidefinite_kernels.MaternOneHalf</code></a>

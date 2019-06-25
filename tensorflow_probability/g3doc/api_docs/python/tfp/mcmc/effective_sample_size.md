@@ -36,6 +36,7 @@ If the sequence is uncorrelated, `ESS = N`.  In general, one should expect
 
 #### Args:
 
+
 * <b>`states`</b>:  `Tensor` or list of `Tensor` objects.  Dimension zero should index
   identically distributed states.
 * <b>`filter_threshold`</b>:  `Tensor` or list of `Tensor` objects.
@@ -52,11 +53,13 @@ If the sequence is uncorrelated, `ESS = N`.  In general, one should expect
 
 #### Returns:
 
+
 * <b>`ess`</b>:  `Tensor` or list of `Tensor` objects.  The effective sample size of
   each component of `states`.  Shape will be `states.shape[1:]`.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>:  If `states` and `filter_threshold` or `states` and
   `filter_beyond_lag` are both lists with different lengths.

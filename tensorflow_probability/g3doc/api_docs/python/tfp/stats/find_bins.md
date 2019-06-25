@@ -31,6 +31,7 @@ This function returns `bins`, such that:
 
 #### Args:
 
+
 * <b>`x`</b>:  Numeric `N-D` `Tensor` with `N > 0`.
 * <b>`edges`</b>:  `Tensor` of same `dtype` as `x`.  The first dimension indexes edges
   of intervals.  Must either be `1-D` or have
@@ -51,12 +52,14 @@ This function returns `bins`, such that:
 
 #### Returns:
 
+
 * <b>`bins`</b>: `Tensor` with same `shape` as `x` and `dtype`.
   Has whole number values.  `bins[i] = k` means the `x[i]` falls into the
   `kth` bin, ie, `edges[bins[i]] <= x[i] < edges[bins[i] + 1]`.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>:  If `edges.shape[0]` is determined to be less than 2.
 

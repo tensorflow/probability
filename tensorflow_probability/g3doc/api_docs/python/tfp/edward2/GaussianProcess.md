@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See GaussianProcess for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Instantiate a GaussianProcess Distribution.
 
 #### Args:
+
 
 * <b>`kernel`</b>: `PositiveSemidefiniteKernel`-like instance representing the
   GP's covariance function.
@@ -71,5 +73,6 @@ Instantiate a GaussianProcess Distribution.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `mean_fn` is not `None` and is not callable.

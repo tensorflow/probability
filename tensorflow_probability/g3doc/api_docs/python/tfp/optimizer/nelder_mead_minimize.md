@@ -102,6 +102,7 @@ point.
 
 #### Args:
 
+
 * <b>`objective_function`</b>:  A Python callable that accepts a point as a
   real `Tensor` and returns a `Tensor` of real dtype containing
   the value of the function at that point. The function
@@ -181,6 +182,7 @@ point.
 
 #### Returns:
 
+
 * <b>`optimizer_results`</b>: A namedtuple containing the following items:
   converged: Scalar boolean tensor indicating whether the minimum was
     found within tolerance.
@@ -203,6 +205,7 @@ point.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: If any of the following conditions hold
   1. If none or more than one of `initial_simplex` and `initial_vertex` are

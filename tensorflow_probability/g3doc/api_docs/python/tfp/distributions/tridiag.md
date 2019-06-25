@@ -26,6 +26,7 @@ Defined in [`python/internal/distribution_util.py`](https://github.com/tensorflo
 #### Example:
 
 
+
 ```python
 tridiag(below=[1., 2., 3.],
         diag=[4., 5., 6., 7.],
@@ -40,6 +41,7 @@ Warning: This Op is intended for convenience, not efficiency.
 
 #### Args:
 
+
 * <b>`below`</b>: `Tensor` of shape `[B1, ..., Bb, d-1]` corresponding to the below
   diagonal part. `None` is logically equivalent to `below = 0`.
 * <b>`diag`</b>: `Tensor` of shape `[B1, ..., Bb, d]` corresponding to the diagonal
@@ -51,9 +53,11 @@ Warning: This Op is intended for convenience, not efficiency.
 
 #### Returns:
 
+
 * <b>`tridiag`</b>: `Tensor` with values set above, below and on the diagonal.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if all inputs are `None`.

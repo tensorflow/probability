@@ -26,6 +26,7 @@ Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/t
 
 #### Args:
 
+
 * <b>`sparse_or_dense_a`</b>: `SparseTensor` or `Tensor` representing a (batch of)
   matrices.
 * <b>`dense_b`</b>: `Tensor` representing a (batch of) matrices, with the same batch
@@ -41,6 +42,7 @@ Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/t
 
 
 #### Returns:
+
 
 * <b>`product`</b>: A dense (batch of) matrix-shaped Tensor of the same batch shape and
 dtype as `sparse_or_dense_a` and `dense_b`. If `sparse_or_dense_a` or

@@ -43,6 +43,7 @@ Compare to `numpy.percentile`.
 
 #### Args:
 
+
 * <b>`x`</b>:  Numeric `N-D` `Tensor` with `N > 0`.  If `axis` is not `None`,
   `x` must have statically known number of dimensions.
 * <b>`q`</b>:  Scalar or vector `Tensor` with values in `[0, 100]`. The percentile(s).
@@ -72,6 +73,7 @@ Compare to `numpy.percentile`.
 
 
 #### Returns:
+
 A `(rank(q) + N - len(axis))` dimensional `Tensor` of same dtype as `x`, or,
   if `axis` is `None`, a `rank(q)` `Tensor`.  The first `rank(q)` dimensions
   index quantiles for different values of `q`.
@@ -79,6 +81,7 @@ A `(rank(q) + N - len(axis))` dimensional `Tensor` of same dtype as `x`, or,
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>:  If argument 'interpolation' is not an allowed type.
 * <b>`ValueError`</b>:  If interpolation type not compatible with `dtype`.

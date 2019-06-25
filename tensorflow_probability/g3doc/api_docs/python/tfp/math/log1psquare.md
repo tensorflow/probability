@@ -32,11 +32,13 @@ machine epsilon.
 
 #### Args:
 
+
 * <b>`x`</b>: Float `Tensor` input.
 * <b>`name`</b>: Python string indicating the name of the TensorFlow operation.
   Default value: `'log1psquare'`.
 
 
 #### Returns:
+
 
 * <b>`log1psq`</b>: Float `Tensor` representing `log(1. + x**2.)`.

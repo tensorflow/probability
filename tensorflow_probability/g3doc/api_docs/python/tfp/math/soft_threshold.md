@@ -83,6 +83,7 @@ multivariate case does not have a known closed form like above.)
 
 #### Args:
 
+
 * <b>`x`</b>: `float` `Tensor` representing the input to the SoftThreshold function.
 * <b>`threshold`</b>: nonnegative scalar, `float` `Tensor` representing the radius of
   the interval on which each coordinate of SoftThreshold takes the value
@@ -92,6 +93,7 @@ multivariate case does not have a known closed form like above.)
 
 
 #### Returns:
+
 
 * <b>`softthreshold`</b>: `float` `Tensor` with the same shape and dtype as `x`,
   representing the value of the SoftThreshold function.

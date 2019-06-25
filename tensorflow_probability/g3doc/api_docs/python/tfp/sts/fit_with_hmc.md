@@ -48,6 +48,7 @@ which is thought to be in the desirable range for optimal mixing [2].
 
 #### Args:
 
+
 * <b>`model`</b>: An instance of `StructuralTimeSeries` representing a
   time-series model. This represents a joint distribution over
   time-series and their parameters with batch shape `[b1, ..., bN]`.
@@ -96,6 +97,7 @@ which is thought to be in the desirable range for optimal mixing [2].
 
 
 #### Returns:
+
 
 * <b>`samples`</b>: Python `list` of `Tensors` representing posterior samples of model
   parameters, with shapes `[concat([[num_results], chain_batch_shape,

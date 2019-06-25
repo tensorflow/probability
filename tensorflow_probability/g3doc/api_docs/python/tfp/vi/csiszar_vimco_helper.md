@@ -30,11 +30,13 @@ h[j] iid~ q(H | x)
 
 #### Args:
 
+
 * <b>`logu`</b>: Floating-type `Tensor` representing `log(p(x, h) / q(h | x))`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
 
 
 #### Returns:
+
 
 * <b>`log_avg_u`</b>: `logu.dtype` `Tensor` corresponding to the natural-log of the
   average of `u`. The sum of the gradient of `log_avg_u` is `1`.

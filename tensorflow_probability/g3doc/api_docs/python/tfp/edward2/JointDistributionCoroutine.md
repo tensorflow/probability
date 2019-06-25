@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See JointDistributionCoroutine for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct the `JointDistributionCoroutine` distribution.
 
 #### Args:
+
 
 * <b>`model`</b>: A generator that yields a sequence of `tfd.Distribution`-like
   instances.

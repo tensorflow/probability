@@ -36,6 +36,7 @@ inspect the behavior of the chain during adaptation.
 
 #### Args:
 
+
 * <b>`num_adaptation_steps`</b>: Scalar `int` `Tensor` number of initial steps to
   during which to adjust the step size. This may be greater, less than, or
   equal to the number of burnin steps. If `None`, the step size is adapted
@@ -56,6 +57,7 @@ inspect the behavior of the chain during adaptation.
 
 
 #### Returns:
+
 
 * <b>`step_size_simple_update_fn`</b>: Callable that takes args
   `step_size_var, kernel_results` and returns updated step size(s).

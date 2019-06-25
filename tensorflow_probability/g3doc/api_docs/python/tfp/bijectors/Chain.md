@@ -39,11 +39,13 @@ Defined in [`python/bijectors/chain.py`](https://github.com/tensorflow/probabili
 #### Example Use:
 
 
+
 ```python
 chain = Chain([Exp(), Softplus()], name="one_plus_exp")
 ```
 
 #### Results in:
+
 
 
 * Forward:
@@ -80,7 +82,9 @@ __init__(
 
 Instantiates `Chain` bijector.
 
+
 #### Args:
+
 
 * <b>`bijectors`</b>: Python `list` of bijector instances. An empty list makes this
   bijector equivalent to the `Identity` bijector.
@@ -92,6 +96,7 @@ Instantiates `Chain` bijector.
 
 #### Raises:
 
+
 * <b>`ValueError`</b>: if bijectors have different dtypes.
 
 
@@ -102,29 +107,36 @@ Instantiates `Chain` bijector.
 
 
 
+
 <h3 id="dtype"><code>dtype</code></h3>
 
 dtype of `Tensor`s transformable by this distribution.
+
 
 <h3 id="forward_min_event_ndims"><code>forward_min_event_ndims</code></h3>
 
 Returns the minimal number of dimensions bijector.forward operates on.
 
+
 <h3 id="graph_parents"><code>graph_parents</code></h3>
 
 Returns this `Bijector`'s graph_parents as a Python list.
+
 
 <h3 id="inverse_min_event_ndims"><code>inverse_min_event_ndims</code></h3>
 
 Returns the minimal number of dimensions bijector.inverse operates on.
 
+
 <h3 id="is_constant_jacobian"><code>is_constant_jacobian</code></h3>
 
 Returns true iff the Jacobian matrix is not a function of x.
+
 Note: Jacobian matrix is either constant for both forward and inverse or
 neither.
 
 #### Returns:
+
 
 * <b>`is_constant_jacobian`</b>: Python `bool`.
 
@@ -132,9 +144,11 @@ neither.
 
 Returns the string name of this `Bijector`.
 
+
 <h3 id="validate_args"><code>validate_args</code></h3>
 
 Returns True if Tensor arguments will be validated.
+
 
 
 
@@ -151,6 +165,7 @@ __call__(
 ```
 
 Applies or composes the `Bijector`, depending on input type.
+
 This is a convenience function which applies the `Bijector` instance in
 three different ways, depending on the input:
 
@@ -162,6 +177,7 @@ three different ways, depending on the input:
 
 #### Args:
 
+
 * <b>`value`</b>: A `tfd.Distribution`, `tfb.Bijector`, or a `Tensor`.
 * <b>`name`</b>: Python `str` name given to ops created by this function.
 * <b>`**kwargs`</b>: Additional keyword arguments passed into the created
@@ -169,6 +185,7 @@ three different ways, depending on the input:
 
 
 #### Returns:
+
 
 * <b>`composition`</b>: A `tfd.TransformedDistribution` if the input was a
   `tfd.Distribution`, a `tfb.Chain` if the input was a `tfb.Bijector`, or
@@ -207,7 +224,9 @@ forward(
 
 Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
+
 #### Args:
+
 
 * <b>`x`</b>: `Tensor`. The input to the "forward" evaluation.
 * <b>`name`</b>: The name to give this op.
@@ -215,11 +234,13 @@ Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
 
 #### Returns:
+
 `Tensor`.
 
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `self.dtype` is specified and `x.dtype` is not
   `self.dtype`.
@@ -232,15 +253,18 @@ forward_event_shape(input_shape)
 ```
 
 Shape of a single sample from a single batch as a `TensorShape`.
+
 Same meaning as `forward_event_shape_tensor`. May be only partially defined.
 
 #### Args:
+
 
 * <b>`input_shape`</b>: `TensorShape` indicating event-portion shape passed into
   `forward` function.
 
 
 #### Returns:
+
 
 * <b>`forward_event_shape_tensor`</b>: `TensorShape` indicating event-portion shape
   after applying `forward`. Possibly unknown.
@@ -256,7 +280,9 @@ forward_event_shape_tensor(
 
 Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
 
+
 #### Args:
+
 
 * <b>`input_shape`</b>: `Tensor`, `int32` vector indicating event-portion shape
   passed into `forward` function.
@@ -264,6 +290,7 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
 
 
 #### Returns:
+
 
 * <b>`forward_event_shape_tensor`</b>: `Tensor`, `int32` vector indicating
   event-portion shape after applying `forward`.
@@ -281,7 +308,9 @@ forward_log_det_jacobian(
 
 Returns both the forward_log_det_jacobian.
 
+
 #### Args:
+
 
 * <b>`x`</b>: `Tensor`. The input to the "forward" Jacobian determinant evaluation.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
@@ -294,12 +323,14 @@ Returns both the forward_log_det_jacobian.
 
 
 #### Returns:
+
 `Tensor`, if this bijector is injective.
   If not injective this is not implemented.
 
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `self.dtype` is specified and `y.dtype` is not
   `self.dtype`.
@@ -319,7 +350,9 @@ inverse(
 
 Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
+
 #### Args:
+
 
 * <b>`y`</b>: `Tensor`. The input to the "inverse" evaluation.
 * <b>`name`</b>: The name to give this op.
@@ -327,6 +360,7 @@ Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
 
 #### Returns:
+
 `Tensor`, if this bijector is injective.
   If not injective, returns the k-tuple containing the unique
   `k` points `(x1, ..., xk)` such that `g(xi) = y`.
@@ -334,6 +368,7 @@ Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `self.dtype` is specified and `y.dtype` is not
   `self.dtype`.
@@ -346,15 +381,18 @@ inverse_event_shape(output_shape)
 ```
 
 Shape of a single sample from a single batch as a `TensorShape`.
+
 Same meaning as `inverse_event_shape_tensor`. May be only partially defined.
 
 #### Args:
+
 
 * <b>`output_shape`</b>: `TensorShape` indicating event-portion shape passed into
   `inverse` function.
 
 
 #### Returns:
+
 
 * <b>`inverse_event_shape_tensor`</b>: `TensorShape` indicating event-portion shape
   after applying `inverse`. Possibly unknown.
@@ -370,7 +408,9 @@ inverse_event_shape_tensor(
 
 Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
 
+
 #### Args:
+
 
 * <b>`output_shape`</b>: `Tensor`, `int32` vector indicating event-portion shape
   passed into `inverse` function.
@@ -378,6 +418,7 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
 
 
 #### Returns:
+
 
 * <b>`inverse_event_shape_tensor`</b>: `Tensor`, `int32` vector indicating
   event-portion shape after applying `inverse`.
@@ -394,12 +435,14 @@ inverse_log_det_jacobian(
 ```
 
 Returns the (log o det o Jacobian o inverse)(y).
+
 Mathematically, returns: `log(det(dX/dY))(Y)`. (Recall that: `X=g^{-1}(Y)`.)
 
 Note that `forward_log_det_jacobian` is the negative of this function,
 evaluated at `g^{-1}(y)`.
 
 #### Args:
+
 
 * <b>`y`</b>: `Tensor`. The input to the "inverse" Jacobian determinant evaluation.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
@@ -413,6 +456,7 @@ evaluated at `g^{-1}(y)`.
 
 #### Returns:
 
+
 * <b>`ildj`</b>: `Tensor`, if this bijector is injective.
   If not injective, returns the tuple of local log det
   Jacobians, `log(det(Dg_i^{-1}(y)))`, where `g_i` is the restriction
@@ -420,6 +464,7 @@ evaluated at `g^{-1}(y)`.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `self.dtype` is specified and `y.dtype` is not
   `self.dtype`.

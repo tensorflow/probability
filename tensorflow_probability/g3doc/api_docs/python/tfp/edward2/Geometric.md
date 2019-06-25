@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Geometric for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct Geometric distributions.
 
 #### Args:
+
 
 * <b>`logits`</b>: Floating-point `Tensor` with shape `[B1, ..., Bb]` where `b >= 0`
   indicates the number of batch dimensions. Each entry represents logits

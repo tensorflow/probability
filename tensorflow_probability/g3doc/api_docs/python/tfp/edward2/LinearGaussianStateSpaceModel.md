@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See LinearGaussianStateSpaceModel for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Initialize a `LinearGaussianStateSpaceModel.
 
 #### Args:
+
 
 * <b>`num_timesteps`</b>: Integer `Tensor` total number of timesteps.
 * <b>`transition_matrix`</b>: A transition operator, represented by a Tensor or

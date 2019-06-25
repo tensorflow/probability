@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See Chi2 for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct Chi2 distributions with parameter `df`.
 
 #### Args:
+
 
 * <b>`df`</b>: Floating point tensor, the degrees of freedom of the
   distribution(s). `df` must contain only positive values.

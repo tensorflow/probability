@@ -40,6 +40,7 @@ default `rcond` is `1e-15`. Here the default is
 
 #### Args:
 
+
 * <b>`a`</b>: (Batch of) `float`-like matrix-shaped `Tensor`(s) which are to be
   pseudo-inverted.
 * <b>`rcond`</b>: `Tensor` of small singular value cutoffs.  Singular values smaller
@@ -55,11 +56,13 @@ default `rcond` is `1e-15`. Here the default is
 
 #### Returns:
 
+
 * <b>`a_pinv`</b>: The pseudo-inverse of input `a`. Has same shape as `a` except
   rightmost two dimensions are transposed.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if input `a` does not have `float`-like `dtype`.
 * <b>`ValueError`</b>: if input `a` has fewer than 2 dimensions.

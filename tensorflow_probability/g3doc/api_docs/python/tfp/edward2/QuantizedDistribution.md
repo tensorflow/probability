@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See QuantizedDistribution for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -35,6 +36,7 @@ Some properties are inherited from the distribution defining `X`. Example:
 the `distribution`.
 
 #### Args:
+
 
 * <b>`distribution`</b>:  The base distribution class to transform. Typically an
   instance of `Distribution`.
@@ -55,6 +57,7 @@ the `distribution`.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: If `dist_cls` is not a subclass of
     `Distribution` or continuous.

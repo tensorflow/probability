@@ -32,6 +32,7 @@ of a structural time series model. In particular, it:
 
 #### Args:
 
+
 * <b>`model`</b>: An instance of <a href="../../tfp/sts/Sum.md"><code>tfp.sts.Sum</code></a> representing a structural time series
   model.
 * <b>`observed_time_series`</b>: `float` `Tensor` of shape
@@ -47,6 +48,7 @@ of a structural time series model. In particular, it:
   `Tensor` values.
 
 #### Returns:
+
 
 * <b>`component_dists`</b>: A `collections.OrderedDict` instance mapping
   component StructuralTimeSeries instances (elements of `model.components`)

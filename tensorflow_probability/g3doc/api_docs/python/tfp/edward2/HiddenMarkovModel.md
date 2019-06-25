@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See HiddenMarkovModel for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Initialize hidden Markov model.
 
 #### Args:
+
 
 * <b>`initial_distribution`</b>: A `Categorical`-like instance.
   Determines probability of first hidden state in Markov chain.
@@ -60,6 +62,7 @@ Initialize hidden Markov model.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `num_steps` is not at least 1.
 * <b>`ValueError`</b>: if `initial_distribution` does not have scalar `event_shape`.

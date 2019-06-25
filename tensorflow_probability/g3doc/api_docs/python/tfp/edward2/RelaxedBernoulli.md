@@ -23,6 +23,7 @@ Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/proba
 See RelaxedBernoulli for more details.
 
 #### Returns:
+
 RandomVariable.
 
 
@@ -31,6 +32,7 @@ RandomVariable.
 Construct RelaxedBernoulli distributions.
 
 #### Args:
+
 
 * <b>`temperature`</b>: An 0-D `Tensor`, representing the temperature
   of a set of RelaxedBernoulli distributions. The temperature should be
@@ -55,5 +57,6 @@ Construct RelaxedBernoulli distributions.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: If both `probs` and `logits` are passed, or if neither.
