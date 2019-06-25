@@ -509,9 +509,8 @@ compute_output_shape(input_shape)
 
 Computes the output shape of the layer.
 
-If the layer has not been built, this method will call `build` on the
-layer. This assumes that the layer will later be used with inputs that
-match the input shape provided here.
+Assumes that the layer will be built
+to match that input shape provided.
 
 #### Arguments:
 
