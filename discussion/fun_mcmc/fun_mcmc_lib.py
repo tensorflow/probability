@@ -55,12 +55,18 @@ __all__ = [
     'blanes_4_stage_step',
     'call_and_grads',
     'call_fn',
+    'gaussian_momentum_sample',
+    'hamiltonian_integrator',
     'hamiltonian_monte_carlo',
     'hamiltonian_monte_carlo_init',
     'HamiltonianMonteCarloExtra',
     'HamiltonianMonteCarloState',
+    'IntegratorExtras',
+    'IntegratorState',
+    'IntegratorStep',
     'IntegratorStepState',
     'leapfrog_step',
+    'make_gaussian_kinetic_energy_fn',
     'maybe_broadcast_structure',
     'metropolis_hastings_step',
     'PotentialFn',
@@ -79,6 +85,8 @@ IntTensor = Union[int, tf.Tensor, np.ndarray, np.integer]
 FloatTensor = Union[float, tf.Tensor, np.ndarray, np.floating]
 # TODO(b/109648354): Correctly represent the recursive nature of this type.
 TensorNest = Union[AnyTensor, Sequence[AnyTensor], Mapping[Any, AnyTensor]]
+TensorSpecNest = Union[tf.TensorSpec, Sequence[tf.TensorSpec],
+                       Mapping[Any, tf.TensorSpec]]
 BijectorNest = Union[tfb.Bijector, Sequence[tfb.Bijector], Mapping[Any, tfb
                                                                    .Bijector]]
 FloatNest = Union[FloatTensor, Sequence[FloatTensor], Mapping[Any, FloatTensor]]
@@ -88,10 +96,13 @@ PotentialFn = Union[Callable[[TensorNest], Tuple[tf.Tensor, TensorNest]],
                     Callable[..., Tuple[tf.Tensor, TensorNest]]]
 
 
-def trace(state: State, fn: TransitionOperator, num_steps: IntTensor,
-          trace_fn: Callable[[State, TensorNest], TensorNest],
-          parallel_iterations: int = 10,
-         ) -> Tuple[State, TensorNest]:
+def trace(
+    state: State,
+    fn: TransitionOperator,
+    num_steps: IntTensor,
+    trace_fn: Callable[[State, TensorNest], TensorNest],
+    parallel_iterations: int = 10,
+) -> Tuple[State, TensorNest]:
   """`TransitionOperator` that runs `fn` repeatedly and traces its outputs.
 
   Args:
@@ -121,7 +132,9 @@ def trace(state: State, fn: TransitionOperator, num_steps: IntTensor,
     state, first_trace = wrapper(state)
     trace_arrays = tf.nest.map_structure(
         lambda v: tf.TensorArray(  # pylint: disable=g-long-lambda
-            v.dtype, size=num_steps, element_shape=v.shape).write(0, v),
+            v.dtype,
+            size=num_steps,
+            element_shape=v.shape).write(0, v),
         first_trace)
     start_idx = 1
   else:
@@ -240,8 +253,7 @@ def maybe_broadcast_structure(from_structure: Any, to_structure: Any) -> Any:
 
 def transform_log_prob_fn(log_prob_fn: PotentialFn,
                           bijector: BijectorNest,
-                          init_state: State = None
-                         ) -> Any:
+                          init_state: State = None) -> Any:
   """Transforms a log-prob function using a bijector.
 
   This takes a log-prob function and creates a new log-prob function that now
@@ -304,6 +316,8 @@ IntegratorStepState = collections.namedtuple('IntegratorStepState',
 IntegratorStepExtras = collections.namedtuple(
     'IntegratorStepExtras', 'target_log_prob, state_extra, '
     'kinetic_energy, kinetic_energy_extra')
+IntegratorStep = Callable[[IntegratorStepState],
+                          Tuple[IntegratorStepState, IntegratorStepExtras]]
 
 
 def symmetric_spliting_integrator_step(
@@ -429,7 +443,7 @@ def ruth4_step(
   [1]: Ruth, Ronald D. (August 1983). "A Canonical Integration Technique".
        Nuclear Science, IEEE Trans. on. NS-30 (4): 2669-2671
   """
-  c = 2**(1./3)
+  c = 2**(1. / 3)
   coefficients = (1. / (2 - c)) * np.array([0.5, 1., 0.5 - 0.5 * c, -c])
   return symmetric_spliting_integrator_step(
       integrator_step_state,
@@ -569,11 +583,65 @@ def metropolis_hastings_step(current_state: State,
   return next_state, is_accepted, log_uniform
 
 
-# state_extra is not a true state, but here for convenience.
+MomentumSampleFn = Callable[[], State]
+
+
+def gaussian_momentum_sample(state_spec: TensorSpecNest = None,
+                             state: State = None) -> State:
+  """Generates a sample from a Gaussian (Normal) momentum distribution.
+
+  One of `state` or `state_spec` need to be specified to obtain the correct
+  structure.
+
+  Args:
+    state_spec: A nest of `TensorSpec`s describing the output shape and dtype.
+    state: A nest of `Tensor`s with the shape and dtype being the same as the
+      output.
+
+  Returns:
+    sample: A nest of `Tensor`s with the same structure, shape and dtypes as one
+      of the two inputs, distributed with Normal distribution.
+  """
+  if state_spec is None:
+    if state is None:
+      raise ValueError(
+          'If `state_spec` is `None`, then `state` must be specified.')
+    shapes = tf.nest.map_structure(tf.shape, state)
+    dtypes = tf.nest.map_structure(lambda t: t.dtype, state)
+  else:
+    shapes = tf.nest.map_structure(lambda spec: spec.shape, state_spec)
+    dtypes = tf.nest.map_structure(lambda spec: spec.dtype, state_spec)
+  return tf.nest.map_structure(
+      lambda shape, dtype: tf.random.normal(shape, dtype=dtype), shapes, dtypes)
+
+
+def make_gaussian_kinetic_energy_fn(
+    chain_ndims: IntTensor) -> Callable[..., Tuple[tf.Tensor, TensorNest]]:
+  """Returns a function that computes the kinetic energy of a state.
+
+  Args:
+    chain_ndims: How many leading dimensions correspond to independent
+      particles.
+
+  Returns:
+    kinetic_energy_fn: A callable that takes in the expanded state (see
+      `call_fn`) and returns the kinetic energy + dummy auxiliary output.
+  """
+
+  def kinetic_energy_fn(*args, **kwargs):
+    def one_component(x):
+      return tf.reduce_sum(tf.square(x), axis=tf.range(chain_ndims, tf.rank(x)))
+
+    return (
+        tf.add_n([one_component(x) for x in tf.nest.flatten([args, kwargs])]) /
+        2.), ()
+
+  return kinetic_energy_fn
+
+
 class HamiltonianMonteCarloState(
-    collections.namedtuple(
-        'HamiltonianMonteCarloState',
-        'state, state_grads, target_log_prob, state_extra')):
+    collections.namedtuple('HamiltonianMonteCarloState',
+                           'state, state_grads, target_log_prob, state_extra')):
   """State of `hamiltonian_monte_carlo`."""
   __slots__ = ()
 
@@ -587,12 +655,11 @@ class HamiltonianMonteCarloState(
                               state_extra)
 
 
+# state_extra is not a true state, but here for convenience.
 HamiltonianMonteCarloExtra = collections.namedtuple(
     'HamiltonianMonteCarloExtra',
-    'is_accepted, log_accept_ratio, integrator_trace, '
-    'proposed_hmc_state, integrator_step_state')
-
-MomentumSampleFn = Union[Callable[[State], State], Callable[..., State]]
+    'is_accepted, log_accept_ratio, proposed_hmc_state, '
+    'integrator_state, integrator_extra, initial_momentum')
 
 
 def hamiltonian_monte_carlo_init(state: TensorNest,
@@ -616,15 +683,15 @@ def hamiltonian_monte_carlo_init(state: TensorNest,
 def hamiltonian_monte_carlo(
     hmc_state: HamiltonianMonteCarloState,
     target_log_prob_fn: PotentialFn,
-    step_size: Any,
-    num_integrator_steps: IntTensor,
+    step_size: Any = None,
+    num_integrator_steps: IntTensor = None,
     momentum: State = None,
     kinetic_energy_fn: PotentialFn = None,
     momentum_sample_fn: MomentumSampleFn = None,
     integrator_trace_fn: Callable[[IntegratorStepState, IntegratorStepExtras],
                                   TensorNest] = lambda *args: (),
     log_uniform: FloatTensor = None,
-    integrator=leapfrog_step,
+    integrator_fn=None,
     seed=None,
 ) -> Tuple[HamiltonianMonteCarloState, HamiltonianMonteCarloExtra]:
   """Hamiltonian Monte Carlo `TransitionOperator`.
@@ -669,15 +736,17 @@ def hamiltonian_monte_carlo(
     hmc_state: HamiltonianMonteCarloState.
     target_log_prob_fn: Target log prob fn.
     step_size: Step size, structure broadcastable to the `target_log_prob_fn`
-      state.
-    num_integrator_steps: Number of integrator steps to take.
-    momentum: Initial momentum, passed to `momentum_sample_fn`. Default: zeroes.
+      state. Optional if `integrator_fn` is specified.
+    num_integrator_steps: Number of integrator steps to take. Optional if
+      `integrator_fn` is specified.
+    momentum: Initial momentum, by default sampled from a standard gaussian.
     kinetic_energy_fn: Kinetic energy function.
     momentum_sample_fn: Sampler for the momentum.
-    integrator_trace_fn: Trace function for the integrator integrator.
+    integrator_trace_fn: Trace function for the integrator.
     log_uniform: Optional logarithm of a uniformly distributed random sample in
       [0, 1], used for the MH accept/reject step.
-    integrator: Integrator to use for the HMC dynamics.
+    integrator_fn: Integrator to use for the HMC dynamics. Uses a
+      `hamiltonian_integrator` with `leapfrog_step` by default.
     seed: For reproducibility.
 
   Returns:
@@ -693,75 +762,48 @@ def hamiltonian_monte_carlo(
   state_extra = hmc_state.state_extra
 
   if kinetic_energy_fn is None:
-
-    # pylint: disable=function-redefined
-    def kinetic_energy_fn(*momentum):
-      return tf.add_n([
-          tf.reduce_sum(input_tensor=tf.square(x), axis=-1) / 2.
-          for x in tf.nest.flatten(momentum)
-      ]), ()
+    kinetic_energy_fn = make_gaussian_kinetic_energy_fn(
+        target_log_prob.shape.ndims if target_log_prob.shape else tf
+        .rank(target_log_prob))
 
   if momentum_sample_fn is None:
+    momentum_sample_fn = lambda: gaussian_momentum_sample(state=state)
 
-    # pylint: disable=function-redefined
-    def momentum_sample_fn(*momentum):
-      ret = tf.nest.map_structure(
-          lambda x: tf.random.normal(tf.shape(input=x), dtype=x.dtype),
-          momentum)
-      return tf.nest.pack_sequence_as(state, tf.nest.flatten(ret))
+  if integrator_fn is None:
+    integrator_fn = lambda state: hamiltonian_integrator(  # pylint: disable=g-long-lambda
+        state,
+        num_steps=num_integrator_steps,
+        integrator_step_fn=lambda state: leapfrog_step(  # pylint: disable=g-long-lambda
+            state,
+            step_size=step_size,
+            target_log_prob_fn=target_log_prob_fn,
+            kinetic_energy_fn=kinetic_energy_fn),
+        kinetic_energy_fn=kinetic_energy_fn,
+        integrator_trace_fn=integrator_trace_fn)
 
   if momentum is None:
-    momentum = call_fn(momentum_sample_fn,
-                       tf.nest.map_structure(tf.zeros_like, state))
+    momentum = momentum_sample_fn()
 
-  kinetic_energy, _ = call_fn(kinetic_energy_fn, momentum)
-  current_energy = -target_log_prob + kinetic_energy
-  current_state = HamiltonianMonteCarloState(
+  integrator_state = IntegratorState(
+      target_log_prob=target_log_prob,
+      momentum=momentum,
       state=state,
       state_grads=state_grads,
       state_extra=state_extra,
-      target_log_prob=target_log_prob)
+  )
 
-  def integrator_wrapper(integrator_step_state, target_log_prob, state_extra):
-    """Integrator wrapper that tracks extra state."""
-    del target_log_prob
-    del state_extra
+  integrator_state, integrator_extra = integrator_fn(integrator_state)
 
-    integrator_step_state, integrator_extra = integrator(
-        integrator_step_state,
-        step_size=step_size,
-        target_log_prob_fn=target_log_prob_fn,
-        kinetic_energy_fn=kinetic_energy_fn)
-
-    return (integrator_step_state, integrator_extra.target_log_prob,
-            integrator_extra.state_extra), integrator_extra
-
-  def integrator_trace_wrapper_fn(args, integrator_extra):
-    return integrator_trace_fn(args[0], integrator_extra)
-
-  integrator_wrapper_state = (IntegratorStepState(
-      state, state_grads, momentum), target_log_prob, state_extra)
-
-  [integrator_step_state, target_log_prob,
-   state_extra], integrator_trace = trace(
-       integrator_wrapper_state,
-       integrator_wrapper,
-       num_integrator_steps,
-       trace_fn=integrator_trace_wrapper_fn)
-
-  kinetic_energy, _ = call_fn(kinetic_energy_fn, integrator_step_state.momentum)
-  proposed_energy = -target_log_prob + kinetic_energy
   proposed_state = HamiltonianMonteCarloState(
-      state=integrator_step_state.state,
-      state_grads=integrator_step_state.state_grads,
-      target_log_prob=target_log_prob,
-      state_extra=state_extra)
+      state=integrator_state.state,
+      state_grads=integrator_state.state_grads,
+      target_log_prob=integrator_state.target_log_prob,
+      state_extra=integrator_state.state_extra)
 
-  energy_change = proposed_energy - current_energy
   hmc_state, is_accepted, _ = metropolis_hastings_step(
-      current_state,
+      hmc_state,
       proposed_state,
-      energy_change,
+      integrator_extra.energy_change,
       log_uniform=log_uniform,
       seed=seed)
 
@@ -769,9 +811,121 @@ def hamiltonian_monte_carlo(
   return hmc_state, HamiltonianMonteCarloExtra(
       is_accepted=is_accepted,
       proposed_hmc_state=proposed_state,
-      log_accept_ratio=-energy_change,
-      integrator_trace=integrator_trace,
-      integrator_step_state=integrator_step_state)
+      log_accept_ratio=-integrator_extra.energy_change,
+      integrator_state=integrator_state,
+      integrator_extra=integrator_extra,
+      initial_momentum=momentum)
+
+
+IntegratorState = collections.namedtuple(
+    'IntegratorState',
+    'state, state_extra, state_grads, target_log_prob, momentum')
+IntegratorExtras = collections.namedtuple(
+    'IntegratorExtras',
+    'kinetic_energy, kinetic_energy_extra, energy_change, integrator_trace')
+
+
+def hamiltonian_integrator(
+    int_state: IntegratorState,
+    num_steps: IntTensor,
+    integrator_step_fn: IntegratorStep,
+    kinetic_energy_fn: PotentialFn,
+    integrator_trace_fn: Callable[[IntegratorStepState, IntegratorStepExtras],
+                                  TensorNest] = lambda *args: (),
+) -> Tuple[IntegratorState, IntegratorExtras]:
+  """Intergrates a discretized set of Hamiltonian equations.
+
+  This function will use the passed `integrator_step_fn` to evolve the system
+  for `num_steps`. The `integrator_step_fn` is assumed to be reversible.
+
+  Args:
+    int_state: Current `IntegratorState`.
+    num_steps: Integer scalar or N-D `Tensor`. Number of steps to take. If this
+      is not a scalar, then each corresponding independent system will be
+      evaluated for that number of steps, followed by copying the final state to
+      avoid creating a ragged Tensor. Keep this in mind when interpreting the
+      `integrator_trace` in the auxiliary output.
+    integrator_step_fn: Instance of `IntegratorStep`.
+    kinetic_energy_fn: Function to compute the kinetic energy from momentums.
+    integrator_trace_fn: Trace function for the integrator.
+
+  Returns:
+    integrator_state: `IntegratorState`
+    integrator_exras: `IntegratorExtras`
+  """
+  target_log_prob = int_state.target_log_prob
+  momentum = int_state.momentum
+  state = int_state.state
+  state_grads = int_state.state_grads
+  state_extra = int_state.state_extra
+
+  num_steps = tf.convert_to_tensor(num_steps)
+  is_ragged = num_steps.shape.ndims > 0
+
+  kinetic_energy, kinetic_energy_extra = call_fn(kinetic_energy_fn, momentum)
+  current_energy = -target_log_prob + kinetic_energy
+
+  if is_ragged:
+    step = 0
+    max_num_steps = tf.reduce_max(num_steps)
+  else:
+    step = []
+    max_num_steps = num_steps
+
+  # We need to carry around the integrator state extras so we can properly do
+  # the ragged computation.
+  # TODO(siege): In principle we can condition this on `is_ragged`, but doesn't
+  # seem worthwhile at the time.
+  integrator_wrapper_state = (step,
+                              IntegratorStepState(state, state_grads, momentum),
+                              IntegratorStepExtras(target_log_prob, state_extra,
+                                                   kinetic_energy,
+                                                   kinetic_energy_extra))
+
+  def integrator_wrapper(step, integrator_step_state, integrator_step_extra):
+    """Integrator wrapper that tracks extra state."""
+    old_integrator_step_state = integrator_step_state
+    old_integrator_step_extra = integrator_step_extra
+    integrator_step_state, integrator_step_extra = integrator_step_fn(
+        integrator_step_state)
+
+    if is_ragged:
+      integrator_step_state = _choose(step < num_steps, integrator_step_state,
+                                      old_integrator_step_state)
+      integrator_step_extra = _choose(step < num_steps, integrator_step_extra,
+                                      old_integrator_step_extra)
+      step = step + 1
+
+    return (step, integrator_step_state, integrator_step_extra), []
+
+  def integrator_trace_wrapper_fn(args, _):
+    return integrator_trace_fn(args[1], args[2])
+
+  [_, integrator_step_state, integrator_step_extra], integrator_trace = trace(
+      integrator_wrapper_state,
+      integrator_wrapper,
+      max_num_steps,
+      trace_fn=integrator_trace_wrapper_fn)
+
+  proposed_energy = (-integrator_step_extra.target_log_prob +
+                     integrator_step_extra.kinetic_energy)
+
+  energy_change = proposed_energy - current_energy
+
+  state = IntegratorState(
+      state=integrator_step_state.state,
+      state_extra=integrator_step_extra.state_extra,
+      state_grads=integrator_step_state.state_grads,
+      target_log_prob=integrator_step_extra.target_log_prob,
+      momentum=integrator_step_state.momentum)
+
+  extra = IntegratorExtras(
+      kinetic_energy=integrator_step_extra.kinetic_energy,
+      kinetic_energy_extra=integrator_step_extra.kinetic_energy_extra,
+      energy_change=energy_change,
+      integrator_trace=integrator_trace)
+
+  return state, extra
 
 
 def sign_adaptation(control: FloatNest,
@@ -796,8 +950,7 @@ def sign_adaptation(control: FloatNest,
   """
 
   def _get_new_control(control, output, set_point):
-    new_control = _choose(output > set_point,
-                          control * (1. + adaptation_rate),
+    new_control = _choose(output > set_point, control * (1. + adaptation_rate),
                           control / (1. + adaptation_rate))
     return new_control
 

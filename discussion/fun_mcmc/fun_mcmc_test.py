@@ -412,6 +412,61 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual({'x': 2., 'y': 3.}, self.evaluate(final_state))
     self.assertAllEqual(1. + 2., self.evaluate(final_kr))
 
+  def testRaggedIntegrator(self):
+
+    def target_log_prob_fn(q):
+      return -q**2, q
+
+    def kinetic_energy_fn(p):
+      return tf.abs(p)**3., p
+
+    integrator_fn = lambda state, num_steps: fun_mcmc.hamiltonian_integrator(  # pylint: disable=g-long-lambda
+        state,
+        num_steps=num_steps,
+        integrator_step_fn=lambda state: fun_mcmc.leapfrog_step(  # pylint: disable=g-long-lambda
+            state,
+            step_size=0.1,
+            target_log_prob_fn=target_log_prob_fn,
+            kinetic_energy_fn=kinetic_energy_fn),
+        kinetic_energy_fn=kinetic_energy_fn,
+        integrator_trace_fn=lambda state, extra: (state, extra))
+
+    state = tf.zeros([2])
+    momentum = tf.ones([2])
+    target_log_prob, _, state_grads = fun_mcmc.call_and_grads(
+        target_log_prob_fn, state)
+
+    start_state = fun_mcmc.IntegratorState(
+        target_log_prob=target_log_prob,
+        momentum=momentum,
+        state=state,
+        state_grads=state_grads,
+        state_extra=state,
+    )
+
+    state_1 = integrator_fn(start_state, 1)
+    state_2 = integrator_fn(start_state, 2)
+    state_1_2 = integrator_fn(start_state, [1, 2])
+
+    # Make sure integrators actually integrated to different points.
+    self.assertFalse(np.all(state_1[0].state == state_2[0].state))
+
+    # Ragged integration should be consistent with the non-ragged equivalent.
+    def get_batch(state, idx):
+      # For the integrator trace, we'll grab the final value.
+      return tf.nest.map_structure(
+          lambda x: x[idx].numpy() if x.shape.ndims == 1 else x[-1, idx].numpy(
+          ), state)
+    self.assertAllClose(get_batch(state_1, 0), get_batch(state_1_2, 0))
+    self.assertAllClose(get_batch(state_2, 0), get_batch(state_1_2, 1))
+
+    # Ragged traces should be equal up to the number of steps for the batch
+    # element.
+    def get_slice(state, num, idx):
+      return tf.nest.map_structure(
+          lambda x: x[:num, idx].numpy(), state[1].integrator_trace)
+    self.assertAllClose(get_slice(state_1, 1, 0), get_slice(state_1_2, 1, 0))
+    self.assertAllClose(get_slice(state_2, 2, 0), get_slice(state_1_2, 2, 1))
 
 if __name__ == '__main__':
   tf.test.main()

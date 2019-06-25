@@ -22,12 +22,18 @@ from discussion.fun_mcmc.fun_mcmc_lib import blanes_3_stage_step
 from discussion.fun_mcmc.fun_mcmc_lib import blanes_4_stage_step
 from discussion.fun_mcmc.fun_mcmc_lib import call_and_grads
 from discussion.fun_mcmc.fun_mcmc_lib import call_fn
+from discussion.fun_mcmc.fun_mcmc_lib import gaussian_momentum_sample
+from discussion.fun_mcmc.fun_mcmc_lib import hamiltonian_integrator
 from discussion.fun_mcmc.fun_mcmc_lib import hamiltonian_monte_carlo
 from discussion.fun_mcmc.fun_mcmc_lib import hamiltonian_monte_carlo_init
 from discussion.fun_mcmc.fun_mcmc_lib import HamiltonianMonteCarloExtra
 from discussion.fun_mcmc.fun_mcmc_lib import HamiltonianMonteCarloState
+from discussion.fun_mcmc.fun_mcmc_lib import IntegratorExtras
+from discussion.fun_mcmc.fun_mcmc_lib import IntegratorState
+from discussion.fun_mcmc.fun_mcmc_lib import IntegratorStep
 from discussion.fun_mcmc.fun_mcmc_lib import IntegratorStepState
 from discussion.fun_mcmc.fun_mcmc_lib import leapfrog_step
+from discussion.fun_mcmc.fun_mcmc_lib import make_gaussian_kinetic_energy_fn
 from discussion.fun_mcmc.fun_mcmc_lib import maybe_broadcast_structure
 from discussion.fun_mcmc.fun_mcmc_lib import metropolis_hastings_step
 from discussion.fun_mcmc.fun_mcmc_lib import PotentialFn
@@ -45,12 +51,18 @@ __all__ = [
     'blanes_4_stage_step',
     'call_and_grads',
     'call_fn',
+    'gaussian_momentum_sample',
+    'hamiltonian_integrator',
     'hamiltonian_monte_carlo',
     'hamiltonian_monte_carlo_init',
     'HamiltonianMonteCarloExtra',
     'HamiltonianMonteCarloState',
+    'IntegratorExtras',
+    'IntegratorState',
+    'IntegratorStep',
     'IntegratorStepState',
     'leapfrog_step',
+    'make_gaussian_kinetic_energy_fn',
     'maybe_broadcast_structure',
     'metropolis_hastings_step',
     'PotentialFn',
