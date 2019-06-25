@@ -170,21 +170,21 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
 
     z = joint.sample()
 
-    self.assertAllEqual(tf.shape(input=z[0]), [])
-    self.assertAllEqual(tf.shape(input=z[1]), [])
-    self.assertAllEqual(tf.shape(input=z[2]), [])
+    self.assertAllEqual(tf.shape(z[0]), [])
+    self.assertAllEqual(tf.shape(z[1]), [])
+    self.assertAllEqual(tf.shape(z[2]), [])
 
     z = joint.sample(2)
 
-    self.assertAllEqual(tf.shape(input=z[0]), [2])
-    self.assertAllEqual(tf.shape(input=z[1]), [2])
-    self.assertAllEqual(tf.shape(input=z[2]), [2])
+    self.assertAllEqual(tf.shape(z[0]), [2])
+    self.assertAllEqual(tf.shape(z[1]), [2])
+    self.assertAllEqual(tf.shape(z[2]), [2])
 
     z = joint.sample([3, 2])
 
-    self.assertAllEqual(tf.shape(input=z[0]), [3, 2])
-    self.assertAllEqual(tf.shape(input=z[1]), [3, 2])
-    self.assertAllEqual(tf.shape(input=z[2]), [3, 2])
+    self.assertAllEqual(tf.shape(z[0]), [3, 2])
+    self.assertAllEqual(tf.shape(z[1]), [3, 2])
+    self.assertAllEqual(tf.shape(z[2]), [3, 2])
 
   def test_sample_shape_with_plate(self):
     # The joint distribution specified below corresponds to this
@@ -207,24 +207,24 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
 
     z = joint.sample()
 
-    self.assertAllEqual(tf.shape(input=z[0]), [])
-    self.assertAllEqual(tf.shape(input=z[1]), [])
-    self.assertAllEqual(tf.shape(input=z[2]), [20])
-    self.assertAllEqual(tf.shape(input=z[3]), [20])
+    self.assertAllEqual(tf.shape(z[0]), [])
+    self.assertAllEqual(tf.shape(z[1]), [])
+    self.assertAllEqual(tf.shape(z[2]), [20])
+    self.assertAllEqual(tf.shape(z[3]), [20])
 
     z = joint.sample(2)
 
-    self.assertAllEqual(tf.shape(input=z[0]), [2])
-    self.assertAllEqual(tf.shape(input=z[1]), [2])
-    self.assertAllEqual(tf.shape(input=z[2]), [2, 20])
-    self.assertAllEqual(tf.shape(input=z[3]), [2, 20])
+    self.assertAllEqual(tf.shape(z[0]), [2])
+    self.assertAllEqual(tf.shape(z[1]), [2])
+    self.assertAllEqual(tf.shape(z[2]), [2, 20])
+    self.assertAllEqual(tf.shape(z[3]), [2, 20])
 
     z = joint.sample([3, 2])
 
-    self.assertAllEqual(tf.shape(input=z[0]), [3, 2])
-    self.assertAllEqual(tf.shape(input=z[1]), [3, 2])
-    self.assertAllEqual(tf.shape(input=z[2]), [3, 2, 20])
-    self.assertAllEqual(tf.shape(input=z[3]), [3, 2, 20])
+    self.assertAllEqual(tf.shape(z[0]), [3, 2])
+    self.assertAllEqual(tf.shape(z[1]), [3, 2])
+    self.assertAllEqual(tf.shape(z[2]), [3, 2, 20])
+    self.assertAllEqual(tf.shape(z[3]), [3, 2, 20])
 
   def test_log_prob_no_plate(self):
     # The joint distribution specified below corresponds to this
@@ -286,9 +286,9 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
 
     expected_log_prob = (
         np.log(0.5) +
-        tf.reduce_sum(input_tensor=tf.math.log(b * (0.25 + 0.5 * a) +
-                                               (1 - b) * (0.75 -0.5 * a))) +
-        tf.reduce_sum(input_tensor=-0.5 * ((c - a) / (1. + b)) ** 2 -
+        tf.reduce_sum(tf.math.log(b * (0.25 + 0.5 * a) +
+                                  (1 - b) * (0.75 - 0.5 * a))) +
+        tf.reduce_sum(-0.5 * ((c - a) / (1. + b))**2 -
                       0.5 * np.log(2. * np.pi) -
                       tf.math.log((1. + b))))
 
@@ -385,22 +385,18 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
 
     a, b, c, d = z  # pylint: disable=unbalanced-tuple-unpacking
 
-    expected_log_prob = (- a +
-                         tf.reduce_sum(
-                             input_tensor=
-                             -0.5 * (b - a) ** 2 +
-                             -0.5 * np.log(2. * np.pi),
-                             axis=-1) -
-                         c +
-                         tf.reduce_sum(
-                             input_tensor=
-                             -0.5 * (d - b) ** 2 / c ** 2 +
-                             -0.5 * tf.math.log(2. * np.pi * c ** 2),
-                             axis=-1))
+    expected_log_prob = (
+        -a +
+        tf.reduce_sum(-0.5 * (b - a)**2 + -0.5 * np.log(2. * np.pi), axis=-1) -
+        c +
+        tf.reduce_sum(-0.5 * (d - b)**2 / c**2 -
+                      0.5 * tf.math.log(2. * np.pi * c**2),
+                      axis=-1))
 
     log_prob = joint.log_prob(z)
 
-    self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
+    self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]),
+                        rtol=1e-5)
 
   def test_log_prob_multiple_roots_and_samples(self):
     # The joint distribution specified below corresponds to this
@@ -427,18 +423,14 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
 
     expanded_c = tf.expand_dims(c, -1)
     expected_log_prob = (
-        - a +
-        tf.reduce_sum(
-            input_tensor=
-            -0.5 * (b - tf.expand_dims(a, -1)) ** 2 +
-            -0.5 * np.log(2. * np.pi),
-            axis=-1) -
+        -a +
+        tf.reduce_sum(-0.5 * (b - tf.expand_dims(a, -1))**2 -
+                      0.5 * np.log(2. * np.pi),
+                      axis=-1) -
         c +
-        tf.reduce_sum(
-            input_tensor=
-            -0.5 * (d - b) ** 2 / expanded_c ** 2 +
-            -0.5 * tf.math.log(2. * np.pi * expanded_c ** 2),
-            axis=-1))
+        tf.reduce_sum(-0.5 * (d - b)**2 / expanded_c**2 -
+                      0.5 * tf.math.log(2. * np.pi * expanded_c**2),
+                      axis=-1))
 
     log_prob = joint.log_prob(z)
 

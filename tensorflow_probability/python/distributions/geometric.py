@@ -114,7 +114,7 @@ class Geometric(distribution.Distribution):
     return self._probs
 
   def _batch_shape_tensor(self):
-    return tf.shape(input=self._probs)
+    return tf.shape(self._probs)
 
   def _batch_shape(self):
     return self.probs.shape
@@ -135,7 +135,7 @@ class Geometric(distribution.Distribution):
     # this case, a subnormal number (i.e., np.nextafter) can cause us to sample
     # 0.
     sampled = tf.random.uniform(
-        tf.concat([[n], tf.shape(input=self._probs)], 0),
+        tf.concat([[n], tf.shape(self._probs)], 0),
         minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,
         seed=seed,

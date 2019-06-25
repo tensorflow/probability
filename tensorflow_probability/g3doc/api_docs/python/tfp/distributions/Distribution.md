@@ -63,14 +63,14 @@ Defined in [`python/distributions/distribution.py`](https://github.com/tensorflo
 
 Subclasses are expected to implement a leading-underscore version of the
 same-named function. The argument signature should be identical except for
-the omission of `name="..."`. For example, to enable `log_prob(value,
-name="log_prob")` a subclass should implement `_log_prob(value)`.
+the omission of `name='...'`. For example, to enable `log_prob(value,
+name='log_prob')` a subclass should implement `_log_prob(value)`.
 
 Subclasses can append to public-level docstrings by providing
 docstrings for their method specializations. For example:
 
 ```python
-@distribution_util.AppendDocstring("Some other details.")
+@distribution_util.AppendDocstring('Some other details.')
 def _log_prob(self, value):
   ...
 ```
@@ -928,7 +928,7 @@ quantile(
 )
 ```
 
-Quantile function. Aka "inverse cdf" or "percent point function".
+Quantile function. Aka 'inverse cdf' or 'percent point function'.
 
 Given random variable `X` and `p in [0, 1]`, the `quantile` is:
 

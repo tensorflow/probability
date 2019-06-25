@@ -127,7 +127,7 @@ class Transpose(bijector.Bijector):
                          '`rightmost_transposed_ndims` and `perm`.')
       if rightmost_transposed_ndims is not None:
         rightmost_transposed_ndims = tf.convert_to_tensor(
-            value=rightmost_transposed_ndims,
+            rightmost_transposed_ndims,
             dtype=np.int32,
             name='rightmost_transposed_ndims')
         rightmost_transposed_ndims_ = tf.get_static_value(
@@ -142,9 +142,9 @@ class Transpose(bijector.Bijector):
             1)
         perm = tf.range(start=perm_start, limit=-1, delta=-1, name='perm')
       else:  # perm is not None:
-        perm = tf.convert_to_tensor(value=perm, dtype=np.int32, name='perm')
+        perm = tf.convert_to_tensor(perm, dtype=np.int32, name='perm')
         rightmost_transposed_ndims = tf.size(
-            input=perm, name='rightmost_transposed_ndims')
+            perm, name='rightmost_transposed_ndims')
         rightmost_transposed_ndims_ = tf.get_static_value(
             rightmost_transposed_ndims)
         assertions = _maybe_validate_perm(perm, validate_args)
@@ -211,7 +211,7 @@ class Transpose(bijector.Bijector):
     return self._event_shape(input_shape, static_perm_to_shape)
 
   def _forward_event_shape_tensor(self, input_shape):
-    perm = self._make_perm(tf.size(input=input_shape), self.perm)
+    perm = self._make_perm(tf.size(input_shape), self.perm)
     return tf.gather(input_shape, perm)
 
   def _inverse(self, y):
@@ -227,7 +227,7 @@ class Transpose(bijector.Bijector):
     return self._event_shape(output_shape, static_perm_to_shape)
 
   def _inverse_event_shape_tensor(self, output_shape):
-    perm = self._make_perm(tf.size(input=output_shape), tf.argsort(self.perm))
+    perm = self._make_perm(tf.size(output_shape), tf.argsort(self.perm))
     return tf.gather(output_shape, perm)
 
   def _inverse_log_det_jacobian(self, y):
@@ -312,7 +312,7 @@ def _maybe_validate_perm(perm, validate_args, name=None):
     elif validate_args:
       assertions += [
           assert_util.assert_equal(
-              tf.sort(perm), tf.range(tf.size(input=perm)), message=msg)
+              tf.sort(perm), tf.range(tf.size(perm)), message=msg)
       ]
 
     return assertions

@@ -44,7 +44,7 @@ def _pick_scalar_condition(pred, cond_true, cond_false):
   # Note: This function is only valid if all of pred, cond_true, and cond_false
   # are scalars. This means its semantics are arguably more like tf.cond than
   # tf.where even though we use tf1.where to implement it.
-  pred_ = tf.get_static_value(tf.convert_to_tensor(value=pred))
+  pred_ = tf.get_static_value(tf.convert_to_tensor(pred))
   if pred_ is None:
     return tf1.where(pred, cond_true, cond_false)
   return cond_true if pred_ else cond_false
@@ -299,7 +299,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     if (tensorshape_util.rank(self.distribution.batch_shape) == 0 and
         self.parameters.get("batch_shape", None) is not None):
       overrides["batch_shape"] = tf.shape(
-          input=tf.zeros(self.parameters["batch_shape"])[slices])
+          tf.zeros(self.parameters["batch_shape"])[slices])
     elif self.parameters.get("distribution", None) is not None:
       overrides["distribution"] = self.distribution[slices]
     return self.copy(**overrides)
@@ -368,7 +368,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     # works).
     with self._name_and_control_scope(name):
       sample_shape = tf.convert_to_tensor(
-          value=sample_shape, dtype=tf.int32, name="sample_shape")
+          sample_shape, dtype=tf.int32, name="sample_shape")
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, "sample_shape")
 
@@ -381,7 +381,7 @@ class TransformedDistribution(distribution_lib.Distribution):
 
       # Next, we reshape `x` into its final form. We do this prior to the call
       # to the bijector to ensure that the bijector caching works.
-      batch_event_shape = tf.shape(input=x)[1:]
+      batch_event_shape = tf.shape(x)[1:]
       final_shape = tf.concat([sample_shape, batch_event_shape], 0)
       x = tf.reshape(x, final_shape)
 
@@ -411,7 +411,7 @@ class TransformedDistribution(distribution_lib.Distribution):
         self._finish_log_prob_for_one_fiber(
             y, x_i, ildj_i, event_ndims, **distribution_kwargs)
         for x_i, ildj_i in zip(x, ildj)]
-    return tf.reduce_logsumexp(input_tensor=tf.stack(lp_on_fibers), axis=0)
+    return tf.reduce_logsumexp(tf.stack(lp_on_fibers), axis=0)
 
   def _finish_log_prob_for_one_fiber(self, y, x, ildj, event_ndims,
                                      **distribution_kwargs):
@@ -419,8 +419,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     x = self._maybe_rotate_dims(x, rotate_right=True)
     log_prob = self.distribution.log_prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
-      log_prob = tf.reduce_sum(
-          input_tensor=log_prob, axis=self._reduce_event_indices)
+      log_prob = tf.reduce_sum(log_prob, axis=self._reduce_event_indices)
     log_prob += tf.cast(ildj, log_prob.dtype)
     if self._is_maybe_event_override and isinstance(event_ndims, int):
       tensorshape_util.set_shape(
@@ -455,7 +454,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     x = self._maybe_rotate_dims(x, rotate_right=True)
     prob = self.distribution.prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
-      prob = tf.reduce_prod(input_tensor=prob, axis=self._reduce_event_indices)
+      prob = tf.reduce_prod(prob, axis=self._reduce_event_indices)
     prob *= tf.exp(tf.cast(ildj, prob.dtype))
     if self._is_maybe_event_override and isinstance(event_ndims, int):
       tensorshape_util.set_shape(
@@ -549,8 +548,7 @@ class TransformedDistribution(distribution_lib.Distribution):
 
     y = self.bijector.forward(x, **bijector_kwargs)
 
-    sample_shape = tf.convert_to_tensor(
-        value=[], dtype=tf.int32, name="sample_shape")
+    sample_shape = tf.convert_to_tensor([], dtype=tf.int32, name="sample_shape")
     y = self._set_sample_static_shape(y, sample_shape)
     return y
 
@@ -572,7 +570,7 @@ class TransformedDistribution(distribution_lib.Distribution):
       # H[X] = sum_i H[X_i] if X_i are mutually independent.
       # This means that a reduce_sum is a simple rescaling.
       entropy *= tf.cast(
-          tf.reduce_prod(input_tensor=self._override_event_shape),
+          tf.reduce_prod(self._override_event_shape),
           dtype=dtype_util.base_dtype(entropy.dtype))
     if self._is_maybe_batch_override:
       new_shape = tf.concat([
@@ -593,7 +591,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     event_ndims = (
         tensorshape_util.rank(self.event_shape)
         if tensorshape_util.rank(self.event_shape) is not None else tf.size(
-            input=self.event_shape_tensor()))
+            self.event_shape_tensor()))
     ildj = self.bijector.inverse_log_det_jacobian(
         dummy, event_ndims=event_ndims, **bijector_kwargs)
 
@@ -608,7 +606,7 @@ class TransformedDistribution(distribution_lib.Distribution):
       override_shape = []
 
     override_shape = tf.convert_to_tensor(
-        value=override_shape, dtype=tf.int32, name=name)
+        override_shape, dtype=tf.int32, name=name)
 
     if not dtype_util.is_integer(override_shape.dtype):
       raise TypeError("shape override must be an integer")
@@ -670,7 +668,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     if tensorshape_util.rank(self.event_shape) is not None:
       return tensorshape_util.rank(self.event_shape)
 
-    event_ndims = tf.size(input=self.event_shape_tensor())
+    event_ndims = tf.size(self.event_shape_tensor())
     event_ndims_ = distribution_util.maybe_get_static_value(event_ndims)
 
     if event_ndims_ is not None:

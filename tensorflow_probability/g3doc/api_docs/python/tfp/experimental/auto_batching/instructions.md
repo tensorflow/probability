@@ -12,7 +12,10 @@ Instruction language for auto-batching virtual machine.
 
 * Module `tfp.experimental.auto_batching.frontend.instructions`
 * Module `tfp.experimental.auto_batching.frontend.st.inst`
+* Module `tfp.experimental.auto_batching.frontend.stack.inst`
 * Module `tfp.experimental.auto_batching.instructions`
+* Module `tfp.experimental.auto_batching.stack_optimization.inst`
+* Module `tfp.experimental.auto_batching.stackless.inst`
 
 
 

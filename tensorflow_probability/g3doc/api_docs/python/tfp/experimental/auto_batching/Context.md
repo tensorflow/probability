@@ -5,6 +5,7 @@
 <meta itemprop="property" content="batch"/>
 <meta itemprop="property" content="batch_uncurried"/>
 <meta itemprop="property" content="function_names"/>
+<meta itemprop="property" content="lowered_for_args"/>
 <meta itemprop="property" content="module"/>
 <meta itemprop="property" content="program"/>
 <meta itemprop="property" content="program_compiled"/>
@@ -163,6 +164,19 @@ function_names()
 ```
 
 
+
+
+<h3 id="lowered_for_args"><code>lowered_for_args</code></h3>
+
+``` python
+lowered_for_args(
+    name,
+    args,
+    backend
+)
+```
+
+Helper for calling program_lowered that computes the type signature.
 
 
 <h3 id="module"><code>module</code></h3>

@@ -11,7 +11,10 @@ Returns an `Op` that pushes values from `vars_in` into `vars_out`.
 
 * `tfp.experimental.auto_batching.frontend.instructions.push_op`
 * `tfp.experimental.auto_batching.frontend.st.inst.push_op`
+* `tfp.experimental.auto_batching.frontend.stack.inst.push_op`
 * `tfp.experimental.auto_batching.instructions.push_op`
+* `tfp.experimental.auto_batching.stack_optimization.inst.push_op`
+* `tfp.experimental.auto_batching.stackless.inst.push_op`
 
 ``` python
 tfp.experimental.auto_batching.instructions.push_op(

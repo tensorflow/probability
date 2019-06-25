@@ -58,9 +58,9 @@ def trainable_lu_factorization(
   with tf.name_scope(name, 'trainable_lu_factorization',
                      [event_size, batch_shape]):
     event_size = tf.convert_to_tensor(
-        event_size, preferred_dtype=tf.int32, name='event_size')
+        event_size, dtype_hint=tf.int32, name='event_size')
     batch_shape = tf.convert_to_tensor(
-        batch_shape, preferred_dtype=event_size.dtype, name='batch_shape')
+        batch_shape, dtype_hint=event_size.dtype, name='batch_shape')
     random_matrix = tf.random_uniform(
         shape=tf.concat([batch_shape, [event_size, event_size]], axis=0),
         dtype=dtype,
@@ -68,7 +68,7 @@ def trainable_lu_factorization(
     random_orthonormal = tf.linalg.qr(random_matrix)[0]
     lower_upper, permutation = tf.linalg.lu(random_orthonormal)
     lower_upper = tf.Variable(
-        initial_value=lower_upper,
+        initial_lower_upper,
         trainable=True,
         use_resource=True,
         name='lower_upper')
@@ -326,7 +326,7 @@ Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 #### Args:
 
 
-* <b>`x`</b>: `Tensor`. The input to the "forward" evaluation.
+* <b>`x`</b>: `Tensor`. The input to the 'forward' evaluation.
 * <b>`name`</b>: The name to give this op.
 * <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
@@ -410,7 +410,7 @@ Returns both the forward_log_det_jacobian.
 #### Args:
 
 
-* <b>`x`</b>: `Tensor`. The input to the "forward" Jacobian determinant evaluation.
+* <b>`x`</b>: `Tensor`. The input to the 'forward' Jacobian determinant evaluation.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
   transformed. Must be greater than or equal to
   `self.forward_min_event_ndims`. The result is summed over the final
@@ -452,7 +452,7 @@ Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 #### Args:
 
 
-* <b>`y`</b>: `Tensor`. The input to the "inverse" evaluation.
+* <b>`y`</b>: `Tensor`. The input to the 'inverse' evaluation.
 * <b>`name`</b>: The name to give this op.
 * <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
@@ -542,7 +542,7 @@ evaluated at `g^{-1}(y)`.
 #### Args:
 
 
-* <b>`y`</b>: `Tensor`. The input to the "inverse" Jacobian determinant evaluation.
+* <b>`y`</b>: `Tensor`. The input to the 'inverse' Jacobian determinant evaluation.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
   transformed. Must be greater than or equal to
   `self.inverse_min_event_ndims`. The result is summed over the final

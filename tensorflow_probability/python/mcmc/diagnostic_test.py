@@ -49,7 +49,7 @@ class _EffectiveSampleSizeTest(object):
       filter_beyond_lag=None,
       filter_beyond_positive_pairs=False):
     x = tf1.placeholder_with_default(
-        input=x_, shape=x_.shape if self.use_static_shape else None)
+        x_, shape=x_.shape if self.use_static_shape else None)
     ess = tfp.mcmc.effective_sample_size(
         x,
         filter_threshold=filter_threshold,
@@ -229,7 +229,7 @@ class _EffectiveSampleSizeTest(object):
     x_ = (iid_x_ * np.ones((500, 10)).astype(np.float32)).reshape((5000,))
     with spectral_ops_test_util.fft_kernel_label_map():
       x = tf1.placeholder_with_default(
-          input=x_, shape=x_.shape if self.use_static_shape else None)
+          x_, shape=x_.shape if self.use_static_shape else None)
 
       ess_none_none = tfp.mcmc.effective_sample_size(
           x, filter_threshold=None, filter_beyond_lag=None)
@@ -256,7 +256,7 @@ class _EffectiveSampleSizeTest(object):
     x_ = (iid_x_ * np.ones((500, 10)).astype(np.float32)).reshape((5000,))
     with spectral_ops_test_util.fft_kernel_label_map():
       x = tf1.placeholder_with_default(
-          input=x_, shape=x_.shape if self.use_static_shape else None)
+          x_, shape=x_.shape if self.use_static_shape else None)
 
       ess_1_9 = tfp.mcmc.effective_sample_size(
           x, filter_threshold=1., filter_beyond_lag=9)
@@ -280,7 +280,7 @@ class _EffectiveSampleSizeTest(object):
     x_ = np.linspace(-1., 1., 100).astype(np.float32)
     with spectral_ops_test_util.fft_kernel_label_map():
       x = tf1.placeholder_with_default(
-          input=x_, shape=x_.shape if self.use_static_shape else None)
+          x_, shape=x_.shape if self.use_static_shape else None)
 
       ess_true_37 = tfp.mcmc.effective_sample_size(
           x,
@@ -313,7 +313,7 @@ class _EffectiveSampleSizeTest(object):
           0.5) * np.exp(-np.linspace(0., 10., 100))
     with spectral_ops_test_util.fft_kernel_label_map():
       x = tf1.placeholder_with_default(
-          input=x_, shape=x_.shape if self.use_static_shape else None)
+          x_, shape=x_.shape if self.use_static_shape else None)
 
       ess = tfp.mcmc.effective_sample_size(
           x, filter_beyond_positive_pairs=True)
@@ -382,7 +382,7 @@ class _PotentialScaleReductionTest(object):
     sample_ndims = 1
     independent_chain_ndims = len(independent_chain_shape)
     state = tf1.placeholder_with_default(
-        input=state_, shape=state_.shape if self.use_static_shape else None)
+        state_, shape=state_.shape if self.use_static_shape else None)
 
     rhat = tfp.mcmc.potential_scale_reduction(
         state,
@@ -502,7 +502,7 @@ class _PotentialScaleReductionTest(object):
   def testNotEnoughSamplesNoSplitChainsFailsIfValidateArgs(self):
     input_ = rng.rand(1, 10)
     x = tf1.placeholder_with_default(
-        input=input_, shape=input_.shape if self.use_static_shape else None)
+        input_, shape=input_.shape if self.use_static_shape else None)
     with self.assertRaisesError("Must provide at least 2 samples"):
       self.evaluate(
           tfp.mcmc.potential_scale_reduction(
@@ -514,7 +514,7 @@ class _PotentialScaleReductionTest(object):
   def testNotEnoughSamplesWithSplitChainsFailsIfValidateArgs(self):
     input_ = rng.rand(3, 10)
     x = tf1.placeholder_with_default(
-        input=input_, shape=input_.shape if self.use_static_shape else None)
+        input_, shape=input_.shape if self.use_static_shape else None)
     with self.assertRaisesError("Must provide at least 4 samples"):
       self.evaluate(
           tfp.mcmc.potential_scale_reduction(
@@ -566,7 +566,7 @@ class _ReduceVarianceTest(object):
   def check_versus_numpy(self, x_, axis, biased, keepdims):
     x_ = np.asarray(x_)
     x = tf1.placeholder_with_default(
-        input=x_, shape=x_.shape if self.use_static_shape else None)
+        x_, shape=x_.shape if self.use_static_shape else None)
     var = _reduce_variance(
         x, axis=axis, biased=biased, keepdims=keepdims)
     np_var = np.var(x_, axis=axis, ddof=0 if biased else 1, keepdims=keepdims)

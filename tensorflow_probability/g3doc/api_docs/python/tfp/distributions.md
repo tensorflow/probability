@@ -194,9 +194,9 @@ Defined in [`python/distributions/__init__.py`](https://github.com/tensorflow/pr
 
 [`assign_moving_mean_variance(...)`](../tfp/distributions/assign_moving_mean_variance.md): Compute exponentially weighted moving {mean,variance} of a streaming value.
 
-[`fill_triangular(...)`](../tfp/distributions/fill_triangular.md): Creates a (batch of) triangular matrix from a vector of inputs.
+[`fill_triangular(...)`](../tfp/distributions/fill_triangular.md): Creates a (batch of) triangular matrix from a vector of inputs. (deprecated)
 
-[`fill_triangular_inverse(...)`](../tfp/distributions/fill_triangular_inverse.md): Creates a vector from a (batch of) triangular matrix.
+[`fill_triangular_inverse(...)`](../tfp/distributions/fill_triangular_inverse.md): Creates a vector from a (batch of) triangular matrix. (deprecated)
 
 [`kl_divergence(...)`](../tfp/distributions/kl_divergence.md): Get the KL-divergence KL(distribution_a || distribution_b).
 
@@ -216,9 +216,9 @@ Defined in [`python/distributions/__init__.py`](https://github.com/tensorflow/pr
 
 [`quadrature_scheme_softmaxnormal_quantiles(...)`](../tfp/distributions/quadrature_scheme_softmaxnormal_quantiles.md): Use SoftmaxNormal quantiles to form quadrature on `K - 1` simplex.
 
-[`reduce_weighted_logsumexp(...)`](../tfp/distributions/reduce_weighted_logsumexp.md): Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`.
+[`reduce_weighted_logsumexp(...)`](../tfp/distributions/reduce_weighted_logsumexp.md): Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`. (deprecated)
 
-[`softplus_inverse(...)`](../tfp/distributions/softplus_inverse.md): Computes the inverse softplus, i.e., x = softplus_inverse(softplus(x)).
+[`softplus_inverse(...)`](../tfp/distributions/softplus_inverse.md): Computes the inverse softplus, i.e., x = softplus_inverse(softplus(x)). (deprecated)
 
 [`tridiag(...)`](../tfp/distributions/tridiag.md): Creates a matrix with values set above, below, and on the diagonal.
 

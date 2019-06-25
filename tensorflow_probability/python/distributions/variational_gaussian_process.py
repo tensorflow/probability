@@ -41,9 +41,9 @@ def _solve_cholesky_factored_system(
     cholesky_factor, rhs, name=None):
   with tf.name_scope(
       name or '_solve_cholesky_factored_system') as scope:
-    cholesky_factor = tf.convert_to_tensor(value=cholesky_factor,
-                                           name='cholesky_factor')
-    rhs = tf.convert_to_tensor(value=rhs, name='rhs')
+    cholesky_factor = tf.convert_to_tensor(
+        cholesky_factor, name='cholesky_factor')
+    rhs = tf.convert_to_tensor(rhs, name='rhs')
     lin_op = tf.linalg.LinearOperatorLowerTriangular(
         cholesky_factor, name=scope)
     return lin_op.solve(lin_op.solve(rhs), adjoint=True)
@@ -53,8 +53,8 @@ def _solve_cholesky_factored_system_vec(cholesky_factor, rhs, name=None):
   with tf.name_scope(
       name or '_solve_cholesky_factored_system') as scope:
     cholesky_factor = tf.convert_to_tensor(
-        value=cholesky_factor, name='cholesky_factor')
-    rhs = tf.convert_to_tensor(value=rhs, name='rhs')
+        cholesky_factor, name='cholesky_factor')
+    rhs = tf.convert_to_tensor(rhs, name='rhs')
     lin_op = tf.linalg.LinearOperatorLowerTriangular(
         cholesky_factor, name=scope)
     return lin_op.solvevec(lin_op.solvevec(rhs), adjoint=True)
@@ -580,28 +580,29 @@ class VariationalGaussianProcess(
            jitter], tf.float32)
 
       index_points = tf.convert_to_tensor(
-          value=index_points, dtype=dtype, name='index_points')
+          index_points, dtype=dtype, name='index_points')
       inducing_index_points = tf.convert_to_tensor(
-          value=inducing_index_points, dtype=dtype,
-          name='inducing_index_points')
+          inducing_index_points, dtype=dtype, name='inducing_index_points')
       variational_inducing_observations_loc = tf.convert_to_tensor(
-          value=variational_inducing_observations_loc, dtype=dtype,
+          variational_inducing_observations_loc,
+          dtype=dtype,
           name='variational_inducing_observations_loc')
       variational_inducing_observations_scale = tf.convert_to_tensor(
-          value=variational_inducing_observations_scale, dtype=dtype,
+          variational_inducing_observations_scale,
+          dtype=dtype,
           name='variational_inducing_observations_scale')
       observation_noise_variance = tf.convert_to_tensor(
-          value=observation_noise_variance,
+          observation_noise_variance,
           dtype=dtype,
           name='observation_noise_variance')
       if predictive_noise_variance is None:
         predictive_noise_variance = observation_noise_variance
       else:
         predictive_noise_variance = tf.convert_to_tensor(
-            value=predictive_noise_variance, dtype=dtype,
+            predictive_noise_variance,
+            dtype=dtype,
             name='predictive_noise_variance')
-      jitter = tf.convert_to_tensor(
-          value=jitter, dtype=dtype, name='jitter')
+      jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
 
       self._kernel = kernel
       self._index_points = index_points
@@ -772,13 +773,13 @@ class VariationalGaussianProcess(
       if observation_index_points is None:
         observation_index_points = self._index_points
       observation_index_points = tf.convert_to_tensor(
-          value=observation_index_points, dtype=self._dtype,
+          observation_index_points,
+          dtype=self._dtype,
           name='observation_index_points')
       observations = tf.convert_to_tensor(
-          value=observations, dtype=self._dtype, name='observations')
+          observations, dtype=self._dtype, name='observations')
       kl_weight = tf.convert_to_tensor(
-          value=kl_weight, dtype=self._dtype,
-          name='kl_weight')
+          kl_weight, dtype=self._dtype, name='kl_weight')
 
       # The variational loss is a negative ELBO. The ELBO can be broken down
       # into three terms:
@@ -807,8 +808,8 @@ class VariationalGaussianProcess(
       kxx_diag = self.kernel.apply(
           observation_index_points, observation_index_points, example_ndims=1)
       ktilde_trace_term = (
-          tf.reduce_sum(input_tensor=kxx_diag, axis=-1) -
-          tf.reduce_sum(input_tensor=chol_kzz_inv_kzx ** 2, axis=[-2, -1]))
+          tf.reduce_sum(kxx_diag, axis=-1) -
+          tf.reduce_sum(chol_kzz_inv_kzx**2, axis=[-2, -1]))
 
       # Tr(SB)
       # where S = A A.T, A = variational_inducing_observations_scale
@@ -818,9 +819,8 @@ class VariationalGaussianProcess(
       #            = Tr(A.T Kzz^-1 Kzx Kzx.T Kzz^-1 A)
       #            = sum_ij (A.T Kzz^-1 Kzx)_{ij}^2
       other_trace_term = tf.reduce_sum(
-          input_tensor=(
-              self._variational_inducing_observations_posterior.scale.matmul(
-                  kzz_inv_kzx) ** 2),
+          (self._variational_inducing_observations_posterior.scale.matmul(
+              kzz_inv_kzx)**2),
           axis=[-2, -1])
 
       trace_term = (.5 * (ktilde_trace_term + other_trace_term) /
@@ -838,7 +838,7 @@ class VariationalGaussianProcess(
 
       lower_bound = (obs_ll - trace_term - kl_term)
 
-      return -tf.reduce_mean(input_tensor=lower_bound)
+      return -tf.reduce_mean(lower_bound)
 
   @staticmethod
   def optimal_variational_posterior(
@@ -915,19 +915,18 @@ class VariationalGaussianProcess(
            jitter], tf.float32)
 
       inducing_index_points = tf.convert_to_tensor(
-          value=inducing_index_points,
-          dtype=dtype, name='inducing_index_points')
+          inducing_index_points, dtype=dtype, name='inducing_index_points')
       observation_index_points = tf.convert_to_tensor(
-          value=observation_index_points, dtype=dtype,
+          observation_index_points,
+          dtype=dtype,
           name='observation_index_points')
       observations = tf.convert_to_tensor(
-          value=observations, dtype=dtype, name='observations')
+          observations, dtype=dtype, name='observations')
       observation_noise_variance = tf.convert_to_tensor(
-          value=observation_noise_variance,
+          observation_noise_variance,
           dtype=dtype,
           name='observation_noise_variance')
-      jitter = tf.convert_to_tensor(
-          value=jitter, dtype=dtype, name='jitter')
+      jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
 
       # Default to a constant zero function.
       if mean_fn is None:

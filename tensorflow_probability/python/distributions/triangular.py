@@ -139,9 +139,9 @@ class Triangular(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([low, high, peak], tf.float32)
-      low = tf.convert_to_tensor(value=low, name="low", dtype=dtype)
-      high = tf.convert_to_tensor(value=high, name="high", dtype=dtype)
-      peak = tf.convert_to_tensor(value=peak, name="peak", dtype=dtype)
+      low = tf.convert_to_tensor(low, name="low", dtype=dtype)
+      high = tf.convert_to_tensor(high, name="high", dtype=dtype)
+      peak = tf.convert_to_tensor(peak, name="peak", dtype=dtype)
 
       with tf.control_dependencies([
           assert_util.assert_less(
@@ -190,9 +190,8 @@ class Triangular(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.peak),
-        tf.broadcast_dynamic_shape(
-            tf.shape(input=self.low), tf.shape(input=self.high)))
+        tf.shape(self.peak),
+        tf.broadcast_dynamic_shape(tf.shape(self.low), tf.shape(self.high)))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -253,7 +252,7 @@ class Triangular(distribution.Distribution):
         broadcast_x_to_peak < self.low, broadcast_x_to_peak > self.high)
 
     broadcast_shape = tf.broadcast_dynamic_shape(
-        tf.shape(input=x), self.batch_shape_tensor())
+        tf.shape(x), self.batch_shape_tensor())
 
     return tf1.where(outside_interval,
                      tf.zeros(broadcast_shape, dtype=self.dtype),
@@ -261,7 +260,7 @@ class Triangular(distribution.Distribution):
 
   def _cdf(self, x):
     broadcast_shape = tf.broadcast_dynamic_shape(
-        tf.shape(input=x), self.batch_shape_tensor())
+        tf.shape(x), self.batch_shape_tensor())
 
     broadcast_x_to_high = _broadcast_to(x, [self.high])
     left_of_peak = tf.logical_and(

@@ -152,9 +152,9 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       tf.float32)
       concentration1 = tf.convert_to_tensor(
-          value=concentration1, name="concentration1", dtype=dtype)
+          concentration1, name="concentration1", dtype=dtype)
       concentration0 = tf.convert_to_tensor(
-          value=concentration0, name="concentration0", dtype=dtype)
+          concentration0, name="concentration0", dtype=dtype)
     super(Kumaraswamy, self).__init__(
         distribution=uniform.Uniform(
             low=tf.zeros([], dtype=concentration1.dtype),

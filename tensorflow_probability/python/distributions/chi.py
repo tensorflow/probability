@@ -82,7 +82,7 @@ class Chi(transformed_distribution.TransformedDistribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       df = tf.convert_to_tensor(
-          value=df,
+          df,
           name="df",
           dtype=dtype_util.common_dtype([df], dtype_hint=tf.float32))
       validation_assertions = (

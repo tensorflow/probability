@@ -27,7 +27,9 @@ Defined in [`python/internal/auto_batching/frontend.py`](https://github.com/tens
 
 [`lowering`](../../../tfp/experimental/auto_batching/lowering.md) module: Lowering the full IR to stack machine instructions.
 
-[`st`](../../../tfp/experimental/auto_batching/frontend/st.md) module: A stackless auto-batching VM.
+[`st`](../../../tfp/experimental/auto_batching/stackless.md) module: A stackless auto-batching VM.
+
+[`stack`](../../../tfp/experimental/auto_batching/stack_optimization.md) module: Optimizing stack usage (pushes and pops).
 
 [`tf_backend`](../../../tfp/experimental/auto_batching/tf_backend.md) module: TensorFlow (graph) backend for auto-batching VM.
 

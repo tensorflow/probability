@@ -104,9 +104,9 @@ class InverseGaussian(distribution.Distribution):
     with tf.name_scope(name):
       dtype = dtype_util.common_dtype([loc, concentration],
                                       dtype_hint=tf.float32)
-      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       concentration = tf.convert_to_tensor(
-          value=concentration, name="concentration", dtype=dtype)
+          concentration, name="concentration", dtype=dtype)
       with tf.control_dependencies([
           assert_util.assert_positive(loc),
           assert_util.assert_positive(concentration)
@@ -139,7 +139,7 @@ class InverseGaussian(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.loc), tf.shape(input=self.concentration))
+        tf.shape(self.loc), tf.shape(self.concentration))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(

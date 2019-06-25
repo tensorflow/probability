@@ -154,11 +154,10 @@ class DirichletTest(test_case.TestCase):
                       [2.5, 4, 0.01]], dtype=np.float32)
     dist = tfd.Dirichlet(alpha)  # batch_shape=[2], event_shape=[3]
     x = dist.sample(int(250e3), seed=tfp_test_util.test_seed())
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+    sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean[None, ...]
     sample_cov = tf.reduce_mean(
-        input_tensor=tf.matmul(x_centered[..., None], x_centered[..., None, :]),
-        axis=0)
+        tf.matmul(x_centered[..., None], x_centered[..., None, :]), axis=0)
     sample_var = tf.linalg.diag_part(sample_cov)
     sample_stddev = tf.sqrt(sample_var)
 
@@ -257,8 +256,7 @@ class DirichletTest(test_case.TestCase):
     d1 = tfd.Dirichlet(conc1)
     d2 = tfd.Dirichlet(conc2)
     x = d1.sample(int(1e4), seed=tfp_test_util.test_seed())
-    kl_sample = tf.reduce_mean(
-        input_tensor=d1.log_prob(x) - d2.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(d1.log_prob(x) - d2.log_prob(x), axis=0)
     kl_actual = tfd.kl_divergence(d1, d2)
 
     kl_sample_val = self.evaluate(kl_sample)

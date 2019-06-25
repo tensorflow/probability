@@ -18,7 +18,10 @@ A conditional.
 
 * Class `tfp.experimental.auto_batching.frontend.instructions.BranchOp`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.BranchOp`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.BranchOp`
 * Class `tfp.experimental.auto_batching.instructions.BranchOp`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.BranchOp`
+* Class `tfp.experimental.auto_batching.stackless.inst.BranchOp`
 
 
 

@@ -41,7 +41,7 @@ Defined in [`python/bijectors/bijector.py`](https://github.com/tensorflow/probab
 
 Bijectors can be used to represent any differentiable and injective
 (one to one) function defined on an open subset of `R^n`.  Some non-injective
-transformations are also supported (see "Non Injective Transforms" below).
+transformations are also supported (see 'Non Injective Transforms' below).
 
 #### Mathematical Details
 
@@ -61,13 +61,13 @@ characterized by three operations:
 
 2. Inverse
 
-   Useful for "reversing" a transformation to compute one probability in
+   Useful for 'reversing' a transformation to compute one probability in
    terms of another.
 
 3. `log_det_jacobian(x)`
 
-   "The log of the absolute value of the determinant of the matrix of all
-   first-order partial derivatives of the inverse function."
+   'The log of the absolute value of the determinant of the matrix of all
+   first-order partial derivatives of the inverse function.'
 
    Useful for inverting a transformation to compute one probability in terms
    of another. Geometrically, the Jacobian determinant is the volume of the
@@ -113,7 +113,7 @@ def transformed_sample(bijector, x):
 
 #### Example Bijectors
 
-- "Exponential"
+- 'Exponential'
 
   ```none
   Y = g(X) = exp(X)
@@ -135,7 +135,7 @@ def transformed_sample(bijector, x):
   ```python
     class Exp(Bijector):
 
-      def __init__(self, validate_args=False, name="exp"):
+      def __init__(self, validate_args=False, name='exp'):
         super(Exp, self).__init__(
             validate_args=validate_args,
             forward_min_event_ndims=0,
@@ -158,7 +158,7 @@ def transformed_sample(bijector, x):
         return x
     ```
 
-- "Affine"
+- 'Affine'
 
   ```none
   Y = g(X) = sqrtSigma * X + mu
@@ -265,7 +265,7 @@ jacobian matrix, the same aforementioned matrix.
 `is_constant_jacobian` encodes the fact that the jacobian matrix is constant.
 The semantics of this argument are the following:
 
-  * Repeated calls to "log_det_jacobian" functions with the same
+  * Repeated calls to 'log_det_jacobian' functions with the same
     `event_ndims` (but not necessarily same input), will return the first
     computed jacobian (because the matrix is constant, and hence is input
     independent).
@@ -277,7 +277,7 @@ The semantics of this argument are the following:
     ```python
     class Identity(Bijector):
 
-      def __init__(self, validate_args=False, name="identity"):
+      def __init__(self, validate_args=False, name='identity'):
         super(Identity, self).__init__(
             is_constant_jacobian=True,
             validate_args=validate_args,
@@ -335,7 +335,7 @@ The semantics of this argument are the following:
     3. Only calling probability functions on the output of `sample` means
       `_inverse` can be implemented as a cache lookup.
 
-  See "Example Uses" [above] which shows how these functions are used to
+  See 'Example Uses' [above] which shows how these functions are used to
   transform a distribution. (Note: `_forward` could theoretically be
   implemented as a cache lookup but this would require controlling the
   underlying sample generation mechanism.)
@@ -634,7 +634,7 @@ Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 #### Args:
 
 
-* <b>`x`</b>: `Tensor`. The input to the "forward" evaluation.
+* <b>`x`</b>: `Tensor`. The input to the 'forward' evaluation.
 * <b>`name`</b>: The name to give this op.
 * <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
@@ -718,7 +718,7 @@ Returns both the forward_log_det_jacobian.
 #### Args:
 
 
-* <b>`x`</b>: `Tensor`. The input to the "forward" Jacobian determinant evaluation.
+* <b>`x`</b>: `Tensor`. The input to the 'forward' Jacobian determinant evaluation.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
   transformed. Must be greater than or equal to
   `self.forward_min_event_ndims`. The result is summed over the final
@@ -760,7 +760,7 @@ Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 #### Args:
 
 
-* <b>`y`</b>: `Tensor`. The input to the "inverse" evaluation.
+* <b>`y`</b>: `Tensor`. The input to the 'inverse' evaluation.
 * <b>`name`</b>: The name to give this op.
 * <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
@@ -850,7 +850,7 @@ evaluated at `g^{-1}(y)`.
 #### Args:
 
 
-* <b>`y`</b>: `Tensor`. The input to the "inverse" Jacobian determinant evaluation.
+* <b>`y`</b>: `Tensor`. The input to the 'inverse' Jacobian determinant evaluation.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
   transformed. Must be greater than or equal to
   `self.inverse_min_event_ndims`. The result is summed over the final

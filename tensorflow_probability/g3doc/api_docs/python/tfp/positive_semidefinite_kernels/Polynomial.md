@@ -19,6 +19,7 @@
 <meta itemprop="property" content="apply"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
 <meta itemprop="property" content="matrix"/>
+<meta itemprop="property" content="tensor"/>
 <meta itemprop="property" content="with_name_scope"/>
 </div>
 
@@ -166,7 +167,7 @@ The number of feature dimensions.
 Kernel functions generally act on pairs of inputs from some space like
 
 ```none
-R^(d1 x ... x  dD)
+R^(d1 x ... x dD)
 ```
 
 or, in words: rank-`D` real-valued tensors of shape `[d1, ..., dD]`. Inputs
@@ -279,34 +280,43 @@ __mul__(k)
 ``` python
 apply(
     x1,
-    x2
+    x2,
+    example_ndims=0
 )
 ```
 
-Apply the kernel function to a pair of (batches of) inputs.
+Apply the kernel function pairs of inputs.
 
 
 #### Args:
 
 
-* <b>`x1`</b>: `Tensor` input to the first positional parameter of the kernel, of
-  shape `[b1, ..., bB, f1, ..., fF]`, where `B` may be zero (ie, no
-  batching) and `F` (number of feature dimensions) must equal the kernel's
-  `feature_ndims` property. Batch shape must broadcast with the batch
-  shape of `x2` and with the kernel's parameters.
-* <b>`x2`</b>: `Tensor` input to the second positional parameter of the kernel,
-  shape `[c1, ..., cC, f1, ..., fF]`, where `C` may be zero (ie, no
-  batching) and `F` (number of feature dimensions) must equal the kernel's
-  `feature_ndims` property. Batch shape must broadcast with the batch
-  shape of `x1` and with the kernel's parameters.
+* <b>`x1`</b>: `Tensor` input to the kernel, of shape `B1 + E1 + F`, where `B1` and
+  `E1` may be empty (ie, no batch/example dims, resp.) and `F` (the
+  feature shape) must have rank equal to the kernel's `feature_ndims`
+  property. Batch shape must broadcast with the batch shape of `x2` and
+  with the kernel's batch shape. Example shape must broadcast with example
+  shape of `x2`. `x1` and `x2` must have the same *number* of example dims
+  (ie, same rank).
+* <b>`x2`</b>: `Tensor` input to the kernel, of shape `B2 + E2 + F`, where `B2` and
+  `E2` may be empty (ie, no batch/example dims, resp.) and `F` (the
+  feature shape) must have rank equal to the kernel's `feature_ndims`
+  property. Batch shape must broadcast with the batch shape of `x2` and
+  with the kernel's batch shape. Example shape must broadcast with example
+  shape of `x2`. `x1` and `x2` must have the same *number* of example
+* <b>`example_ndims`</b>: A python integer, the number of example dims in the inputs.
+  In essence, this parameter controls how broadcasting of the kernel's
+  batch shape with input batch shapes works. The kernel batch shape will
+  be broadcast against everything to the left of the combined example and
+  feature dimensions in the input shapes.
 
 
 #### Returns:
 
-`Tensor` containing the (batch of) results of applying the kernel function
-to inputs `x1` and `x2`. If the kernel parameters' batch shape is
-`[k1, ..., kK]` then the shape of the `Tensor` resulting from this method
-call is `broadcast([b1, ..., bB], [c1, ..., cC], [k1, ..., kK])`.
+`Tensor` containing the results of applying the kernel function to inputs
+`x1` and `x2`. If the kernel parameters' batch shape is `Bk` then the
+shape of the `Tensor` resulting from this method call is
+`broadcast(Bk, B1, B2) + broadcast(E1, E2)`.
 
 
 Given an index set `S`, a kernel function is mathematically defined as a
@@ -324,9 +334,7 @@ conjugate, in the complex case.
 This method most closely resembles the function described in the
 mathematical definition of a kernel. Given a PositiveSemidefiniteKernel `k`
 with scalar parameters and inputs `x` and `y` in `S`, `apply(x, y)` yields a
-single scalar value. Given the same kernel and, say, batched inputs of shape
-`[b1, ..., bB, f1, ..., fF]`, it will yield a batch of scalars of shape
-`[b1, ..., bB]`.
+single scalar value.
 
 #### Examples
 
@@ -362,8 +370,10 @@ batch_kernel.apply(x, y).shape
 ```
 
 The parameter batch shape of `[2]` and the input batch shape of `[5]` can't
-be broadcast together. We can fix this by giving the parameter a shape of
-`[2, 1]` which will correctly broadcast with `[5]` to yield `[2, 5]`:
+be broadcast together. We can fix this in either of two ways:
+
+1. Give the parameter a shape of `[2, 1]` which will correctly
+broadcast with `[5]` to yield `[2, 5]`:
 
 ```python
 batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
@@ -373,6 +383,17 @@ batch_kernel.batch_shape
 batch_kernel.apply(x, y).shape
 # ==> [2, 5]
 ```
+
+2. By specifying `example_ndims`, which tells the kernel to treat the `5`
+in the input shape as part of the "example shape", and "pushing" the
+kernel batch shape to the left:
+
+```python
+batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[.2, .5])
+batch_kernel.batch_shape
+# ==> [2]
+batch_kernel.apply(x, y, example_ndims=1).shape
+# ==> [2, 5]
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -405,27 +426,27 @@ Construct (batched) matrices from (batches of) collections of inputs.
 
 
 * <b>`x1`</b>: `Tensor` input to the first positional parameter of the kernel, of
-  shape `[b1, ..., bB, e1, f1, ..., fF]`, where `B` may be zero (ie, no
-  batching), e1 is an integer greater than zero, and `F` (number of
-  feature dimensions) must equal the kernel's `feature_ndims` property.
-  Batch shape must broadcast with the batch shape of `x2` and with the
-  kernel's parameters *after* parameter expansion (see
-  `param_expansion_ndims` argument).
+  shape `B1 + [e1] + F`, where `B1` may be empty (ie, no batch dims,
+  resp.), `e1` is a single integer (ie, `x1` has example ndims exactly 1),
+  and `F` (the feature shape) must have rank equal to the kernel's
+  `feature_ndims` property. Batch shape must broadcast with the batch
+  shape of `x2` and with the kernel's batch shape.
 * <b>`x2`</b>: `Tensor` input to the second positional parameter of the kernel,
-  shape `[c1, ..., cC, e2, f1, ..., fF]`, where `C` may be zero (ie, no
-  batching), e2 is an integer greater than zero,  and `F` (number of
-  feature dimensions) must equal the kernel's `feature_ndims` property.
-  Batch shape must broadcast with the batch shape of `x1` and with the
-  kernel's parameters *after* parameter expansion (see
-  `param_expansion_ndims` argument).
+  shape `B2 + [e2] + F`, where `B2` may be empty (ie, no batch dims,
+  resp.), `e2` is a single integer (ie, `x2` has example ndims exactly 1),
+  and `F` (the feature shape) must have rank equal to the kernel's
+  `feature_ndims` property. Batch shape must broadcast with the batch
+  shape of `x1` and with the kernel's batch shape.
 
 
 #### Returns:
 
-`Tensor containing (batch of) matrices of kernel applications to pairs
-from inputs `x1` and `x2`. If the kernel parameters' batch shape is
-`[k1, ..., kK]`, then the shape of the resulting `Tensor` is
-`broadcast([b1, ..., bB], [c1, ..., cC], [k1, ..., kK]) + [e1, e2]`.
+`Tensor` containing the matrix (possibly batched) of kernel applications
+to pairs from inputs `x1` and `x2`. If the kernel parameters' batch shape
+is `Bk` then the shape of the `Tensor` resulting from this method call is
+`broadcast(Bk, B1, B2) + [e1, e2]` (note this differs from `apply`: the
+example dimensions are concatenated, whereas in `apply` the example dims
+are broadcast together).
 
 
 Given inputs `x1` and `x2` of shapes
@@ -451,27 +472,6 @@ and `e2` above).
 When the two inputs are the (batches of) identical collections, the
 resulting matrix is the so-called Gram (or Gramian) matrix
 (https://en.wikipedia.org/wiki/Gramian_matrix).
-
-N.B., this method can only be used to compute the pairwise application of
-the kernel function on rank-1 collections. E.g., it *does* support inputs of
-shape `[e1, f]` and `[e2, f]`, yielding a matrix of shape `[e1, e2]`. It
-*does not* support inputs of shape `[e1, e2, f]` and `[e3, e4, f]`, yielding
-a `Tensor` of shape `[e1, e2, e3, e4]`. To do this, one should instead
-reshape the inputs and pass them to `apply`, e.g.:
-
-```python
-k = tfpk.SomeKernel()
-t1 = tf.placeholder([4, 4, 3], tf.float32)
-t2 = tf.placeholder([5, 5, 3], tf.float32)
-k.apply(
-    tf.reshape(t1, [4, 4, 1, 1, 3]),
-    tf.reshape(t2, [1, 1, 5, 5, 3])).shape
-# ==> [4, 4, 5, 5, 3]
-```
-
-`matrix` is a special case of the above, where there is only one example
-dimension; indeed, its implementation looks almost exactly like the above
-(reshaped inputs passed to the private version of `_apply`).
 
 #### Examples
 
@@ -579,11 +579,177 @@ batch_kernel.batch_shape
 # ==> [2]
 batch_kernel.matrix(x, y).shape
 # ==> [10, 2, 5, 4]
-
 ```
 
 Here, we have the result of applying the kernel, with 2 different
 parameters, to each of a batch of 10 pairs of input lists.
+
+<h3 id="tensor"><code>tensor</code></h3>
+
+``` python
+tensor(
+    x1,
+    x2,
+    x1_example_ndims,
+    x2_example_ndims
+)
+```
+
+Construct (batched) tensors from (batches of) collections of inputs.
+
+
+#### Args:
+
+
+* <b>`x1`</b>: `Tensor` input to the first positional parameter of the kernel, of
+  shape `B1 + E1 + F`, where `B1` and `E1` arbitrary shapes which may be
+  empty (ie, no batch/example dims, resp.), and `F` (the feature shape)
+  must have rank equal to the kernel's `feature_ndims` property. Batch
+  shape must broadcast with the batch shape of `x2` and with the kernel's
+  batch shape.
+* <b>`x2`</b>: `Tensor` input to the second positional parameter of the kernel,
+  shape `B2 + E2 + F`, where `B2` and `E2` arbitrary shapes which may be
+  empty (ie, no batch/example dims, resp.), and `F` (the feature shape)
+  must have rank equal to the kernel's `feature_ndims` property. Batch
+  shape must broadcast with the batch shape of `x1` and with the kernel's
+  batch shape.
+* <b>`x1_example_ndims`</b>: A python integer greater than or equal to 0, the number
+  of example dims in the first input. This affects both the alignment of
+  batch shapes and the shape of the final output of the function.
+  Everything left of the feature shape and the example dims in `x1` is
+  considered "batch shape", and must broadcast as specified above.
+* <b>`x2_example_ndims`</b>: A python integer greater than or equal to 0, the number
+  of example dims in the second input. This affects both the alignment of
+  batch shapes and the shape of the final output of the function.
+  Everything left of the feature shape and the example dims in `x1` is
+  considered "batch shape", and must broadcast as specified above.
+
+
+#### Returns:
+
+`Tensor` containing (possibly batched) kernel applications to pairs from
+inputs `x1` and `x2`. If the kernel parameters' batch shape is `Bk` then
+the shape of the `Tensor` resulting from this method call is
+`broadcast(Bk, B1, B2) + E1 + E2`. Note this differs from `apply`: the
+example dimensions are concatenated, whereas in `apply` the example dims
+are broadcast together. It also differs from `matrix`: the example shapes
+are arbitrary here, and the result accrues a rank equal to the sum of the
+ranks of the input example shapes.
+
+
+#### Examples
+
+First, consider a kernel with a single scalar parameter.
+
+```python
+import tensorflow_probability as tfp
+
+scalar_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=.5)
+scalar_kernel.batch_shape
+# ==> []
+
+# Our inputs are two rank-2 collections of 3-D vectors
+x = np.ones([5, 6, 3], np.float32)
+y = np.ones([7, 8, 3], np.float32)
+scalar_kernel.tensor(x, y, x1_example_ndims=2, x2_example_ndims=2).shape
+# ==> [5, 6, 7, 8]
+
+# Empty example shapes work too!
+x = np.ones([3], np.float32)
+y = np.ones([5, 3], np.float32)
+scalar_kernel.tensor(x, y, x1_example_ndims=0, x2_example_ndims=1).shape
+# ==> [5]
+```
+
+The result comes from applying the kernel to the entries in `x` and `y`
+pairwise, across all pairs:
+
+  ```none
+  | k(x[0], y[0])    k(x[0], y[1])  ...  k(x[0], y[3]) |
+  | k(x[1], y[0])    k(x[1], y[1])  ...  k(x[1], y[3]) |
+  |      ...              ...                 ...      |
+  | k(x[4], y[0])    k(x[4], y[1])  ...  k(x[4], y[3]) |
+  ```
+
+Now consider a kernel with batched parameters.
+
+```python
+batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[1., .5])
+batch_kernel.batch_shape
+# ==> [2]
+
+# Inputs are two rank-2 collections of 3-D vectors
+x = np.ones([5, 6, 3], np.float32)
+y = np.ones([7, 8, 3], np.float32)
+scalar_kernel.tensor(x, y, x1_example_ndims=2, x2_example_ndims=2).shape
+# ==> [2, 5, 6, 7, 8]
+```
+
+We also support batching of the inputs. First, let's look at that with
+the scalar kernel again.
+
+```python
+# Batch of 10 lists of 5x6 collections of dimension 3
+x = np.ones([10, 5, 6, 3], np.float32)
+
+# Batch of 10 lists of 7x8 collections of dimension 3
+y = np.ones([10, 7, 8, 3], np.float32)
+
+scalar_kernel.tensor(x, y, x1_example_ndims=2, x2_example_ndims=2).shape
+# ==> [10, 5, 6, 7, 8]
+```
+
+The result is a batch of 10 tensors built from the batch of 10 rank-2
+collections of input vectors. The batch shapes have to be broadcastable.
+The following will *not* work:
+
+```python
+x = np.ones([10, 5, 3], np.float32)
+y = np.ones([20, 4, 3], np.float32)
+scalar_kernel.tensor(x, y, x1_example_ndims=1, x2_example_ndims=1).shape
+# ==> Error! [10] and [20] can't broadcast.
+```
+
+Now let's consider batches of inputs in conjunction with batches of kernel
+parameters. We require that the input batch shapes be broadcastable with
+the kernel parameter batch shapes, otherwise we get an error:
+
+```python
+x = np.ones([10, 5, 6, 3], np.float32)
+y = np.ones([10, 7, 8, 3], np.float32)
+
+batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(params=[1., .5])
+batch_kernel.batch_shape
+# ==> [2]
+batch_kernel.tensor(x, y, x1_example_ndims=2, x2_example_ndims=2).shape
+# ==> Error! [2] and [10] can't broadcast.
+```
+
+The fix is to make the kernel parameter shape broadcastable with `[10]` (or
+reshape the inputs to be broadcastable!):
+
+```python
+x = np.ones([10, 5, 6, 3], np.float32)
+y = np.ones([10, 7, 8, 3], np.float32)
+
+batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+    params=[[1.], [.5]])
+batch_kernel.batch_shape
+# ==> [2, 1]
+batch_kernel.tensor(x, y, x1_example_ndims=2, x2_example_ndims=2).shape
+# ==> [2, 10, 5, 6, 7, 8]
+
+# Or, make the inputs broadcastable:
+x = np.ones([10, 1, 5, 6, 3], np.float32)
+y = np.ones([10, 1, 7, 8, 3], np.float32)
+
+batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+    params=[1., .5])
+batch_kernel.batch_shape
+# ==> [2]
+batch_kernel.tensor(x, y, x1_example_ndims=2, x2_example_ndims=2).shape
+# ==> [10, 2, 5, 6, 7, 8]
+```
 
 <h3 id="with_name_scope"><code>with_name_scope</code></h3>
 

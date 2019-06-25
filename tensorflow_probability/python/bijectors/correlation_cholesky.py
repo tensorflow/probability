@@ -136,7 +136,7 @@ class CorrelationCholesky(bijector.Bijector):
     return fill_triangular.FillTriangular().inverse_event_shape_tensor(y_shape)
 
   def _forward(self, x):
-    x = tf.convert_to_tensor(value=x, name="x")
+    x = tf.convert_to_tensor(x, name="x")
     batch_shape = prefer_static.shape(x)[:-1]
 
     # Pad zeros on the top row and right column.

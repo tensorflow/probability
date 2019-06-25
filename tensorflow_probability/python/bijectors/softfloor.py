@@ -101,8 +101,7 @@ class Softfloor(bijector.Bijector):
                validate_args=False,
                name="softfloor"):
     with tf.name_scope(name) as name:
-      self._temperature = tf.convert_to_tensor(
-          value=temperature, name="temperature")
+      self._temperature = tf.convert_to_tensor(temperature, name="temperature")
       if validate_args:
         self._temperature = distribution_util.with_dependencies([
             assert_util.assert_positive(

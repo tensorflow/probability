@@ -18,7 +18,10 @@ A basic block.
 
 * Class `tfp.experimental.auto_batching.frontend.instructions.Block`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.Block`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.Block`
 * Class `tfp.experimental.auto_batching.instructions.Block`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.Block`
+* Class `tfp.experimental.auto_batching.stackless.inst.Block`
 
 
 

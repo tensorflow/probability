@@ -136,16 +136,14 @@ def reduce_weighted_logsumexp(logx,
   with tf.name_scope(name or 'reduce_weighted_logsumexp'):
     logx = tf.convert_to_tensor(logx, name='logx')
     if w is None:
-      lswe = tf.reduce_logsumexp(
-          input_tensor=logx, axis=axis, keepdims=keep_dims)
+      lswe = tf.reduce_logsumexp(logx, axis=axis, keepdims=keep_dims)
       if return_sign:
         sgn = tf.ones_like(lswe)
         return lswe, sgn
       return lswe
     w = tf.convert_to_tensor(w, dtype=logx.dtype, name='w')
     log_absw_x = logx + tf.math.log(tf.abs(w))
-    max_log_absw_x = tf.reduce_max(
-        input_tensor=log_absw_x, axis=axis, keepdims=True)
+    max_log_absw_x = tf.reduce_max(log_absw_x, axis=axis, keepdims=True)
     # If the largest element is `-inf` or `inf` then we don't bother subtracting
     # off the max. We do this because otherwise we'd get `inf - inf = NaN`. That
     # this is ok follows from the fact that we're actually free to subtract any
@@ -156,7 +154,7 @@ def reduce_weighted_logsumexp(logx,
         max_log_absw_x)
     wx_over_max_absw_x = (tf.sign(w) * tf.exp(log_absw_x - max_log_absw_x))
     sum_wx_over_max_absw_x = tf.reduce_sum(
-        input_tensor=wx_over_max_absw_x, axis=axis, keepdims=keep_dims)
+        wx_over_max_absw_x, axis=axis, keepdims=keep_dims)
     if not keep_dims:
       max_log_absw_x = tf.squeeze(max_log_absw_x, axis)
     sgn = tf.sign(sum_wx_over_max_absw_x)

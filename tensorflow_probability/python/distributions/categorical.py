@@ -51,7 +51,7 @@ def _broadcast_cat_event_and_params(event, params, base_dtype):
   if not shape_known_statically or params.shape[:-1] != event.shape:
     params = params * tf.ones_like(event[..., tf.newaxis],
                                    dtype=params.dtype)
-    params_shape = tf.shape(input=params)[:-1]
+    params_shape = tf.shape(params)[:-1]
     event = event * tf.ones(params_shape, dtype=event.dtype)
     if tensorshape_util.rank(params.shape) is not None:
       tensorshape_util.set_shape(event, params.shape[:-1])
@@ -273,7 +273,7 @@ class Categorical(distribution.Distribution):
     # Will use k as an index in the gather below, so clip it to {0,...,K-1}.
     k = tf.clip_by_value(tf.cast(k, tf.int32), 0, num_categories - 1)
 
-    batch_shape = tf.shape(input=k)
+    batch_shape = tf.shape(k)
 
     # tf.gather(..., batch_dims=batch_dims) requires static batch_dims kwarg, so
     # to handle the case where the batch shape is dynamic, flatten the batch

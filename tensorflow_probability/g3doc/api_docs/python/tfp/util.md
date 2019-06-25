@@ -14,3 +14,7 @@ Defined in [`python/util/__init__.py`](https://github.com/tensorflow/probability
 <!-- Placeholder for "Used in" -->
 
 
+## Classes
+
+[`class DeferredTensor`](../tfp/util/DeferredTensor.md): Variable tracking object which applies function upon `convert_to_tensor`.
+

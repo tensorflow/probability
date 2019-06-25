@@ -171,7 +171,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
           [loc, scale_diag, scale_identity_multiplier, skewness, tailweight],
           tf.float32)
       loc = loc if loc is None else tf.convert_to_tensor(
-          value=loc, name="loc", dtype=dtype)
+          loc, name="loc", dtype=dtype)
       tailweight = 1. if tailweight is None else tailweight
       has_default_skewness = skewness is None
       skewness = 0. if skewness is None else skewness
@@ -213,10 +213,9 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
               asserts, scale_diag_part)
 
       # Make the SAS bijector, 'F'.
-      skewness = tf.convert_to_tensor(
-          value=skewness, dtype=dtype, name="skewness")
+      skewness = tf.convert_to_tensor(skewness, dtype=dtype, name="skewness")
       tailweight = tf.convert_to_tensor(
-          value=tailweight, dtype=dtype, name="tailweight")
+          tailweight, dtype=dtype, name="tailweight")
       f = sinh_arcsinh_bijector.SinhArcsinh(
           skewness=skewness, tailweight=tailweight)
       if has_default_skewness:
@@ -228,7 +227,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
 
       # Make the Affine bijector, Z --> loc + C * Z.
       c = 2 * scale_diag_part / f_noskew.forward(
-          tf.convert_to_tensor(value=2, dtype=dtype))
+          tf.convert_to_tensor(2, dtype=dtype))
       affine = affine_bijector.Affine(
           shift=loc, scale_diag=c, validate_args=validate_args)
 

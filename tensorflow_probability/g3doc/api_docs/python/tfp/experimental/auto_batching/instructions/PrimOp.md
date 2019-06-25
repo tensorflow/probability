@@ -4,6 +4,7 @@
 <meta itemprop="property" content="vars_in"/>
 <meta itemprop="property" content="vars_out"/>
 <meta itemprop="property" content="function"/>
+<meta itemprop="property" content="skip_push_mask"/>
 <meta itemprop="property" content="replace"/>
 </div>
 
@@ -19,7 +20,10 @@ An arbitrary already-batched computation, a 'primitive operation'.
 
 * Class `tfp.experimental.auto_batching.frontend.instructions.PrimOp`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.PrimOp`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.PrimOp`
 * Class `tfp.experimental.auto_batching.instructions.PrimOp`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.PrimOp`
+* Class `tfp.experimental.auto_batching.stackless.inst.PrimOp`
 
 
 
@@ -80,6 +84,8 @@ The exact contract for `function` is as follows:
 * <b>`vars_out`</b>: Pattern of strings.  The names of the VM variables
   where to save the results returned from `function`.
 * <b>`function`</b>: Python callable implementing the computation.
+* <b>`skip_push_mask`</b>: Set of strings, a subset of `vars_out`.  These VM variables
+  will be updated in place rather than pushed.
 
 ## Properties
 
@@ -94,6 +100,11 @@ The exact contract for `function` is as follows:
 
 
 <h3 id="function"><code>function</code></h3>
+
+
+
+
+<h3 id="skip_push_mask"><code>skip_push_mask</code></h3>
 
 
 

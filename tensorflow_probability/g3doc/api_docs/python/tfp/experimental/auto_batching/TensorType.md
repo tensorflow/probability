@@ -18,7 +18,10 @@ TensorType(dtype, shape)
 * Class `tfp.experimental.auto_batching.TensorType`
 * Class `tfp.experimental.auto_batching.frontend.instructions.TensorType`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.TensorType`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.TensorType`
 * Class `tfp.experimental.auto_batching.instructions.TensorType`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.TensorType`
+* Class `tfp.experimental.auto_batching.stackless.inst.TensorType`
 
 
 

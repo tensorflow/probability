@@ -87,5 +87,5 @@ class LogNormalTest(tf.test.TestCase):
                         self.evaluate(analytical_cdf))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

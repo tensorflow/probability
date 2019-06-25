@@ -1,14 +1,19 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfp.experimental.auto_batching.frontend.st.execute" />
+<meta itemprop="name" content="tfp.experimental.auto_batching.stackless.execute" />
 <meta itemprop="path" content="Stable" />
 </div>
 
-# tfp.experimental.auto_batching.frontend.st.execute
+# tfp.experimental.auto_batching.stackless.execute
 
 Executes a given program in stackless auto-batching mode.
 
+### Aliases:
+
+* `tfp.experimental.auto_batching.frontend.st.execute`
+* `tfp.experimental.auto_batching.stackless.execute`
+
 ``` python
-tfp.experimental.auto_batching.frontend.st.execute(
+tfp.experimental.auto_batching.stackless.execute(
     program,
     backend,
     block_code_cache,

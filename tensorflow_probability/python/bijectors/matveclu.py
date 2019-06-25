@@ -60,7 +60,7 @@ class MatvecLU(bijector.Bijector):
       random_orthonormal = tf.linalg.qr(random_matrix)[0]
       lower_upper, permutation = tf.linalg.lu(random_orthonormal)
       lower_upper = tf.Variable(
-          initial_value=lower_upper,
+          initial_lower_upper,
           trainable=True,
           use_resource=True,
           name='lower_upper')
@@ -117,9 +117,9 @@ class MatvecLU(bijector.Bijector):
     """
     with tf.name_scope(name or 'MatvecLU') as name:
       self._lower_upper = tf.convert_to_tensor(
-          value=lower_upper, dtype_hint=tf.float32, name='lower_upper')
+          lower_upper, dtype_hint=tf.float32, name='lower_upper')
       self._permutation = tf.convert_to_tensor(
-          value=permutation, dtype_hint=tf.int32, name='permutation')
+          permutation, dtype_hint=tf.int32, name='permutation')
     super(MatvecLU, self).__init__(
         is_constant_jacobian=True,
         forward_min_event_ndims=1,
@@ -149,6 +149,5 @@ class MatvecLU(bijector.Bijector):
 
   def _forward_log_det_jacobian(self, unused_x):
     return tf.reduce_sum(
-        input_tensor=tf.math.log(
-            tf.abs(tf.linalg.tensor_diag_part(self.lower_upper))),
+        tf.math.log(tf.abs(tf.linalg.tensor_diag_part(self.lower_upper))),
         axis=-1)

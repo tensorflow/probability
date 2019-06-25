@@ -94,11 +94,11 @@ class Permute(bijector.Bijector):
       NotImplementedError: if `axis` is not negative.
     """
     with tf.name_scope(name or "permute") as name:
-      axis = tf.convert_to_tensor(value=axis, name="axis")
+      axis = tf.convert_to_tensor(axis, name="axis")
       if not dtype_util.is_integer(axis.dtype):
         raise TypeError("axis.dtype ({}) should be `int`-like.".format(
             dtype_util.name(axis.dtype)))
-      permutation = tf.convert_to_tensor(value=permutation, name="permutation")
+      permutation = tf.convert_to_tensor(permutation, name="permutation")
       if not dtype_util.is_integer(permutation.dtype):
         raise TypeError("permutation.dtype ({}) should be `int`-like.".format(
             dtype_util.name(permutation.dtype)))
@@ -109,11 +109,11 @@ class Permute(bijector.Bijector):
                            "each of `{0, 1, ..., d}`.")
       elif validate_args:
         p, _ = tf.nn.top_k(
-            -permutation, k=tf.shape(input=permutation)[-1], sorted=True)
+            -permutation, k=tf.shape(permutation)[-1], sorted=True)
         permutation = distribution_util.with_dependencies([
             assert_util.assert_equal(
                 -p,
-                tf.range(tf.size(input=p)),
+                tf.range(tf.size(p)),
                 message=("Permutation over `d` must contain exactly one of "
                          "each of `{0, 1, ..., d}`.")),
         ], permutation)

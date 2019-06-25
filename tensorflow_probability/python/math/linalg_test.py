@@ -219,7 +219,7 @@ class _PivotedCholesky(tf.test.TestCase, parameterized.TestCase):
     mat = tf.matmul(pchol, pchol, transpose_b=True)
     diag_diff_prev = self.evaluate(tf.abs(tf.linalg.diag_part(mat) - true_diag))
     diff_norm_prev = self.evaluate(
-        tf.linalg.norm(tensor=mat - matrix, ord='fro', axis=[-1, -2]))
+        tf.linalg.norm(mat - matrix, ord='fro', axis=[-1, -2]))
     for rank in range(2, dim + 1):
       # Specifying diag_rtol forces the full max_rank decomposition.
       pchol = tfp.math.pivoted_cholesky(matrix, max_rank=rank, diag_rtol=-1)
@@ -228,8 +228,7 @@ class _PivotedCholesky(tf.test.TestCase, parameterized.TestCase):
       pchol_shp, diag_diff, diff_norm, zeros_per_col = self.evaluate([
           tf.shape(pchol),
           tf.abs(tf.linalg.diag_part(mat) - true_diag),
-          tf.linalg.norm(tensor=mat - matrix, ord='fro', axis=[-1, -2]),
-          zeros_per_col
+          tf.linalg.norm(mat - matrix, ord='fro', axis=[-1, -2]), zeros_per_col
       ])
       self.assertAllEqual([2, dim, rank], pchol_shp)
       self.assertAllEqual(
@@ -247,8 +246,7 @@ class _PivotedCholesky(tf.test.TestCase, parameterized.TestCase):
         lambda matrix: tfp.math.pivoted_cholesky(matrix, max_rank=dim // 3),
         matrix)
     self.assertIsNotNone(dmatrix)
-    self.assertAllGreater(
-        tf.linalg.norm(tensor=dmatrix, ord='fro', axis=[-1, -2]), 0.)
+    self.assertAllGreater(tf.linalg.norm(dmatrix, ord='fro', axis=[-1, -2]), 0.)
 
   @test_util.enable_control_flow_v2
   def testGradientTapeCFv2(self):
@@ -260,8 +258,7 @@ class _PivotedCholesky(tf.test.TestCase, parameterized.TestCase):
     dmatrix = tape.gradient(
         pchol, matrix, output_gradients=tf.ones_like(pchol) * .01)
     self.assertIsNotNone(dmatrix)
-    self.assertAllGreater(
-        tf.linalg.norm(tensor=dmatrix, ord='fro', axis=[-1, -2]), 0.)
+    self.assertAllGreater(tf.linalg.norm(dmatrix, ord='fro', axis=[-1, -2]), 0.)
 
   # pyformat: disable
   @parameterized.parameters(
@@ -332,7 +329,7 @@ del _PivotedCholesky
 
 def make_tensor_hiding_attributes(value, hide_shape, hide_value=True):
   if not hide_value:
-    return tf.convert_to_tensor(value=value)
+    return tf.convert_to_tensor(value)
 
   shape = None if hide_shape else getattr(value, 'shape', None)
   return tf1.placeholder_with_default(value, shape=shape)

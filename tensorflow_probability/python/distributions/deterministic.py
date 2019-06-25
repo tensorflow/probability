@@ -421,8 +421,7 @@ class VectorDeterministic(_BaseDeterministic):
           x = tf.identity(x)
     loc = tf.identity(self.loc)
     return tf.cast(
-        tf.reduce_all(
-            input_tensor=tf.abs(x - loc) <= self._slack(loc), axis=-1),
+        tf.reduce_all(tf.abs(x - loc) <= self._slack(loc), axis=-1),
         dtype=self.dtype)
 
 

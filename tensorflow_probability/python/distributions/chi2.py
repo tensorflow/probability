@@ -88,7 +88,7 @@ class Chi2(gamma.Gamma):
     # through to the parent class results in unnecessary asserts.
     with tf.name_scope(name) as name:
       df = tf.convert_to_tensor(
-          value=df,
+          df,
           name="df",
           dtype=dtype_util.common_dtype([df], dtype_hint=tf.float32))
       with tf.control_dependencies([
@@ -106,7 +106,7 @@ class Chi2(gamma.Gamma):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {"df": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
+    return {"df": tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
 
   @classmethod
   def _params_event_ndims(cls):

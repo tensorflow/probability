@@ -139,7 +139,7 @@ def _augment_sample_shape(partial_batch_dist,
   if validate_args:
     runtime_assertions.append(
         assert_util.assert_greater_equal(
-            tf.convert_to_tensor(value=num_broadcast_dims, dtype=tf.int32),
+            tf.convert_to_tensor(num_broadcast_dims, dtype=tf.int32),
             tf.zeros((), dtype=tf.int32),
             message=("Cannot broadcast distribution {} batch shape to "
                      "target batch shape with fewer dimensions.".format(
@@ -330,7 +330,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     with tf.name_scope(name) as name:
 
       self.num_timesteps = tf.convert_to_tensor(
-          value=num_timesteps, name="num_timesteps")
+          num_timesteps, name="num_timesteps")
       self.initial_state_prior = initial_state_prior
       self.initial_step = initial_step
       self.final_step = self.initial_step + self.num_timesteps
@@ -347,7 +347,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         """Converts Tensors into LinearOperators."""
         if not isinstance(x, tfl.LinearOperator):
           x = tfl.LinearOperatorFullMatrix(
-              tf.convert_to_tensor(value=x, dtype=dtype),
+              tf.convert_to_tensor(x, dtype=dtype),
               is_square=is_square,
               name=name)
         return x
@@ -492,13 +492,12 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """
     with tf.name_scope("backward_pass"):
       filtered_means = tf.convert_to_tensor(
-          value=filtered_means, name="filtered_means")
-      filtered_covs = tf.convert_to_tensor(
-          value=filtered_covs, name="filtered_covs")
+          filtered_means, name="filtered_means")
+      filtered_covs = tf.convert_to_tensor(filtered_covs, name="filtered_covs")
       predicted_means = tf.convert_to_tensor(
-          value=predicted_means, name="predicted_means")
+          predicted_means, name="predicted_means")
       predicted_covs = tf.convert_to_tensor(
-          value=predicted_covs, name="predicted_covs")
+          predicted_covs, name="predicted_covs")
 
       # To scan over time dimension, we need to move 'num_timesteps' from the
       # event shape to the initial dimension of the tensor.
@@ -515,7 +514,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       initial_backward_mean = predicted_means[-1, ...]
       initial_backward_cov = predicted_covs[-1, ...]
 
-      num_timesteps = tf.shape(input=filtered_means)[0]
+      num_timesteps = tf.shape(filtered_means)[0]
       initial_state = BackwardPassState(
           backward_mean=initial_backward_mean,
           backward_cov=initial_backward_cov,
@@ -577,8 +576,8 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
   def _event_shape(self):
     return tf.TensorShape([
-        tf.get_static_value(tf.convert_to_tensor(value=self.num_timesteps)),
-        tf.get_static_value(tf.convert_to_tensor(value=self.observation_size))
+        tf.get_static_value(tf.convert_to_tensor(self.num_timesteps)),
+        tf.get_static_value(tf.convert_to_tensor(self.observation_size))
     ])
 
   def _event_shape_tensor(self):
@@ -692,7 +691,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     log_likelihoods, _, _, _, _, _, _ = self.forward_filter(x, mask=mask)
 
     # Sum over timesteps to compute the log marginal likelihood.
-    return tf.reduce_sum(input_tensor=log_likelihoods, axis=-1)
+    return tf.reduce_sum(log_likelihoods, axis=-1)
 
   def forward_filter(self, x, mask=None):
     """Run a Kalman filter over a provided sequence of outputs.
@@ -756,14 +755,14 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """
 
     with tf.name_scope("forward_filter"):
-      x = tf.convert_to_tensor(value=x, name="x")
+      x = tf.convert_to_tensor(x, name="x")
       if mask is not None:
-        mask = tf.convert_to_tensor(value=mask, name="mask", dtype_hint=tf.bool)
+        mask = tf.convert_to_tensor(mask, name="mask", dtype_hint=tf.bool)
 
       # Check event shape statically if possible
-      check_x_shape_op = _check_equal_shape(
-          "x", x.shape[-2:], tf.shape(input=x)[-2:],
-          self.event_shape, self.event_shape_tensor())
+      check_x_shape_op = _check_equal_shape("x", x.shape[-2:],
+                                            tf.shape(x)[-2:], self.event_shape,
+                                            self.event_shape_tensor())
       check_mask_dims_op = None
       check_mask_shape_op = None
       if mask is not None:
@@ -779,8 +778,9 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
                   tensorshape_util.rank(mask.shape),
                   tensorshape_util.rank(x.shape)))
         check_mask_shape_op = _check_equal_shape(
-            "mask", mask.shape[-1:], tf.shape(input=mask)[-1:],
-            self.event_shape[-2:-1], self.event_shape_tensor()[-2:-1])
+            "mask", mask.shape[-1:],
+            tf.shape(mask)[-1:], self.event_shape[-2:-1],
+            self.event_shape_tensor()[-2:-1])
       if self.validate_args:
         runtime_assertions = self.runtime_assertions
         if check_x_shape_op is not None:
@@ -803,7 +803,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
             x.shape[:-2], self.batch_shape)
       else:
         sample_and_batch_shape = tf.broadcast_dynamic_shape(
-            tf.shape(input=x)[:-2], self.batch_shape_tensor())
+            tf.shape(x)[:-2], self.batch_shape_tensor())
 
       # Get the full output shape for covariances. The posterior variances
       # in a LGSSM depend only on the model params (batch shape) and on the
@@ -818,7 +818,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
               mask.shape[:-1], self.batch_shape)
         else:
           mask_sample_and_batch_shape = tf.broadcast_dynamic_shape(
-              tf.shape(input=mask)[:-1], self.batch_shape_tensor())
+              tf.shape(mask)[:-1], self.batch_shape_tensor())
 
       # To scan over timesteps we need to move `num_timsteps` from the
       # event shape to the initial dimension of the tensor.
@@ -869,7 +869,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           log_marginal_likelihood=tf.zeros(
               shape=sample_and_batch_shape, dtype=self.dtype),
           timestep=tf.convert_to_tensor(
-              value=self.initial_step, dtype=tf.int32, name="initial_step"))
+              self.initial_step, dtype=tf.int32, name="initial_step"))
 
       update_step_fn = build_kalman_filter_step(
           self.get_transition_matrix_for_timestep,
@@ -964,7 +964,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """
 
     with tf.name_scope("smooth"):
-      x = tf.convert_to_tensor(value=x, name="x")
+      x = tf.convert_to_tensor(x, name="x")
       (_, filtered_means, filtered_covs,
        predicted_means, predicted_covs, _, _) = self.forward_filter(
            x, mask=mask)
@@ -1344,8 +1344,8 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
                                    observation_matrix,
                                    observation_noise) * tf.ones_like(x_t)
       x_t = tf1.where(
-          tf.broadcast_to(mask_t, tf.shape(input=x_expected)), x_expected,
-          tf.broadcast_to(x_t, tf.shape(input=x_expected)))
+          tf.broadcast_to(mask_t, tf.shape(x_expected)), x_expected,
+          tf.broadcast_to(x_t, tf.shape(x_expected)))
 
     # Given predicted mean u_{t|t-1} and covariance P_{t|t-1} from the
     # previous step, incorporate the observation x_t, producing the
@@ -1363,14 +1363,13 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
 
     if mask_t is not None:
       filtered_mean = tf1.where(
-          tf.broadcast_to(mask_t, tf.shape(input=filtered_mean)),
+          tf.broadcast_to(mask_t, tf.shape(filtered_mean)),
           state.predicted_mean, filtered_mean)
       filtered_cov = tf1.where(
-          tf.broadcast_to(mask_t, tf.shape(input=filtered_cov)),
-          state.predicted_cov, filtered_cov)
+          tf.broadcast_to(mask_t, tf.shape(filtered_cov)), state.predicted_cov,
+          filtered_cov)
       log_marginal_likelihood = tf1.where(
-          tf.broadcast_to(mask_t[..., 0, 0],
-                          tf.shape(input=log_marginal_likelihood)),
+          tf.broadcast_to(mask_t[..., 0, 0], tf.shape(log_marginal_likelihood)),
           tf.zeros_like(log_marginal_likelihood), log_marginal_likelihood)
 
     # Run the filtered posterior through the transition

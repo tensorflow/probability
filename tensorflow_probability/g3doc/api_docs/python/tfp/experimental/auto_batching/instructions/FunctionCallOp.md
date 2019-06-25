@@ -19,7 +19,10 @@ Call a `Function`.
 
 * Class `tfp.experimental.auto_batching.frontend.instructions.FunctionCallOp`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.FunctionCallOp`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.FunctionCallOp`
 * Class `tfp.experimental.auto_batching.instructions.FunctionCallOp`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.FunctionCallOp`
+* Class `tfp.experimental.auto_batching.stackless.inst.FunctionCallOp`
 
 
 

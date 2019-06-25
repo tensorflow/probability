@@ -128,9 +128,9 @@ class VonMises(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, concentration],
                                       dtype_hint=tf.float32)
-      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       concentration = tf.convert_to_tensor(
-          value=concentration, name="concentration", dtype=dtype)
+          concentration, name="concentration", dtype=dtype)
       with tf.control_dependencies([
           assert_util.assert_non_negative(concentration)
       ] if validate_args else []):
@@ -150,7 +150,7 @@ class VonMises(distribution.Distribution):
   def _param_shapes(sample_shape):
     return dict(
         zip(("loc", "concentration"),
-            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
+            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
   def _params_event_ndims(cls):
@@ -168,7 +168,7 @@ class VonMises(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.loc), tf.shape(input=self.concentration))
+        tf.shape(self.loc), tf.shape(self.concentration))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.loc.shape, self.concentration.shape)
@@ -336,8 +336,8 @@ def von_mises_cdf(x, concentration):
     [1] G. Hill "Algorithm 518: Incomplete Bessel Function I_0. The Von Mises
     Distribution." ACM Transactions on Mathematical Software, 1977
   """
-  x = tf.convert_to_tensor(value=x)
-  concentration = tf.convert_to_tensor(value=concentration)
+  x = tf.convert_to_tensor(x)
+  concentration = tf.convert_to_tensor(concentration)
   dtype = x.dtype
 
   # Map x to [-pi, pi].
@@ -477,7 +477,7 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
   """
   seed = SeedStream(seed, salt="von_mises")
   concentration = tf.convert_to_tensor(
-      value=concentration, dtype=dtype, name="concentration")
+      concentration, dtype=dtype, name="concentration")
 
   @tf.custom_gradient
   def rejection_sample_with_gradient(concentration):
@@ -544,7 +544,7 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
       return done | accept, u, w
 
     _, u, w = tf.while_loop(
-        cond=lambda done, *_: ~tf.reduce_all(input_tensor=done),
+        cond=lambda done, *_: ~tf.reduce_all(done),
         body=loop_body,
         loop_vars=(
             tf.zeros(shape, dtype=tf.bool, name="done"),
@@ -576,8 +576,7 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
       # ones.
       num_sample_dimensions = (tf.rank(broadcast_concentration) -
                                tf.rank(concentration))
-      return tf.reduce_sum(
-          input_tensor=ret, axis=tf.range(num_sample_dimensions))
+      return tf.reduce_sum(ret, axis=tf.range(num_sample_dimensions))
 
     return x, grad
 

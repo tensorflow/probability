@@ -893,7 +893,7 @@ quantile(
 )
 ```
 
-Quantile function. Aka "inverse cdf" or "percent point function".
+Quantile function. Aka 'inverse cdf' or 'percent point function'.
 
 Given random variable `X` and `p in [0, 1]`, the `quantile` is:
 

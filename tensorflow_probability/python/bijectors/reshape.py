@@ -146,9 +146,9 @@ class Reshape(bijector.Bijector):
     """
     with tf.name_scope(name or 'reshape') as name:
       event_shape_out = tf.convert_to_tensor(
-          value=event_shape_out, name='event_shape_out', dtype_hint=tf.int32)
+          event_shape_out, name='event_shape_out', dtype_hint=tf.int32)
       event_shape_in = tf.convert_to_tensor(
-          value=event_shape_in, name='event_shape_in', dtype_hint=tf.int32)
+          event_shape_in, name='event_shape_in', dtype_hint=tf.int32)
 
       forward_min_event_ndims_ = tensorshape_util.num_elements(
           event_shape_in.shape)
@@ -189,9 +189,7 @@ class Reshape(bijector.Bijector):
 
   def _forward(self, x):
     output_shape, output_tensorshape = _replace_event_shape_in_shape_tensor(
-        tf.shape(input=x),
-        self._event_shape_in,
-        self._event_shape_out,
+        tf.shape(x), self._event_shape_in, self._event_shape_out,
         self.validate_args)
     y = tf.reshape(x, output_shape)
     tensorshape_util.set_shape(y, output_tensorshape)
@@ -199,9 +197,7 @@ class Reshape(bijector.Bijector):
 
   def _inverse(self, y):
     output_shape, output_tensorshape = _replace_event_shape_in_shape_tensor(
-        tf.shape(input=y),
-        self._event_shape_out,
-        self._event_shape_in,
+        tf.shape(y), self._event_shape_out, self._event_shape_in,
         self.validate_args)
     x = tf.reshape(y, output_shape)
     tensorshape_util.set_shape(x, output_tensorshape)
@@ -273,12 +269,12 @@ def _replace_event_shape_in_shape_tensor(
       (is_validated or not validate_args)):
     with tf.control_dependencies(validation_dependencies):
       output_shape = tf.convert_to_tensor(
-          value=output_tensorshape, name='output_shape', dtype_hint=tf.int32)
+          output_tensorshape, name='output_shape', dtype_hint=tf.int32)
     return output_shape, output_tensorshape
 
   with tf.control_dependencies(validation_dependencies):
     event_shape_in_ndims = (
-        tf.size(input=event_shape_in)
+        tf.size(event_shape_in)
         if tensorshape_util.num_elements(event_shape_in.shape) is None else
         tensorshape_util.num_elements(event_shape_in.shape))
     input_non_event_shape, input_event_shape = tf.split(
@@ -293,10 +289,8 @@ def _replace_event_shape_in_shape_tensor(
     # `event_shape_in`. Note that our validations at construction time ensure
     # there is at most one such entry in `event_shape_in`.
     mask = event_shape_in >= 0
-    explicit_input_event_shape = tf.boolean_mask(
-        tensor=input_event_shape, mask=mask)
-    explicit_event_shape_in = tf.boolean_mask(
-        tensor=event_shape_in, mask=mask)
+    explicit_input_event_shape = tf.boolean_mask(input_event_shape, mask=mask)
+    explicit_event_shape_in = tf.boolean_mask(event_shape_in, mask=mask)
     additional_assertions.append(
         assert_util.assert_equal(
             explicit_input_event_shape,
@@ -405,10 +399,11 @@ def _maybe_check_valid_shape(shape, validate_args):
     if sum(shape_ == -1) > 1:
       raise ValueError(message.format(shape))
   elif validate_args:
-    assertions.append(assert_util.assert_less(
-        tf.reduce_sum(input_tensor=tf.cast(tf.equal(shape, -1), tf.int32)),
-        2,
-        message=message.format(shape)))
+    assertions.append(
+        assert_util.assert_less(
+            tf.reduce_sum(tf.cast(tf.equal(shape, -1), tf.int32)),
+            2,
+            message=message.format(shape)))
 
   message = '`{}` elements must be either positive integers or `-1`.'
   if shape_ is not None:

@@ -41,7 +41,7 @@ nor is this condition checked even when `validate_args=True`.
   actually invertible, even when `validate_args=True`.
   Default value: `False` (i.e., don't validate arguments).
 * <b>`name`</b>: Python `str` name given to ops managed by this object.
-  Default value: `None` (i.e., "lu_solve").
+  Default value: `None` (i.e., 'lu_solve').
 
 
 #### Returns:

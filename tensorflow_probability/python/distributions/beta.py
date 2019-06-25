@@ -176,11 +176,11 @@ class Beta(distribution.Distribution):
                                       tf.float32)
       self._concentration1 = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(
-              value=concentration1, name="concentration1", dtype=dtype),
+              concentration1, name="concentration1", dtype=dtype),
           validate_args)
       self._concentration0 = self._maybe_assert_valid_concentration(
           tf.convert_to_tensor(
-              value=concentration0, name="concentration0", dtype=dtype),
+              concentration0, name="concentration0", dtype=dtype),
           validate_args)
       self._total_concentration = self._concentration1 + self._concentration0
     super(Beta, self).__init__(
@@ -197,7 +197,7 @@ class Beta(distribution.Distribution):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    s = tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)
+    s = tf.convert_to_tensor(sample_shape, dtype=tf.int32)
     return dict(concentration1=s, concentration0=s)
 
   @classmethod
@@ -220,7 +220,7 @@ class Beta(distribution.Distribution):
     return self._total_concentration
 
   def _batch_shape_tensor(self):
-    return tf.shape(input=self.total_concentration)
+    return tf.shape(self.total_concentration)
 
   def _batch_shape(self):
     return self.total_concentration.shape

@@ -15,7 +15,10 @@ Jump to the address in the reserved "program counter" variable.
 
 * Class `tfp.experimental.auto_batching.frontend.instructions.IndirectGotoOp`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.IndirectGotoOp`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.IndirectGotoOp`
 * Class `tfp.experimental.auto_batching.instructions.IndirectGotoOp`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.IndirectGotoOp`
+* Class `tfp.experimental.auto_batching.stackless.inst.IndirectGotoOp`
 
 
 

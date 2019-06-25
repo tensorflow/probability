@@ -9,8 +9,8 @@
 <meta itemprop="property" content="cond"/>
 <meta itemprop="property" content="create_variable"/>
 <meta itemprop="property" content="equal"/>
+<meta itemprop="property" content="fill"/>
 <meta itemprop="property" content="full_mask"/>
-<meta itemprop="property" content="initial_program_counter"/>
 <meta itemprop="property" content="merge_dtypes"/>
 <meta itemprop="property" content="merge_shapes"/>
 <meta itemprop="property" content="not_equal"/>
@@ -209,6 +209,36 @@ equal(
 Implements equality comparison for Numpy backend.
 
 
+<h3 id="fill"><code>fill</code></h3>
+
+``` python
+fill(
+    value,
+    size,
+    dtype,
+    shape,
+    name=None
+)
+```
+
+Fill a fresh batched Tensor of the given shape and dtype with `value`.
+
+
+#### Args:
+
+
+* <b>`value`</b>: Scalar to fill with.
+* <b>`size`</b>: Scalar `int` `Tensor` specifying the number of VM threads.
+* <b>`dtype`</b>: `tf.DType` of the zeros to be returned.
+* <b>`shape`</b>: Rank 1 `int` `Tensor`, the per-thread value shape.
+* <b>`name`</b>: Optional name for the op.
+
+
+#### Returns:
+
+
+* <b>`result`</b>: `Tensor` of `dtype` `value`s with shape `[size, *shape]`
+
 <h3 id="full_mask"><code>full_mask</code></h3>
 
 ``` python
@@ -219,32 +249,6 @@ full_mask(
 ```
 
 Returns an all-True mask `np.ndarray` with shape `[size]`.
-
-
-<h3 id="initial_program_counter"><code>initial_program_counter</code></h3>
-
-``` python
-initial_program_counter(
-    size,
-    dtype,
-    name=None
-)
-```
-
-Returns a 0-value initializer for the Program Counter variable.
-
-
-#### Args:
-
-
-* <b>`size`</b>: Scalar int `np.ndarray` specifying the number of VM threads.
-* <b>`dtype`</b>: Type representing the program counter.
-* <b>`name`</b>: Optional name for the op.
-
-
-#### Returns:
-
-`np.ndarray` int64 zeroes with shape `[size]`.
 
 
 <h3 id="merge_dtypes"><code>merge_dtypes</code></h3>
@@ -404,7 +408,7 @@ Implements a switch (branch_selector) { case ... } construct.
 ``` python
 type_of(
     t,
-    preferred_dtype=None
+    dtype_hint=None
 )
 ```
 
@@ -415,7 +419,7 @@ Returns the `instructions.Type` of `t`.
 
 
 * <b>`t`</b>: `np.ndarray` or a Python constant.
-* <b>`preferred_dtype`</b>: dtype to prefer, if `t` is a constant.
+* <b>`dtype_hint`</b>: dtype to prefer, if `t` is a constant.
 
 
 #### Returns:

@@ -243,7 +243,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
             () if args and not self._always_use_specified_sample_shape
             else sample_shape, seed=seed())
       else:
-        xs[i] = tf.convert_to_tensor(value=xs[i], dtype_hint=ds[-1].dtype)
+        xs[i] = tf.convert_to_tensor(xs[i], dtype_hint=ds[-1].dtype)
         seed()  # Ensure reproducibility even when xs are (partially) set.
     # Note: we could also resolve distributions up to the first non-`None` in
     # `self._model_flatten(value)`, however we omit this feature for simplicity,

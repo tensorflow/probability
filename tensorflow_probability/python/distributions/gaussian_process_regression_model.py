@@ -476,25 +476,25 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
       ], tf.float32)
       if index_points is not None:
         index_points = tf.convert_to_tensor(
-            value=index_points, dtype=dtype, name='index_points')
+            index_points, dtype=dtype, name='index_points')
       observation_index_points = (None if observation_index_points is None else
                                   tf.convert_to_tensor(
-                                      value=observation_index_points,
+                                      observation_index_points,
                                       dtype=dtype,
                                       name='observation_index_points'))
       observations = (None if observations is None else tf.convert_to_tensor(
-          value=observations, dtype=dtype, name='observations'))
+          observations, dtype=dtype, name='observations'))
       observation_noise_variance = tf.convert_to_tensor(
-          value=observation_noise_variance,
+          observation_noise_variance,
           dtype=dtype,
           name='observation_noise_variance')
       predictive_noise_variance = (
           observation_noise_variance
           if predictive_noise_variance is None else tf.convert_to_tensor(
-              value=predictive_noise_variance,
+              predictive_noise_variance,
               dtype=dtype,
               name='predictive_noise_variance'))
-      jitter = tf.convert_to_tensor(value=jitter, dtype=dtype, name='jitter')
+      jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
 
       if (observation_index_points is None) != (observations is None):
         raise ValueError(

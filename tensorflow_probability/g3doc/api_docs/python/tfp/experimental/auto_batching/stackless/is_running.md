@@ -1,14 +1,19 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfp.experimental.auto_batching.frontend.st.is_running" />
+<meta itemprop="name" content="tfp.experimental.auto_batching.stackless.is_running" />
 <meta itemprop="path" content="Stable" />
 </div>
 
-# tfp.experimental.auto_batching.frontend.st.is_running
+# tfp.experimental.auto_batching.stackless.is_running
 
 Returns whether the stackless machine is running a computation.
 
+### Aliases:
+
+* `tfp.experimental.auto_batching.frontend.st.is_running`
+* `tfp.experimental.auto_batching.stackless.is_running`
+
 ``` python
-tfp.experimental.auto_batching.frontend.st.is_running()
+tfp.experimental.auto_batching.stackless.is_running()
 ```
 
 

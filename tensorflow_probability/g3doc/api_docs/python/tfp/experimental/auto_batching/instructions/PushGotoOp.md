@@ -17,7 +17,10 @@ Save an address for `IndirectGotoOp` and unconditionally jump to another.
 
 * Class `tfp.experimental.auto_batching.frontend.instructions.PushGotoOp`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.PushGotoOp`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.PushGotoOp`
 * Class `tfp.experimental.auto_batching.instructions.PushGotoOp`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.PushGotoOp`
+* Class `tfp.experimental.auto_batching.stackless.inst.PushGotoOp`
 
 
 

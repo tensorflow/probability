@@ -616,7 +616,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       event_shape = [height * width * channels]
       reshaped_images = tf.reshape(images, [n, event_shape])
 
-      # Density estimatino with MADE.
+      # Density estimation with MADE.
       made = tfb.AutoregressiveNetwork(params=2, event_shape=event_shape,
                                        hidden_units=[20, 20], activation="relu")
       distribution = tfd.TransformedDistribution(

@@ -30,6 +30,10 @@ Defined in [`python/internal/auto_batching/__init__.py`](https://github.com/tens
 
 [`numpy_backend`](../../tfp/experimental/auto_batching/numpy_backend.md) module: Numpy backend for auto-batching VM.
 
+[`stack_optimization`](../../tfp/experimental/auto_batching/stack_optimization.md) module: Optimizing stack usage (pushes and pops).
+
+[`stackless`](../../tfp/experimental/auto_batching/stackless.md) module: A stackless auto-batching VM.
+
 [`tf_backend`](../../tfp/experimental/auto_batching/tf_backend.md) module: TensorFlow (graph) backend for auto-batching VM.
 
 [`type_inference`](../../tfp/experimental/auto_batching/type_inference.md) module: Type inference pass on functional control flow graph.

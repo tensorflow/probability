@@ -125,10 +125,10 @@ class TruncatedNormal(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale, low, high], tf.float32)
-      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
-      low = tf.convert_to_tensor(value=low, name="low", dtype=dtype)
-      high = tf.convert_to_tensor(value=high, name="high", dtype=dtype)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
+      low = tf.convert_to_tensor(low, name="low", dtype=dtype)
+      high = tf.convert_to_tensor(high, name="high", dtype=dtype)
       dtype_util.assert_same_float_dtype([loc, scale, low, high])
 
       self._broadcast_batch_shape = distribution_util.get_broadcast_shape(
@@ -191,7 +191,7 @@ class TruncatedNormal(distribution.Distribution):
   @staticmethod
   def _param_shapes(sample_shape):
     # All parameters are of the same shape
-    shape = tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)
+    shape = tf.convert_to_tensor(sample_shape, dtype=tf.int32)
     return {"loc": shape,
             "scale": shape,
             "high": shape,
@@ -220,7 +220,7 @@ class TruncatedNormal(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     # All the parameters are broadcast the same shape during construction.
-    return tf.shape(input=self.loc)
+    return tf.shape(self.loc)
 
   def _batch_shape(self):
     # All the parameters are broadcast the same shape during construction.
@@ -235,7 +235,7 @@ class TruncatedNormal(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     sample_and_batch_shape = tf.concat([[n], self.batch_shape_tensor()], 0)
     flat_batch_and_sample_shape = tf.stack(
-        [tf.reduce_prod(input_tensor=self.batch_shape_tensor()), n])
+        [tf.reduce_prod(self.batch_shape_tensor()), n])
 
     # In order to be reparameterizable we sample on the truncated_normal of
     # unit variance and mean and scale (but with the standardized
@@ -296,8 +296,8 @@ class TruncatedNormal(distribution.Distribution):
                     tf.math.log1p(-cdf_samples))
 
         # Reduce the gradient across the samples
-        grad_u = tf.reduce_sum(input_tensor=dy * du, axis=-1)
-        grad_l = tf.reduce_sum(input_tensor=dy * dl, axis=-1)
+        grad_u = tf.reduce_sum(dy * du, axis=-1)
+        grad_l = tf.reduce_sum(dy * dl, axis=-1)
         return [grad_l, grad_u]
 
       return std_samples, grad

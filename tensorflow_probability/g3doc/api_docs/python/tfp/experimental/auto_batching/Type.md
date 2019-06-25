@@ -17,7 +17,10 @@ Type(tensors,)
 * Class `tfp.experimental.auto_batching.Type`
 * Class `tfp.experimental.auto_batching.frontend.instructions.Type`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.Type`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.Type`
 * Class `tfp.experimental.auto_batching.instructions.Type`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.Type`
+* Class `tfp.experimental.auto_batching.stackless.inst.Type`
 
 
 

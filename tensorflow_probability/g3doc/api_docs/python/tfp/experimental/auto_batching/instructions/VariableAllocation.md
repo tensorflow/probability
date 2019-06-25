@@ -20,7 +20,10 @@ A token indicating how to allocate memory for an autobatched variable.
 
 * Class `tfp.experimental.auto_batching.frontend.instructions.VariableAllocation`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.VariableAllocation`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.VariableAllocation`
 * Class `tfp.experimental.auto_batching.instructions.VariableAllocation`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.VariableAllocation`
+* Class `tfp.experimental.auto_batching.stackless.inst.VariableAllocation`
 
 
 

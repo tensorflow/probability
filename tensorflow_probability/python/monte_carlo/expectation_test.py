@@ -218,6 +218,32 @@ class ExpectationTest(tf.test.TestCase):
         rtol=0.03,
         atol=0.)
 
+  def test_works_with_structured_samples(self):
+
+    # Check that we don't accidentally destroy the structure of `samples` when
+    # it's a dict or other non-Tensor object from a joint distribution.
+    p = tfd.JointDistributionNamed({
+        'x': tfd.Normal(0., 1.),
+        'y': tfd.Normal(0., 1.)})
+
+    total_variance_with_reparam = tfp.monte_carlo.expectation(
+        f=lambda d: d['x']**2 + d['y']**2,
+        samples=p.sample(1000, seed=42),
+        log_prob=p.log_prob,
+        use_reparametrization=True)
+    total_variance_without_reparam = tfp.monte_carlo.expectation(
+        f=lambda d: d['x']**2 + d['y']**2,
+        samples=p.sample(1000, seed=42),
+        log_prob=p.log_prob,
+        use_reparametrization=False)
+    [
+        total_variance_with_reparam_,
+        total_variance_without_reparam_
+    ] = self.evaluate([
+        total_variance_with_reparam,
+        total_variance_without_reparam])
+    self.assertAllClose(total_variance_with_reparam_, 2., atol=0.2)
+    self.assertAllClose(total_variance_without_reparam_, 2., atol=0.2)
 
 if __name__ == '__main__':
   tf.test.main()

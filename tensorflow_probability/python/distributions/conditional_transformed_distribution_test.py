@@ -34,7 +34,7 @@ class _ChooseLocation(tfp.bijectors.ConditionalBijector):
 
   def __init__(self, loc, name="ChooseLocation"):
     with tf.name_scope(name) as name:
-      self._loc = tf.convert_to_tensor(value=loc, name="loc")
+      self._loc = tf.convert_to_tensor(loc, name="loc")
       super(_ChooseLocation, self).__init__(
           graph_parents=[self._loc],
           is_constant_jacobian=True,
@@ -52,7 +52,7 @@ class _ChooseLocation(tfp.bijectors.ConditionalBijector):
     return 0.
 
   def _gather_loc(self, z):
-    z = tf.convert_to_tensor(value=z)
+    z = tf.convert_to_tensor(z)
     z = tf.cast((1 + z) / 2, tf.int32)
     return tf.gather(self._loc, z)
 

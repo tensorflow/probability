@@ -108,7 +108,7 @@ class FiniteDiscrete(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf1.name_scope(name) as name:
-      self._outcomes = tf.convert_to_tensor(value=outcomes, name='outcomes')
+      self._outcomes = tf.convert_to_tensor(outcomes, name='outcomes')
       if validate_args:
         assertions = _maybe_validate_args(self._outcomes, logits, probs,
                                           validate_args)
@@ -167,7 +167,7 @@ class FiniteDiscrete(distribution.Distribution):
     return tf.TensorShape([])
 
   def _cdf(self, x):
-    x = tf.convert_to_tensor(value=x, name='x')
+    x = tf.convert_to_tensor(x, name='x')
     flat_x = tf.reshape(x, shape=[-1])
     upper_bound = tf.searchsorted(self.outcomes, values=flat_x, side='right')
     values_at_ub = tf.gather(
@@ -189,9 +189,9 @@ class FiniteDiscrete(distribution.Distribution):
     return tf.abs(a - b) < self._atol + self._rtol * tf.abs(b)
 
   def _log_prob(self, x):
-    x = tf.convert_to_tensor(value=x, name='x')
+    x = tf.convert_to_tensor(x, name='x')
     right_indices = tf.minimum(
-        tf.size(input=self.outcomes) - 1,
+        tf.size(self.outcomes) - 1,
         tf.reshape(
             tf.searchsorted(
                 self.outcomes, values=tf.reshape(x, shape=[-1]), side='right'),
@@ -266,9 +266,7 @@ def _maybe_validate_args(outcomes, logits, probs, validate_args):
     elif validate_args:
       assertions.append(
           tf1.assert_equal(
-              tf.shape(input=tensor_a)[-1],
-              tf.shape(input=tensor_b)[-1],
-              message=message))
+              tf.shape(tensor_a)[-1], tf.shape(tensor_b)[-1], message=message))
 
   if logits is not None:
     validate_equal_last_dim(
@@ -293,9 +291,7 @@ def _maybe_validate_args(outcomes, logits, probs, validate_args):
     if outcomes.shape.num_elements() == 0:
       raise ValueError(message)
   elif validate_args:
-    assertions.append(
-        tf1.assert_greater(
-            tf.size(input=outcomes), 0, message=message))
+    assertions.append(tf1.assert_greater(tf.size(outcomes), 0, message=message))
 
   if validate_args:
     assertions.append(

@@ -305,8 +305,11 @@ A sequence of all submodules.
 
 <h3 id="total_concentration"><code>total_concentration</code></h3>
 
-Sum of last dim of concentration parameter.
+Sum of last dim of concentration parameter. (deprecated)
 
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+The `total_concentration` property is deprecated; instead use `tf.reduce_sum(dist.concentration, axis=-1)`.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
@@ -920,7 +923,7 @@ quantile(
 )
 ```
 
-Quantile function. Aka "inverse cdf" or "percent point function".
+Quantile function. Aka 'inverse cdf' or 'percent point function'.
 
 Given random variable `X` and `p in [0, 1]`, the `quantile` is:
 

@@ -343,7 +343,7 @@ Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 #### Args:
 
 
-* <b>`x`</b>: `Tensor`. The input to the "forward" evaluation.
+* <b>`x`</b>: `Tensor`. The input to the 'forward' evaluation.
 * <b>`name`</b>: The name to give this op.
 * <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
@@ -427,7 +427,7 @@ Returns both the forward_log_det_jacobian.
 #### Args:
 
 
-* <b>`x`</b>: `Tensor`. The input to the "forward" Jacobian determinant evaluation.
+* <b>`x`</b>: `Tensor`. The input to the 'forward' Jacobian determinant evaluation.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
   transformed. Must be greater than or equal to
   `self.forward_min_event_ndims`. The result is summed over the final
@@ -469,7 +469,7 @@ Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 #### Args:
 
 
-* <b>`y`</b>: `Tensor`. The input to the "inverse" evaluation.
+* <b>`y`</b>: `Tensor`. The input to the 'inverse' evaluation.
 * <b>`name`</b>: The name to give this op.
 * <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
@@ -559,7 +559,7 @@ evaluated at `g^{-1}(y)`.
 #### Args:
 
 
-* <b>`y`</b>: `Tensor`. The input to the "inverse" Jacobian determinant evaluation.
+* <b>`y`</b>: `Tensor`. The input to the 'inverse' Jacobian determinant evaluation.
 * <b>`event_ndims`</b>: Number of dimensions in the probabilistic events being
   transformed. Must be greater than or equal to
   `self.inverse_min_event_ndims`. The result is summed over the final

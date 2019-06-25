@@ -819,7 +819,7 @@ class Distribution(_BaseDistribution):
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, 'sample_shape')
       samples = self._sample_n(n, seed, **kwargs)
-      batch_event_shape = tf.shape(input=samples)[1:]
+      batch_event_shape = tf.shape(samples)[1:]
       final_shape = tf.concat([sample_shape, batch_event_shape], 0)
       samples = tf.reshape(samples, final_shape)
       samples = self._set_sample_static_shape(samples, sample_shape)
@@ -1271,8 +1271,13 @@ class Distribution(_BaseDistribution):
         representing `n` different calculations of the Kullback-Leibler
         divergence.
     """
-    with self._name_and_control_scope(name):
-      return self._kl_divergence(other)
+    # NOTE: We do not enter a `self._name_and_control_scope` here.  We rely on
+    # `tfd.kl_divergence(self, other)` to use `_name_and_control_scope` to apply
+    # assertions on both Distributions.
+    #
+    # Subclasses that override `Distribution.kl_divergence` or `_kl_divergence`
+    # must ensure that assertions are applied for both `self` and `other`.
+    return self._kl_divergence(other)
 
   def __str__(self):
     if self.batch_shape:
@@ -1330,7 +1335,7 @@ class Distribution(_BaseDistribution):
     """Helper to `sample` which ensures input is 1D."""
     x_static_val = tf.get_static_value(x)
     if x_static_val is None:
-      prod = tf.reduce_prod(input_tensor=x)
+      prod = tf.reduce_prod(x)
     else:
       prod = np.prod(x_static_val, dtype=dtype_util.as_numpy_dtype(x.dtype))
 
@@ -1391,7 +1396,7 @@ class Distribution(_BaseDistribution):
       # this branch. We keep it just in case there's some unimagined corner
       # case.
       return tensorshape_util.as_list(shape.shape) == [0]
-    return tf.equal(tf.shape(input=shape)[0], 0)
+    return tf.equal(tf.shape(shape)[0], 0)
 
   def _parameter_control_dependencies(self, is_init):
     """Returns a list of ops to be executed in members with graph deps.

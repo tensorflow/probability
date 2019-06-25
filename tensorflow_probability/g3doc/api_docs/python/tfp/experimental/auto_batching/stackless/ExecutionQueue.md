@@ -1,18 +1,23 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
-<meta itemprop="name" content="tfp.experimental.auto_batching.frontend.st.ExecutionQueue" />
+<meta itemprop="name" content="tfp.experimental.auto_batching.stackless.ExecutionQueue" />
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="dequeue"/>
 <meta itemprop="property" content="enqueue"/>
 </div>
 
-# tfp.experimental.auto_batching.frontend.st.ExecutionQueue
+# tfp.experimental.auto_batching.stackless.ExecutionQueue
 
 ## Class `ExecutionQueue`
 
 A priority queue of resumption points.
 
 
+
+### Aliases:
+
+* Class `tfp.experimental.auto_batching.frontend.st.ExecutionQueue`
+* Class `tfp.experimental.auto_batching.stackless.ExecutionQueue`
 
 
 

@@ -18,7 +18,10 @@ An auto-batchable program.
 
 * Class `tfp.experimental.auto_batching.frontend.instructions.Program`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.Program`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.Program`
 * Class `tfp.experimental.auto_batching.instructions.Program`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.Program`
+* Class `tfp.experimental.auto_batching.stackless.inst.Program`
 
 
 

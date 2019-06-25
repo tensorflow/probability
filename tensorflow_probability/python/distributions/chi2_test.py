@@ -108,8 +108,7 @@ class Chi2Test(tf.test.TestCase):
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(1e5), seed=tfp_test_util.test_seed())
-    kl_sample = tf.reduce_mean(
-        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
     self.assertAllClose(true_kl, kl_, atol=0., rtol=5e-13)

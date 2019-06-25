@@ -219,7 +219,7 @@ class MultivariateNormalDiagPlusLowRank(
 
     def _convert_to_tensor(x, name, dtype=None):
       return None if x is None else tf.convert_to_tensor(
-          value=x, name=name, dtype=dtype)
+          x, name=name, dtype=dtype)
 
     with tf.name_scope(name) as name:
       with tf.name_scope("init"):

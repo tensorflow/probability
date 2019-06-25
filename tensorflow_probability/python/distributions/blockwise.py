@@ -127,12 +127,12 @@ class Blockwise(distribution.Distribution):
   def _event_shape_tensor(self):
     with tf.control_dependencies(self._assertions):
       event_sizes = [
-          tf.reduce_prod(input_tensor=d.event_shape_tensor())  # pylint: disable=g-complex-comprehension
+          tf.reduce_prod(d.event_shape_tensor())  # pylint: disable=g-complex-comprehension
           if tensorshape_util.num_elements(d.event_shape) is None else
           tensorshape_util.num_elements(d.event_shape)
           for d in self._distributions
       ]
-      return tf.reduce_sum(input_tensor=event_sizes)[tf.newaxis]
+      return tf.reduce_sum(event_sizes)[tf.newaxis]
 
   def _sample_n(self, n, seed=None):
     with tf.control_dependencies(self._assertions):
@@ -202,7 +202,8 @@ def _maybe_validate_distributions(distributions, dtype_override, validate_args):
     elif validate_args:
       assertions.append(
           assert_util.assert_equal(
-              1, tf.size(input=d.event_shape_tensor()),
+              1,
+              tf.size(d.event_shape_tensor()),
               message='`Distribution` must be vector variate.'))
 
   batch_shapes = [d.batch_shape for d in distributions]
@@ -272,4 +273,4 @@ def _kl_blockwise_blockwise(b0, b1, name=None):
 def _event_size(d):
   if tensorshape_util.num_elements(d.event_shape) is not None:
     return tensorshape_util.num_elements(d.event_shape)
-  return tf.reduce_prod(input_tensor=d.event_shape_tensor())
+  return tf.reduce_prod(d.event_shape_tensor())

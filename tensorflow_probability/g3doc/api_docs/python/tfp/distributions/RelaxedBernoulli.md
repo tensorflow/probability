@@ -34,11 +34,13 @@
 <meta itemprop="property" content="log_cdf"/>
 <meta itemprop="property" content="log_prob"/>
 <meta itemprop="property" content="log_survival_function"/>
+<meta itemprop="property" content="logits_parameter"/>
 <meta itemprop="property" content="mean"/>
 <meta itemprop="property" content="mode"/>
 <meta itemprop="property" content="param_shapes"/>
 <meta itemprop="property" content="param_static_shapes"/>
 <meta itemprop="property" content="prob"/>
+<meta itemprop="property" content="probs_parameter"/>
 <meta itemprop="property" content="quantile"/>
 <meta itemprop="property" content="sample"/>
 <meta itemprop="property" content="stddev"/>
@@ -267,7 +269,7 @@ May be partially defined or unknown.
 
 <h3 id="logits"><code>logits</code></h3>
 
-Log-odds of `1`.
+Input argument `logits`.
 
 
 <h3 id="name"><code>name</code></h3>
@@ -287,7 +289,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 
 <h3 id="probs"><code>probs</code></h3>
 
-Probability of `1`.
+Input argument `probs`.
 
 
 <h3 id="reparameterization_type"><code>reparameterization_type</code></h3>
@@ -789,6 +791,15 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
   `self.dtype`.
 
 
+<h3 id="logits_parameter"><code>logits_parameter</code></h3>
+
+``` python
+logits_parameter(name=None)
+```
+
+Logits computed from non-`None` input arg (`probs` or `logits`).
+
+
 <h3 id="mean"><code>mean</code></h3>
 
 ``` python
@@ -908,6 +919,15 @@ Probability density/mass function.
 * <b>`prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
   values of type `self.dtype`.
 
+<h3 id="probs_parameter"><code>probs_parameter</code></h3>
+
+``` python
+probs_parameter(name=None)
+```
+
+Probs computed from non-`None` input arg (`probs` or `logits`).
+
+
 <h3 id="quantile"><code>quantile</code></h3>
 
 ``` python
@@ -918,7 +938,7 @@ quantile(
 )
 ```
 
-Quantile function. Aka "inverse cdf" or "percent point function".
+Quantile function. Aka 'inverse cdf' or 'percent point function'.
 
 Given random variable `X` and `p in [0, 1]`, the `quantile` is:
 

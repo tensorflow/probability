@@ -16,7 +16,10 @@ Restore the given variables from their stacks.
 
 * Class `tfp.experimental.auto_batching.frontend.instructions.PopOp`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.PopOp`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.PopOp`
 * Class `tfp.experimental.auto_batching.instructions.PopOp`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.PopOp`
+* Class `tfp.experimental.auto_batching.stackless.inst.PopOp`
 
 
 

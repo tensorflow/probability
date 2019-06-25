@@ -148,7 +148,7 @@ class Normal(distribution.Distribution):
   def _param_shapes(sample_shape):
     return dict(
         zip(("loc", "scale"),
-            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
+            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
   def _params_event_ndims(cls):
@@ -164,9 +164,10 @@ class Normal(distribution.Distribution):
     """Distribution parameter for standard deviation."""
     return self._scale
 
-  def _batch_shape_tensor(self):
+  def _batch_shape_tensor(self, loc=None, scale=None):
     return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.loc), tf.shape(input=self.scale))
+        tf.shape(self.loc if loc is None else loc),
+        tf.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -180,13 +181,18 @@ class Normal(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    shape = tf.concat([[n], self.batch_shape_tensor()], 0)
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    shape = tf.concat([[n], self._batch_shape_tensor(loc=loc, scale=scale)], 0)
     sampled = tf.random.normal(
         shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=seed)
-    return sampled * self.scale + self.loc
+    return sampled * scale + loc
 
   def _log_prob(self, x):
-    return self._log_unnormalized_prob(x) - self._log_normalization()
+    scale = tf.convert_to_tensor(self.scale)
+    log_unnormalized = -0.5 * tf.square(self._z(x, scale=scale))
+    log_normalization = (0.5 * np.log(2. * np.pi)) + tf.math.log(scale)
+    return log_unnormalized - log_normalization
 
   def _log_cdf(self, x):
     return special_math.log_ndtr(self._z(x))
@@ -200,12 +206,6 @@ class Normal(distribution.Distribution):
   def _survival_function(self, x):
     return special_math.ndtr(-self._z(x))
 
-  def _log_unnormalized_prob(self, x):
-    return -0.5 * tf.square(self._z(x))
-
-  def _log_normalization(self):
-    return 0.5 * np.log(2. * np.pi) + tf.math.log(self.scale)
-
   def _entropy(self):
     # Use broadcasting rules to calculate the full broadcast scale.
     scale = self.scale * tf.ones_like(self.loc)
@@ -215,7 +215,7 @@ class Normal(distribution.Distribution):
     return self.loc * tf.ones_like(self.scale)
 
   def _quantile(self, p):
-    return self._inv_z(special_math.ndtri(p))
+    return special_math.ndtri(p) * self.scale + self.loc
 
   def _stddev(self):
     return self.scale * tf.ones_like(self.loc)
@@ -223,15 +223,10 @@ class Normal(distribution.Distribution):
   def _mode(self):
     return self._mean()
 
-  def _z(self, x):
+  def _z(self, x, scale=None):
     """Standardize input `x` to a unit normal."""
     with tf.name_scope("standardize"):
-      return (x - self.loc) / self.scale
-
-  def _inv_z(self, z):
-    """Reconstruct input `x` from a its normalized version."""
-    with tf.name_scope("reconstruct"):
-      return z * self.scale + self.loc
+      return (x - self.loc) / (self.scale if scale is None else scale)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

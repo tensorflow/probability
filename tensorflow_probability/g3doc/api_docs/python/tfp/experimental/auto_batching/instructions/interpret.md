@@ -11,7 +11,10 @@ Interprets a program in this instruction language and returns the result.
 
 * `tfp.experimental.auto_batching.frontend.instructions.interpret`
 * `tfp.experimental.auto_batching.frontend.st.inst.interpret`
+* `tfp.experimental.auto_batching.frontend.stack.inst.interpret`
 * `tfp.experimental.auto_batching.instructions.interpret`
+* `tfp.experimental.auto_batching.stack_optimization.inst.interpret`
+* `tfp.experimental.auto_batching.stackless.inst.interpret`
 
 ``` python
 tfp.experimental.auto_batching.instructions.interpret(

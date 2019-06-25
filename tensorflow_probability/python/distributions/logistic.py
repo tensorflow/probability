@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import math
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -26,7 +25,9 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 
 
 class Logistic(distribution.Distribution):
@@ -92,7 +93,7 @@ class Logistic(distribution.Distribution):
                scale,
                validate_args=False,
                allow_nan_stats=True,
-               name="Logistic"):
+               name='Logistic'):
     """Construct Logistic distributions with mean and scale `loc` and `scale`.
 
     The parameters `loc` and `scale` must be shaped in a way that supports
@@ -107,7 +108,7 @@ class Logistic(distribution.Distribution):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
-        (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+        (e.g., mean, mode, variance) use the value '`NaN`' to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
       name: The name to give Ops created by the initializer.
@@ -118,27 +119,23 @@ class Logistic(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], dtype_hint=tf.float32)
-      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
-      with tf.control_dependencies(
-          [assert_util.assert_positive(scale)] if validate_args else []):
-        self._loc = tf.identity(loc, name="loc")
-        self._scale = tf.identity(scale, name="scale")
-        dtype_util.assert_same_float_dtype([self._loc, self._scale])
-    super(Logistic, self).__init__(
-        dtype=self._scale.dtype,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._loc, self._scale],
-        name=name)
+      self._loc = tensor_util.convert_immutable_to_tensor(
+          loc, name='loc', dtype=dtype)
+      self._scale = tensor_util.convert_immutable_to_tensor(
+          scale, name='scale', dtype=dtype)
+      super(Logistic, self).__init__(
+          dtype=self._scale.dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("loc", "scale"),
-            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
+        zip(('loc', 'scale'),
+            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
   def _params_event_ndims(cls):
@@ -154,13 +151,13 @@ class Logistic(distribution.Distribution):
     """Distribution parameter for scale."""
     return self._scale
 
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.loc), tf.shape(input=self.scale))
+  def _batch_shape_tensor(self, loc=None, scale=None):
+    return prefer_static.broadcast_shape(
+        prefer_static.shape(self.loc if loc is None else loc),
+        prefer_static.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(self.loc.shape,
-                                     self.scale.shape)
+    return tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -169,24 +166,30 @@ class Logistic(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    shape = tf.concat([[n], self._batch_shape_tensor(loc=loc, scale=scale)], 0)
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
     # than `[0, 1)`. To do so, we use
     # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny` because it is the
-    # smallest, positive, "normal" number. A "normal" number is such that the
+    # smallest, positive, 'normal' number. A 'normal' number is such that the
     # mantissa has an implicit leading 1. Normal, positive numbers x, y have the
     # reasonable property that, `x + y >= max(x, y)`. In this case, a subnormal
     # number (i.e., np.nextafter) can cause us to sample 0.
     uniform = tf.random.uniform(
-        shape=tf.concat([[n], self.batch_shape_tensor()], 0),
+        shape=shape,
         minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,
         dtype=self.dtype,
         seed=seed)
     sampled = tf.math.log(uniform) - tf.math.log1p(-1. * uniform)
-    return sampled * self.scale + self.loc
+    return sampled * scale + loc
 
   def _log_prob(self, x):
-    return self._log_unnormalized_prob(x) - self._log_normalization()
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    z = (x - loc) / scale
+    return -z - 2. * tf.nn.softplus(-z) - tf.math.log(scale)
 
   def _log_cdf(self, x):
     return -tf.nn.softplus(-self._z(x))
@@ -200,28 +203,35 @@ class Logistic(distribution.Distribution):
   def _survival_function(self, x):
     return tf.sigmoid(-self._z(x))
 
-  def _log_unnormalized_prob(self, x):
-    z = self._z(x)
-    return -z - 2. * tf.nn.softplus(-z)
-
-  def _log_normalization(self):
-    return tf.math.log(self.scale)
-
   def _entropy(self):
-    # Use broadcasting rules to calculate the full broadcast sigma.
-    scale = self.scale * tf.ones_like(self.loc)
-    return 2 + tf.math.log(scale)
+    scale = tf.convert_to_tensor(self.scale)
+    return tf.broadcast_to(2. + tf.math.log(scale),
+                           self._batch_shape_tensor(scale=scale))
 
   def _mean(self):
-    return self.loc * tf.ones_like(self.scale)
+    loc = tf.convert_to_tensor(self.loc)
+    return tf.broadcast_to(loc, self._batch_shape_tensor(loc=loc))
 
   def _stddev(self):
-    return self.scale * tf.ones_like(self.loc) * math.pi / math.sqrt(3)
+    scale = tf.convert_to_tensor(self.scale)
+    return tf.broadcast_to(scale * np.pi / np.sqrt(3),
+                           self._batch_shape_tensor(scale=scale))
 
   def _mode(self):
     return self._mean()
 
   def _z(self, x):
     """Standardize input `x` to a unit logistic."""
-    with tf.name_scope("standardize"):
+    with tf.name_scope('standardize'):
       return (x - self.loc) / self.scale
+
+  def _parameter_control_dependencies(self, is_init):
+    if is_init:
+      dtype_util.assert_same_float_dtype([self.loc, self.scale])
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_mutable(self._scale):
+      assertions.append(assert_util.assert_positive(
+          self._scale, message='Argument `scale` must be positive.'))
+    return assertions

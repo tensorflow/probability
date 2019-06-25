@@ -140,7 +140,7 @@ class Horseshoe(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([scale], dtype_hint=tf.float32)
-      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       with tf.control_dependencies(
           [assert_util.assert_positive(scale)] if validate_args else []):
         self._scale = tf.identity(
@@ -160,7 +160,7 @@ class Horseshoe(distribution.Distribution):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {"scale": tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)}
+    return {"scale": tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
 
   @classmethod
   def _params_event_ndims(cls):
@@ -172,7 +172,7 @@ class Horseshoe(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self):
-    return tf.shape(input=self.scale)
+    return tf.shape(self.scale)
 
   def _batch_shape(self):
     return self.scale.shape

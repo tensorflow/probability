@@ -11,7 +11,10 @@ Returns a control transfer `Op` that means "exit this graph".
 
 * `tfp.experimental.auto_batching.frontend.instructions.halt_op`
 * `tfp.experimental.auto_batching.frontend.st.inst.halt_op`
+* `tfp.experimental.auto_batching.frontend.stack.inst.halt_op`
 * `tfp.experimental.auto_batching.instructions.halt_op`
+* `tfp.experimental.auto_batching.stack_optimization.inst.halt_op`
+* `tfp.experimental.auto_batching.stackless.inst.halt_op`
 
 ``` python
 tfp.experimental.auto_batching.instructions.halt_op()

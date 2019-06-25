@@ -60,7 +60,7 @@ class CategoricalToDiscrete(bijector.Bijector):
       name: Python `str` name given to ops managed by this object.
     """
     with tf.name_scope(name):
-      map_values = tf.convert_to_tensor(value=map_values, name='map_values')
+      map_values = tf.convert_to_tensor(map_values, name='map_values')
       assertions = _maybe_check_valid_map_values(map_values, validate_args)
       if assertions:
         with tf.control_dependencies(assertions):
@@ -77,7 +77,7 @@ class CategoricalToDiscrete(bijector.Bijector):
     if self.validate_args:
       with tf.control_dependencies([
           assert_util.assert_equal(
-              (0 <= x) & (x < tf.size(input=self.map_values)),
+              (0 <= x) & (x < tf.size(self.map_values)),
               True,
               message='indices out of bound')
       ]):
@@ -93,7 +93,7 @@ class CategoricalToDiscrete(bijector.Bijector):
     # Since self.map_values is strictly increasing, the closest is either the
     # first one that is strictly greater than flat_y, or the one before it.
     upper_candidates = tf.minimum(
-        tf.size(input=self.map_values) - 1,
+        tf.size(self.map_values) - 1,
         tf.searchsorted(self.map_values, values=flat_y, side='right'))
     lower_candidates = tf.maximum(0, upper_candidates - 1)
     candidates = tf.stack([lower_candidates, upper_candidates], axis=-1)
@@ -108,9 +108,8 @@ class CategoricalToDiscrete(bijector.Bijector):
       ]):
         candidates = tf.identity(candidates)
     candidate_selector = tf.stack([
-        tf.range(tf.size(input=flat_y), dtype=tf.int32),
-        tf.argmin(
-            input=[lower_cand_diff, upper_cand_diff], output_type=tf.int32)
+        tf.range(tf.size(flat_y), dtype=tf.int32),
+        tf.argmin([lower_cand_diff, upper_cand_diff], output_type=tf.int32)
     ],
                                   axis=-1)
     return tf.reshape(
@@ -141,8 +140,7 @@ def _maybe_check_valid_map_values(map_values, validate_args):
       raise ValueError(message)
   elif validate_args:
     assertions.append(
-        assert_util.assert_greater(
-            tf.size(input=map_values), 0, message=message))
+        assert_util.assert_greater(tf.size(map_values), 0, message=message))
 
   if validate_args:
     assertions.append(

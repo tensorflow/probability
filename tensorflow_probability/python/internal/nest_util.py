@@ -103,7 +103,7 @@ def _nested_convert_to_tensor(struct, dtype=None, name=None):
   if _maybe_convertible_to_tensor(struct):
     try:
       # Try converting the structure wholesale.
-      return tf.convert_to_tensor(value=struct, name=name)
+      return tf.convert_to_tensor(struct, name=name)
     except (ValueError, TypeError):
       # Unfortunately Eager/Graph mode don't agree on the error type.
       pass

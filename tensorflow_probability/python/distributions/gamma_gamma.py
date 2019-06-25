@@ -125,11 +125,11 @@ class GammaGamma(distribution.Distribution):
           [concentration, mixing_concentration, mixing_rate],
           dtype_hint=tf.float32)
       concentration = tf.convert_to_tensor(
-          value=concentration, name="concentration", dtype=dtype)
+          concentration, name="concentration", dtype=dtype)
       mixing_concentration = tf.convert_to_tensor(
-          value=mixing_concentration, name="mixing_concentration", dtype=dtype)
+          mixing_concentration, name="mixing_concentration", dtype=dtype)
       mixing_rate = tf.convert_to_tensor(
-          value=mixing_rate, name="mixing_rate", dtype=dtype)
+          mixing_rate, name="mixing_rate", dtype=dtype)
       with tf.control_dependencies([
           assert_util.assert_positive(concentration),
           assert_util.assert_positive(mixing_concentration),
@@ -176,7 +176,7 @@ class GammaGamma(distribution.Distribution):
   def _batch_shape_tensor(self):
     tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
     return functools.reduce(tf.broadcast_dynamic_shape,
-                            [tf.shape(input=tensor) for tensor in tensors])
+                            [tf.shape(tensor) for tensor in tensors])
 
   def _batch_shape(self):
     tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]

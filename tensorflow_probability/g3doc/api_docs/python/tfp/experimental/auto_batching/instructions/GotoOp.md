@@ -16,7 +16,10 @@ An unconditional jump.
 
 * Class `tfp.experimental.auto_batching.frontend.instructions.GotoOp`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.GotoOp`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.GotoOp`
 * Class `tfp.experimental.auto_batching.instructions.GotoOp`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.GotoOp`
+* Class `tfp.experimental.auto_batching.stackless.inst.GotoOp`
 
 
 

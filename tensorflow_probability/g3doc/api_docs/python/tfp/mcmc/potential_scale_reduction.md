@@ -11,6 +11,8 @@ Gelman and Rubin (1992)'s potential scale reduction for chain convergence.
 tfp.mcmc.potential_scale_reduction(
     chains_states,
     independent_chain_ndims=1,
+    split_chains=False,
+    validate_args=False,
     name=None
 )
 ```
@@ -58,6 +60,11 @@ distributed. See [Gelman and Rubin (1992)][1]; [Brooks and Gelman (1998)][2].
 * <b>`independent_chain_ndims`</b>: Integer type `Tensor` with value `>= 1` giving the
   number of dimensions, from `dim = 1` to `dim = D`, holding independent
   chain results to be tested for convergence.
+* <b>`split_chains`</b>: Python `bool`. If `True`, divide samples from each chain into
+  first and second halves, treating these as separate chains.  This makes
+  R-hat more robust to non-stationary chains, and is recommended in [3].
+* <b>`validate_args`</b>: Whether to add runtime checks of argument validity. If False,
+  and arguments are incorrect, correct behavior is not guaranteed.
 * <b>`name`</b>: `String` name to prepend to created tf.  Default:
   `potential_scale_reduction`.
 
@@ -130,3 +137,5 @@ distribution, they will have the same mean, and thus the ratio should be one.
 
 [2]: Andrew Gelman and Donald B. Rubin. Inference from Iterative Simulation
      Using Multiple Sequences. _Statistical Science_, 7(4):457-472, 1992.
+[3]: Vehtari et al.  Rank-normalization, folding, and localization: An
+     improved Rhat for assessing convergence of MCMC.

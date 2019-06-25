@@ -161,12 +161,12 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
       with tf.name_scope("init"):
         dtype = dtype_util.common_dtype([loc, covariance_matrix], tf.float32)
         loc = loc if loc is None else tf.convert_to_tensor(
-            value=loc, name="loc", dtype=dtype)
+            loc, name="loc", dtype=dtype)
         if covariance_matrix is None:
           scale_tril = None
         else:
           covariance_matrix = tf.convert_to_tensor(
-              value=covariance_matrix, name="covariance_matrix", dtype=dtype)
+              covariance_matrix, name="covariance_matrix", dtype=dtype)
           if validate_args:
             covariance_matrix = distribution_util.with_dependencies([
                 assert_util.assert_near(

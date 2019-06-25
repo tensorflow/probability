@@ -77,11 +77,11 @@ def matrix_rank(a, tol=None, validate_args=False, name=None):
       if tensorshape_util.is_fully_defined(a.shape[-2:]):
         m = np.max(a.shape[-2:].as_list())
       else:
-        m = tf.reduce_max(input_tensor=tf.shape(a)[-2:])
+        m = tf.reduce_max(tf.shape(a)[-2:])
       eps = np.finfo(a.dtype.as_numpy_dtype).eps
-      tol = (eps * tf.cast(m, a.dtype) *
-             tf.reduce_max(input_tensor=s, axis=-1, keepdims=True))
-    return tf.reduce_sum(input_tensor=tf.cast(s > tol, tf.int32), axis=-1)
+      tol = (
+          eps * tf.cast(m, a.dtype) * tf.reduce_max(s, axis=-1, keepdims=True))
+    return tf.reduce_sum(tf.cast(s > tol, tf.int32), axis=-1)
 
 
 def cholesky_concat(chol, cols, name=None):
@@ -240,14 +240,14 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
         diag_rtol, dtype=dtype, name='diag_rtol')
     matrix_diag = tf.linalg.diag_part(matrix)
     # matrix is P.D., therefore all matrix_diag > 0, so we don't need abs.
-    orig_error = tf.reduce_max(input_tensor=matrix_diag, axis=-1)
+    orig_error = tf.reduce_max(matrix_diag, axis=-1)
 
     def cond(m, pchol, perm, matrix_diag):
       """Condition for `tf.while_loop` continuation."""
       del pchol
       del perm
-      error = tf.linalg.norm(tensor=matrix_diag, ord=1, axis=-1)
-      max_err = tf.reduce_max(input_tensor=error / orig_error)
+      error = tf.linalg.norm(matrix_diag, ord=1, axis=-1)
+      max_err = tf.reduce_max(error / orig_error)
       return (m < max_rank) & (tf.equal(m, 0) | (max_err > diag_rtol))
 
     batch_dims = tensorshape_util.rank(matrix.shape) - 2
@@ -286,7 +286,7 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
       prev_rows_perm_m_onward = batch_gather(prev_rows, perm[..., m + 1:])
       prev_rows_pivot_col = batch_gather(prev_rows, perm[..., m:m + 1])
       row -= tf.reduce_sum(
-          input_tensor=prev_rows_perm_m_onward * prev_rows_pivot_col,
+          prev_rows_perm_m_onward * prev_rows_pivot_col,
           axis=-2)[..., tf.newaxis, :]
       # Step 6.
       pivot = tf.sqrt(maxval)[..., tf.newaxis, tf.newaxis]
@@ -297,11 +297,11 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
       paddings = tf.concat([
           tf.zeros([prefer_static.rank(pchol) - 1, 2], dtype=tf.int32),
           [[tf.cast(m, tf.int32), 0]]], axis=0)
-      diag_update = tf.pad(tensor=row**2, paddings=paddings)[..., 0, :]
+      diag_update = tf.pad(row**2, paddings=paddings)[..., 0, :]
       reverse_perm = _invert_permutation(perm)
       matrix_diag -= batch_gather(diag_update, reverse_perm)
       # Step 9.
-      row = tf.pad(tensor=row, paddings=paddings)
+      row = tf.pad(row, paddings=paddings)
       # TODO(bjp): Defer the reverse permutation all-at-once at the end?
       row = batch_gather(row, reverse_perm)
       pchol_shape = pchol.shape
@@ -429,7 +429,7 @@ def pinv(a, rcond=None, validate_args=False, name=None):
 
     # Saturate small singular values to inf. This has the effect of make
     # `1. / s = 0.` while not resulting in `NaN` gradients.
-    cutoff = rcond * tf.reduce_max(input_tensor=singular_values, axis=-1)
+    cutoff = rcond * tf.reduce_max(singular_values, axis=-1)
     singular_values = tf1.where(
         singular_values > cutoff[..., tf.newaxis], singular_values,
         tf.fill(tf.shape(singular_values), np.array(np.inf, dtype)))
@@ -526,7 +526,7 @@ def lu_solve(lower_upper, perm, rhs,
       # Tile out perm and add batch indices.
       broadcast_perm = tf.broadcast_to(perm, rhs_broadcast_shape[:-1])
       broadcast_perm = tf.reshape(broadcast_perm, [-1, d])
-      broadcast_batch_size = tf.reduce_prod(input_tensor=broadcast_batch_shape)
+      broadcast_batch_size = tf.reduce_prod(broadcast_batch_shape)
       broadcast_batch_indices = tf.broadcast_to(
           tf.range(broadcast_batch_size)[:, tf.newaxis],
           [broadcast_batch_size, d])
@@ -662,7 +662,7 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
 
     if lower_upper.shape.ndims is None or lower_upper.shape.ndims != 2:
       # We either don't know the batch rank or there are >0 batch dims.
-      batch_size = tf.reduce_prod(input_tensor=shape[:-2])
+      batch_size = tf.reduce_prod(shape[:-2])
       d = shape[-1]
       x = tf.reshape(x, [batch_size, d, d])
       perm = tf.reshape(perm, [batch_size, d])

@@ -103,7 +103,7 @@ class Zipf(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       power = tf.convert_to_tensor(
-          value=power,
+          power,
           name="power",
           dtype=dtype_util.common_dtype([power], dtype_hint=tf.float32))
       if (not dtype_util.is_floating(power.dtype) or
@@ -149,7 +149,7 @@ class Zipf(distribution.Distribution):
     return self._sample_maximum_iterations
 
   def _batch_shape_tensor(self):
-    return tf.shape(input=self.power)
+    return tf.shape(self.power)
 
   def _batch_shape(self):
     return self.power.shape
@@ -193,8 +193,7 @@ class Zipf(distribution.Distribution):
     cdf = 1. - (
         tf.math.zeta(self.power, safe_x + 1.) / tf.math.zeta(self.power, 1.))
     return tf1.where(
-        tf.broadcast_to(tf.less(x, 1.), tf.shape(input=cdf)),
-        tf.zeros_like(cdf), cdf)
+        tf.broadcast_to(tf.less(x, 1.), tf.shape(cdf)), tf.zeros_like(cdf), cdf)
 
   def _log_normalization(self):
     return tf.math.log(tf.math.zeta(self.power, 1.))
@@ -202,9 +201,8 @@ class Zipf(distribution.Distribution):
   def _log_unnormalized_prob(self, x):
     safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 1.)
     y = -self.power * tf.math.log(safe_x)
-    is_supported = tf.broadcast_to(tf.equal(x, safe_x), tf.shape(input=y))
-    neg_inf = tf.fill(
-        tf.shape(input=y), value=dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
+    is_supported = tf.broadcast_to(tf.equal(x, safe_x), tf.shape(y))
+    neg_inf = tf.fill(tf.shape(y), dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
     return tf1.where(is_supported, y, neg_inf)
 
   @distribution_util.AppendDocstring(
@@ -278,8 +276,7 @@ class Zipf(distribution.Distribution):
       return [should_continue & (~accept), k]
 
     should_continue, samples = tf.while_loop(
-        cond=lambda should_continue, *ignore: tf.reduce_any(
-            input_tensor=should_continue),
+        cond=lambda should_continue, *ignore: tf.reduce_any(should_continue),
         body=loop_body,
         loop_vars=[
             tf.ones(shape, dtype=tf.bool),  # should_continue
@@ -299,7 +296,7 @@ class Zipf(distribution.Distribution):
     if self.validate_args:
       npdt = dtype_util.as_numpy_dtype(self.dtype)
       v = npdt(dtype_util.min(npdt) if dtype_util.is_integer(npdt) else np.nan)
-      mask = tf.fill(shape, value=v)
+      mask = tf.fill(shape, v)
       samples = tf1.where(should_continue, mask, samples)
 
     return samples

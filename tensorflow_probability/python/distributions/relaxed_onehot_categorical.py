@@ -172,7 +172,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
       with tf.control_dependencies(
           [assert_util.assert_positive(temperature)] if validate_args else []):
         self._temperature = tf.convert_to_tensor(
-            value=temperature, name='temperature', dtype=dtype)
+            temperature, name='temperature', dtype=dtype)
         self._temperature_2d = tf.reshape(
             self._temperature, [-1, 1], name='temperature_2d')
 
@@ -180,7 +180,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
           self._logits.shape, 1)
       if tensorshape_util.rank(logits_shape_static) is not None:
         self._batch_rank = tf.convert_to_tensor(
-            value=tensorshape_util.rank(logits_shape_static) - 1,
+            tensorshape_util.rank(logits_shape_static) - 1,
             dtype=tf.int32,
             name='batch_rank')
       else:
@@ -188,7 +188,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
           self._batch_rank = tf.rank(self._logits) - 1
 
       with tf.name_scope('event_size'):
-        self._event_size = tf.shape(input=self._logits)[-1]
+        self._event_size = tf.shape(self._logits)[-1]
 
     super(ExpRelaxedOneHotCategorical, self).__init__(
         dtype=dtype,
@@ -225,15 +225,15 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.temperature),
-        tf.shape(input=self.logits)[:-1])
+        tf.shape(self.temperature),
+        tf.shape(self.logits)[:-1])
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.temperature.shape,
                                      self.logits.shape[:-1])
 
   def _event_shape_tensor(self):
-    return tf.shape(input=self.logits)[-1:]
+    return tf.shape(self.logits)[-1:]
 
   def _event_shape(self):
     return tensorshape_util.with_rank_at_least(self.logits.shape, 1)[-1:]
@@ -274,8 +274,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     # compute the unnormalized density
     log_softmax = tf.nn.log_softmax(
         self.logits - x * self.temperature[..., tf.newaxis])
-    log_unnorm_prob = tf.reduce_sum(
-        input_tensor=log_softmax, axis=[-1], keepdims=False)
+    log_unnorm_prob = tf.reduce_sum(log_softmax, axis=[-1], keepdims=False)
     # combine unnormalized density with normalization constant
     return log_norm_const + log_unnorm_prob
 
@@ -299,8 +298,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     return distribution_util.with_dependencies([
         assert_util.assert_non_positive(x),
         assert_util.assert_near(
-            tf.zeros([], dtype=self.dtype),
-            tf.reduce_logsumexp(input_tensor=x, axis=[-1])),
+            tf.zeros([], dtype=self.dtype), tf.reduce_logsumexp(x, axis=[-1])),
     ], x)
 
 

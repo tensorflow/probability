@@ -20,7 +20,10 @@ A control flow graph (CFG).
 
 * Class `tfp.experimental.auto_batching.frontend.instructions.ControlFlowGraph`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.ControlFlowGraph`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.ControlFlowGraph`
 * Class `tfp.experimental.auto_batching.instructions.ControlFlowGraph`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.ControlFlowGraph`
+* Class `tfp.experimental.auto_batching.stackless.inst.ControlFlowGraph`
 
 
 

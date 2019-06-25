@@ -56,8 +56,8 @@ class HalfNormalTest(test_case.TestCase):
     scale_shape = param_shapes['scale']
     self.assertAllEqual(expected, self.evaluate(scale_shape))
     scale = tf.ones(scale_shape)
-    self.assertAllEqual(
-        expected, self.evaluate(tf.shape(input=tfd.HalfNormal(scale).sample())))
+    self.assertAllEqual(expected,
+                        self.evaluate(tf.shape(tfd.HalfNormal(scale).sample())))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.HalfNormal.param_static_shapes(sample_shape)
@@ -285,7 +285,7 @@ class HalfNormalTest(test_case.TestCase):
   def testHalfNormalShapeWithPlaceholders(self):
     if tf.executing_eagerly():
       return
-    scale = tf1.placeholder_with_default(input=[1., 2], shape=None)
+    scale = tf1.placeholder_with_default([1., 2], shape=None)
     halfnorm = tfd.HalfNormal(scale=scale)
 
     # get_batch_shape should return an '<unknown>' tensor.
@@ -311,8 +311,7 @@ class HalfNormalTest(test_case.TestCase):
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(4e5), seed=tfp_test_util.test_seed(hardcoded_seed=0))
-    kl_sample = tf.reduce_mean(
-        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
     self.assertAllEqual(true_kl, kl_)

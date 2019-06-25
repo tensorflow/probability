@@ -33,8 +33,7 @@ __all__ = [
 
 def _as_tensor(x, name, dtype):
   """Convenience to convert to `Tensor` or leave as `None`."""
-  return None if x is None else tf.convert_to_tensor(
-      value=x, name=name, dtype=dtype)
+  return None if x is None else tf.convert_to_tensor(x, name=name, dtype=dtype)
 
 
 class Affine(bijector.Bijector):
@@ -192,14 +191,14 @@ class Affine(bijector.Bijector):
         ], tf.float32)
 
       if shift is not None:
-        shift = tf.convert_to_tensor(value=shift, name="shift", dtype=dtype)
+        shift = tf.convert_to_tensor(shift, name="shift", dtype=dtype)
       self._shift = shift
 
       # When no args are specified, pretend the scale matrix is the identity
       # matrix.
       if (self._is_only_identity_multiplier and
           scale_identity_multiplier is None):
-        scale_identity_multiplier = tf.convert_to_tensor(value=1., dtype=dtype)
+        scale_identity_multiplier = tf.convert_to_tensor(1., dtype=dtype)
 
       # self._create_scale_operator returns a LinearOperator in all cases
       # except if self._is_only_identity_multiplier; in which case it
@@ -356,7 +355,7 @@ class Affine(bijector.Bijector):
       # We don't pad in this case and instead let the fldj be applied
       # via broadcast.
       log_abs_diag = tf.math.log(tf.abs(self._scale))
-      event_size = tf.shape(input=x)[-1]
+      event_size = tf.shape(x)[-1]
       event_size = tf.cast(event_size, dtype=log_abs_diag.dtype)
       return log_abs_diag * event_size
     return self.scale.log_abs_determinant()

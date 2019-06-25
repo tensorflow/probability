@@ -97,12 +97,13 @@ class CholeskyToInvCholesky(bijector.Bijector):
     #                      = 2^p prod_{j=0}^{p-1} Y[j,j]^{p-j}
     n = tf.cast(tf.shape(x)[-1], x.dtype)
     y = self._forward(x)
-    return ((self._cholesky.forward_log_det_jacobian(x, event_ndims=2) -
-             (n + 1.) * tf.reduce_sum(
-                 input_tensor=tf.math.log(tf.linalg.diag_part(x)), axis=-1)) -
-            (self._cholesky.forward_log_det_jacobian(y, event_ndims=2) -
-             (n + 1.) * tf.reduce_sum(
-                 input_tensor=tf.math.log(tf.linalg.diag_part(y)), axis=-1)))
+    return (
+        (self._cholesky.forward_log_det_jacobian(x, event_ndims=2) -
+         (n + 1.) * tf.reduce_sum(tf.math.log(tf.linalg.diag_part(x)), axis=-1))
+        -
+        (self._cholesky.forward_log_det_jacobian(y, event_ndims=2) -
+         (n + 1.) * tf.reduce_sum(tf.math.log(tf.linalg.diag_part(y)), axis=-1))
+    )
 
   _inverse_log_det_jacobian = _forward_log_det_jacobian
 

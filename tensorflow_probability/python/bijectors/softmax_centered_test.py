@@ -106,8 +106,8 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
             bijector.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
   def testShapeGettersWithDynamicShape(self):
-    x = tf1.placeholder_with_default(input=[2, 4], shape=None)
-    y = tf1.placeholder_with_default(input=[2, 5], shape=None)
+    x = tf1.placeholder_with_default([2, 4], shape=None)
+    y = tf1.placeholder_with_default([2, 5], shape=None)
     bijector = tfb.SoftmaxCentered(validate_args=True)
     self.assertAllEqual(
         [2, 5], self.evaluate(bijector.forward_event_shape_tensor(x)))

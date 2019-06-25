@@ -1090,8 +1090,7 @@ class Bijector(tf.Module):
           x, y, tensor_to_use, use_inverse_ldj_fn, kwargs)
 
     return self._reduce_jacobian_det_over_event(
-        tf.shape(input=tensor_to_use), unreduced_ildj, min_event_ndims,
-        event_ndims)
+        tf.shape(tensor_to_use), unreduced_ildj, min_event_ndims, event_ndims)
 
   def _compute_unreduced_nonconstant_ildj_with_caching(
       self, x, y, tensor_to_use, use_inverse_ldj_fn, kwargs):
@@ -1205,9 +1204,7 @@ class Bijector(tf.Module):
         ildjs = self._inverse_log_det_jacobian(y, **kwargs)
         return tuple(
             self._reduce_jacobian_det_over_event(  # pylint: disable=g-complex-comprehension
-                tf.shape(input=y),
-                ildj,
-                self.inverse_min_event_ndims, event_ndims)
+                tf.shape(y), ildj, self.inverse_min_event_ndims, event_ndims)
             for ildj in ildjs)
 
       return self._compute_inverse_log_det_jacobian_with_caching(
@@ -1390,12 +1387,12 @@ class Bijector(tf.Module):
       self, shape_tensor, ildj, min_event_ndims, event_ndims):
     """Reduce jacobian over event_ndims - min_event_ndims."""
     # In this case, we need to tile the Jacobian over the event and reduce.
-    rank = tf.size(input=shape_tensor)
+    rank = tf.size(shape_tensor)
     shape_tensor = shape_tensor[rank - event_ndims:rank - min_event_ndims]
 
     ones = tf.ones(shape_tensor, ildj.dtype)
     reduced_ildj = tf.reduce_sum(
-        input_tensor=ones * ildj,
+        ones * ildj,
         axis=self._get_event_reduce_dims(min_event_ndims, event_ndims))
 
     return reduced_ildj

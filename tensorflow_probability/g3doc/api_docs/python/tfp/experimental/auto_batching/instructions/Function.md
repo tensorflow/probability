@@ -17,7 +17,10 @@ A function subject to auto-batching, callable with `FunctionCallOp`.
 
 * Class `tfp.experimental.auto_batching.frontend.instructions.Function`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.Function`
+* Class `tfp.experimental.auto_batching.frontend.stack.inst.Function`
 * Class `tfp.experimental.auto_batching.instructions.Function`
+* Class `tfp.experimental.auto_batching.stack_optimization.inst.Function`
+* Class `tfp.experimental.auto_batching.stackless.inst.Function`
 
 
 

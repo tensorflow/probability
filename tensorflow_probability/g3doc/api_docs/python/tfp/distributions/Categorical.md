@@ -5,7 +5,6 @@
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="event_shape"/>
-<meta itemprop="property" content="event_size"/>
 <meta itemprop="property" content="logits"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="name_scope"/>
@@ -33,11 +32,13 @@
 <meta itemprop="property" content="log_cdf"/>
 <meta itemprop="property" content="log_prob"/>
 <meta itemprop="property" content="log_survival_function"/>
+<meta itemprop="property" content="logits_parameter"/>
 <meta itemprop="property" content="mean"/>
 <meta itemprop="property" content="mode"/>
 <meta itemprop="property" content="param_shapes"/>
 <meta itemprop="property" content="param_static_shapes"/>
 <meta itemprop="property" content="prob"/>
+<meta itemprop="property" content="probs_parameter"/>
 <meta itemprop="property" content="quantile"/>
 <meta itemprop="property" content="sample"/>
 <meta itemprop="property" content="stddev"/>
@@ -236,17 +237,9 @@ May be partially defined or unknown.
 
 * <b>`event_shape`</b>: `TensorShape`, possibly unknown.
 
-<h3 id="event_size"><code>event_size</code></h3>
-
-Scalar `int32` tensor: the number of categories. (deprecated)
-
-Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-05-19.
-Instructions for updating:
-The `event_size` property is deprecated.  Use `num_categories` instead.  They have the same value, but `event_size` is misnamed.
-
 <h3 id="logits"><code>logits</code></h3>
 
-Vector of coordinatewise logits.
+Input argument `logits`.
 
 
 <h3 id="name"><code>name</code></h3>
@@ -261,8 +254,11 @@ Returns a `tf.name_scope` instance for this class.
 
 <h3 id="num_categories"><code>num_categories</code></h3>
 
-Scalar `int32` tensor: the number of categories.
+Scalar `int32` tensor: the number of categories. (deprecated)
 
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+The `num_categories` property is deprecated.  Use `tf.shape(self.probs if self.logits is None else self.logits)[-1]` instead.
 
 <h3 id="parameters"><code>parameters</code></h3>
 
@@ -271,7 +267,7 @@ Dictionary of parameters used to instantiate this `Distribution`.
 
 <h3 id="probs"><code>probs</code></h3>
 
-Vector of coordinatewise probabilities.
+Input argument `probs`.
 
 
 <h3 id="reparameterization_type"><code>reparameterization_type</code></h3>
@@ -772,6 +768,15 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
   `self.dtype`.
 
 
+<h3 id="logits_parameter"><code>logits_parameter</code></h3>
+
+``` python
+logits_parameter(name=None)
+```
+
+Logits vec computed from non-`None` input arg (`probs` or `logits`).
+
+
 <h3 id="mean"><code>mean</code></h3>
 
 ``` python
@@ -891,6 +896,15 @@ Probability density/mass function.
 * <b>`prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
   values of type `self.dtype`.
 
+<h3 id="probs_parameter"><code>probs_parameter</code></h3>
+
+``` python
+probs_parameter(name=None)
+```
+
+Probs vec computed from non-`None` input arg (`probs` or `logits`).
+
+
 <h3 id="quantile"><code>quantile</code></h3>
 
 ``` python
@@ -901,7 +915,7 @@ quantile(
 )
 ```
 
-Quantile function. Aka "inverse cdf" or "percent point function".
+Quantile function. Aka 'inverse cdf' or 'percent point function'.
 
 Given random variable `X` and `p in [0, 1]`, the `quantile` is:
 

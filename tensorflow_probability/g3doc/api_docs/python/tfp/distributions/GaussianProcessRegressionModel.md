@@ -322,8 +322,7 @@ gprm = tfd.GaussianProcessRegressionModel(
     index_points=index_points,
     observation_index_points=observation_index_points,
     observations=observations,
-    # We reshape this to align batch dimensions.
-    observation_noise_variance=observation_noise_variances[..., np.newaxis])
+    observation_noise_variance=observation_noise_variances)
 samples = gprm.sample()
 
 with tf.Session() as sess:
@@ -1206,7 +1205,7 @@ quantile(
 )
 ```
 
-Quantile function. Aka "inverse cdf" or "percent point function".
+Quantile function. Aka 'inverse cdf' or 'percent point function'.
 
 Given random variable `X` and `p in [0, 1]`, the `quantile` is:
 

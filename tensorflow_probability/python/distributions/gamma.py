@@ -146,8 +146,8 @@ class Gamma(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration, rate], tf.float32)
       concentration = tf.convert_to_tensor(
-          value=concentration, name="concentration", dtype=dtype)
-      rate = tf.convert_to_tensor(value=rate, name="rate", dtype=dtype)
+          concentration, name="concentration", dtype=dtype)
+      rate = tf.convert_to_tensor(rate, name="rate", dtype=dtype)
       with tf.control_dependencies([
           assert_util.assert_positive(concentration),
           assert_util.assert_positive(rate),
@@ -168,7 +168,7 @@ class Gamma(distribution.Distribution):
   def _param_shapes(sample_shape):
     return dict(
         zip(("concentration", "rate"),
-            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
+            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
   def _params_event_ndims(cls):
@@ -186,7 +186,7 @@ class Gamma(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.concentration), tf.shape(input=self.rate))
+        tf.shape(self.concentration), tf.shape(self.rate))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
