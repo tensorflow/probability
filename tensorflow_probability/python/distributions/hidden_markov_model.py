@@ -25,6 +25,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -162,8 +163,19 @@ class HiddenMarkovModel(distribution.Distribution):
     with tf.name_scope(name) as name:
       self._runtime_assertions = []  # pylint: enable=protected-access
 
-      if num_steps < 1:
-        raise ValueError("num_steps ({}) must be at least 1.".format(num_steps))
+      num_steps = tf.convert_to_tensor(value=num_steps, name="num_steps")
+      if validate_args:
+        self._runtime_assertions += [
+            assert_util.assert_equal(
+                tf.rank(num_steps),
+                0,
+                message="`num_steps` must be a scalar")]
+        self._runtime_assertions += [
+            assert_util.assert_greater_equal(
+                num_steps,
+                1,
+                message="`num_steps` must be at least 1.")
+        ]
 
       self._initial_distribution = initial_distribution
       self._observation_distribution = observation_distribution
@@ -258,8 +270,13 @@ class HiddenMarkovModel(distribution.Distribution):
       self._underlying_event_rank = tf.size(
           self._observation_distribution.event_shape_tensor())
 
-      self.static_event_shape = tf.TensorShape(
-          [num_steps]).concatenate(self._observation_distribution.event_shape)
+      num_steps_ = tf.get_static_value(num_steps)
+      if num_steps_ is not None:
+        self.static_event_shape = tf.TensorShape(
+            [num_steps_]).concatenate(
+                self._observation_distribution.event_shape)
+      else:
+        self.static_event_shape = None
 
       with tf.control_dependencies(self._runtime_assertions):
         self.static_batch_shape = tf.broadcast_static_shape(
@@ -368,18 +385,19 @@ class HiddenMarkovModel(distribution.Distribution):
 
         return tf.reduce_sum(old_states_one_hot * new_states, axis=-1)
 
-      if self._num_steps > 1:
+      def _scan_multiple_steps():
         dummy_index = tf.zeros(self._num_steps - 1, dtype=tf.float32)
         hidden_states = tf.scan(generate_step, dummy_index,
                                 initializer=init_state)
 
         # TODO(b/115618503): add/use prepend_initializer to tf.scan
-        hidden_states = tf.concat([[init_state],
-                                   hidden_states], axis=0)
-      else:
-        hidden_states = init_state[tf.newaxis, ...]
+        return tf.concat([[init_state],
+                          hidden_states], axis=0)
 
-      # hidden_states :: num_steps n batch_size num_states
+      hidden_states = prefer_static.cond(
+          self._num_steps > 1,
+          _scan_multiple_steps,
+          lambda: init_state[tf.newaxis, ...])
 
       hidden_one_hot = tf.one_hot(hidden_states, num_states,
                                   dtype=self._observation_distribution.dtype)
@@ -492,7 +510,9 @@ class HiddenMarkovModel(distribution.Distribution):
                                                   axis=0))
     # initial_log_probs :: batch_shape num_states
 
-    if self._num_steps > 1:
+    def _scan_multiple_steps():
+      """Perform `scan` operation when `num_steps` > 1."""
+
       transition_log_probs = self._log_trans
 
       def forward_step(log_probs, _):
@@ -504,12 +524,13 @@ class HiddenMarkovModel(distribution.Distribution):
                                   initializer=initial_log_probs,
                                   name="forward_log_probs")
 
-      forward_log_probs = tf.concat([[initial_log_probs], forward_log_probs],
-                                    axis=0)
-    else:
-      forward_log_probs = initial_log_probs[tf.newaxis, ...]
+      return tf.concat([[initial_log_probs], forward_log_probs],
+                       axis=0)
 
-    # returns :: num_steps batch_shape num_states
+    forward_log_probs = prefer_static.cond(
+        self._num_steps > 1,
+        _scan_multiple_steps,
+        lambda: initial_log_probs[tf.newaxis, ...])
 
     return tf.exp(forward_log_probs)
 
@@ -627,6 +648,8 @@ class HiddenMarkovModel(distribution.Distribution):
     return tf.control_dependencies(shape_condition)
 
   def _observation_log_probs(self, observations, mask):
+    """Compute and shape tensor of log probs associated with observations.."""
+
     # Let E be the underlying event shape
     #     M the number of steps in the HMM
     #     N the number of states of the HMM
@@ -768,7 +791,7 @@ class HiddenMarkovModel(distribution.Distribution):
           log_transition = self._log_trans
           log_adjoint_prob = tf.zeros_like(log_prob)
 
-          if self._num_steps > 1:
+          def _scan_multiple_steps_forwards():
             def forward_step(log_previous_step, log_prob_observation):
               return _log_vector_matrix(log_previous_step,
                                         log_transition) + log_prob_observation
@@ -776,14 +799,18 @@ class HiddenMarkovModel(distribution.Distribution):
             forward_log_probs = tf.scan(forward_step, observation_log_probs[1:],
                                         initializer=log_prob,
                                         name="forward_log_probs")
-            forward_log_probs = tf.concat([[log_prob],
-                                           forward_log_probs], axis=0)
-          else:
-            forward_log_probs = tf.convert_to_tensor([log_prob])
+            return tf.concat([[log_prob], forward_log_probs], axis=0)
+
+          forward_log_probs = prefer_static.cond(
+              self._num_steps > 1,
+              _scan_multiple_steps_forwards,
+              lambda: tf.convert_to_tensor([log_prob]))
 
           total_log_prob = tf.reduce_logsumexp(forward_log_probs[-1], axis=-1)
 
-          if self._num_steps > 1:
+          def _scan_multiple_steps_backwards():
+            """Perform `scan` operation when `num_steps` > 1."""
+
             def backward_step(log_previous_step, log_prob_observation):
               return _log_matrix_vector(
                   log_transition,
@@ -796,11 +823,13 @@ class HiddenMarkovModel(distribution.Distribution):
                 reverse=True,
                 name="backward_log_adjoint_probs")
 
-            backward_log_adjoint_probs = tf.concat(
-                [backward_log_adjoint_probs, [log_adjoint_prob]], axis=0)
-          else:
-            backward_log_adjoint_probs = tf.convert_to_tensor(
-                [log_adjoint_prob])
+            return tf.concat([backward_log_adjoint_probs,
+                              [log_adjoint_prob]], axis=0)
+
+          backward_log_adjoint_probs = prefer_static.cond(
+              self._num_steps > 1,
+              _scan_multiple_steps_backwards,
+              lambda: tf.convert_to_tensor([log_adjoint_prob]))
 
           log_likelihoods = forward_log_probs + backward_log_adjoint_probs
 
@@ -916,47 +945,59 @@ class HiddenMarkovModel(distribution.Distribution):
               observations, mask)
           log_prob = self._log_init + observation_log_probs[0]
 
-          if self._num_steps == 1:
-            most_likely_end = tf.argmax(log_prob, axis=-1)
-            return most_likely_end[..., tf.newaxis]
+          def _reduce_multiple_steps():
+            """Perform `reduce_max` operation when `num_steps` > 1."""
 
-          def forward_step(previous_step_pair, log_prob_observation):
-            log_prob_previous = previous_step_pair[0]
-            log_prob = (log_prob_previous[..., tf.newaxis] +
-                        self._log_trans +
-                        log_prob_observation[..., tf.newaxis, :])
-            most_likely_given_successor = tf.argmax(log_prob, axis=-2)
-            max_log_p_given_successor = tf.reduce_max(log_prob, axis=-2)
-            return (max_log_p_given_successor, most_likely_given_successor)
+            def forward_step(previous_step_pair, log_prob_observation):
+              log_prob_previous = previous_step_pair[0]
+              log_prob = (log_prob_previous[..., tf.newaxis] +
+                          self._log_trans +
+                          log_prob_observation[..., tf.newaxis, :])
+              most_likely_given_successor = tf.argmax(log_prob, axis=-2)
+              max_log_p_given_successor = tf.reduce_max(input_tensor=log_prob,
+                                                        axis=-2)
+              return (max_log_p_given_successor, most_likely_given_successor)
 
-          forward_log_probs, all_most_likely_given_successor = tf.scan(
-              forward_step,
-              observation_log_probs[1:],
-              initializer=(log_prob,
-                           tf.zeros(tf.shape(log_prob), dtype=tf.int64)),
-              name="forward_log_probs")
+            forward_log_probs, all_most_likely_given_successor = tf.scan(
+                forward_step,
+                observation_log_probs[1:],
+                initializer=(log_prob,
+                             tf.zeros(tf.shape(log_prob),
+                                      dtype=tf.int64)),
+                name="forward_log_probs")
 
-          most_likely_end = tf.argmax(forward_log_probs[-1], axis=-1)
+            most_likely_end = tf.argmax(forward_log_probs[-1], axis=-1)
 
-          # We require the operation that gives C from A and B where
-          # C[i...j] = A[i...j, B[i...j]]
-          # and A = most_likely_given_successor
-          #     B = most_likely_successor.
-          # tf.gather requires indices of known shape so instead we use
-          # reduction with tf.one_hot(B) to pick out elements from B
-          def backward_step(most_likely_successor, most_likely_given_successor):
-            return tf.reduce_sum((most_likely_given_successor * tf.one_hot(
-                most_likely_successor, self._num_states, dtype=tf.int64)),
-                                 axis=-1)
+            # We require the operation that gives C from A and B where
+            # C[i...j] = A[i...j, B[i...j]]
+            # and A = most_likely_given_successor
+            #     B = most_likely_successor.
+            # tf.gather requires indices of known shape so instead we use
+            # reduction with tf.one_hot(B) to pick out elements from B
+            def backward_step(most_likely_successor,
+                              most_likely_given_successor):
+              return tf.reduce_sum(
+                  input_tensor=(most_likely_given_successor *
+                                tf.one_hot(most_likely_successor,
+                                           self._num_states,
+                                           dtype=tf.int64)),
+                  axis=-1)
 
-          backward_scan = tf.scan(
-              backward_step,
-              all_most_likely_given_successor,
-              most_likely_end,
-              reverse=True)
-          most_likely_sequences = tf.concat([backward_scan, [most_likely_end]],
-                                            axis=0)
-          return distribution_util.move_dimension(most_likely_sequences, 0, -1)
+            backward_scan = tf.scan(
+                backward_step,
+                all_most_likely_given_successor,
+                most_likely_end,
+                reverse=True)
+            most_likely_sequences = tf.concat([backward_scan,
+                                               [most_likely_end]],
+                                              axis=0)
+            return distribution_util.move_dimension(
+                most_likely_sequences, 0, -1)
+
+          return prefer_static.cond(
+              self.num_steps > 1,
+              _reduce_multiple_steps,
+              lambda: tf.argmax(log_prob, axis=-1)[..., tf.newaxis])
 
 
 def _log_vector_matrix(vs, ms):
