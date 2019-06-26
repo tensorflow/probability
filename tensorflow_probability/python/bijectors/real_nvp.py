@@ -78,7 +78,7 @@ class RealNVP(bijector.Bijector):
 
   Caching: the scalar input depth `D` of the base distribution is not known at
   construction time. The first call to any of `forward(x)`, `inverse(x)`,
-  `inverse_log_det_jacobian(x)`, or `forward_log_det_jacobian(x)` memoizes
+  `inverse_log_det_jacobian(x)`, or `forward_log_det_jacobian(x)` memorizes
   `D`, which is re-used in subsequent calls. This shape must be known prior to
   graph execution (which is the case if using tf.layers).
 
