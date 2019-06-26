@@ -1700,8 +1700,10 @@ py_test(
     size = "small",
     srcs = ["joint_distribution_coroutine_test.py"],
     deps = [
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
