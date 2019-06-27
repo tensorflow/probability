@@ -23,10 +23,11 @@ import itertools
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'interp_regular_1d_grid',
@@ -50,12 +51,7 @@ def _interp_regular_1d_grid_impl(x,
   # Note: we do *not* make the no-batch version a special case of the batch
   # version, because that would an inefficient use of batch_gather with
   # unnecessarily broadcast args.
-  with tf.compat.v1.name_scope(
-      name,
-      values=[
-          x, x_ref_min, x_ref_max, y_ref, axis, fill_value, fill_value_below,
-          fill_value_above
-      ]):
+  with tf.name_scope(name or 'interp_regular_1d_grid_impl'):
 
     # Arg checking.
     allowed_fv_st = ('constant_extension', 'extrapolate')
@@ -78,17 +74,17 @@ def _interp_regular_1d_grid_impl(x,
 
     dtype = dtype_util.common_dtype([x, x_ref_min, x_ref_max, y_ref],
                                     dtype_hint=tf.float32)
-    x = tf.convert_to_tensor(value=x, name='x', dtype=dtype)
+    x = tf.convert_to_tensor(x, name='x', dtype=dtype)
 
     x_ref_min = tf.convert_to_tensor(
-        value=x_ref_min, name='x_ref_min', dtype=dtype)
+        x_ref_min, name='x_ref_min', dtype=dtype)
     x_ref_max = tf.convert_to_tensor(
-        value=x_ref_max, name='x_ref_max', dtype=dtype)
+        x_ref_max, name='x_ref_max', dtype=dtype)
     if not batch_y_ref:
       _assert_ndims_statically(x_ref_min, expect_ndims=0)
       _assert_ndims_statically(x_ref_max, expect_ndims=0)
 
-    y_ref = tf.convert_to_tensor(value=y_ref, name='y_ref', dtype=dtype)
+    y_ref = tf.convert_to_tensor(y_ref, name='y_ref', dtype=dtype)
 
     if batch_y_ref:
       # If we're batching,
@@ -100,11 +96,11 @@ def _interp_regular_1d_grid_impl(x,
       x_ref_min = x_ref_min[..., tf.newaxis]
       x_ref_max = x_ref_max[..., tf.newaxis]
 
-    axis = tf.convert_to_tensor(value=axis, name='axis', dtype=tf.int32)
+    axis = tf.convert_to_tensor(axis, name='axis', dtype=tf.int32)
     axis = prefer_static.non_negative_axis(axis, tf.rank(y_ref))
     _assert_ndims_statically(axis, expect_ndims=0)
 
-    ny = tf.cast(tf.shape(input=y_ref)[axis], dtype)
+    ny = tf.cast(tf.shape(y_ref)[axis], dtype)
 
     # Map [x_ref_min, x_ref_max] to [0, ny - 1].
     # This is the (fractional) index of x.
@@ -119,17 +115,15 @@ def _interp_regular_1d_grid_impl(x,
     # Keep track of the nan indices here (so we can impute NaN later).
     # Also eliminate any NaN indices, since there is not NaN in 32bit.
     nan_idx = tf.math.is_nan(x_idx_unclipped)
-    x_idx_unclipped = tf.compat.v1.where(nan_idx,
-                                         tf.zeros_like(x_idx_unclipped),
-                                         x_idx_unclipped)
-
-    x_idx = tf.clip_by_value(x_idx_unclipped, tf.zeros((), dtype=dtype), ny - 1)
+    zero = tf.zeros((), dtype=dtype)
+    x_idx_unclipped = tf.where(nan_idx, zero, x_idx_unclipped)
+    x_idx = tf.clip_by_value(x_idx_unclipped, zero, ny - 1)
 
     # Get the index above and below x_idx.
     # Naively we could set idx_below = floor(x_idx), idx_above = ceil(x_idx),
     # however, this results in idx_below == idx_above whenever x is on a grid.
     # This in turn results in y_ref_below == y_ref_above, and then the gradient
-    # at this point is zero.  So here we "jitter" one of idx_below, idx_above,
+    # at this point is zero.  So here we 'jitter' one of idx_below, idx_above,
     # so that they are at different values.  This jittering does not affect the
     # interpolated value, but does make the gradient nonzero (unless of course
     # the y_ref values are the same).
@@ -177,16 +171,15 @@ def _interp_regular_1d_grid_impl(x,
     # Now begins a long excursion to fill values outside [x_min, x_max].
 
     # Re-insert NaN wherever x was NaN.
-    y = tf.compat.v1.where(
-        nan_idx, tf.fill(tf.shape(input=y), tf.constant(np.nan, y.dtype)), y)
+    y = tf.where(nan_idx, tf.constant(np.nan, y.dtype), y)
 
     if not need_separate_fills:
       if fill_value == 'constant_extension':
         pass  # Already handled by clipping x_idx_unclipped.
       else:
-        y = tf.compat.v1.where(
+        y = tf.where(
             (x_idx_unclipped < 0) | (x_idx_unclipped > ny - 1),
-            fill_value + tf.zeros_like(y), y)
+            fill_value, y)
     else:
       # Fill values below x_ref_min <==> x_idx_unclipped < 0.
       if fill_value_below == 'constant_extension':
@@ -203,36 +196,33 @@ def _interp_regular_1d_grid_impl(x,
           # member of x.  An easy way to do that is to gather using
           # indices = zeros/ones(x.shape).
           y_0 = tf.gather(
-              y_ref, tf.zeros(tf.shape(input=x), dtype=tf.int32), axis=axis)
+              y_ref, tf.zeros(tf.shape(x), dtype=tf.int32), axis=axis)
           y_1 = tf.gather(
-              y_ref, tf.ones(tf.shape(input=x), dtype=tf.int32), axis=axis)
+              y_ref, tf.ones(tf.shape(x), dtype=tf.int32), axis=axis)
         x_delta = (x_ref_max - x_ref_min) / (ny - 1)
         x_factor = expand_x_fn((x - x_ref_min) / x_delta, broadcast=True)
-        y = tf.compat.v1.where(x_idx_unclipped < 0,
-                               y_0 + x_factor * (y_1 - y_0), y)
+        y = tf.where(x_idx_unclipped < 0, y_0 + x_factor * (y_1 - y_0), y)
       else:
-        y = tf.compat.v1.where(x_idx_unclipped < 0,
-                               fill_value_below + tf.zeros_like(y), y)
+        y = tf.where(x_idx_unclipped < 0, fill_value_below, y)
       # Fill values above x_ref_min <==> x_idx_unclipped > ny - 1.
       if fill_value_above == 'constant_extension':
         pass  # Already handled by the clipping that created x_idx_unclipped.
       elif fill_value_above == 'extrapolate':
-        ny_int32 = tf.shape(input=y_ref)[axis]
+        ny_int32 = tf.shape(y_ref)[axis]
         if batch_y_ref:
-          y_n1 = tf.gather(y_ref, [tf.shape(input=y_ref)[axis] - 1], axis=axis)
-          y_n2 = tf.gather(y_ref, [tf.shape(input=y_ref)[axis] - 2], axis=axis)
+          y_n1 = tf.gather(y_ref, [tf.shape(y_ref)[axis] - 1], axis=axis)
+          y_n2 = tf.gather(y_ref, [tf.shape(y_ref)[axis] - 2], axis=axis)
         else:
           y_n1 = tf.gather(
-              y_ref, tf.fill(tf.shape(input=x), ny_int32 - 1), axis=axis)
+              y_ref, tf.fill(tf.shape(x), ny_int32 - 1), axis=axis)
           y_n2 = tf.gather(
-              y_ref, tf.fill(tf.shape(input=x), ny_int32 - 2), axis=axis)
+              y_ref, tf.fill(tf.shape(x), ny_int32 - 2), axis=axis)
         x_delta = (x_ref_max - x_ref_min) / (ny - 1)
         x_factor = expand_x_fn((x - x_ref_max) / x_delta, broadcast=True)
-        y = tf.compat.v1.where(x_idx_unclipped > ny - 1,
-                               y_n1 + x_factor * (y_n1 - y_n2), y)
+        y = tf.where(x_idx_unclipped > ny - 1,
+                     y_n1 + x_factor * (y_n1 - y_n2), y)
       else:
-        y = tf.compat.v1.where(x_idx_unclipped > ny - 1,
-                               fill_value_above + tf.zeros_like(y), y)
+        y = tf.where(x_idx_unclipped > ny - 1, fill_value_above, y)
 
     return y
 
@@ -286,9 +276,9 @@ def interp_regular_1d_grid(x,
       Default value: `-1`, the rightmost axis.
     fill_value:  Determines what values output should take for `x` values that
       are below `x_ref_min` or above `x_ref_max`. `Tensor` or one of the strings
-      "constant_extension" ==> Extend as constant function. "extrapolate" ==>
+      'constant_extension' ==> Extend as constant function. 'extrapolate' ==>
       Extrapolate in a linear fashion.
-      Default value: `"constant_extension"`
+      Default value: `'constant_extension'`
     fill_value_below:  Optional override of `fill_value` for `x < x_ref_min`.
     fill_value_above:  Optional override of `fill_value` for `x > x_ref_max`.
     grid_regularizing_transform:  Optional transformation `g` which regularizes
@@ -296,7 +286,7 @@ def interp_regular_1d_grid(x,
       provided, we assume `g(x_ref_i)` is a regular grid between `g(x_ref_min)`
       and `g(x_ref_max)`.
     name:  A name to prepend to created ops.
-      Default value: `"interp_regular_1d_grid"`.
+      Default value: `'interp_regular_1d_grid'`.
 
   Returns:
     y_interp:  Interpolation between members of `y_ref`, at points `x`.
@@ -416,9 +406,9 @@ def batch_interp_regular_1d_grid(x,
       Default value: `-1`, the rightmost axis.
     fill_value:  Determines what values output should take for `x` values that
       are below `x_ref_min` or above `x_ref_max`. `Tensor` or one of the strings
-      "constant_extension" ==> Extend as constant function. "extrapolate" ==>
+      'constant_extension' ==> Extend as constant function. 'extrapolate' ==>
       Extrapolate in a linear fashion.
-      Default value: `"constant_extension"`
+      Default value: `'constant_extension'`
     fill_value_below:  Optional override of `fill_value` for `x < x_ref_min`.
     fill_value_above:  Optional override of `fill_value` for `x > x_ref_max`.
     grid_regularizing_transform:  Optional transformation `g` which regularizes
@@ -426,7 +416,7 @@ def batch_interp_regular_1d_grid(x,
       provided, we assume `g(x_ref_i)` is a regular grid between `g(x_ref_min)`
       and `g(x_ref_max)`.
     name:  A name to prepend to created ops.
-      Default value: `"batch_interp_regular_1d_grid"`.
+      Default value: `'batch_interp_regular_1d_grid'`.
 
   Returns:
     y_interp:  Interpolation between members of `y_ref`, at points `x`.
@@ -542,10 +532,10 @@ def batch_interp_regular_nd_grid(x,
       requires `axis=-5`.
     fill_value:  Determines what values output should take for `x` values that
       are below `x_ref_min` or above `x_ref_max`. Scalar `Tensor` or
-      "constant_extension" ==> Extend as constant function.
-      Default value: `"constant_extension"`
+      'constant_extension' ==> Extend as constant function.
+      Default value: `'constant_extension'`
     name:  A name to prepend to created ops.
-      Default value: `"batch_interp_regular_nd_grid"`.
+      Default value: `'batch_interp_regular_nd_grid'`.
 
   Returns:
     y_interp:  Interpolation between members of `y_ref`, at points `x`.
@@ -593,10 +583,7 @@ def batch_interp_regular_nd_grid(x,
   ```
 
   """
-  with tf.compat.v1.name_scope(
-      name,
-      default_name='interp_regular_nd_grid',
-      values=[x, x_ref_min, x_ref_max, y_ref, fill_value]):
+  with tf.name_scope(name or 'interp_regular_nd_grid'):
     dtype = dtype_util.common_dtype([x, x_ref_min, x_ref_max, y_ref],
                                     dtype_hint=tf.float32)
 
@@ -608,37 +595,38 @@ def batch_interp_regular_nd_grid(x,
                 fill_value, 'constant_extension'))
     else:
       fill_value = tf.convert_to_tensor(
-          value=fill_value, name='fill_value', dtype=dtype)
+          fill_value, name='fill_value', dtype=dtype)
       _assert_ndims_statically(fill_value, expect_ndims=0)
 
     # x.shape = [..., nd].
-    x = tf.convert_to_tensor(value=x, name='x', dtype=dtype)
+    x = tf.convert_to_tensor(x, name='x', dtype=dtype)
     _assert_ndims_statically(x, expect_ndims_at_least=2)
 
     # y_ref.shape = [..., C1,...,Cnd, B1,...,BM]
-    y_ref = tf.convert_to_tensor(value=y_ref, name='y_ref', dtype=dtype)
+    y_ref = tf.convert_to_tensor(y_ref, name='y_ref', dtype=dtype)
 
     # x_ref_min.shape = [nd]
     x_ref_min = tf.convert_to_tensor(
-        value=x_ref_min, name='x_ref_min', dtype=dtype)
+        x_ref_min, name='x_ref_min', dtype=dtype)
     x_ref_max = tf.convert_to_tensor(
-        value=x_ref_max, name='x_ref_max', dtype=dtype)
+        x_ref_max, name='x_ref_max', dtype=dtype)
     _assert_ndims_statically(
         x_ref_min, expect_ndims_at_least=1, expect_static=True)
     _assert_ndims_statically(
         x_ref_max, expect_ndims_at_least=1, expect_static=True)
 
     # nd is the number of dimensions indexing the interpolation table, it's the
-    # "nd" in the function name.
+    # 'nd' in the function name.
     nd = tf.compat.dimension_value(x_ref_min.shape[-1])
     if nd is None:
       raise ValueError('`x_ref_min.shape[-1]` must be known statically.')
-    x_ref_max.shape[-1:].assert_is_compatible_with(x_ref_min.shape[-1:])
+    tensorshape_util.assert_is_compatible_with(
+        x_ref_max.shape[-1:], x_ref_min.shape[-1:])
 
     # Convert axis and check it statically.
-    axis = tf.convert_to_tensor(value=axis, dtype=tf.int32, name='axis')
+    axis = tf.convert_to_tensor(axis, dtype=tf.int32, name='axis')
     axis = prefer_static.non_negative_axis(axis, tf.rank(y_ref))
-    axis.shape.assert_has_rank(0)
+    tensorshape_util.assert_has_rank(axis.shape, 0)
     axis_ = tf.get_static_value(axis)
     y_ref_rank_ = tf.get_static_value(tf.rank(y_ref))
     if axis_ is not None and y_ref_rank_ is not None:
@@ -650,10 +638,10 @@ def batch_interp_regular_nd_grid(x,
             'dimensions of `x_ref_min` to be {}.'.format(
                 axis_, y_ref_rank_, nd))
 
-    x_batch_shape = tf.shape(input=x)[:-2]
-    x_ref_min_batch_shape = tf.shape(input=x_ref_min)[:-1]
-    x_ref_max_batch_shape = tf.shape(input=x_ref_max)[:-1]
-    y_ref_batch_shape = tf.shape(input=y_ref)[:axis]
+    x_batch_shape = tf.shape(x)[:-2]
+    x_ref_min_batch_shape = tf.shape(x_ref_min)[:-1]
+    x_ref_max_batch_shape = tf.shape(x_ref_max)[:-1]
+    y_ref_batch_shape = tf.shape(y_ref)[:axis]
 
     # Do a brute-force broadcast of batch dims (add zeros).
     batch_shape = y_ref_batch_shape
@@ -695,7 +683,7 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
   #  and x_ref_max have shapes [A1, ..., An, nd].
 
   # ny[k] is number of y reference points in interp dim k.
-  ny = tf.cast(tf.shape(input=y_ref)[batch_dims:batch_dims + nd], dtype)
+  ny = tf.cast(tf.shape(y_ref)[batch_dims:batch_dims + nd], dtype)
 
   # Map [x_ref_min, x_ref_max] to [0, ny - 1].
   # This is the (fractional) index of x.
@@ -710,8 +698,7 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
   # Keep track of the nan indices here (so we can impute NaN later).
   # Also eliminate any NaN indices, since there is not NaN in 32bit.
   nan_idx = tf.math.is_nan(x_idx_unclipped)
-  x_idx_unclipped = tf.compat.v1.where(nan_idx, tf.zeros_like(x_idx_unclipped),
-                                       x_idx_unclipped)
+  x_idx_unclipped = tf.where(nan_idx, 0., x_idx_unclipped)
 
   # x_idx.shape = [A1, ..., An, D, nd]
   x_idx = tf.clip_by_value(x_idx_unclipped, tf.zeros((), dtype=dtype), ny - 1)
@@ -720,7 +707,7 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
   # Naively we could set idx_below = floor(x_idx), idx_above = ceil(x_idx),
   # however, this results in idx_below == idx_above whenever x is on a grid.
   # This in turn results in y_ref_below == y_ref_above, and then the gradient
-  # at this point is zero.  So here we "jitter" one of idx_below, idx_above,
+  # at this point is zero.  So here we 'jitter' one of idx_below, idx_above,
   # so that they are at different values.  This jittering does not affect the
   # interpolated value, but does make the gradient nonzero (unless of course
   # the y_ref values are the same).
@@ -746,8 +733,8 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
   def _expand_x_fn(tensor):
     # Reshape tensor to tensor.shape + [1] * M.
     extended_shape = tf.concat([
-        tf.shape(input=tensor),
-        tf.ones_like(tf.shape(input=y_ref)[batch_dims + nd:])
+        tf.shape(tensor),
+        tf.ones_like(tf.shape(y_ref)[batch_dims + nd:])
     ],
                                axis=0)
     return tf.reshape(tensor, extended_shape)
@@ -758,9 +745,7 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
 
   # Re-insert NaN wherever x was NaN.
   nan_idx = _expand_x_fn(nan_idx)
-  t = tf.compat.v1.where(nan_idx,
-                         tf.fill(tf.shape(input=t), tf.constant(np.nan, dtype)),
-                         t)
+  t = tf.where(nan_idx, tf.constant(np.nan, dtype), t)
 
   terms = []
   # Our work above has located x's fractional index inside a cube of above/below
@@ -780,12 +765,12 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
     for k, zero_or_one in enumerate(zero_ones_list):
       if zero_or_one == 0:
         # If the kth iterate has zero_or_one = 0,
-        # Will gather from the "below" reference point along axis k.
+        # Will gather from the 'below' reference point along axis k.
         gather_from_y_ref_idx.append(idx_below_list[k])
         # Now append the index to gather for computing opposite_volume.
         # This could be done by initializing opposite_volume to 1, then here:
         #  opposite_volume *= tf.gather(s, indices=k, axis=tf.rank(x) - 1)
-        # but that puts a gather in the "inner loop."  Better to append the
+        # but that puts a gather in the 'inner loop.'  Better to append the
         # index and do one larger gather down below.
         opposite_volume_s_idx.append(k)
       else:
@@ -796,16 +781,16 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
 
     # Compute opposite_volume (volume of cube opposite the ref point):
     # Recall t.shape = s.shape = [D, nd] + [1, ..., 1]
-    # Gather from t and s along the "nd" axis, which is rank(x) - 1.
+    # Gather from t and s along the 'nd' axis, which is rank(x) - 1.
     ov_axis = tf.rank(x) - 1
     opposite_volume = (
         tf.reduce_prod(
-            input_tensor=tf.gather(
+            tf.gather(
                 t, indices=tf.cast(opposite_volume_t_idx, dtype=tf.int32),
                 axis=ov_axis),
             axis=ov_axis) *
         tf.reduce_prod(
-            input_tensor=tf.gather(
+            tf.gather(
                 s, indices=tf.cast(opposite_volume_s_idx, dtype=tf.int32),
                 axis=ov_axis),
             axis=ov_axis)
@@ -825,14 +810,14 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
     # so here we check if it was out of bounds in any of the nd dims.
     # Thus, oob_idx.shape = [D].
     oob_idx = tf.reduce_any(
-        input_tensor=(x_idx_unclipped < 0) | (x_idx_unclipped > ny - 1),
+        (x_idx_unclipped < 0) | (x_idx_unclipped > ny - 1),
         axis=-1)
 
     # Now, y.shape = [D, B1,...,BM], so we'll have to broadcast oob_idx.
 
     oob_idx = _expand_x_fn(oob_idx)  # Shape [D, 1,...,1]
-    oob_idx |= tf.fill(tf.shape(input=y), False)
-    y = tf.compat.v1.where(oob_idx, tf.fill(tf.shape(input=y), fill_value), y)
+    oob_idx |= tf.fill(tf.shape(y), False)
+    y = tf.where(oob_idx, fill_value, y)
   return y
 
 
@@ -841,7 +826,7 @@ def _assert_ndims_statically(x,
                              expect_ndims_at_least=None,
                              expect_static=False):
   """Assert that Tensor x has expected number of dimensions."""
-  ndims = x.shape.ndims
+  ndims = tensorshape_util.rank(x.shape)
   if ndims is None:
     if expect_static:
       raise ValueError('Expected static ndims. Found: {}'.format(x))
@@ -860,7 +845,7 @@ def _make_expand_x_fn_for_non_batch_interpolation(y_ref, axis):
   #   y_ref.shape[:axis] + x.shape + y_ref.shape[axis+1:]
 
   # Recall we made axis non-negative
-  y_ref_shape = tf.shape(input=y_ref)
+  y_ref_shape = tf.shape(y_ref)
   y_ref_shape_left = y_ref_shape[:axis]
   y_ref_shape_right = y_ref_shape[axis + 1:]
 
@@ -869,15 +854,15 @@ def _make_expand_x_fn_for_non_batch_interpolation(y_ref, axis):
     # Assume out_shape = A + x.shape + B, and rank(A) = axis.
     # Expand with singletons with same rank as A, B.
     expanded_shape = tf.pad(
-        tensor=tf.shape(input=x),
-        paddings=[[axis, tf.size(input=y_ref_shape_right)]],
+        tensor=tf.shape(x),
+        paddings=[[axis, tf.size(y_ref_shape_right)]],
         constant_values=1)
     x_expanded = tf.reshape(x, expanded_shape)
 
     if broadcast:
       out_shape = tf.concat((
           y_ref_shape_left,
-          tf.shape(input=x),
+          tf.shape(x),
           y_ref_shape_right,
       ),
                             axis=0)
@@ -898,25 +883,25 @@ def _make_expand_x_fn_for_batch_interpolation(y_ref, axis):
   #   x.shape[-1:] +  y_ref.shape[axis+1:]
 
   # Recall we made axis non-negative
-  y_ref_shape = tf.shape(input=y_ref)
+  y_ref_shape = tf.shape(y_ref)
   y_ref_shape_left = y_ref_shape[:axis]
   y_ref_shape_right = y_ref_shape[axis + 1:]
 
   def expand_right_dims(x, broadcast=False):
     """Expand x so it can bcast w/ tensors of output shape."""
     expanded_shape_left = tf.broadcast_dynamic_shape(
-        tf.shape(input=x)[:-1],
-        tf.ones([tf.size(input=y_ref_shape_left)], dtype=tf.int32))
+        tf.shape(x)[:-1],
+        tf.ones([tf.size(y_ref_shape_left)], dtype=tf.int32))
     expanded_shape = tf.concat(
-        (expanded_shape_left, tf.shape(input=x)[-1:],
-         tf.ones([tf.size(input=y_ref_shape_right)], dtype=tf.int32)),
+        (expanded_shape_left, tf.shape(x)[-1:],
+         tf.ones([tf.size(y_ref_shape_right)], dtype=tf.int32)),
         axis=0)
     x_expanded = tf.reshape(x, expanded_shape)
     if broadcast:
       broadcast_shape_left = tf.broadcast_dynamic_shape(
-          tf.shape(input=x)[:-1], y_ref_shape_left)
+          tf.shape(x)[:-1], y_ref_shape_left)
       broadcast_shape = tf.concat(
-          (broadcast_shape_left, tf.shape(input=x)[-1:], y_ref_shape_right),
+          (broadcast_shape_left, tf.shape(x)[-1:], y_ref_shape_right),
           axis=0)
       if x.dtype.is_bool:
         x_expanded = x_expanded | tf.cast(tf.zeros(broadcast_shape), tf.bool)
@@ -943,13 +928,13 @@ def _batch_gather_with_broadcast(params, indices, axis):
 
   # leading_bcast_shape is the broadcast of [A1,...,AN] and [a1,...,aN].
   leading_bcast_shape = tf.broadcast_dynamic_shape(
-      tf.shape(input=params)[:axis],
-      tf.shape(input=indices)[:-1])
+      tf.shape(params)[:axis],
+      tf.shape(indices)[:-1])
   params += tf.zeros(
-      tf.concat((leading_bcast_shape, tf.shape(input=params)[axis:]), axis=0),
+      tf.concat((leading_bcast_shape, tf.shape(params)[axis:]), axis=0),
       dtype=params.dtype)
   indices += tf.zeros(
-      tf.concat((leading_bcast_shape, tf.shape(input=indices)[-1:]), axis=0),
+      tf.concat((leading_bcast_shape, tf.shape(indices)[-1:]), axis=0),
       dtype=indices.dtype)
   return tf.gather(params, indices, batch_dims=indices.shape.ndims-1)
 

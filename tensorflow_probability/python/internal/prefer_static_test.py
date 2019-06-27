@@ -20,8 +20,9 @@ from __future__ import print_function
 
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
 
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
@@ -103,6 +104,11 @@ class PreferStaticPredicatesTest(tf.test.TestCase, parameterized.TestCase):
            args_fn=lambda: [tf.constant(-1), tf.constant(0)],
            kwargs=dict(),
            expected=True),
+      dict(testcase_name='_log',
+           predicate=prefer_static.log,
+           args_fn=lambda: [tf.constant(1.)],
+           kwargs=dict(),
+           expected=0.),
       dict(testcase_name='_equal_true',
            predicate=prefer_static.equal,
            args_fn=lambda: [tf.constant(0), 0],
@@ -255,8 +261,8 @@ class PreferStaticShapeTest(tf.test.TestCase):
 
     # case: tensor input with dynamic shape
     if not tf.executing_eagerly():
-      shape = prefer_static.shape(input=tf.compat.v1.placeholder_with_default(
-          input=vector_value, shape=None))
+      shape = prefer_static.shape(tf1.placeholder_with_default(
+          vector_value, shape=None))
       self.assertAllEqual(self.evaluate(shape), [2])
 
   def testRankFromShape(self):
@@ -275,7 +281,7 @@ class PreferStaticShapeTest(tf.test.TestCase):
     self.assertEqual(rank, expected_rank)
 
     # case: tensorshape is fully defined
-    v_tensor = tf.convert_to_tensor(value=v_ndarray)
+    v_tensor = tf.convert_to_tensor(v_ndarray)
     rank = prefer_static.rank_from_shape(
         shape_tensor_fn=prefer_static.shape(v_tensor),
         tensorshape=v_tensor.shape)
@@ -283,8 +289,7 @@ class PreferStaticShapeTest(tf.test.TestCase):
 
     if not tf.executing_eagerly():
       # case: tensorshape is unknown, rank cannot be statically inferred
-      v_dynamic = tf.compat.v1.placeholder_with_default(
-          input=v_ndarray, shape=None)
+      v_dynamic = tf1.placeholder_with_default(v_ndarray, shape=None)
       rank = prefer_static.rank_from_shape(
           shape_tensor_fn=lambda: prefer_static.shape(v_dynamic),
           tensorshape=v_dynamic.shape)
@@ -297,25 +302,41 @@ class PreferStaticShapeTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
+class PreferStaticSizeTest(tf.test.TestCase):
+
+  def testStatic(self):
+    self.assertAllEqual(
+        3 * 4 * 5,
+        prefer_static.size(tf.random.normal([3, 4, 5])))
+
+  def testDynamic(self):
+    if tf.executing_eagerly(): return
+    x = tf1.placeholder_with_default(
+        tf.random.normal([3, 4, 5]), shape=None)
+    self.assertAllEqual(
+        3 * 4 * 5,
+        self.evaluate(prefer_static.size(x)))
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class TestNonNegativeAxis(tf.test.TestCase):
 
   def test_static_scalar_positive_index(self):
     positive_axis = prefer_static.non_negative_axis(axis=2, rank=4)
-    self.assertAllEqual(2, self.evaluate(positive_axis))
+    self.assertAllEqual(2, positive_axis)
 
   def test_static_scalar_negative_index(self):
     positive_axis = prefer_static.non_negative_axis(axis=-1, rank=4)
-    self.assertAllEqual(3, self.evaluate(positive_axis))
+    self.assertAllEqual(3, positive_axis)
 
   def test_static_vector_index(self):
-    positive_axis = prefer_static.non_negative_axis(
-        axis=[0, -2], rank=4)
-    self.assertAllEqual([0, 2], self.evaluate(positive_axis))
+    positive_axis = prefer_static.non_negative_axis(axis=[0, -2], rank=4)
+    self.assertAllEqual([0, 2], positive_axis)
 
   def test_dynamic_vector_index(self):
-    positive_axis = prefer_static.non_negative_axis(
-        axis=tf.compat.v1.placeholder_with_default(input=[0, -2], shape=None),
-        rank=4)
+    axis = tf.Variable([0, -2])
+    positive_axis = prefer_static.non_negative_axis(axis=axis, rank=4)
+    self.evaluate(axis.initializer)
     self.assertAllEqual([0, 2], self.evaluate(positive_axis))
 
 

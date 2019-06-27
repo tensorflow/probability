@@ -206,6 +206,10 @@ def case(pred_fn_pairs, default=None, exclusive=False, name='smart_case'):
 # The following functions are intended as drop-in replacements for their
 # TensorFlow counterparts.
 
+cast = _prefer_static(
+    tf.cast,
+    lambda x, dtype, name=None: np.array(x, dtype=_numpy_dtype(dtype)))
+
 concat = _prefer_static(
     tf.concat,
     lambda values, axis, name='concat': np.concatenate(values, axis))
@@ -221,6 +225,10 @@ greater = _prefer_static(
 less = _prefer_static(
     tf.less,
     lambda x, y, name=None: np.less(x, y))
+
+log = _prefer_static(
+    tf.math.log,
+    lambda x, name=None: np.log(x))
 
 logical_and = _prefer_static(
     tf.logical_and,
@@ -250,7 +258,7 @@ ones = _prefer_static(
 
 def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
   s = _shape(input)
-  if isinstance(s, (np.ndarray, np.generic)):
+  if is_numpy(s):
     return np.ones(s, _numpy_dtype(dtype or input.dtype))
   return tf.ones(s, dtype or s.dtype, name)
 ones_like = _copy_docstring(tf.ones_like, _ones_like)
@@ -287,6 +295,19 @@ reduce_sum = _prefer_static(
         input_tensor, axis, keepdims=keepdims))
 
 
+def _size(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin
+  if not hasattr(input, 'shape'):
+    x = np.array(input)
+    input = tf.convert_to_tensor(input) if x.dtype is np.object else x
+  n = tensorshape_util.num_elements(tf.TensorShape(input.shape))
+  if n is None:
+    return tf.size(input, out_type=out_type, name=name)
+  return np.array(n).astype(_numpy_dtype(out_type))
+
+
+size = _copy_docstring(tf.size, _size)
+
+
 def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin
   if not hasattr(input, 'shape'):
     x = np.array(input)
@@ -312,7 +333,7 @@ zeros = _prefer_static(
 
 def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
   s = _shape(input)
-  if isinstance(s, (np.ndarray, np.generic)):
+  if is_numpy(s):
     return np.zeros(s, _numpy_dtype(dtype or input.dtype))
   return tf.zeros(s, dtype or s.dtype, name)
 zeros_like = _copy_docstring(tf.zeros_like, _zeros_like)
@@ -321,25 +342,18 @@ zeros_like = _copy_docstring(tf.zeros_like, _zeros_like)
 def non_negative_axis(axis, rank, name=None):  # pylint:disable=redefined-outer-name
   """Make (possibly negatively indexed) `axis` argument non-negative."""
   with tf.name_scope(name or 'non_negative_axis'):
-    axis = tf.convert_to_tensor(axis, name='axis')
-    rank = tf.convert_to_tensor(rank, name='rank')
-    axis_ = tf.get_static_value(axis)
+    if axis is None:
+      return None
+    if rank is None:
+      raise ValueError('Argument `rank` cannot be `None`.')
     rank_ = tf.get_static_value(rank)
-
-    # Dynamic case.
-    if axis_ is None or rank_ is None:
+    axis_ = tf.get_static_value(axis)
+    if rank_ is None or axis_ is None:
       return tf.where(axis < 0, rank + axis, axis)
+    axis_ = np.array(axis_, dtype=np.int32)
+    return np.where(axis_ < 0, axis_ + np.int32(rank_), axis_)
 
-    # Static case.
-    is_scalar = axis_.ndim == 0
-    if is_scalar:
-      axis_ = [axis_]
-    positive_axis = []
-    for a_ in axis_:
-      if a_ < 0:
-        positive_axis.append(rank_ + a_)
-      else:
-        positive_axis.append(a_)
-    if is_scalar:
-      positive_axis = positive_axis[0]
-    return tf.convert_to_tensor(positive_axis, dtype=axis.dtype)
+
+def is_numpy(x):
+  """Returns true if `x` is a numpy object."""
+  return isinstance(x, (np.ndarray, np.generic))
