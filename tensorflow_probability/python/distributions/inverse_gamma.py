@@ -20,7 +20,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -264,11 +263,10 @@ class InverseGamma(distribution.Distribution):
   def _mean(self):
     mean = self.scale / (self.concentration - 1.)
     if self.allow_nan_stats:
-      nan = tf.fill(
-          self.batch_shape_tensor(),
-          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
-          name="nan")
-      return tf1.where(self.concentration > 1., mean, nan)
+      return tf.where(
+          self.concentration > 1.,
+          mean,
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
       return distribution_util.with_dependencies([
           assert_util.assert_less(
@@ -286,11 +284,10 @@ class InverseGamma(distribution.Distribution):
         tf.square(self.scale) / tf.square(self.concentration - 1.) /
         (self.concentration - 2.))
     if self.allow_nan_stats:
-      nan = tf.fill(
-          self.batch_shape_tensor(),
-          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
-          name="nan")
-      return tf1.where(self.concentration > 2., var, nan)
+      return tf.where(
+          self.concentration > 2.,
+          var,
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
       return distribution_util.with_dependencies([
           assert_util.assert_less(

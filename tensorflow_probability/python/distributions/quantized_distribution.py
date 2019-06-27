@@ -20,7 +20,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distributions
@@ -339,18 +338,15 @@ class QuantizedDistribution(distributions.Distribution):
     with tf.name_scope("transform"):
       n = tf.convert_to_tensor(n, name="n")
       x_samps = self.distribution.sample(n, seed=seed)
-      ones = tf.ones_like(x_samps)
 
       # Snap values to the intervals (j - 1, j].
       result_so_far = tf.math.ceil(x_samps)
 
       if low is not None:
-        result_so_far = tf1.where(result_so_far < low, low * ones,
-                                  result_so_far)
+        result_so_far = tf.where(result_so_far < low, low, result_so_far)
 
       if high is not None:
-        result_so_far = tf1.where(result_so_far > high, high * ones,
-                                  result_so_far)
+        result_so_far = tf.where(result_so_far > high, high, result_so_far)
 
       return result_so_far
 
@@ -388,8 +384,8 @@ class QuantizedDistribution(distributions.Distribution):
     # In either case, we are doing Log[ exp{big} - exp{small} ]
     # We want to use the sf items precisely when we are on the right side of the
     # median, which occurs when logsf_y < logcdf_y.
-    big = tf1.where(logsf_y < logcdf_y, logsf_y_minus_1, logcdf_y)
-    small = tf1.where(logsf_y < logcdf_y, logsf_y, logcdf_y_minus_1)
+    big = tf.where(logsf_y < logcdf_y, logsf_y_minus_1, logcdf_y)
+    small = tf.where(logsf_y < logcdf_y, logsf_y, logcdf_y_minus_1)
 
     return _logsum_expbig_minus_expsmall(big, small)
 
@@ -418,7 +414,7 @@ class QuantizedDistribution(distributions.Distribution):
     cdf_y_minus_1 = self.cdf(y - 1)
 
     # sf_prob has greater precision iff we're on the right side of the median.
-    return tf1.where(
+    return tf.where(
         sf_y < cdf_y,  # True iff we're on the right side of the median.
         sf_y_minus_1 - sf_y,
         cdf_y - cdf_y_minus_1)
@@ -440,17 +436,15 @@ class QuantizedDistribution(distributions.Distribution):
 
     result_so_far = self.distribution.log_cdf(j)
 
-    # Broadcast, because it's possible that this is a single distribution being
-    # evaluated on a number of samples, or something like that.
-    j += tf.zeros_like(result_so_far)
-
     # Re-define values at the cutoffs.
     if low is not None:
-      neg_inf = -np.inf * tf.ones_like(result_so_far)
-      result_so_far = tf1.where(j < low, neg_inf, result_so_far)
+      result_so_far = tf.where(
+          j < low,
+          dtype_util.as_numpy_dtype(self.dtype)(-np.inf),
+          result_so_far)
     if high is not None:
-      result_so_far = tf1.where(j >= high, tf.zeros_like(result_so_far),
-                                result_so_far)
+      result_so_far = tf.where(
+          j >= high, tf.zeros_like(result_so_far), result_so_far)
 
     return result_so_far
 
@@ -472,17 +466,13 @@ class QuantizedDistribution(distributions.Distribution):
     # P[X <= j], used when low < X < high.
     result_so_far = self.distribution.cdf(j)
 
-    # Broadcast, because it's possible that this is a single distribution being
-    # evaluated on a number of samples, or something like that.
-    j += tf.zeros_like(result_so_far)
-
     # Re-define values at the cutoffs.
     if low is not None:
-      result_so_far = tf1.where(j < low, tf.zeros_like(result_so_far),
-                                result_so_far)
+      result_so_far = tf.where(
+          j < low, tf.zeros_like(result_so_far), result_so_far)
     if high is not None:
-      result_so_far = tf1.where(j >= high, tf.ones_like(result_so_far),
-                                result_so_far)
+      result_so_far = tf.where(
+          j >= high, tf.ones_like(result_so_far), result_so_far)
 
     return result_so_far
 
@@ -504,17 +494,15 @@ class QuantizedDistribution(distributions.Distribution):
     # P[X > j], used when low < X < high.
     result_so_far = self.distribution.log_survival_function(j)
 
-    # Broadcast, because it's possible that this is a single distribution being
-    # evaluated on a number of samples, or something like that.
-    j += tf.zeros_like(result_so_far)
-
     # Re-define values at the cutoffs.
     if low is not None:
-      result_so_far = tf1.where(j < low, tf.zeros_like(result_so_far),
-                                result_so_far)
+      result_so_far = tf.where(
+          j < low, tf.zeros_like(result_so_far), result_so_far)
     if high is not None:
-      neg_inf = -np.inf * tf.ones_like(result_so_far)
-      result_so_far = tf1.where(j >= high, neg_inf, result_so_far)
+      result_so_far = tf.where(
+          j >= high,
+          dtype_util.as_numpy_dtype(self.dtype)(-np.inf),
+          result_so_far)
 
     return result_so_far
 
@@ -536,17 +524,13 @@ class QuantizedDistribution(distributions.Distribution):
     # P[X > j], used when low < X < high.
     result_so_far = self.distribution.survival_function(j)
 
-    # Broadcast, because it's possible that this is a single distribution being
-    # evaluated on a number of samples, or something like that.
-    j += tf.zeros_like(result_so_far)
-
     # Re-define values at the cutoffs.
     if low is not None:
-      result_so_far = tf1.where(j < low, tf.ones_like(result_so_far),
-                                result_so_far)
+      result_so_far = tf.where(j < low, tf.ones_like(result_so_far),
+                               result_so_far)
     if high is not None:
-      result_so_far = tf1.where(j >= high, tf.zeros_like(result_so_far),
-                                result_so_far)
+      result_so_far = tf.where(j >= high, tf.zeros_like(result_so_far),
+                               result_so_far)
 
     return result_so_far
 

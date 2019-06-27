@@ -19,12 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 
@@ -165,35 +163,26 @@ class Uniform(distribution.Distribution):
     return self.low + self.range() * samples
 
   def _prob(self, x):
-    broadcasted_x = x * tf.ones(
-        self.batch_shape_tensor(), dtype=x.dtype)
-    return tf1.where(
-        tf.math.is_nan(broadcasted_x),
-        broadcasted_x,
-        tf1.where(
-            tf.logical_or(
-                broadcasted_x < self.low,
-                # This > is only sound for continuous uniform
-                broadcasted_x > self.high),
-            tf.zeros_like(broadcasted_x),
-            tf.ones_like(broadcasted_x) / self.range()))
+    return tf.where(
+        tf.math.is_nan(x),
+        x,
+        tf.where(
+            # This > is only sound for continuous uniform
+            (x < self.low) | (x > self.high),
+            tf.zeros_like(x),
+            tf.ones_like(x) / self.range()))
 
   def _cdf(self, x):
     broadcast_shape = tf.broadcast_dynamic_shape(
         tf.shape(x), self.batch_shape_tensor())
     zeros = tf.zeros(broadcast_shape, dtype=self.dtype)
     ones = tf.ones(broadcast_shape, dtype=self.dtype)
-    broadcasted_x = x * ones
-    result_if_not_big = tf1.where(x < self.low, zeros,
-                                  (broadcasted_x - self.low) / self.range())
-    return tf1.where(x >= self.high, ones, result_if_not_big)
+    result_if_not_big = tf.where(x < self.low, zeros,
+                                 (x - self.low) / self.range())
+    return tf.where(x >= self.high, ones, result_if_not_big)
 
   def _quantile(self, value):
-    broadcast_shape = tf.broadcast_dynamic_shape(
-        tf.shape(value), self.batch_shape_tensor())
-    ones = tf.ones(broadcast_shape, dtype=self.dtype)
-    broadcasted_value = value * ones
-    return (1. - broadcasted_value) * self.low + broadcasted_value * self.high
+    return (1. - value) * self.low + value * self.high
 
   def _entropy(self):
     return tf.math.log(self.range())
@@ -229,12 +218,8 @@ def _kl_uniform_uniform(a, b, name=None):
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 60
     # Watch out for the change in conventions--they use 'a' and 'b' to refer to
     # lower and upper bounds respectively there.
-    final_batch_shape = distribution_util.get_broadcast_shape(
-        a.low, b.low, a.high, b.high)
     dtype = dtype_util.common_dtype(
         [a.low, a.high, b.low, b.high], tf.float32)
-    return tf1.where((b.low <= a.low) & (a.high <= b.high),
-                     tf.math.log(b.high - b.low) - tf.math.log(a.high - a.low),
-                     tf.broadcast_to(
-                         dtype_util.as_numpy_dtype(dtype)(np.inf),
-                         final_batch_shape))
+    return tf.where((b.low <= a.low) & (a.high <= b.high),
+                    tf.math.log(b.high - b.low) - tf.math.log(a.high - a.low),
+                    dtype_util.as_numpy_dtype(dtype)(np.inf))

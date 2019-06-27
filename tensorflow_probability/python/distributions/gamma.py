@@ -253,11 +253,10 @@ class Gamma(distribution.Distribution):
           tf.ones([], self.dtype), concentration,
           message="Mode not defined when any concentration <= 1.")]
     with tf.control_dependencies(assertions):
-      nan = tf.fill(
-          self._batch_shape_tensor(concentration=concentration, rate=rate),
-          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
-          name="nan")
-      return tf.where(concentration > 1., mode, nan)
+      return tf.where(
+          concentration > 1.,
+          mode,
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan))
 
   def _maybe_assert_valid_sample(self, x):
     if not self.validate_args:

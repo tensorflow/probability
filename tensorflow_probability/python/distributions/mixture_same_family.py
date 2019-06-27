@@ -32,7 +32,6 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
 
 from tensorflow.python.ops import array_ops  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops.parallel_for import gradients  # pylint: disable=g-direct-tensorflow-import
 
 
 class MixtureSameFamily(distribution.Distribution):
@@ -451,8 +450,11 @@ class MixtureSameFamily(distribution.Distribution):
 
     # transform_2d: [S*prod(B), prod(E)]
     # jacobian: [S*prod(B), prod(E), prod(E)]
-    transform_2d, jacobian = _value_and_batch_jacobian(
-        reshaped_distributional_transform, tf.reshape(x, x_2d_shape))
+    x_2d = tf.reshape(x, x_2d_shape)
+    with tf.GradientTape() as tape:
+      tape.watch(x_2d)
+      transform_2d = reshaped_distributional_transform(x_2d)
+    jacobian = tape.batch_jacobian(transform_2d, x_2d)
 
     # We only provide the first derivative; the second derivative computed by
     # autodiff would be incorrect, so we raise an error if it is requested.
@@ -542,29 +544,6 @@ def _outer_squared_difference(x, y):
   """Convenience function analogous to tf.squared_difference."""
   z = x - y
   return z[..., tf.newaxis, :] * z[..., tf.newaxis]
-
-
-def _value_and_batch_jacobian(f, x):
-  """Enables uniform interface to value and batch jacobian calculation.
-
-  Works in both eager and graph modes.
-
-  Arguments:
-    f: The scalar function to evaluate.
-    x: The value at which to compute the value and the batch jacobian.
-
-  Returns:
-    A tuple (f(x), J(x)), where J(x) is the batch jacobian.
-  """
-  if tf.executing_eagerly():
-    with tf.GradientTape() as tape:
-      tape.watch(x)
-      value = f(x)
-    batch_jacobian = tape.batch_jacobian(value, x)
-  else:
-    value = f(x)
-    batch_jacobian = gradients.batch_jacobian(value, x)
-  return value, batch_jacobian
 
 
 @tf.custom_gradient

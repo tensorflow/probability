@@ -20,7 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -76,7 +77,7 @@ def count_integers(arr,
     A vector with the same dtype as `weights` or the given `dtype`. The bin
     values.
   """
-  with tf.compat.v1.name_scope(
+  with tf1.name_scope(
       name, 'count_integers', values=[arr, weights, minlength, maxlength,
                                       axis]):
     if axis is None:
@@ -227,7 +228,7 @@ def find_bins(x,
   #    quantile/percentile return these edges in the leftmost (sample) dim.
   # 2. Say you have event_shape = [5], then we expect the bin will be different
   #    for all 5 events, so the index of the bin should not be in the event dim.
-  with tf.compat.v1.name_scope(
+  with tf1.name_scope(
       name, default_name='find_bins', values=[x, edges]):
     in_type = dtype_util.common_dtype([x, edges], dtype_hint=tf.float32)
     edges = tf.convert_to_tensor(value=edges, name='edges', dtype=in_type)
@@ -274,15 +275,13 @@ def find_bins(x,
 
     if not extend_lower_interval:
       low_fill = np.nan if dtype.is_floating else -1
-      bins = tf.compat.v1.where(
-          x < tf.expand_dims(edges[0], 0),
-          tf.fill(tf.shape(input=x), tf.cast(low_fill, dtype)), bins)
+      bins = tf.where(x < tf.expand_dims(edges[0], 0),
+                      tf.cast(low_fill, dtype), bins)
 
     if not extend_upper_interval:
       up_fill = np.nan if dtype.is_floating else tf.shape(input=edges)[0] - 1
-      bins = tf.compat.v1.where(
-          x > tf.expand_dims(edges[-1], 0),
-          tf.fill(tf.shape(input=x), tf.cast(up_fill, dtype)), bins)
+      bins = tf.where(x > tf.expand_dims(edges[-1], 0),
+                      tf.cast(up_fill, dtype), bins)
 
     if flattening_x:
       bins = tf.reshape(bins, x_orig_shape)
@@ -354,7 +353,7 @@ def histogram(x,
   ```
 
   """
-  with tf.compat.v1.name_scope(name, 'histogram', values=[x, edges, axis]):
+  with tf1.name_scope(name, 'histogram', values=[x, edges, axis]):
 
     # Tensor conversions.
     in_dtype = dtype_util.common_dtype([x, edges], dtype_hint=tf.float32)
@@ -506,7 +505,7 @@ def percentile(x,
       raise ValueError('Argument `interpolation` must be in %s.  Found %s' %
                        (allowed_interpolations, interpolation))
 
-  with tf.compat.v1.name_scope(name, values=[x, q]):
+  with tf1.name_scope(name, values=[x, q]):
     x = tf.convert_to_tensor(value=x, name='x')
 
     if interpolation in {'linear', 'midpoint'} and x.dtype.is_integer:
@@ -520,9 +519,9 @@ def percentile(x,
 
     if validate_args:
       q = distribution_util.with_dependencies([
-          tf.compat.v1.assert_rank_in(q, [0, 1]),
-          tf.compat.v1.assert_greater_equal(q, tf.cast(0., tf.float64)),
-          tf.compat.v1.assert_less_equal(q, tf.cast(100., tf.float64))
+          tf1.assert_rank_in(q, [0, 1]),
+          tf1.assert_greater_equal(q, tf.cast(0., tf.float64)),
+          tf1.assert_less_equal(q, tf.cast(100., tf.float64))
       ], q)
 
     # Move `axis` dims of `x` to the rightmost, call it `y`.
@@ -601,11 +600,8 @@ def percentile(x,
           constant_values=1)
       nan_batch_members = tf.reshape(
           nan_batch_members, shape=right_rank_matched_shape)
-      shape_gathered_y = tf.shape(input=gathered_y)
       nan = np.array(np.nan, gathered_y.dtype.as_numpy_dtype)
-      gathered_y = tf.compat.v1.where(
-          tf.broadcast_to(nan_batch_members, shape_gathered_y),
-          tf.fill(shape_gathered_y, nan), gathered_y)
+      gathered_y = tf.where(nan_batch_members, nan, gathered_y)
 
     # Expand dimensions if requested
     if keep_dims:
@@ -703,7 +699,7 @@ def quantiles(x,
   ```
 
   """
-  with tf.compat.v1.name_scope(
+  with tf1.name_scope(
       name, 'quantiles', values=[x, num_quantiles, axis]):
     x = tf.convert_to_tensor(value=x, name='x')
     return percentile(

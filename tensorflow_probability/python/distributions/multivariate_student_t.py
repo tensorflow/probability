@@ -20,7 +20,6 @@ from __future__ import print_function
 import functools
 
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math
@@ -36,10 +35,6 @@ from tensorflow_probability.python.internal import reparameterization
 __all__ = [
     "MultivariateStudentTLinearOperator",
 ]
-
-
-def _broadcast_to_shape(x, shape):
-  return x + tf.zeros(shape=shape, dtype=x.dtype)
 
 
 class MultivariateStudentTLinearOperator(distribution.Distribution):
@@ -247,12 +242,12 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     # covariance matrix and a sample from the chi-squared distribution.
     seed = seed_stream.SeedStream(seed, salt="multivariate t")
 
-    loc = _broadcast_to_shape(self.loc, self._sample_shape())
+    loc = tf.broadcast_to(self.loc, self._sample_shape())
     mvn = mvn_linear_operator.MultivariateNormalLinearOperator(
         loc=tf.zeros_like(loc), scale=self.scale)
     normal_samp = mvn.sample(n, seed=seed())
 
-    df = _broadcast_to_shape(self.df, self.batch_shape_tensor())
+    df = tf.broadcast_to(self.df, self.batch_shape_tensor())
     chi2 = chi2_lib.Chi2(df=df)
     chi2_samp = chi2.sample(n, seed=seed())
 
@@ -283,23 +278,23 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
       `NaN`. If `self.allow_nan_stats=False`, then an exception will be raised
       rather than returning `NaN`.""")
   def _mean(self):
-    mean = _broadcast_to_shape(self.loc, self._sample_shape())
-    df = _broadcast_to_shape(self.df[..., tf.newaxis], tf.shape(mean))
+    mean = tf.broadcast_to(self.loc, self._sample_shape())
 
     if self.allow_nan_stats:
-      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
-      return tf1.where(df > 1., mean, tf.fill(tf.shape(mean), nan, name="nan"))
+      return tf.where(
+          self.df[..., tf.newaxis] > 1., mean,
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
       with tf.control_dependencies([
           assert_util.assert_less(
               tf.cast(1., self.dtype),
-              df,
+              self.df,
               message="mean not defined for components of df <= 1"),
       ]):
         return tf.identity(mean)
 
   def _mode(self):
-    return _broadcast_to_shape(self.loc, self._sample_shape())
+    return tf.broadcast_to(self.loc, self._sample_shape())
 
   def _std_var_helper(self, statistic, statistic_name, statistic_ndims,
                       df_factor_fn):
@@ -309,20 +304,17 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
         tf.concat(
             [tf.shape(self.df),
              tf.ones([statistic_ndims], dtype=tf.int32)], -1))
-    df = _broadcast_to_shape(df, tf.shape(statistic))
     # We need to put the tf.where inside the outer tf1.where to ensure we never
     # hit a NaN in the gradient.
-    denom = tf1.where(df > 2., df - 2., tf.ones_like(df))
+    denom = tf.where(df > 2., df - 2., tf.ones_like(df))
     statistic = statistic * df_factor_fn(df / denom)
     # When 1 < df <= 2, stddev/variance are infinite.
-    inf = dtype_util.as_numpy_dtype(self.dtype)(np.inf)
-    result_where_defined = tf1.where(
-        df > 2., statistic, tf.fill(tf.shape(statistic), inf, name="inf"))
+    result_where_defined = tf.where(
+        df > 2., statistic, dtype_util.as_numpy_dtype(self.dtype)(np.inf))
 
     if self.allow_nan_stats:
-      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
-      return tf1.where(df > 1., result_where_defined,
-                       tf.fill(tf.shape(statistic), nan, name="nan"))
+      return tf.where(df > 1., result_where_defined,
+                      dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
       with tf.control_dependencies([
           assert_util.assert_less(
@@ -352,7 +344,7 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
 
     cov_shape = tf.concat(
         [self._sample_shape(), self._event_shape_tensor()], -1)
-    mvn_cov = _broadcast_to_shape(mvn_cov, cov_shape)
+    mvn_cov = tf.broadcast_to(mvn_cov, cov_shape)
     return self._std_var_helper(mvn_cov, "covariance", 2, lambda x: x)
 
   @distribution_util.AppendDocstring("""
@@ -376,7 +368,7 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
       mvn_var = tf.linalg.diag_part(
           self.scale.matmul(self.scale.to_dense(), adjoint_arg=True))
 
-    mvn_var = _broadcast_to_shape(mvn_var, self._sample_shape())
+    mvn_var = tf.broadcast_to(mvn_var, self._sample_shape())
     return self._std_var_helper(mvn_var, "variance", 1, lambda x: x)
 
   @distribution_util.AppendDocstring("""
@@ -400,11 +392,11 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
           tf.linalg.diag_part(
               self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)))
 
-    mvn_std = _broadcast_to_shape(mvn_std, self._sample_shape())
+    mvn_std = tf.broadcast_to(mvn_std, self._sample_shape())
     return self._std_var_helper(mvn_std, "standard deviation", 1, tf.sqrt)
 
   def _entropy(self):
-    df = _broadcast_to_shape(self.df, self.batch_shape_tensor())
+    df = tf.broadcast_to(self.df, self.batch_shape_tensor())
     num_dims = tf.cast(self.event_shape_tensor()[0], self.dtype)
 
     def _lbeta(concentration0, concentration1):

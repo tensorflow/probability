@@ -21,7 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -184,30 +183,21 @@ class Pareto(distribution.Distribution):
       """The mean of Pareto is defined` if `concentration > 1.`, otherwise it
       is `Inf`.""")
   def _mean(self):
-    broadcasted_concentration = self.concentration + tf.zeros_like(
-        self.scale)
-    infs = tf.fill(
-        dims=tf.shape(broadcasted_concentration),
-        value=dtype_util.as_numpy_dtype(self.dtype)(np.inf))
-
-    return tf1.where(broadcasted_concentration > 1.,
-                     self.concentration * self.scale / (self.concentration - 1),
-                     infs)
+    return tf.where(self.concentration > 1.,
+                    self.concentration * self.scale / (self.concentration - 1),
+                    dtype_util.as_numpy_dtype(self.dtype)(np.inf))
 
   @distribution_util.AppendDocstring(
       """The variance of Pareto is defined` if `concentration > 2.`, otherwise
       it is `Inf`.""")
   def _variance(self):
-    broadcasted_concentration = self.concentration + tf.zeros_like(self.scale)
-    infs = tf.fill(
-        dims=tf.shape(broadcasted_concentration),
-        value=dtype_util.as_numpy_dtype(self.dtype)(np.inf))
-    return tf1.where(
-        broadcasted_concentration > 2., self.scale**2 * self.concentration /
-        ((self.concentration - 1.)**2 * (self.concentration - 2.)), infs)
+    return tf.where(
+        self.concentration > 2., self.scale**2 * self.concentration /
+        ((self.concentration - 1.)**2 * (self.concentration - 2.)),
+        dtype_util.as_numpy_dtype(self.dtype)(np.inf))
 
   def _mode(self):
-    return self.scale + tf.zeros_like(self.concentration)
+    return tf.broadcast_to(self.scale, self.batch_shape_tensor())
 
   def _extend_support(self, x, f, alt):
     """Returns `f(x)` if x is in the support, and `alt` otherwise.
@@ -225,21 +215,16 @@ class Pareto(distribution.Distribution):
     Returns:
       Tensor representing an extension of `f(x)`.
     """
-    # We need to do a series of broadcasts for the tf1.where.
-    scale = self.scale + tf.zeros_like(self.concentration)
-    is_invalid = x < scale
-    scale = scale + tf.zeros_like(x)
-    x = x + tf.zeros_like(scale)
+    is_invalid = x < self.scale
     # We need to do this to ensure gradients are sound.
-    y = f(tf1.where(is_invalid, scale, x))
+    y = f(tf.where(is_invalid, self.scale, x))
     if alt == 0.:
       alt = tf.zeros_like(y)
     elif alt == 1.:
       alt = tf.ones_like(y)
     else:
-      alt = tf.fill(
-          dims=tf.shape(y), value=dtype_util.as_numpy_dtype(self.dtype)(alt))
-    return tf1.where(is_invalid, alt, y)
+      alt = dtype_util.as_numpy_dtype(self.dtype)(alt)
+    return tf.where(is_invalid, alt, y)
 
 
 @kullback_leibler.RegisterKL(Pareto, Pareto)
@@ -261,13 +246,11 @@ def _kl_pareto_pareto(a, b, name=None):
     # Terminology is different from source to source for Pareto distributions.
     # The 'concentration' parameter corresponds to 'a' in that source, and the
     # 'scale' parameter corresponds to 'm'.
-    final_batch_shape = distribution_util.get_broadcast_shape(
-        a.concentration, b.concentration, a.scale, b.scale)
     common_type = dtype_util.common_dtype(
         [a.concentration, b.concentration, a.scale, b.scale], tf.float32)
-    return tf1.where(
+    return tf.where(
         a.scale >= b.scale,
         b.concentration * (tf.math.log(a.scale) - tf.math.log(b.scale)) +
         tf.math.log(a.concentration) - tf.math.log(b.concentration) +
         b.concentration / a.concentration - 1.0,
-        tf.broadcast_to(tf.cast(np.inf, common_type), final_batch_shape))
+        dtype_util.as_numpy_dtype(common_type)(np.inf))

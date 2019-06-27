@@ -17,7 +17,6 @@
 from __future__ import absolute_import
 from __future__ import division
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import categorical
@@ -719,12 +718,9 @@ class HiddenMarkovModel(distribution.Distribution):
                              tf.concat([batch_shape, [self._num_steps]],
                                        axis=0))
       mask = distribution_util.move_dimension(mask, -1, 0)
-      mask = tf.expand_dims(mask, -1)
-      mask = tf.broadcast_to(mask, tf.shape(observation_log_probs))
-
-      observation_log_probs = tf1.where(mask,
-                                        tf.zeros_like(observation_log_probs),
-                                        observation_log_probs)
+      observation_log_probs = tf.where(mask[..., tf.newaxis],
+                                       tf.zeros_like(observation_log_probs),
+                                       observation_log_probs)
 
     return observation_log_probs
 

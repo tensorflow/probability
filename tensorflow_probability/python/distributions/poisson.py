@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -160,10 +159,10 @@ class Poisson(distribution.Distribution):
     log_probs = self._log_unnormalized_prob(x) - self._log_normalization()
     if not self.interpolate_nondiscrete:
       # Ensure the gradient wrt `rate` is zero at non-integer points.
-      neg_inf = tf.fill(
-          tf.shape(log_probs),
-          dtype_util.as_numpy_dtype(log_probs.dtype)(-np.inf))
-      log_probs = tf1.where(tf.math.is_inf(log_probs), neg_inf, log_probs)
+      log_probs = tf.where(
+          tf.math.is_inf(log_probs),
+          dtype_util.as_numpy_dtype(log_probs.dtype)(-np.inf),
+          log_probs)
     return log_probs
 
   def _log_cdf(self, x):
@@ -176,8 +175,7 @@ class Poisson(distribution.Distribution):
     # the values and handle this case explicitly.
     safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 0.)
     cdf = tf.math.igammac(1. + safe_x, self.rate)
-    return tf1.where(
-        tf.broadcast_to(x < 0., tf.shape(cdf)), tf.zeros_like(cdf), cdf)
+    return tf.where(x < 0., tf.zeros_like(cdf), cdf)
 
   def _log_normalization(self):
     return self.rate
@@ -187,9 +185,8 @@ class Poisson(distribution.Distribution):
     # Catch such x's and set the output value accordingly.
     safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 0.)
     y = safe_x * self.log_rate - tf.math.lgamma(1. + safe_x)
-    is_supported = tf.broadcast_to(tf.equal(x, safe_x), tf.shape(y))
-    neg_inf = tf.fill(tf.shape(y), dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
-    return tf1.where(is_supported, y, neg_inf)
+    return tf.where(
+        tf.equal(x, safe_x), y, dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
 
   def _mean(self):
     return tf.identity(self.rate)

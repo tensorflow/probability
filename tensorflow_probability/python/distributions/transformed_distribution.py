@@ -17,7 +17,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
@@ -43,10 +42,10 @@ def _pick_scalar_condition(pred, cond_true, cond_false):
   """Convenience function which chooses the condition based on the predicate."""
   # Note: This function is only valid if all of pred, cond_true, and cond_false
   # are scalars. This means its semantics are arguably more like tf.cond than
-  # tf.where even though we use tf1.where to implement it.
+  # tf.where even though we use tf.where to implement it.
   pred_ = tf.get_static_value(tf.convert_to_tensor(pred))
   if pred_ is None:
-    return tf1.where(pred, cond_true, cond_false)
+    return tf.where(pred, cond_true, cond_false)
   return cond_true if pred_ else cond_false
 
 

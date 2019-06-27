@@ -23,7 +23,7 @@ import collections
 
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.mcmc import kernel as kernel_base
@@ -329,11 +329,7 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
             chain_not_done, tf.rank(next_state_parts[0]))
         for n_state, c_state in zip(next_state_parts, current_state_parts):
           new_state_part = tf.where(
-              tf.broadcast_to(
-                  broadcasted_chain_not_done,
-                  tf.shape(n_state)),
-              n_state,
-              c_state)
+              broadcasted_chain_not_done, n_state, c_state)
           new_state_parts.append(new_state_part)
 
         return (

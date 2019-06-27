@@ -20,7 +20,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -268,7 +267,7 @@ class StudentT(distribution.Distribution):
     y = (x - self.loc) / tf.abs(self.scale)
     x_t = self.df / (y**2. + self.df)
     neg_cdf = 0.5 * tf.math.betainc(0.5 * self.df, 0.5, x_t)
-    return tf1.where(tf.less(y, 0.), neg_cdf, 1. - neg_cdf)
+    return tf.where(y < 0., neg_cdf, 1. - neg_cdf)
 
   def _entropy(self):
     v = tf.ones(self.batch_shape_tensor(),
@@ -288,11 +287,10 @@ class StudentT(distribution.Distribution):
     mean = self.loc * tf.ones(self.batch_shape_tensor(),
                               dtype=self.dtype)
     if self.allow_nan_stats:
-      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
-      return tf1.where(
-          tf.greater(self.df,
-                     tf.ones(self.batch_shape_tensor(), dtype=self.dtype)),
-          mean, tf.fill(self.batch_shape_tensor(), nan, name="nan"))
+      return tf.where(
+          self.df > 1.,
+          mean,
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
       return distribution_util.with_dependencies([
           assert_util.assert_less(
@@ -311,26 +309,23 @@ class StudentT(distribution.Distribution):
       ```
       """)
   def _variance(self):
-    # We need to put the tf.where inside the outer tf1.where to ensure we never
+    # We need to put the tf.where inside the outer tf.where to ensure we never
     # hit a NaN in the gradient.
-    denom = tf1.where(
-        tf.greater(self.df, 2.), self.df - 2., tf.ones_like(self.df))
+    denom = tf.where(self.df > 2., self.df - 2., tf.ones_like(self.df))
     # Abs(scale) superfluous.
     var = (tf.ones(self.batch_shape_tensor(), dtype=self.dtype) *
            tf.square(self.scale) * self.df / denom)
     # When 1 < df <= 2, variance is infinite.
-    inf = dtype_util.as_numpy_dtype(self.dtype)(np.inf)
-    result_where_defined = tf1.where(
-        self.df > tf.fill(self.batch_shape_tensor(), 2.), var,
-        tf.fill(self.batch_shape_tensor(), inf, name="inf"))
+    result_where_defined = tf.where(
+        self.df > 2.,
+        var,
+        dtype_util.as_numpy_dtype(self.dtype)(np.inf))
 
     if self.allow_nan_stats:
-      nan = dtype_util.as_numpy_dtype(self.dtype)(np.nan)
-      return tf1.where(
-          tf.greater(self.df,
-                     tf.ones(self.batch_shape_tensor(), dtype=self.dtype)),
+      return tf.where(
+          self.df > 1.,
           result_where_defined,
-          tf.fill(self.batch_shape_tensor(), nan, name="nan"))
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
       return distribution_util.with_dependencies([
           assert_util.assert_less(

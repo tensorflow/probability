@@ -21,9 +21,11 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import monte_carlo
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
 
 __all__ = [
@@ -93,7 +95,7 @@ def amari_alpha(logu, alpha=1., self_normalized=False, name=None):
     TypeError: if `alpha` is `None` or a `Tensor`.
     TypeError: if `self_normalized` is `None` or a `Tensor`.
   """
-  with tf.compat.v1.name_scope(name, "amari_alpha", [logu]):
+  with tf1.name_scope(name, "amari_alpha", [logu]):
     if alpha is None or tf.is_tensor(alpha):
       raise TypeError("`alpha` cannot be `None` or `Tensor` type.")
     if (self_normalized is None or tf.is_tensor(self_normalized)):
@@ -163,7 +165,7 @@ def kl_reverse(logu, self_normalized=False, name=None):
     TypeError: if `self_normalized` is `None` or a `Tensor`.
   """
 
-  with tf.compat.v1.name_scope(name, "kl_reverse", [logu]):
+  with tf1.name_scope(name, "kl_reverse", [logu]):
     return amari_alpha(logu, alpha=0., self_normalized=self_normalized)
 
 
@@ -211,7 +213,7 @@ def kl_forward(logu, self_normalized=False, name=None):
     TypeError: if `self_normalized` is `None` or a `Tensor`.
   """
 
-  with tf.compat.v1.name_scope(name, "kl_forward", [logu]):
+  with tf1.name_scope(name, "kl_forward", [logu]):
     return amari_alpha(logu, alpha=1., self_normalized=self_normalized)
 
 
@@ -264,7 +266,7 @@ def jensen_shannon(logu, self_normalized=False, name=None):
       evaluated at `u = exp(logu)`.
   """
 
-  with tf.compat.v1.name_scope(name, "jensen_shannon", [logu]):
+  with tf1.name_scope(name, "jensen_shannon", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     npdt = logu.dtype.as_numpy_dtype
     y = tf.nn.softplus(logu)
@@ -318,7 +320,7 @@ def arithmetic_geometric(logu, self_normalized=False, name=None):
       Csiszar-function evaluated at `u = exp(logu)`.
   """
 
-  with tf.compat.v1.name_scope(name, "arithmetic_geometric", [logu]):
+  with tf1.name_scope(name, "arithmetic_geometric", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     y = tf.nn.softplus(logu) - 0.5 * logu
     if self_normalized:
@@ -353,7 +355,7 @@ def total_variation(logu, name=None):
       evaluated at `u = exp(logu)`.
   """
 
-  with tf.compat.v1.name_scope(name, "total_variation", [logu]):
+  with tf1.name_scope(name, "total_variation", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return 0.5 * tf.abs(tf.math.expm1(logu))
 
@@ -385,7 +387,7 @@ def pearson(logu, name=None):
       `u = exp(logu)`.
   """
 
-  with tf.compat.v1.name_scope(name, "pearson", [logu]):
+  with tf1.name_scope(name, "pearson", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return tf.square(tf.math.expm1(logu))
 
@@ -420,7 +422,7 @@ def squared_hellinger(logu, name=None):
       evaluated at `u = exp(logu)`.
   """
 
-  with tf.compat.v1.name_scope(name, "squared_hellinger", [logu]):
+  with tf1.name_scope(name, "squared_hellinger", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return pearson(0.5 * logu)
 
@@ -455,7 +457,7 @@ def triangular(logu, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.compat.v1.name_scope(name, "triangular", [logu]):
+  with tf1.name_scope(name, "triangular", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return pearson(logu) / (1. + tf.exp(logu))
 
@@ -492,14 +494,13 @@ def t_power(logu, t, self_normalized=False, name=None):
     t_power_of_u: `float`-like `Tensor` of the Csiszar-function evaluated
       at `u = exp(logu)`.
   """
-  with tf.compat.v1.name_scope(name, "t_power", [logu, t]):
+  with tf1.name_scope(name, "t_power", [logu, t]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     t = tf.convert_to_tensor(value=t, dtype=logu.dtype.base_dtype, name="t")
     fu = tf.math.expm1(t * logu)
     if self_normalized:
       fu -= t * tf.math.expm1(logu)
-    fu *= tf.compat.v1.where(
-        tf.logical_and(0. < t, t < 1.), -tf.ones_like(t), tf.ones_like(t))
+    fu *= tf.where((0. < t) & (t < 1.), -tf.ones_like(t), tf.ones_like(t))
     return fu
 
 
@@ -542,7 +543,7 @@ def log1p_abs(logu, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.compat.v1.name_scope(name, "log1p_abs", [logu]):
+  with tf1.name_scope(name, "log1p_abs", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return tf.math.expm1(tf.abs(logu))
 
@@ -580,7 +581,7 @@ def jeffreys(logu, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.compat.v1.name_scope(name, "jeffreys", [logu]):
+  with tf1.name_scope(name, "jeffreys", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return 0.5 * tf.math.expm1(logu) * logu
 
@@ -612,7 +613,7 @@ def chi_square(logu, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.compat.v1.name_scope(name, "chi_square", [logu]):
+  with tf1.name_scope(name, "chi_square", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return tf.math.expm1(2. * logu)
 
@@ -653,7 +654,7 @@ def modified_gan(logu, self_normalized=False, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.compat.v1.name_scope(name, "chi_square", [logu]):
+  with tf1.name_scope(name, "chi_square", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     y = tf.nn.softplus(logu) - logu
     if self_normalized:
@@ -705,7 +706,7 @@ def dual_csiszar_function(logu, csiszar_function, name=None):
       `f` at `u = exp(logu)`.
   """
 
-  with tf.compat.v1.name_scope(name, "dual_csiszar_function", [logu]):
+  with tf1.name_scope(name, "dual_csiszar_function", [logu]):
     return tf.exp(logu) * csiszar_function(-logu)
 
 
@@ -774,7 +775,7 @@ def symmetrized_csiszar_function(logu, csiszar_function, name=None):
       symmetrization of `g` evaluated at `u = exp(logu)`.
   """
 
-  with tf.compat.v1.name_scope(name, "symmetrized_csiszar_function", [logu]):
+  with tf1.name_scope(name, "symmetrized_csiszar_function", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
     return 0.5 * (csiszar_function(logu)
                   + dual_csiszar_function(logu, csiszar_function))
@@ -881,8 +882,7 @@ def monte_carlo_csiszar_f_divergence(
       to parameters) is valid.
     TypeError: if `p_log_prob` is not a Python `callable`.
   """
-  with tf.compat.v1.name_scope(name, "monte_carlo_csiszar_f_divergence",
-                               [num_draws]):
+  with tf1.name_scope(name, "monte_carlo_csiszar_f_divergence", [num_draws]):
 
     def divergence_fn(q_samples):
       p_log_prob_term = nest_util.call_fn(p_log_prob, q_samples)
@@ -989,8 +989,7 @@ def csiszar_vimco(f,
        objectives. In _International Conference on Machine Learning_, 2016.
        https://arxiv.org/abs/1602.06725
   """
-  with tf.compat.v1.name_scope(name, "csiszar_vimco",
-                               [num_draws, num_batch_draws]):
+  with tf1.name_scope(name, "csiszar_vimco", [num_draws, num_batch_draws]):
     if num_draws < 2:
       raise ValueError("Must specify num_draws > 1.")
     stop = tf.stop_gradient  # For readability.
@@ -1047,7 +1046,7 @@ def csiszar_vimco_helper(logu, name=None):
       ```
 
   """
-  with tf.compat.v1.name_scope(name, "csiszar_vimco_helper", [logu]):
+  with tf1.name_scope(name, "csiszar_vimco_helper", [logu]):
     logu = tf.convert_to_tensor(value=logu, name="logu")
 
     n = tf.compat.dimension_value(logu.shape.with_rank_at_least(1)[0])
@@ -1078,34 +1077,30 @@ def csiszar_vimco_helper(logu, name=None):
     # happens; if it does we want to complain loudly (which `softplus_inverse`
     # will).
     d_ok = tf.not_equal(d, 0.)
-    safe_d = tf.compat.v1.where(d_ok, d, tf.ones_like(d))
+    safe_d = tf.where(d_ok, d, tf.ones_like(d))
     d_ok_result = logu + tfd.softplus_inverse(safe_d)
-
-    inf = np.array(np.inf, dtype=logu.dtype.as_numpy_dtype)
 
     # When not(d_ok) and is_positive_and_largest then we manually compute the
     # log_loosum_u. (We can efficiently do this for any one point but not all,
     # hence we still need the above calculation.) This is good because when
     # this condition is met, we cannot use the above calculation; its -inf.
-    # We now compute the log-leave-out-max-sum, replicate it to every
-    # point and make sure to select it only when we need to.
     is_positive_and_largest = tf.logical_and(
         logu > 0.,
         tf.equal(logu, log_max_u[tf.newaxis, ...]))
     log_lomsum_u = tf.reduce_logsumexp(
-        input_tensor=tf.compat.v1.where(is_positive_and_largest,
-                                        tf.fill(tf.shape(input=logu), -inf),
-                                        logu),
+        input_tensor=tf.where(
+            is_positive_and_largest,
+            dtype_util.as_numpy_dtype(logu.dtype)(-np.inf),
+            logu),
         axis=0,
         keepdims=True)
-    log_lomsum_u = tf.tile(
+
+    d_not_ok_result = tf.where(
+        is_positive_and_largest,
         log_lomsum_u,
-        multiples=1 + tf.pad(tensor=[n - 1], paddings=[[0, tf.rank(logu) - 1]]))
+        dtype_util.as_numpy_dtype(logu.dtype)(-np.inf))
 
-    d_not_ok_result = tf.compat.v1.where(is_positive_and_largest, log_lomsum_u,
-                                         tf.fill(tf.shape(input=d), -inf))
-
-    log_loosum_u = tf.compat.v1.where(d_ok, d_ok_result, d_not_ok_result)
+    log_loosum_u = tf.where(d_ok, d_ok_result, d_not_ok_result)
 
     # The swap-one-out-sum ("soosum") is n different sums, each of which
     # replaces the i-th item with the i-th-left-out average, i.e.,

@@ -20,7 +20,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -291,13 +290,10 @@ class Beta(distribution.Distribution):
   def _mode(self):
     mode = (self.concentration1 - 1.) / (self.total_concentration - 2.)
     if self.allow_nan_stats:
-      nan = tf.fill(
-          self.batch_shape_tensor(),
-          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
-          name="nan")
-      is_defined = tf.logical_and(self.concentration1 > 1.,
-                                  self.concentration0 > 1.)
-      return tf1.where(is_defined, mode, nan)
+      return tf.where(
+          (self.concentration1 > 1.) & (self.concentration0 > 1.),
+          mode,
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     return distribution_util.with_dependencies([
         assert_util.assert_less(
             tf.ones([], dtype=self.dtype),

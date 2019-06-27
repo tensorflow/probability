@@ -20,7 +20,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import kumaraswamy as kumaraswamy_bijector
@@ -218,12 +217,10 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
     b = self.concentration0
     mode = ((a - 1) / (a * b - 1))**(1. / a)
     if self.allow_nan_stats:
-      nan = tf.fill(
-          self.batch_shape_tensor(),
-          dtype_util.as_numpy_dtype(self.dtype)(np.nan),
-          name="nan")
-      is_defined = (self.concentration1 > 1.) & (self.concentration0 > 1.)
-      return tf1.where(is_defined, mode, nan)
+      return tf.where(
+          (self.concentration1 > 1.) & (self.concentration0 > 1.),
+          mode,
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan))
 
     return distribution_util.with_dependencies([
         assert_util.assert_less(

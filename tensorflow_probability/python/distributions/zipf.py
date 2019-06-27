@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -192,8 +191,7 @@ class Zipf(distribution.Distribution):
 
     cdf = 1. - (
         tf.math.zeta(self.power, safe_x + 1.) / tf.math.zeta(self.power, 1.))
-    return tf1.where(
-        tf.broadcast_to(tf.less(x, 1.), tf.shape(cdf)), tf.zeros_like(cdf), cdf)
+    return tf.where(x < 1., tf.zeros_like(cdf), cdf)
 
   def _log_normalization(self):
     return tf.math.log(tf.math.zeta(self.power, 1.))
@@ -201,9 +199,8 @@ class Zipf(distribution.Distribution):
   def _log_unnormalized_prob(self, x):
     safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 1.)
     y = -self.power * tf.math.log(safe_x)
-    is_supported = tf.broadcast_to(tf.equal(x, safe_x), tf.shape(y))
-    neg_inf = tf.fill(tf.shape(y), dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
-    return tf1.where(is_supported, y, neg_inf)
+    return tf.where(
+        tf.equal(x, safe_x), y, dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
 
   @distribution_util.AppendDocstring(
       """Note: Zipf has an infinite mean when `power` <= 2.""")
@@ -270,7 +267,7 @@ class Zipf(distribution.Distribution):
 
       # Update the non-accepted points.
       # Since X \in (K - .5, K + .5), the sample K is chosen as floor(X + 0.5).
-      k = tf1.where(should_continue, tf.floor(x + 0.5), k)
+      k = tf.where(should_continue, tf.floor(x + 0.5), k)
       accept = (u <= self._hat_integral(k + .5) + tf.exp(self._log_prob(k + 1)))
 
       return [should_continue & (~accept), k]
@@ -296,8 +293,7 @@ class Zipf(distribution.Distribution):
     if self.validate_args:
       npdt = dtype_util.as_numpy_dtype(self.dtype)
       v = npdt(dtype_util.min(npdt) if dtype_util.is_integer(npdt) else np.nan)
-      mask = tf.fill(shape, v)
-      samples = tf1.where(should_continue, mask, samples)
+      samples = tf.where(should_continue, v, samples)
 
     return samples
 

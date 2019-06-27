@@ -19,7 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -158,15 +159,14 @@ def sqrt_with_finite_grads(x, name=None):
   the sqrt (as opposed to just using the max floating point value) to avoid
   potential overflow when combining this value with others downstream.
   """
-  with tf.compat.v1.name_scope(name, 'sqrt_with_finite_grads', [x]):
+  with tf1.name_scope(name, 'sqrt_with_finite_grads', [x]):
     x = tf.convert_to_tensor(value=x, name='x')
     if not x.dtype.is_floating:
       raise TypeError('Input `x` must be floating type.')
     def grad(grad_ys):
       large_float_like_x = np.sqrt(np.finfo(x.dtype.as_numpy_dtype()).max)
-      safe_grads = tf.compat.v1.where(
-          tf.equal(x, 0), tf.fill(tf.shape(input=x), large_float_like_x),
-          0.5 * tf.math.rsqrt(x))
+      safe_grads = tf.where(
+          tf.equal(x, 0), large_float_like_x, 0.5 * tf.math.rsqrt(x))
       return grad_ys * safe_grads
     return tf.sqrt(x), grad
 

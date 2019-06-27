@@ -176,7 +176,7 @@ class FiniteDiscrete(distribution.Distribution):
                            dist_util.prefer_static_shape(self.outcomes)[-1] -
                            1))
     should_use_upper_bound = self._is_equal_or_close(flat_x, values_at_ub)
-    indices = tf1.where(should_use_upper_bound, upper_bound, upper_bound - 1)
+    indices = tf.where(should_use_upper_bound, upper_bound, upper_bound - 1)
     return self._categorical.cdf(
         tf.reshape(indices, shape=dist_util.prefer_static_shape(x)))
 
@@ -202,15 +202,11 @@ class FiniteDiscrete(distribution.Distribution):
     use_left_indices = self._is_equal_or_close(
         x, tf.gather(self.outcomes, indices=left_indices))
     log_probs = self._categorical.log_prob(
-        tf1.where(use_left_indices, left_indices, right_indices))
-    should_be_neg_inf = tf.broadcast_to(
+        tf.where(use_left_indices, left_indices, right_indices))
+    return tf.where(
         tf.logical_not(use_left_indices | use_right_indices),
-        shape=dist_util.prefer_static_shape(log_probs))
-    return tf1.where(
-        should_be_neg_inf,
-        tf.fill(
-            dist_util.prefer_static_shape(should_be_neg_inf),
-            dtype_util.as_numpy_dtype(log_probs.dtype)(-np.inf)), log_probs)
+        dtype_util.as_numpy_dtype(log_probs.dtype)(-np.inf),
+        log_probs)
 
   def _mean(self):
     probs = self.probs

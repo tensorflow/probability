@@ -21,7 +21,6 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
@@ -36,10 +35,6 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
 
 tfl = tf.linalg
-
-
-def _broadcast_to_shape(x, shape):
-  return x + tf.zeros(shape=shape, dtype=x.dtype)
 
 
 def _check_equal_shape(name,
@@ -838,11 +833,11 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # a Kalman filter depends on data, so should match the full
       # sample and batch shape. The covariance is data-independent, so
       # only has batch shape.
-      prior_mean = _broadcast_to_shape(
+      prior_mean = tf.broadcast_to(
           self.initial_state_prior.mean()[..., tf.newaxis],
           tf.concat([sample_and_batch_shape,
                      [self.latent_size, 1]], axis=0))
-      prior_cov = _broadcast_to_shape(
+      prior_cov = tf.broadcast_to(
           self.initial_state_prior.covariance(),
           tf.concat([mask_sample_and_batch_shape,
                      [self.latent_size, self.latent_size]], axis=0))
@@ -997,7 +992,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
       with tf.control_dependencies(self.runtime_assertions):
         # Broadcast to ensure we represent the full batch shape.
-        initial_latent_mean = _broadcast_to_shape(
+        initial_latent_mean = tf.broadcast_to(
             self.initial_state_prior.mean()[..., tf.newaxis],
             tf.concat([self.batch_shape_tensor(),
                        [self.latent_size, 1]], axis=0))
@@ -1053,7 +1048,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     with tf.name_scope("covariance_joint"):
 
       with tf.control_dependencies(self.runtime_assertions):
-        initial_latent_cov = _broadcast_to_shape(
+        initial_latent_cov = tf.broadcast_to(
             self.initial_state_prior.covariance(),
             tf.concat([self.batch_shape_tensor(),
                        [self.latent_size, self.latent_size]], axis=0))
@@ -1334,7 +1329,7 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
       # from masked elements will not be selected below, but we need to ensure
       # that any results we incidently compute on masked values are at least
       # finite (not inf or NaN) so that they don't screw up gradient propagation
-      # through `tf1.where`, as described in
+      # through `tf.where`, as described in
       #  https://github.com/tensorflow/tensorflow/issues/2540.
       # We fill with the prior expectation because any fixed value such as zero
       # might be arbitrarily unlikely under the prior, leading to overflow in
@@ -1343,9 +1338,7 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
       x_expected = _propagate_mean(state.predicted_mean,
                                    observation_matrix,
                                    observation_noise) * tf.ones_like(x_t)
-      x_t = tf1.where(
-          tf.broadcast_to(mask_t, tf.shape(x_expected)), x_expected,
-          tf.broadcast_to(x_t, tf.shape(x_expected)))
+      x_t = tf.where(mask_t, x_expected, x_t)
 
     # Given predicted mean u_{t|t-1} and covariance P_{t|t-1} from the
     # previous step, incorporate the observation x_t, producing the
@@ -1362,15 +1355,11 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
     log_marginal_likelihood = observation_dist.log_prob(x_t[..., 0])
 
     if mask_t is not None:
-      filtered_mean = tf1.where(
-          tf.broadcast_to(mask_t, tf.shape(filtered_mean)),
-          state.predicted_mean, filtered_mean)
-      filtered_cov = tf1.where(
-          tf.broadcast_to(mask_t, tf.shape(filtered_cov)), state.predicted_cov,
-          filtered_cov)
-      log_marginal_likelihood = tf1.where(
-          tf.broadcast_to(mask_t[..., 0, 0], tf.shape(log_marginal_likelihood)),
-          tf.zeros_like(log_marginal_likelihood), log_marginal_likelihood)
+      filtered_mean = tf.where(mask_t, state.predicted_mean, filtered_mean)
+      filtered_cov = tf.where(mask_t, state.predicted_cov, filtered_cov)
+      log_marginal_likelihood = tf.where(
+          mask_t[..., 0, 0], tf.zeros_like(log_marginal_likelihood),
+          log_marginal_likelihood)
 
     # Run the filtered posterior through the transition
     # model to predict the next time step:

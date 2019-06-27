@@ -21,7 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
@@ -37,7 +36,7 @@ __all__ = [
 def _sqrtx2p1(x):
   """Implementation of `sqrt(1 + x**2)` which is stable despite large `x`."""
   sqrt_eps = np.sqrt(np.finfo(dtype_util.as_numpy_dtype(x.dtype)).eps)
-  return tf1.where(
+  return tf.where(
       tf.abs(x) * sqrt_eps <= 1.,
       tf.sqrt(x**2. + 1.),
       # For large x, calculating x**2 can overflow. This can be alleviated by
