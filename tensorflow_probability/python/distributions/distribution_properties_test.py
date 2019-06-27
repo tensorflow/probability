@@ -93,6 +93,7 @@ TF2_FRIENDLY_DISTS = (
 )
 
 NO_LOG_PROB_PARAM_GRADS = ('Deterministic',)
+NO_KL_PARAM_GRADS = ('Deterministic',)
 
 MUTEX_PARAMS = [
     set(['logits', 'probs']),
@@ -176,6 +177,15 @@ def broadcasting_shapes(draw, batch_shape, param_names):
   n = len(param_names)
   return dict(zip(draw(hps.permutations(param_names)),
                   draw(tfp_test_util.broadcasting_shapes(batch_shape, n))))
+
+
+@hps.composite
+def broadcast_compatible_shape(draw, batch_shape):
+  """Draws a shape which is broadcast-compatible with `batch_shape`."""
+  # broadcasting_shapes draws a sequence of shapes, so that the last "completes"
+  # the broadcast to fill out batch_shape. Here we just draw two and take the
+  # first (incomplete) one.
+  return draw(tfp_test_util.broadcasting_shapes(batch_shape, 2))[0]
 
 
 @hps.composite
@@ -481,6 +491,13 @@ def maybe_seed(seed):
   return tf.compat.v1.set_random_seed(seed) if tf.executing_eagerly() else seed
 
 
+def get_event_dim(dist):
+  for param, val in dist.parameters.items():
+    if (param in dist._params_event_ndims() and val is not None and
+        dist._params_event_ndims()[param]):
+      return tf.compat.dimension_value(val.shape[-1])
+
+
 @test_util.run_all_in_graph_and_eager_modes
 class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
 
@@ -499,6 +516,13 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
             hpnp.arrays(dtype=np.int64, shape=[]).filter(lambda x: x != 0)))
     dist, batch_shape = data.draw(
         distributions(dist_name=dist_name, enable_vars=True))
+    batch_shape2 = data.draw(broadcast_compatible_shape(batch_shape))
+    dist2, _ = data.draw(
+        distributions(
+            dist_name=dist_name,
+            batch_shape=batch_shape2,
+            event_dim=get_event_dim(dist),
+            enable_vars=True))
     del batch_shape
     logging.info(
         'distribution: %s; parameters used: %s', dist,
@@ -515,9 +539,14 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
                 k, dist_name, e))
 
     for stat in data.draw(
-        hps.permutations(
-            ['covariance', 'entropy', 'mean', 'mode', 'stddev',
-             'variance']))[:3]:
+        hps.sets(
+            hps.one_of(
+                map(hps.just, [
+                    'covariance', 'entropy', 'mean', 'mode', 'stddev',
+                    'variance'
+                ])),
+            min_size=3,
+            max_size=3)):
       logging.info('%s.%s', dist_name, stat)
       try:
         VAR_USAGES.clear()
@@ -540,7 +569,30 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
                   var, dist_name))
 
     # Turn off validations, since log_prob can choke on dist's own samples.
+    # Also, to relax conversion counts for KL (might do >2 w/ validate_args).
     dist = dist.copy(validate_args=False)
+    dist2 = dist2.copy(validate_args=False)
+
+    try:
+      for d1, d2 in (dist, dist2), (dist2, dist):
+        VAR_USAGES.clear()
+        with tf.GradientTape() as tape:
+          kl = d1.kl_divergence(d2)
+        assert_no_excessive_var_usage(
+            '`kl_divergence` of (`{}` (vars {}), `{}` (vars {}))'.format(
+                d1, d1.variables, d2, d2.variables),
+            max_permissible=1)  # No validation => 1 convert per var.
+        wrt_vars = list(d1.variables) + list(d2.variables)
+        grads = tape.gradient(kl, wrt_vars)
+        for grad, var in zip(grads, wrt_vars):
+          if grad is None and dist_name not in NO_KL_PARAM_GRADS:
+            raise AssertionError('Missing KL({} || {}) -> {} grad:\n'
+                                 '{} vars: {}\n{} vars: {}'.format(
+                                     d1, d2, var, d1, d1.variables, d2,
+                                     d2.variables))
+    except NotImplementedError:
+      pass
+
     if dist_name not in NO_LOG_PROB_PARAM_GRADS:
       with tf.GradientTape() as tape:
         lp = dist.log_prob(tf.stop_gradient(sample))
@@ -552,10 +604,14 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
                   var, dist_name))
 
     for evaluative in data.draw(
-        hps.permutations([
-            'log_prob', 'prob', 'log_cdf', 'cdf', 'log_survival_function',
-            'survival_function'
-        ]))[:3]:
+        hps.sets(
+            hps.one_of(
+                map(hps.just, [
+                    'log_prob', 'prob', 'log_cdf', 'cdf',
+                    'log_survival_function', 'survival_function'
+                ])),
+            min_size=3,
+            max_size=3)):
       logging.info('%s.%s', dist_name, evaluative)
       try:
         VAR_USAGES.clear()

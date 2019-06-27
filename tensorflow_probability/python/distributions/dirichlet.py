@@ -417,11 +417,13 @@ def _kl_dirichlet_dirichlet(d1, d2, name=None):
     #     = sum_i[(a[i] - b[i]) * (digamma(a[i]) - digamma(sum_j a[j]))]
     #          - lbeta(a) + lbeta(b))
 
+    concentration1 = tf.convert_to_tensor(d1.concentration)
+    concentration2 = tf.convert_to_tensor(d2.concentration)
     digamma_sum_d1 = tf.math.digamma(
-        tf.reduce_sum(d1.concentration, axis=-1, keepdims=True))
-    digamma_diff = tf.math.digamma(d1.concentration) - digamma_sum_d1
-    concentration_diff = d1.concentration - d2.concentration
+        tf.reduce_sum(concentration1, axis=-1, keepdims=True))
+    digamma_diff = tf.math.digamma(concentration1) - digamma_sum_d1
+    concentration_diff = concentration1 - concentration2
 
     return (
         tf.reduce_sum(concentration_diff * digamma_diff, axis=-1) -
-        tf.math.lbeta(d1.concentration) + tf.math.lbeta(d2.concentration))
+        tf.math.lbeta(concentration1) + tf.math.lbeta(concentration2))

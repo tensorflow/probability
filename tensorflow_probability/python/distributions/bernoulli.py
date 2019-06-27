@@ -243,8 +243,8 @@ def _kl_bernoulli_bernoulli(a, b, name=None):
     Batchwise KL(a || b)
   """
   with tf.name_scope(name or 'kl_bernoulli_bernoulli'):
-    a_logits = a.logits_parameter()
-    b_logits = b.logits_parameter()
+    a_logits = a._logits_parameter_no_checks()  # pylint:disable=protected-access
+    b_logits = b._logits_parameter_no_checks()  # pylint:disable=protected-access
     return (
         tf.sigmoid(a_logits) * (
             tf.math.softplus(-b_logits) - tf.math.softplus(-a_logits)) +

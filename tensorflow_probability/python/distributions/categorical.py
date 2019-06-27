@@ -447,8 +447,8 @@ def _kl_categorical_categorical(a, b, name=None):
     Batchwise KL(a || b)
   """
   with tf.name_scope(name or 'kl_categorical_categorical'):
-    a_logits = a.logits_parameter()
-    b_logits = b.logits_parameter()
+    a_logits = a._logits_parameter_no_checks()  # pylint:disable=protected-access
+    b_logits = b._logits_parameter_no_checks()  # pylint:disable=protected-access
     return tf.reduce_sum(
         (tf.nn.softmax(a_logits) *
          (tf.nn.log_softmax(a_logits) - tf.nn.log_softmax(b_logits))),

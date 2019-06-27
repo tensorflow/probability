@@ -285,7 +285,7 @@ class Deterministic(_BaseDeterministic):
     return tf.TensorShape([])
 
   def _prob(self, x):
-    loc = tf.identity(self.loc)
+    loc = tf.convert_to_tensor(self.loc)
     # Enforces dtype of probability to be float, when self.dtype is not.
     prob_dtype = self.dtype if self.dtype.is_floating else tf.float32
     return tf.cast(tf.abs(x - loc) <= self._slack(loc), dtype=prob_dtype)
@@ -419,7 +419,7 @@ class VectorDeterministic(_BaseDeterministic):
       with tf.control_dependencies([is_vector_check]):
         with tf.control_dependencies([right_vec_space_check]):
           x = tf.identity(x)
-    loc = tf.identity(self.loc)
+    loc = tf.convert_to_tensor(self.loc)
     return tf.cast(
         tf.reduce_all(tf.abs(x - loc) <= self._slack(loc), axis=-1),
         dtype=self.dtype)
