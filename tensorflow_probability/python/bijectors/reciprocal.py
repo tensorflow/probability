@@ -77,5 +77,5 @@ class Reciprocal(bijector.Bijector):
     if not self.validate_args:
       return []
     return [assert_util.assert_none_equal(
-        t, dtype_util.as_numpy_dtype(t.type)(0.),
+        t, dtype_util.as_numpy_dtype(t.dtype)(0.),
         message="All elements must be non-zero.")]

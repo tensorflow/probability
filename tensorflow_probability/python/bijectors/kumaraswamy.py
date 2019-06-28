@@ -98,10 +98,12 @@ class Kumaraswamy(bijector.Bijector):
 
   def _inverse_log_det_jacobian(self, y):
     y = self._maybe_assert_valid(y)
-    return (tf.math.log(self.concentration1) +
-            tf.math.log(self.concentration0) +
-            tf.math.xlogy(self.concentration1 - 1, y) +
-            (self.concentration0 - 1) * tf.math.log1p(-y**self.concentration1))
+    concentration1 = tf.convert_to_tensor(self.concentration1)
+    concentration0 = tf.convert_to_tensor(self.concentration0)
+    return (tf.math.log(concentration1) +
+            tf.math.log(concentration0) +
+            tf.math.xlogy(concentration1 - 1, y) +
+            (concentration0 - 1) * tf.math.log1p(-y**concentration1))
 
   def _maybe_assert_valid(self, x):
     if not self.validate_args:

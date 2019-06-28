@@ -28,7 +28,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -141,11 +141,11 @@ class _CholeskyExtend(tf.test.TestCase):
 
   @hp.given(hps.data())
   @hp.settings(deadline=None, max_examples=10,
-               derandomize=tfp_test_util.derandomize_hypothesis())
+               derandomize=tfp_hps.derandomize_hypothesis())
   def testCholeskyExtensionRandomized(self, data):
     jitter = lambda n: tf.linalg.eye(n, dtype=self.dtype) * 1e-5
     target_bs = data.draw(hpnp.array_shapes())
-    prev_bs, new_bs = data.draw(tfp_test_util.broadcasting_shapes(target_bs, 2))
+    prev_bs, new_bs = data.draw(tfp_hps.broadcasting_shapes(target_bs, 2))
     ones = tf.TensorShape([1] * len(target_bs))
     smallest_shared_shp = tuple(np.min(
         [tf.broadcast_static_shape(ones, shp).as_list()

@@ -101,6 +101,50 @@ py_library(
 )
 
 py_library(
+    name = "bijector_properties_testlib",
+    testonly = 1,
+    srcs = ["bijector_properties_test.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":hypothesis_testlib",
+        # absl/flags dep,
+        # absl/logging dep,
+        # absl/testing:parameterized dep,
+        # hypothesis dep,
+        # numpy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+py_test(
+    name = "bijector_properties_test_eager",
+    size = "medium",
+    srcs = ["bijector_properties_test.py"],
+    args = ["--tf_mode=eager"],
+    main = "bijector_properties_test.py",
+    shard_count = 5,
+    tags = ["hypothesis"],
+    deps = [":bijector_properties_testlib"],
+)
+
+py_test(
+    name = "bijector_properties_test_graph",
+    size = "medium",
+    srcs = ["bijector_properties_test.py"],
+    args = ["--tf_mode=graph"],
+    main = "bijector_properties_test.py",
+    shard_count = 5,
+    tags = ["hypothesis"],
+    deps = [":bijector_properties_testlib"],
+)
+
+py_library(
     name = "absolute_value",
     srcs = ["absolute_value.py"],
     deps = [

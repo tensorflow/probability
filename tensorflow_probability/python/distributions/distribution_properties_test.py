@@ -21,7 +21,6 @@ from __future__ import print_function
 import collections
 import functools
 import inspect
-import os
 import traceback
 
 from absl import flags
@@ -35,10 +34,9 @@ import six
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
-from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
@@ -47,35 +45,6 @@ flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
                   'TF execution mode to use')
 
 FLAGS = flags.FLAGS
-
-
-VAR_USAGES = {}
-
-
-def usage_counting_identity(var):
-  VAR_USAGES[var] = VAR_USAGES.get(var, []) + [traceback.format_stack(limit=15)]
-  return tf.identity(var)
-
-
-def assert_no_excessive_var_usage(dist_and_method, max_permissible=2):
-  # TODO(jvdillon): Reduce max_permissible to 1?
-  var_nusages = {var: len(usages) for var, usages in VAR_USAGES.items()}
-  if any(len(usages) > max_permissible for usages in VAR_USAGES.values()):
-    for var, usages in six.iteritems(VAR_USAGES):
-      if len(usages) > max_permissible:
-        print('While executing {}, saw {} Tensor conversions of {}:'.format(
-            dist_and_method, len(usages), var))
-        for i, usage in enumerate(usages):
-          print('Conversion {} of {}:\n{}'.format(i + 1, len(usages),
-                                                  ''.join(usage)))
-    raise AssertionError(
-        'Excessive tensor conversions detected for {}: {}'.format(
-            dist_and_method, var_nusages))
-
-
-def hypothesis_max_examples():
-  # Use --test_env=TFP_HYPOTHESIS_MAX_EXAMPLES=1000 to get fuller coverage.
-  return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', 20))
 
 
 TF2_FRIENDLY_DISTS = (
@@ -96,14 +65,14 @@ TF2_FRIENDLY_DISTS = (
 NO_LOG_PROB_PARAM_GRADS = ('Deterministic',)
 NO_KL_PARAM_GRADS = ('Deterministic',)
 
-MUTEX_PARAMS = [
+MUTEX_PARAMS = (
     set(['logits', 'probs']),
     set(['probits', 'probs']),
     set(['rate', 'log_rate']),
     set(['scale', 'scale_tril', 'scale_diag', 'scale_identity_multiplier']),
-]
+)
 
-SPECIAL_DISTS = [
+SPECIAL_DISTS = (
     'ConditionalDistribution',
     'ConditionalTransformedDistribution',
     'Distribution',
@@ -111,7 +80,7 @@ SPECIAL_DISTS = [
     'Independent',
     'MixtureSameFamily',
     'TransformedDistribution',
-]
+)
 
 
 def instantiable_dists():
@@ -155,39 +124,6 @@ del instantiable_dists
 # argument 'batch_shape' in function call"), so disable this lint for the file.
 
 # pylint: disable=no-value-for-parameter
-
-
-@hps.composite
-def broadcasting_shapes(draw, batch_shape, param_names):
-  """Draws a set of parameter batch shapes that broadcast to `batch_shape`.
-
-  For each parameter we need to choose its batch rank, and whether or not each
-  axis i is 1 or batch_shape[i]. This function chooses a set of shapes that
-  have possibly mismatched ranks, and possibly broadcasting axes, with the
-  promise that the broadcast of the set of all shapes matches `batch_shape`.
-
-  Args:
-    draw: Hypothesis sampler.
-    batch_shape: `tf.TensorShape`, the target (fully-defined) batch shape .
-    param_names: Iterable of `str`, the parameters whose batch shapes need
-      determination.
-
-  Returns:
-    param_batch_shapes: `dict` of `str->tf.TensorShape` where the set of
-        shapes broadcast to `batch_shape`. The shapes are fully defined.
-  """
-  n = len(param_names)
-  return dict(zip(draw(hps.permutations(param_names)),
-                  draw(tfp_test_util.broadcasting_shapes(batch_shape, n))))
-
-
-@hps.composite
-def broadcast_compatible_shape(draw, batch_shape):
-  """Draws a shape which is broadcast-compatible with `batch_shape`."""
-  # broadcasting_shapes draws a sequence of shapes, so that the last "completes"
-  # the broadcast to fill out batch_shape. Here we just draw two and take the
-  # first (incomplete) one.
-  return draw(tfp_test_util.broadcasting_shapes(batch_shape, 2))[0]
 
 
 @hps.composite
@@ -271,41 +207,6 @@ def stringify_slices(slices):
 
 
 @hps.composite
-def batch_shapes(draw, min_ndims=0, max_ndims=3, min_lastdimsize=1):
-  rank = draw(hps.integers(min_value=min_ndims, max_value=max_ndims))
-  shape = tf.TensorShape(None).with_rank(rank)
-  if rank > 0:
-
-    def resize_lastdim(x):
-      return x[:-1] + (max(x[-1], min_lastdimsize),)
-
-    shape = draw(
-        hpnp.array_shapes(min_dims=rank, max_dims=rank).map(resize_lastdim).map(
-            tf.TensorShape))
-  return shape
-
-
-def single_param(constraint_fn, param_shape):
-  """Draws the value of a single distribution parameter."""
-  # TODO(bjp): Allow a wider range of floats.
-  # float32s = hps.floats(
-  #     np.finfo(np.float32).min / 2, np.finfo(np.float32).max / 2,
-  #     allow_nan=False, allow_infinity=False)
-  float32s = hps.floats(-200, 200, allow_nan=False, allow_infinity=False)
-
-  def mapper(x):
-    result = assert_util.assert_finite(
-        constraint_fn(tf.convert_to_tensor(value=x)),
-        message='param non-finite')
-    if tf.executing_eagerly():
-      return result.numpy()
-    return result
-
-  return hpnp.arrays(
-      dtype=np.float32, shape=param_shape, elements=float32s).map(mapper)
-
-
-@hps.composite
 def broadcasting_params(draw,
                         dist_name,
                         batch_shape,
@@ -313,51 +214,31 @@ def broadcasting_params(draw,
                         enable_vars=False):
   """Draws a dict of parameters which should yield the given batch shape."""
   _, params_event_ndims = INSTANTIABLE_DISTS[dist_name]
-  if event_dim is None:
-    event_dim = draw(hps.integers(min_value=2, max_value=6))
 
-  remaining_params = set(params_event_ndims.keys())
-  params_to_use = []
-  while remaining_params:
-    param = draw(hps.one_of(map(hps.just, remaining_params)))
-    params_to_use.append(param)
-    remaining_params.remove(param)
-    for mutex_set in MUTEX_PARAMS:
-      if param in mutex_set:
-        remaining_params -= mutex_set
+  def _constraint(param):
+    return constraint_for(dist_name, param)
 
-  param_batch_shapes = draw(broadcasting_shapes(batch_shape, params_to_use))
-  params_kwargs = dict()
-  for param in params_to_use:
-    param_batch_shape = param_batch_shapes[param]
-    param_event_rank = params_event_ndims[param]
-    params_kwargs[param] = tf.convert_to_tensor(
-        value=draw(
-            single_param(
-                constraint_for(dist_name, param),
-                (tensorshape_util.as_list(param_batch_shape) +
-                 [event_dim] * param_event_rank))),
-        dtype=tf.float32,
-        name=param)
-    if enable_vars and draw(hps.booleans()):
-      params_kwargs[param] = tf.compat.v2.Variable(
-          params_kwargs[param], name=param)
-      if draw(hps.booleans()):
-        params_kwargs[param] = tfp.util.DeferredTensor(usage_counting_identity,
-                                                       params_kwargs[param])
-  return params_kwargs
+  return draw(
+      tfp_hps.broadcasting_params(
+          batch_shape,
+          event_dim=event_dim,
+          enable_vars=enable_vars,
+          params_event_ndims=params_event_ndims,
+          constraint_fn_for=_constraint,
+          mutex_params=MUTEX_PARAMS))
 
 
 @hps.composite
 def independents(draw, batch_shape=None, event_dim=None, enable_vars=False):
   reinterpreted_batch_ndims = draw(hps.integers(min_value=0, max_value=2))
   if batch_shape is None:
-    batch_shape = draw(batch_shapes(min_ndims=reinterpreted_batch_ndims))
+    batch_shape = draw(
+        tfp_hps.batch_shapes(min_ndims=reinterpreted_batch_ndims))
   else:  # This independent adds some batch dims to its underlying distribution.
     batch_shape = tensorshape_util.concatenate(
         batch_shape,
         draw(
-            batch_shapes(
+            tfp_hps.batch_shapes(
                 min_ndims=reinterpreted_batch_ndims,
                 max_ndims=reinterpreted_batch_ndims)))
   underlying, batch_shape = draw(
@@ -384,7 +265,7 @@ def transformed_distributions(draw,
   bijector = draw(bijector_hps.unconstrained_bijectors())
   logging.info('TD bijector: %s', bijector)
   if batch_shape is None:
-    batch_shape = draw(batch_shapes())
+    batch_shape = draw(tfp_hps.batch_shapes())
   underlying_batch_shape = batch_shape
   batch_shape_arg = None
   if draw(hps.booleans()):
@@ -415,11 +296,11 @@ def mixtures_same_family(draw,
                          enable_vars=False):
   if batch_shape is None:
     # Ensure the components dist has at least one batch dim (a component dim).
-    batch_shape = draw(batch_shapes(min_ndims=1, min_lastdimsize=2))
+    batch_shape = draw(tfp_hps.batch_shapes(min_ndims=1, min_lastdimsize=2))
   else:  # This mixture adds a batch dim to its underlying components dist.
     batch_shape = tensorshape_util.concatenate(
         batch_shape,
-        draw(batch_shapes(min_ndims=1, max_ndims=1, min_lastdimsize=2)))
+        draw(tfp_hps.batch_shapes(min_ndims=1, max_ndims=1, min_lastdimsize=2)))
 
   component_dist, _ = draw(
       distributions(
@@ -478,7 +359,7 @@ def distributions(draw,
     return draw(transformed_distributions(batch_shape, event_dim, enable_vars))
 
   if batch_shape is None:
-    batch_shape = draw(batch_shapes())
+    batch_shape = draw(tfp_hps.batch_shapes())
 
   params_kwargs = draw(
       broadcasting_params(
@@ -507,9 +388,9 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
   @hp.given(hps.data())
   @hp.settings(
       deadline=None,
-      max_examples=hypothesis_max_examples(),
+      max_examples=tfp_hps.hypothesis_max_examples(),
       suppress_health_check=[hp.HealthCheck.too_slow],
-      derandomize=tfp_test_util.derandomize_hypothesis())
+      derandomize=tfp_hps.derandomize_hypothesis())
   def testDistribution(self, dist_name, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
       return
@@ -518,7 +399,7 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
             hpnp.arrays(dtype=np.int64, shape=[]).filter(lambda x: x != 0)))
     dist, batch_shape = data.draw(
         distributions(dist_name=dist_name, enable_vars=True))
-    batch_shape2 = data.draw(broadcast_compatible_shape(batch_shape))
+    batch_shape2 = data.draw(tfp_hps.broadcast_compatible_shape(batch_shape))
     dist2, _ = data.draw(
         distributions(
             dist_name=dist_name,
@@ -551,17 +432,17 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
             max_size=3)):
       logging.info('%s.%s', dist_name, stat)
       try:
-        VAR_USAGES.clear()
-        getattr(dist, stat)()
-        assert_no_excessive_var_usage('statistic `{}` of `{}`'.format(
-            stat, dist))
+        with tfp_hps.assert_no_excessive_var_usage(
+            'statistic `{}` of `{}`'.format(stat, dist)):
+          getattr(dist, stat)()
+
       except NotImplementedError:
         pass
 
-    VAR_USAGES.clear()
     with tf.GradientTape() as tape:
-      sample = dist.sample()
-    assert_no_excessive_var_usage('method `sample` of `{}`'.format(dist))
+      with tfp_hps.assert_no_excessive_var_usage(
+          'method `sample` of `{}`'.format(dist)):
+        sample = dist.sample()
     if dist.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
       grads = tape.gradient(sample, dist.variables)
       for grad, var in zip(grads, dist.variables):
@@ -577,13 +458,12 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
 
     try:
       for d1, d2 in (dist, dist2), (dist2, dist):
-        VAR_USAGES.clear()
         with tf.GradientTape() as tape:
-          kl = d1.kl_divergence(d2)
-        assert_no_excessive_var_usage(
-            '`kl_divergence` of (`{}` (vars {}), `{}` (vars {}))'.format(
-                d1, d1.variables, d2, d2.variables),
-            max_permissible=1)  # No validation => 1 convert per var.
+          with tfp_hps.assert_no_excessive_var_usage(
+              '`kl_divergence` of (`{}` (vars {}), `{}` (vars {}))'.format(
+                  d1, d1.variables, d2, d2.variables),
+              max_permissible=1):  # No validation => 1 convert per var.
+            kl = d1.kl_divergence(d2)
         wrt_vars = list(d1.variables) + list(d2.variables)
         grads = tape.gradient(kl, wrt_vars)
         for grad, var in zip(grads, wrt_vars):
@@ -616,10 +496,10 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
             max_size=3)):
       logging.info('%s.%s', dist_name, evaluative)
       try:
-        VAR_USAGES.clear()
-        getattr(dist, evaluative)(sample)
-        assert_no_excessive_var_usage('evaluative `{}` of `{}`'.format(
-            evaluative, dist), max_permissible=1)  # No validation => 1 convert.
+        with tfp_hps.assert_no_excessive_var_usage(
+            'evaluative `{}` of `{}`'.format(evaluative, dist),
+            max_permissible=1):  # No validation => 1 convert
+          getattr(dist, evaluative)(sample)
       except NotImplementedError:
         pass
 
@@ -724,9 +604,9 @@ class DistributionSlicingTest(tf.test.TestCase):
   @hp.given(hps.data())
   @hp.settings(
       deadline=None,
-      max_examples=hypothesis_max_examples(),
+      max_examples=tfp_hps.hypothesis_max_examples(),
       suppress_health_check=[hp.HealthCheck.too_slow],
-      derandomize=tfp_test_util.derandomize_hypothesis())
+      derandomize=tfp_hps.derandomize_hypothesis())
   def testDistributions(self, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'): return
     self._run_test(data)
@@ -734,14 +614,6 @@ class DistributionSlicingTest(tf.test.TestCase):
 
 # Functions used to constrain randomly sampled parameter ndarrays.
 # TODO(b/128518790): Eliminate / minimize the fudge factors in here.
-
-
-def identity_fn(x):
-  return x
-
-
-def softplus_plus_eps(eps=1e-6):
-  return lambda x: tf.nn.softplus(x) + eps
 
 
 def sigmoid_plus_eps(eps=1e-6):
@@ -769,15 +641,13 @@ def ensure_high_gt_low(low, high):
   return new_high
 
 
-def symmetric(x):
-  return (x + tf.linalg.matrix_transpose(x)) / 2
+def fix_finite_discrete(d):
+  size = d.get('probs', d.get('logits', None)).shape[-1]
+  return dict(d, outcomes=tf.linspace(-1.0, 1.0, size))
 
 
-def positive_definite(x):
-  shp = tensorshape_util.as_list(x.shape)
-  psd = (tf.matmul(x, x, transpose_b=True) +
-         .1 * tf.linalg.eye(shp[-1], batch_shape=shp[:-2]))
-  return symmetric(psd)
+def fix_lkj(d):
+  return dict(d, concentration=d['concentration'] + 1, dimension=3)
 
 
 def fix_triangular(d):
@@ -792,35 +662,32 @@ def fix_wishart(d):
   return dict(d, df=tf.maximum(df, tf.cast(scale.shape[-1], df.dtype)))
 
 
-def generate_outcomes(d):
-  size = tf.shape(input=d.get('probs', d.get('logits', None)))[-1]
-  return dict(d, outcomes=tf.linspace(-1.0, 1.0, size))
-
-
 CONSTRAINTS = {
     'atol':
         tf.nn.softplus,
     'rtol':
         tf.nn.softplus,
     'concentration':
-        softplus_plus_eps(),
+        tfp_hps.softplus_plus_eps(),
     'concentration0':
-        softplus_plus_eps(),
+        tfp_hps.softplus_plus_eps(),
     'concentration1':
-        softplus_plus_eps(),
+        tfp_hps.softplus_plus_eps(),
     'covariance_matrix':
-        positive_definite,
+        tfp_hps.positive_definite,
     'df':
-        softplus_plus_eps(),
+        tfp_hps.softplus_plus_eps(),
     'Chi2WithAbsDf.df':
-        softplus_plus_eps(1),  # does floor(abs(x)) for some reason
+        tfp_hps.softplus_plus_eps(1),  # does floor(abs(x)) for some reason
     'InverseGaussian.loc':
-        softplus_plus_eps(),
+        tfp_hps.softplus_plus_eps(),
     'VonMisesFisher.mean_direction':  # max ndims is 5
         lambda x: tf.nn.l2_normalize(tf.nn.sigmoid(x[..., :5]) + 1e-6, -1),
     'Categorical.probs':
         tf.nn.softmax,
     'ExpRelaxedOneHotCategorical.probs':
+        tf.nn.softmax,
+    'FiniteDiscrete.probs':
         tf.nn.softmax,
     'Multinomial.probs':
         tf.nn.softmax,
@@ -829,7 +696,7 @@ CONSTRAINTS = {
     'RelaxedCategorical.probs':
         tf.nn.softmax,
     'Zipf.power':
-        softplus_plus_eps(1 + 1e-6),  # strictly > 1
+        tfp_hps.softplus_plus_eps(1 + 1e-6),  # strictly > 1
     'Geometric.logits':  # TODO(b/128410109): re-enable down to -50
         lambda x: tf.maximum(x, -16.),  # works around the bug
     'Geometric.probs':
@@ -845,32 +712,31 @@ CONSTRAINTS = {
     'RelaxedBernoulli.probs':
         tf.sigmoid,
     'mixing_concentration':
-        softplus_plus_eps(),
+        tfp_hps.softplus_plus_eps(),
     'mixing_rate':
-        softplus_plus_eps(),
+        tfp_hps.softplus_plus_eps(),
     'rate':
-        softplus_plus_eps(),
+        tfp_hps.softplus_plus_eps(),
     'scale':
-        softplus_plus_eps(),
+        tfp_hps.softplus_plus_eps(),
     'Wishart.scale':
-        positive_definite,
+        tfp_hps.positive_definite,
     'scale_diag':
-        softplus_plus_eps(),
+        tfp_hps.softplus_plus_eps(),
     'MultivariateNormalDiagWithSoftplusScale.scale_diag':
         lambda x: tf.maximum(x, -87.),  # softplus(-87) ~= 1e-38
     'scale_identity_multiplier':
-        softplus_plus_eps(),
+        tfp_hps.softplus_plus_eps(),
     'scale_tril':
-        lambda x: tf.linalg.band_part(  # pylint: disable=g-long-lambda
-            tfd.matrix_diag_transform(x, softplus_plus_eps()), -1, 0),
+        tfp_hps.lower_tril_positive_definite,
     'temperature':
-        softplus_plus_eps(),
+        tfp_hps.softplus_plus_eps(),
     'total_count':
         lambda x: tf.floor(tf.sigmoid(x / 100) * 100) + 1,
     'Bernoulli':
         lambda d: dict(d, dtype=tf.float32),
     'LKJ':
-        lambda d: dict(d, concentration=d['concentration'] + 1, dimension=3),
+        fix_lkj,
     'Triangular':
         fix_triangular,
     'TruncatedNormal':
@@ -881,18 +747,16 @@ CONSTRAINTS = {
         fix_wishart,
     'Zipf':
         lambda d: dict(d, dtype=tf.float32),
-    'FiniteDiscrete.probs':
-        tf.nn.softmax,
     'FiniteDiscrete':
-        generate_outcomes,
+        fix_finite_discrete,
 }
 
 
 def constraint_for(dist=None, param=None):
   if param is not None:
     return CONSTRAINTS.get('{}.{}'.format(dist, param),
-                           CONSTRAINTS.get(param, identity_fn))
-  return CONSTRAINTS.get(dist, identity_fn)
+                           CONSTRAINTS.get(param, tfp_hps.identity_fn))
+  return CONSTRAINTS.get(dist, tfp_hps.identity_fn)
 
 
 if __name__ == '__main__':

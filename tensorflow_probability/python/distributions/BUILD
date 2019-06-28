@@ -2364,9 +2364,9 @@ py_library(
         "//tensorflow_probability",
         "//tensorflow_probability/python/bijectors:hypothesis_testlib",
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

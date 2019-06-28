@@ -145,11 +145,12 @@ class SinhArcsinh(bijector.Bijector):
 
     # This is computed inside the log to avoid catastrophic cancellations
     # from cosh((arcsinh(y) / tailweight) - skewness) and sqrt(x**2 + 1).
+    tailweight = tf.convert_to_tensor(self.tailweight)
     return (tf.math.log(
-        tf.cosh(tf.asinh(y) / self.tailweight - self.skewness)
+        tf.cosh(tf.asinh(y) / tailweight - self.skewness)
         # TODO(srvasude): Consider using cosh(arcsinh(x)) in cases
         # where (arcsinh(x) / tailweight) - skewness ~= arcsinh(x).
-        / _sqrtx2p1(y)) - tf.math.log(self.tailweight))
+        / _sqrtx2p1(y)) - tf.math.log(tailweight))
 
   def _forward_log_det_jacobian(self, x):
     # y = sinh((arcsinh(x) + skewness) * tailweight)
@@ -159,11 +160,12 @@ class SinhArcsinh(bijector.Bijector):
 
     # This is computed inside the log to avoid catastrophic cancellations
     # from cosh((arcsinh(x) + skewness) * tailweight) and sqrt(x**2 + 1).
+    tailweight = tf.convert_to_tensor(self.tailweight)
     return (tf.math.log(
-        tf.cosh((tf.asinh(x) + self.skewness) * self.tailweight)
+        tf.cosh((tf.asinh(x) + self.skewness) * tailweight)
         # TODO(srvasude): Consider using cosh(arcsinh(x)) in cases
         # where (arcsinh(x) + skewness) * tailweight ~= arcsinh(x).
-        / _sqrtx2p1(x)) + tf.math.log(self.tailweight))
+        / _sqrtx2p1(x)) + tf.math.log(tailweight))
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

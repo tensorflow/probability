@@ -62,13 +62,13 @@ class Ordered(bijector.Bijector):
 
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):
-      y0 = x[..., 0, tf.newaxis]
+      y0 = x[..., :1]
       yk = tf.math.log(x[..., 1:] - x[..., :-1])
       y = tf.concat([y0, yk], axis=-1)
       return y
 
   def _inverse(self, y):
-    x0 = y[..., 0, tf.newaxis]
+    x0 = y[..., :1]
     xk = tf.exp(y[..., 1:])
     x = tf.concat([x0, xk], axis=-1)
     return tf.cumsum(x, axis=-1)

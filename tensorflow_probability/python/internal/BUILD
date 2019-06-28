@@ -261,6 +261,20 @@ py_test(
 )
 
 py_library(
+    name = "hypothesis_testlib",
+    testonly = 1,
+    srcs = ["hypothesis_testlib.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":assert_util",
+        ":tensorshape_util",
+        # hypothesis dep,
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
     name = "test_util",
     testonly = 1,
     srcs = ["test_util.py"],

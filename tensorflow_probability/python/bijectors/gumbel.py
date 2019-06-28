@@ -98,8 +98,9 @@ class Gumbel(bijector.Bijector):
     return tf.math.log(self.scale / (-tf.math.log(y) * y))
 
   def _forward_log_det_jacobian(self, x):
-    z = (x - self.loc) / self.scale
-    return -z - tf.exp(-z) - tf.math.log(self.scale)
+    scale = tf.convert_to_tensor(self.scale)
+    z = (x - self.loc) / scale
+    return -z - tf.exp(-z) - tf.math.log(scale)
 
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:

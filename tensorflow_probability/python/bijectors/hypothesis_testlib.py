@@ -77,6 +77,7 @@ class Support(object):
   SCALAR_UNCONSTRAINED = 'SCALAR_UNCONSTRAINED'
   SCALAR_NON_NEGATIVE = 'SCALAR_NON_NEGATIVE'
   SCALAR_NON_ZERO = 'SCALAR_NON_ZERO'
+  SCALAR_POSITIVE = 'SCALAR_POSITIVE'
   SCALAR_GT_NEG1 = 'SCALAR_GT_NEG1'
   SCALAR_IN_NEG1_1 = 'SCALAR_IN_NEG1_1'
   SCALAR_IN_0_1 = 'SCALAR_IN_0_1'
@@ -101,6 +102,9 @@ def bijector_supports():
   if BIJECTOR_SUPPORTS is not None:
     return BIJECTOR_SUPPORTS
   supports = {
+      'AffineScalar':
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED,
+                          Support.SCALAR_UNCONSTRAINED),
       'CholeskyOuterProduct':
           BijectorSupport(Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE,
                           Support.MATRIX_POSITIVE_DEFINITE),
@@ -110,17 +114,21 @@ def bijector_supports():
       'CorrelationCholesky':
           BijectorSupport(Support.VECTOR_SIZE_TRIANGULAR,
                           Support.CORRELATION_CHOLESKY),
+      'Cumsum':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_UNCONSTRAINED),
       'MatrixInverseTriL':
           BijectorSupport(Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE,
                           Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
       'NormalCDF':
-          BijectorSupport(Support.SCALAR_UNCONSTRAINED,
-                          Support.SCALAR_NON_NEGATIVE),
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'Exp':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
-                          Support.SCALAR_NON_NEGATIVE),
+                          Support.SCALAR_POSITIVE),
       'Expm1':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_GT_NEG1),
+      'Gumbel':
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'Identity':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
@@ -129,6 +137,8 @@ def bijector_supports():
       'IteratedSigmoidCentered':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
                           Support.VECTOR_WITH_L1_NORM_1_SIZE_GT1),
+      'Kumaraswamy':
+          BijectorSupport(Support.SCALAR_IN_0_1, Support.SCALAR_IN_0_1),
       'Ordered':
           BijectorSupport(Support.VECTOR_STRICTLY_INCREASING,
                           Support.VECTOR_UNCONSTRAINED),
@@ -136,6 +146,9 @@ def bijector_supports():
           BijectorSupport(Support.SCALAR_NON_ZERO, Support.SCALAR_NON_ZERO),
       'Sigmoid':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
+      'SinhArcsinh':
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED,
+                          Support.SCALAR_UNCONSTRAINED),
       'Softsign':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_IN_NEG1_1),
@@ -150,11 +163,8 @@ def bijector_supports():
                           Support.SCALAR_IN_NEG1_1),
   }
   missing_keys = set(instantiable_bijectors().keys()) - set(supports.keys())
-  unexpected_keys = set(supports.keys()) - set(instantiable_bijectors().keys())
   if missing_keys:
     raise ValueError('Missing bijector supports: {}'.format(missing_keys))
-  if unexpected_keys:
-    raise ValueError('Unexpected bijector names: {}'.format(unexpected_keys))
   BIJECTOR_SUPPORTS = supports
   return BIJECTOR_SUPPORTS
 
