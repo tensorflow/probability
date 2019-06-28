@@ -414,8 +414,6 @@ class RelaxedOneHotCategorical(
                                        validate_args=validate_args,
                                        allow_nan_stats=allow_nan_stats)
 
-    self._temperature = dist.temperature
-
     super(RelaxedOneHotCategorical, self).__init__(dist,
                                                    exp_bijector.Exp(),
                                                    name=name)
@@ -423,7 +421,7 @@ class RelaxedOneHotCategorical(
   @property
   def temperature(self):
     """Batchwise temperature tensor of a RelaxedCategorical."""
-    return self._temperature
+    return self.distribution.temperature
 
   @property
   def probs(self):
