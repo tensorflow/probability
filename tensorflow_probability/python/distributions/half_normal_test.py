@@ -166,7 +166,7 @@ class HalfNormalTest(test_case.TestCase):
           return getattr(tfd.HalfNormal(scale=scale), name)(x)
         return half_normal
 
-      self.evaluate(tf1.global_variables_initializer())
+      self.evaluate(scale.initializer)
       for func_name in [
           'cdf', 'log_cdf', 'survival_function',
           'log_prob', 'prob', 'log_survival_function',
@@ -332,15 +332,15 @@ class HalfNormalTest(test_case.TestCase):
 
   def testAssertsPositiveScale(self):
     scale = tf.Variable([1., 2., -3.])
-    self.evaluate(tf1.global_variables_initializer())
     with self.assertRaisesError('Argument `scale` must be positive.'):
       d = tfd.HalfNormal(scale=scale, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
       self.evaluate(d.sample())
 
   def testAssertsPositiveScaleAfterMutation(self):
     scale = tf.Variable([1., 2., 3.])
-    self.evaluate(tf1.global_variables_initializer())
     d = tfd.HalfNormal(scale=scale, validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
     with self.assertRaisesError('Argument `scale` must be positive.'):
       with tf.control_dependencies([scale.assign([1., 2., -3.])]):
         self.evaluate(d.sample())

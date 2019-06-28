@@ -237,7 +237,7 @@ class DeterministicTest(test_case.TestCase):
     deterministic = tfd.Deterministic(
         loc=0.1, atol=atol, rtol=rtol, validate_args=True)
 
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate([v.initializer for v in deterministic.variables])
     self.evaluate(deterministic.log_prob(1.))
 
     self.evaluate(atol.assign(-1.))
@@ -434,7 +434,7 @@ class VectorDeterministicTest(test_case.TestCase):
     deterministic = tfd.VectorDeterministic(
         loc=[0.1], atol=atol, rtol=rtol, validate_args=True)
 
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate([v.initializer for v in deterministic.variables])
     self.evaluate(deterministic.log_prob([1.]))
 
     self.evaluate(atol.assign(-1.))

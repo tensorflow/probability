@@ -380,17 +380,17 @@ class MultinomialFromVariableTest(test_case.TestCase):
 
   def testAssertionsProbs(self):
     x = tf.Variable([0.1, 0.7, 0.0])
-    self.evaluate(tf1.global_variables_initializer())
     with self.assertRaisesOpError('Argument `probs` must sum to 1.'):
       d = tfd.Multinomial(total_count=2., probs=x, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
       self.evaluate(d.mean())
 
   def testAssertionsLogits(self):
     x = tfp.util.DeferredTensor(tf.identity, tf.Variable(0.), shape=None)
-    self.evaluate(tf1.global_variables_initializer())
     with self.assertRaisesRegexp(
         ValueError, 'Argument `logits` must have rank at least 1.'):
       d = tfd.Multinomial(total_count=2., logits=x, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
       self.evaluate(d.mean())
 
 

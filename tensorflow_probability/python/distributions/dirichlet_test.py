@@ -22,7 +22,6 @@ import numpy as np
 from scipy import special as sp_special
 from scipy import stats as sp_stats
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -305,10 +304,10 @@ class DirichletFromVariableTest(test_case.TestCase):
         tf.exp,
         tf.Variable(-1.),
         shape=None)
-    self.evaluate(tf1.global_variables_initializer())
     with self.assertRaisesRegexp(
         ValueError, 'Argument `concentration` must have rank at least 1.'):
       d = tfd.Dirichlet(concentration=x, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
       self.evaluate(d.entropy())
 
 

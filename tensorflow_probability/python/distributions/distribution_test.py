@@ -563,7 +563,7 @@ class TfModuleTest(tf.test.TestCase):
     with tf.GradientTape() as tape:
       loss = -normal.log_prob(0.)
     g = tape.gradient(loss, normal.trainable_variables)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate([v.initializer for v in normal.variables])
     self.assertEqual((1.,), self.evaluate(g))
 
 

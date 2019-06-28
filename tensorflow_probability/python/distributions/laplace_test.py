@@ -21,7 +21,6 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats as sp_stats
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -304,7 +303,7 @@ class LaplaceTest(test_case.TestCase):
       self.evaluate(laplace.mean())
 
     scale = tf.Variable([1., 2., -3.])
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(scale.initializer)
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       d = tfd.Laplace(loc=0, scale=scale, validate_args=True)
       self.evaluate(d.sample())
@@ -352,8 +351,8 @@ class LaplaceTest(test_case.TestCase):
 
   def testAssertsPositiveScaleAfterMutation(self):
     scale = tf.Variable([1., 2., 3.])
-    self.evaluate(tf1.global_variables_initializer())
     d = tfd.Laplace(loc=0., scale=scale, validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       with tf.control_dependencies([scale.assign([1., 2., -3.])]):
         self.evaluate(tfd.Laplace(loc=0., scale=1.).kl_divergence(d))
