@@ -89,6 +89,7 @@ py_library(
         ":pareto",
         ":poisson",
         ":poisson_lognormal",
+        ":probit_bernoulli",
         ":quantized_distribution",
         ":relaxed_bernoulli",
         ":relaxed_onehot_categorical",
@@ -921,6 +922,23 @@ py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+py_library(
+    name = "probit_bernoulli",
+    srcs = ["probit_bernoulli.py"],
+    deps = [
+        ":distribution",
+        ":kullback_leibler",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
@@ -2022,6 +2040,21 @@ py_test(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "probit_bernoulli_test",
+    srcs = ["probit_bernoulli_test.py"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

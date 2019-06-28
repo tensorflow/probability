@@ -90,6 +90,7 @@ from tensorflow_probability.python.distributions.poisson import Poisson
 from tensorflow_probability.python.distributions.poisson_lognormal import PoissonLogNormalQuadratureCompound
 from tensorflow_probability.python.distributions.poisson_lognormal import quadrature_scheme_lognormal_gauss_hermite
 from tensorflow_probability.python.distributions.poisson_lognormal import quadrature_scheme_lognormal_quantiles
+from tensorflow_probability.python.distributions.probit_bernoulli import ProbitBernoulli
 from tensorflow_probability.python.distributions.quantized_distribution import QuantizedDistribution
 from tensorflow_probability.python.distributions.relaxed_bernoulli import RelaxedBernoulli
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import ExpRelaxedOneHotCategorical
@@ -186,6 +187,7 @@ __all__ = [
     'Normal',
     'Poisson',
     'PoissonLogNormalQuadratureCompound',
+    'ProbitBernoulli',
     'Sample',
     'SeedStream',
     'SinhArcsinh',

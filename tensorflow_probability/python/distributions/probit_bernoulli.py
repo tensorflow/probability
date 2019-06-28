@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""The Bernoulli distribution class."""
+"""The ProbitBernoulli distribution class."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -26,35 +26,48 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
-class Bernoulli(distribution.Distribution):
-  """Bernoulli distribution.
+class ProbitBernoulli(distribution.Distribution):
+  """ProbitBernoulli distribution.
 
-  The Bernoulli distribution with `probs` parameter, i.e., the probability of a
-  `1` outcome (vs a `0` outcome).
+  The ProbitBernoulli distribution with `probs` parameter, i.e., the probability
+  of a `1` outcome (vs a `0` outcome). Unlike a regular Bernoulli distribution,
+  which uses the logistic (aka 'sigmoid') function to go from the un-constrained
+  parameters to probabilities, this distribution uses the CDF of the [standard
+  normal distribution](https://en.wikipedia.org/wiki/Normal_distribution):
+
+  ```none
+  p(x=1; probits) = 0.5 * (1 + erf(probits / sqrt(2)))
+  p(x=0; probits) = 1 - p(x=1; probits)
+  ```
+
+  Where `erf` is the [error
+  function](https://en.wikipedia.org/wiki/Error_function). A typical application
+  of this distribution is in [probit
+  regression](https://en.wikipedia.org/wiki/Probit_model).
   """
 
   def __init__(self,
-               logits=None,
+               probits=None,
                probs=None,
                dtype=tf.int32,
                validate_args=False,
                allow_nan_stats=True,
-               name='Bernoulli'):
-    """Construct Bernoulli distributions.
+               name='ProbitBernoulli'):
+    """Construct ProbitBernoulli distributions.
 
     Args:
-      logits: An N-D `Tensor` representing the log-odds of a `1` event. Each
-        entry in the `Tensor` parametrizes an independent Bernoulli distribution
-        where the probability of an event is sigmoid(logits). Only one of
-        `logits` or `probs` should be passed in.
+      probits: An N-D `Tensor` representing the probit-odds of a `1` event. Each
+        entry in the `Tensor` parametrizes an independent ProbitBernoulli
+        distribution where the probability of an event is normal_cdf(probits).
+        Only one of `probits` or `probs` should be passed in.
       probs: An N-D `Tensor` representing the probability of a `1`
         event. Each entry in the `Tensor` parameterizes an independent
-        Bernoulli distribution. Only one of `logits` or `probs` should be passed
-        in.
+        ProbitBernoulli distribution. Only one of `probits` or `probs` should be
+        passed in.
       dtype: The type of the event samples. Default: `int32`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
@@ -67,17 +80,17 @@ class Bernoulli(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
 
     Raises:
-      ValueError: If p and logits are passed, or if neither are passed.
+      ValueError: If probs and probits are passed, or if neither are passed.
     """
     parameters = dict(locals())
-    if (probs is None) == (logits is None):
-      raise ValueError('Must pass probs or logits, but not both.')
+    if (probs is None) == (probits is None):
+      raise ValueError('Must pass probs or probits, but not both.')
     with tf.name_scope(name) as name:
       self._probs = tensor_util.convert_immutable_to_tensor(
           probs, dtype_hint=tf.float32, name='probs')
-      self._logits = tensor_util.convert_immutable_to_tensor(
-          logits, dtype_hint=tf.float32, name='logits')
-    super(Bernoulli, self).__init__(
+      self._probits = tensor_util.convert_immutable_to_tensor(
+          probits, dtype_hint=tf.float32, name='probits')
+    super(ProbitBernoulli, self).__init__(
         dtype=dtype,
         reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
         validate_args=validate_args,
@@ -87,32 +100,28 @@ class Bernoulli(distribution.Distribution):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {'logits': tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
+    return {'probits': tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
 
   @classmethod
   def _params_event_ndims(cls):
-    return dict(logits=0, probs=0)
+    return dict(probits=0, probs=0)
 
   @property
-  def logits(self):
-    """Input argument `logits`."""
-    if self._logits is None:
-      return self._logits_deprecated_behavior()
-    return self._logits
+  def probits(self):
+    """Input argument `probits`."""
+    return self._probits
 
   @property
   def probs(self):
     """Input argument `probs`."""
-    if self._probs is None:
-      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self):
-    x = self._probs if self._logits is None else self._logits
+    x = self._probs if self._probits is None else self._probits
     return tf.shape(x)
 
   def _batch_shape(self):
-    x = self._probs if self._logits is None else self._logits
+    x = self._probs if self._probits is None else self._probits
     return x.shape
 
   def _event_shape_tensor(self):
@@ -138,15 +147,16 @@ class Bernoulli(distribution.Distribution):
     return event * (log_probs1 - log_probs0) + log_probs0
 
   def _outcome_log_probs(self):
-    if self._logits is None:
+    if self._probits is None:
       p = tf.convert_to_tensor(self._probs)
       return tf.math.log1p(-p), tf.math.log(p)
-    s = tf.convert_to_tensor(self._logits)
-    return -tf.nn.softplus(s), -tf.nn.softplus(-s)
+    s = tf.convert_to_tensor(self._probits)
+    return special_math.log_ndtr(-s), special_math.log_ndtr(s)
 
   def _entropy(self):
-    logits = self._logits_parameter_no_checks()
-    return -logits * (tf.sigmoid(logits) - 1) + tf.math.softplus(-logits)
+    log_probs0, log_probs1 = self._outcome_log_probs()
+    probs1 = tf.exp(log_probs1)
+    return -(1. - probs1) * log_probs0 - probs1 * log_probs1
 
   def _mean(self):
     return self._probs_parameter_no_checks()
@@ -159,53 +169,37 @@ class Bernoulli(distribution.Distribution):
     """Returns `1` if `prob > 0.5` and `0` otherwise."""
     return tf.cast(self._probs_parameter_no_checks() > 0.5, self.dtype)
 
-  def logits_parameter(self, name=None):
-    """Logits computed from non-`None` input arg (`probs` or `logits`)."""
-    with self._name_and_control_scope(name or 'logits_parameter'):
-      return self._logits_parameter_no_checks()
+  def probits_parameter(self, name=None):
+    """Probits computed from non-`None` input arg (`probs` or `probits`)."""
+    with self._name_and_control_scope(name or 'probits_parameter'):
+      return self._probits_parameter_no_checks()
 
-  def _logits_parameter_no_checks(self):
-    if self._logits is None:
+  def _probits_parameter_no_checks(self):
+    if self._probits is None:
       probs = tf.convert_to_tensor(self._probs)
-      return tf.math.log(probs) - tf.math.log1p(-probs)
-    return tf.identity(self._logits)
+      return special_math.ndtri(probs)
+    return tf.identity(self._probits)
 
   def probs_parameter(self, name=None):
-    """Probs computed from non-`None` input arg (`probs` or `logits`)."""
+    """Probs computed from non-`None` input arg (`probs` or `probits`)."""
     with self._name_and_control_scope(name or 'probs_parameter'):
       return self._probs_parameter_no_checks()
 
   def _probs_parameter_no_checks(self):
-    if self._logits is None:
+    if self._probits is None:
       return tf.identity(self._probs)
-    return tf.math.sigmoid(self._logits)
-
-  @deprecation.deprecated(
-      '2019-10-01',
-      'The `logits` property will return `None` when the distribution is '
-      'parameterized with `logits=None`. Use `logits_parameter()` instead.',
-      warn_once=True)
-  def _logits_deprecated_behavior(self):
-    return self.logits_parameter()
-
-  @deprecation.deprecated(
-      '2019-10-01',
-      'The `probs` property will return `None` when the distribution is '
-      'parameterized with `probs=None`. Use `probs_parameter()` instead.',
-      warn_once=True)
-  def _probs_deprecated_behavior(self):
-    return self.probs_parameter()
+    return special_math.ndtr(self._probits)
 
   def _parameter_control_dependencies(self, is_init):
     return maybe_assert_bernoulli_param_correctness(
-        is_init, self.validate_args, self._probs, self._logits)
+        is_init, self.validate_args, self._probs, self._probits)
 
 
 def maybe_assert_bernoulli_param_correctness(
-    is_init, validate_args, probs, logits):
-  """Return assertions for `Bernoulli`-type distributions."""
+    is_init, validate_args, probs, probits):
+  """Return assertions for `ProbitBernoulli`-type distributions."""
   if is_init:
-    x, name = (probs, 'probs') if logits is None else (logits, 'logits')
+    x, name = (probs, 'probs') if probits is None else (probits, 'probits')
     if not dtype_util.is_floating(x.dtype):
       raise TypeError(
           'Argument `{}` must having floating type.'.format(name))
@@ -229,24 +223,23 @@ def maybe_assert_bernoulli_param_correctness(
   return assertions
 
 
-@kullback_leibler.RegisterKL(Bernoulli, Bernoulli)
+@kullback_leibler.RegisterKL(ProbitBernoulli, ProbitBernoulli)
 def _kl_bernoulli_bernoulli(a, b, name=None):
-  """Calculate the batched KL divergence KL(a || b) with a and b Bernoulli.
+  """Calculate the batched KL divergence KL(a || b) with a and b ProbitBernoulli.
 
   Args:
-    a: instance of a Bernoulli distribution object.
-    b: instance of a Bernoulli distribution object.
+    a: instance of a ProbitBernoulli distribution object.
+    b: instance of a ProbitBernoulli distribution object.
     name: Python `str` name to use for created operations.
       Default value: `None` (i.e., `'kl_bernoulli_bernoulli'`).
 
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name or 'kl_bernoulli_bernoulli'):
-    a_logits = a._logits_parameter_no_checks()  # pylint:disable=protected-access
-    b_logits = b._logits_parameter_no_checks()  # pylint:disable=protected-access
-    return (
-        tf.sigmoid(a_logits) * (
-            tf.math.softplus(-b_logits) - tf.math.softplus(-a_logits)) +
-        tf.sigmoid(-a_logits) * (
-            tf.math.softplus(b_logits) - tf.math.softplus(a_logits)))
+  with tf.name_scope(name or 'kl_probit_bernoulli_probit_bernoulli'):
+    a_log_probs0, a_log_probs1 = a._outcome_log_probs()  # pylint: disable=protected-access
+    b_log_probs0, b_log_probs1 = b._outcome_log_probs()  # pylint: disable=protected-access
+    a_prob1 = tf.exp(a_log_probs1)
+
+    return (1. - a_prob1) * (a_log_probs0 - b_log_probs0) + a_prob1 * (
+        a_log_probs1 - b_log_probs1)

@@ -89,7 +89,8 @@ TF2_FRIENDLY_DISTS = (
     'LogNormal',
     'Logistic',
     'Normal',
-    'Multinomial'
+    'Multinomial',
+    'ProbitBernoulli',
 )
 
 NO_LOG_PROB_PARAM_GRADS = ('Deterministic',)
@@ -97,6 +98,7 @@ NO_KL_PARAM_GRADS = ('Deterministic',)
 
 MUTEX_PARAMS = [
     set(['logits', 'probs']),
+    set(['probits', 'probs']),
     set(['rate', 'log_rate']),
     set(['scale', 'scale_tril', 'scale_diag', 'scale_identity_multiplier']),
 ]
@@ -837,6 +839,8 @@ CONSTRAINTS = {
     'NegativeBinomial.probs':
         tf.sigmoid,
     'Bernoulli.probs':
+        tf.sigmoid,
+    'ProbitBernoulli.probs':
         tf.sigmoid,
     'RelaxedBernoulli.probs':
         tf.sigmoid,
