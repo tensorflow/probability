@@ -22,7 +22,8 @@ from __future__ import print_function
 
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -44,7 +45,7 @@ class MultivariateStudentTTestFloat32StaticShape(
   def _input(self, value):
     """Helper to create inputs with varied dtypes an static shapes."""
     value = tf.cast(value, self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         value, shape=value.shape if self.use_static_shape else None)
 
   # pyformat: disable
@@ -305,11 +306,11 @@ class MultivariateStudentTTestFloat32StaticShape(
          [-1., 2.]]))
     # pyformat: enable
     seed = tfp_test_util.test_seed()
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     dist1 = tfd.MultivariateStudentTLinearOperator(
         loc=[1., 2.], df=5., scale=scale)
     samples1 = self.evaluate(dist1.sample(100, seed=seed))
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     dist2 = tfd.MultivariateStudentTLinearOperator(
         loc=[1., 2.], df=5., scale=scale)
     samples2 = self.evaluate(dist2.sample(100, seed=seed))

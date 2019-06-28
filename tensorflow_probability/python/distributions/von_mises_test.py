@@ -23,7 +23,8 @@ import numpy as np
 from scipy import special as sp_special
 from scipy import stats as sp_stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
@@ -39,7 +40,7 @@ class _VonMisesTest(object):
 
   def make_tensor(self, x):
     x = tf.cast(x, self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=x, shape=x.shape if self.use_static_shape else None)
 
   def testVonMisesShape(self):
@@ -131,14 +132,13 @@ class _VonMisesTest(object):
       cdf = von_mises.cdf(x)
 
       self.assertLess(
-          tf.compat.v1.test.compute_gradient_error(x, x.shape, cdf, cdf.shape),
+          tf1.test.compute_gradient_error(x, x.shape, cdf, cdf.shape), 1e-3)
+      self.assertLess(
+          tf1.test.compute_gradient_error(locs, locs.shape, cdf, cdf.shape),
           1e-3)
       self.assertLess(
-          tf.compat.v1.test.compute_gradient_error(locs, locs.shape, cdf,
-                                                   cdf.shape), 1e-3)
-      self.assertLess(
-          tf.compat.v1.test.compute_gradient_error(
-              concentrations, concentrations.shape, cdf, cdf.shape), 1e-3)
+          tf1.test.compute_gradient_error(concentrations, concentrations.shape,
+                                          cdf, cdf.shape), 1e-3)
 
   def testVonMisesCdfGradientSimple(self):
     # This is a simple finite difference test that also works in the Eager mode.

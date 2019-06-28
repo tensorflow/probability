@@ -20,7 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import _augment_sample_shape
@@ -163,7 +164,7 @@ class _IIDNormalTest(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
@@ -585,9 +586,9 @@ class MissingObservationsTests(tfp_test_case.TestCase):
     # heavyweight, we split the load: this test uses dynamic shape and others
     # use static shape, so we expect to catch any pervasive problems with both
     # approaches.
-    observed_time_series = tf.compat.v1.placeholder_with_default(
+    observed_time_series = tf1.placeholder_with_default(
         input=observed_time_series_, shape=None)
-    observation_mask = tf.compat.v1.placeholder_with_default(
+    observation_mask = tf1.placeholder_with_default(
         input=observation_mask_, shape=None)
 
     # In a random walk, skipping a timestep just adds variance, so we can
@@ -1271,7 +1272,7 @@ class KalmanStepsTestDynamic(tf.test.TestCase, _KalmanStepsTest):
     return _KalmanStepsTest.setUp(self)
 
   def build_tensor(self, tensor):
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=tf.convert_to_tensor(value=tensor), shape=None)
 
 
@@ -1345,10 +1346,10 @@ class AugmentSampleShapeTestDynamic(tf.test.TestCase, _AugmentSampleShapeTest):
       return self.assertRaisesOpError(msg)
 
   def build_inputs(self, full_batch_shape, partial_batch_shape):
-    full_batch_shape = tf.compat.v1.placeholder_with_default(
+    full_batch_shape = tf1.placeholder_with_default(
         input=np.asarray(full_batch_shape, dtype=np.int32), shape=None)
 
-    partial_batch_shape = tf.compat.v1.placeholder_with_default(
+    partial_batch_shape = tf1.placeholder_with_default(
         input=np.asarray(partial_batch_shape, dtype=np.int32), shape=None)
     dist = tfd.Normal(tf.random.normal(partial_batch_shape), 1.)
 

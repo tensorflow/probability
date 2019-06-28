@@ -19,7 +19,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 from tensorflow_probability.python.internal import tensorshape_util
@@ -60,16 +61,14 @@ class _GaussianProcessRegressionModelTest(object):
     observations = np.random.uniform(-1., 1., (3, 7)).astype(np.float64)
 
     if not self.is_static:
-      amplitude = tf.compat.v1.placeholder_with_default(amplitude, shape=None)
-      length_scale = tf.compat.v1.placeholder_with_default(
-          length_scale, shape=None)
-      batched_index_points = tf.compat.v1.placeholder_with_default(
+      amplitude = tf1.placeholder_with_default(amplitude, shape=None)
+      length_scale = tf1.placeholder_with_default(length_scale, shape=None)
+      batched_index_points = tf1.placeholder_with_default(
           batched_index_points, shape=None)
 
-      observation_index_points = tf.compat.v1.placeholder_with_default(
+      observation_index_points = tf1.placeholder_with_default(
           observation_index_points, shape=None)
-      observations = tf.compat.v1.placeholder_with_default(
-          observations, shape=None)
+      observations = tf1.placeholder_with_default(observations, shape=None)
 
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
 
@@ -272,18 +271,14 @@ class _GaussianProcessRegressionModelTest(object):
 
     # ==> shape = [6, 25, 2]
     if not self.is_static:
-      index_points_1 = tf.compat.v1.placeholder_with_default(
-          index_points_1, shape=None)
-      index_points_2 = tf.compat.v1.placeholder_with_default(
-          index_points_2, shape=None)
-      observation_index_points_1 = tf.compat.v1.placeholder_with_default(
+      index_points_1 = tf1.placeholder_with_default(index_points_1, shape=None)
+      index_points_2 = tf1.placeholder_with_default(index_points_2, shape=None)
+      observation_index_points_1 = tf1.placeholder_with_default(
           observation_index_points_1, shape=None)
-      observation_index_points_2 = tf.compat.v1.placeholder_with_default(
+      observation_index_points_2 = tf1.placeholder_with_default(
           observation_index_points_2, shape=None)
-      observations_1 = tf.compat.v1.placeholder_with_default(
-          observations_1, shape=None)
-      observations_2 = tf.compat.v1.placeholder_with_default(
-          observations_2, shape=None)
+      observations_1 = tf1.placeholder_with_default(observations_1, shape=None)
+      observations_2 = tf1.placeholder_with_default(observations_2, shape=None)
 
     mean_fn = lambda x: np.array([0.], np.float32)
     kernel_1 = psd_kernels.ExponentiatedQuadratic()

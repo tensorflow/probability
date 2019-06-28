@@ -24,7 +24,8 @@ import math
 import numpy as np
 from scipy import stats as sp_stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
@@ -159,11 +160,11 @@ class StudentTTest(tf.test.TestCase):
     n = tf.constant(100)
     seed = tfp_test_util.test_seed()
 
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     student = tfd.StudentT(df=df, loc=mu, scale=sigma, name="student_t1")
     samples1 = self.evaluate(student.sample(n, seed=seed))
 
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     student2 = tfd.StudentT(df=df, loc=mu, scale=sigma, name="student_t2")
     samples2 = self.evaluate(student2.sample(n, seed=seed))
 

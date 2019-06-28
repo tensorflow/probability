@@ -20,7 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
@@ -265,12 +266,12 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
 
   def testDeterministicSampling(self):
     seed = tfp_test_util.test_seed()
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     dist = tfd.MixtureSameFamily(
         mixture_distribution=tfd.Categorical(logits=[0., 0.]),
         components_distribution=tfd.Normal(loc=[0., 200.], scale=[1., 1.]))
     sample_1 = self.evaluate(dist.sample([100], seed=seed))
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     sample_2 = self.evaluate(dist.sample([100], seed=seed))
     self.assertAllClose(sample_1, sample_2)
 
@@ -307,7 +308,7 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
     if self.use_static_shape:
       return tf.convert_to_tensor(value=ndarray)
     else:
-      return tf.compat.v1.placeholder_with_default(input=ndarray, shape=None)
+      return tf1.placeholder_with_default(input=ndarray, shape=None)
 
 
 @test_util.run_all_in_graph_and_eager_modes

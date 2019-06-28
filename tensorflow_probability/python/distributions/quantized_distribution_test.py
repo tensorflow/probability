@@ -20,7 +20,8 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -319,9 +320,9 @@ class QuantizedDistributionTest(test_case.TestCase):
       return inner_func
 
     for dtype in [np.float32, np.float64]:
-      mu = tf.compat.v2.Variable(0., name="mu", dtype=dtype)
-      sigma = tf.compat.v2.Variable(1., name="sigma", dtype=dtype)
-      self.evaluate(tf.compat.v1.global_variables_initializer())
+      mu = tf.Variable(0., name="mu", dtype=dtype)
+      sigma = tf.Variable(1., name="sigma", dtype=dtype)
+      self.evaluate(tf1.global_variables_initializer())
       value, grads = self.evaluate(tfp.math.value_and_gradient(
           quantized_log_prob(dtype), [mu, sigma]))
       self._assert_all_finite(value)
@@ -335,10 +336,10 @@ class QuantizedDistributionTest(test_case.TestCase):
           distribution=tfd.Normal(loc=mu, scale=sigma))
       return qdist.log_prob(x)
 
-    mu = tf.compat.v2.Variable(0.0, name="mu")
-    sigma = tf.compat.v2.Variable(1.0, name="sigma")
+    mu = tf.Variable(0.0, name="mu")
+    sigma = tf.Variable(1.0, name="sigma")
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     value, grads = self.evaluate(tfp.math.value_and_gradient(
         quantized_log_prob, [mu, sigma]))
     self._assert_all_finite(value)
@@ -355,7 +356,7 @@ class QuantizedDistributionTest(test_case.TestCase):
       self.evaluate(qdist.sample())
 
   def testCutoffsMustBeIntegerValuedIfValidateArgsTrue(self):
-    low = tf.compat.v1.placeholder_with_default(input=1.5, shape=[])
+    low = tf1.placeholder_with_default(input=1.5, shape=[])
     with self.assertRaisesOpError("has non-integer components"):
       qdist = tfd.QuantizedDistribution(
           distribution=tfd.Normal(loc=0., scale=1.),

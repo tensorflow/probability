@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability import distributions as tfd
 from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
@@ -70,17 +71,16 @@ class _VariationalGaussianProcessTest(object):
     observation_noise_variance = np.float64(1e-2)
 
     if not self.is_static:
-      amplitude = tf.compat.v1.placeholder_with_default(amplitude, shape=None)
-      length_scale = tf.compat.v1.placeholder_with_default(
-          length_scale, shape=None)
-      batched_index_points = tf.compat.v1.placeholder_with_default(
+      amplitude = tf1.placeholder_with_default(amplitude, shape=None)
+      length_scale = tf1.placeholder_with_default(length_scale, shape=None)
+      batched_index_points = tf1.placeholder_with_default(
           batched_index_points, shape=None)
 
-      inducing_index_points = tf.compat.v1.placeholder_with_default(
+      inducing_index_points = tf1.placeholder_with_default(
           inducing_index_points, shape=None)
-      variational_inducing_observations_loc = tf.compat.v1.placeholder_with_default(
+      variational_inducing_observations_loc = tf1.placeholder_with_default(
           variational_inducing_observations_loc, shape=None)
-      variational_inducing_observations_scale = tf.compat.v1.placeholder_with_default(
+      variational_inducing_observations_scale = tf1.placeholder_with_default(
           variational_inducing_observations_scale, shape=None)
 
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
@@ -153,13 +153,12 @@ class _VariationalGaussianProcessTest(object):
     observation_noise_variance = np.float64(1e-2)
 
     if not self.is_static:
-      amplitude = tf.compat.v1.placeholder_with_default(amplitude, shape=None)
-      length_scale = tf.compat.v1.placeholder_with_default(
-          length_scale, shape=None)
-      observation_index_points = tf.compat.v1.placeholder_with_default(
+      amplitude = tf1.placeholder_with_default(amplitude, shape=None)
+      length_scale = tf1.placeholder_with_default(length_scale, shape=None)
+      observation_index_points = tf1.placeholder_with_default(
           observation_index_points, shape=None)
 
-      inducing_index_points = tf.compat.v1.placeholder_with_default(
+      inducing_index_points = tf1.placeholder_with_default(
           inducing_index_points, shape=None)
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
 
@@ -222,21 +221,19 @@ class _VariationalGaussianProcessTest(object):
     observation_noise_variance = np.float64(1e-2)
 
     if not self.is_static:
-      amplitude = tf.compat.v1.placeholder_with_default(amplitude, shape=None)
-      length_scale = tf.compat.v1.placeholder_with_default(
-          length_scale, shape=None)
-      batched_index_points = tf.compat.v1.placeholder_with_default(
+      amplitude = tf1.placeholder_with_default(amplitude, shape=None)
+      length_scale = tf1.placeholder_with_default(length_scale, shape=None)
+      batched_index_points = tf1.placeholder_with_default(
           batched_index_points, shape=None)
 
-      observations = tf.compat.v1.placeholder_with_default(
-          observations, shape=None)
-      observation_index_points = tf.compat.v1.placeholder_with_default(
+      observations = tf1.placeholder_with_default(observations, shape=None)
+      observation_index_points = tf1.placeholder_with_default(
           observation_index_points, shape=None)
-      inducing_index_points = tf.compat.v1.placeholder_with_default(
+      inducing_index_points = tf1.placeholder_with_default(
           inducing_index_points, shape=None)
-      variational_inducing_observations_loc = tf.compat.v1.placeholder_with_default(
+      variational_inducing_observations_loc = tf1.placeholder_with_default(
           variational_inducing_observations_loc, shape=None)
-      variational_inducing_observations_scale = tf.compat.v1.placeholder_with_default(
+      variational_inducing_observations_scale = tf1.placeholder_with_default(
           variational_inducing_observations_scale, shape=None)
 
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)

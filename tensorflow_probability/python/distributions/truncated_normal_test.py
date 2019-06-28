@@ -25,7 +25,8 @@ from absl.testing import parameterized
 import numpy as np
 from scipy import stats as sp_stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -145,10 +146,10 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
   def testShapeWithPlaceholders(self):
     if tf.executing_eagerly():
       return
-    loc = tf.compat.v1.placeholder_with_default(input=5., shape=None)
-    scale = tf.compat.v1.placeholder_with_default(input=[1., 2], shape=None)
-    ub = tf.compat.v1.placeholder_with_default(input=[10., 11.], shape=None)
-    lb = tf.compat.v1.placeholder_with_default(input=[-1.], shape=None)
+    loc = tf1.placeholder_with_default(input=5., shape=None)
+    scale = tf1.placeholder_with_default(input=[1., 2], shape=None)
+    ub = tf1.placeholder_with_default(input=[10., 11.], shape=None)
+    lb = tf1.placeholder_with_default(input=[-1.], shape=None)
     dist = tfd.TruncatedNormal(loc, scale, lb, ub)
 
     self.assertEqual(dist.batch_shape, tf.TensorShape(None))
@@ -157,7 +158,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
     self.assertAllEqual(self.evaluate(dist.batch_shape_tensor()), [2])
     self.assertAllEqual(self.evaluate(dist.sample(5)).shape, [5, 2])
 
-    ub = tf.compat.v1.placeholder_with_default(input=[[5., 11.]], shape=None)
+    ub = tf1.placeholder_with_default(input=[[5., 11.]], shape=None)
     dist = tfd.TruncatedNormal(loc, scale, lb, ub)
     self.assertAllEqual(self.evaluate(dist.sample(5)).shape, [5, 1, 2])
 
@@ -237,11 +238,11 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
 
   @parameterized.parameters((np.float32), (np.float64))
   def testReparametrizable(self, dtype=np.float32):
-    loc = tf.compat.v2.Variable(dtype(0.1))
-    scale = tf.compat.v2.Variable(dtype(1.1))
-    low = tf.compat.v2.Variable(dtype(-10.0))
-    high = tf.compat.v2.Variable(dtype(5.0))
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    loc = tf.Variable(dtype(0.1))
+    scale = tf.Variable(dtype(1.1))
+    low = tf.Variable(dtype(-10.0))
+    high = tf.Variable(dtype(5.0))
+    self.evaluate(tf1.global_variables_initializer())
 
     def f(loc, scale, low, high):
       dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
@@ -273,13 +274,13 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
                          "survival_function", "log_survival_function"))
   )
   def testGradientsFx(self, dtype, fn_name):
-    loc = tf.compat.v2.Variable(dtype(0.1))
-    scale = tf.compat.v2.Variable(dtype(3.0))
-    low = tf.compat.v2.Variable(dtype(-10.0))
-    high = tf.compat.v2.Variable(dtype(5.0))
+    loc = tf.Variable(dtype(0.1))
+    scale = tf.Variable(dtype(3.0))
+    low = tf.Variable(dtype(-10.0))
+    high = tf.Variable(dtype(5.0))
 
     x = np.array([-1.0, 0.01, 0.1, 1., 4.9]).astype(dtype)
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
 
     def f(loc, scale):
       dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
@@ -295,12 +296,12 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
                         ("entropy", "mean", "variance", "mode"))
   )
   def testGradientsNx(self, dtype, fn_name):
-    loc = tf.compat.v2.Variable(dtype(0.1))
-    scale = tf.compat.v2.Variable(dtype(3.0))
-    low = tf.compat.v2.Variable(dtype(-10.0))
-    high = tf.compat.v2.Variable(dtype(5.0))
+    loc = tf.Variable(dtype(0.1))
+    scale = tf.Variable(dtype(3.0))
+    low = tf.Variable(dtype(-10.0))
+    high = tf.Variable(dtype(5.0))
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
 
     def f(loc, scale):
       dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)

@@ -19,7 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import finite_discrete
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -30,7 +31,7 @@ class FiniteDiscreteTest(object):
   def _build_tensor(self, ndarray):
     # Enforce parameterized dtype and static/dynamic testing.
     ndarray = np.asarray(ndarray)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _get_shape(self, tensor):

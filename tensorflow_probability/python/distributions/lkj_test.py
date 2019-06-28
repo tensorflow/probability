@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
@@ -367,7 +368,7 @@ class LKJTestGraphOnly(tf.test.TestCase):
     with self.assertRaisesOpError('dimension mismatch'):
       self.evaluate(
           testee_lkj.log_prob(
-              tf.compat.v1.placeholder_with_default(tf.eye(4), shape=None)))
+              tf1.placeholder_with_default(tf.eye(4), shape=None)))
 
 
 if __name__ == '__main__':

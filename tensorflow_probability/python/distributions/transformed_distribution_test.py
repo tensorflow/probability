@@ -22,7 +22,8 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
@@ -328,9 +329,9 @@ class ScalarToMultiTest(tf.test.TestCase):
     # batch_shape agnostic and only care about event_ndims.
     # In the case of `Affine`, if we got it wrong then it would fire an
     # exception due to incompatible dimensions.
-    batch_shape_pl = tf.compat.v1.placeholder_with_default(
+    batch_shape_pl = tf1.placeholder_with_default(
         input=np.int32(batch_shape), shape=None, name="dynamic_batch_shape")
-    event_shape_pl = tf.compat.v1.placeholder_with_default(
+    event_shape_pl = tf1.placeholder_with_default(
         input=np.int32(event_shape), shape=None, name="dynamic_event_shape")
     fake_mvn_dynamic = self._cls()(
         distribution=base_distribution_class(
@@ -485,9 +486,9 @@ class ScalarToMultiTest(tf.test.TestCase):
   def testMatrixEvent(self):
     batch_shape = [2]
     event_shape = [2, 3, 3]
-    batch_shape_pl = tf.compat.v1.placeholder_with_default(
+    batch_shape_pl = tf1.placeholder_with_default(
         input=np.int32(batch_shape), shape=None, name="dynamic_batch_shape")
-    event_shape_pl = tf.compat.v1.placeholder_with_default(
+    event_shape_pl = tf1.placeholder_with_default(
         input=np.int32(event_shape), shape=None, name="dynamic_event_shape")
 
     scale = 2.
@@ -559,9 +560,9 @@ class ScalarToMultiTest(tf.test.TestCase):
         loc = tf.zeros(batch_shape + event_shape)
         scale_diag = tf.ones(batch_shape + event_shape)
         if shapes_are_dynamic:
-          loc = tf.compat.v1.placeholder_with_default(
+          loc = tf1.placeholder_with_default(
               loc, shape=None, name="dynamic_loc")
-          scale_diag = tf.compat.v1.placeholder_with_default(
+          scale_diag = tf1.placeholder_with_default(
               scale_diag, shape=None, name="dynamic_scale_diag")
 
         mvn = tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)

@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy.special import gamma
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
@@ -160,8 +161,7 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
 
   def testUnknownShape(self):
-    logits_pl = tf.compat.v1.placeholder_with_default(
-        input=[.3, .1, .4], shape=None)
+    logits_pl = tf1.placeholder_with_default(input=[.3, .1, .4], shape=None)
     temperature = 1.0
     dist = tfd.ExpRelaxedOneHotCategorical(temperature, logits_pl)
     self.assertAllEqual([3], self.evaluate(dist.sample()).shape)

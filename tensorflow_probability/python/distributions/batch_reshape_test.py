@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
@@ -35,9 +36,8 @@ class _BatchReshapeTest(object):
 
   def make_wishart(self, dims, new_batch_shape, old_batch_shape):
     new_batch_shape_ph = (
-        tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
-            np.int32(new_batch_shape), shape=None))
+        tf.constant(np.int32(new_batch_shape)) if self.is_static_shape else
+        tf1.placeholder_with_default(np.int32(new_batch_shape), shape=None))
 
     scale = self.dtype([
         [[1., 0.5],
@@ -47,7 +47,7 @@ class _BatchReshapeTest(object):
     ])
     scale = np.reshape(np.concatenate([scale, scale], axis=0),
                        old_batch_shape + [dims, dims])
-    scale_ph = tf.compat.v1.placeholder_with_default(
+    scale_ph = tf1.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
     wishart = tfd.Wishart(df=5, scale=scale_ph)
     reshape_wishart = tfd.BatchReshape(
@@ -181,13 +181,12 @@ class _BatchReshapeTest(object):
 
   def make_normal(self, new_batch_shape, old_batch_shape):
     new_batch_shape_ph = (
-        tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
-            np.int32(new_batch_shape), shape=None))
+        tf.constant(np.int32(new_batch_shape)) if self.is_static_shape else
+        tf1.placeholder_with_default(np.int32(new_batch_shape), shape=None))
 
     scale = self.dtype(0.5 + np.arange(
         np.prod(old_batch_shape)).reshape(old_batch_shape))
-    scale_ph = tf.compat.v1.placeholder_with_default(
+    scale_ph = tf1.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
     normal = tfd.Normal(loc=self.dtype(0), scale=scale_ph)
     reshape_normal = tfd.BatchReshape(
@@ -315,12 +314,11 @@ class _BatchReshapeTest(object):
 
   def make_mvn(self, dims, new_batch_shape, old_batch_shape):
     new_batch_shape_ph = (
-        tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
-            np.int32(new_batch_shape), shape=None))
+        tf.constant(np.int32(new_batch_shape)) if self.is_static_shape else
+        tf1.placeholder_with_default(np.int32(new_batch_shape), shape=None))
 
     scale = np.ones(old_batch_shape + [dims], self.dtype)
-    scale_ph = tf.compat.v1.placeholder_with_default(
+    scale_ph = tf1.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
     mvn = tfd.MultivariateNormalDiag(scale_diag=scale_ph)
     reshape_mvn = tfd.BatchReshape(
@@ -466,12 +464,11 @@ class _BatchReshapeTest(object):
     old_batch_shape = [2]   # 2 != 2*3
 
     new_batch_shape_ph = (
-        tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
-            np.int32(new_batch_shape), shape=None))
+        tf.constant(np.int32(new_batch_shape)) if self.is_static_shape else
+        tf1.placeholder_with_default(np.int32(new_batch_shape), shape=None))
 
     scale = np.ones(old_batch_shape + [dims], self.dtype)
-    scale_ph = tf.compat.v1.placeholder_with_default(
+    scale_ph = tf1.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
     mvn = tfd.MultivariateNormalDiag(scale_diag=scale_ph)
 
@@ -503,12 +500,11 @@ class _BatchReshapeTest(object):
       new_batch_shape = [-2, -2]  # -2 * -2 = 4, same size as the old shape.
 
     new_batch_shape_ph = (
-        tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
-            np.int32(new_batch_shape), shape=None))
+        tf.constant(np.int32(new_batch_shape)) if self.is_static_shape else
+        tf1.placeholder_with_default(np.int32(new_batch_shape), shape=None))
 
     scale = np.ones(old_batch_shape + [dims], self.dtype)
-    scale_ph = tf.compat.v1.placeholder_with_default(
+    scale_ph = tf1.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
     mvn = tfd.MultivariateNormalDiag(scale_diag=scale_ph)
 
@@ -538,12 +534,11 @@ class _BatchReshapeTest(object):
     old_batch_shape = [2]
 
     new_batch_shape_ph = (
-        tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
-            np.int32(new_batch_shape), shape=None))
+        tf.constant(np.int32(new_batch_shape)) if self.is_static_shape else
+        tf1.placeholder_with_default(np.int32(new_batch_shape), shape=None))
 
     scale = np.ones(old_batch_shape + [dims], self.dtype)
-    scale_ph = tf.compat.v1.placeholder_with_default(
+    scale_ph = tf1.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
     mvn = tfd.MultivariateNormalDiag(scale_diag=scale_ph)
 
@@ -567,13 +562,12 @@ class _BatchReshapeTest(object):
     new_batch_shape = [1, 4, 1]
     rate_ = self.dtype([1, 10, 2, 20])
 
-    rate = tf.compat.v1.placeholder_with_default(
+    rate = tf1.placeholder_with_default(
         rate_, shape=old_batch_shape if self.is_static_shape else None)
     poisson_4 = tfd.Poisson(rate)
     new_batch_shape_ph = (
-        tf.constant(np.int32(new_batch_shape))
-        if self.is_static_shape else tf.compat.v1.placeholder_with_default(
-            np.int32(new_batch_shape), shape=None))
+        tf.constant(np.int32(new_batch_shape)) if self.is_static_shape else
+        tf1.placeholder_with_default(np.int32(new_batch_shape), shape=None))
     poisson_141_reshaped = tfd.BatchReshape(
         poisson_4, new_batch_shape_ph, validate_args=True)
 

@@ -18,7 +18,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
@@ -148,7 +149,7 @@ class GammaGammaTest(tf.test.TestCase):
     self.assertAllClose(self.evaluate(gg.mean()), expected_mean)
 
   def testGammaGammaSample(self):
-    with tf.compat.v1.Session():
+    with tf1.Session():
       alpha_v = 2.0
       alpha0_v = 3.0
       beta0_v = 5.0

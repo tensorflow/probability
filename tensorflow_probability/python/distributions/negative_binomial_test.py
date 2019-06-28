@@ -19,7 +19,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
@@ -124,7 +125,7 @@ class NegativeBinomialTest(tf.test.TestCase):
     batch_size = 6
     probs = [.9] * batch_size
     total_count = 5.
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         input=[2.5, 3.2, 4.3, 5.1, 6., 7.], shape=[6])
     negbinom = tfd.NegativeBinomial(
         total_count=total_count, probs=probs, validate_args=True)

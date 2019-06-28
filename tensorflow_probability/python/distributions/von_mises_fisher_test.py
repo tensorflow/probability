@@ -22,7 +22,7 @@ from __future__ import print_function
 import numpy as np
 from scipy import special as sp_special
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.von_mises_fisher import _bessel_ive

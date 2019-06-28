@@ -22,7 +22,8 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats as sp_stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -190,15 +191,15 @@ class CauchyTest(test_case.TestCase):
 
   def testFiniteGradientAtDifficultPoints(self):
     for dtype in [np.float32, np.float64]:
-      loc = tf.compat.v2.Variable(dtype(0.0))
-      scale = tf.compat.v2.Variable(dtype(1.0))
+      loc = tf.Variable(dtype(0.0))
+      scale = tf.Variable(dtype(1.0))
       x = np.array([-100., -20., -5., 0., 5., 20., 100.]).astype(dtype)
       def cauchy_function(name, x):
         def cauchy(loc, scale):
           return getattr(tfd.Cauchy(loc=loc, scale=scale), name)(x)
         return cauchy
 
-      self.evaluate(tf.compat.v1.global_variables_initializer())
+      self.evaluate(tf1.global_variables_initializer())
       for func_name in [
           "cdf", "log_cdf", "survival_function",
           "log_survival_function", "log_prob", "prob"
@@ -392,8 +393,8 @@ class CauchyTest(test_case.TestCase):
   def testCauchyShapeWithPlaceholders(self):
     if tf.executing_eagerly():
       return
-    loc = tf.compat.v1.placeholder_with_default(input=5., shape=[])
-    scale = tf.compat.v1.placeholder_with_default(input=[1., 2], shape=None)
+    loc = tf1.placeholder_with_default(input=5., shape=[])
+    scale = tf1.placeholder_with_default(input=[1., 2], shape=None)
     cauchy = tfd.Cauchy(loc=loc, scale=scale)
 
     # get_batch_shape should return an "<unknown>" tensor.

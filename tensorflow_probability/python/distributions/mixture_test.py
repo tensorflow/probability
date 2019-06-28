@@ -23,7 +23,8 @@ import contextlib
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
@@ -43,7 +44,7 @@ def _set_seed(seed):
   """Helper which uses graph seed if using TFE."""
   # TODO(b/68017812): Deprecate once TFE supports seed.
   if tf.executing_eagerly():
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     return None
   return seed
 
@@ -200,7 +201,7 @@ class MixtureTest(tf.test.TestCase):
     # to test failure to infer shape
     if not tf.executing_eagerly():
       with self.assertRaisesWithPredicateMatch(ValueError, r"Could not infer"):
-        cat_logits = tf.compat.v1.placeholder(shape=[1, None], dtype=tf.float32)
+        cat_logits = tf1.placeholder(shape=[1, None], dtype=tf.float32)
         tfd.Mixture(
             tfd.Categorical(cat_logits), [tfd.Normal(loc=[1.0], scale=[2.0])],
             use_static_graph=self.use_static_graph)
@@ -209,8 +210,8 @@ class MixtureTest(tf.test.TestCase):
     if tf.executing_eagerly():
       return
 
-    d0_param = tf.compat.v1.placeholder_with_default(input=[2., 3], shape=None)
-    d1_param = tf.compat.v1.placeholder_with_default(input=[1.], shape=None)
+    d0_param = tf1.placeholder_with_default(input=[2., 3], shape=None)
+    d1_param = tf1.placeholder_with_default(input=[1.], shape=None)
 
     d = tfd.Mixture(
         tfd.Categorical([0.1, 0.2]), [
@@ -547,7 +548,7 @@ class MixtureTest(tf.test.TestCase):
     n = 100
     seed = tfp_test_util.test_seed()
 
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     components = [
         tfd.Normal(loc=mu, scale=sigma) for mu, sigma in zip(mus, sigmas)
     ]
@@ -559,7 +560,7 @@ class MixtureTest(tf.test.TestCase):
         use_static_graph=self.use_static_graph)
     samples1 = self.evaluate(dist1.sample(n, seed=seed))
 
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     components2 = [
         tfd.Normal(loc=mu, scale=sigma) for mu, sigma in zip(mus, sigmas)
     ]
@@ -634,8 +635,7 @@ class MixtureTest(tf.test.TestCase):
       batch_shape_tensor = [2, 3]
     else:
       batch_shape = [None, 3]
-      batch_shape_tensor = tf.compat.v1.placeholder_with_default(
-          input=[2, 3], shape=[2])
+      batch_shape_tensor = tf1.placeholder_with_default(input=[2, 3], shape=[2])
 
     dist = make_multivariate_mixture(
         batch_shape=batch_shape,
@@ -824,18 +824,18 @@ class MixtureBenchmark(tf.test.Benchmark):
   def _runSamplingBenchmark(self, name, create_distribution, use_gpu,
                             num_components, batch_size, num_features,
                             sample_size):
-    config = tf.compat.v1.ConfigProto()
+    config = tf1.ConfigProto()
     config.allow_soft_placement = True
     np.random.seed(127)
-    with tf.compat.v1.Session(config=config, graph=tf.Graph()) as sess:
-      tf.compat.v1.set_random_seed(0)
+    with tf1.Session(config=config, graph=tf.Graph()) as sess:
+      tf1.set_random_seed(0)
       with tf.device("/device:GPU:0" if use_gpu else "/cpu:0"):
         mixture = create_distribution(
             num_components=num_components,
             batch_size=batch_size,
             num_features=num_features)
         sample_op = mixture.sample(sample_size).op
-        sess.run(tf.compat.v1.global_variables_initializer())
+        sess.run(tf1.global_variables_initializer())
         reported = self.run_op_benchmark(
             sess,
             sample_op,
@@ -843,23 +843,23 @@ class MixtureBenchmark(tf.test.Benchmark):
             name=("%s_%s_components_%d_batch_%d_features_%d_sample_%d" %
                   (name, use_gpu, num_components, batch_size, num_features,
                    sample_size)))
-        tf.compat.v1.logging.vlog(
+        tf1.logging.vlog(
             2, "\t".join(["%s", "%d", "%d", "%d", "%d", "%g"]) %
             (use_gpu, num_components, batch_size, num_features, sample_size,
              reported["wall_time"]))
 
   def benchmarkSamplingMVNDiag(self):
-    tf.compat.v1.logging.vlog(
+    tf1.logging.vlog(
         2, "mvn_diag\tuse_gpu\tcomponents\tbatch\tfeatures\tsample\twall_time")
 
     def create_distribution(batch_size, num_components, num_features):
       cat = tfd.Categorical(logits=np.random.randn(batch_size, num_components))
       mus = [
-          tf.compat.v2.Variable(np.random.randn(batch_size, num_features))
+          tf.Variable(np.random.randn(batch_size, num_features))
           for _ in range(num_components)
       ]
       sigmas = [
-          tf.compat.v2.Variable(np.random.rand(batch_size, num_features))
+          tf.Variable(np.random.rand(batch_size, num_features))
           for _ in range(num_components)
       ]
       components = list(
@@ -885,7 +885,7 @@ class MixtureBenchmark(tf.test.Benchmark):
                   sample_size=sample_size)
 
   def benchmarkSamplingMVNFull(self):
-    tf.compat.v1.logging.vlog(
+    tf1.logging.vlog(
         2, "mvn_full\tuse_gpu\tcomponents\tbatch\tfeatures\tsample\twall_time")
 
     def psd(x):
@@ -895,11 +895,11 @@ class MixtureBenchmark(tf.test.Benchmark):
     def create_distribution(batch_size, num_components, num_features):
       cat = tfd.Categorical(logits=np.random.randn(batch_size, num_components))
       mus = [
-          tf.compat.v2.Variable(np.random.randn(batch_size, num_features))
+          tf.Variable(np.random.randn(batch_size, num_features))
           for _ in range(num_components)
       ]
       sigmas = [
-          tf.compat.v2.Variable(
+          tf.Variable(
               psd(np.random.rand(batch_size, num_features, num_features)))
           for _ in range(num_components)
       ]

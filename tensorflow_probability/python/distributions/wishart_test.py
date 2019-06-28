@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import linalg
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
@@ -195,7 +196,7 @@ class WishartTest(tf.test.TestCase):
     n_val = 100
     seed = tfp_test_util.test_seed()
 
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     chol_w1 = tfd.Wishart(
         df=df,
         scale_tril=chol(make_pd(1., 3)),
@@ -203,7 +204,7 @@ class WishartTest(tf.test.TestCase):
         name="wishart1")
     samples1 = self.evaluate(chol_w1.sample(n_val, seed=seed))
 
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     chol_w2 = tfd.Wishart(
         df=df,
         scale_tril=chol(make_pd(1., 3)),
@@ -300,12 +301,12 @@ class WishartTest(tf.test.TestCase):
     self.assertAllEqual([2], w.batch_shape)
     self.assertAllEqual([2], self.evaluate(w.batch_shape_tensor()))
 
-    scale_deferred = tf.compat.v1.placeholder_with_default(
+    scale_deferred = tf1.placeholder_with_default(
         input=chol_scale, shape=chol_scale.shape)
     w = tfd.Wishart(df=4, scale_tril=scale_deferred)
     self.assertAllEqual([], self.evaluate(w.batch_shape_tensor()))
 
-    scale_deferred = tf.compat.v1.placeholder_with_default(
+    scale_deferred = tf1.placeholder_with_default(
         input=np.array([chol_scale, chol_scale]), shape=None)
     w = tfd.Wishart(df=4, scale_tril=scale_deferred)
     self.assertAllEqual([2], self.evaluate(w.batch_shape_tensor()))
@@ -322,12 +323,12 @@ class WishartTest(tf.test.TestCase):
     self.assertAllEqual([2, 2], w.event_shape)
     self.assertAllEqual([2, 2], self.evaluate(w.event_shape_tensor()))
 
-    scale_deferred = tf.compat.v1.placeholder_with_default(
+    scale_deferred = tf1.placeholder_with_default(
         input=chol_scale, shape=chol_scale.shape)
     w = tfd.Wishart(df=4, scale_tril=scale_deferred)
     self.assertAllEqual([2, 2], self.evaluate(w.event_shape_tensor()))
 
-    scale_deferred = tf.compat.v1.placeholder_with_default(
+    scale_deferred = tf1.placeholder_with_default(
         input=np.array([chol_scale, chol_scale]), shape=None)
     w = tfd.Wishart(df=4, scale_tril=scale_deferred)
     self.assertAllEqual([2, 2], self.evaluate(w.event_shape_tensor()))
@@ -335,8 +336,8 @@ class WishartTest(tf.test.TestCase):
   def testValidateArgs(self):
     x = make_pd(1., 3)
     chol_scale = chol(x)
-    df_deferred = tf.compat.v1.placeholder_with_default(input=2., shape=None)
-    chol_scale_deferred = tf.compat.v1.placeholder_with_default(
+    df_deferred = tf1.placeholder_with_default(input=2., shape=None)
+    chol_scale_deferred = tf1.placeholder_with_default(
         input=np.float32(chol_scale), shape=chol_scale.shape)
 
     # In eager mode, these checks are done statically and hence
@@ -352,8 +353,8 @@ class WishartTest(tf.test.TestCase):
       self.evaluate(chol_w.log_prob(np.asarray(x, dtype=np.float32)))
 
     with self.assertRaisesOpError("Cholesky decomposition was not successful"):
-      df_deferred = tf.compat.v1.placeholder_with_default(input=2., shape=None)
-      chol_scale_deferred = tf.compat.v1.placeholder_with_default(
+      df_deferred = tf1.placeholder_with_default(input=2., shape=None)
+      chol_scale_deferred = tf1.placeholder_with_default(
           input=np.ones([3, 3], dtype=np.float32), shape=[3, 3])
       chol_w = tfd.Wishart(df=df_deferred, scale=chol_scale_deferred)
       # np.ones((3, 3)) is not positive, definite.
@@ -367,14 +368,14 @@ class WishartTest(tf.test.TestCase):
       self.evaluate(chol_w.scale())
 
     # Ensure no assertions.
-    df_deferred = tf.compat.v1.placeholder_with_default(input=4., shape=None)
-    chol_scale_deferred = tf.compat.v1.placeholder_with_default(
+    df_deferred = tf1.placeholder_with_default(input=4., shape=None)
+    chol_scale_deferred = tf1.placeholder_with_default(
         input=np.float32(chol_scale), shape=chol_scale.shape)
     chol_w = tfd.Wishart(
         df=df_deferred, scale_tril=chol_scale_deferred, validate_args=False)
     self.evaluate(chol_w.log_prob(np.asarray(x, dtype=np.float32)))
 
-    chol_scale_deferred = tf.compat.v1.placeholder_with_default(
+    chol_scale_deferred = tf1.placeholder_with_default(
         input=np.ones([3, 3], dtype=np.float32), shape=[3, 3])
     chol_w = tfd.Wishart(
         df=df_deferred, scale_tril=chol_scale_deferred, validate_args=False)

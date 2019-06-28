@@ -20,7 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -211,6 +212,8 @@ class _HorseshoeTest(object):
         scale, with shape original_batch_shape + [num_candidates],
         where different candidates for a single scalar parameter are at the
         inner most dimension (axis -1).
+    Returns:
+      scale_mle: max log-likelihood estimate for scale.
     """
     dist = tfd.Horseshoe(scale=scale_candidates)
     dims = tf.shape(input=scale_candidates)
@@ -237,7 +240,7 @@ class _HorseshoeTest(object):
       param_ = param.astype(self.dtype)
     else:
       param_ = np.array(param, dtype=self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=param_, shape=param_.shape if self.use_static_shape else None)
 
 

@@ -17,7 +17,8 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -32,22 +33,19 @@ class BlockwiseTest(test_case.TestCase):
   # TODO(b/126735233): Add better unit-tests.
 
   def test_works_correctly(self):
-    d = tfd.Blockwise(
-        [
-            tfd.Independent(
-                tfd.Normal(
-                    loc=tf.compat.v1.placeholder_with_default(
-                        tf.zeros(4, dtype=tf.float64),
-                        shape=None),
-                    scale=1),
-                reinterpreted_batch_ndims=1),
-            tfd.MultivariateNormalTriL(
-                scale_tril=tf.compat.v1.placeholder_with_default(
-                    tf.eye(2, dtype=tf.float32),
-                    shape=None)),
-        ],
-        dtype_override=tf.float32,
-        validate_args=True)
+    d = tfd.Blockwise([
+        tfd.Independent(
+            tfd.Normal(
+                loc=tf1.placeholder_with_default(
+                    tf.zeros(4, dtype=tf.float64), shape=None),
+                scale=1),
+            reinterpreted_batch_ndims=1),
+        tfd.MultivariateNormalTriL(
+            scale_tril=tf1.placeholder_with_default(
+                tf.eye(2, dtype=tf.float32), shape=None)),
+    ],
+                      dtype_override=tf.float32,
+                      validate_args=True)
     x = d.sample([2, 1], seed=42)
     y = d.log_prob(x)
     x_, y_ = self.evaluate([x, y])
@@ -124,16 +122,14 @@ class BlockwiseTest(test_case.TestCase):
     # the Blockwise ones.
     # In both cases the scale matrix has a block diag structure, owing to
     # independence of the component distributions.
-    d0 = tfd.Blockwise(
-        [
-            tfd.Independent(
-                tfd.Normal(loc=tf.zeros(4, dtype=tf.float64), scale=1.),
-                reinterpreted_batch_ndims=1),
-            tfd.MultivariateNormalTriL(
-                scale_tril=tf.compat.v1.placeholder_with_default(
-                    tf.eye(2, dtype=tf.float64),
-                    shape=None)),
-        ])
+    d0 = tfd.Blockwise([
+        tfd.Independent(
+            tfd.Normal(loc=tf.zeros(4, dtype=tf.float64), scale=1.),
+            reinterpreted_batch_ndims=1),
+        tfd.MultivariateNormalTriL(
+            scale_tril=tf1.placeholder_with_default(
+                tf.eye(2, dtype=tf.float64), shape=None)),
+    ])
 
     d0_mvn = tfd.MultivariateNormalLinearOperator(
         loc=np.float64([0.] * 6),
@@ -144,17 +140,15 @@ class BlockwiseTest(test_case.TestCase):
             tf.linalg.LinearOperatorLowerTriangular(
                 tf.eye(2, dtype=tf.float64))]))
 
-    d1 = tfd.Blockwise(
-        [
-            tfd.Independent(
-                tfd.Normal(loc=tf.ones(4, dtype=tf.float64), scale=1),
-                reinterpreted_batch_ndims=1),
-            tfd.MultivariateNormalTriL(
-                loc=tf.ones(2, dtype=tf.float64),
-                scale_tril=tf.compat.v1.placeholder_with_default(
-                    np.float64([[1., 0.], [2., 3.]]),
-                    shape=None)),
-        ])
+    d1 = tfd.Blockwise([
+        tfd.Independent(
+            tfd.Normal(loc=tf.ones(4, dtype=tf.float64), scale=1),
+            reinterpreted_batch_ndims=1),
+        tfd.MultivariateNormalTriL(
+            loc=tf.ones(2, dtype=tf.float64),
+            scale_tril=tf1.placeholder_with_default(
+                np.float64([[1., 0.], [2., 3.]]), shape=None)),
+    ])
     d1_mvn = tfd.MultivariateNormalLinearOperator(
         loc=np.float64([1.] * 6),
         scale=tf.linalg.LinearOperatorBlockDiag([

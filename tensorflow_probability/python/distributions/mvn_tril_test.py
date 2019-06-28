@@ -23,7 +23,8 @@ from absl.testing import parameterized
 import numpy as np
 from scipy import stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
@@ -359,34 +360,30 @@ class MultivariateNormalTriLTest(tf.test.TestCase, parameterized.TestCase):
     sample_variance_ = np.diag(sample_covariance_)
     sample_stddev_ = np.sqrt(sample_variance_)
 
-    tf.compat.v1.logging.vlog(2, "true_mean:\n{}  ".format(true_mean))
-    tf.compat.v1.logging.vlog(2, "sample_mean:\n{}".format(sample_mean_))
-    tf.compat.v1.logging.vlog(2,
-                              "analytical_mean:\n{}".format(analytical_mean_))
+    tf1.logging.vlog(2, "true_mean:\n{}  ".format(true_mean))
+    tf1.logging.vlog(2, "sample_mean:\n{}".format(sample_mean_))
+    tf1.logging.vlog(2, "analytical_mean:\n{}".format(analytical_mean_))
 
-    tf.compat.v1.logging.vlog(2, "true_covariance:\n{}".format(true_covariance))
-    tf.compat.v1.logging.vlog(
-        2, "sample_covariance:\n{}".format(sample_covariance_))
-    tf.compat.v1.logging.vlog(
+    tf1.logging.vlog(2, "true_covariance:\n{}".format(true_covariance))
+    tf1.logging.vlog(2, "sample_covariance:\n{}".format(sample_covariance_))
+    tf1.logging.vlog(
         2, "analytical_covariance:\n{}".format(analytical_covariance_))
 
-    tf.compat.v1.logging.vlog(2, "true_variance:\n{}".format(true_variance))
-    tf.compat.v1.logging.vlog(2,
-                              "sample_variance:\n{}".format(sample_variance_))
-    tf.compat.v1.logging.vlog(
-        2, "analytical_variance:\n{}".format(analytical_variance_))
+    tf1.logging.vlog(2, "true_variance:\n{}".format(true_variance))
+    tf1.logging.vlog(2, "sample_variance:\n{}".format(sample_variance_))
+    tf1.logging.vlog(2, "analytical_variance:\n{}".format(analytical_variance_))
 
-    tf.compat.v1.logging.vlog(2, "true_stddev:\n{}".format(true_stddev))
-    tf.compat.v1.logging.vlog(2, "sample_stddev:\n{}".format(sample_stddev_))
-    tf.compat.v1.logging.vlog(
-        2, "analytical_stddev:\n{}".format(analytical_stddev_))
+    tf1.logging.vlog(2, "true_stddev:\n{}".format(true_stddev))
+    tf1.logging.vlog(2, "sample_stddev:\n{}".format(sample_stddev_))
+    tf1.logging.vlog(2, "analytical_stddev:\n{}".format(analytical_stddev_))
 
-    tf.compat.v1.logging.vlog(2, "true_scale:\n{}".format(true_scale))
-    tf.compat.v1.logging.vlog(2, "scale:\n{}".format(scale_))
+    tf1.logging.vlog(2, "true_scale:\n{}".format(true_scale))
+    tf1.logging.vlog(2, "scale:\n{}".format(scale_))
 
-    tf.compat.v1.logging.vlog(
-        2, "kl_chol:      analytical:{}  sample:{}".format(
-            analytical_kl_chol_, sample_kl_chol_))
+    tf1.logging.vlog(
+        2,
+        "kl_chol:      analytical:{}  sample:{}".format(analytical_kl_chol_,
+                                                        sample_kl_chol_))
 
     self.assertAllClose(true_mean, sample_mean_, atol=0., rtol=0.03)
     self.assertAllClose(true_mean, analytical_mean_, atol=0., rtol=1e-6)
@@ -521,10 +518,10 @@ class MultivariateNormalTriLSlicingTest(tf.test.TestCase,
 
   def testSliceSequencePreservesOrigVarGradLinkage(self):
     mu = self._rng.rand(4, 3, 1)
-    mu = tf.compat.v2.Variable(mu)
+    mu = tf.Variable(mu)
     chol, _ = self._random_chol(7, 4, 1, 2, 2)
     chol[1, 1] = -chol[1, 1]
-    chol = tf.compat.v2.Variable(chol)
+    chol = tf.Variable(chol)
     self.evaluate([mu.initializer, chol.initializer])
     dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     for slicer in [make_slicer[:5], make_slicer[..., -1], make_slicer[:, 1::2]]:

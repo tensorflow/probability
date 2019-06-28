@@ -20,7 +20,8 @@ from __future__ import print_function
 
 import math
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
@@ -31,7 +32,7 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 class NormalTest(tf.test.TestCase):
 
   def testNormalConjugateKnownSigmaPosterior(self):
-    with tf.compat.v1.Session():
+    with tf1.Session():
       mu0 = tf.constant([3.0])
       sigma0 = tf.constant([math.sqrt(10.0)])
       sigma = tf.constant([math.sqrt(2.0)])
@@ -48,7 +49,7 @@ class NormalTest(tf.test.TestCase):
       self.assertEqual(posterior_log_pdf.shape, (6,))
 
   def testNormalConjugateKnownSigmaPosteriorND(self):
-    with tf.compat.v1.Session():
+    with tf1.Session():
       batch_size = 6
       mu0 = tf.constant([[3.0, -3.0]] * batch_size)
       sigma0 = tf.constant([[math.sqrt(10.0), math.sqrt(15.0)]] * batch_size)
@@ -67,7 +68,7 @@ class NormalTest(tf.test.TestCase):
       self.assertEqual(posterior_log_pdf.shape, (6, 2))
 
   def testNormalConjugateKnownSigmaNDPosteriorND(self):
-    with tf.compat.v1.Session():
+    with tf1.Session():
       batch_size = 6
       mu0 = tf.constant([[3.0, -3.0]] * batch_size)
       sigma0 = tf.constant([[math.sqrt(10.0), math.sqrt(15.0)]] * batch_size)
@@ -91,7 +92,7 @@ class NormalTest(tf.test.TestCase):
       self.assertEqual(self.evaluate(posterior_log_pdf).shape, (6, 2))
 
   def testNormalConjugateKnownSigmaPredictive(self):
-    with tf.compat.v1.Session():
+    with tf1.Session():
       batch_size = 6
       mu0 = tf.constant([3.0] * batch_size)
       sigma0 = tf.constant([math.sqrt(10.0)] * batch_size)

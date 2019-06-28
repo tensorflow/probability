@@ -19,7 +19,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
@@ -85,8 +86,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
     self.evaluate(dist.prob([3., 0, 2]))
     self.evaluate(dist.prob([3.0, 0, 2.0]))
     # Both equality and integer checking fail.
-    placeholder = tf.compat.v1.placeholder_with_default(
-        [1.0, 2.5, 1.5], shape=None)
+    placeholder = tf1.placeholder_with_default([1.0, 2.5, 1.5], shape=None)
     with self.assertRaisesOpError(
         "cannot contain fractional components"):
       self.evaluate(dist.prob(placeholder))

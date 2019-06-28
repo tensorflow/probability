@@ -22,7 +22,8 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
@@ -195,14 +196,13 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     num_draws = 50
     dims = 3
     x = np.zeros([num_draws, dims], dtype=np.float32)
-    x_pl = tf.compat.v1.placeholder_with_default(
-        input=x, shape=[None, dims], name="x")
-    mu_var = tf.compat.v1.get_variable(
+    x_pl = tf1.placeholder_with_default(input=x, shape=[None, dims], name="x")
+    mu_var = tf1.get_variable(
         name="mu",
         shape=[dims],
         dtype=tf.float32,
-        initializer=tf.compat.v1.initializers.constant(1.))
-    self.evaluate([tf.compat.v1.global_variables_initializer()])
+        initializer=tf1.initializers.constant(1.))
+    self.evaluate([tf1.global_variables_initializer()])
 
     def neg_log_likelihood(mu):
       mvn = tfd.MultivariateNormalDiag(
@@ -231,9 +231,8 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     loc = np.float32(self._rng.rand(1, 1, 2))
     scale_diag = np.float32(self._rng.rand(1, 1, 2))
     mvn = tfd.MultivariateNormalDiag(
-        loc=tf.compat.v1.placeholder_with_default(
-            input=loc, shape=[None, None, 2]),
-        scale_diag=tf.compat.v1.placeholder_with_default(
+        loc=tf1.placeholder_with_default(input=loc, shape=[None, None, 2]),
+        scale_diag=tf1.placeholder_with_default(
             input=scale_diag, shape=[None, None, 2]))
     self.assertListEqual(
         tensorshape_util.as_list(mvn.batch_shape), [None, None])
@@ -245,9 +244,8 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     loc = np.float32(self._rng.rand(2, 3, 2))
     scale_diag = np.float32(self._rng.rand(2, 3, 2))
     mvn = tfd.MultivariateNormalDiag(
-        loc=tf.compat.v1.placeholder_with_default(
-            input=loc, shape=[2, 3, None]),
-        scale_diag=tf.compat.v1.placeholder_with_default(
+        loc=tf1.placeholder_with_default(input=loc, shape=[2, 3, None]),
+        scale_diag=tf1.placeholder_with_default(
             input=scale_diag, shape=[2, 3, None]))
     self.assertListEqual(tensorshape_util.as_list(mvn.batch_shape), [2, 3])
     self.assertListEqual(tensorshape_util.as_list(mvn.event_shape), [None])

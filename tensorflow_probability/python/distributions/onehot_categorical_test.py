@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
@@ -97,7 +98,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
         np.array([1]+[0]*4, dtype=np.int64)).dtype)
 
   def testUnknownShape(self):
-    logits = tf.compat.v1.placeholder_with_default(
+    logits = tf1.placeholder_with_default(
         input=[[-1000.0, 1000.0], [1000.0, -1000.0]], shape=None)
     dist = tfd.OneHotCategorical(logits)
     sample = dist.sample()

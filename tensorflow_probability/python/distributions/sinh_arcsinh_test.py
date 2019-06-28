@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
@@ -56,11 +57,10 @@ class SinhArcsinhTest(tf.test.TestCase):
         norm_samps.std(axis=0), sasnorm_samps.std(axis=0), atol=0.1)
 
   def test_broadcast_params_dynamic(self):
-    loc = tf.compat.v1.placeholder_with_default(input=rng.rand(5), shape=None)
-    scale = tf.compat.v1.placeholder_with_default(
+    loc = tf1.placeholder_with_default(input=rng.rand(5), shape=None)
+    scale = tf1.placeholder_with_default(
         input=np.float64(rng.rand()), shape=None)
-    skewness = tf.compat.v1.placeholder_with_default(
-        input=rng.rand(5), shape=None)
+    skewness = tf1.placeholder_with_default(input=rng.rand(5), shape=None)
     sasnorm = tfd.SinhArcsinh(
         loc=loc, scale=scale, skewness=skewness, validate_args=True)
 

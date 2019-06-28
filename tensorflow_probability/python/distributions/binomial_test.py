@@ -19,7 +19,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
@@ -97,8 +98,7 @@ class BinomialTest(tf.test.TestCase):
     self.evaluate(binom.prob([3., 1, 2]))
     self.evaluate(binom.cdf([2., 3, 2]))
     self.evaluate(binom.cdf([3., 1, 2]))
-    placeholder = tf.compat.v1.placeholder_with_default(
-        input=[1.0, 2.5, 1.5], shape=[3])
+    placeholder = tf1.placeholder_with_default(input=[1.0, 2.5, 1.5], shape=[3])
     # Both equality and integer checking fail.
     with self.assertRaisesOpError("cannot contain fractional components."):
       self.evaluate(binom.prob(placeholder))

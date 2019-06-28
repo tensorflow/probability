@@ -22,7 +22,8 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats as sp_stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
@@ -142,8 +143,8 @@ class IndependentDistributionTest(tf.test.TestCase):
   def test_event_ndims_is_static_when_possible(self):
     ind = tfd.Independent(
         distribution=tfd.Normal(
-            loc=tf.compat.v1.placeholder_with_default(input=[2.], shape=None),
-            scale=tf.compat.v1.placeholder_with_default(input=1., shape=None)),
+            loc=tf1.placeholder_with_default(input=[2.], shape=None),
+            scale=tf1.placeholder_with_default(input=1., shape=None)),
         reinterpreted_batch_ndims=1)
     # Even though `event_shape` is not static, event_ndims must equal
     # `reinterpreted_batch_ndims + rank(distribution.event_shape)`.
@@ -239,7 +240,7 @@ class IndependentDistributionTest(tf.test.TestCase):
     def expected_log_prob(x, logits):
       return (x * logits - np.log1p(np.exp(logits))).sum(-1).sum(-1).sum(-1)
 
-    logits_ph = tf.compat.v1.placeholder_with_default(
+    logits_ph = tf1.placeholder_with_default(
         input=logits, shape=logits.shape if static_shape else None)
     ind = tfd.Independent(
         distribution=tfd.Bernoulli(logits=logits_ph))

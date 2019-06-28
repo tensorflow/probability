@@ -20,7 +20,8 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -99,17 +100,17 @@ class ParetoTest(test_case.TestCase):
     pareto = tfd.Pareto(concentration, scale, validate_args=True)
 
     with self.assertRaisesOpError("not in the support"):
-      x = tf.compat.v1.placeholder_with_default(input=[2., 3., 3.], shape=[3])
+      x = tf1.placeholder_with_default(input=[2., 3., 3.], shape=[3])
       log_prob = pareto.log_prob(x)
       self.evaluate(log_prob)
 
     with self.assertRaisesOpError("not in the support"):
-      x = tf.compat.v1.placeholder_with_default(input=[2., 2., 5.], shape=[3])
+      x = tf1.placeholder_with_default(input=[2., 2., 5.], shape=[3])
       log_prob = pareto.log_prob(x)
       self.evaluate(log_prob)
 
     with self.assertRaisesOpError("not in the support"):
-      x = tf.compat.v1.placeholder_with_default(input=[1., 3., 5.], shape=[3])
+      x = tf1.placeholder_with_default(input=[1., 3., 5.], shape=[3])
       log_prob = pareto.log_prob(x)
       self.evaluate(log_prob)
 

@@ -31,7 +31,8 @@ from hypothesis import strategies as hps
 from hypothesis.extra import numpy as hpnp
 import numpy as np
 import six
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
@@ -371,7 +372,7 @@ def distributions(draw,
 
 
 def maybe_seed(seed):
-  return tf.compat.v1.set_random_seed(seed) if tf.executing_eagerly() else seed
+  return tf1.set_random_seed(seed) if tf.executing_eagerly() else seed
 
 
 def get_event_dim(dist):
@@ -394,7 +395,7 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
   def testDistribution(self, dist_name, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
       return
-    tf.compat.v1.set_random_seed(
+    tf1.set_random_seed(
         data.draw(
             hpnp.arrays(dtype=np.int64, shape=[]).filter(lambda x: x != 0)))
     dist, batch_shape = data.draw(
@@ -583,7 +584,7 @@ class DistributionSlicingTest(tf.test.TestCase):
         possibly_nonpacket_lp, possibly_nonpacket_sliced_lp, rtol=rtol)
 
   def _run_test(self, data):
-    tf.compat.v1.set_random_seed(
+    tf1.set_random_seed(
         data.draw(
             hpnp.arrays(dtype=np.int64, shape=[]).filter(lambda x: x != 0)))
     dist, batch_shape = data.draw(distributions())

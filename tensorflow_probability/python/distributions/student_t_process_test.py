@@ -19,7 +19,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
@@ -45,11 +46,10 @@ class _StudentTProcessTest(object):
     batched_index_points = np.stack([index_points]*6)
     # ==> shape = [6, 25, 2]
     if not self.is_static:
-      df = tf.compat.v1.placeholder_with_default(df, shape=None)
-      amplitude = tf.compat.v1.placeholder_with_default(amplitude, shape=None)
-      length_scale = tf.compat.v1.placeholder_with_default(
-          length_scale, shape=None)
-      batched_index_points = tf.compat.v1.placeholder_with_default(
+      df = tf1.placeholder_with_default(df, shape=None)
+      amplitude = tf1.placeholder_with_default(amplitude, shape=None)
+      length_scale = tf1.placeholder_with_default(length_scale, shape=None)
+      batched_index_points = tf1.placeholder_with_default(
           batched_index_points, shape=None)
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
     tp = tfd.StudentTProcess(
@@ -132,10 +132,8 @@ class _StudentTProcessTest(object):
 
     # ==> shape = [6, 25, 2]
     if not self.is_static:
-      index_points_1 = tf.compat.v1.placeholder_with_default(
-          index_points_1, shape=None)
-      index_points_2 = tf.compat.v1.placeholder_with_default(
-          index_points_2, shape=None)
+      index_points_1 = tf1.placeholder_with_default(index_points_1, shape=None)
+      index_points_2 = tf1.placeholder_with_default(index_points_2, shape=None)
 
     mean_fn = lambda x: np.array([0.], np.float32)
     kernel_1 = psd_kernels.ExponentiatedQuadratic()
