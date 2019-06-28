@@ -28,6 +28,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -35,7 +36,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class StudentTTest(tf.test.TestCase):
+class StudentTTest(test_case.TestCase):
 
   def testStudentPDFAndLogPDF(self):
     batch_size = 6
@@ -161,11 +162,11 @@ class StudentTTest(tf.test.TestCase):
     seed = tfp_test_util.test_seed()
 
     tf1.set_random_seed(seed)
-    student = tfd.StudentT(df=df, loc=mu, scale=sigma, name="student_t1")
+    student = tfd.StudentT(df=df, loc=mu, scale=sigma, name='student_t1')
     samples1 = self.evaluate(student.sample(n, seed=seed))
 
     tf1.set_random_seed(seed)
-    student2 = tfd.StudentT(df=df, loc=mu, scale=sigma, name="student_t2")
+    student2 = tfd.StudentT(df=df, loc=mu, scale=sigma, name='student_t2')
     samples2 = self.evaluate(student2.sample(n, seed=seed))
 
     self.assertAllClose(samples1, samples2)
@@ -299,7 +300,7 @@ class StudentTTest(tf.test.TestCase):
     mu = [1., 3.3, 4.4]
     student = tfd.StudentT(
         df=[0.5, 5., 7.], loc=mu, scale=[3., 2., 1.], allow_nan_stats=False)
-    with self.assertRaisesOpError("x < y"):
+    with self.assertRaisesOpError('x < y'):
       self.evaluate(student.mean())
 
   def testMeanAllowNanStatsIsTrueReturnsNaNForUndefinedBatchMembers(self):
@@ -346,13 +347,13 @@ class StudentTTest(tf.test.TestCase):
   def testVarianceAllowNanStatsFalseRaisesForUndefinedBatchMembers(self):
     # df <= 1 ==> variance not defined
     student = tfd.StudentT(df=1., loc=0., scale=1., allow_nan_stats=False)
-    with self.assertRaisesOpError("x < y"):
+    with self.assertRaisesOpError('x < y'):
       self.evaluate(student.variance())
 
     # df <= 1 ==> variance not defined
     student = tfd.StudentT(
         df=0.5, loc=0., scale=1., allow_nan_stats=False)
-    with self.assertRaisesOpError("x < y"):
+    with self.assertRaisesOpError('x < y'):
       self.evaluate(student.variance())
 
   def testStd(self):
@@ -448,11 +449,29 @@ class StudentTTest(tf.test.TestCase):
     self.assertNear(1., total, err=err)
 
   def testNegativeDofFails(self):
-    with self.assertRaisesOpError(r"Condition x > 0 did not hold"):
+    with self.assertRaisesOpError(r'Condition x > 0 did not hold'):
       student = tfd.StudentT(
-          df=[2, -5.], loc=0., scale=1., validate_args=True, name="S")
+          df=[2, -5.], loc=0., scale=1., validate_args=True, name='S')
       self.evaluate(student.mean())
 
+  def testGradientThroughParams(self):
+    df = tf.Variable([[17.3], [14.]])
+    loc = tf.Variable([[-5., 0., 5.]])
+    scale = tf.Variable(2.)
+    d = tfd.StudentT(df=df, loc=loc, scale=scale, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob(np.ones((2, 3)))
+    grad = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(grad, 3)
+    self.assertAllNotNone(grad)
 
-if __name__ == "__main__":
+  def testAssertParamsAreFloats(self):
+    df = tf.Variable(14, dtype=tf.int32)
+    loc = tf.Variable(0, dtype=tf.int32)
+    scale = tf.Variable(1, dtype=tf.int32)
+    with self.assertRaisesRegexp(ValueError, 'Expected floating point'):
+      tfd.StudentT(df=df, loc=loc, scale=scale)
+
+
+if __name__ == '__main__':
   tf.test.main()

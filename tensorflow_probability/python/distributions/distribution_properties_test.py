@@ -61,6 +61,7 @@ TF2_FRIENDLY_DISTS = (
     'Normal',
     'Multinomial',
     'ProbitBernoulli',
+    'StudentT'
 )
 
 NO_LOG_PROB_PARAM_GRADS = ('Deterministic',)
