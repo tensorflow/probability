@@ -424,6 +424,11 @@ class RelaxedOneHotCategorical(
     return self.distribution.temperature
 
   @property
+  def event_size(self):
+    """Scalar `int32` tensor: the number of classes."""
+    return self.distribution.event_size
+
+  @property
   def probs(self):
     """Input argument `probs`."""
     return self.distribution.probs
