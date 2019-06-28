@@ -152,8 +152,7 @@ class _StsTestHarness(object):
     self.assertEqual(ssm.initial_state_prior, initial_state_prior)
 
     # Verify the model has the correct latent size.
-    # TODO(b/134505992): Re-enable check once shape is based on @property.
-    # self.assertEqual(ssm.latent_size, model.latent_size)
+    self.assertEqual(ssm.latent_size, model.latent_size)
 
   def test_log_joint(self):
     model = self._build_sts()

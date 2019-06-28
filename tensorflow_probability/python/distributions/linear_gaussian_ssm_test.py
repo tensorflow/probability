@@ -455,9 +455,7 @@ class BatchTest(tf.test.TestCase):
                                      observation_noise_batch_shape=batch_shape)
 
     # check that we get the basic shapes right
-    # TODO(b/134505992): Re-enable this assertion ocne static shape is correctly
-    # read from shape properties.
-    # self.assertEqual(model.latent_size, latent_size)
+    self.assertEqual(model.latent_size, latent_size)
     self.assertEqual(model.observation_size, observation_size)
     self._sanity_check_shapes(model, batch_shape, event_shape,
                               num_timesteps, latent_size)
