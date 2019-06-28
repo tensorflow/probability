@@ -866,7 +866,7 @@ def _make_expand_x_fn_for_non_batch_interpolation(y_ref, axis):
           y_ref_shape_right,
       ),
                             axis=0)
-      if x.dtype.is_bool:
+      if dtype_util.is_bool(x.dtype):
         x_expanded = x_expanded | tf.cast(tf.zeros(out_shape), tf.bool)
       else:
         x_expanded += tf.zeros(out_shape, dtype=x.dtype)
@@ -903,7 +903,7 @@ def _make_expand_x_fn_for_batch_interpolation(y_ref, axis):
       broadcast_shape = tf.concat(
           (broadcast_shape_left, tf.shape(x)[-1:], y_ref_shape_right),
           axis=0)
-      if x.dtype.is_bool:
+      if dtype_util.is_bool(x.dtype):
         x_expanded = x_expanded | tf.cast(tf.zeros(broadcast_shape), tf.bool)
       else:
         x_expanded += tf.zeros(broadcast_shape, dtype=x.dtype)
@@ -936,7 +936,8 @@ def _batch_gather_with_broadcast(params, indices, axis):
   indices += tf.zeros(
       tf.concat((leading_bcast_shape, tf.shape(indices)[-1:]), axis=0),
       dtype=indices.dtype)
-  return tf.gather(params, indices, batch_dims=indices.shape.ndims-1)
+  return tf.gather(
+      params, indices, batch_dims=tensorshape_util.rank(indices.shape) - 1)
 
 
 def _binary_count(n):

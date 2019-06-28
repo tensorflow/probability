@@ -78,7 +78,7 @@ def matrix_rank(a, tol=None, validate_args=False, name=None):
         m = np.max(a.shape[-2:].as_list())
       else:
         m = tf.reduce_max(tf.shape(a)[-2:])
-      eps = np.finfo(a.dtype.as_numpy_dtype).eps
+      eps = np.finfo(dtype_util.as_numpy_dtype(a.dtype)).eps
       tol = (
           eps * tf.cast(m, a.dtype) * tf.reduce_max(s, axis=-1, keepdims=True))
     return tf.reduce_sum(tf.cast(s > tol, tf.int32), axis=-1)
@@ -399,7 +399,7 @@ def pinv(a, rcond=None, validate_args=False, name=None):
       with tf.control_dependencies(assertions):
         a = tf.identity(a)
 
-    dtype = a.dtype.as_numpy_dtype
+    dtype = dtype_util.as_numpy_dtype(a.dtype)
 
     if rcond is None:
       def get_dim_size(dim):
@@ -441,7 +441,7 @@ def pinv(a, rcond=None, validate_args=False, name=None):
         left_singular_vectors,
         adjoint_b=True)
 
-    if a.shape.ndims is not None:
+    if tensorshape_util.rank(a.shape) is not None:
       a_pinv.set_shape(a.shape[:-2].concatenate([a.shape[-1], a.shape[-2]]))
 
     return a_pinv
@@ -505,7 +505,8 @@ def lu_solve(lower_upper, perm, rhs,
         perm = tf.identity(perm)
         rhs = tf.identity(rhs)
 
-    if rhs.shape.ndims == 2 and perm.shape.ndims == 1:
+    if (tensorshape_util.rank(rhs.shape) == 2 and
+        tensorshape_util.rank(perm.shape) == 1):
       # Both rhs and perm have scalar batch_shape.
       permuted_rhs = tf.gather(rhs, perm, axis=-2)
     else:
@@ -659,7 +660,8 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
     upper = tf.linalg.band_part(lower_upper, num_lower=0, num_upper=-1)
     x = tf.matmul(lower, upper)
 
-    if lower_upper.shape.ndims is None or lower_upper.shape.ndims != 2:
+    if (tensorshape_util.rank(lower_upper.shape) is None or
+        tensorshape_util.rank(lower_upper.shape) != 2):
       # We either don't know the batch rank or there are >0 batch dims.
       batch_size = tf.reduce_prod(shape[:-2])
       d = shape[-1]
@@ -683,16 +685,18 @@ def _lu_reconstruct_assertions(lower_upper, perm, validate_args):
   assertions = []
 
   message = 'Input `lower_upper` must have at least 2 dimensions.'
-  if lower_upper.shape.ndims is not None:
-    if lower_upper.shape.ndims < 2:
+  if tensorshape_util.rank(lower_upper.shape) is not None:
+    if tensorshape_util.rank(lower_upper.shape) < 2:
       raise ValueError(message)
   elif validate_args:
     assertions.append(
         assert_util.assert_rank_at_least(lower_upper, rank=2, message=message))
 
   message = '`rank(lower_upper)` must equal `rank(perm) + 1`'
-  if lower_upper.shape.ndims is not None and perm.shape.ndims is not None:
-    if lower_upper.shape.ndims != perm.shape.ndims + 1:
+  if (tensorshape_util.rank(lower_upper.shape) is not None and
+      tensorshape_util.rank(perm.shape) is not None):
+    if (tensorshape_util.rank(lower_upper.shape) !=
+        tensorshape_util.rank(perm.shape) + 1):
       raise ValueError(message)
   elif validate_args:
     assertions.append(
@@ -1047,7 +1051,9 @@ def _get_shape(x, out_type=tf.int32):
   # Return the shape of a Tensor or a SparseTensor as an np.array if its shape
   # is known statically. Otherwise return a Tensor representing the shape.
   if tensorshape_util.is_fully_defined(x.shape):
-    return np.array(x.shape.as_list(), dtype=out_type.as_numpy_dtype)
+    return np.array(
+        tensorshape_util.as_list(x.shape),
+        dtype=dtype_util.as_numpy_dtype(out_type))
   return tf.shape(x, out_type=out_type)
 
 
@@ -1117,11 +1123,11 @@ def _maybe_validate_matrix(a, validate_args):
   assertions = []
   if not dtype_util.is_floating(a.dtype):
     raise TypeError('Input `a` must have `float`-like `dtype` '
-                    '(saw {}).'.format(a.dtype.name))
-  if a.shape.ndims is not None:
-    if a.shape.ndims < 2:
+                    '(saw {}).'.format(dtype_util.name(a.dtype)))
+  if tensorshape_util.rank(a.shape) is not None:
+    if tensorshape_util.rank(a.shape) < 2:
       raise ValueError('Input `a` must have at least 2 dimensions '
-                       '(saw: {}).'.format(a.shape.ndims))
+                       '(saw: {}).'.format(tensorshape_util.rank(a.shape)))
   elif validate_args:
     assertions.append(assert_util.assert_rank_at_least(
         a, rank=2, message='Input `a` must have at least 2 dimensions.'))

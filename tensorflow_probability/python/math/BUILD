@@ -53,8 +53,9 @@ py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
-        # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -104,7 +105,6 @@ py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
-        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -141,6 +141,7 @@ py_test(
     srcs = ["interpolation_test.py"],
     deps = [
         # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -168,8 +169,9 @@ py_test(
     srcs = ["linalg_test.py"],
     shard_count = 5,
     deps = [
+        # absl/testing:parameterized dep,
+        # hypothesis dep,
         # numpy dep,
-        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
@@ -197,6 +199,7 @@ py_test(
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
+        # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
     ],
@@ -209,7 +212,6 @@ py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
-        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -222,6 +224,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -233,7 +236,6 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":gradient",
-        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -257,6 +259,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -278,8 +281,8 @@ py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
-        # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 

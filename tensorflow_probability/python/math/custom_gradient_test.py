@@ -21,7 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
@@ -49,9 +49,9 @@ class CustomGradientTest(tf.test.TestCase):
     self.assertAllClose(g(x), gx)
 
   def test_works_correctly_vector_of_vars(self):
-    x = tf.compat.v2.Variable(2, name='x', dtype=tf.float32)
-    y = tf.compat.v2.Variable(3, name='y', dtype=tf.float32)
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    x = tf.Variable(2, name='x', dtype=tf.float32)
+    y = tf.Variable(3, name='y', dtype=tf.float32)
+    self.evaluate([x.initializer, y.initializer])
 
     f = lambda z: z[0] * z[1]
     g = lambda z: z[0]**2 * z[1]**2 / 2
@@ -69,9 +69,9 @@ class CustomGradientTest(tf.test.TestCase):
   def test_works_correctly_side_vars(self):
     x_ = np.float32(2.1)  # Adding extra tenth to force imprecision.
     y_ = np.float32(3.1)
-    x = tf.compat.v2.Variable(x_, name='x')
-    y = tf.compat.v2.Variable(y_, name='y')
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    x = tf.Variable(x_, name='x')
+    y = tf.Variable(y_, name='y')
+    self.evaluate([x.initializer, y.initializer])
 
     f = lambda x: x * y
     g = lambda z: tf.square(x) * y
@@ -89,9 +89,9 @@ class CustomGradientTest(tf.test.TestCase):
   def test_works_correctly_fx_gx_manually_stopped(self):
     x_ = np.float32(2.1)  # Adding extra tenth to force imprecision.
     y_ = np.float32(3.1)
-    x = tf.compat.v2.Variable(x_, name='x')
-    y = tf.compat.v2.Variable(y_, name='y')
-    self.evaluate([tf.compat.v1.global_variables_initializer()])
+    x = tf.Variable(x_, name='x')
+    y = tf.Variable(y_, name='y')
+    self.evaluate([x.initializer, y.initializer])
 
     stop = tf.stop_gradient  # For readability.
 

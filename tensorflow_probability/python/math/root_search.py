@@ -20,7 +20,9 @@ from __future__ import print_function
 
 import collections
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     'secant_root',
@@ -187,22 +189,22 @@ def secant_root(objective_fn,
     raise ValueError('stopping_policy_fn must be callable')
 
   position = tf.convert_to_tensor(
-      value=initial_position,
+      initial_position,
       name='position',
   )
   value_at_position = tf.convert_to_tensor(
-      value=value_at_position or objective_fn(position),
+      value_at_position or objective_fn(position),
       name='value_at_position',
-      dtype=position.dtype.base_dtype)
+      dtype=dtype_util.base_dtype(position.dtype))
 
   zero = tf.zeros_like(position)
   position_tolerance = tf.convert_to_tensor(
-      value=position_tolerance, name='position_tolerance', dtype=position.dtype)
+      position_tolerance, name='position_tolerance', dtype=position.dtype)
   value_tolerance = tf.convert_to_tensor(
-      value=value_tolerance, name='value_tolerance', dtype=position.dtype)
+      value_tolerance, name='value_tolerance', dtype=position.dtype)
 
   num_iterations = tf.zeros_like(position, dtype=tf.int32)
-  max_iterations = tf.convert_to_tensor(value=max_iterations, dtype=tf.int32)
+  max_iterations = tf.convert_to_tensor(max_iterations, dtype=tf.int32)
   max_iterations = tf.broadcast_to(
       max_iterations, name='max_iterations', shape=position.shape)
 
@@ -238,7 +240,7 @@ def secant_root(objective_fn,
     """
     del position, value_at_position, num_iterations, step  # Unused
     return ~tf.convert_to_tensor(
-        value=stopping_policy_fn(finished), name='should_stop', dtype=tf.bool)
+        stopping_policy_fn(finished), name='should_stop', dtype=tf.bool)
 
   # For each point in `position`, the search is stopped if either:
   # (1) A root has been found
@@ -269,43 +271,36 @@ def secant_root(objective_fn,
             tf.abs(value_at_position) < value_tolerance)
 
     # Compute the next position and the value at that point.
-    next_position = tf.compat.v1.where(was_finished, position, position + step)
-    value_at_next_position = tf.compat.v1.where(was_finished, value_at_position,
-                                                objective_fn(next_position))
+    next_position = tf.where(was_finished, position, position + step)
+    value_at_next_position = tf.where(was_finished, value_at_position,
+                                      objective_fn(next_position))
 
     # True if the search was already finished, or (2) just became true.
     is_finished = tf.equal(value_at_position, value_at_next_position)
 
     # Use the mid-point between the last two positions if (2) just became true.
-    next_position = tf.compat.v1.where(is_finished & ~was_finished,
-                                       (position + next_position) * 0.5,
-                                       next_position)
+    next_position = tf.where(is_finished & ~was_finished,
+                             (position + next_position) * 0.5, next_position)
 
     # Once finished, stop updating the iteration index and set the step to zero.
-    num_iterations = tf.compat.v1.where(is_finished, num_iterations,
-                                        num_iterations + 1)
-    next_step = tf.compat.v1.where(
+    num_iterations = tf.where(is_finished, num_iterations, num_iterations + 1)
+    next_step = tf.where(
         is_finished, zero, step * value_at_next_position /
         (value_at_position - value_at_next_position))
 
     return (next_position, value_at_next_position, num_iterations, next_step,
             is_finished)
 
-  with tf.compat.v1.name_scope(
-      name, 'secant_root',
-      [position, next_position, value_at_position, max_iterations]):
+  with tf.name_scope(name or 'secant_root'):
 
     assertions = []
     if validate_args:
       assertions += [
           tf.Assert(
-              tf.reduce_all(input_tensor=position_tolerance > zero),
-              [position_tolerance]),
+              tf.reduce_all(position_tolerance > zero), [position_tolerance]),
+          tf.Assert(tf.reduce_all(value_tolerance > zero), [value_tolerance]),
           tf.Assert(
-              tf.reduce_all(input_tensor=value_tolerance > zero),
-              [value_tolerance]),
-          tf.Assert(
-              tf.reduce_all(input_tensor=max_iterations >= num_iterations),
+              tf.reduce_all(max_iterations >= num_iterations),
               [max_iterations]),
       ]
 

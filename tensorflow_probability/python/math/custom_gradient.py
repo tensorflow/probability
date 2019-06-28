@@ -19,8 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     'custom_gradient',
@@ -32,8 +34,7 @@ def is_list_like(x):
 
 
 def identity(x, dtype=None, name=None):
-  return tf.identity(
-      tf.convert_to_tensor(value=x, dtype=dtype, name=name), name=name)
+  return tf.identity(tf.convert_to_tensor(x, dtype=dtype, name=name), name=name)
 
 
 def custom_gradient(fx, gx, x, fx_gx_manually_stopped=False, name=None):
@@ -77,8 +78,8 @@ def custom_gradient(fx, gx, x, fx_gx_manually_stopped=False, name=None):
       return x
     return tf.stop_gradient(x)
 
-  with tf.compat.v1.name_scope(name, 'custom_gradient', [fx, gx, x]):
-    fx = tf.convert_to_tensor(value=fx, name='fx')
+  with tf.name_scope(name or 'custom_gradient'):
+    fx = tf.convert_to_tensor(fx, name='fx')
     # We don't want to bother eagerly computing `gx` since we may not even need
     # it.
     with tf.control_dependencies([fx]):
@@ -97,9 +98,9 @@ def custom_gradient(fx, gx, x, fx_gx_manually_stopped=False, name=None):
       for x_, gx_ in zip(x, gx):
         # Observe: tf.gradients(f(x), x)[i].shape == x[i].shape
         # thus we check that the user is supplying correct shapes.
-        equal_shape = tf.compat.v1.assert_equal(
-            tf.shape(input=x_),
-            tf.shape(input=gx_),
+        equal_shape = assert_util.assert_equal(
+            tf.shape(x_),
+            tf.shape(gx_),
             message='Each `x` must have the same shape as each `gx`.')
         with tf.control_dependencies([equal_shape]):
           # IEEE754 ensures `(x-x)==0.` and that `0.*x==0.` so we make sure to
@@ -110,10 +111,10 @@ def custom_gradient(fx, gx, x, fx_gx_manually_stopped=False, name=None):
           # "Is there a floating point value of x, for which x-x == 0 is false?"
           # http://stackoverflow.com/q/2686644
           zeros_like_x_ = x_ - tf.stop_gradient(x_)
-          override_grad.append(
-              tf.reduce_sum(input_tensor=maybe_stop(gx_) * zeros_like_x_))
+          override_grad.append(tf.reduce_sum(maybe_stop(gx_) * zeros_like_x_))
       override_grad = sum(override_grad)
-      override_grad /= tf.cast(tf.size(input=fx), dtype=fx.dtype.base_dtype)
+      override_grad /= tf.cast(
+          tf.size(fx), dtype=dtype_util.base_dtype(fx.dtype))
 
       # Proof of correctness:
       #

@@ -21,9 +21,11 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -33,12 +35,12 @@ class _RandomRademacher(object):
     shape_ = np.array([2, 3, int(1e3)], np.int32)
     shape = (
         tf.constant(shape_) if self.use_static_shape else
-        tf.compat.v1.placeholder_with_default(shape_, shape=None))
+        tf1.placeholder_with_default(shape_, shape=None))
     x = tfp.math.random_rademacher(shape, self.dtype, seed=42)
     if self.use_static_shape:
       self.assertAllEqual(shape_, x.shape)
     x_ = self.evaluate(x)
-    self.assertEqual(self.dtype, x.dtype.as_numpy_dtype)
+    self.assertEqual(self.dtype, dtype_util.as_numpy_dtype(x.dtype))
     self.assertAllEqual(shape_, x_.shape)
     self.assertAllEqual([-1., 1], np.unique(np.reshape(x_, [-1])))
     self.assertAllClose(
@@ -65,17 +67,17 @@ class _RandomRayleigh(object):
     shape_ = np.array([2, int(1e3)], np.int32)
     shape = (
         tf.constant(shape_) if self.use_static_shape else
-        tf.compat.v1.placeholder_with_default(shape_, shape=None))
+        tf1.placeholder_with_default(shape_, shape=None))
     # This shape will require broadcasting before sampling.
     scale_ = np.linspace(0.1, 0.5, 3 * 2).astype(self.dtype).reshape(3, 2)
     scale = (
         tf.constant(scale_) if self.use_static_shape else
-        tf.compat.v1.placeholder_with_default(scale_, shape=None))
+        tf1.placeholder_with_default(scale_, shape=None))
     x = tfp.math.random_rayleigh(shape,
                                  scale=scale[..., tf.newaxis],
                                  dtype=self.dtype,
                                  seed=42)
-    self.assertEqual(self.dtype, x.dtype.as_numpy_dtype)
+    self.assertEqual(self.dtype, dtype_util.as_numpy_dtype(x.dtype))
     final_shape_ = [3, 2, int(1e3)]
     if self.use_static_shape:
       self.assertAllEqual(final_shape_, x.shape)

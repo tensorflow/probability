@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 
 __all__ = [
@@ -49,12 +49,13 @@ def value_and_gradient(f, xs, use_gradient_tape=False, name=None):
     y: `y = f(*xs)`.
     dydx: Gradient of `y` wrt each of `xs`.
   """
-  with tf.compat.v1.name_scope(name, 'value_and_gradient', [xs]):
+  with tf.name_scope(name or 'value_and_gradient'):
     is_xs_list_like = isinstance(xs, (tuple, list))
     if not is_xs_list_like:
       xs = [xs]
-    xs = [tf.convert_to_tensor(value=x, name='x{}'.format(i))
-          for i, x in enumerate(xs)]
+    xs = [
+        tf.convert_to_tensor(x, name='x{}'.format(i)) for i, x in enumerate(xs)
+    ]
     if tf.executing_eagerly() or use_gradient_tape:
       with tf.GradientTape(watch_accessed_variables=False) as tape:
         for x in xs:

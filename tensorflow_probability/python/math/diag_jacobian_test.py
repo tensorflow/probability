@@ -20,7 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -55,7 +56,7 @@ class JacobianTest(tf.test.TestCase):
     grad_fn = lambda *args: tfp.math.value_and_gradient(target_fn, args)[1]
 
     _, diag_jacobian_shape_passed = tfp.math.diag_jacobian(
-        xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(input=fn_val))
+        xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(fn_val))
     _, diag_jacobian_shape_none = tfp.math.diag_jacobian(
         xs=state, ys=grads, fn=grad_fn)
 
@@ -100,7 +101,7 @@ class JacobianTest(tf.test.TestCase):
     grad_fn = lambda *args: tfp.math.value_and_gradient(target_fn, args)[1]
 
     _, diag_jacobian_shape_passed = tfp.math.diag_jacobian(
-        xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(input=fn_val))
+        xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(fn_val))
     _, diag_jacobian_shape_none = tfp.math.diag_jacobian(
         xs=state, ys=grads, fn=grad_fn)
 
