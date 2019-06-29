@@ -28,8 +28,10 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
-
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     "Beta",
@@ -172,27 +174,18 @@ class Beta(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
-                                      tf.float32)
-      self._concentration1 = self._maybe_assert_valid_concentration(
-          tf.convert_to_tensor(
-              concentration1, name="concentration1", dtype=dtype),
-          validate_args)
-      self._concentration0 = self._maybe_assert_valid_concentration(
-          tf.convert_to_tensor(
-              concentration0, name="concentration0", dtype=dtype),
-          validate_args)
-      self._total_concentration = self._concentration1 + self._concentration0
-    super(Beta, self).__init__(
-        dtype=dtype,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        parameters=parameters,
-        graph_parents=[
-            self._concentration1, self._concentration0,
-            self._total_concentration
-        ],
-        name=name)
+                                      dtype_hint=tf.float32)
+      self._concentration1 = tensor_util.convert_immutable_to_tensor(
+          concentration1, dtype=dtype, name="concentration1")
+      self._concentration0 = tensor_util.convert_immutable_to_tensor(
+          concentration0, dtype=dtype, name="concentration0")
+      super(Beta, self).__init__(
+          dtype=dtype,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
@@ -214,15 +207,26 @@ class Beta(distribution.Distribution):
     return self._concentration0
 
   @property
+  @deprecation.deprecated(
+      "2019-10-01",
+      ("The `total_concentration` property is deprecated; instead use "
+       "`dist.concentration1 + dist.concentration0`."),
+      warn_once=True)
   def total_concentration(self):
     """Sum of concentration parameters."""
-    return self._total_concentration
+    with self._name_and_control_scope("total_concentration"):
+      return self.concentration1 + self.concentration0
 
-  def _batch_shape_tensor(self):
-    return tf.shape(self.total_concentration)
+  def _batch_shape_tensor(self, concentration1=None, concentration0=None):
+    return prefer_static.broadcast_shape(
+        prefer_static.shape(
+            self.concentration1 if concentration1 is None else concentration1),
+        prefer_static.shape(
+            self.concentration0 if concentration0 is None else concentration0))
 
   def _batch_shape(self):
-    return self.total_concentration.shape
+    return tf.broadcast_static_shape(
+        self.concentration1.shape, self.concentration0.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -232,10 +236,11 @@ class Beta(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     seed = seed_stream.SeedStream(seed, "beta")
-    expanded_concentration1 = tf.ones_like(
-        self.total_concentration, dtype=self.dtype) * self.concentration1
-    expanded_concentration0 = tf.ones_like(
-        self.total_concentration, dtype=self.dtype) * self.concentration0
+    concentration1 = tf.convert_to_tensor(self.concentration1)
+    concentration0 = tf.convert_to_tensor(self.concentration0)
+    shape = self._batch_shape_tensor(concentration1, concentration0)
+    expanded_concentration1 = tf.broadcast_to(concentration1, shape)
+    expanded_concentration0 = tf.broadcast_to(concentration0, shape)
     gamma1_sample = tf.random.gamma(
         shape=[n], alpha=expanded_concentration1, dtype=self.dtype, seed=seed())
     gamma2_sample = tf.random.gamma(
@@ -245,7 +250,10 @@ class Beta(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_beta_sample_note)
   def _log_prob(self, x):
-    return self._log_unnormalized_prob(x) - self._log_normalization()
+    concentration0 = tf.convert_to_tensor(self.concentration0)
+    concentration1 = tf.convert_to_tensor(self.concentration1)
+    return (self._log_unnormalized_prob(x, concentration1, concentration0) -
+            self._log_normalization(concentration1, concentration0))
 
   @distribution_util.AppendDocstring(_beta_sample_note)
   def _prob(self, x):
@@ -257,30 +265,42 @@ class Beta(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_beta_sample_note)
   def _cdf(self, x):
-    return tf.math.betainc(self.concentration1, self.concentration0, x)
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
+      concentration1 = tf.convert_to_tensor(self.concentration1)
+      concentration0 = tf.convert_to_tensor(self.concentration0)
+      shape = self._batch_shape_tensor(concentration1, concentration0)
+      concentration1 = tf.broadcast_to(concentration1, shape)
+      concentration0 = tf.broadcast_to(concentration0, shape)
+      return tf.math.betainc(concentration1, concentration0, x)
 
-  def _log_unnormalized_prob(self, x):
-    x = self._maybe_assert_valid_sample(x)
-    return (tf.math.xlogy(self.concentration1 - 1., x) +
-            (self.concentration0 - 1.) * tf.math.log1p(-x))
+  def _log_unnormalized_prob(self, x, concentration1, concentration0):
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
+      return (tf.math.xlogy(concentration1 - 1., x) +
+              (concentration0 - 1.) * tf.math.log1p(-x))
 
-  def _log_normalization(self):
-    return (tf.math.lgamma(self.concentration1) +
-            tf.math.lgamma(self.concentration0) -
-            tf.math.lgamma(self.total_concentration))
+  def _log_normalization(self, concentration1, concentration0):
+    return (tf.math.lgamma(concentration1) + tf.math.lgamma(concentration0) -
+            tf.math.lgamma(concentration1 + concentration0))
 
   def _entropy(self):
-    return (self._log_normalization() -
-            (self.concentration1 - 1.) * tf.math.digamma(self.concentration1) -
-            (self.concentration0 - 1.) * tf.math.digamma(self.concentration0) +
-            ((self.total_concentration - 2.) *
-             tf.math.digamma(self.total_concentration)))
+    concentration1 = tf.convert_to_tensor(self.concentration1)
+    concentration0 = tf.convert_to_tensor(self.concentration0)
+    total_concentration = concentration1 + concentration0
+    return (self._log_normalization(concentration1, concentration0) -
+            (concentration1 - 1.) * tf.math.digamma(concentration1) -
+            (concentration0 - 1.) * tf.math.digamma(concentration0) +
+            (total_concentration - 2.) * tf.math.digamma(total_concentration))
 
   def _mean(self):
-    return self._concentration1 / self._total_concentration
+    concentration1 = tf.convert_to_tensor(self.concentration1)
+    return concentration1 / (concentration1 + self.concentration0)
 
   def _variance(self):
-    return self._mean() * (1. - self._mean()) / (1. + self.total_concentration)
+    concentration1 = tf.convert_to_tensor(self.concentration1)
+    concentration0 = tf.convert_to_tensor(self.concentration0)
+    total_concentration = concentration1 + concentration0
+    return (concentration1 * concentration0 /
+            ((total_concentration)**2 * (total_concentration + 1.)))
 
   @distribution_util.AppendDocstring(
       """Note: The mode is undefined when `concentration1 <= 1` or
@@ -288,40 +308,42 @@ class Beta(distribution.Distribution):
       is used for undefined modes. If `self.allow_nan_stats` is `False` an
       exception is raised when one or more modes are undefined.""")
   def _mode(self):
-    mode = (self.concentration1 - 1.) / (self.total_concentration - 2.)
-    if self.allow_nan_stats:
-      return tf.where(
-          (self.concentration1 > 1.) & (self.concentration0 > 1.),
-          mode,
-          dtype_util.as_numpy_dtype(self.dtype)(np.nan))
-    return distribution_util.with_dependencies([
+    concentration1 = tf.convert_to_tensor(self.concentration1)
+    concentration0 = tf.convert_to_tensor(self.concentration0)
+    mode = (concentration1 - 1.) / (concentration1 + concentration0 - 2.)
+    with tf.control_dependencies([] if self.allow_nan_stats else [  # pylint: disable=g-long-ternary
         assert_util.assert_less(
             tf.ones([], dtype=self.dtype),
-            self.concentration1,
+            concentration1,
             message="Mode undefined for concentration1 <= 1."),
         assert_util.assert_less(
             tf.ones([], dtype=self.dtype),
-            self.concentration0,
+            concentration0,
             message="Mode undefined for concentration0 <= 1.")
-    ], mode)
-
-  def _maybe_assert_valid_concentration(self, concentration, validate_args):
-    """Checks the validity of a concentration parameter."""
-    if not validate_args:
-      return concentration
-    return distribution_util.with_dependencies([
-        assert_util.assert_positive(
-            concentration, message="Concentration parameter must be positive."),
-    ], concentration)
+    ]):
+      return tf.where(
+          (concentration1 > 1.) & (concentration0 > 1.),
+          mode,
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan))
 
   def _maybe_assert_valid_sample(self, x):
     """Checks the validity of a sample."""
     if not self.validate_args:
-      return x
-    return distribution_util.with_dependencies([
-        assert_util.assert_positive(x, message="sample must be positive"),
-        assert_util.assert_less(x, 1., message="sample must be less than `1`."),
-    ], x)
+      return []
+    return [
+        assert_util.assert_positive(x, message="Sample must be positive."),
+        assert_util.assert_less(x, 1., message="Sample must be less than `1`.")]
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    for concentration in [self.concentration0, self.concentration1]:
+      if is_init != tensor_util.is_mutable(concentration):
+        assertions.append(assert_util.assert_positive(
+            concentration,
+            message="Concentration parameter must be positive."))
+    return assertions
 
 
 @kullback_leibler.RegisterKL(Beta, Beta)
@@ -337,14 +359,23 @@ def _kl_beta_beta(d1, d2, name=None):
   Returns:
     Batchwise KL(d1 || d2)
   """
-  def delta(fn, is_property=True):
-    fn1 = getattr(d1, fn)
-    fn2 = getattr(d2, fn)
-    return (fn2 - fn1) if is_property else (fn2() - fn1())
-
   with tf.name_scope(name or "kl_beta_beta"):
-    return (delta("_log_normalization", is_property=False) -
-            tf.math.digamma(d1.concentration1) * delta("concentration1") -
-            tf.math.digamma(d1.concentration0) * delta("concentration0") +
-            (tf.math.digamma(d1.total_concentration) *
-             delta("total_concentration")))
+    d1_concentration1 = tf.convert_to_tensor(d1.concentration1)
+    d1_concentration0 = tf.convert_to_tensor(d1.concentration0)
+    d2_concentration1 = tf.convert_to_tensor(d2.concentration1)
+    d2_concentration0 = tf.convert_to_tensor(d2.concentration0)
+    d1_total_concentration = d1_concentration1 + d1_concentration0
+    d2_total_concentration = d2_concentration1 + d2_concentration0
+
+    d1_log_normalization = d1._log_normalization(  # pylint: disable=protected-access
+        d1_concentration1, d1_concentration0)
+    d2_log_normalization = d2._log_normalization(  # pylint: disable=protected-access
+        d2_concentration1, d2_concentration0)
+    return ((d2_log_normalization - d1_log_normalization) -
+            (tf.math.digamma(d1_concentration1) *
+             (d2_concentration1 - d1_concentration1)) -
+            (tf.math.digamma(d1_concentration0) *
+             (d2_concentration0 - d1_concentration0)) +
+            (tf.math.digamma(d1_total_concentration) *
+             (d2_total_concentration - d1_total_concentration)))
+

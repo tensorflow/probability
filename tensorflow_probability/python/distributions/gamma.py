@@ -208,9 +208,10 @@ class Gamma(distribution.Distribution):
         dtype=self.dtype,
         seed=seed)
 
-  def _log_prob(self, x):
-    concentration = tf.convert_to_tensor(self.concentration)
-    rate = tf.convert_to_tensor(self.rate)
+  def _log_prob(self, x, concentration=None, rate=None):
+    concentration = tf.convert_to_tensor(
+        self.concentration if concentration is None else concentration)
+    rate = tf.convert_to_tensor(self.rate if rate is None else rate)
     with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
       log_unnormalized_prob = tf.math.xlogy(concentration - 1., x) - rate * x
       log_normalization = (tf.math.lgamma(concentration) -

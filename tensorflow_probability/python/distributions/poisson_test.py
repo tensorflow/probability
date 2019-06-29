@@ -52,9 +52,9 @@ class PoissonTest(test_case.TestCase):
   def testInvalidLam(self):
     invalid_lams = [-.01, 0., -2.]
     for lam in invalid_lams:
-      with self.assertRaisesOpError("Condition x > 0"):
+      with self.assertRaisesOpError("Argument `rate` must be positive."):
         poisson = self._make_poisson(rate=lam, validate_args=True)
-        self.evaluate(poisson.rate)
+        self.evaluate(poisson.rate_parameter())
 
   def testPoissonLogPmfDiscreteMatchesScipy(self):
     batch_size = 12
@@ -299,6 +299,31 @@ class PoissonTest(test_case.TestCase):
     self.assertAllClose(
         sample_values.var(axis=0), stats.poisson.var(lam_v), rtol=.03, atol=0)
 
+  def testGradientThroughRate(self):
+    rate = tf.Variable(3.)
+    dist = self._make_poisson(rate=rate)
+    with tf.GradientTape() as tape:
+      loss = -dist.log_prob([1., 2., 4.])
+    grad = tape.gradient(loss, dist.trainable_variables)
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
+
+  def testAssertsPositiveRate(self):
+    rate = tf.Variable([1., 2., -3.])
+    self.evaluate(rate.initializer)
+    with self.assertRaisesOpError("Argument `rate` must be positive."):
+      dist = self._make_poisson(rate=rate, validate_args=True)
+      self.evaluate(dist.sample())
+
+  def testAssertsPositiveRateAfterMutation(self):
+    rate = tf.Variable([1., 2., 3.])
+    self.evaluate(rate.initializer)
+    dist = self._make_poisson(rate=rate, validate_args=True)
+    self.evaluate(dist.mean())
+    with self.assertRaisesOpError("Argument `rate` must be positive."):
+      with tf.control_dependencies([rate.assign([1., 2., -3.])]):
+        self.evaluate(dist.sample())
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class PoissonLogRateTest(PoissonTest):
@@ -312,11 +337,27 @@ class PoissonLogRateTest(PoissonTest):
         validate_args=validate_args,
         interpolate_nondiscrete=interpolate_nondiscrete)
 
+  # No need to worry about the non-negativity of `rate` when using the
+  # `log_rate` parameterization.
   def testInvalidLam(self):
-    # No need to worry about the non-negativity of `rate` when using the
-    # `log_rate` parameterization.
     pass
 
+  def testAssertsPositiveRate(self):
+    pass
+
+  def testAssertsPositiveRateAfterMutation(self):
+    pass
+
+  # The gradient is not tracked through tf.math.log(rate) in _make_poisson(),
+  # so log_rate needs to be defined as a Variable and passed directly.
+  def testGradientThroughRate(self):
+    log_rate = tf.Variable(3.)
+    dist = tfd.Poisson(log_rate=log_rate)
+    with tf.GradientTape() as tape:
+      loss = -dist.log_prob([1., 2., 4.])
+    grad = tape.gradient(loss, dist.trainable_variables)
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
 
 if __name__ == "__main__":
   tf.test.main()

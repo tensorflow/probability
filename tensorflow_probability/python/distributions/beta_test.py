@@ -26,6 +26,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -33,7 +34,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BetaTest(tf.test.TestCase):
+class BetaTest(test_case.TestCase):
 
   def testSimpleShapes(self):
     a = np.random.rand(3)
@@ -83,13 +84,13 @@ class BetaTest(tf.test.TestCase):
     self.evaluate(dist.prob([.1, .3, .6]))
     self.evaluate(dist.prob([.2, .3, .5]))
     # Either condition can trigger.
-    with self.assertRaisesOpError("sample must be positive"):
+    with self.assertRaisesOpError("Sample must be positive."):
       self.evaluate(dist.prob([-1., 0.1, 0.5]))
-    with self.assertRaisesOpError("sample must be positive"):
+    with self.assertRaisesOpError("Sample must be positive."):
       self.evaluate(dist.prob([0., 0.1, 0.5]))
-    with self.assertRaisesOpError("sample must be less than `1`"):
+    with self.assertRaisesOpError("Sample must be less than `1`."):
       self.evaluate(dist.prob([.1, .2, 1.2]))
-    with self.assertRaisesOpError("sample must be less than `1`"):
+    with self.assertRaisesOpError("Sample must be less than `1`."):
       self.evaluate(dist.prob([.1, .2, 1.0]))
 
   def testPdfTwoBatches(self):
@@ -330,6 +331,69 @@ class BetaTest(tf.test.TestCase):
       kl_same = self.evaluate(tfd.kl_divergence(d1, d1))
       self.assertAllClose(kl_same, np.zeros_like(kl_expected))
 
+  def testBetaMeanAfterMutation(self):
+    concentration1 = tf.Variable(2.)
+    concentration0 = tf.Variable(3.)
+    self.evaluate(concentration1.initializer)
+    self.evaluate(concentration0.initializer)
+    dist = tfd.Beta(
+        concentration1=concentration1, concentration0=concentration0)
+    with tf.control_dependencies([concentration0.assign(6.)]):
+      mean = self.evaluate(dist.mean())
+      self.assertEqual(mean, 0.25)
+
+  def testGradientThroughConcentration1(self):
+    concentration1 = tf.Variable(3.)
+    d = tfd.Beta(concentration1=concentration1, concentration0=5.)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([1., 2., 4.])
+    grad = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
+
+  def testAssertsPositiveConcentration1(self):
+    concentration1 = tf.Variable([1., 2., -3.])
+    self.evaluate(concentration1.initializer)
+    with self.assertRaisesOpError("Concentration parameter must be positive."):
+      d = tfd.Beta(
+          concentration1=concentration1, concentration0=[5.],
+          validate_args=True)
+      self.evaluate(d.sample())
+
+  def testAssertsPositiveConcentration1AfterMutation(self):
+    concentration1 = tf.Variable([1., 2., 3.])
+    self.evaluate(concentration1.initializer)
+    d = tfd.Beta(concentration1=concentration1, concentration0=[5.],
+                 validate_args=True)
+    with self.assertRaisesOpError("Concentration parameter must be positive."):
+      with tf.control_dependencies([concentration1.assign([1., 2., -3.])]):
+        self.evaluate(d.sample())
+
+  def testGradientThroughConcentration0(self):
+    concentration0 = tf.Variable(3.)
+    d = tfd.Beta(concentration0=concentration0, concentration1=5.)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([1., 2., 4.])
+    grad = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
+
+  def testAssertsPositiveConcentration0(self):
+    concentration0 = tf.Variable([1., 2., -3.])
+    self.evaluate(concentration0.initializer)
+    with self.assertRaisesOpError("Concentration parameter must be positive."):
+      d = tfd.Beta(concentration0=concentration0, concentration1=[5.],
+                   validate_args=True)
+      self.evaluate(d.sample())
+
+  def testAssertsPositiveConcentration0AfterMutation(self):
+    concentration0 = tf.Variable([1., 2., 3.])
+    self.evaluate(concentration0.initializer)
+    d = tfd.Beta(concentration0=concentration0, concentration1=[5.],
+                 validate_args=True)
+    with self.assertRaisesOpError("Concentration parameter must be positive."):
+      with tf.control_dependencies([concentration0.assign([1., 2., -3.])]):
+        self.evaluate(d.sample())
 
 if __name__ == "__main__":
   tf.test.main()

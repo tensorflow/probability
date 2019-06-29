@@ -50,9 +50,11 @@ FLAGS = flags.FLAGS
 
 TF2_FRIENDLY_DISTS = (
     'Bernoulli',
+    'Beta',
     'Categorical',
     'Deterministic',
     'Dirichlet',
+    'Exponential',
     'Gamma',
     'HalfNormal',
     'Laplace',
@@ -60,6 +62,7 @@ TF2_FRIENDLY_DISTS = (
     'Logistic',
     'Normal',
     'Multinomial',
+    'Poisson',
     'ProbitBernoulli',
     'StudentT'
 )
@@ -713,6 +716,8 @@ CONSTRAINTS = {
         tf.sigmoid,
     'RelaxedBernoulli.probs':
         tf.sigmoid,
+    'log_rate':
+        lambda x: tf.maximum(x, -16.),
     'mixing_concentration':
         tfp_hps.softplus_plus_eps(),
     'mixing_rate':

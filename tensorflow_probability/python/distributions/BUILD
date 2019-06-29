@@ -168,7 +168,9 @@ py_library(
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -349,6 +351,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -903,6 +906,7 @@ py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1332,6 +1336,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1516,6 +1521,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -2021,7 +2027,7 @@ py_test(
 
 py_test(
     name = "poisson_test",
-    size = "small",
+    size = "medium",
     srcs = ["poisson_test.py"],
     deps = [
         # numpy dep,
@@ -2389,7 +2395,7 @@ py_test(
     srcs = ["distribution_properties_test.py"],
     args = ["--tf_mode=graph"],
     main = "distribution_properties_test.py",
-    shard_count = 3,
+    shard_count = 5,
     tags = ["hypothesis"],
     deps = [":distribution_properties_testlib"],
 )

@@ -28,13 +28,14 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import exponential as exponential_lib
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ExponentialTest(tf.test.TestCase):
+class ExponentialTest(test_case.TestCase):
 
   def testExponentialLogPDF(self):
     batch_size = 6
@@ -171,8 +172,7 @@ class ExponentialTest(tf.test.TestCase):
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(4e5), seed=tfp_test_util.test_seed())
-    kl_sample = tf.reduce_mean(
-        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
     self.assertAllClose(true_kl, kl_, atol=0., rtol=1e-12)
@@ -182,6 +182,30 @@ class ExponentialTest(tf.test.TestCase):
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
+  def testGradientThroughRate(self):
+    rate = tf.Variable(3.)
+    d = tfd.Exponential(rate=rate)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([1., 2., 4.])
+    grad = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
+
+  def testAssertsPositiveRate(self):
+    rate = tf.Variable([1., 2., -3.])
+    self.evaluate(rate.initializer)
+    with self.assertRaisesOpError("Argument `rate` must be positive."):
+      d = tfd.Exponential(rate=rate, validate_args=True)
+      self.evaluate(d.sample())
+
+  def testAssertsPositiveRateAfterMutation(self):
+    rate = tf.Variable([1., 2., 3.])
+    self.evaluate(rate.initializer)
+    d = tfd.Exponential(rate=rate, validate_args=True)
+    self.evaluate(d.mean())
+    with self.assertRaisesOpError("Argument `rate` must be positive."):
+      with tf.control_dependencies([rate.assign([1., 2., -3.])]):
+        self.evaluate(d.sample())
 
 if __name__ == "__main__":
   tf.test.main()

@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
@@ -90,18 +91,17 @@ class Exponential(gamma.Gamma):
     # allow_nan_stats=True
     # through to the parent class results in unnecessary asserts.
     with tf.name_scope(name) as name:
-      self._rate = tf.convert_to_tensor(
+      self._rate = tensor_util.convert_immutable_to_tensor(
           rate,
           name="rate",
           dtype=dtype_util.common_dtype([rate], dtype_hint=tf.float32))
-    super(Exponential, self).__init__(
-        concentration=1.,
-        rate=self._rate,
-        allow_nan_stats=allow_nan_stats,
-        validate_args=validate_args,
-        name=name)
-    self._parameters = parameters
-    self._graph_parents += [self._rate]
+      super(Exponential, self).__init__(
+          concentration=1.,
+          rate=self._rate,
+          allow_nan_stats=allow_nan_stats,
+          validate_args=validate_args,
+          name=name)
+      self._parameters = parameters
 
   @staticmethod
   def _param_shapes(sample_shape):
@@ -116,10 +116,12 @@ class Exponential(gamma.Gamma):
     return self._rate
 
   def _log_survival_function(self, value):
-    return self._log_prob(value) - tf.math.log(self._rate)
+    rate = tf.convert_to_tensor(self._rate)
+    return self._log_prob(value, rate=rate) - tf.math.log(rate)
 
   def _sample_n(self, n, seed=None):
-    shape = tf.concat([[n], tf.shape(self._rate)], 0)
+    rate = tf.convert_to_tensor(self.rate)
+    shape = tf.concat([[n], tf.shape(rate)], 0)
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
     # than `[0, 1)`. To do so, we use
     # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny`
@@ -134,4 +136,4 @@ class Exponential(gamma.Gamma):
         maxval=1.,
         seed=seed,
         dtype=self.dtype)
-    return -tf.math.log(sampled) / self._rate
+    return -tf.math.log(sampled) / rate
