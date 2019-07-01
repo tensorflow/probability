@@ -180,12 +180,20 @@ class _StsTestHarness(object):
     # We alternate full_batch_shape, partial_batch_shape in sequence so that in
     # a model with only one parameter, that parameter is constructed with full
     # batch shape.
-    batch_shaped_parameters = [
+    batch_shaped_parameters_ = self.evaluate([
         p.prior.sample(sample_shape=full_batch_shape if (i % 2 == 0)
                        else partial_batch_shape)
-        for (i, p) in enumerate(model.parameters)]
-    lp = self.evaluate(log_joint_fn(*batch_shaped_parameters))
+        for (i, p) in enumerate(model.parameters)])
+
+    lp = self.evaluate(log_joint_fn(*batch_shaped_parameters_))
     self.assertEqual(tf.TensorShape(full_batch_shape), lp.shape)
+
+    # Check that the log joint function also supports parameters passed
+    # as kwargs.
+    parameters_by_name_ = {
+        p.name: v for (p, v) in zip(model.parameters, batch_shaped_parameters_)}
+    lp_with_kwargs = self.evaluate(log_joint_fn(**parameters_by_name_))
+    self.assertAllClose(lp, lp_with_kwargs)
 
   def test_log_joint_with_missing_observations(self):
     # Test that this component accepts MaskedTimeSeries inputs. In most
@@ -345,7 +353,8 @@ class LinearRegressionTest(tf.test.TestCase, _StsTestHarness):
                                           batch_shape=batch_shape)
 
     regression = LinearRegression(
-        design_matrix=tf.random.normal([max_timesteps, num_features]),
+        design_matrix=np.random.randn(
+            max_timesteps, num_features).astype(np.float32),
         weights_prior=prior)
     return Sum(components=[regression],
                observed_time_series=observed_time_series)
@@ -369,7 +378,8 @@ class SparseLinearRegressionTest(tf.test.TestCase, _StsTestHarness):
       batch_shape = tf.shape(input=observed_time_series_tensor)[:-2]
 
     regression = SparseLinearRegression(
-        design_matrix=tf.random.normal([max_timesteps, num_features]),
+        design_matrix=np.random.randn(
+            max_timesteps, num_features).astype(np.float32),
         weights_batch_shape=batch_shape)
     return Sum(components=[regression],
                observed_time_series=observed_time_series)
@@ -383,9 +393,9 @@ class DynamicLinearRegressionTest(tf.test.TestCase, _StsTestHarness):
     num_features = 3
 
     return DynamicLinearRegression(
-        design_matrix=tf.random.normal([max_timesteps, num_features]),
+        design_matrix=np.random.randn(
+            max_timesteps, num_features).astype(np.float32),
         observed_time_series=observed_time_series)
-
 
 if __name__ == '__main__':
   tf.test.main()

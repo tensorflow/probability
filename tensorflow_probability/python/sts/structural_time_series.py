@@ -243,8 +243,15 @@ class StructuralTimeSeries(object):
       num_timesteps = distribution_util.prefer_static_value(
           tf.shape(input=observed_time_series))[-2]
 
-      def log_joint_fn(*param_vals):
+      def log_joint_fn(*param_vals, **param_kwargs):
         """Generated log-density function."""
+
+        if param_kwargs:
+          if param_vals: raise ValueError(
+              'log_joint_fn saw both positional args ({}) and named args ({}). '
+              'This is not supported: you have to choose!'.format(
+                  param_vals, param_kwargs))
+          param_vals = [param_kwargs[p.name] for p in self.parameters]
 
         # Sum the log_prob values from parameter priors.
         param_lp = sum([
