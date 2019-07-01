@@ -346,7 +346,7 @@ class VonMisesFisher(distribution.Distribution):
         self._event_shape_tensor()[0])
     basis = tf.concat([[1.], tf.zeros([event_dim - 1], dtype=self.dtype)],
                       axis=0),
-    u = tf.nn.l2_normalize(basis - self.mean_direction, axis=-1)
+    u = tf.math.l2_normalize(basis - self.mean_direction, axis=-1)
     return samples - 2 * tf.reduce_sum(samples * u, axis=-1, keepdims=True) * u
 
   def _sample_3d(self, n, seed=None):
@@ -441,16 +441,16 @@ class VonMisesFisher(distribution.Distribution):
           assert_util.assert_less_equal(
               samples_dim0,
               dtype_util.as_numpy_dtype(self.dtype)(1.01),
-              data=[tf.nn.top_k(tf.reshape(samples_dim0, [-1]))[0]]),
+              data=[tf.math.top_k(tf.reshape(samples_dim0, [-1]))[0]]),
           assert_util.assert_greater_equal(
               samples_dim0,
               dtype_util.as_numpy_dtype(self.dtype)(-1.01),
-              data=[-tf.nn.top_k(tf.reshape(-samples_dim0, [-1]))[0]])
+              data=[-tf.math.top_k(tf.reshape(-samples_dim0, [-1]))[0]])
       ]):
         samples_dim0 = tf.identity(samples_dim0)
     samples_otherdims_shape = tf.concat([sample_batch_shape, [event_dim - 1]],
                                         axis=0)
-    unit_otherdims = tf.nn.l2_normalize(
+    unit_otherdims = tf.math.l2_normalize(
         tf.random.normal(
             samples_otherdims_shape, seed=seed(), dtype=self.dtype),
         axis=-1)
@@ -458,13 +458,13 @@ class VonMisesFisher(distribution.Distribution):
         samples_dim0,  # we must avoid sqrt(1 - (>1)**2)
         tf.sqrt(tf.maximum(1 - samples_dim0**2, 0.)) * unit_otherdims
     ], axis=-1)
-    samples = tf.nn.l2_normalize(samples, axis=-1)
+    samples = tf.math.l2_normalize(samples, axis=-1)
     if not self._allow_nan_stats:
       samples = tf.debugging.check_numerics(samples, 'samples')
 
     # Runtime assert that samples are unit length.
     if not self._allow_nan_stats:
-      worst, idx = tf.nn.top_k(
+      worst, idx = tf.math.top_k(
           tf.reshape(tf.abs(1 - tf.linalg.norm(samples, axis=-1)), [-1]))
       with tf.control_dependencies([
           assert_util.assert_near(

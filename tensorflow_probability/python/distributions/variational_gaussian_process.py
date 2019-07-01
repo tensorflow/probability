@@ -254,15 +254,15 @@ class VariationalGaussianProcess(
 
   # Create kernel with trainable parameters, and trainable observation noise
   # variance variable. Each of these is constrained to be positive.
-  amplitude = (tf.nn.softplus(tf.Variable(-1., dtype=dtype, name='amplitude')))
+  amplitude = tf.math.softplus(tf.Variable(-1., dtype=dtype, name='amplitude'))
   length_scale = (1e-5 +
-                  tf.nn.softplus(
+                  tf.math.softplus(
                       tf.Variable(-3., dtype=dtype, name='length_scale')))
   kernel = tfk.ExponentiatedQuadratic(
       amplitude=amplitude,
       length_scale=length_scale)
 
-  observation_noise_variance = tf.nn.softplus(
+  observation_noise_variance = tf.math.softplus(
       tf.Variable(0, dtype=dtype, name='observation_noise_variance'))
 
   # Create trainable inducing point locations and variational parameters.
@@ -371,17 +371,17 @@ class VariationalGaussianProcess(
 
   # Create kernel with trainable parameters, and trainable observation noise
   # variance variable. Each of these is constrained to be positive.
-  amplitude = (tf.nn.softplus(
+  amplitude = (tf.math.softplus(
     tf.Variable(.54, dtype=dtype, name='amplitude', use_resource=True)))
   length_scale = (
     1e-5 +
-    tf.nn.softplus(
+    tf.math.softplus(
       tf.Variable(.54, dtype=dtype, name='length_scale', use_resource=True)))
   kernel = tfk.ExponentiatedQuadratic(
       amplitude=amplitude,
       length_scale=length_scale)
 
-  observation_noise_variance = tf.nn.softplus(
+  observation_noise_variance = tf.math.softplus(
       tf.Variable(
         .54, dtype=dtype, name='observation_noise_variance', use_resource=True))
 

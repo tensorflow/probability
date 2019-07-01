@@ -280,7 +280,7 @@ class DirichletTest(test_case.TestCase):
 
   def testDegenerateAlignedStridedSlice(self):
     # Corresponds to the TF fix in tensorflow/tensorflow#d9b3db0
-    d = tfd.Dirichlet(tf.nn.softplus(tf.zeros([2, 2, 2])))
+    d = tfd.Dirichlet(tf.math.softplus(tf.zeros([2, 2, 2])))
     batch_shape = [2, 2]
     self.assertAllEqual(batch_shape, d.batch_shape)
     self.assertAllEqual(np.zeros(batch_shape)[1:0].shape,

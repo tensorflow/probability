@@ -51,7 +51,7 @@ class Tanh(bijector.Bijector):
           name=name)
 
   def _forward(self, x):
-    return tf.nn.tanh(x)
+    return tf.math.tanh(x)
 
   def _inverse(self, y):
     return tf.atanh(y)
@@ -71,4 +71,4 @@ class Tanh(bijector.Bijector):
     #    = 2 * log(2e^-x / (e^-2x + 1))
     #    = 2 * (log(2) - x - log(e^-2x + 1))
     #    = 2 * (log(2) - x - softplus(-2x))
-    return 2. * (np.log(2.) - x - tf.nn.softplus(-2. * x))
+    return 2. * (np.log(2.) - x - tf.math.softplus(-2. * x))

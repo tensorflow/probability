@@ -195,7 +195,7 @@ class QuantizedDistribution(distributions.Distribution):
   loc, unconstrained_scale, logits = tf.split(net,
                                               num_or_size_splits=3,
                                               axis=-1)
-  scale = tf.nn.softplus(unconstrained_scale)
+  scale = tf.math.softplus(unconstrained_scale)
 
   # Form mixture of discretized logistic distributions. Note we shift the
   # logistic distribution by -0.5. This lets the quantization capture "rounding"

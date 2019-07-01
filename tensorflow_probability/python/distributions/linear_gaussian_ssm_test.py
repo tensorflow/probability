@@ -372,17 +372,17 @@ class BatchTest(tf.test.TestCase):
         transition_matrix=tf.random.normal(transition_matrix_batch_shape +
                                            [latent_size, latent_size]),
         transition_noise=tfd.MultivariateNormalDiag(
-            scale_diag=tf.nn.softplus(
+            scale_diag=tf.math.softplus(
                 tf.random.normal(transition_noise_batch_shape +
                                  [latent_size]))),
         observation_matrix=tf.random.normal(observation_matrix_batch_shape +
                                             [observation_size, latent_size]),
         observation_noise=tfd.MultivariateNormalDiag(
-            scale_diag=tf.nn.softplus(
+            scale_diag=tf.math.softplus(
                 tf.random.normal(observation_noise_batch_shape +
                                  [observation_size]))),
         initial_state_prior=tfd.MultivariateNormalDiag(
-            scale_diag=tf.nn.softplus(
+            scale_diag=tf.math.softplus(
                 tf.random.normal(prior_batch_shape + [latent_size]))),
         validate_args=True)
 

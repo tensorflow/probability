@@ -256,7 +256,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         seed=seed)
     gumbel = -tf.math.log(-tf.math.log(uniform))
     noisy_logits = (gumbel + self.logits) / self.temperature[..., tf.newaxis]
-    return tf.nn.log_softmax(noisy_logits)
+    return tf.math.log_softmax(noisy_logits)
 
   def _log_prob(self, x):
     x = self._assert_valid_sample(x)
@@ -272,8 +272,8 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     log_norm_const = (
         tf.math.lgamma(k) + (k - 1.) * tf.math.log(self.temperature))
     # compute the unnormalized density
-    log_softmax = tf.nn.log_softmax(
-        self.logits - x * self.temperature[..., tf.newaxis])
+    log_softmax = tf.math.log_softmax(self.logits -
+                                      x * self.temperature[..., tf.newaxis])
     log_unnorm_prob = tf.reduce_sum(log_softmax, axis=[-1], keepdims=False)
     # combine unnormalized density with normalization constant
     return log_norm_const + log_unnorm_prob
@@ -290,7 +290,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     with self._name_and_control_scope(name or 'probs_parameter'):
       if self.logits is None:
         return tf.identity(self.probs)
-      return tf.nn.softmax(self.logits)
+      return tf.math.softmax(self.logits)
 
   def _assert_valid_sample(self, x):
     if not self.validate_args:

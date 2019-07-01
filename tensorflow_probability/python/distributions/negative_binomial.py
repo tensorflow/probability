@@ -201,4 +201,4 @@ class NegativeBinomial(distribution.Distribution):
     with self._name_and_control_scope(name or 'probs_parameter'):
       if self.logits is None:
         return tf.identity(self.probs)
-      return tf.nn.sigmoid(self.logits)
+      return tf.math.sigmoid(self.logits)

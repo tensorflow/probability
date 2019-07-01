@@ -336,8 +336,7 @@ class JointDistributionSequentialTest(
     avg_doc_length = 5
     u = tfd.Uniform(low=-1., high=1.)
     alpha = tfp.util.DeferredTensor(
-        tf.nn.softplus,
-        tf.Variable(u.sample([num_topics]), name='raw_alpha'))
+        tf.math.softplus, tf.Variable(u.sample([num_topics]), name='raw_alpha'))
     beta = tf.Variable(u.sample([num_topics, num_words]), name='beta')
 
     # LDA Model.

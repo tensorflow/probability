@@ -253,8 +253,9 @@ class Multinomial(distribution.Distribution):
   @distribution_util.AppendDocstring(_multinomial_sample_note)
   def _log_prob(self, counts):
     with tf.control_dependencies(self._maybe_assert_valid_sample(counts)):
-      log_p = (tf.math.log(self._probs) if self._logits is None
-               else tf.nn.log_softmax(self._logits))
+      log_p = (
+          tf.math.log(self._probs)
+          if self._logits is None else tf.math.log_softmax(self._logits))
       k = tf.convert_to_tensor(self.total_count)
       return (
           tf.reduce_sum(counts * log_p, axis=-1) +        # log_unnorm_prob
@@ -296,7 +297,7 @@ class Multinomial(distribution.Distribution):
   def _probs_parameter_no_checks(self):
     if self._logits is None:
       return tf.identity(self._probs)
-    return tf.nn.softmax(self._logits)
+    return tf.math.softmax(self._logits)
 
   @deprecation.deprecated(
       '2019-10-01',

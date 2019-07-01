@@ -108,7 +108,7 @@ class Permute(bijector.Bijector):
           raise ValueError("Permutation over `d` must contain exactly one of "
                            "each of `{0, 1, ..., d}`.")
       elif validate_args:
-        p, _ = tf.nn.top_k(
+        p, _ = tf.math.top_k(
             -permutation, k=tf.shape(permutation)[-1], sorted=True)
         permutation = distribution_util.with_dependencies([
             assert_util.assert_equal(

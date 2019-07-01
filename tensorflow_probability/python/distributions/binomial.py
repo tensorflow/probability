@@ -238,7 +238,8 @@ class Binomial(distribution.Distribution):
 
   def _log_unnormalized_prob(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
-    return counts * self.logits - self.total_count * tf.nn.softplus(self.logits)
+    return counts * self.logits - self.total_count * tf.math.softplus(
+        self.logits)
 
   def _log_normalization(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
@@ -296,7 +297,7 @@ class Binomial(distribution.Distribution):
     with self._name_and_control_scope(name or 'probs_parameter'):
       if self.logits is None:
         return tf.identity(self.probs)
-      return tf.nn.sigmoid(self.logits)
+      return tf.math.sigmoid(self.logits)
 
   def _maybe_assert_valid_total_count(self, total_count, validate_args):
     if not validate_args:

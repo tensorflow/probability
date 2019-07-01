@@ -104,7 +104,7 @@ class SoftmaxCentered(bijector.Bijector):
           None if last_dim is None else last_dim + 1)
       tensorshape_util.set_shape(y, shape)
 
-    return tf.nn.softmax(y)
+    return tf.math.softmax(y)
 
   def _inverse(self, y):
     # To derive the inverse mapping note that:
@@ -153,13 +153,13 @@ class SoftmaxCentered(bijector.Bijector):
     return -tf.reduce_sum(tf.math.log(y), axis=-1)
 
   def _forward_log_det_jacobian(self, x):
-    # This code is similar to tf.nn.log_softmax but different because we have
+    # This code is similar to tf.math.log_softmax but different because we have
     # an implicit zero column to handle. I.e., instead of:
     #   reduce_sum(logits - reduce_sum(exp(logits), dim))
     # we must do:
     #   log_normalization = 1 + reduce_sum(exp(logits))
     #   -log_normalization + reduce_sum(logits - log_normalization)
-    log_normalization = tf.nn.softplus(
+    log_normalization = tf.math.softplus(
         tf.reduce_logsumexp(x, axis=-1, keepdims=True))
     return tf.squeeze(
         (-log_normalization +

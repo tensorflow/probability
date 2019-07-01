@@ -117,7 +117,7 @@ class IteratedSigmoidCentered(bijector.Bijector):
         tf.cast(
             tf.range(tf.shape(x)[-1], 0, delta=-1),
             dtype=dtype_util.base_dtype(x.dtype)))
-    z = tf.nn.sigmoid(x + offset)
+    z = tf.math.sigmoid(x + offset)
     y = z * tf.math.cumprod(1 - z, axis=-1, exclusive=True)
     return tf.concat([y, 1. - tf.reduce_sum(y, axis=-1, keepdims=True)],
                      axis=-1)

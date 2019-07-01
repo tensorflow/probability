@@ -206,7 +206,8 @@ class OneHotCategorical(distribution.Distribution):
     return ret
 
   def _entropy(self):
-    return -tf.reduce_sum(tf.nn.log_softmax(self.logits) * self.probs, axis=-1)
+    return -tf.reduce_sum(
+        tf.math.log_softmax(self.logits) * self.probs, axis=-1)
 
   def _mean(self):
     return self.probs
@@ -237,7 +238,7 @@ class OneHotCategorical(distribution.Distribution):
     with self._name_and_control_scope(name or 'probs_parameter'):
       if self.logits is None:
         return tf.identity(self.probs)
-      return tf.nn.softmax(self.logits)
+      return tf.math.softmax(self.logits)
 
   def _assert_valid_sample(self, x):
     if not self.validate_args:
@@ -268,6 +269,6 @@ def _kl_categorical_categorical(a, b, name=None):
     a_logits = a.logits_parameter()
     b_logits = b.logits_parameter()
     return tf.reduce_sum(
-        (tf.nn.softmax(a_logits) *
-         (tf.nn.log_softmax(a_logits) - tf.nn.log_softmax(b_logits))),
+        (tf.math.softmax(a_logits) *
+         (tf.math.log_softmax(a_logits) - tf.math.log_softmax(b_logits))),
         axis=-1)

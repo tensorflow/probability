@@ -43,7 +43,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase, parameterized.TestCase):
 
   def _random_chol(self, *shape):
     mat = self._rng.rand(*shape)
-    chol = tfd.matrix_diag_transform(mat, transform=tf.nn.softplus)
+    chol = tfd.matrix_diag_transform(mat, transform=tf.math.softplus)
     chol = tf.linalg.band_part(chol, -1, 0)
     sigma = tf.matmul(chol, chol, adjoint_b=True)
     return self.evaluate(chol), self.evaluate(sigma)
@@ -437,7 +437,7 @@ class MultivariateNormalTriLSlicingTest(tf.test.TestCase,
 
   def _random_chol(self, *shape):
     mat = self._rng.rand(*shape)
-    chol = tfd.matrix_diag_transform(mat, transform=tf.nn.softplus)
+    chol = tfd.matrix_diag_transform(mat, transform=tf.math.softplus)
     chol = tf.linalg.band_part(chol, -1, 0)
     sigma = tf.matmul(chol, chol, adjoint_b=True)
     return self.evaluate(chol), self.evaluate(sigma)

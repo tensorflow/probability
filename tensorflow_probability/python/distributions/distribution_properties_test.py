@@ -669,9 +669,9 @@ def fix_wishart(d):
 
 CONSTRAINTS = {
     'atol':
-        tf.nn.softplus,
+        tf.math.softplus,
     'rtol':
-        tf.nn.softplus,
+        tf.math.softplus,
     'concentration':
         tfp_hps.softplus_plus_eps(),
     'concentration0':
@@ -687,19 +687,19 @@ CONSTRAINTS = {
     'InverseGaussian.loc':
         tfp_hps.softplus_plus_eps(),
     'VonMisesFisher.mean_direction':  # max ndims is 5
-        lambda x: tf.nn.l2_normalize(tf.nn.sigmoid(x[..., :5]) + 1e-6, -1),
+        lambda x: tf.math.l2_normalize(tf.math.sigmoid(x[..., :5]) + 1e-6, -1),
     'Categorical.probs':
-        tf.nn.softmax,
+        tf.math.softmax,
     'ExpRelaxedOneHotCategorical.probs':
-        tf.nn.softmax,
+        tf.math.softmax,
     'FiniteDiscrete.probs':
-        tf.nn.softmax,
+        tf.math.softmax,
     'Multinomial.probs':
-        tf.nn.softmax,
+        tf.math.softmax,
     'OneHotCategorical.probs':
-        tf.nn.softmax,
+        tf.math.softmax,
     'RelaxedCategorical.probs':
-        tf.nn.softmax,
+        tf.math.softmax,
     'Zipf.power':
         tfp_hps.softplus_plus_eps(1 + 1e-6),  # strictly > 1
     'Geometric.logits':  # TODO(b/128410109): re-enable down to -50

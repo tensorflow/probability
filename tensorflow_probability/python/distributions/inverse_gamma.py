@@ -334,9 +334,9 @@ class _InverseGammaWithSoftplusConcentrationScale(InverseGamma):
           concentration, name="softplus_concentration", dtype=dtype)
       scale = tf.convert_to_tensor(scale, name="softplus_scale", dtype=dtype)
       super(_InverseGammaWithSoftplusConcentrationScale, self).__init__(
-          concentration=tf.nn.softplus(
+          concentration=tf.math.softplus(
               concentration, name="softplus_concentration"),
-          scale=tf.nn.softplus(scale, name="softplus_scale"),
+          scale=tf.math.softplus(scale, name="softplus_scale"),
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           name=name)
@@ -346,8 +346,8 @@ class _InverseGammaWithSoftplusConcentrationScale(InverseGamma):
 _rate_deprecator = deprecation.deprecated(
     "2019-06-05",
     "InverseGammaWithSoftplusConcentrationRate is deprecated, use "
-    "InverseGamma(concentration=tf.nn.softplus(concentration), "
-    "scale=tf.nn.softplus(scale)) instead.",
+    "InverseGamma(concentration=tf.math.softplus(concentration), "
+    "scale=tf.math.softplus(scale)) instead.",
     warn_once=True)
 # pylint: disable=invalid-name
 InverseGammaWithSoftplusConcentrationRate = _rate_deprecator(
@@ -356,8 +356,8 @@ InverseGammaWithSoftplusConcentrationRate = _rate_deprecator(
 _scale_deprecator = deprecation.deprecated(
     "2019-06-05",
     "InverseGammaWithSoftplusConcentrationScale is deprecated, use "
-    "InverseGamma(concentration=tf.nn.softplus(concentration), "
-    "scale=tf.nn.softplus(scale)) instead.",
+    "InverseGamma(concentration=tf.math.softplus(concentration), "
+    "scale=tf.math.softplus(scale)) instead.",
     warn_once=True)
 InverseGammaWithSoftplusConcentrationScale = _scale_deprecator(
     _InverseGammaWithSoftplusConcentrationScale)

@@ -46,9 +46,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
       self.assertAllClose(sp_special.ive(v, z), _bessel_ive(v, z))
 
   def testSampleMeanDir2d(self):
-    mean_dirs = tf.nn.l2_normalize([[1., 1],
-                                    [-2, 1],
-                                    [0, -1]], axis=-1)
+    mean_dirs = tf.math.l2_normalize([[1., 1], [-2, 1], [0, -1]], axis=-1)
     concentration = [[0], [0.1], [2], [40], [1000]]
     vmf = tfp.distributions.VonMisesFisher(
         mean_direction=mean_dirs,
@@ -89,8 +87,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
                         atol=0.03)
 
   def testSampleMeanDir3d(self):
-    mean_dir = tf.nn.l2_normalize([[1., 2, 3],
-                                   [-2, -3, -1]], axis=-1)
+    mean_dir = tf.math.l2_normalize([[1., 2, 3], [-2, -3, -1]], axis=-1)
     concentration = [[0], [0.1], [2], [40], [1000]]
     vmf = tfp.distributions.VonMisesFisher(
         mean_direction=mean_dir,
@@ -255,8 +252,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
         atol=0.015)
 
   def testSampleAndPdfConsistency2d(self):
-    mean_dir = tf.nn.l2_normalize([[1., 2],
-                                   [-2, -3]], axis=-1)
+    mean_dir = tf.math.l2_normalize([[1., 2], [-2, -3]], axis=-1)
     concentration = [[0], [1e-5], [0.1], [1], [10]]
     vmf = tfp.distributions.VonMisesFisher(
         mean_direction=mean_dir, concentration=concentration,
@@ -266,8 +262,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     self._verifyPdfWithNumpy(vmf)
 
   def testSampleAndPdfConsistency3d(self):
-    mean_dir = tf.nn.l2_normalize([[1., 2, 3],
-                                   [-2, -3, -1]], axis=-1)
+    mean_dir = tf.math.l2_normalize([[1., 2, 3], [-2, -3, -1]], axis=-1)
     concentration = [[0], [1e-5], [0.1], [1], [10]]
     vmf = tfp.distributions.VonMisesFisher(
         mean_direction=mean_dir, concentration=concentration,
@@ -277,8 +272,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     self._verifyPdfWithNumpy(vmf, atol=.002)
 
   def testSampleAndPdfConsistency4d(self):
-    mean_dir = tf.nn.l2_normalize([[1., 2, 3, 4],
-                                   [-2, -3, -1, 0]], axis=-1)
+    mean_dir = tf.math.l2_normalize([[1., 2, 3, 4], [-2, -3, -1, 0]], axis=-1)
     concentration = [[0], [1e-4], [0.1], [1], [10]]
     vmf = tfp.distributions.VonMisesFisher(
         mean_direction=mean_dir, concentration=concentration,
@@ -288,8 +282,8 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     self._verifyPdfWithNumpy(vmf)
 
   def testSampleAndPdfConsistency5d(self):
-    mean_dir = tf.nn.l2_normalize([[1., 2, 3, 4, 5],
-                                   [-2, -3, -1, 0, 1]], axis=-1)
+    mean_dir = tf.math.l2_normalize([[1., 2, 3, 4, 5], [-2, -3, -1, 0, 1]],
+                                    axis=-1)
     # TODO(bjp): Numerical instability 0 < k < 1e-2 concentrations.
     # Should resolve by eliminating the bessel_i recurrence in favor of
     # a more stable algorithm, e.g. cephes.

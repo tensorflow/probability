@@ -224,7 +224,7 @@ class MultivariateNormalDiagWithSoftplusScale(MultivariateNormalDiag):
   @deprecation.deprecated(
       "2019-06-05",
       "MultivariateNormalDiagWithSoftplusScale is deprecated, use "
-      "MultivariateNormalDiag(loc=loc, scale_diag=tf.nn.softplus(scale_diag)) "
+      "MultivariateNormalDiag(loc=loc, scale_diag=tf.math.softplus(scale_diag)) "
       "instead.",
       warn_once=True)
   def __init__(self,
@@ -237,7 +237,7 @@ class MultivariateNormalDiagWithSoftplusScale(MultivariateNormalDiag):
     with tf.name_scope(name) as name:
       super(MultivariateNormalDiagWithSoftplusScale, self).__init__(
           loc=loc,
-          scale_diag=tf.nn.softplus(scale_diag),
+          scale_diag=tf.math.softplus(scale_diag),
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           name=name)

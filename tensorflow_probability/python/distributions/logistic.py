@@ -189,16 +189,16 @@ class Logistic(distribution.Distribution):
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
     z = (x - loc) / scale
-    return -z - 2. * tf.nn.softplus(-z) - tf.math.log(scale)
+    return -z - 2. * tf.math.softplus(-z) - tf.math.log(scale)
 
   def _log_cdf(self, x):
-    return -tf.nn.softplus(-self._z(x))
+    return -tf.math.softplus(-self._z(x))
 
   def _cdf(self, x):
     return tf.sigmoid(self._z(x))
 
   def _log_survival_function(self, x):
-    return -tf.nn.softplus(self._z(x))
+    return -tf.math.softplus(self._z(x))
 
   def _survival_function(self, x):
     return tf.sigmoid(-self._z(x))

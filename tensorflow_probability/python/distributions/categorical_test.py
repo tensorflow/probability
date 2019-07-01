@@ -325,8 +325,8 @@ class CategoricalTest(test_case.TestCase, parameterized.TestCase):
       logits = tf.constant([[1., 2., 3.], [2., 5., 1.]])
       tape.watch(logits)
 
-      probabilities = tf.nn.softmax(logits)
-      log_probabilities = tf.nn.log_softmax(logits)
+      probabilities = tf.math.softmax(logits)
+      log_probabilities = tf.math.log_softmax(logits)
       true_entropy = -tf.reduce_sum(probabilities * log_probabilities, axis=-1)
 
       categorical_distribution = tfd.Categorical(probs=probabilities)
@@ -477,8 +477,10 @@ class CategoricalTest(test_case.TestCase, parameterized.TestCase):
         *self.evaluate([x, d.logits_parameter()]),
         atol=0, rtol=1e-4)
     self.assertAllClose(
-        *self.evaluate([tf.nn.softmax(x), d.probs_parameter()]),
-        atol=0, rtol=1e-4)
+        *self.evaluate([tf.math.softmax(x),
+                        d.probs_parameter()]),
+        atol=0,
+        rtol=1e-4)
 
   def testParamTensorFromProbs(self):
     x = tf.constant([0.1, 0.5, 0.4])

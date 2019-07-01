@@ -104,9 +104,9 @@ class Softplus(bijector.Bijector):
 
   def _forward(self, x):
     if self.hinge_softness is None:
-      return tf.nn.softplus(x)
+      return tf.math.softplus(x)
     hinge_softness = tf.cast(self.hinge_softness, x.dtype)
-    return hinge_softness * tf.nn.softplus(x / hinge_softness)
+    return hinge_softness * tf.math.softplus(x / hinge_softness)
 
   def _inverse(self, y):
     if self.hinge_softness is None:
@@ -132,7 +132,7 @@ class Softplus(bijector.Bijector):
   def _forward_log_det_jacobian(self, x):
     if self.hinge_softness is not None:
       x /= tf.cast(self.hinge_softness, x.dtype)
-    return -tf.nn.softplus(-x)
+    return -tf.math.softplus(-x)
 
   @property
   def hinge_softness(self):

@@ -333,7 +333,7 @@ class MixtureSameFamily(distribution.Distribution):
     with tf.control_dependencies(self._runtime_assertions):
       x = self._pad_sample_dims(x)
       log_prob_x = self.components_distribution.log_prob(x)  # [S, B, k]
-      log_mix_prob = tf.nn.log_softmax(
+      log_mix_prob = tf.math.log_softmax(
           self.mixture_distribution.logits_parameter(), axis=-1)  # [B, k]
       return tf.reduce_logsumexp(log_prob_x + log_mix_prob, axis=-1)  # [S, B]
 
@@ -350,7 +350,7 @@ class MixtureSameFamily(distribution.Distribution):
   def _log_cdf(self, x):
     x = self._pad_sample_dims(x)
     log_cdf_x = self.components_distribution.log_cdf(x)      # [S, B, k]
-    log_mix_prob = tf.nn.log_softmax(
+    log_mix_prob = tf.math.log_softmax(
         self.mixture_distribution.logits_parameter(), axis=-1)  # [B, k]
     return tf.reduce_logsumexp(log_cdf_x + log_mix_prob, axis=-1)  # [S, B]
 
@@ -495,7 +495,8 @@ class MixtureSameFamily(distribution.Distribution):
     """
 
     if tensorshape_util.rank(x.shape) is None:
-      # tf.nn.softmax raises an error when applied to inputs of undefined rank.
+      # tf.math.softmax raises an error when applied to inputs of undefined
+      # rank.
       raise ValueError("Distributional transform does not support inputs of "
                        "undefined rank.")
 
@@ -535,8 +536,8 @@ class MixtureSameFamily(distribution.Distribution):
       log_posterior_weights_x = logits_mix_prob + cumsum_log_prob_x
 
       component_axis = tensorshape_util.rank(x.shape) - self._event_ndims
-      posterior_weights_x = tf.nn.softmax(log_posterior_weights_x,
-                                          axis=component_axis)
+      posterior_weights_x = tf.math.softmax(
+          log_posterior_weights_x, axis=component_axis)
       return tf.reduce_sum(posterior_weights_x * cdf_x, axis=component_axis)
 
 

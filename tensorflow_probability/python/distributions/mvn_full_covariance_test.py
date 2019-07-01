@@ -36,7 +36,7 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
 
   def _random_pd_matrix(self, *shape):
     mat = rng.rand(*shape)
-    chol = tfd.matrix_diag_transform(mat, transform=tf.nn.softplus)
+    chol = tfd.matrix_diag_transform(mat, transform=tf.math.softplus)
     chol = tf.linalg.band_part(chol, -1, 0)
     return self.evaluate(tf.matmul(chol, chol, adjoint_b=True))
 

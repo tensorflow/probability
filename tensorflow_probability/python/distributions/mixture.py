@@ -494,7 +494,7 @@ class Mixture(distribution.Distribution):
   def _cat_probs(self, log_probs):
     """Get a list of num_components batchwise probabilities."""
     if log_probs:
-      x = tf.nn.log_softmax(self.cat.logits_parameter())
+      x = tf.math.log_softmax(self.cat.logits_parameter())
     else:
       x = self.cat.probs_parameter()
     return tf.unstack(x, num=self.num_components, axis=-1)

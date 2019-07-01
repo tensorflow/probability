@@ -187,7 +187,7 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     dist = tfd.MultivariateNormalDiagWithSoftplusScale(
         mu, diag, validate_args=True)
     samps = self.evaluate(dist.sample(1000, seed=tfp_test_util.test_seed()))
-    cov_mat = self.evaluate(tf.linalg.diag(tf.nn.softplus(diag))**2)
+    cov_mat = self.evaluate(tf.linalg.diag(tf.math.softplus(diag))**2)
 
     self.assertAllClose(mu, samps.mean(axis=0), atol=0.1)
     self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.1)

@@ -155,8 +155,8 @@ class StudentTProcess(
 
   # Define a kernel with trainable parameters.
   kernel = psd_kernels.ExponentiatedQuadratic(
-      amplitude=tf.nn.softplus(amplitude),
-      length_scale=tf.nn.softplus(length_scale))
+      amplitude=tf.math.softplus(amplitude),
+      length_scale=tf.math.softplus(length_scale))
 
   tp = tfp.StudentTProcess(df=3., kernel, observed_index_points)
   neg_log_likelihood = -tp.log_prob(observed_values)

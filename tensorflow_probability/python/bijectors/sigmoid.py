@@ -48,4 +48,4 @@ class Sigmoid(bijector.Bijector):
   # `-tf.log(y) - tf.log1p(-y)` has lower numerical precision.
 
   def _forward_log_det_jacobian(self, x):
-    return -tf.nn.softplus(-x) - tf.nn.softplus(x)
+    return -tf.math.softplus(-x) - tf.math.softplus(x)

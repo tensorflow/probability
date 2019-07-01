@@ -359,8 +359,10 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
         *self.evaluate([x, d.logits_parameter()]),
         atol=0, rtol=1e-4)
     self.assertAllClose(
-        *self.evaluate([tf.nn.softmax(x), d.probs_parameter()]),
-        atol=0, rtol=1e-4)
+        *self.evaluate([tf.math.softmax(x),
+                        d.probs_parameter()]),
+        atol=0,
+        rtol=1e-4)
 
   def testParamTensorFromProbs(self):
     outcomes = self._build_tensor([0.1, 0.2, 0.4])

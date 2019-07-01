@@ -190,7 +190,7 @@ class Geometric(distribution.Distribution):
     #
     # using the fact that,
     # 1-sigmoid(s) = sigmoid(-s) = 1/(1+exp(s))
-    return tf.nn.softplus(self.logits) / probs - self.logits
+    return tf.math.softplus(self.logits) / probs - self.logits
 
   def _mean(self):
     return tf.exp(-self.logits)
@@ -213,4 +213,4 @@ class Geometric(distribution.Distribution):
     with self._name_and_control_scope(name or 'probs_parameter'):
       if self.logits is None:
         return tf.identity(self.probs)
-      return tf.nn.sigmoid(self.logits)
+      return tf.math.sigmoid(self.logits)

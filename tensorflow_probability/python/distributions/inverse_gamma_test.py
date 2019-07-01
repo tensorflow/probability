@@ -307,10 +307,10 @@ class InverseGammaTest(test_case.TestCase):
     inv_gamma = tfd.InverseGammaWithSoftplusConcentrationScale(
         concentration=alpha, scale=beta, validate_args=True)
     self.assertAllClose(
-        self.evaluate(tf.nn.softplus(alpha)),
+        self.evaluate(tf.math.softplus(alpha)),
         self.evaluate(inv_gamma.concentration))
     self.assertAllClose(
-        self.evaluate(tf.nn.softplus(beta)), self.evaluate(inv_gamma.scale))
+        self.evaluate(tf.math.softplus(beta)), self.evaluate(inv_gamma.scale))
 
   def testRateArgBackwardsCompatiblity(self):
     concentration = 1.

@@ -351,7 +351,7 @@ class Categorical(distribution.Distribution):
   def _probs_parameter_no_checks(self):
     if self._logits is None:
       return tf.identity(self._probs)
-    return tf.nn.softmax(self._logits)
+    return tf.math.softmax(self._logits)
 
   def _num_categories(self, x=None):
     """Scalar `int32` tensor: the number of categories."""
@@ -450,6 +450,6 @@ def _kl_categorical_categorical(a, b, name=None):
     a_logits = a._logits_parameter_no_checks()  # pylint:disable=protected-access
     b_logits = b._logits_parameter_no_checks()  # pylint:disable=protected-access
     return tf.reduce_sum(
-        (tf.nn.softmax(a_logits) *
-         (tf.nn.log_softmax(a_logits) - tf.nn.log_softmax(b_logits))),
+        (tf.math.softmax(a_logits) *
+         (tf.math.log_softmax(a_logits) - tf.math.log_softmax(b_logits))),
         axis=-1)

@@ -954,7 +954,7 @@ def vec_osquare(x):
 
 
 def softmax(x, axis, name=None):
-  """Equivalent to tf.nn.softmax but works around b/70297725."""
+  """Equivalent to tf.math.softmax but works around b/70297725."""
   with tf.name_scope(name or "softmax"):
     x = tf.convert_to_tensor(x, name="x")
     ndims = (
@@ -967,4 +967,4 @@ def softmax(x, axis, name=None):
       axis = np.int(ndims + axis_ if axis_ < 0 else axis_)
     else:
       axis = tf.where(axis < 0, ndims + axis, axis)
-  return tf.nn.softmax(x, axis=axis)
+  return tf.math.softmax(x, axis=axis)

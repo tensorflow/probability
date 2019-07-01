@@ -142,7 +142,7 @@ class Bernoulli(distribution.Distribution):
       p = tf.convert_to_tensor(self._probs)
       return tf.math.log1p(-p), tf.math.log(p)
     s = tf.convert_to_tensor(self._logits)
-    return -tf.nn.softplus(s), -tf.nn.softplus(-s)
+    return -tf.math.softplus(s), -tf.math.softplus(-s)
 
   def _entropy(self):
     logits = self._logits_parameter_no_checks()
