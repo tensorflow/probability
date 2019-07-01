@@ -39,6 +39,20 @@ class _AffineScalarBijectorTest(object):
     bijector = tfb.AffineScalar(shift=-1.)
     self.assertStartsWith(bijector.name, "affine_scalar")
 
+  def testTinyScale(self):
+    log_scale = tf.cast(-2000., self.dtype)
+    x = tf.cast(1., self.dtype)
+    scale = tf.exp(log_scale)
+    fldj_linear = tfb.AffineScalar(scale=scale).forward_log_det_jacobian(
+        x, event_ndims=0)
+    fldj_log = tfb.AffineScalar(log_scale=log_scale).forward_log_det_jacobian(
+        x, event_ndims=0)
+    fldj_linear_, fldj_log_ = self.evaluate([fldj_linear, fldj_log])
+    # Using the linear scale will saturate to 0, and produce bad log-det
+    # Jacobians.
+    self.assertNotEqual(fldj_linear_, fldj_log_)
+    self.assertAllClose(-2000., fldj_log_)
+
   def testNoBatchScalar(self):
     def static_run(fun, x, **kwargs):
       return self.evaluate(fun(x, **kwargs))
@@ -137,6 +151,15 @@ class _AffineScalarBijectorTest(object):
 
   def testScalarCongruency(self):
     bijector = tfb.AffineScalar(shift=self.dtype(3.6), scale=self.dtype(0.42))
+    bijector_test_util.assert_scalar_congruency(
+        bijector,
+        lower_x=self.dtype(-2.),
+        upper_x=self.dtype(2.),
+        eval_func=self.evaluate)
+
+  def testScalarCongruencyLogScale(self):
+    bijector = tfb.AffineScalar(
+        shift=self.dtype(3.6), log_scale=self.dtype(np.log(0.42)))
     bijector_test_util.assert_scalar_congruency(
         bijector,
         lower_x=self.dtype(-2.),

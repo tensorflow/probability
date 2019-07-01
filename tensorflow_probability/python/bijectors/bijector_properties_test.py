@@ -60,13 +60,15 @@ TF2_FRIENDLY_BIJECTORS = (
 )
 
 BIJECTOR_PARAMS_NDIMS = {
-    'AffineScalar': dict(shift=0, scale=0),
+    'AffineScalar': dict(shift=0, scale=0, log_scale=0),
     'Gumbel': dict(loc=0, scale=0),
     'Kumaraswamy': dict(concentration1=0, concentration0=0),
     'SinhArcsinh': dict(skewness=0, tailweight=0),
 }
 
-MUTEX_PARAMS = ()
+MUTEX_PARAMS = (
+    set(['scale', 'log_scale']),
+)
 
 NO_LDJ_GRADS_EXPECTED = {
     'AffineScalar': {'[arg]', 'shift'},
@@ -104,7 +106,8 @@ def broadcasting_params(draw,
           event_dim=event_dim,
           enable_vars=enable_vars,
           params_event_ndims=params_event_ndims,
-          constraint_fn_for=_constraint))
+          constraint_fn_for=_constraint,
+          mutex_params=MUTEX_PARAMS))
 
 
 @hps.composite
