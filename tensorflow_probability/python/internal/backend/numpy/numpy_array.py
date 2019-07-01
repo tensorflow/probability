@@ -66,19 +66,30 @@ __all__ = [
 ]
 
 
+# TODO(rif): Add unit test.
 def _gather(  # pylint: disable=unused-argument
     params,
     indices,
     validate_indices=None,
-    name=None,
-    axis=0):
-  raise NotImplementedError
+    axis=None,
+    batch_dims=0,
+    name=None):
+  """gather."""
+  if validate_indices is not None:
+    raise NotImplementedError(
+        'Argument `validate_indices != None` is currently unimplemented.')
+  if batch_dims != 0:
+    raise NotImplementedError(
+        'Argument `batch_dims != 0` is currently unimplemented.')
+  return np.take(params, indices, axis=axis)
 
 
 def _gather_nd(  # pylint: disable=unused-argument
     params,
     indices,
+    batch_dims=0,
     name=None):
+  """gather_nd."""
   raise NotImplementedError
 
 
