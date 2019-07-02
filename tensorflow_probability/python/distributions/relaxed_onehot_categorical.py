@@ -405,11 +405,33 @@ class RelaxedOneHotCategorical(
         undefined statistics will return NaN for this statistic.
       name: A name for this distribution (optional).
     """
+
     dist = ExpRelaxedOneHotCategorical(temperature,
                                        logits=logits,
                                        probs=probs,
                                        validate_args=validate_args,
                                        allow_nan_stats=allow_nan_stats)
+
     super(RelaxedOneHotCategorical, self).__init__(dist,
                                                    exp_bijector.Exp(),
                                                    name=name)
+
+  @property
+  def temperature(self):
+    """Batchwise temperature tensor of a RelaxedCategorical."""
+    return self.distribution.temperature
+
+  @property
+  def event_size(self):
+    """Scalar `int32` tensor: the number of classes."""
+    return self.distribution.event_size
+
+  @property
+  def probs(self):
+    """Input argument `probs`."""
+    return self.distribution.probs
+
+  @property
+  def logits(self):
+    """Input argument `logits`."""
+    return self.distribution.logits

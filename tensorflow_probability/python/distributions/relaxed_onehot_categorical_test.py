@@ -41,7 +41,7 @@ def make_relaxed_categorical(batch_shape, num_classes, dtype=tf.float32):
 @test_util.run_all_in_graph_and_eager_modes
 class ExpRelaxedOneHotCategoricalTest(tf.test.TestCase):
 
-  def testP(self):
+  def testProbs(self):
     temperature = 1.0
     logits = [2.0, 3.0, -4.0]
     dist = tfd.ExpRelaxedOneHotCategorical(temperature, logits)
@@ -82,13 +82,20 @@ def analytical_pdf(x, temperature, logits):
 @test_util.run_all_in_graph_and_eager_modes
 class RelaxedOneHotCategoricalTest(tf.test.TestCase):
 
+  def testProbs(self):
+    temperature = 1.0
+    probs = [0.1, 0.5, 0.4]
+    dist = tfd.RelaxedOneHotCategorical(temperature, probs=probs)
+    self.assertAllClose(probs, self.evaluate(dist.probs))
+    self.assertAllEqual([3], dist.probs.shape)
+
   def testLogits(self):
     temperature = 1.0
     logits = [2.0, 3.0, -4.0]
     dist = tfd.RelaxedOneHotCategorical(temperature, logits)
     # check p for ExpRelaxed base distribution
-    self.assertAllClose(logits, self.evaluate(dist._distribution.logits))
-    self.assertAllEqual([3], dist._distribution.logits.shape)
+    self.assertAllClose(logits, self.evaluate(dist.logits))
+    self.assertAllEqual([3], dist.logits.shape)
 
   def testParamBroadcasting(self):
     temperature = [1.0, 1.4]
