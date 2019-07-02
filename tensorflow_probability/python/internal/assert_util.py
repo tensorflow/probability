@@ -39,6 +39,7 @@ assert_non_positive = tf.compat.v1.assert_non_positive
 assert_none_equal = tf.compat.v1.assert_none_equal
 assert_positive = tf.compat.v1.assert_positive
 assert_rank_at_least = tf.compat.v1.assert_rank_at_least
+assert_rank_in = tf.compat.v1.assert_rank_in
 
 
 def assert_finite(x, data=None, summarize=None, message=None, name=None):

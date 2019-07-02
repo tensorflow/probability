@@ -25,6 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -41,7 +42,7 @@ def raise_exception_in_eager_mode(value):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GetStaticValueTest(tf.test.TestCase, parameterized.TestCase):
+class GetStaticValueTest(test_case.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       dict(testcase_name='_True',
@@ -81,7 +82,7 @@ class GetStaticValueTest(tf.test.TestCase, parameterized.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PreferStaticPredicatesTest(tf.test.TestCase, parameterized.TestCase):
+class PredicatesTest(test_case.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       dict(testcase_name='_greater_true',
@@ -177,43 +178,43 @@ class PreferStaticPredicatesTest(tf.test.TestCase, parameterized.TestCase):
            kwargs=dict(keepdims=True),
            expected=[[True]]),
       )
-  def testStaticPredicate(self, predicate, args_fn, kwargs, expected):
+  def test_static_predicate(self, predicate, args_fn, kwargs, expected):
     actual = predicate(*args_fn(), **kwargs)
     self.assertAllCloseAccordingToType(expected, actual)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PreferStaticCondTest(tf.test.TestCase, parameterized.TestCase):
+class CondTest(test_case.TestCase, parameterized.TestCase):
 
-  def testTrue(self):
+  def test_true(self):
     x = tf.constant(2)
     y = tf.constant(5)
     z = prefer_static.cond(True, lambda: tf.multiply(x, 16),
                            lambda: tf.multiply(y, 5))
     self.assertEqual(self.evaluate(z), 32)
 
-  def testFalse(self):
+  def test_false(self):
     x = tf.constant(4)
     y = tf.constant(3)
     z = prefer_static.cond(False, lambda: tf.multiply(x, 16),
                            lambda: tf.multiply(y, 3))
     self.assertEqual(self.evaluate(z), 9)
 
-  def testMissingArg1(self):
+  def test_missing_arg1(self):
     x = tf.constant(1)
     with self.assertRaises(TypeError):
       prefer_static.cond(True, false_fn=lambda: x)
 
-  def testMissingArg2(self):
+  def test_missing_arg2(self):
     x = tf.constant(1)
     with self.assertRaises(TypeError):
       prefer_static.cond(True, lambda: x)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PreferStaticCaseTest(tf.test.TestCase):
+class CaseTest(test_case.TestCase):
 
-  def testTrue(self):
+  def test_true(self):
     x = tf.constant(0)
     conditions = [(True, lambda: tf.constant(1)),
                   (x == 0, raise_exception)]
@@ -225,7 +226,7 @@ class PreferStaticCaseTest(tf.test.TestCase):
     self.assertEqual(self.evaluate(y), 1)
     self.assertEqual(self.evaluate(z), 1)
 
-  def testFalse(self):
+  def test_false(self):
     conditions = [(False, raise_exception)]
     y = prefer_static.case(conditions,
                            default=lambda: tf.constant(1),
@@ -236,7 +237,7 @@ class PreferStaticCaseTest(tf.test.TestCase):
     self.assertEqual(self.evaluate(y), 1)
     self.assertEqual(self.evaluate(z), 1)
 
-  def testMix(self):
+  def test_mix(self):
     x = tf.constant(0)
     y = tf.constant(10)
     conditions = [(x > 1, lambda: tf.constant(1)),
@@ -248,9 +249,9 @@ class PreferStaticCaseTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PreferStaticShapeTest(tf.test.TestCase):
+class ShapeTest(test_case.TestCase):
 
-  def testShape(self):
+  def test_shape(self):
     vector_value = [0., 1.]
 
     # case: numpy input
@@ -265,7 +266,7 @@ class PreferStaticShapeTest(tf.test.TestCase):
           vector_value, shape=None))
       self.assertAllEqual(self.evaluate(shape), [2])
 
-  def testRankFromShape(self):
+  def test_rank_from_shape(self):
     shape = [2, 4, 3]
     expected_rank = len(shape)
     v_ndarray = np.ones(shape)
@@ -302,14 +303,43 @@ class PreferStaticShapeTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PreferStaticSizeTest(tf.test.TestCase):
+class SetDiff1DTest(test_case.TestCase):
 
-  def testStatic(self):
+  def test_static(self):
+    self.assertAllEqual(
+        [0, 3, 4],
+        prefer_static.setdiff1d(np.arange(5), [1, 2]))
+    self.assertAllEqual(
+        [],
+        prefer_static.setdiff1d([], [1, 2]))
+    self.assertAllEqual(
+        [1, 2],
+        prefer_static.setdiff1d([1, 2], []))
+
+  def test_dynamic(self):
+    if tf.executing_eagerly(): return
+    x = tf1.placeholder_with_default(np.arange(5), shape=None)
+    self.assertAllEqual(
+        [0, 3, 4],
+        self.evaluate(prefer_static.setdiff1d(x, [1, 2])))
+    x = tf1.placeholder_with_default(np.array([], np.int32), shape=None)
+    self.assertAllEqual(
+        [],
+        self.evaluate(prefer_static.setdiff1d(x, [1, 2])))
+    self.assertAllEqual(
+        [1, 2],
+        self.evaluate(prefer_static.setdiff1d([1, 2], x)))
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class SizeTest(test_case.TestCase):
+
+  def test_static(self):
     self.assertAllEqual(
         3 * 4 * 5,
         prefer_static.size(tf.random.normal([3, 4, 5])))
 
-  def testDynamic(self):
+  def test_dynamic(self):
     if tf.executing_eagerly(): return
     x = tf1.placeholder_with_default(
         tf.random.normal([3, 4, 5]), shape=None)
@@ -319,7 +349,7 @@ class PreferStaticSizeTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestNonNegativeAxis(tf.test.TestCase):
+class NonNegativeAxisTest(test_case.TestCase):
 
   def test_static_scalar_positive_index(self):
     positive_axis = prefer_static.non_negative_axis(axis=2, rank=4)

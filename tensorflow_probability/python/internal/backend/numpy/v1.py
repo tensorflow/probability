@@ -49,6 +49,7 @@ __all__ = [
     'assert_positive',
     'assert_rank',
     'assert_rank_at_least',
+    'assert_rank_in',
     'assert_scalar',
     'colocate_with',
     'get_variable',
@@ -120,6 +121,10 @@ def _assert_positive(*_, **__):  # pylint: disable=unused-argument
 
 
 def _assert_rank_at_least(*_, **__):  # pylint: disable=unused-argument
+  pass
+
+
+def _assert_rank_in(*_, **__):  # pylint: disable=unused-argument
   pass
 
 
@@ -212,6 +217,10 @@ assert_positive = utils.copy_docstring(
 assert_rank_at_least = utils.copy_docstring(
     tf.compat.v1.assert_rank_at_least,
     _assert_rank_at_least)
+
+assert_rank_in = utils.copy_docstring(
+    tf.compat.v1.assert_rank_in,
+    _assert_rank_in)
 
 colocate_with = utils.copy_docstring(
     tf.compat.v1.colocate_with,

@@ -46,6 +46,8 @@ py_library(
         ":numpy_math",
         ":ops",
         ":random_generators",
+        ":sets_lib",
+        ":sparse_lib",
         ":test_lib",
         # tensorflow dep,
     ],
@@ -232,6 +234,25 @@ py_library(
     deps = [
         ":numpy_math",
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
+    name = "sets_lib",
+    srcs = ["sets_lib.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
+    name = "sparse_lib",
+    srcs = ["sparse_lib.py"],
+    deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],

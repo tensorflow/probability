@@ -37,6 +37,7 @@ __all__ = [
     'max',
     'min',
     'name',
+    'real_dtype',
     'size',
 ]
 
@@ -152,6 +153,15 @@ def size(dtype):
   if hasattr(dtype, 'size'):
     return dtype.size
   return np.dtype(dtype).itemsize
+
+
+def real_dtype(dtype):
+  """Returns the dtype of the real part."""
+  dtype = tf.as_dtype(dtype)
+  if hasattr(dtype, 'real_dtype'):
+    return dtype.real_dtype
+  # TODO(jvdillon): Find a better way.
+  return np.array(0, as_numpy_dtype(dtype)).real.dtype
 
 
 def _assert_same_base_type(items, expected_type=None):

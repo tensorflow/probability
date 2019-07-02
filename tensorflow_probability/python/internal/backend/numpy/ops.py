@@ -113,6 +113,11 @@ class GradientTape(object):
                unconnected_gradients=UnconnectedGradients.NONE):  # pylint: disable=unused-argument
     return sources
 
+  def batch_jacobian(self, target, source,  # pylint: disable=unused-argument
+                     unconnected_gradients=UnconnectedGradients.NONE,  # pylint: disable=unused-argument
+                     parallel_iterations=None, experimental_use_pfor=True):  # pylint: disable=unused-argument
+    return source
+
 
 broadcast_dynamic_shape = utils.copy_docstring(
     tf.broadcast_dynamic_shape,
@@ -232,6 +237,7 @@ def Variable(initial_value=None, trainable=True, validate_shape=True,  # pylint:
 
 
 class Module(object):
+  """tf.Module."""
 
   _TF_MODULE_IGNORED_PROPERTIES = frozenset()
 
@@ -240,3 +246,9 @@ class Module(object):
 
   def _no_dependency(self, x):
     return x
+
+  def trainable_variables(self):
+    return []
+
+  def variables(self):
+    return []

@@ -173,7 +173,8 @@ def _swap_m_with_i(vecs, m, i):
   vecs_shape = vecs.shape
   vecs = tf.concat([
       vecs[..., :m],
-      tf.gather(vecs, i, batch_dims=prefer_static.rank(vecs) - 1), trailing_elts
+      tf.gather(vecs, i, batch_dims=int(prefer_static.rank(vecs)) - 1),
+      trailing_elts
   ], axis=-1)
   tensorshape_util.set_shape(vecs, vecs_shape)
   return vecs

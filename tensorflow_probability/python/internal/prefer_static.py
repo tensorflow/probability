@@ -24,6 +24,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python import pywrap_tensorflow as c_api  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
@@ -72,7 +73,9 @@ def _copy_docstring(original_fn, new_fn):
 
 
 def _numpy_dtype(dtype):
-  return dtype.as_numpy_dtype if hasattr(dtype, 'as_numpy_dtype') else dtype
+  if dtype is None:
+    return None
+  return dtype_util.as_numpy_dtype(dtype)
 
 
 def _get_static_predicate(pred):
@@ -258,21 +261,23 @@ ones = _prefer_static(
 
 def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
   s = _shape(input)
-  if is_numpy(s):
-    return np.ones(s, _numpy_dtype(dtype or input.dtype))
+  s_ = tf.get_static_value(s)
+  if s_ is not None:
+    return np.ones(s_, dtype_util.as_numpy_dtype(dtype or input.dtype))
   return tf.ones(s, dtype or s.dtype, name)
 ones_like = _copy_docstring(tf.ones_like, _ones_like)
 
 range = _prefer_static(  # pylint: disable=redefined-builtin
     tf.range,
     lambda start, limit=None, delta=1, dtype=None, name='range': np.arange(  # pylint: disable=g-long-lambda
-        start, limit, delta, _numpy_dtype(dtype)))
+        start, limit, delta).astype(_numpy_dtype(
+            dtype or np.array(tf.get_static_value(start)).dtype)))
 
 rank = _copy_docstring(
     tf.rank,
     lambda input, name=None: (  # pylint: disable=redefined-builtin,g-long-lambda
-        tf.rank(input) if tensorshape_util.rank(input.shape) is None else
-        tensorshape_util.rank(input.shape)))
+        tf.rank(input) if tensorshape_util.rank(input.shape) is None
+        else np.int32(tensorshape_util.rank(input.shape))))
 
 reduce_all = _prefer_static(
     tf.reduce_all,
@@ -293,6 +298,34 @@ reduce_sum = _prefer_static(
     tf.reduce_sum,
     lambda input_tensor, axis=None, keepdims=False, name=None: np.sum(  # pylint: disable=g-long-lambda
         input_tensor, axis, keepdims=keepdims))
+
+
+def _setdiff1d(a, b, aminusb=True, validate_indices=True):
+  """Compute set difference of elements in last dimension of `a` and `b`."""
+  if not aminusb:
+    raise NotImplementedError(
+        'Argument `aminusb != True` is currently unimplemented.')
+  if not validate_indices:
+    raise NotImplementedError(
+        'Argument `validate_indices != True` is currently unimplemented.')
+  with tf.name_scope('setdiff1d'):
+    dtype = dtype_util.as_numpy_dtype(
+        dtype_util.common_dtype([a, b], dtype_hint=tf.int32))
+    a_ = tf.get_static_value(a)
+    b_ = tf.get_static_value(b)
+    if a_ is None or b_ is None:
+      a = tf.convert_to_tensor(a, dtype=dtype, name='a')
+      b = tf.convert_to_tensor(b, dtype=dtype, name='b')
+      return tf.sparse.to_dense(tf.sets.difference(
+          a[tf.newaxis], b[tf.newaxis]))[0]
+    a_ = np.array(a_, dtype=dtype)
+    b_ = np.array(b_, dtype=dtype)
+    return np.setdiff1d(a_, b_)
+
+
+setdiff1d = _copy_docstring(
+    tf.sets.difference,
+    _setdiff1d)
 
 
 def _size(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin
@@ -333,7 +366,8 @@ zeros = _prefer_static(
 
 def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
   s = _shape(input)
-  if is_numpy(s):
+  s_ = tf.get_static_value(s)
+  if s_ is not None:
     return np.zeros(s, _numpy_dtype(dtype or input.dtype))
   return tf.zeros(s, dtype or s.dtype, name)
 zeros_like = _copy_docstring(tf.zeros_like, _zeros_like)
@@ -346,12 +380,17 @@ def non_negative_axis(axis, rank, name=None):  # pylint:disable=redefined-outer-
       return None
     if rank is None:
       raise ValueError('Argument `rank` cannot be `None`.')
+    dtype = dtype_util.as_numpy_dtype(
+        dtype_util.common_dtype([axis, rank], dtype_hint=tf.int32))
     rank_ = tf.get_static_value(rank)
     axis_ = tf.get_static_value(axis)
     if rank_ is None or axis_ is None:
+      axis = tf.convert_to_tensor(axis, dtype=dtype, name='axis')
+      rank = tf.convert_to_tensor(rank, dtype=dtype, name='rank')
       return tf.where(axis < 0, rank + axis, axis)
-    axis_ = np.array(axis_, dtype=np.int32)
-    return np.where(axis_ < 0, axis_ + np.int32(rank_), axis_)
+    axis_ = np.array(axis_, dtype=dtype)
+    rank_ = np.array(rank_, dtype=dtype)
+    return np.where(axis_ < 0, axis_ + rank_, axis_)
 
 
 def is_numpy(x):

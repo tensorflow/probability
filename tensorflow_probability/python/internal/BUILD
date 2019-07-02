@@ -162,6 +162,7 @@ py_library(
     name = "prefer_static",
     srcs = ["prefer_static.py"],
     deps = [
+        ":dtype_util",
         ":tensorshape_util",
         # decorator dep,
         # numpy dep,
@@ -177,6 +178,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 

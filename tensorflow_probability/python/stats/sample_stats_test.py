@@ -20,11 +20,12 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops import spectral_ops_test_util
+from tensorflow.python.ops import spectral_ops_test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 rng = np.random.RandomState(0)
@@ -43,8 +44,8 @@ class _AutoCorrelationTest(object):
 
   def test_constant_sequence_axis_0_max_lags_none_center_false(self):
     x_ = np.array([[0., 0., 0.], [1., 1., 1.]]).astype(self.dtype)
-    x_ph = tf.compat.v1.placeholder_with_default(
-        input=x_, shape=x_.shape if self.use_static_shape else None)
+    x_ph = tf1.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
       # Setting normalize = True means we divide by zero.
       auto_corr = tfp.stats.auto_correlation(
@@ -56,8 +57,8 @@ class _AutoCorrelationTest(object):
 
   def test_constant_sequence_axis_0_max_lags_none_center_true(self):
     x_ = np.array([[0., 0., 0.], [1., 1., 1.]]).astype(self.dtype)
-    x_ph = tf.compat.v1.placeholder_with_default(
-        input=x_, shape=x_.shape if self.use_static_shape else None)
+    x_ph = tf1.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
       # Setting normalize = True means we divide by zero.
       auto_corr = tfp.stats.auto_correlation(
@@ -88,7 +89,7 @@ class _AutoCorrelationTest(object):
     if normalize:
       rxx /= np.take(rxx, [0], axis=axis)
 
-    x_ph = tf.compat.v1.placeholder_with_default(
+    x_ph = tf1.placeholder_with_default(
         x, shape=x.shape if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
       auto_corr = tfp.stats.auto_correlation(
@@ -157,7 +158,7 @@ class _AutoCorrelationTest(object):
   def test_long_orthonormal_sequence_has_corr_length_0(self):
     l = 10000
     x = rng.randn(l).astype(self.dtype)
-    x_ph = tf.compat.v1.placeholder_with_default(
+    x_ph = tf1.placeholder_with_default(
         x, shape=(l,) if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
       rxx = tfp.stats.auto_correlation(
@@ -182,7 +183,7 @@ class _AutoCorrelationTest(object):
     # x jumps to new random value every 10 steps.  So correlation length = 10.
     x = (rng.randint(-10, 10, size=(1000, 1)) * np.ones(
         (1, 10))).ravel().astype(self.dtype)
-    x_ph = tf.compat.v1.placeholder_with_default(
+    x_ph = tf1.placeholder_with_default(
         x, shape=(1000 * 10,) if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
       rxx = tfp.stats.auto_correlation(
@@ -202,7 +203,7 @@ class _AutoCorrelationTest(object):
   def test_normalization(self):
     l = 10000
     x = 3 * rng.randn(l).astype(self.dtype)
-    x_ph = tf.compat.v1.placeholder_with_default(
+    x_ph = tf1.placeholder_with_default(
         x, shape=(l,) if self.use_static_shape else None)
     with spectral_ops_test_util.fft_kernel_label_map():
       rxx = tfp.stats.auto_correlation(
@@ -363,8 +364,8 @@ class CovarianceTest(tf.test.TestCase):
     x = rng.randn(2, 3, 4, 5, 6)
     y = x + 0.1 * rng.randn(2, 3, 4, 5, 6)
 
-    x_ph = tf.compat.v1.placeholder_with_default(input=x, shape=None)
-    y_ph = tf.compat.v1.placeholder_with_default(input=y, shape=None)
+    x_ph = tf1.placeholder_with_default(x, shape=None)
+    y_ph = tf1.placeholder_with_default(y, shape=None)
 
     cov = tfp.stats.covariance(
         x_ph, y_ph, sample_axis=[0, 3], event_axis=[1, 2])
