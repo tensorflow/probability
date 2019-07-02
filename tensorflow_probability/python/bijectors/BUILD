@@ -460,6 +460,7 @@ py_library(
     name = "real_nvp",
     srcs = ["real_nvp.py"],
     deps = [
+        ":affine_scalar",
         ":bijector",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
@@ -1034,6 +1035,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
