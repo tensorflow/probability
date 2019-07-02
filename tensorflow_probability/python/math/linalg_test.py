@@ -140,8 +140,7 @@ class _CholeskyExtend(tf.test.TestCase):
     self.assertAllClose(new_chol_expected, new_chol)
 
   @hp.given(hps.data())
-  @hp.settings(deadline=None, max_examples=10,
-               derandomize=tfp_hps.derandomize_hypothesis())
+  @tfp_hps.tfp_hp_settings()
   def testCholeskyExtensionRandomized(self, data):
     jitter = lambda n: tf.linalg.eye(n, dtype=self.dtype) * 1e-5
     target_bs = data.draw(hpnp.array_shapes())

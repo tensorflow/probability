@@ -43,6 +43,7 @@ from tensorflow_probability.python.distributions.gamma import Gamma
 from tensorflow_probability.python.distributions.gamma_gamma import GammaGamma
 from tensorflow_probability.python.distributions.gaussian_process import GaussianProcess
 from tensorflow_probability.python.distributions.gaussian_process_regression_model import GaussianProcessRegressionModel
+from tensorflow_probability.python.distributions.generalized_pareto import GeneralizedPareto
 from tensorflow_probability.python.distributions.geometric import Geometric
 from tensorflow_probability.python.distributions.gumbel import Gumbel
 from tensorflow_probability.python.distributions.half_cauchy import HalfCauchy
@@ -160,6 +161,7 @@ __all__ = [
     'Gamma',
     'GammaGamma',
     'InverseGaussian',
+    'GeneralizedPareto',
     'Geometric',
     'GaussianProcess',
     'GaussianProcessRegressionModel',

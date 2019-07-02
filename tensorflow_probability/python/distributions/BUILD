@@ -53,6 +53,7 @@ py_library(
         ":gamma_gamma",
         ":gaussian_process",
         ":gaussian_process_regression_model",
+        ":generalized_pareto",
         ":geometric",
         ":gumbel",
         ":half_cauchy",
@@ -418,6 +419,21 @@ py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/positive_semidefinite_kernels",
+    ],
+)
+
+py_library(
+    name = "generalized_pareto",
+    srcs = ["generalized_pareto.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1585,6 +1601,20 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/positive_semidefinite_kernels",
+    ],
+)
+
+py_test(
+    name = "generalized_pareto_test",
+    srcs = ["generalized_pareto_test.py"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

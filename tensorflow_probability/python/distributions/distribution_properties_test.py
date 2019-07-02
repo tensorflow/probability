@@ -56,6 +56,7 @@ TF2_FRIENDLY_DISTS = (
     'Dirichlet',
     'Exponential',
     'Gamma',
+    'GeneralizedPareto',
     'HalfNormal',
     'Laplace',
     'LogNormal',
@@ -391,11 +392,7 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
 
   @parameterized.parameters((dname,) for dname in TF2_FRIENDLY_DISTS)
   @hp.given(hps.data())
-  @hp.settings(
-      deadline=None,
-      max_examples=tfp_hps.hypothesis_max_examples(),
-      suppress_health_check=[hp.HealthCheck.too_slow],
-      derandomize=tfp_hps.derandomize_hypothesis())
+  @tfp_hps.tfp_hp_settings()
   def testDistribution(self, dist_name, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
       return
@@ -607,11 +604,7 @@ class DistributionSlicingTest(tf.test.TestCase):
     # self.evaluate(dist.log_prob(dist.sample()))
 
   @hp.given(hps.data())
-  @hp.settings(
-      deadline=None,
-      max_examples=tfp_hps.hypothesis_max_examples(),
-      suppress_health_check=[hp.HealthCheck.too_slow],
-      derandomize=tfp_hps.derandomize_hypothesis())
+  @tfp_hps.tfp_hp_settings()
   def testDistributions(self, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'): return
     self._run_test(data)
@@ -674,6 +667,8 @@ CONSTRAINTS = {
         tf.math.softplus,
     'concentration':
         tfp_hps.softplus_plus_eps(),
+    'GeneralizedPareto.concentration':  # Permits +ve and -ve concentrations.
+        lambda x: tf.math.tanh(x) * 0.24,
     'concentration0':
         tfp_hps.softplus_plus_eps(),
     'concentration1':

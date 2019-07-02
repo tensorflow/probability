@@ -237,11 +237,7 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.parameters((bname,) for bname in TF2_FRIENDLY_BIJECTORS)
   @hp.given(hps.data())
-  @hp.settings(
-      deadline=None,
-      max_examples=tfp_hps.hypothesis_max_examples(),
-      suppress_health_check=[hp.HealthCheck.too_slow],
-      derandomize=tfp_hps.derandomize_hypothesis())
+  @tfp_hps.tfp_hp_settings()
   def testBijector(self, bijector_name, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
       return

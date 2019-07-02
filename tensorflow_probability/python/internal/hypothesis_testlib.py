@@ -23,6 +23,7 @@ import os
 import traceback
 
 # Dependency imports
+import hypothesis as hp
 from hypothesis.extra import numpy as hpnp
 import hypothesis.strategies as hps
 import numpy as np
@@ -39,9 +40,19 @@ def derandomize_hypothesis():
   return bool(int(os.environ.get('TFP_DERANDOMIZE_HYPOTHESIS', 1)))
 
 
-def hypothesis_max_examples():
+def hypothesis_max_examples(default=None):
   # Use --test_env=TFP_HYPOTHESIS_MAX_EXAMPLES=1000 to get fuller coverage.
-  return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', 20))
+  return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', default or 20))
+
+
+def tfp_hp_settings(**kwargs):
+  kwds = dict(
+      deadline=None,
+      max_examples=hypothesis_max_examples(kwargs.pop('max_examples', None)),
+      suppress_health_check=[hp.HealthCheck.too_slow],
+      derandomize=derandomize_hypothesis())
+  kwds.update(kwargs)
+  return hp.settings(**kwds)
 
 
 VAR_USAGES = {}
