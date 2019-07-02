@@ -66,7 +66,7 @@ __all__ = [
 ]
 
 
-# TODO(rif): Add unit test.
+# TODO(b/256095991): Add unit test.
 def _gather(  # pylint: disable=unused-argument
     params,
     indices,
@@ -132,13 +132,17 @@ def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-built
   return tf.ones(s, dtype or s.dtype, name)
 
 
+# TODO(b/136555907): Add unit-test.
 def _pad(  # pylint: disable=unused-argument
     tensor,
     paddings,
     mode='CONSTANT',
     name=None,
     constant_values=0):
-  raise NotImplementedError
+  return np.pad(
+      tensor, paddings,
+      mode=mode.lower(),
+      constant_values=constant_values)
 
 
 def _reverse(tensor, axis, name=None):  # pylint: disable=unused-argument

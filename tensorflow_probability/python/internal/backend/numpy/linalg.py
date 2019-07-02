@@ -42,6 +42,7 @@ __all__ = [
     'matrix_transpose',
     'norm',
     'set_diag',
+    'slogdet',
     'triangular_solve',
     # 'adjoint',
     # 'cross',
@@ -59,7 +60,6 @@ __all__ = [
     # 'matvec',
     # 'norm',
     # 'qr',
-    # 'slogdet',
     # 'solve',
     # 'sqrtm',
     # 'svd',
@@ -164,6 +164,11 @@ norm = utils.copy_docstring(
 set_diag = utils.copy_docstring(
     tf.linalg.set_diag,
     _fill_diagonal)
+
+# TODO(b/136555907): Add unit-test.
+slogdet = utils.copy_docstring(
+    tf.linalg.slogdet,
+    np.linalg.slogdet)
 
 matrix_transpose = utils.copy_docstring(
     tf.linalg.matrix_transpose,

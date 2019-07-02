@@ -73,7 +73,7 @@ __all__ = [
     'igammac',
     'imag',
     # 'in_top_k',
-    # 'invert_permutation',
+    'invert_permutation',
     'is_finite',
     'is_inf',
     'is_nan',
@@ -397,9 +397,10 @@ imag = utils.copy_docstring(
 #     tf.math.in_top_k,
 #     lambda targets, predictions, k, name=None: np.in_top_k)
 
-# invert_permutation = utils.copy_docstring(
-#     tf.math.invert_permutation,
-#     lambda x, name=None: np.invert_permutation)
+# TODO(b/256095991): Add unit-test.
+invert_permutation = utils.copy_docstring(
+    tf.math.invert_permutation,
+    lambda x, name=None: np.argsort)
 
 is_finite = utils.copy_docstring(
     tf.math.is_finite,

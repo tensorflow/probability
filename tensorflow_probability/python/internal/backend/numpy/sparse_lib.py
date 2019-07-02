@@ -41,7 +41,7 @@ def _to_dense(sp_input, default_value=0, validate_indices=True, name=None):  # p
 # --- Begin Public Functions --------------------------------------------------
 
 
-# TODO(rif): Add unit test.
+# TODO(b/136555907): Add unit test.
 to_dense = utils.copy_docstring(
     tf.sparse.to_dense,
     _to_dense)

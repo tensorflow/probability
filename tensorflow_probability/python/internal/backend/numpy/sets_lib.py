@@ -44,7 +44,7 @@ def _difference(a, b, aminusb=True, validate_indices=True):
 # --- Begin Public Functions --------------------------------------------------
 
 
-# TODO(rif): Add unit test.
+# TODO(b/136555907): Add unit test.
 difference = utils.copy_docstring(
     tf.sets.difference,
     _difference)
