@@ -80,8 +80,6 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 

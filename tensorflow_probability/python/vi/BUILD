@@ -44,8 +44,11 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:nest_util",
+        "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/monte_carlo",
+        "//tensorflow_probability/python/stats:leave_one_out",
     ],
 )
 

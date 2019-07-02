@@ -26,7 +26,6 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow_probability.python.math.gradient import value_and_gradient
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -709,11 +708,12 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
         exact_kl_,
         exact_kl_grad_,
     ] = self.evaluate(
-        list(value_and_gradient(approx_kl, s)) +
-        list(value_and_gradient(approx_kl_self_normalized, s)) +
-        list(value_and_gradient(approx_kl_score_trick, s)) +
-        list(value_and_gradient(approx_kl_self_normalized_score_trick, s)) +
-        list(value_and_gradient(exact_kl, s)))
+        list(tfp.math.value_and_gradient(approx_kl, s)) +
+        list(tfp.math.value_and_gradient(approx_kl_self_normalized, s)) +
+        list(tfp.math.value_and_gradient(approx_kl_score_trick, s)) +
+        list(tfp.math.value_and_gradient(
+            approx_kl_self_normalized_score_trick, s)) +
+        list(tfp.math.value_and_gradient(exact_kl, s)))
 
     # Test average divergence.
     self.assertAllClose(approx_kl_, exact_kl_,
@@ -774,143 +774,6 @@ class CsiszarVIMCOTest(test_case.TestCase):
 
     log_avg_u = np.log(np.mean(u, axis=0))
     return log_avg_u, log_sooavg_u
-
-  def _csiszar_vimco_helper_grad(self, logu, delta):
-    """Finite difference approximation of `grad(csiszar_vimco_helper, logu)`."""
-
-    # This code actually estimates the sum of the Jacobiab because that's what
-    # TF's `gradients` does.
-    np_log_avg_u1, np_log_sooavg_u1 = self._csiszar_vimco_helper(
-        logu[..., None] + np.diag([delta]*len(logu)))
-    np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(
-        logu[..., None])
-    return [
-        (np_log_avg_u1 - np_log_avg_u) / delta,
-        np.sum(np_log_sooavg_u1 - np_log_sooavg_u, axis=0) / delta,
-    ]
-
-  def test_vimco_helper_1(self):
-    """Tests that function calculation correctly handles batches."""
-
-    logu = np.linspace(-100., 100., 100).reshape([10, 2, 5])
-    np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(logu)
-    [log_avg_u, log_sooavg_u] = self.evaluate(tfp.vi.csiszar_vimco_helper(logu))
-    self.assertAllClose(np_log_avg_u, log_avg_u,
-                        rtol=1e-8, atol=0.)
-    self.assertAllClose(np_log_sooavg_u, log_sooavg_u,
-                        rtol=1e-8, atol=0.)
-
-  def test_vimco_helper_2(self):
-    """Tests that function calculation correctly handles overflow."""
-
-    # Using 700 (rather than 1e3) since naive numpy version can't handle higher.
-    logu = np.float32([0., 700, -1, 1])
-    np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(logu)
-    [log_avg_u, log_sooavg_u] = self.evaluate(tfp.vi.csiszar_vimco_helper(logu))
-    self.assertAllClose(np_log_avg_u, log_avg_u,
-                        rtol=1e-6, atol=0.)
-    self.assertAllClose(np_log_sooavg_u, log_sooavg_u,
-                        rtol=1e-5, atol=0.)
-
-  def test_vimco_helper_3(self):
-    """Tests that function calculation correctly handles underlow."""
-
-    logu = np.float32([0., -1000, -1, 1])
-    np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(logu)
-    [log_avg_u, log_sooavg_u] = self.evaluate(tfp.vi.csiszar_vimco_helper(logu))
-    self.assertAllClose(np_log_avg_u, log_avg_u,
-                        rtol=1e-5, atol=0.)
-    self.assertAllClose(np_log_sooavg_u, log_sooavg_u,
-                        rtol=1e-4, atol=1e-15)
-
-  def test_vimco_helper_gradient_using_finite_difference_1(self):
-    """Tests that gradient calculation correctly handles batches."""
-
-    logu_ = np.linspace(-100., 100., 100).reshape([10, 2, 5])
-    logu = tf.constant(logu_)
-
-    def log_avg_u(logu):
-      return tfp.vi.csiszar_vimco_helper(logu)[0]
-    _, grad_log_avg_u = self.evaluate(value_and_gradient(log_avg_u, logu))
-
-    def log_sooavg_u(logu):
-      return tfp.vi.csiszar_vimco_helper(logu)[1]
-    _, grad_log_sooavg_u = self.evaluate(value_and_gradient(log_sooavg_u, logu))
-
-    # We skip checking against finite-difference approximation since it
-    # doesn't support batches.
-
-    # Verify claim in docstring.
-    self.assertAllClose(
-        np.ones_like(grad_log_avg_u.sum(axis=0)),
-        grad_log_avg_u.sum(axis=0))
-    self.assertAllClose(
-        np.ones_like(grad_log_sooavg_u.mean(axis=0)),
-        grad_log_sooavg_u.mean(axis=0))
-
-  def test_vimco_helper_gradient_using_finite_difference_2(self):
-    """Tests that gradient calculation correctly handles overflow."""
-
-    delta = 1e-3
-    logu_ = np.float32([0., 1000, -1, 1])
-    logu = tf.constant(logu_)
-
-    [
-        np_grad_log_avg_u,
-        np_grad_log_sooavg_u,
-    ] = self._csiszar_vimco_helper_grad(logu_, delta)
-
-    def log_avg_u(logu):
-      return tfp.vi.csiszar_vimco_helper(logu)[0]
-    _, grad_log_avg_u = self.evaluate(value_and_gradient(log_avg_u, logu))
-
-    def log_sooavg_u(logu):
-      return tfp.vi.csiszar_vimco_helper(logu)[1]
-    _, grad_log_sooavg_u = self.evaluate(value_and_gradient(log_sooavg_u, logu))
-
-    self.assertAllClose(np_grad_log_avg_u, grad_log_avg_u,
-                        rtol=delta, atol=0.)
-    self.assertAllClose(np_grad_log_sooavg_u, grad_log_sooavg_u,
-                        rtol=delta, atol=0.)
-    # Verify claim in docstring.
-    self.assertAllClose(
-        np.ones_like(grad_log_avg_u.sum(axis=0)),
-        grad_log_avg_u.sum(axis=0))
-    self.assertAllClose(
-        np.ones_like(grad_log_sooavg_u.mean(axis=0)),
-        grad_log_sooavg_u.mean(axis=0))
-
-  def test_vimco_helper_gradient_using_finite_difference_3(self):
-    """Tests that gradient calculation correctly handles underlow."""
-
-    delta = 1e-3
-    logu_ = np.float32([0., -1000, -1, 1])
-    logu = tf.constant(logu_)
-
-    [
-        np_grad_log_avg_u,
-        np_grad_log_sooavg_u,
-    ] = self._csiszar_vimco_helper_grad(logu_, delta)
-
-    def log_avg_u(logu):
-      return tfp.vi.csiszar_vimco_helper(logu)[0]
-    _, grad_log_avg_u = self.evaluate(value_and_gradient(log_avg_u, logu))
-
-    def log_sooavg_u(logu):
-      return tfp.vi.csiszar_vimco_helper(logu)[1]
-    _, grad_log_sooavg_u = self.evaluate(value_and_gradient(log_sooavg_u, logu))
-
-    self.assertAllClose(np_grad_log_avg_u, grad_log_avg_u,
-                        rtol=delta, atol=delta)
-    self.assertAllClose(np_grad_log_sooavg_u, grad_log_sooavg_u,
-                        rtol=delta, atol=delta)
-    # Verify claim in docstring.
-    self.assertAllClose(
-        np.ones_like(grad_log_avg_u.sum(axis=0)),
-        grad_log_avg_u.sum(axis=0))
-    self.assertAllClose(
-        np.ones_like(grad_log_sooavg_u.mean(axis=0)),
-        grad_log_sooavg_u.mean(axis=0))
 
   def test_vimco_and_gradient(self):
     dims = 5  # Dimension

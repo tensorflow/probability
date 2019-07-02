@@ -24,10 +24,11 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-
 from tensorflow_probability.python.internal import dtype_util
 
+
 __all__ = [
+    'log_add_exp',
     'log_combinations',
     'reduce_weighted_logsumexp',
     'soft_threshold',
@@ -284,7 +285,7 @@ def softplus_inverse(x, name=None):
     #       = Log[(exp{x} - 1) / exp{x}] + Log[exp{x}]
     #       = Log[(1 - exp{-x}) / 1] + Log[exp{x}]
     #       = Log[1 - exp{-x}] + x                           (3)
-    # (2) is the 'obvious' inverse, but (3) is more stable than (2) for large x.
+    # (2) is the "obvious" inverse, but (3) is more stable than (2) for large x.
     # For small x (e.g. x = 1e-10), (3) will become -inf since 1 - exp{-x} will
     # be zero. To fix this, we use 1 - exp{-x} approx x for small x > 0.
     #
@@ -311,3 +312,22 @@ def softplus_inverse(x, name=None):
     return tf.where(is_too_small,
                     too_small_value,
                     tf.where(is_too_large, too_large_value, y))
+
+
+def log_add_exp(x, y, name=None):
+  """Computes `log(exp(x) + exp(y))` in a numerically stable way.
+
+  Args:
+    x: `float` `Tensor` broadcastable with `y`.
+    y: `float` `Tensor` broadcastable with `x`.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'log_add_exp'`).
+
+  Returns:
+    log_add_exp: `log(exp(x) + exp(y))` computed in a numerically stable way.
+  """
+  with tf.name_scope(name or 'log_add_exp'):
+    dtype = dtype_util.common_dtype([x, y], dtype_hint=tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype, name='x')
+    y = tf.convert_to_tensor(y, dtype=dtype, name='y')
+    return tf.maximum(x, y) + tf.math.softplus(-abs(x - y))

@@ -54,7 +54,8 @@ def value_and_gradient(f, xs, use_gradient_tape=False, name=None):
     if not is_xs_list_like:
       xs = [xs]
     xs = [
-        tf.convert_to_tensor(x, name='x{}'.format(i)) for i, x in enumerate(xs)
+        tf.convert_to_tensor(x, dtype_hint=tf.float32, name='x{}'.format(i))
+        for i, x in enumerate(xs)
     ]
     if tf.executing_eagerly() or use_gradient_tape:
       with tf.GradientTape(watch_accessed_variables=False) as tape:

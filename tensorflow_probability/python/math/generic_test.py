@@ -23,7 +23,8 @@ from absl.testing import parameterized
 import numpy as np
 from scipy import special as sp_special
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -31,8 +32,11 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
 
 
+tfd = tfp.distributions
+
+
 @test_util.run_all_in_graph_and_eager_modes
-class LogCombinationsTest(tf.test.TestCase):
+class LogCombinationsTest(test_case.TestCase):
 
   def testLogCombinationsBinomial(self):
     n = [2, 5, 12, 15]
@@ -58,7 +62,7 @@ class LogCombinationsTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ReduceWeightedLogSumExp(tf.test.TestCase):
+class ReduceWeightedLogSumExp(test_case.TestCase):
 
   def _reduce_weighted_logsumexp(self, logx, w, axis, keep_dims=False):
     m = np.max(logx, axis=axis, keepdims=True)
@@ -190,7 +194,7 @@ class SoftThresholdTest(test_case.TestCase, parameterized.TestCase):
   # pylint: enable=bad-whitespace
   # pyformat: enable
   def test_soft_threshold(self, x, threshold, expected_y, expected_dydx):
-    x = tf.convert_to_tensor(value=x, dtype=self.dtype)
+    x = tf.convert_to_tensor(x, dtype=self.dtype)
     y, dydx = tfp.math.value_and_gradient(
         lambda x_: tfp.math.soft_threshold(x_, threshold), x)
     y_, dydx_ = self.evaluate([y, dydx])
@@ -202,7 +206,7 @@ class SoftThresholdTest(test_case.TestCase, parameterized.TestCase):
 # tensorflow/python/kernel_tests/softplus_op_test.py
 # once TF core is accepting new ops.
 @test_util.run_all_in_graph_and_eager_modes
-class SoftplusInverseTest(tf.test.TestCase):
+class SoftplusInverseTest(test_case.TestCase):
 
   def _npSoftplus(self, np_features):
     np_features = np.asarray(np_features)
@@ -212,7 +216,7 @@ class SoftplusInverseTest(tf.test.TestCase):
   def _testSoftplus(self, np_features, use_gpu=False):
     np_features = np.asarray(np_features)
     np_softplus = self._npSoftplus(np_features)
-    softplus = tf.nn.softplus(np_features)
+    softplus = tf.math.softplus(np_features)
     softplus_inverse = tfp.math.softplus_inverse(softplus)
     [tf_softplus, tf_softplus_inverse] = self.evaluate([
         softplus, softplus_inverse])
@@ -284,8 +288,8 @@ class SoftplusInverseTest(tf.test.TestCase):
         shape=[2, 5],
         name='x')
     err = gradient_checker_v2.max_error(
-        *gradient_checker_v2.compute_gradient(tf.nn.softplus, [x]))
-    tf.compat.v1.logging.vlog(2, 'softplus (float) gradient err = ', err)
+        *gradient_checker_v2.compute_gradient(tf.math.softplus, [x]))
+    tf1.logging.vlog(2, 'softplus (float) gradient err = ', err)
     self.assertLess(err, 1e-4)
 
   def testInverseSoftplusGradientNeverNan(self):
@@ -305,6 +309,34 @@ class SoftplusInverseTest(tf.test.TestCase):
     # Equivalent to `assertAllTrue` (if it existed).
     self.assertAllEqual(
         np.ones_like(grads).astype(np.bool), np.isfinite(grads))
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class LogAddExp(test_case.TestCase):
+
+  def test_small(self):
+    x = [-2, -1000]
+    y = [-1000, -3]
+    z, g = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.log_add_exp, [x, y]))
+    self.assertAllClose([-2., -3.], z, atol=0., rtol=1e-5)
+    self.assertAllEqual(np.eye(2), g)
+
+  def test_medium(self):
+    x = [-2, -3]
+    y = [-3, 2]
+    z, g = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.log_add_exp, [x, y]))
+    self.assertAllClose(np.log(np.exp(x) + np.exp(y)), z, atol=0., rtol=1e-5)
+    self.assertAllNotNone(g)
+
+  def test_big(self):
+    x = [2, 1000]
+    y = [1000, 3]
+    z, g = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.log_add_exp, [x, y]))
+    self.assertAllClose([1000., 1000.], z, atol=0., rtol=1e-5)
+    self.assertAllEqual(1. - np.eye(2), g)
 
 
 if __name__ == '__main__':

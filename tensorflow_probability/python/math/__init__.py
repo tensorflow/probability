@@ -21,6 +21,7 @@ from __future__ import print_function
 from tensorflow_probability.python.math import ode
 from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
+from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import log_combinations
 from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
 from tensorflow_probability.python.math.generic import soft_threshold
@@ -61,6 +62,7 @@ _allowed_symbols = [
     'fill_triangular_inverse',
     'interp_regular_1d_grid',
     'log1psquare',
+    'log_add_exp',
     'log_combinations',
     'lu_matrix_inverse',
     'lu_reconstruct',
