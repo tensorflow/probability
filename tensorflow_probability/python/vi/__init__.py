@@ -27,6 +27,7 @@ from tensorflow_probability.python.vi.csiszar_divergence import kl_reverse
 from tensorflow_probability.python.vi.csiszar_divergence import log1p_abs
 from tensorflow_probability.python.vi.csiszar_divergence import modified_gan
 from tensorflow_probability.python.vi.csiszar_divergence import monte_carlo_csiszar_f_divergence
+from tensorflow_probability.python.vi.csiszar_divergence import monte_carlo_variational_loss
 from tensorflow_probability.python.vi.csiszar_divergence import pearson
 from tensorflow_probability.python.vi.csiszar_divergence import squared_hellinger
 from tensorflow_probability.python.vi.csiszar_divergence import symmetrized_csiszar_function
@@ -34,7 +35,7 @@ from tensorflow_probability.python.vi.csiszar_divergence import t_power
 from tensorflow_probability.python.vi.csiszar_divergence import total_variation
 from tensorflow_probability.python.vi.csiszar_divergence import triangular
 
-from tensorflow.python.util.all_util import remove_undocumented
+from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 
 _allowed_symbols = [
@@ -51,6 +52,7 @@ _allowed_symbols = [
     "log1p_abs",
     "modified_gan",
     "monte_carlo_csiszar_f_divergence",
+    "monte_carlo_variational_loss",
     "pearson",
     "squared_hellinger",
     "symmetrized_csiszar_function",

@@ -465,7 +465,7 @@ class DualCsiszarFunctionTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
+class MonteCarloVariationalLossTest(test_case.TestCase):
 
   def test_kl_forward(self):
     q = tfd.Normal(
@@ -476,18 +476,19 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
     seed = tfp_test_util.test_seed()
 
-    approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=tfp.vi.kl_forward,
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(4e5),
+    approx_kl = tfp.vi.monte_carlo_variational_loss(
+        discrepancy_fn=tfp.vi.kl_forward,
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        sample_size=int(4e5),
         seed=seed)
 
-    approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=lambda logu: tfp.vi.kl_forward(logu, self_normalized=True),
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(4e5),
+    approx_kl_self_normalized = tfp.vi.monte_carlo_variational_loss(
+        discrepancy_fn=(
+            lambda logu: tfp.vi.kl_forward(logu, self_normalized=True)),
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        sample_size=int(4e5),
         seed=seed)
 
     exact_kl = tfd.kl_divergence(p, q)
@@ -510,18 +511,19 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
     seed = tfp_test_util.test_seed()
 
-    approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=tfp.vi.kl_reverse,
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(4.5e5),
+    approx_kl = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        discrepancy_fn=tfp.vi.kl_reverse,
+        sample_size=int(4.5e5),
         seed=seed)
 
-    approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(4.5e5),
+    approx_kl_self_normalized = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        discrepancy_fn=(
+            lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True)),
+        sample_size=int(4.5e5),
         seed=seed)
 
     exact_kl = tfd.kl_divergence(q, p)
@@ -548,18 +550,19 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
     seed = tfp_test_util.test_seed()
 
-    approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=tfp.vi.kl_forward,
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(6e5),
+    approx_kl = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        discrepancy_fn=tfp.vi.kl_forward,
+        sample_size=int(6e5),
         seed=seed)
 
-    approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=lambda logu: tfp.vi.kl_forward(logu, self_normalized=True),
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(6e5),
+    approx_kl_self_normalized = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        discrepancy_fn=(
+            lambda logu: tfp.vi.kl_forward(logu, self_normalized=True)),
+        sample_size=int(6e5),
         seed=seed)
 
     exact_kl = tfd.kl_divergence(p, q)
@@ -587,18 +590,19 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
     seed = tfp_test_util.test_seed()
 
-    approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=tfp.vi.kl_reverse,
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(6e5),
+    approx_kl = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        discrepancy_fn=tfp.vi.kl_reverse,
+        sample_size=int(6e5),
         seed=seed)
 
-    approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(6e5),
+    approx_kl_self_normalized = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        discrepancy_fn=(
+            lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True)),
+        sample_size=int(6e5),
         seed=seed)
 
     exact_kl = tfd.kl_divergence(q, p)
@@ -615,7 +619,7 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
   def test_kl_with_joint_q(self):
 
     # Target distribution: equiv to MVNFullCovariance(cov=[[1., 1.], [1., 2.]])
-    def p_log_prob(z, x):
+    def target_log_prob_fn(z, x):
       return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
 
     # Factored q distribution: equiv to MVNDiag(scale_diag=[1., sqrt(2)])
@@ -630,18 +634,18 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
     seed = tfp_test_util.test_seed()
 
-    reverse_kl_sequential = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=tfp.vi.kl_reverse,
-        p_log_prob=p_log_prob,
-        q=q_sequential,
-        num_draws=int(3e5),
+    reverse_kl_sequential = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=target_log_prob_fn,
+        surrogate_posterior=q_sequential,
+        discrepancy_fn=tfp.vi.kl_reverse,
+        sample_size=int(3e5),
         seed=seed)
 
-    reverse_kl_named = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=tfp.vi.kl_reverse,
-        p_log_prob=p_log_prob,
-        q=q_named,
-        num_draws=int(3e5),
+    reverse_kl_named = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=target_log_prob_fn,
+        surrogate_posterior=q_named,
+        discrepancy_fn=tfp.vi.kl_reverse,
+        sample_size=int(3e5),
         seed=seed)
 
     reverse_kl_sequential_, reverse_kl_named_, = self.evaluate(
@@ -653,7 +657,7 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
   def test_score_trick(self):
     d = 5  # Dimension
-    num_draws = int(4.5e5)
+    sample_size = int(4.5e5)
     seed = tfp_test_util.test_seed()
 
     # Variance is very high when approximating Forward KL, so we make
@@ -667,11 +671,11 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
         p = tfd.MultivariateNormalFullCovariance(
             covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
         q = tfd.MultivariateNormalDiag(scale_diag=tf.tile([s], [d]))
-        return tfp.vi.monte_carlo_csiszar_f_divergence(
-            f=func,
-            p_log_prob=p.log_prob,
-            q=q,
-            num_draws=num_draws,
+        return tfp.vi.monte_carlo_variational_loss(
+            target_log_prob_fn=p.log_prob,
+            surrogate_posterior=q,
+            discrepancy_fn=func,
+            sample_size=sample_size,
             use_reparametrization=use_reparametrization,
             seed=seed)
       return _fn
