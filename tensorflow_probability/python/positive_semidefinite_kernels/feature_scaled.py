@@ -84,3 +84,14 @@ class FeatureScaled(feature_transformed.FeatureTransformed):
   @property
   def scale_diag(self):
     return self._scale_diag
+
+  def _batch_shape(self):
+    return tf.broadcast_static_shape(
+        self.kernel.batch_shape,
+        self.scale_diag.shape[:-self.kernel.feature_ndims])
+
+  def _batch_shape_tensor(self):
+    return tf.broadcast_dynamic_shape(
+        self.kernel.batch_shape_tensor(),
+        tf.shape(input=self.scale_diag)[:-self.kernel.feature_ndims])
+

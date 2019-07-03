@@ -44,6 +44,20 @@ def _numpy_exp_quad_matrix(amplitude, length_scale, x, feature_ndims):
 @test_util.run_all_in_graph_and_eager_modes
 class _FeatureScaledTest(parameterized.TestCase):
 
+  def testBatchShape(self):
+    # Batch shape [10, 2]
+    amplitude = np.random.uniform(
+        low=1., high=10., size=[10, 2]).astype(self.dtype)
+    inner_length_scale = self.dtype(1.)
+    # Use 3 feature_ndims.
+    kernel = tfpk.ExponentiatedQuadratic(
+        amplitude, inner_length_scale, feature_ndims=3)
+    scale_diag = tf.ones([20, 1, 2, 1, 1, 1])
+    ard_kernel = tfpk.FeatureScaled(kernel, scale_diag=scale_diag)
+    self.assertAllEqual([20, 10, 2], ard_kernel.batch_shape)
+    self.assertAllEqual(
+        [20, 10, 2], self.evaluate(ard_kernel.batch_shape_tensor()))
+
   @parameterized.parameters(
       {'feature_ndims': 1, 'dims': 3},
       {'feature_ndims': 1, 'dims': 4},
