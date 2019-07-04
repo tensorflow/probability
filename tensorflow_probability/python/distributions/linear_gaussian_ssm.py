@@ -660,7 +660,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # Combine the initial sampled timestep with the remaining timesteps.
       if latents:
         latents = tf.concat([initial_latent[tf.newaxis, ...],
-                            latents], axis=0)
+                             latents], axis=0)
       else:
         latents = initial_latent[tf.newaxis, ...]
       if observations:
@@ -668,7 +668,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
                                   observations], axis=0)
       else:
         observations = initial_observation[tf.newaxis, ...]
-        
+
       # Put dimensions back in order. The samples we've computed are
       # ordered by timestep, with shape `[num_timesteps, num_samples,
       # batch_shape, size, 1]` where `size` represents `latent_size`
