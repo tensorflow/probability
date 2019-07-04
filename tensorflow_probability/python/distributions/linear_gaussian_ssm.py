@@ -658,12 +658,12 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           initializer=(initial_latent, initial_observation))
 
       # Combine the initial sampled timestep with the remaining timesteps.
-      if latents:
+      if latents is not None:
         latents = tf.concat([initial_latent[tf.newaxis, ...],
                              latents], axis=0)
       else:
         latents = initial_latent[tf.newaxis, ...]
-      if observations:
+      if observations is not None:
         observations = tf.concat([initial_observation[tf.newaxis, ...],
                                   observations], axis=0)
       else:
