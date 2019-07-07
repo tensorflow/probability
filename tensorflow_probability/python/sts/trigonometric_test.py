@@ -1,0 +1,145 @@
+# Copyright 2018 The TensorFlow Probability Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+"""Trigonometric State Space Model Tests."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+# Dependency imports
+import numpy as np
+import tensorflow as tf
+import tensorflow_probability as tfp
+from tensorflow_probability.python.sts import Trigonometric
+from tensorflow_probability.python.sts import TrigonometricStateSpaceModel
+
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
+tfd = tfp.distributions
+
+class _TrigonometricStateSpaceModelTest(object):
+
+  def test_basic_statistics_no_latent_variance_one_frequency(self):
+    # fix the latent variables at the value 1 so the results are deterministic
+    num_timesteps = 10
+    period = 42
+    selected_frequencies = [3]
+    drift_scale = 0.
+
+    initial_state_loc = self._build_placeholder(np.ones([2]))
+    initial_state_scale = tf.zeros_like(initial_state_loc)
+
+    initial_state_prior = tfd.MultivariateNormalDiag(
+        loc=initial_state_loc, scale_diag=initial_state_scale)
+
+    ssm = TrigonometricStateSpaceModel(
+        num_timesteps=num_timesteps,
+        period=period,
+        selected_frequencies=selected_frequencies,
+        drift_scale=drift_scale,
+        initial_state_prior=initial_state_prior)
+
+    sine_terms = np.sin(2 * np.pi * 3 * np.arange(0, num_timesteps) / 42)
+    cosine_terms = np.cos(2 * np.pi * 3 * np.arange(0, num_timesteps) / 42)
+    predicted_time_series = (sine_terms + cosine_terms)[..., np.newaxis]
+
+    self.assertAllClose(self.evaluate(ssm.mean()), predicted_time_series)
+    self.assertAllClose(*self.evaluate((ssm.stddev(),
+                                        tf.zeros_like(predicted_time_series))))
+
+  def test_matrices_from_component(self):
+    num_timesteps = 4
+    drift_scale = 1.23
+    period = 12
+    selected_frequencies = [1, 3]
+
+    component = Trigonometric(
+        period=period, selected_frequencies=selected_frequencies)
+
+    ssm = component.make_state_space_model(num_timesteps, [drift_scale])
+
+    lambda_0 = 2 * np.pi * selected_frequencies[0] / period
+    lambda_1 = 2 * np.pi * selected_frequencies[1] / period
+
+    first_frequency_transition = np.array(
+        [[np.cos(lambda_0), np.sin(lambda_0)],
+         [-np.sin(lambda_0), np.cos(lambda_0)]])
+
+    second_frequency_transition = np.array(
+        [[np.cos(lambda_1), np.sin(lambda_1)],
+         [-np.sin(lambda_1), np.cos(lambda_1)]])
+
+    latents_transition = np.block(
+        [[first_frequency_transition, np.zeros([2, 2])],
+         [np.zeros([2, 2]), second_frequency_transition]])
+
+    for t in range(num_timesteps):
+      observation_matrix = self.evaluate(
+          ssm.get_observation_matrix_for_timestep(t).to_dense())
+
+      self.assertAllClose([[1.0, 0.0, 1.0, 0.0]], observation_matrix)
+
+      observation_noise_mean = self.evaluate(
+          ssm.get_observation_noise_for_timestep(t).mean())
+      observation_noise_covariance = self.evaluate(
+          ssm.get_observation_noise_for_timestep(t).covariance())
+
+      self.assertAllClose([0.0], observation_noise_mean)
+      self.assertAllClose([[0.0]], observation_noise_covariance)
+
+      transition_matrix = self.evaluate(
+          ssm.get_transition_matrix_for_timestep(t).to_dense())
+
+      self.assertAllClose(latents_transition, transition_matrix)
+
+      transition_noise_mean = self.evaluate(
+          ssm.get_transition_noise_for_timestep(t).mean())
+      transition_noise_covariance = self.evaluate(
+          ssm.get_transition_noise_for_timestep(t).covariance())
+
+      self.assertAllClose(np.zeros([4]),
+                          transition_noise_mean)
+      self.assertAllClose(np.square(drift_scale) * np.eye(4),
+                          transition_noise_covariance)
+
+  def _build_placeholder(self, ndarray):
+    ndarray = np.asarray(ndarray).astype(self.dtype)
+    return tf.compat.v1.placeholder_with_default(
+        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class TrigonometricStateSpaceModelTestStaticShape32(
+    tf.test.TestCase, _TrigonometricStateSpaceModelTest):
+  dtype = np.float32
+  use_static_shape = True
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class TrigonometricStateSpaceModelTestDynamicShape32(
+    tf.test.TestCase, _TrigonometricStateSpaceModelTest):
+  dtype = np.float32
+  use_static_shape = False
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class TrigonometricStateSpaceModelTestStaticShape64(
+    tf.test.TestCase, _TrigonometricStateSpaceModelTest):
+  dtype = np.float64
+  use_static_shape = True
+
+
+if __name__ == "__main__":
+  tf.test.main()
