@@ -32,6 +32,7 @@ from tensorflow_probability.python.sts import Seasonal
 from tensorflow_probability.python.sts import SemiLocalLinearTrend
 from tensorflow_probability.python.sts import SparseLinearRegression
 from tensorflow_probability.python.sts import Sum
+from tensorflow_probability.python.sts import Trigonometric
 from tensorflow_probability.python.sts.internal import util as sts_util
 
 tfd = tfp.distributions
@@ -396,6 +397,16 @@ class DynamicLinearRegressionTest(tf.test.TestCase, _StsTestHarness):
         design_matrix=np.random.randn(
             max_timesteps, num_features).astype(np.float32),
         observed_time_series=observed_time_series)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class TrigonometricTest(tf.test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    return Trigonometric(period=42,
+                         selected_frequencies=[1, 2, 4],
+                         observed_time_series=observed_time_series)
+
 
 if __name__ == '__main__':
   tf.test.main()

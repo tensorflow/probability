@@ -44,6 +44,8 @@ from tensorflow_probability.python.sts.semilocal_linear_trend import SemiLocalLi
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 from tensorflow_probability.python.sts.sum import AdditiveStateSpaceModel
 from tensorflow_probability.python.sts.sum import Sum
+from tensorflow_probability.python.sts.trigonometric import Trigonometric
+from tensorflow_probability.python.sts.trigonometric import TrigonometricStateSpaceModel
 
 from tensorflow.python.util.all_util import remove_undocumented
 
@@ -67,6 +69,8 @@ _allowed_symbols = [
     'SparseLinearRegression',
     'StructuralTimeSeries',
     'Sum',
+    'Trigonometric',
+    'TrigonometricStateSpaceModel',
     'build_factored_variational_loss',
     'decompose_by_component',
     'decompose_forecast_by_component',

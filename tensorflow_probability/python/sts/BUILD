@@ -44,6 +44,7 @@ py_library(
         ":semilocal_linear_trend",
         ":structural_time_series",
         ":sum",
+        ":trigonometric",
     ],
 )
 
@@ -311,6 +312,28 @@ py_test(
     size = "large",
     srcs = ["sum_test.py"],
     shard_count = 2,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "trigonometric",
+    srcs = ["trigonometric.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "trigonometric_test",
+    size = "medium",
+    srcs = ["trigonometric_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
