@@ -99,7 +99,10 @@ class _BaseDeterministic(distribution.Distribution):
 
       super(_BaseDeterministic, self).__init__(
           dtype=self._loc.dtype,
-          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
+          reparameterization_type=(
+              reparameterization.FULLY_REPARAMETERIZED
+              if self._loc.dtype.is_floating
+              else reparameterization.NOT_REPARAMETERIZED),
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,

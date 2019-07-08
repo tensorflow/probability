@@ -68,6 +68,9 @@ TF2_FRIENDLY_DISTS = (
     'StudentT'
 )
 
+NO_SAMPLE_PARAM_GRADS = {
+    'Deterministic': ('atol', 'rtol'),
+}
 NO_LOG_PROB_PARAM_GRADS = ('Deterministic',)
 NO_KL_PARAM_GRADS = ('Deterministic',)
 
@@ -448,10 +451,13 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
     if dist.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
       grads = tape.gradient(sample, dist.variables)
       for grad, var in zip(grads, dist.variables):
+        var_name = var.name.rstrip('_0123456789:')
+        if var_name in NO_SAMPLE_PARAM_GRADS.get(dist_name, ()):
+          continue
         if grad is None:
           raise AssertionError(
               'Missing sample -> {} grad for distribution {}'.format(
-                  var, dist_name))
+                  var_name, dist_name))
 
     # Turn off validations, since log_prob can choke on dist's own samples.
     # Also, to relax conversion counts for KL (might do >2 w/ validate_args).
