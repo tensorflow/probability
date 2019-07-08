@@ -41,6 +41,7 @@ from tensorflow_probability.python.math.linalg import pinv
 from tensorflow_probability.python.math.linalg import pivoted_cholesky
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matmul
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
+from tensorflow_probability.python.math.minimize import minimize
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 from tensorflow_probability.python.math.numeric import log1psquare
 from tensorflow_probability.python.math.random_ops import random_rademacher
@@ -68,6 +69,7 @@ _allowed_symbols = [
     'lu_reconstruct',
     'lu_solve',
     'matrix_rank',
+    'minimize',
     'ode',
     'pinv',
     'pivoted_cholesky',
