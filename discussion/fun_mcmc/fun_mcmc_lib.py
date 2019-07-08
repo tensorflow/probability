@@ -265,13 +265,18 @@ def transform_log_prob_fn(log_prob_fn: PotentialFn,
   and calls the original log-prob function. It then returns the log-probability
   that correctly accounts for this transformation.
 
-  The forward-transformed state is pre-pended to the original log-prob
-  function's extra returns and returned as the new extra return.
+  The wrapped function has the following signature:
+  ```none
+    (*args, **kwargs) ->
+      transformed_space_state, [original_space_state, original_log_prob_extra]
+  ```
+  Note that currently it is forbidden to pass both `args` and `kwargs` to the
+  wrapper.
 
   For convenience you can also pass the initial state (in the original space),
-  and this function will return the inverse transformed as the 2nd return value.
-  You'd use this to initialize MCMC operators that operate in the transformed
-  space.
+  and this function will return the inverse transformed state as the 2nd return
+  value. You'd use this to initialize MCMC operators that operate in the
+  transformed space.
 
   Args:
     log_prob_fn: Log prob fn.
@@ -285,19 +290,23 @@ def transform_log_prob_fn(log_prob_fn: PotentialFn,
       transformed space.
   """
 
-  def wrapper(*args):
+  def wrapper(*args, **kwargs):
     """Transformed wrapper."""
     bijector_ = bijector
 
+    if args and kwargs:
+      raise ValueError('It is forbidden to pass both `args` and `kwargs` to '
+                       'this wrapper.')
+    if kwargs:
+      args = kwargs
+    # Use bijector_ to recover the structure of args that has been lossily
+    # transmitted via *args and **kwargs.
+    args = tf.nest.pack_sequence_as(bijector_, tf.nest.flatten(args))
+
     args = tf.nest.map_structure(lambda x: 0. + x, args)
-    if len(args) == 1:
-      args = args[0]
-    elif isinstance(bijector_, list):
-      args = list(args)
 
     original_space_args = tf.nest.map_structure(lambda b, x: b.forward(x),
                                                 bijector_, args)
-    original_space_args = original_space_args  # type: Tuple[Any]
     original_space_log_prob, extra = call_fn(log_prob_fn, original_space_args)
     event_ndims = tf.nest.map_structure(
         lambda x: tf.rank(x) - tf.rank(original_space_log_prob), args)

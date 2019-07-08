@@ -108,11 +108,39 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertIsInstance(transformed_init_state, list)
     self.assertAllClose([1., 1.], transformed_init_state)
     tlp, (orig_space, _) = transformed_log_prob_fn(1., 1.)
-    self.assertIsInstance(orig_space, list)
     lp = log_prob_fn(2., 3.)[0] + sum(
         b.forward_log_det_jacobian(1., event_ndims=0) for b in bijectors)
 
     self.assertAllClose([2., 3.], orig_space)
+    self.assertAllClose(lp, tlp)
+
+  def testTransformLogProbFnKwargs(self):
+
+    def log_prob_fn(x, y):
+      return tfd.Normal(0., 1.).log_prob(x) + tfd.Normal(1., 1.).log_prob(y), ()
+
+    bijectors = {
+        'x': tfb.AffineScalar(scale=2.),
+        'y': tfb.AffineScalar(scale=3.)
+    }
+
+    (transformed_log_prob_fn,
+     transformed_init_state) = fun_mcmc.transform_log_prob_fn(
+         log_prob_fn, bijectors, {
+             'x': 2.,
+             'y': 3.
+         })
+
+    self.assertIsInstance(transformed_init_state, dict)
+    self.assertAllClose({'x': 1., 'y': 1.}, transformed_init_state)
+
+    tlp, (orig_space, _) = transformed_log_prob_fn(x=1., y=1.)
+    lp = log_prob_fn(
+        x=2., y=3.)[0] + sum(
+            b.forward_log_det_jacobian(1., event_ndims=0)
+            for b in bijectors.values())
+
+    self.assertAllClose({'x': 2., 'y': 3.}, orig_space)
     self.assertAllClose(lp, tlp)
 
   @parameterized.parameters(
