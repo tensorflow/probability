@@ -134,8 +134,6 @@ augment_kl_xent_docs(_sys.modules[__name__])
 del augment_kl_xent_docs
 del _sys
 
-# pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member,g-bad-import-order
-
 __all__ = [
     'Cauchy',
     'ConditionalDistribution',
