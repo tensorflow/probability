@@ -20,21 +20,21 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PowerTransformBijectorTest(tf.test.TestCase):
   """Tests correctness of the power transformation."""
 
   def testBijector(self):
     c = 0.2
     bijector = tfb.PowerTransform(power=c, validate_args=True)
-    self.assertEqual("power_transform", bijector.name)
+    self.assertStartsWith(bijector.name, "power_transform")
     x = np.array([[[-1.], [2.], [-5. + 1e-4]]])
     y = (1. + x * c)**(1. / c)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))

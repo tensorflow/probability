@@ -19,17 +19,20 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 rng = np.random.RandomState(123)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class QuantizedDistributionTest(test_case.TestCase):
 
   def _assert_all_finite(self, array):
@@ -161,7 +164,7 @@ class QuantizedDistributionTest(test_case.TestCase):
 
     qdist = tfd.QuantizedDistribution(distribution=normal, low=0., high=None)
 
-    samps = qdist.sample(5000, seed=42)
+    samps = qdist.sample(5000, seed=tfp_test_util.test_seed())
     samps_v = self.evaluate(samps)
 
     # With low = 0, the interval j=0 is (-infty, 0], which holds 1/2
@@ -187,7 +190,7 @@ class QuantizedDistributionTest(test_case.TestCase):
     # integers.  Hence, F(X) (see below) will not be uniform exactly.
     qdist = tfd.QuantizedDistribution(distribution=tfd.Exponential(rate=0.01))
     # X ~ QuantizedExponential
-    x = qdist.sample(10000, seed=42)
+    x = qdist.sample(10000, seed=tfp_test_util.test_seed())
     # Z = F(X), should be Uniform.
     z = qdist.cdf(x)
     # Compare the CDF of Z to that of a Uniform.
@@ -210,7 +213,8 @@ class QuantizedDistributionTest(test_case.TestCase):
     # Standard error should be less than 1 / (2 * sqrt(n_samples))
     n_samples = 10000
     stddev_err_bound = 1 / (2 * np.sqrt(n_samples))
-    samps = self.evaluate(qdist.sample((n_samples,), seed=42))
+    samps = self.evaluate(qdist.sample(
+        (n_samples,), seed=tfp_test_util.test_seed(hardcoded_seed=42)))
     # The smallest value the samples can take on is 1, which corresponds to
     # the interval (0, 1].  Recall we use ceiling in the sampling definition.
     self.assertLess(0.5, samps.min())
@@ -318,17 +322,15 @@ class QuantizedDistributionTest(test_case.TestCase):
     for dtype in [np.float32, np.float64]:
       mu = tf.Variable(0., name="mu", dtype=dtype)
       sigma = tf.Variable(1., name="sigma", dtype=dtype)
-      self.evaluate(tf.global_variables_initializer())
-      grads = self.compute_gradients(
-          quantized_log_prob(dtype), args=[mu, sigma])
-      self._assert_all_finite(
-          self.evaluate(quantized_log_prob(dtype)(mu, sigma)))
-      self._assert_all_finite(grads[0])
-      self._assert_all_finite(grads[1])
+      self.evaluate(tf1.global_variables_initializer())
+      value, grads = self.evaluate(tfp.math.value_and_gradient(
+          quantized_log_prob(dtype), [mu, sigma]))
+      self._assert_all_finite(value)
+      self._assert_all_finite(grads)
 
   def testProbAndGradGivesFiniteResultsForCommonEvents(self):
     def quantized_log_prob(mu, sigma):
-      x = tf.ceil(4 * rng.rand(100).astype(np.float32) - 2)
+      x = tf.math.ceil(4 * rng.rand(100).astype(np.float32) - 2)
 
       qdist = tfd.QuantizedDistribution(
           distribution=tfd.Normal(loc=mu, scale=sigma))
@@ -337,13 +339,11 @@ class QuantizedDistributionTest(test_case.TestCase):
     mu = tf.Variable(0.0, name="mu")
     sigma = tf.Variable(1.0, name="sigma")
 
-    self.evaluate(tf.global_variables_initializer())
-    grads = self.compute_gradients(
-        quantized_log_prob, args=[mu, sigma])
-    self._assert_all_finite(
-        self.evaluate(quantized_log_prob(mu, sigma)))
-    self._assert_all_finite(grads[0])
-    self._assert_all_finite(grads[1])
+    self.evaluate(tf1.global_variables_initializer())
+    value, grads = self.evaluate(tfp.math.value_and_gradient(
+        quantized_log_prob, [mu, sigma]))
+    self._assert_all_finite(value)
+    self._assert_all_finite(grads)
 
   def testLowerCutoffMustBeBelowUpperCutoffOrWeRaise(self):
     with self.assertRaisesOpError("must be strictly less"):
@@ -356,7 +356,7 @@ class QuantizedDistributionTest(test_case.TestCase):
       self.evaluate(qdist.sample())
 
   def testCutoffsMustBeIntegerValuedIfValidateArgsTrue(self):
-    low = tf.placeholder_with_default(input=1.5, shape=[])
+    low = tf1.placeholder_with_default(input=1.5, shape=[])
     with self.assertRaisesOpError("has non-integer components"):
       qdist = tfd.QuantizedDistribution(
           distribution=tfd.Normal(loc=0., scale=1.),
@@ -380,7 +380,7 @@ class QuantizedDistributionTest(test_case.TestCase):
     batch_shape = (2, 3)
     qdist = tfd.QuantizedDistribution(
         distribution=tfd.Normal(
-            loc=tf.zeros(batch_shape), scale=tf.zeros(batch_shape)),
+            loc=tf.zeros(batch_shape), scale=tf.ones(batch_shape)),
         low=1.0,
         high=10.0)
 
@@ -389,7 +389,7 @@ class QuantizedDistributionTest(test_case.TestCase):
     self.assertEqual((), qdist.event_shape)
     self.assertAllEqual((), self.evaluate(qdist.event_shape_tensor()))
 
-    samps = qdist.sample(10, seed=42)
+    samps = qdist.sample(10, seed=tfp_test_util.test_seed())
     self.assertEqual((10,) + batch_shape, samps.shape)
     self.assertAllEqual((10,) + batch_shape, self.evaluate(samps).shape)
 

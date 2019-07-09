@@ -112,7 +112,7 @@ FLAGS = flags.FLAGS
 
 def read_image(filepath):
   """Returns an image tensor."""
-  im_bytes = tf.read_file(filepath)
+  im_bytes = tf.io.read_file(filepath)
   im = tf.image.decode_image(im_bytes, channels=CHANNELS)
   im = tf.image.convert_image_dtype(im, tf.float32)
   return im
@@ -126,14 +126,14 @@ def join_seq(seq):
 def download_sprites():
   """Downloads the sprites data and returns the saved filepath."""
   filepath = os.path.join(FLAGS.data_dir, DATA_SPRITES_DIR)
-  if not tf.gfile.Exists(filepath):
-    if not tf.gfile.Exists(FLAGS.data_dir):
-      tf.gfile.MakeDirs(FLAGS.data_dir)
+  if not tf.io.gfile.exists(filepath):
+    if not tf.io.gfile.exists(FLAGS.data_dir):
+      tf.io.gfile.makedirs(FLAGS.data_dir)
     zip_name = "{}.zip".format(filepath)
     urllib.request.urlretrieve(DATA_SPRITES_URL, zip_name)
     with zipfile.ZipFile(zip_name, "r") as zip_file:
       zip_file.extractall(FLAGS.data_dir)
-    tf.gfile.Remove(zip_name)
+    tf.io.gfile.remove(zip_name)
   return filepath
 
 
@@ -177,17 +177,17 @@ def create_seq(character, action_metadata, direction, length=8, start=0):
 
   # Extract a slice of the desired length.
   # NOTE: Length could be longer than the number of frames, so tile as needed.
-  frames = tf.manip.roll(frames, shift=-start, axis=0)
+  frames = tf.roll(frames, shift=-start, axis=0)
   frames = tf.tile(frames, [2, 1, 1, 1])  # 2 is a hack
   frames = frames[:length]
-  frames = tf.to_float(frames)
+  frames = tf.cast(frames, dtype=tf.float32)
   frames.set_shape([length, FRAME_SIZE, FRAME_SIZE, CHANNELS])
   return frames
 
 
 def create_random_seq(character, action_metadata, direction, length=8):
   """Creates a random sequence."""
-  start = tf.random_uniform([], maxval=action_metadata[1], dtype=tf.int32)
+  start = tf.random.uniform([], maxval=action_metadata[1], dtype=tf.int32)
   return create_seq(character, action_metadata, direction, length, start)
 
 
@@ -213,7 +213,7 @@ def create_sprites_dataset(characters, actions, directions, channels=3,
     label name) tuples.
   """
   if fake_data:
-    dummy_image = tf.random_normal([HEIGHT, WIDTH, CHANNELS])
+    dummy_image = tf.random.normal([HEIGHT, WIDTH, CHANNELS])
   else:
     basedir = download_sprites()
 

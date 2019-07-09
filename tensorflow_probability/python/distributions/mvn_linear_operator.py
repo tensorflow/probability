@@ -18,13 +18,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import affine_linear_operator as affine_linear_operator_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -170,10 +172,10 @@ class MultivariateNormalLinearOperator(
     parameters = dict(locals())
     if scale is None:
       raise ValueError("Missing required `scale` parameter.")
-    if not scale.dtype.is_floating:
+    if not dtype_util.is_floating(scale.dtype):
       raise TypeError("`scale` parameter must have floating-point dtype.")
 
-    with tf.name_scope(name, values=[loc] + scale.graph_parents) as name:
+    with tf.name_scope(name) as name:
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
       loc = loc if loc is None else tf.convert_to_tensor(
@@ -212,8 +214,8 @@ class MultivariateNormalLinearOperator(
     return super(MultivariateNormalLinearOperator, self)._prob(x)
 
   def _mean(self):
-    shape = self.batch_shape.concatenate(self.event_shape)
-    has_static_shape = shape.is_fully_defined()
+    shape = tensorshape_util.concatenate(self.batch_shape, self.event_shape)
+    has_static_shape = tensorshape_util.is_fully_defined(shape)
     if not has_static_shape:
       shape = tf.concat([
           self.batch_shape_tensor(),
@@ -232,7 +234,7 @@ class MultivariateNormalLinearOperator(
 
   def _covariance(self):
     if distribution_util.is_diagonal_scale(self.scale):
-      return tf.matrix_diag(tf.square(self.scale.diag_part()))
+      return tf.linalg.diag(tf.square(self.scale.diag_part()))
     else:
       return self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)
 
@@ -241,9 +243,9 @@ class MultivariateNormalLinearOperator(
       return tf.square(self.scale.diag_part())
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
-      return tf.matrix_diag_part(self.scale.matmul(self.scale.to_dense()))
+      return tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense()))
     else:
-      return tf.matrix_diag_part(
+      return tf.linalg.diag_part(
           self.scale.matmul(self.scale.to_dense(), adjoint_arg=True))
 
   def _stddev(self):
@@ -252,10 +254,10 @@ class MultivariateNormalLinearOperator(
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
       return tf.sqrt(
-          tf.matrix_diag_part(self.scale.matmul(self.scale.to_dense())))
+          tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense())))
     else:
       return tf.sqrt(
-          tf.matrix_diag_part(
+          tf.linalg.diag_part(
               self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)))
 
   def _mode(self):
@@ -309,10 +311,7 @@ def _kl_brute_force(a, b, name=None):
             isinstance(x, tf.linalg.LinearOperatorScaledIdentity) or
             isinstance(x, tf.linalg.LinearOperatorDiag))
 
-  with tf.name_scope(
-      name,
-      "kl_mvn",
-      values=[a.loc, b.loc] + a.scale.graph_parents + b.scale.graph_parents):
+  with tf.name_scope(name or "kl_mvn"):
     # Calculation is based on:
     # http://stats.stackexchange.com/questions/60680/kl-divergence-between-two-multivariate-gaussians
     # and,
@@ -336,5 +335,6 @@ def _kl_brute_force(a, b, name=None):
         0.5 * (-tf.cast(a.scale.domain_dimension_tensor(), a.dtype) +
                squared_frobenius_norm(b_inv_a) + squared_frobenius_norm(
                    b.scale.solve((b.mean() - a.mean())[..., tf.newaxis]))))
-    kl_div.set_shape(tf.broadcast_static_shape(a.batch_shape, b.batch_shape))
+    tensorshape_util.set_shape(
+        kl_div, tf.broadcast_static_shape(a.batch_shape, b.batch_shape))
     return kl_div

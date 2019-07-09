@@ -5,6 +5,8 @@
 
 # tfp.vi.t_power
 
+The T-Power Csiszar-function in log-space.
+
 ``` python
 tfp.vi.t_power(
     logu,
@@ -14,7 +16,11 @@ tfp.vi.t_power(
 )
 ```
 
-The T-Power Csiszar-function in log-space.
+
+
+Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
+
+<!-- Placeholder for "Used in" -->
 
 A Csiszar-function is a member of,
 
@@ -37,6 +43,7 @@ divergence being the same up to factors depending only on `t`.
 
 #### Args:
 
+
 * <b>`logu`</b>: `float`-like `Tensor` representing `log(u)` from above.
 * <b>`t`</b>:  `Tensor` of same `dtype` as `logu` and broadcastable shape.
 * <b>`self_normalized`</b>: Python `bool` indicating whether `f'(u=1)=0`.
@@ -45,5 +52,6 @@ divergence being the same up to factors depending only on `t`.
 
 #### Returns:
 
+
 * <b>`t_power_of_u`</b>: `float`-like `Tensor` of the Csiszar-function evaluated
-    at `u = exp(logu)`.
+  at `u = exp(logu)`.

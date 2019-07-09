@@ -23,15 +23,25 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import monte_carlo
 
-tfb = tf.contrib.bayesflow
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
+def _set_seed(seed):
+  """Helper which uses graph seed if using TFE."""
+  # TODO(b/68017812): Deprecate once TFE supports seed.
+  if tf.executing_eagerly():
+    tf.compat.v1.set_random_seed(seed)
+    return None
+  return seed
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class HaltonSequenceTest(tf.test.TestCase):
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_known_values_small_bases(self):
     # The first five elements of the non-randomized Halton sequence
     # with base 2 and 3.
@@ -43,7 +53,6 @@ class HaltonSequenceTest(tf.test.TestCase):
     sample = tfp.mcmc.sample_halton_sequence(2, num_results=5, randomized=False)
     self.assertAllClose(expected, self.evaluate(sample), rtol=1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_dynamic_num_samples(self):
     """Tests that num_samples argument supports Tensors."""
     # The first five elements of the non-randomized Halton sequence
@@ -57,7 +66,6 @@ class HaltonSequenceTest(tf.test.TestCase):
         2, num_results=tf.constant(5), randomized=False)
     self.assertAllClose(expected, self.evaluate(sample), rtol=1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_sequence_indices(self):
     """Tests access of sequence elements by index."""
     dim = 5
@@ -70,7 +78,6 @@ class HaltonSequenceTest(tf.test.TestCase):
         self.evaluate(sample_direct), self.evaluate(sample_from_indices),
         rtol=1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_dtypes_works_correctly(self):
     """Tests that all supported dtypes work without error."""
     dim = 3
@@ -81,7 +88,6 @@ class HaltonSequenceTest(tf.test.TestCase):
     self.assertEqual(self.evaluate(sample_float32).dtype, np.float32)
     self.assertEqual(self.evaluate(sample_float64).dtype, np.float64)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_normal_integral_mean_and_var_correctly_estimated(self):
     n = int(1000)
     # This test is almost identical to the similarly named test in
@@ -103,11 +109,11 @@ class HaltonSequenceTest(tf.test.TestCase):
     q_sample = q.quantile(cdf_sample)
 
     # Compute E_p[X].
-    e_x = tfb.monte_carlo.expectation_importance_sampler(
+    e_x = monte_carlo.expectation_importance_sampler(
         f=lambda x: x, log_p=p.log_prob, sampling_dist_q=q, z=q_sample, seed=42)
 
     # Compute E_p[X^2].
-    e_x2 = tfb.monte_carlo.expectation_importance_sampler(
+    e_x2 = monte_carlo.expectation_importance_sampler(
         f=tf.square, log_p=p.log_prob, sampling_dist_q=q, z=q_sample, seed=1412)
 
     stddev = tf.sqrt(e_x2 - tf.square(e_x))
@@ -117,7 +123,6 @@ class HaltonSequenceTest(tf.test.TestCase):
     self.assertAllClose(
         self.evaluate(p.stddev()), self.evaluate(stddev), rtol=0.02)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_docstring_example(self):
     # Produce the first 1000 members of the Halton sequence in 3 dimensions.
     num_results = 1000
@@ -128,8 +133,9 @@ class HaltonSequenceTest(tf.test.TestCase):
     # Evaluate the integral of x_1 * x_2^2 * x_3^3  over the three dimensional
     # hypercube.
     powers = tf.range(1., limit=dim + 1)
-    integral = tf.reduce_mean(tf.reduce_prod(sample ** powers, axis=-1))
-    true_value = 1. / tf.reduce_prod(powers + 1.)
+    integral = tf.reduce_mean(
+        input_tensor=tf.reduce_prod(input_tensor=sample**powers, axis=-1))
+    true_value = 1. / tf.reduce_prod(input_tensor=powers + 1.)
 
     # Produces a relative absolute error of 1.7%.
     self.assertAllClose(
@@ -144,11 +150,11 @@ class HaltonSequenceTest(tf.test.TestCase):
         dim, sequence_indices=sequence_indices, randomized=False)
 
     integral_leaped = tf.reduce_mean(
-        tf.reduce_prod(sample_leaped ** powers, axis=-1))
+        input_tensor=tf.reduce_prod(
+            input_tensor=sample_leaped**powers, axis=-1))
     self.assertAllClose(
         self.evaluate(integral_leaped), self.evaluate(true_value), rtol=0.05)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_randomized_qmc_basic(self):
     """Tests the randomization of the Halton sequences."""
     # This test is identical to the example given in Owen (2017), Figure 5.
@@ -162,11 +168,11 @@ class HaltonSequenceTest(tf.test.TestCase):
     for _ in range(replica):
       sample = tfp.mcmc.sample_halton_sequence(
           dim, num_results=num_results, seed=seed())
-      f = tf.reduce_mean(tf.reduce_sum(sample, axis=1) ** 2)
+      f = tf.reduce_mean(
+          input_tensor=tf.reduce_sum(input_tensor=sample, axis=1)**2)
       values.append(self.evaluate(f))
     self.assertAllClose(np.mean(values), 101.6667, atol=np.std(values) * 2)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_partial_sum_func_qmc(self):
     """Tests the QMC evaluation of (x_j + x_{j+1} ...+x_{n})^2.
 
@@ -197,9 +203,9 @@ class HaltonSequenceTest(tf.test.TestCase):
     seed_hi = tfd.seed_stream.SeedStream(898128, "partial_sum_func_qmc_hi")
 
     def func_estimate(x):
-      return tf.reduce_mean(tf.squared_difference(
-          tf.reduce_sum(x[:, -m:], axis=-1),
-          m / 2.))
+      return tf.reduce_mean(
+          input_tensor=tf.math.squared_difference(
+              tf.reduce_sum(input_tensor=x[:, -m:], axis=-1), m / 2.))
 
     estimates = []
     for _ in range(replica):
@@ -217,15 +223,13 @@ class HaltonSequenceTest(tf.test.TestCase):
     log_rel_err = np.log(100 * var_hi / var_lo)
     self.assertAllClose(log_rel_err, 0., atol=1.2)
 
-# TODO(https://github.com/tensorflow/community/pull/38): Enable this test
-# in eager mode.
   def test_seed_implies_deterministic_results(self):
     dim = 20
     num_results = 100
     sample1 = tfp.mcmc.sample_halton_sequence(
-        dim, num_results=num_results, seed=1925)
+        dim, num_results=num_results, seed=_set_seed(1925))
     sample2 = tfp.mcmc.sample_halton_sequence(
-        dim, num_results=num_results, seed=1925)
+        dim, num_results=num_results, seed=_set_seed(1925))
     [sample1_, sample2_] = self.evaluate([sample1, sample2])
     self.assertAllClose(sample1_, sample2_, atol=0., rtol=1e-6)
 

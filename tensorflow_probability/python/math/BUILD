@@ -34,11 +34,16 @@ py_library(
     deps = [
         ":custom_gradient",
         ":diag_jacobian",
+        ":generic",
+        ":gradient",
         ":interpolation",
         ":linalg",
+        ":minimize",
         ":numeric",
         ":random_ops",
         ":root_search",
+        ":sparse",
+        "//tensorflow_probability/python/math/ode",
     ],
 )
 
@@ -49,8 +54,9 @@ py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
-        # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -58,6 +64,54 @@ py_test(
     name = "custom_gradient_test",
     size = "small",
     srcs = ["custom_gradient_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "generic",
+    srcs = [
+        "generic.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+py_test(
+    name = "generic_test",
+    size = "small",
+    srcs = ["generic_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_library(
+    name = "gradient",
+    srcs = [
+        "gradient.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "gradient_test",
+    size = "small",
+    srcs = ["gradient_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -74,15 +128,19 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
 py_test(
     name = "interpolation_test",
-    size = "small",
+    size = "medium",
     srcs = ["interpolation_test.py"],
     deps = [
         # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],
@@ -97,14 +155,44 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
 py_test(
     name = "linalg_test",
-    size = "small",
+    size = "medium",
     srcs = ["linalg_test.py"],
+    shard_count = 5,
+    deps = [
+        # absl/testing:parameterized dep,
+        # hypothesis dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+    ],
+)
+
+py_library(
+    name = "minimize",
+    srcs = [
+        "minimize.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "minimize_test",
+    size = "small",
+    srcs = ["minimize_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -121,6 +209,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -130,9 +219,10 @@ py_test(
         "numeric_test.py",
     ],
     deps = [
-        ":numeric",
         # absl/testing:parameterized dep,
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
     ],
 )
@@ -144,7 +234,6 @@ py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
-        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -157,6 +246,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -167,7 +257,7 @@ py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
-        # numpy dep,
+        ":gradient",
         # tensorflow dep,
     ],
 )
@@ -191,6 +281,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -200,6 +291,29 @@ py_test(
     srcs = ["root_search_test.py"],
     deps = [
         # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "sparse",
+    srcs = [
+        "sparse.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+py_test(
+    name = "sparse_test",
+    size = "small",
+    srcs = ["sparse_test.py"],
+    deps = [
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],

@@ -25,19 +25,21 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
 def tridiag(d, diag_value, offdiag_value):
   """d x d matrix with given value on diag, and one super/sub diag."""
   diag_mat = tf.eye(d) * (diag_value - offdiag_value)
-  three_bands = tf.matrix_band_part(
-      tf.fill([d, d], offdiag_value), 1, 1)
+  three_bands = tf.linalg.band_part(tf.fill([d, d], offdiag_value), 1, 1)
   return diag_mat + three_bands
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class AmariAlphaTest(test_case.TestCase):
 
   def setUp(self):
@@ -91,7 +93,7 @@ class AmariAlphaTest(test_case.TestCase):
            - alpha * (self._u - 1)) / (alpha * (alpha - 1.)))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class KLReverseTest(test_case.TestCase):
 
   def setUp(self):
@@ -114,7 +116,7 @@ class KLReverseTest(test_case.TestCase):
         -self._logu + (self._u - 1.))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class KLForwardTest(test_case.TestCase):
 
   def setUp(self):
@@ -137,7 +139,7 @@ class KLForwardTest(test_case.TestCase):
         self._u * self._logu - (self._u - 1.))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class JensenShannonTest(test_case.TestCase):
 
   def setUp(self):
@@ -174,7 +176,7 @@ class JensenShannonTest(test_case.TestCase):
          - (1 + self._u) * np.log((1 + self._u) / 2)))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ArithmeticGeometricMeanTest(test_case.TestCase):
 
   def setUp(self):
@@ -205,7 +207,7 @@ class ArithmeticGeometricMeanTest(test_case.TestCase):
         (1. + self._u) * np.log(0.5 * (1. + self._u) / np.sqrt(self._u)))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class TotalVariationTest(test_case.TestCase):
 
   def setUp(self):
@@ -221,7 +223,7 @@ class TotalVariationTest(test_case.TestCase):
         0.5 * np.abs(self._u - 1))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class PearsonTest(test_case.TestCase):
 
   def setUp(self):
@@ -237,7 +239,7 @@ class PearsonTest(test_case.TestCase):
         np.square(self._u - 1))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SquaredHellingerTest(test_case.TestCase):
 
   def setUp(self):
@@ -259,7 +261,7 @@ class SquaredHellingerTest(test_case.TestCase):
         np.square(np.sqrt(self._u) - 1))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class TriangularTest(test_case.TestCase):
 
   def setUp(self):
@@ -281,7 +283,7 @@ class TriangularTest(test_case.TestCase):
         np.square(self._u - 1) / (1 + self._u))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class TPowerTest(test_case.TestCase):
 
   def setUp(self):
@@ -325,7 +327,7 @@ class TPowerTest(test_case.TestCase):
         self._u ** 1.1 - 1. - 1.1 * (self._u - 1.))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class Log1pAbsTest(test_case.TestCase):
 
   def setUp(self):
@@ -341,7 +343,7 @@ class Log1pAbsTest(test_case.TestCase):
         self._u**(np.sign(self._u - 1)) - 1)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class JeffreysTest(test_case.TestCase):
 
   def setUp(self):
@@ -363,7 +365,7 @@ class JeffreysTest(test_case.TestCase):
         0.5 * (self._u * self._logu - self._logu))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ChiSquareTest(test_case.TestCase):
 
   def setUp(self):
@@ -379,7 +381,7 @@ class ChiSquareTest(test_case.TestCase):
         self._u**2 - 1)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ModifiedGanTest(test_case.TestCase):
 
   def setUp(self):
@@ -403,7 +405,7 @@ class ModifiedGanTest(test_case.TestCase):
         np.log1p(self._u) - self._logu + 0.5 * (self._u - 1))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SymmetrizedCsiszarFunctionTest(test_case.TestCase):
 
   def setUp(self):
@@ -442,7 +444,7 @@ class SymmetrizedCsiszarFunctionTest(test_case.TestCase):
         self.evaluate(tfp.vi.jeffreys(self._logu)))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class DualCsiszarFunctionTest(test_case.TestCase):
 
   def setUp(self):
@@ -462,8 +464,8 @@ class DualCsiszarFunctionTest(test_case.TestCase):
         self.evaluate(tfp.vi.kl_forward(self._logu)))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
+@test_util.run_all_in_graph_and_eager_modes
+class MonteCarloVariationalLossTest(test_case.TestCase):
 
   def test_kl_forward(self):
     q = tfd.Normal(
@@ -472,19 +474,22 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
     p = tfd.Normal(loc=q.loc + 0.1, scale=q.scale - 0.2)
 
-    approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=tfp.vi.kl_forward,
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(1e5),
-        seed=1)
+    seed = tfp_test_util.test_seed()
 
-    approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=lambda logu: tfp.vi.kl_forward(logu, self_normalized=True),
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(1e5),
-        seed=1)
+    approx_kl = tfp.vi.monte_carlo_variational_loss(
+        discrepancy_fn=tfp.vi.kl_forward,
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        sample_size=int(4e5),
+        seed=seed)
+
+    approx_kl_self_normalized = tfp.vi.monte_carlo_variational_loss(
+        discrepancy_fn=(
+            lambda logu: tfp.vi.kl_forward(logu, self_normalized=True)),
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        sample_size=int(4e5),
+        seed=seed)
 
     exact_kl = tfd.kl_divergence(p, q)
 
@@ -492,10 +497,10 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
         approx_kl, approx_kl_self_normalized, exact_kl])
 
     self.assertAllClose(approx_kl_, exact_kl_,
-                        rtol=0.08, atol=0.)
+                        rtol=0.10, atol=0.)
 
     self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
-                        rtol=0.02, atol=0.)
+                        rtol=0.06, atol=0.)
 
   def test_kl_reverse(self):
     q = tfd.Normal(
@@ -504,19 +509,22 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
 
     p = tfd.Normal(loc=q.loc + 0.1, scale=q.scale - 0.2)
 
-    approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=tfp.vi.kl_reverse,
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(1e5),
-        seed=1)
+    seed = tfp_test_util.test_seed()
 
-    approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(1e5),
-        seed=1)
+    approx_kl = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        discrepancy_fn=tfp.vi.kl_reverse,
+        sample_size=int(4.5e5),
+        seed=seed)
+
+    approx_kl_self_normalized = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        discrepancy_fn=(
+            lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True)),
+        sample_size=int(4.5e5),
+        seed=seed)
 
     exact_kl = tfd.kl_divergence(q, p)
 
@@ -524,43 +532,10 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
         approx_kl, approx_kl_self_normalized, exact_kl])
 
     self.assertAllClose(approx_kl_, exact_kl_,
+                        rtol=0.13, atol=0.)
+
+    self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
                         rtol=0.07, atol=0.)
-
-    self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
-                        rtol=0.02, atol=0.)
-
-  def test_kl_reverse_multidim(self):
-    d = 5  # Dimension
-
-    p = tfd.MultivariateNormalFullCovariance(
-        covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
-
-    q = tfd.MultivariateNormalDiag(scale_diag=[0.5]*d)
-
-    approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=tfp.vi.kl_reverse,
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(3e5),
-        seed=12475)
-
-    approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(3e5),
-        seed=12485)
-
-    exact_kl = tfd.kl_divergence(q, p)
-
-    [approx_kl_, approx_kl_self_normalized_, exact_kl_] = self.evaluate([
-        approx_kl, approx_kl_self_normalized, exact_kl])
-
-    self.assertAllClose(approx_kl_, exact_kl_,
-                        rtol=0.02, atol=0.)
-
-    self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
-                        rtol=0.08, atol=0.)
 
   def test_kl_forward_multidim(self):
     d = 5  # Dimension
@@ -569,23 +544,26 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
         covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
 
     # Variance is very high when approximating Forward KL, so we make
-    # scale_diag larger than in test_kl_reverse_multidim. This ensures q
+    # scale_diag large. This ensures q
     # "covers" p and thus Var_q[p/q] is smaller.
     q = tfd.MultivariateNormalDiag(scale_diag=[1.]*d)
 
-    approx_kl = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=tfp.vi.kl_forward,
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(1e5),
-        seed=1)
+    seed = tfp_test_util.test_seed()
 
-    approx_kl_self_normalized = tfp.vi.monte_carlo_csiszar_f_divergence(
-        f=lambda logu: tfp.vi.kl_forward(logu, self_normalized=True),
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=int(1e5),
-        seed=1)
+    approx_kl = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        discrepancy_fn=tfp.vi.kl_forward,
+        sample_size=int(6e5),
+        seed=seed)
+
+    approx_kl_self_normalized = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        discrepancy_fn=(
+            lambda logu: tfp.vi.kl_forward(logu, self_normalized=True)),
+        sample_size=int(6e5),
+        seed=seed)
 
     exact_kl = tfd.kl_divergence(p, q)
 
@@ -593,37 +571,114 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
         approx_kl, approx_kl_self_normalized, exact_kl])
 
     self.assertAllClose(approx_kl_, exact_kl_,
-                        rtol=0.06, atol=0.)
+                        rtol=0.14, atol=0.)
 
     self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
-                        rtol=0.05, atol=0.)
+                        rtol=0.14, atol=0.)
 
-  def test_score_trick(self):
+  def test_kl_reverse_multidim(self):
     d = 5  # Dimension
-    num_draws = int(2e5)
-    seed = 23
 
     p = tfd.MultivariateNormalFullCovariance(
         covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
 
+    # Variance is very high when approximating Reverse KL with self
+    # normalization, because we pick up a term E_q[p / q]. So we make
+    # scale_diag large. This ensures q "covers" p and thus Var_q[p/q] is
+    # smaller.
+    q = tfd.MultivariateNormalDiag(scale_diag=[1.]*d)
+
+    seed = tfp_test_util.test_seed()
+
+    approx_kl = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        discrepancy_fn=tfp.vi.kl_reverse,
+        sample_size=int(6e5),
+        seed=seed)
+
+    approx_kl_self_normalized = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=p.log_prob,
+        surrogate_posterior=q,
+        discrepancy_fn=(
+            lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True)),
+        sample_size=int(6e5),
+        seed=seed)
+
+    exact_kl = tfd.kl_divergence(q, p)
+
+    [approx_kl_, approx_kl_self_normalized_, exact_kl_] = self.evaluate([
+        approx_kl, approx_kl_self_normalized, exact_kl])
+
+    self.assertAllClose(approx_kl_, exact_kl_,
+                        rtol=0.02, atol=0.)
+
+    self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
+                        rtol=0.14, atol=0.)
+
+  def test_kl_with_joint_q(self):
+
+    # Target distribution: equiv to MVNFullCovariance(cov=[[1., 1.], [1., 2.]])
+    def target_log_prob_fn(z, x):
+      return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
+
+    # Factored q distribution: equiv to MVNDiag(scale_diag=[1., sqrt(2)])
+    q_sequential = tfd.JointDistributionSequential([  # Should pass as *args.
+        tfd.Normal(0., 1.),
+        tfd.Normal(0., tf.sqrt(2.))
+    ])
+    q_named = tfd.JointDistributionNamed({  # Should pass as **kwargs.
+        'x': tfd.Normal(0., tf.sqrt(2.)),
+        'z': tfd.Normal(0., 1.)
+    })
+
+    seed = tfp_test_util.test_seed()
+
+    reverse_kl_sequential = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=target_log_prob_fn,
+        surrogate_posterior=q_sequential,
+        discrepancy_fn=tfp.vi.kl_reverse,
+        sample_size=int(3e5),
+        seed=seed)
+
+    reverse_kl_named = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=target_log_prob_fn,
+        surrogate_posterior=q_named,
+        discrepancy_fn=tfp.vi.kl_reverse,
+        sample_size=int(3e5),
+        seed=seed)
+
+    reverse_kl_sequential_, reverse_kl_named_, = self.evaluate(
+        [reverse_kl_sequential, reverse_kl_named])
+
+    # Compare to analytic MVN.kl[q|p] == 0.6534264.
+    self.assertAllClose(reverse_kl_sequential_, 0.6534264, rtol=0.07, atol=0.)
+    self.assertAllClose(reverse_kl_named_, 0.6534264, rtol=0.07, atol=0.)
+
+  def test_score_trick(self):
+    d = 5  # Dimension
+    sample_size = int(4.5e5)
+    seed = tfp_test_util.test_seed()
+
     # Variance is very high when approximating Forward KL, so we make
-    # scale_diag larger than in test_kl_reverse_multidim. This ensures q
-    # "covers" p and thus Var_q[p/q] is smaller.
+    # scale_diag large. This ensures q "covers" p and thus Var_q[p/q] is
+    # smaller.
     s = tf.constant(1.)
 
     def construct_monte_carlo_csiszar_f_divergence(
         func, use_reparametrization=True):
-      def compute_csiszar_f_divergence(s):
-        q = tfd.MultivariateNormalDiag(
-            scale_diag=tf.tile([s], [d]))
-        return tfp.vi.monte_carlo_csiszar_f_divergence(
-            f=func,
-            p_log_prob=p.log_prob,
-            q=q,
-            num_draws=num_draws,
+      def _fn(s):
+        p = tfd.MultivariateNormalFullCovariance(
+            covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
+        q = tfd.MultivariateNormalDiag(scale_diag=tf.tile([s], [d]))
+        return tfp.vi.monte_carlo_variational_loss(
+            target_log_prob_fn=p.log_prob,
+            surrogate_posterior=q,
+            discrepancy_fn=func,
+            sample_size=sample_size,
             use_reparametrization=use_reparametrization,
             seed=seed)
-      return compute_csiszar_f_divergence
+      return _fn
 
     approx_kl = construct_monte_carlo_csiszar_f_divergence(
         tfp.vi.kl_reverse)
@@ -640,62 +695,59 @@ class MonteCarloCsiszarFDivergenceTest(test_case.TestCase):
             use_reparametrization=False))
 
     def exact_kl(s):
-      q = tfd.MultivariateNormalDiag(
-          scale_diag=tf.tile([s], [d]))
+      p = tfd.MultivariateNormalFullCovariance(
+          covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
+      q = tfd.MultivariateNormalDiag(scale_diag=tf.tile([s], [d]))
       return tfd.kl_divergence(q, p)
 
     [
         approx_kl_,
+        approx_kl_grad_,
         approx_kl_self_normalized_,
+        approx_kl_self_normalized_grad_,
         approx_kl_score_trick_,
+        approx_kl_score_trick_grad_,
         approx_kl_self_normalized_score_trick_,
+        approx_kl_self_normalized_score_trick_grad_,
         exact_kl_,
-    ] = self.evaluate([
-        approx_kl(s),
-        approx_kl_self_normalized(s),
-        approx_kl_score_trick(s),
-        approx_kl_self_normalized_score_trick(s),
-        exact_kl(s),
-    ])
-
-    approx_kl_grad_ = self.compute_gradients(approx_kl, [s])
-    approx_kl_self_normalized_grad_ = self.compute_gradients(
-        approx_kl_self_normalized, [s])
-    approx_kl_score_trick_grad_ = self.compute_gradients(
-        approx_kl_score_trick, [s])
-    approx_kl_self_normalized_score_trick_grad_ = self.compute_gradients(
-        approx_kl_self_normalized_score_trick, [s])
-    exact_kl_grad_ = self.compute_gradients(exact_kl, [s])
+        exact_kl_grad_,
+    ] = self.evaluate(
+        list(tfp.math.value_and_gradient(approx_kl, s)) +
+        list(tfp.math.value_and_gradient(approx_kl_self_normalized, s)) +
+        list(tfp.math.value_and_gradient(approx_kl_score_trick, s)) +
+        list(tfp.math.value_and_gradient(
+            approx_kl_self_normalized_score_trick, s)) +
+        list(tfp.math.value_and_gradient(exact_kl, s)))
 
     # Test average divergence.
     self.assertAllClose(approx_kl_, exact_kl_,
-                        rtol=0.02, atol=0.)
+                        rtol=0.04, atol=0.)
 
     self.assertAllClose(approx_kl_self_normalized_, exact_kl_,
                         rtol=0.08, atol=0.)
 
     self.assertAllClose(approx_kl_score_trick_, exact_kl_,
-                        rtol=0.02, atol=0.)
+                        rtol=0.04, atol=0.)
 
     self.assertAllClose(approx_kl_self_normalized_score_trick_, exact_kl_,
                         rtol=0.08, atol=0.)
 
     # Test average gradient-divergence.
     self.assertAllClose(approx_kl_grad_, exact_kl_grad_,
-                        rtol=0.007, atol=0.)
+                        rtol=0.04, atol=0.)
 
     self.assertAllClose(approx_kl_self_normalized_grad_, exact_kl_grad_,
-                        rtol=0.011, atol=0.)
+                        rtol=0.04, atol=0.)
 
     self.assertAllClose(approx_kl_score_trick_grad_, exact_kl_grad_,
-                        rtol=0.018, atol=0.)
+                        rtol=0.05, atol=0.)
 
     self.assertAllClose(
         approx_kl_self_normalized_score_trick_grad_, exact_kl_grad_,
-        rtol=0.017, atol=0.)
+        rtol=0.04, atol=0.)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class CsiszarVIMCOTest(test_case.TestCase):
 
   def _csiszar_vimco_helper(self, logu):
@@ -727,191 +779,48 @@ class CsiszarVIMCOTest(test_case.TestCase):
     log_avg_u = np.log(np.mean(u, axis=0))
     return log_avg_u, log_sooavg_u
 
-  def _csiszar_vimco_helper_grad(self, logu, delta):
-    """Finite difference approximation of `grad(csiszar_vimco_helper, logu)`."""
-
-    # This code actually estimates the sum of the Jacobiab because that's what
-    # TF's `gradients` does.
-    np_log_avg_u1, np_log_sooavg_u1 = self._csiszar_vimco_helper(
-        logu[..., None] + np.diag([delta]*len(logu)))
-    np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(
-        logu[..., None])
-    return [
-        (np_log_avg_u1 - np_log_avg_u) / delta,
-        np.sum(np_log_sooavg_u1 - np_log_sooavg_u, axis=0) / delta,
-    ]
-
-  def test_vimco_helper_1(self):
-    """Tests that function calculation correctly handles batches."""
-
-    logu = np.linspace(-100., 100., 100).reshape([10, 2, 5])
-    np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(logu)
-    [log_avg_u, log_sooavg_u] = self.evaluate(tfp.vi.csiszar_vimco_helper(logu))
-    self.assertAllClose(np_log_avg_u, log_avg_u,
-                        rtol=1e-8, atol=0.)
-    self.assertAllClose(np_log_sooavg_u, log_sooavg_u,
-                        rtol=1e-8, atol=0.)
-
-  def test_vimco_helper_2(self):
-    """Tests that function calculation correctly handles overflow."""
-
-    # Using 700 (rather than 1e3) since naive numpy version can't handle higher.
-    logu = np.float32([0., 700, -1, 1])
-    np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(logu)
-    [log_avg_u, log_sooavg_u] = self.evaluate(tfp.vi.csiszar_vimco_helper(logu))
-    self.assertAllClose(np_log_avg_u, log_avg_u,
-                        rtol=1e-6, atol=0.)
-    self.assertAllClose(np_log_sooavg_u, log_sooavg_u,
-                        rtol=1e-5, atol=0.)
-
-  def test_vimco_helper_3(self):
-    """Tests that function calculation correctly handles underlow."""
-
-    logu = np.float32([0., -1000, -1, 1])
-    np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(logu)
-    [log_avg_u, log_sooavg_u] = self.evaluate(tfp.vi.csiszar_vimco_helper(logu))
-    self.assertAllClose(np_log_avg_u, log_avg_u,
-                        rtol=1e-5, atol=0.)
-    self.assertAllClose(np_log_sooavg_u, log_sooavg_u,
-                        rtol=1e-4, atol=1e-15)
-
-  def test_vimco_helper_gradient_using_finite_difference_1(self):
-    """Tests that gradient calculation correctly handles batches."""
-
-    logu_ = np.linspace(-100., 100., 100).reshape([10, 2, 5])
-    logu = tf.constant(logu_)
-
-    def log_avg_u(logu):
-      return tfp.vi.csiszar_vimco_helper(logu)[0]
-    grad_log_avg_u = self.compute_gradients(log_avg_u, args=[logu])[0]
-
-    def log_sooavg_u(logu):
-      return tfp.vi.csiszar_vimco_helper(logu)[1]
-    grad_log_sooavg_u = self.compute_gradients(log_sooavg_u, args=[logu])[0]
-
-    # We skip checking against finite-difference approximation since it
-    # doesn't support batches.
-
-    # Verify claim in docstring.
-    self.assertAllClose(
-        np.ones_like(grad_log_avg_u.sum(axis=0)),
-        grad_log_avg_u.sum(axis=0))
-    self.assertAllClose(
-        np.ones_like(grad_log_sooavg_u.mean(axis=0)),
-        grad_log_sooavg_u.mean(axis=0))
-
-  def test_vimco_helper_gradient_using_finite_difference_2(self):
-    """Tests that gradient calculation correctly handles overflow."""
-
-    delta = 1e-3
-    logu_ = np.float32([0., 1000, -1, 1])
-    logu = tf.constant(logu_)
-
-    [
-        np_grad_log_avg_u,
-        np_grad_log_sooavg_u,
-    ] = self._csiszar_vimco_helper_grad(logu_, delta)
-
-    def log_avg_u(logu):
-      return tfp.vi.csiszar_vimco_helper(logu)[0]
-    grad_log_avg_u = self.compute_gradients(log_avg_u, args=[logu])[0]
-
-    def log_sooavg_u(logu):
-      return tfp.vi.csiszar_vimco_helper(logu)[1]
-    grad_log_sooavg_u = self.compute_gradients(log_sooavg_u, args=[logu])[0]
-
-    self.assertAllClose(np_grad_log_avg_u, grad_log_avg_u,
-                        rtol=delta, atol=0.)
-    self.assertAllClose(np_grad_log_sooavg_u, grad_log_sooavg_u,
-                        rtol=delta, atol=0.)
-    # Verify claim in docstring.
-    self.assertAllClose(
-        np.ones_like(grad_log_avg_u.sum(axis=0)),
-        grad_log_avg_u.sum(axis=0))
-    self.assertAllClose(
-        np.ones_like(grad_log_sooavg_u.mean(axis=0)),
-        grad_log_sooavg_u.mean(axis=0))
-
-  def test_vimco_helper_gradient_using_finite_difference_3(self):
-    """Tests that gradient calculation correctly handles underlow."""
-
-    delta = 1e-3
-    logu_ = np.float32([0., -1000, -1, 1])
-    logu = tf.constant(logu_)
-
-    [
-        np_grad_log_avg_u,
-        np_grad_log_sooavg_u,
-    ] = self._csiszar_vimco_helper_grad(logu_, delta)
-
-    def log_avg_u(logu):
-      return tfp.vi.csiszar_vimco_helper(logu)[0]
-    grad_log_avg_u = self.compute_gradients(log_avg_u, args=[logu])[0]
-
-    def log_sooavg_u(logu):
-      return tfp.vi.csiszar_vimco_helper(logu)[1]
-    grad_log_sooavg_u = self.compute_gradients(log_sooavg_u, args=[logu])[0]
-
-    self.assertAllClose(np_grad_log_avg_u, grad_log_avg_u,
-                        rtol=delta, atol=0.)
-    self.assertAllClose(np_grad_log_sooavg_u, grad_log_sooavg_u,
-                        rtol=delta, atol=0.)
-    # Verify claim in docstring.
-    self.assertAllClose(
-        np.ones_like(grad_log_avg_u.sum(axis=0)),
-        grad_log_avg_u.sum(axis=0))
-    self.assertAllClose(
-        np.ones_like(grad_log_sooavg_u.mean(axis=0)),
-        grad_log_sooavg_u.mean(axis=0))
-
   def test_vimco_and_gradient(self):
-    # TODO(b/117119069): Rewrite the test below to be eager friendly and
-    # remove this conditional.
-    if tf.executing_eagerly():
-      return
-
     dims = 5  # Dimension
-    num_draws = int(20)
+    num_draws = int(1e3)
     num_batch_draws = int(3)
-    seed = 1
+    seed = tfp_test_util.test_seed()
 
-    f = lambda logu: tfp.vi.kl_reverse(logu, self_normalized=False)
-    np_f = lambda logu: -logu
+    with tf.GradientTape(persistent=True) as tape:
+      f = lambda logu: tfp.vi.kl_reverse(logu, self_normalized=False)
+      np_f = lambda logu: -logu
 
-    p = tfd.MultivariateNormalFullCovariance(
-        covariance_matrix=tridiag(dims, diag_value=1, offdiag_value=0.5))
+      s = tf.constant(1.)
+      tape.watch(s)
+      p = tfd.MultivariateNormalFullCovariance(
+          covariance_matrix=tridiag(dims, diag_value=1, offdiag_value=0.5))
 
-    # Variance is very high when approximating Forward KL, so we make
-    # scale_diag larger than in test_kl_reverse_multidim. This ensures q
-    # "covers" p and thus Var_q[p/q] is smaller.
-    s = tf.constant(1.)
-    q = tfd.MultivariateNormalDiag(
-        scale_diag=tf.tile([s], [dims]))
+      # Variance is very high when approximating Forward KL, so we make
+      # scale_diag large. This ensures q "covers" p and thus Var_q[p/q] is
+      # smaller.
+      q = tfd.MultivariateNormalDiag(
+          scale_diag=tf.tile([s], [dims]))
 
-    vimco = tfp.vi.csiszar_vimco(
-        f=f,
-        p_log_prob=p.log_prob,
-        q=q,
-        num_draws=num_draws,
-        num_batch_draws=num_batch_draws,
-        seed=seed)
+      vimco = tfp.vi.csiszar_vimco(
+          f=f,
+          p_log_prob=p.log_prob,
+          q=q,
+          num_draws=num_draws,
+          num_batch_draws=num_batch_draws,
+          seed=seed)
 
-    x = q.sample(sample_shape=[num_draws, num_batch_draws],
-                 seed=seed)
-    x = tf.stop_gradient(x)
-    logu = p.log_prob(x) - q.log_prob(x)
-    f_log_sum_u = f(tfp.vi.csiszar_vimco_helper(logu)[0])
+      # We want the seed to be the same since we will use computations
+      # with the same underlying sample to show correctness of vimco.
+      if tf.executing_eagerly():
+        tf.compat.v1.set_random_seed(seed)
+      x = q.sample(sample_shape=[num_draws, num_batch_draws], seed=seed)
+      x = tf.stop_gradient(x)
+      logu = p.log_prob(x) - q.log_prob(x)
+      f_log_sum_u = f(tfp.vi.csiszar_vimco_helper(logu)[0])
+      q_log_prob_x = q.log_prob(x)
 
-    grad_sum = lambda fs: tf.gradients(fs, s)[0]
-
-    def jacobian(x):
-      # Warning: this function is slow and may not even finish if prod(shape)
-      # is larger than, say, 100.
-      shape = x.shape.as_list()
-      assert all(s is not None for s in shape)
-      x = tf.reshape(x, shape=[-1])
-      r = [grad_sum(x[i]) for i in range(np.prod(shape))]
-      return tf.reshape(tf.stack(r), shape=shape)
+    grad_vimco = tape.gradient(vimco, s)
+    grad_mean_f_log_sum_u = tape.gradient(f_log_sum_u, s) / num_batch_draws
+    jacobian_logqx = tape.jacobian(q_log_prob_x, s)
 
     [
         logu_,
@@ -922,18 +831,18 @@ class CsiszarVIMCOTest(test_case.TestCase):
         grad_mean_f_log_sum_u_,
     ] = self.evaluate([
         logu,
-        jacobian(q.log_prob(x)),
+        jacobian_logqx,
         vimco,
-        grad_sum(vimco),
+        grad_vimco,
         f_log_sum_u,
-        grad_sum(f_log_sum_u) / num_batch_draws,
+        grad_mean_f_log_sum_u,
     ])
 
     np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(logu_)
 
     # Test VIMCO loss is correct.
     self.assertAllClose(np_f(np_log_avg_u).mean(axis=0), vimco_,
-                        rtol=1e-5, atol=0.)
+                        rtol=1e-4, atol=1e-5)
 
     # Test gradient of VIMCO loss is correct.
     #
@@ -948,7 +857,7 @@ class CsiszarVIMCOTest(test_case.TestCase):
     # correctness of the zero-th order derivative (for each batch member).
     # Since `tfp.vi.csiszar_vimco_helper` itself does not manipulate any
     # gradient information, we can safely rely on TF.
-    self.assertAllClose(np_f(np_log_avg_u), f_log_sum_u_, rtol=1e-4, atol=0.)
+    self.assertAllClose(np_f(np_log_avg_u), f_log_sum_u_, rtol=1e-4, atol=1e-5)
     #
     # Regarding `jacobian_logqx_`, note that testing the gradient of
     # `q.log_prob` is outside the scope of this unit-test thus we may safely
@@ -964,9 +873,45 @@ class CsiszarVIMCOTest(test_case.TestCase):
                 axis=0),
             axis=0))
 
-    self.assertAllClose(np_grad_vimco, grad_vimco_,
-                        rtol=1e-5, atol=0.)
+    self.assertAllClose(np_grad_vimco, grad_vimco_, rtol=0.03, atol=1e-3)
+
+  def test_vimco_with_joint_q(self):
+
+    # Target distribution: equiv to MVNFullCovariance(cov=[[1., 1.], [1., 2.]])
+    def p_log_prob(z, x):
+      return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
+
+    # Factored q distribution: equiv to MVNDiag(scale_diag=[1., sqrt(2)])
+    q_sequential = tfd.JointDistributionSequential([  # Should pass as *args.
+        tfd.Normal(0., 1.),
+        tfd.Normal(0., tf.sqrt(2.))
+    ])
+    q_named = tfd.JointDistributionNamed({  # Should pass as **kwargs.
+        'x': tfd.Normal(0., tf.sqrt(2.)),
+        'z': tfd.Normal(0., 1.)
+    })
+
+    seed = tfp_test_util.test_seed()
+
+    reverse_kl_sequential = tfp.vi.csiszar_vimco(
+        f=tfp.vi.kl_reverse,
+        p_log_prob=p_log_prob,
+        q=q_sequential,
+        num_draws=int(3e5),
+        seed=seed)
+
+    reverse_kl_named = tfp.vi.csiszar_vimco(
+        f=tfp.vi.kl_reverse,
+        p_log_prob=p_log_prob,
+        q=q_named,
+        num_draws=int(3e5),
+        seed=seed)
+
+    [reverse_kl_sequential_, reverse_kl_named_
+    ] = self.evaluate([reverse_kl_sequential, reverse_kl_named])
+
+    self.assertAllClose(reverse_kl_sequential_, reverse_kl_named_, atol=0.02)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

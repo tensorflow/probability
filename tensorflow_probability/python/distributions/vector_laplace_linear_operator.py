@@ -20,12 +20,14 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import affine_linear_operator as affine_linear_operator_bijector
 from tensorflow_probability.python.distributions import laplace
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -192,10 +194,10 @@ class VectorLaplaceLinearOperator(
     parameters = dict(locals())
     if scale is None:
       raise ValueError("Missing required `scale` parameter.")
-    if not scale.dtype.is_floating:
+    if not dtype_util.is_floating(scale.dtype):
       raise TypeError("`scale` parameter must have floating-point dtype.")
 
-    with tf.name_scope(name, values=[loc] + scale.graph_parents):
+    with tf.name_scope(name):
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
       loc = loc if loc is None else tf.convert_to_tensor(
@@ -234,8 +236,8 @@ class VectorLaplaceLinearOperator(
     return super(VectorLaplaceLinearOperator, self)._prob(x)
 
   def _mean(self):
-    shape = self.batch_shape.concatenate(self.event_shape)
-    has_static_shape = shape.is_fully_defined()
+    shape = tensorshape_util.concatenate(self.batch_shape, self.event_shape)
+    has_static_shape = tensorshape_util.is_fully_defined(shape)
     if not has_static_shape:
       shape = tf.concat([
           self.batch_shape_tensor(),
@@ -262,7 +264,7 @@ class VectorLaplaceLinearOperator(
     # Since E[wi wj] = 0 if i != j, and 2 if i == j, we have
     #   Cov(X) = 2 LL^T
     if distribution_util.is_diagonal_scale(self.scale):
-      return 2. * tf.matrix_diag(tf.square(self.scale.diag_part()))
+      return 2. * tf.linalg.diag(tf.square(self.scale.diag_part()))
     else:
       return 2. * self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)
 
@@ -271,9 +273,9 @@ class VectorLaplaceLinearOperator(
       return 2. * tf.square(self.scale.diag_part())
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
-      return tf.matrix_diag_part(2. * self.scale.matmul(self.scale.to_dense()))
+      return tf.linalg.diag_part(2. * self.scale.matmul(self.scale.to_dense()))
     else:
-      return 2. * tf.matrix_diag_part(
+      return 2. * tf.linalg.diag_part(
           self.scale.matmul(self.scale.to_dense(), adjoint_arg=True))
 
   def _stddev(self):
@@ -282,10 +284,10 @@ class VectorLaplaceLinearOperator(
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
       return np.sqrt(2) * tf.sqrt(
-          tf.matrix_diag_part(self.scale.matmul(self.scale.to_dense())))
+          tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense())))
     else:
       return np.sqrt(2) * tf.sqrt(
-          tf.matrix_diag_part(
+          tf.linalg.diag_part(
               self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)))
 
   def _mode(self):

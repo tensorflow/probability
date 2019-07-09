@@ -18,9 +18,15 @@
 
 ## Class `ReplicaExchangeMC`
 
+Runs one step of the Replica Exchange Monte Carlo.
+
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
 
-Runs one step of the Replica Exchange Monte Carlo.
+
+
+Defined in [`python/mcmc/replica_exchange_mc.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/replica_exchange_mc.py).
+
+<!-- Placeholder for "Used in" -->
 
 [Replica Exchange Monte Carlo](
 https://en.wikipedia.org/wiki/Parallel_tempering) is a Markov chain
@@ -144,34 +150,35 @@ __init__(
     make_kernel_fn,
     exchange_proposed_fn=default_exchange_proposed_fn(1.0),
     seed=None,
-    name=None,
-    **kwargs
+    name=None
 )
 ```
 
 Instantiates this object.
 
+
 #### Args:
 
+
 * <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
-    `current_state` (or `*current_state` if it's a list) and returns its
-    (possibly unnormalized) log-density under the target distribution.
+  `current_state` (or `*current_state` if it's a list) and returns its
+  (possibly unnormalized) log-density under the target distribution.
 * <b>`inverse_temperatures`</b>: `1D` `Tensor of inverse temperatures to perform
-    samplings with each replica. Must have statically known `shape`.
-    `inverse_temperatures[0]` produces the states returned by samplers,
-    and is typically == 1.
+  samplings with each replica. Must have statically known `shape`.
+  `inverse_temperatures[0]` produces the states returned by samplers,
+  and is typically == 1.
 * <b>`make_kernel_fn`</b>: Python callable which takes target_log_prob_fn and seed
-    args and returns a TransitionKernel instance.
+  args and returns a TransitionKernel instance.
 * <b>`exchange_proposed_fn`</b>: Python callable which take a number of replicas, and
-    return combinations of replicas for exchange.
+  return combinations of replicas for exchange.
 * <b>`seed`</b>: Python integer to seed the random number generator.
-    Default value: `None` (i.e., no seed).
+  Default value: `None` (i.e., no seed).
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-    Default value: `None` (i.e., "remc_kernel").
-* <b>`**kwargs`</b>: Arguments for `make_kernel_fn`.
+  Default value: `None` (i.e., "remc_kernel").
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: `inverse_temperatures` doesn't have statically known 1D shape.
 
@@ -183,15 +190,21 @@ Instantiates this object.
 
 
 
+
 <h3 id="inverse_temperatures"><code>inverse_temperatures</code></h3>
+
 
 
 
 <h3 id="is_calibrated"><code>is_calibrated</code></h3>
 
+Returns `True` if Markov chain converges to specified distribution.
 
+`TransitionKernel`s which are "uncalibrated" are often calibrated by
+composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp.mcmc.MetropolisHastings</code></a> `TransitionKernel`.
 
 <h3 id="name"><code>name</code></h3>
+
 
 
 
@@ -199,15 +212,19 @@ Instantiates this object.
 
 
 
+
 <h3 id="parameters"><code>parameters</code></h3>
 
 Return `dict` of ``__init__`` arguments and their values.
+
 
 <h3 id="seed"><code>seed</code></h3>
 
 
 
+
 <h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
+
 
 
 
@@ -223,17 +240,20 @@ bootstrap_results(init_state)
 
 Returns an object with the same type as returned by `one_step`.
 
+
 #### Args:
 
+
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    initial state(s) of the Markov chain(s).
+  initial state(s) of the Markov chain(s).
 
 
 #### Returns:
 
+
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
-    `Tensor`s representing internal calculations made within this function.
-    This inculdes replica states.
+  `Tensor`s representing internal calculations made within this function.
+  This inculdes replica states.
 
 <h3 id="one_step"><code>one_step</code></h3>
 
@@ -246,22 +266,25 @@ one_step(
 
 Takes one step of the TransitionKernel.
 
+
 #### Args:
 
+
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    current state(s) of the Markov chain(s).
+  current state(s) of the Markov chain(s).
 * <b>`previous_kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or
-    `list` of `Tensor`s representing internal calculations made within the
-    previous call to this function (or as returned by `bootstrap_results`).
+  `list` of `Tensor`s representing internal calculations made within the
+  previous call to this function (or as returned by `bootstrap_results`).
 
 
 #### Returns:
 
+
 * <b>`next_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    next state(s) of the Markov chain(s).
+  next state(s) of the Markov chain(s).
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
-    `Tensor`s representing internal calculations made within this function.
-    This inculdes replica states.
+  `Tensor`s representing internal calculations made within this function.
+  This inculdes replica states.
 
 
 

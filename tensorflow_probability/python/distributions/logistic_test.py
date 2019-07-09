@@ -21,15 +21,19 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
-class LogisticTest(tf.test.TestCase):
+@test_util.run_all_in_graph_and_eager_modes
+class LogisticTest(test_case.TestCase):
 
   def testReparameterizable(self):
     batch_size = 6
@@ -142,7 +146,8 @@ class LogisticTest(tf.test.TestCase):
     loc = [3.0, 4.0, 2.0]
     scale = 1.0
     dist = tfd.Logistic(loc, scale)
-    sample = dist.sample(seed=100)
+    sample = dist.sample(
+        seed=tfp_test_util.test_seed(hardcoded_seed=100, set_eager_seed=False))
     self.assertEqual(sample.shape, (3,))
     self.assertAllClose(
         self.evaluate(sample), [6.22460556, 3.79602098, 2.05084133])
@@ -167,6 +172,37 @@ class LogisticTest(tf.test.TestCase):
     dist64 = tfd.Logistic(loc, scale)
     self.assertEqual(dist64.dtype, tf.float64)
     self.assertEqual(dist64.dtype, dist64.sample(5).dtype)
+
+  def testGradientThroughParams(self):
+    loc = tf.Variable([-5., 0., 5.])
+    scale = tf.Variable(2.)
+    d = tfd.Logistic(loc=loc, scale=scale, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([1., 2., 3.])
+    grad = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(grad, 2)
+    self.assertAllNotNone(grad)
+
+  def testAssertsPositiveScale(self):
+    scale = tf.Variable([1., 2., -3.])
+    with self.assertRaisesOpError("Argument `scale` must be positive."):
+      d = tfd.Logistic(loc=0, scale=scale, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.sample())
+
+  def testAssertsPositiveScaleAfterMutation(self):
+    scale = tf.Variable([1., 2., 3.])
+    self.evaluate(scale.initializer)
+    d = tfd.Logistic(loc=0., scale=scale, validate_args=True)
+    with self.assertRaisesOpError("Argument `scale` must be positive."):
+      with tf.control_dependencies([scale.assign([1., 2., -3.])]):
+        self.evaluate(d.sample())
+
+  def testAssertParamsAreFloats(self):
+    loc = tf.convert_to_tensor(0, dtype=tf.int32)
+    scale = tf.convert_to_tensor(1, dtype=tf.int32)
+    with self.assertRaisesRegexp(ValueError, "Expected floating point"):
+      tfd.Logistic(loc=loc, scale=scale)
 
 
 if __name__ == "__main__":

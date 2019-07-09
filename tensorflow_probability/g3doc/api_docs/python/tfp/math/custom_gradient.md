@@ -5,6 +5,8 @@
 
 # tfp.math.custom_gradient
 
+Embeds a custom gradient into a `Tensor`.
+
 ``` python
 tfp.math.custom_gradient(
     fx,
@@ -15,7 +17,11 @@ tfp.math.custom_gradient(
 )
 ```
 
-Embeds a custom gradient into a `Tensor`.
+
+
+Defined in [`python/math/custom_gradient.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/custom_gradient.py).
+
+<!-- Placeholder for "Used in" -->
 
 This function works by clever application of `stop_gradient`. I.e., observe
 that:
@@ -40,15 +46,17 @@ relevant portions of `f`, `g`. For example see the unit-test,
 
 #### Args:
 
+
 * <b>`fx`</b>: `Tensor`. Output of function evaluated at `x`.
 * <b>`gx`</b>: `Tensor` or list of `Tensor`s. Gradient of function at (each) `x`.
 * <b>`x`</b>: `Tensor` or list of `Tensor`s. Args of evaluation for `f`.
 * <b>`fx_gx_manually_stopped`</b>: Python `bool` indicating that `fx`, `gx` manually
-    have `stop_gradient` applied.
+  have `stop_gradient` applied.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
 
 
 #### Returns:
 
+
 * <b>`fx`</b>: Floating-type `Tensor` equal to `f(x)` but which has gradient
-    `stop_gradient(g(x))`.
+  `stop_gradient(g(x))`.

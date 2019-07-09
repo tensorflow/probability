@@ -14,9 +14,16 @@
 
 ## Class `CustomExponentialFamily`
 
+Constucts GLM from arbitrary distribution and inverse link function.
+
 Inherits From: [`ExponentialFamily`](../../tfp/glm/ExponentialFamily.md)
 
-Constucts GLM from arbitrary distribution and inverse link function.
+
+
+Defined in [`python/glm/family.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/family.py).
+
+<!-- Placeholder for "Used in" -->
+
 
 <h2 id="__init__"><code>__init__</code></h2>
 
@@ -31,21 +38,23 @@ __init__(
 
 Creates the `CustomExponentialFamily`.
 
+
 #### Args:
 
+
 * <b>`distribution_fn`</b>: Python `callable` which returns a
-    `tf.distribution.Distribution`-like instance from a single input
-    representing the distribution's required `mean`, i.e.,
-    `mean = linear_model_to_mean_fn(matmul(model_matrix, weights))`.
+  `tf.distribution.Distribution`-like instance from a single input
+  representing the distribution's required `mean`, i.e.,
+  `mean = linear_model_to_mean_fn(matmul(model_matrix, weights))`.
 * <b>`linear_model_to_mean_fn`</b>: Python `callable` which returns the
-    distribution's required mean as computed from the predicted linear
-    response, `matmul(model_matrix, weights)`.
+  distribution's required mean as computed from the predicted linear
+  response, `matmul(model_matrix, weights)`.
 * <b>`is_canonical`</b>: Python `bool` indicating that taken together,
-    `distribution_fn` and `linear_model_to_mean_fn` imply that the
-    distribution's `variance` is equivalent to `d/dr
-    linear_model_to_mean_fn(r)`.
+  `distribution_fn` and `linear_model_to_mean_fn` imply that the
+  distribution's `variance` is equivalent to `d/dr
+  linear_model_to_mean_fn(r)`.
 * <b>`name`</b>: Python `str` used as TF namescope for ops created by member
-    functions. Default value: `None` (i.e., the subclass name).
+  functions. Default value: `None` (i.e., the subclass name).
 
 
 
@@ -55,17 +64,21 @@ Creates the `CustomExponentialFamily`.
 
 
 
+
 <h3 id="is_canonical"><code>is_canonical</code></h3>
 
 Returns `True` when `variance(r) == grad_mean(r)` for all `r`.
 
+
 <h3 id="linear_model_to_mean_fn"><code>linear_model_to_mean_fn</code></h3>
+
 
 
 
 <h3 id="name"><code>name</code></h3>
 
 Returns TF namescope prefixed to ops created by member functions.
+
 
 
 
@@ -96,24 +109,26 @@ often `T(Y) := Y` and in that case the distinction doesn't matter.
 
 #### Args:
 
+
 * <b>`predicted_linear_response`</b>: `float`-like `Tensor` corresponding to
-    `tf.matmul(model_matrix, weights)`.
+  `tf.matmul(model_matrix, weights)`.
 * <b>`name`</b>: Python `str` used as TF namescope for ops created by member
-    functions. Default value: `None` (i.e., 'call').
+  functions. Default value: `None` (i.e., 'call').
 
 
 #### Returns:
 
+
 * <b>`mean`</b>: `Tensor` with shape and dtype of `predicted_linear_response`
-    representing the distribution prescribed mean, given the prescribed
-    linear-response to mean mapping.
+  representing the distribution prescribed mean, given the prescribed
+  linear-response to mean mapping.
 * <b>`variance`</b>: `Tensor` with shape and dtype of `predicted_linear_response`
-    representing the distribution prescribed variance, given the prescribed
-    linear-response to mean mapping.
+  representing the distribution prescribed variance, given the prescribed
+  linear-response to mean mapping.
 * <b>`grad_mean`</b>: `Tensor` with shape and dtype of `predicted_linear_response`
-    representing the gradient of the mean with respect to the
-    linear-response and given the prescribed linear-response to mean
-    mapping.
+  representing the gradient of the mean with respect to the
+  linear-response and given the prescribed linear-response to mean
+  mapping.
 
 <h3 id="log_prob"><code>log_prob</code></h3>
 
@@ -127,21 +142,24 @@ log_prob(
 
 Computes `D(param=mean(r)).log_prob(response)` for linear response, `r`.
 
+
 #### Args:
 
+
 * <b>`response`</b>: `float`-like `Tensor` representing observed ("actual")
-    responses.
+  responses.
 * <b>`predicted_linear_response`</b>: `float`-like `Tensor` corresponding to
-    `tf.matmul(model_matrix, weights)`.
+  `tf.matmul(model_matrix, weights)`.
 * <b>`name`</b>: Python `str` used as TF namescope for ops created by member
-    functions. Default value: `None` (i.e., 'log_prob').
+  functions. Default value: `None` (i.e., 'log_prob').
 
 
 #### Returns:
 
+
 * <b>`log_prob`</b>: `Tensor` with shape and dtype of `predicted_linear_response`
-    representing the distribution prescribed log-probability of the observed
-    `response`s.
+  representing the distribution prescribed log-probability of the observed
+  `response`s.
 
 
 

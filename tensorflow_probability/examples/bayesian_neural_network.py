@@ -166,7 +166,7 @@ def build_input_pipeline(mnist_data, batch_size, heldout_size):
       (mnist_data.train.images, np.int32(mnist_data.train.labels)))
   training_batches = training_dataset.shuffle(
       50000, reshuffle_each_iteration=True).repeat().batch(batch_size)
-  training_iterator = training_batches.make_one_shot_iterator()
+  training_iterator = tf.compat.v1.data.make_one_shot_iterator(training_batches)
 
   # Build a iterator over the heldout set with batch_size=heldout_size,
   # i.e., return the entire heldout set as a constant.
@@ -175,12 +175,12 @@ def build_input_pipeline(mnist_data, batch_size, heldout_size):
        np.int32(mnist_data.validation.labels)))
   heldout_frozen = (heldout_dataset.take(heldout_size).
                     repeat().batch(heldout_size))
-  heldout_iterator = heldout_frozen.make_one_shot_iterator()
+  heldout_iterator = tf.compat.v1.data.make_one_shot_iterator(heldout_frozen)
 
   # Combine these into a feedable iterator that can switch between training
   # and validation inputs.
-  handle = tf.placeholder(tf.string, shape=[])
-  feedable_iterator = tf.data.Iterator.from_string_handle(
+  handle = tf.compat.v1.placeholder(tf.string, shape=[])
+  feedable_iterator = tf.compat.v1.data.Iterator.from_string_handle(
       handle, training_batches.output_types, training_batches.output_shapes)
   images, labels = feedable_iterator.get_next()
 
@@ -212,11 +212,11 @@ def build_fake_data(num_examples=10):
 
 def main(argv):
   del argv  # unused
-  if tf.gfile.Exists(FLAGS.model_dir):
-    tf.logging.warning(
+  if tf.io.gfile.exists(FLAGS.model_dir):
+    tf.compat.v1.logging.warning(
         "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
-    tf.gfile.DeleteRecursively(FLAGS.model_dir)
-  tf.gfile.MakeDirs(FLAGS.model_dir)
+    tf.io.gfile.rmtree(FLAGS.model_dir)
+  tf.io.gfile.makedirs(FLAGS.model_dir)
 
   if FLAGS.fake_data:
     mnist_data = build_fake_data()
@@ -230,7 +230,7 @@ def main(argv):
   # Build a Bayesian LeNet5 network. We use the Flipout Monte Carlo estimator
   # for the convolution and fully-connected layers: this enables lower
   # variance stochastic gradients than naive reparameterization.
-  with tf.name_scope("bayesian_neural_net", values=[images]):
+  with tf.compat.v1.name_scope("bayesian_neural_net", values=[images]):
     neural_net = tf.keras.Sequential([
         tfp.layers.Convolution2DFlipout(6,
                                         kernel_size=5,
@@ -259,14 +259,15 @@ def main(argv):
     labels_distribution = tfd.Categorical(logits=logits)
 
   # Compute the -ELBO as the loss, averaged over the batch size.
-  neg_log_likelihood = -tf.reduce_mean(labels_distribution.log_prob(labels))
+  neg_log_likelihood = -tf.reduce_mean(
+      input_tensor=labels_distribution.log_prob(labels))
   kl = sum(neural_net.losses) / mnist_data.train.num_examples
   elbo_loss = neg_log_likelihood + kl
 
   # Build metrics for evaluation. Predictions are formed from a single forward
   # pass of the probabilistic layers. They are cheap but noisy predictions.
-  predictions = tf.argmax(logits, axis=1)
-  accuracy, accuracy_update_op = tf.metrics.accuracy(
+  predictions = tf.argmax(input=logits, axis=1)
+  accuracy, accuracy_update_op = tf.compat.v1.metrics.accuracy(
       labels=labels, predictions=predictions)
 
   # Extract weight posterior statistics for layers with weight distributions
@@ -283,14 +284,15 @@ def main(argv):
     qmeans.append(q.mean())
     qstds.append(q.stddev())
 
-  with tf.name_scope("train"):
-    optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)
+  with tf.compat.v1.name_scope("train"):
+    optimizer = tf.compat.v1.train.AdamOptimizer(
+        learning_rate=FLAGS.learning_rate)
     train_op = optimizer.minimize(elbo_loss)
 
-  init_op = tf.group(tf.global_variables_initializer(),
-                     tf.local_variables_initializer())
+  init_op = tf.group(tf.compat.v1.global_variables_initializer(),
+                     tf.compat.v1.local_variables_initializer())
 
-  with tf.Session() as sess:
+  with tf.compat.v1.Session() as sess:
     sess.run(init_op)
 
     # Run the training loop.
@@ -338,4 +340,4 @@ def main(argv):
                                   .format(heldout_lp))
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()

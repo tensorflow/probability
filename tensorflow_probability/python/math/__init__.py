@@ -18,40 +18,70 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.math import ode
 from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
+from tensorflow_probability.python.math.generic import log_add_exp
+from tensorflow_probability.python.math.generic import log_combinations
+from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
+from tensorflow_probability.python.math.generic import soft_threshold
+from tensorflow_probability.python.math.generic import softplus_inverse
+from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_1d_grid
+from tensorflow_probability.python.math.interpolation import batch_interp_regular_nd_grid
 from tensorflow_probability.python.math.interpolation import interp_regular_1d_grid
+from tensorflow_probability.python.math.linalg import cholesky_concat
+from tensorflow_probability.python.math.linalg import fill_triangular
+from tensorflow_probability.python.math.linalg import fill_triangular_inverse
 from tensorflow_probability.python.math.linalg import lu_matrix_inverse
 from tensorflow_probability.python.math.linalg import lu_reconstruct
 from tensorflow_probability.python.math.linalg import lu_solve
+from tensorflow_probability.python.math.linalg import matrix_rank
 from tensorflow_probability.python.math.linalg import pinv
+from tensorflow_probability.python.math.linalg import pivoted_cholesky
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matmul
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
+from tensorflow_probability.python.math.minimize import minimize
+from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 from tensorflow_probability.python.math.numeric import log1psquare
-from tensorflow_probability.python.math.numeric import soft_threshold
 from tensorflow_probability.python.math.random_ops import random_rademacher
 from tensorflow_probability.python.math.random_ops import random_rayleigh
 from tensorflow_probability.python.math.root_search import secant_root
+from tensorflow_probability.python.math.sparse import dense_to_sparse
 
-from tensorflow.python.util.all_util import remove_undocumented
+from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'batch_interp_regular_1d_grid',
+    'batch_interp_regular_nd_grid',
+    'cholesky_concat',
+    'clip_by_value_preserve_gradient',
     'custom_gradient',
+    'dense_to_sparse',
     'diag_jacobian',
+    'fill_triangular',
+    'fill_triangular_inverse',
     'interp_regular_1d_grid',
     'log1psquare',
-    'soft_threshold',
+    'log_add_exp',
+    'log_combinations',
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_solve',
+    'matrix_rank',
+    'minimize',
+    'ode',
     'pinv',
-    'sparse_or_dense_matvecmul',
-    'sparse_or_dense_matmul',
+    'pivoted_cholesky',
     'random_rademacher',
     'random_rayleigh',
+    'reduce_weighted_logsumexp',
     'secant_root',
+    'soft_threshold',
+    'softplus_inverse',
+    'sparse_or_dense_matmul',
+    'sparse_or_dense_matvecmul',
+    'value_and_gradient',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

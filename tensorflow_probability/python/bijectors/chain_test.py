@@ -21,10 +21,11 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow as tf
-from tensorflow_probability.python import bijectors as tfb
 
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 class ShapeChanging(tfb.Bijector):
@@ -37,13 +38,13 @@ class ShapeChanging(tfb.Bijector):
         validate_args=False, name="shape_changer")
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ChainBijectorTest(tf.test.TestCase):
   """Tests the correctness of the Y = Chain(bij1, bij2, bij3) transformation."""
 
   def testBijector(self):
     chain = tfb.Chain((tfb.Exp(), tfb.Softplus()))
-    self.assertEqual("chain_of_exp_of_softplus", chain.name)
+    self.assertStartsWith(chain.name, "chain_of_exp_of_softplus")
     x = np.asarray([[[1., 2.],
                      [2., 3.]]])
     self.assertAllClose(1. + np.exp(x), self.evaluate(chain.forward(x)))
@@ -57,7 +58,7 @@ class ChainBijectorTest(tf.test.TestCase):
 
   def testBijectorIdentity(self):
     chain = tfb.Chain()
-    self.assertEqual("identity", chain.name)
+    self.assertStartsWith(chain.name, "identity")
     x = np.asarray([[[1., 2.],
                      [2., 3.]]])
     self.assertAllClose(x, self.evaluate(chain.forward(x)))
@@ -81,12 +82,14 @@ class ChainBijectorTest(tf.test.TestCase):
     y = tf.TensorShape([2 + 1])
     self.assertAllEqual(y, chain.forward_event_shape(x))
     self.assertAllEqual(
-        y.as_list(),
-        self.evaluate(chain.forward_event_shape_tensor(x.as_list())))
+        tensorshape_util.as_list(y),
+        self.evaluate(
+            chain.forward_event_shape_tensor(tensorshape_util.as_list(x))))
     self.assertAllEqual(x, chain.inverse_event_shape(y))
     self.assertAllEqual(
-        x.as_list(),
-        self.evaluate(chain.inverse_event_shape_tensor(y.as_list())))
+        tensorshape_util.as_list(x),
+        self.evaluate(
+            chain.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
   def testMinEventNdimsChain(self):
     chain = tfb.Chain([tfb.Exp(), tfb.Exp(), tfb.Exp()])
@@ -183,11 +186,56 @@ class ChainBijectorTest(tf.test.TestCase):
 
   def testChainIldjWithPlaceholder(self):
     chain = tfb.Chain((tfb.Exp(), tfb.Exp()))
-    samples = tf.placeholder_with_default(
+    samples = tf.compat.v1.placeholder_with_default(
         np.zeros([2, 10], np.float32), shape=None)
     ildj = chain.inverse_log_det_jacobian(samples, event_ndims=0)
     self.assertTrue(ildj is not None)
     self.evaluate(ildj)
+
+  def testChainDynamicToStatic(self):
+    if tf.executing_eagerly():
+      return
+
+    def xform_dynamic(x):
+      return tf.compat.v1.placeholder_with_default(x, shape=None)
+
+    def xform_static(x):
+      tensorshape_util.set_shape(x, [1])
+      return x
+
+    def ldj(_):
+      return tf.constant(0.)
+
+    # The issue was that the sample's shape was going in-and-out of being fully
+    # specified, causing internal consistency issues inside the bijector.
+    chain = tfb.Chain([
+        tfb.Inline(
+            inverse_log_det_jacobian_fn=ldj,
+            inverse_fn=xform_dynamic,
+            forward_min_event_ndims=0,
+            forward_log_det_jacobian_fn=ldj,
+            forward_fn=xform_dynamic),
+        tfb.Inline(
+            inverse_log_det_jacobian_fn=ldj,
+            inverse_fn=xform_static,
+            forward_min_event_ndims=0,
+            forward_log_det_jacobian_fn=ldj,
+            forward_fn=xform_static),
+        tfb.Inline(
+            inverse_log_det_jacobian_fn=ldj,
+            inverse_fn=xform_dynamic,
+            forward_min_event_ndims=0,
+            forward_log_det_jacobian_fn=ldj,
+            forward_fn=xform_dynamic)
+    ])
+
+    ildj = chain.inverse_log_det_jacobian([0.], event_ndims=0)
+    # The static shape information is lost on the account of the final bijector
+    # being dynamic.
+    self.assertFalse(tensorshape_util.is_fully_defined(ildj.shape))
+    fldj = chain.forward_log_det_jacobian([0.], event_ndims=0)
+    # Ditto.
+    self.assertFalse(tensorshape_util.is_fully_defined(fldj.shape))
 
 
 if __name__ == "__main__":

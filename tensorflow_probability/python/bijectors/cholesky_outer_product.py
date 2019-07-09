@@ -20,11 +20,13 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -75,25 +77,20 @@ class CholeskyOuterProduct(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._graph_parents = []
-    self._name = name
-    super(CholeskyOuterProduct, self).__init__(
-        forward_min_event_ndims=2,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(CholeskyOuterProduct, self).__init__(
+          forward_min_event_ndims=2,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
-    if self.validate_args:
-      is_matrix = tf.assert_rank_at_least(x, 2)
-      shape = tf.shape(x)
-      is_square = tf.assert_equal(shape[-2], shape[-1])
-      x = control_flow_ops.with_dependencies([is_matrix, is_square], x)
-    # For safety, explicitly zero-out the upper triangular part.
-    x = tf.matrix_band_part(x, -1, 0)
-    return tf.matmul(x, x, adjoint_b=True)
+    with tf.control_dependencies(self._assertions(x)):
+      # For safety, explicitly zero-out the upper triangular part.
+      x = tf.linalg.band_part(x, -1, 0)
+      return tf.matmul(x, x, adjoint_b=True)
 
   def _inverse(self, y):
-    return tf.cholesky(y)
+    return tf.linalg.cholesky(y)
 
   def _forward_log_det_jacobian(self, x):
     # Let Y be a symmetric, positive definite matrix and write:
@@ -136,54 +133,41 @@ class CholeskyOuterProduct(bijector.Bijector):
     # Since there is a 2 X[j,j] term for every lower-triangular element of X we
     # conclude:
     #   |Jac(d vec[Y]/d vec[X])| = 2^p prod_{j=0}^{p-1} X[j,j]^{p-j}.
-    diag = tf.matrix_diag_part(x)
+    diag = tf.linalg.diag_part(x)
 
     # We now ensure diag is columnar. Eg, if `diag = [1, 2, 3]` then the output
     # is `[[1], [2], [3]]` and if `diag = [[1, 2, 3], [4, 5, 6]]` then the
     # output is unchanged.
     diag = self._make_columnar(diag)
 
-    if self.validate_args:
-      is_matrix = tf.assert_rank_at_least(
-          x, 2, message="Input must be a (batch of) matrix.")
-      shape = tf.shape(x)
-      is_square = tf.assert_equal(
-          shape[-2],
-          shape[-1],
-          message="Input must be a (batch of) square matrix.")
-      # Assuming lower-triangular means we only need check diag>0.
-      is_positive_definite = tf.assert_positive(
-          diag, message="Input must be positive definite.")
-      x = control_flow_ops.with_dependencies(
-          [is_matrix, is_square, is_positive_definite], x)
+    with tf.control_dependencies(self._assertions(x)):
+      # Create a vector equal to: [p, p-1, ..., 2, 1].
+      if tf.compat.dimension_value(x.shape[-1]) is None:
+        p_int = tf.shape(x)[-1]
+        p_float = tf.cast(p_int, dtype=x.dtype)
+      else:
+        p_int = tf.compat.dimension_value(x.shape[-1])
+        p_float = dtype_util.as_numpy_dtype(x.dtype)(p_int)
+      exponents = tf.linspace(p_float, 1., p_int)
 
-    # Create a vector equal to: [p, p-1, ..., 2, 1].
-    if tf.dimension_value(x.shape[-1]) is None:
-      p_int = tf.shape(x)[-1]
-      p_float = tf.cast(p_int, dtype=x.dtype)
-    else:
-      p_int = tf.dimension_value(x.shape[-1])
-      p_float = np.array(p_int, dtype=x.dtype.as_numpy_dtype)
-    exponents = tf.linspace(p_float, 1., p_int)
+      sum_weighted_log_diag = tf.squeeze(
+          tf.matmul(tf.math.log(diag), exponents[..., tf.newaxis]), axis=-1)
+      fldj = p_float * np.log(2.) + sum_weighted_log_diag
 
-    sum_weighted_log_diag = tf.squeeze(
-        tf.matmul(tf.log(diag), exponents[..., tf.newaxis]), axis=-1)
-    fldj = p_float * np.log(2.) + sum_weighted_log_diag
+      # We finally need to undo adding an extra column in non-scalar cases
+      # where there is a single matrix as input.
+      if tensorshape_util.rank(x.shape) is not None:
+        if tensorshape_util.rank(x.shape) == 2:
+          fldj = tf.squeeze(fldj, axis=-1)
+        return fldj
 
-    # We finally need to undo adding an extra column in non-scalar cases
-    # where there is a single matrix as input.
-    if x.shape.ndims is not None:
-      if x.shape.ndims == 2:
-        fldj = tf.squeeze(fldj, axis=-1)
-      return fldj
-
-    shape = tf.shape(fldj)
-    maybe_squeeze_shape = tf.concat([
-        shape[:-1],
-        distribution_util.pick_vector(
-            tf.equal(tf.rank(x), 2),
-            np.array([], dtype=np.int32), shape[-1:])], 0)
-    return tf.reshape(fldj, maybe_squeeze_shape)
+      shape = tf.shape(fldj)
+      maybe_squeeze_shape = tf.concat([
+          shape[:-1],
+          distribution_util.pick_vector(
+              tf.equal(tf.rank(x), 2),
+              np.array([], dtype=np.int32), shape[-1:])], 0)
+      return tf.reshape(fldj, maybe_squeeze_shape)
 
   def _make_columnar(self, x):
     """Ensures non-scalar input has at least one column.
@@ -201,8 +185,8 @@ class CholeskyOuterProduct(bijector.Bijector):
     Returns:
       columnar_x: `Tensor` with at least two dimensions.
     """
-    if x.shape.ndims is not None:
-      if x.shape.ndims == 1:
+    if tensorshape_util.rank(x.shape) is not None:
+      if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, :]
       return x
     shape = tf.shape(x)
@@ -213,3 +197,13 @@ class CholeskyOuterProduct(bijector.Bijector):
         shape[-1:],
     ], 0)
     return tf.reshape(x, maybe_expanded_shape)
+
+  def _assertions(self, t):
+    if self.validate_args:
+      return []
+    is_matrix = assert_util.assert_rank_at_least(t, 2)
+    is_square = assert_util.assert_equal(tf.shape(t)[-2], tf.shape(t)[-1])
+    is_positive_definite = assert_util.assert_positive(
+        tf.linalg.diag_part(t), message="Input must be positive definite.")
+    return [is_matrix, is_square, is_positive_definite]
+

@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-sudo: required
 language: python
+dist: xenial
 git:
   depth: 20
   quiet: true
@@ -31,20 +31,23 @@ stages:
 jobs:
   include:
     - stage: lint
+      python: "3.5"
       script: ./testing/run_lints.sh
 
 # The below implicitly run under a build stage called "Test". The full matrix
 # of python versions x SHARD will be expanded and run in parallel.
 python:
   - "2.7"
-  - "3.6"
+  - "3.5"
 env:
   global:
-    - NUM_SHARDS=2
+    - NUM_SHARDS=4
   matrix:
     # We shard our tests to avoid timeouts. The run_tests.sh script uses the
     # $NUM_SHARDS and $SHARD environment variables to select a partition of the
     # set of all tests.
     - SHARD=0
     - SHARD=1
+    - SHARD=2
+    - SHARD=3
 script: ./testing/run_tests.sh

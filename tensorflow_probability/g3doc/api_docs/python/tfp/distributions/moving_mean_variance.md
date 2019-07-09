@@ -5,16 +5,20 @@
 
 # tfp.distributions.moving_mean_variance
 
+Compute exponentially weighted moving {mean,variance} of a streaming value. (deprecated)
+
 ``` python
 tfp.distributions.moving_mean_variance(
-    value,
-    decay,
-    collections=None,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
-Compute exponentially weighted moving {mean,variance} of a streaming value.
+<!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-03-22.
+Instructions for updating:
+The `moving_mean_variance` function is deprecated. Use `assign_moving_mean_variance` and construct the Variables explicitly.
 
 The exponentially-weighting moving `mean_var` and `variance_var` are updated
 by `value` according to the following recurrence:
@@ -34,24 +38,24 @@ variable creation.
 
 #### Args:
 
+
 * <b>`value`</b>: `float`-like `Tensor`. Same shape as `mean_var` and `variance_var`.
 * <b>`decay`</b>: A `float`-like `Tensor`. The moving mean decay. Typically close to
-    `1.`, e.g., `0.999`.
-* <b>`collections`</b>: Python list of graph-collections keys to which the internal
-    variables `mean_var` and `variance_var` are added.
-    Default value is `[GraphKeys.GLOBAL_VARIABLES]`.
+  `1.`, e.g., `0.999`.
 * <b>`name`</b>: Optional name of the returned operation.
 
 
 #### Returns:
 
+
 * <b>`mean_var`</b>: `Variable` representing the `value`-updated exponentially weighted
-    moving mean.
+  moving mean.
 * <b>`variance_var`</b>: `Variable` representing the `value`-updated
-    exponentially weighted moving variance.
+  exponentially weighted moving variance.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `value_var` does not have float type `dtype`.
 * <b>`TypeError`</b>: if `value`, `decay` have different `base_dtype`.

@@ -21,20 +21,20 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class NormalCDFBijectorTest(tf.test.TestCase):
   """Tests correctness of the NormalCDF bijector."""
 
   def testBijector(self):
     bijector = tfb.NormalCDF(validate_args=True)
-    self.assertEqual("normal", bijector.name)
+    self.assertStartsWith(bijector.name, "normal")
     x = np.array([[[-3.], [0.], [0.5], [4.2], [5.]]], dtype=np.float64)
     # Normal distribution
     normal_dist = stats.norm(loc=0., scale=1.)

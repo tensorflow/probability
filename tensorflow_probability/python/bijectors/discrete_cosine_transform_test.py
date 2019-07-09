@@ -21,20 +21,20 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import fftpack
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class DiscreteCosineTransformTest(tf.test.TestCase):
   """Tests correctness of the DiscreteCosineTransform bijector."""
 
   def testBijector(self):
     bijector = tfb.DiscreteCosineTransform(validate_args=True)
-    self.assertEqual('dct', bijector.name)
+    self.assertStartsWith(bijector.name, 'dct')
     x = np.random.randn(6, 5, 4).astype(np.float32)
     y = fftpack.dct(x, norm='ortho').astype(np.float32)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
@@ -48,7 +48,7 @@ class DiscreteCosineTransformTest(tf.test.TestCase):
 
   def testBijector_dct3(self):
     bijector = tfb.DiscreteCosineTransform(dct_type=3, validate_args=True)
-    self.assertEqual('dct', bijector.name)
+    self.assertStartsWith(bijector.name, 'dct')
     x = np.random.randn(6, 5, 4).astype(np.float32)
     y = fftpack.dct(x, type=3, norm='ortho').astype(np.float32)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))

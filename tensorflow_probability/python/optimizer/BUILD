@@ -89,6 +89,7 @@ py_library(
     deps = [
         ":bfgs_utils",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -111,6 +112,7 @@ py_library(
     deps = [
         ":bfgs_utils",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -133,6 +135,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -142,6 +145,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -183,6 +187,8 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math:generic",
     ],
 )
 

@@ -20,16 +20,20 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
 tfb = tfp.bijectors
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class OrderedBijectorTest(tf.test.TestCase):
   """Tests correctness of the ordered transformation."""
 
@@ -38,7 +42,7 @@ class OrderedBijectorTest(tf.test.TestCase):
 
   def testBijectorVector(self):
     ordered = tfb.Ordered()
-    self.assertEqual("ordered", ordered.name)
+    self.assertStartsWith(ordered.name, "ordered")
     x = np.asarray([[2., 3, 4], [4., 8, 13]])
     y = [[2., 0, 0], [4., np.log(4.), np.log(5.)]]
     self.assertAllClose(y, self.evaluate(ordered.forward(x)))
@@ -56,12 +60,12 @@ class OrderedBijectorTest(tf.test.TestCase):
 
   def testBijectorUnknownShape(self):
     ordered = tfb.Ordered()
-    self.assertEqual("ordered", ordered.name)
+    self.assertStartsWith(ordered.name, "ordered")
     x_ = np.asarray([[2., 3, 4], [4., 8, 13]], dtype=np.float32)
     y_ = np.asarray(
         [[2., 0, 0], [4., np.log(4.), np.log(5.)]], dtype=np.float32)
-    x = tf.placeholder_with_default(x_, shape=[2, None])
-    y = tf.placeholder_with_default(y_, shape=[2, None])
+    x = tf1.placeholder_with_default(x_, shape=[2, None])
+    y = tf1.placeholder_with_default(y_, shape=[2, None])
     self.assertAllClose(y_, self.evaluate(ordered.forward(x)))
     self.assertAllClose(x_, self.evaluate(ordered.inverse(y)))
     self.assertAllClose(
@@ -80,13 +84,15 @@ class OrderedBijectorTest(tf.test.TestCase):
     y = tf.TensorShape([4])
     bijector = tfb.Ordered(validate_args=True)
     self.assertAllEqual(y, bijector.forward_event_shape(x))
-    self.assertAllEqual(y.as_list(),
-                        self.evaluate(bijector.forward_event_shape_tensor(
-                            x.as_list())))
+    self.assertAllEqual(
+        tensorshape_util.as_list(y),
+        self.evaluate(
+            bijector.forward_event_shape_tensor(tensorshape_util.as_list(x))))
     self.assertAllEqual(x, bijector.inverse_event_shape(y))
-    self.assertAllEqual(x.as_list(),
-                        self.evaluate(bijector.inverse_event_shape_tensor(
-                            y.as_list())))
+    self.assertAllEqual(
+        tensorshape_util.as_list(x),
+        self.evaluate(
+            bijector.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
   def testBijectiveAndFinite(self):
     ordered = tfb.Ordered()

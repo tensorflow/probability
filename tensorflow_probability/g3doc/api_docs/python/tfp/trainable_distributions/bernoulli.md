@@ -5,15 +5,20 @@
 
 # tfp.trainable_distributions.bernoulli
 
+Constructs a trainable `tfd.Bernoulli` distribution. (deprecated)
+
 ``` python
 tfp.trainable_distributions.bernoulli(
-    x,
-    layer_fn=tf.layers.dense,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
-Constructs a trainable `tfd.Bernoulli` distribution.
+<!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-09-01.
+Instructions for updating:
+`multivariate_normal_tril` is deprecated; use <a href="../../tfp/layers/DistributionLambda.md"><code>tfp.layers.DistributionLambda</code></a> or <a href="../../tfp/util/DeferredTensor.md"><code>tfp.util.DeferredTensor</code></a>.
 
 This function creates a Bernoulli distribution parameterized by logits.
 Using default args, this function is mathematically equivalent to:
@@ -79,16 +84,18 @@ with tf.Session() as sess:
 
 #### Args:
 
+
 * <b>`x`</b>: `Tensor` with floating type. Must have statically defined rank and
-    statically known right-most dimension.
+  statically known right-most dimension.
 * <b>`layer_fn`</b>: Python `callable` which takes input `x` and `int` scalar `d` and
-    returns a transformation of `x` with shape
-    `tf.concat([tf.shape(x)[:-1], [1]], axis=0)`.
-    Default value: `tf.layers.dense`.
+  returns a transformation of `x` with shape
+  `tf.concat([tf.shape(x)[:-1], [1]], axis=0)`.
+  Default value: `tf.layers.dense`.
 * <b>`name`</b>: A `name_scope` name for operations created by this function.
-    Default value: `None` (i.e., "bernoulli").
+  Default value: `None` (i.e., "bernoulli").
 
 
 #### Returns:
+
 
 * <b>`bernoulli`</b>: An instance of `tfd.Bernoulli`.

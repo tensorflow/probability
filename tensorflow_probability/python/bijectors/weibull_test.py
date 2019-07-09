@@ -21,14 +21,14 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class WeibullBijectorTest(tf.test.TestCase):
   """Tests correctness of the weibull bijector."""
 
@@ -37,7 +37,7 @@ class WeibullBijectorTest(tf.test.TestCase):
     concentration = 0.3
     bijector = tfb.Weibull(
         scale=scale, concentration=concentration, validate_args=True)
-    self.assertEqual("weibull", bijector.name)
+    self.assertStartsWith(bijector.name, "weibull")
     x = np.array([[[0.], [1.], [14.], [20.], [100.]]], dtype=np.float32)
     # Weibull distribution
     weibull_dist = stats.frechet_r(c=concentration, scale=scale)

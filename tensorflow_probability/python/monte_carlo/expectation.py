@@ -125,7 +125,8 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
 
   Args:
     f: Python callable which can return `f(samples)`.
-    samples: `Tensor` of samples used to form the Monte-Carlo approximation of
+    samples: `Tensor` or nested structure (list, dict, etc.) of `Tensor`s,
+      representing samples used to form the Monte-Carlo approximation of
       `E_p[f(X)]`.  A batch of samples should be indexed by `axis` dimensions.
     log_prob: Python callable which can return `log_prob(samples)`. Must
       correspond to the natural-logarithm of the pdf/pmf of each sample. Only
@@ -154,16 +155,17 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       `callable`.
   """
 
-  with tf.name_scope(name, 'expectation', [samples]):
+  with tf.compat.v1.name_scope(name, 'expectation', [samples]):
     if not callable(f):
       raise ValueError('`f` must be a callable function.')
     if use_reparametrization:
-      return tf.reduce_mean(f(samples), axis=axis, keep_dims=keep_dims)
+      return tf.reduce_mean(
+          input_tensor=f(samples), axis=axis, keepdims=keep_dims)
     else:
       if not callable(log_prob):
         raise ValueError('`log_prob` must be a callable function.')
       stop = tf.stop_gradient  # For readability.
-      x = stop(samples)
+      x = tf.nest.map_structure(stop, samples)
       logpx = log_prob(x)
       fx = f(x)  # Call `f` once in case it has side-effects.
       # To achieve this, we use the fact that:
@@ -188,22 +190,22 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       # "Is there a floating point value of x, for which x-x == 0 is false?"
       # http://stackoverflow.com/q/2686644
       dice = fx * tf.exp(logpx - stop(logpx))
-      return tf.reduce_mean(dice, axis=axis, keep_dims=keep_dims)
+      return tf.reduce_mean(input_tensor=dice, axis=axis, keepdims=keep_dims)
 
 
 def _sample_mean(values):
   """Mean over sample indices.  In this module this is always [0]."""
-  return tf.reduce_mean(values, reduction_indices=[0])
+  return tf.reduce_mean(input_tensor=values, axis=[0])
 
 
 def _sample_max(values):
   """Max over sample indices.  In this module this is always [0]."""
-  return tf.reduce_max(values, reduction_indices=[0])
+  return tf.reduce_max(input_tensor=values, axis=[0])
 
 
 def _get_samples(dist, z, n, seed):
   """Check args and return samples."""
-  with tf.name_scope('get_samples', values=[z, n]):
+  with tf.compat.v1.name_scope('get_samples', values=[z, n]):
     if (n is None) == (z is None):
       raise ValueError(
           'Must specify exactly one of arguments "n" and "z".  Found: '
@@ -211,4 +213,4 @@ def _get_samples(dist, z, n, seed):
     if n is not None:
       return dist.sample(n, seed=seed)
     else:
-      return tf.convert_to_tensor(z, name='z')
+      return tf.convert_to_tensor(value=z, name='z')

@@ -111,7 +111,7 @@ class LocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     lp = linear_trend_model.log_prob(y) # has shape [5, 10, 10]
     ```
 
-    """
+  """
 
   def __init__(self,
                num_timesteps,
@@ -156,19 +156,21 @@ class LocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         Default value: "LocalLinearTrendStateSpaceModel".
     """
 
-    with tf.name_scope(name, 'LocalLinearTrendStateSpaceModel',
-                       [level_scale, slope_scale]) as name:
+    with tf.compat.v1.name_scope(name, 'LocalLinearTrendStateSpaceModel',
+                                 [level_scale, slope_scale]) as name:
 
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
       dtype = initial_state_prior.dtype
 
       level_scale = tf.convert_to_tensor(
-          level_scale, name='level_scale', dtype=dtype)
+          value=level_scale, name='level_scale', dtype=dtype)
       slope_scale = tf.convert_to_tensor(
-          slope_scale, name='slope_scale', dtype=dtype)
+          value=slope_scale, name='slope_scale', dtype=dtype)
       observation_noise_scale = tf.convert_to_tensor(
-          observation_noise_scale, name='observation_noise_scale', dtype=dtype)
+          value=observation_noise_scale,
+          name='observation_noise_scale',
+          dtype=dtype)
 
       # Explicitly broadcast all parameters to the same batch shape. This
       # allows us to use `tf.stack` for a compact model specification.
@@ -272,29 +274,31 @@ class LocalLinearTrend(StructuralTimeSeries):
         `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
         supported when `T > 1`), specifying an observed time series.
         Any priors not explicitly set will be given default values according to
-        the scale of the observed time series (or batch of time series).
+        the scale of the observed time series (or batch of time series). May
+        optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
+        a mask `Tensor` to specify timesteps with missing observations.
         Default value: `None`.
       name: the name of this model component.
         Default value: 'LocalLinearTrend'.
     """
 
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, 'LocalLinearTrend', values=[observed_time_series]) as name:
 
-      observed_stddev, observed_initial = (
+      _, observed_stddev, observed_initial = (
           sts_util.empirical_statistics(observed_time_series)
-          if observed_time_series is not None else (1., 0.))
+          if observed_time_series is not None else (0., 1., 0.))
 
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
       if level_scale_prior is None:
         level_scale_prior = tfd.LogNormal(
-            loc=tf.log(.05 * observed_stddev),
+            loc=tf.math.log(.05 * observed_stddev),
             scale=3.,
             name='level_scale_prior')
       if slope_scale_prior is None:
         slope_scale_prior = tfd.LogNormal(
-            loc=tf.log(.05 * observed_stddev),
+            loc=tf.math.log(.05 * observed_stddev),
             scale=3.,
             name='slope_scale_prior')
       if initial_level_prior is None:
@@ -306,7 +310,7 @@ class LocalLinearTrend(StructuralTimeSeries):
         initial_slope_prior = tfd.Normal(
             loc=0., scale=observed_stddev, name='initial_slope_prior')
 
-      tf.assert_same_float_dtype([
+      tf.debugging.assert_same_float_dtype([
           level_scale_prior, slope_scale_prior, initial_level_prior,
           initial_slope_prior
       ])
@@ -321,10 +325,12 @@ class LocalLinearTrend(StructuralTimeSeries):
               initial_slope_prior.stddev()
           ], axis=-1))
 
+      scaled_softplus = tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
+                                   tfb.Softplus()])
       super(LocalLinearTrend, self).__init__(
           parameters=[
-              Parameter('level_scale', level_scale_prior, tfb.Softplus()),
-              Parameter('slope_scale', slope_scale_prior, tfb.Softplus())
+              Parameter('level_scale', level_scale_prior, scaled_softplus),
+              Parameter('slope_scale', slope_scale_prior, scaled_softplus)
           ],
           latent_size=2,
           name=name)

@@ -21,17 +21,23 @@ from __future__ import print_function
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,
+
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
 def _det_ok_mask(x, det_bounds, input_output_cholesky=False):
   if input_output_cholesky:
-    logdet = 2.0 * tf.reduce_sum(tf.log(tf.matrix_diag_part(x)), axis=[-1])
+    logdet = 2.0 * tf.reduce_sum(
+        input_tensor=tf.math.log(tf.linalg.diag_part(x)), axis=[-1])
   else:
     _, logdet = tf.linalg.slogdet(x)
 
@@ -67,7 +73,7 @@ volume_bounds = {
         0.40: (00.4145900446719042, 0.482655106057178)}}
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 @parameterized.parameters(np.float32, np.float64)
 class LKJTest(parameterized.TestCase, tf.test.TestCase):
 
@@ -131,11 +137,13 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         importance_weights, low=0., high=importance_maxima + high_tolerance,
         expected=means, false_fail_rate=1e-6)
-    chk2 = tf.assert_less(
+    chk2 = assert_util.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
-            num_samples, low=0., high=importance_maxima + high_tolerance,
-            false_fail_rate=1e-6, false_pass_rate=1e-6),
-        dtype(target_discrepancy))
+            num_samples,
+            low=0.,
+            high=importance_maxima + high_tolerance,
+            false_fail_rate=1e-6,
+            false_pass_rate=1e-6), dtype(target_discrepancy))
     self.evaluate([chk1, chk2])
 
   def testSampleConsistentLogProb2(self, dtype):
@@ -155,7 +163,7 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
           dtype=dtype,
           input_output_cholesky=input_output_cholesky,
           target_discrepancy=0.05,
-          seed=41)
+          seed=tfp_test_util.test_seed())
 
   def _testSampleConsistentLogProbInterval(self,
                                            concentrations,
@@ -237,14 +245,13 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
         expected_low=lows,
         expected_high=highs,
         false_fail_rate=false_fail_rate)
-    check2 = tf.assert_less(
+    check2 = assert_util.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples,
             low=0.,
             high=importance_maxima + high_tolerance,
             false_fail_rate=false_fail_rate,
-            false_pass_rate=false_fail_rate),
-        dtype(target_discrepancy))
+            false_pass_rate=false_fail_rate), dtype(target_discrepancy))
     self.evaluate([check1, check2])
 
   def testSampleConsistentLogProbInterval3(self, dtype):
@@ -266,7 +273,7 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
           input_output_cholesky=input_output_cholesky,
           false_fail_rate=5e-7,
           target_discrepancy=0.11,
-          seed=40)
+          seed=tfp_test_util.test_seed())
 
   def testSampleConsistentLogProbInterval4(self, dtype):
     # The hardcoded volume boundaries are (5e-7)-confidence intervals
@@ -286,7 +293,7 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
           input_output_cholesky=input_output_cholesky,
           false_fail_rate=5e-7,
           target_discrepancy=0.22,
-          seed=39)
+          seed=tfp_test_util.test_seed())
 
   def testSampleConsistentLogProbInterval5(self, dtype):
     # The hardcoded volume boundaries are (5e-7)-confidence intervals
@@ -307,7 +314,7 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
           input_output_cholesky=input_output_cholesky,
           false_fail_rate=5e-7,
           target_discrepancy=0.41,
-          seed=37)
+          seed=tfp_test_util.test_seed())
 
   def testDimensionGuard(self, dtype):
     testee_lkj = tfd.LKJ(
@@ -337,9 +344,11 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
         samples=results, low=-1., high=1.,
         expected=mean,
         false_fail_rate=1e-6)
-    check2 = tf.assert_less(
+    check2 = assert_util.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
-            num_samples, low=-1., high=1.,
+            num_samples,
+            low=-1.,
+            high=1.,
             # Smaller false fail rate because of different batch sizes between
             # these two checks.
             false_fail_rate=1e-7,
@@ -352,12 +361,14 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
 class LKJTestGraphOnly(tf.test.TestCase):
 
   def testDimensionGuardDynamicShape(self):
+    if tf.executing_eagerly():
+      return
     testee_lkj = tfd.LKJ(
         dimension=3, concentration=[1., 4.], validate_args=True)
     with self.assertRaisesOpError('dimension mismatch'):
       self.evaluate(
           testee_lkj.log_prob(
-              tf.placeholder_with_default(tf.eye(4), shape=None)))
+              tf1.placeholder_with_default(tf.eye(4), shape=None)))
 
 
 if __name__ == '__main__':

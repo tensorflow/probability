@@ -20,10 +20,11 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import assert_util
 
 
 __all__ = [
@@ -57,27 +58,26 @@ class Square(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._name = name
-    super(Square, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(Square, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
-    x = self._maybe_assert_valid(x)
-    return tf.square(x)
+    with tf.control_dependencies(self._assertions(x)):
+      return tf.square(x)
 
   def _inverse(self, y):
-    y = self._maybe_assert_valid(y)
-    return tf.sqrt(y)
+    with tf.control_dependencies(self._assertions(y)):
+      return tf.sqrt(y)
 
   def _forward_log_det_jacobian(self, x):
-    x = self._maybe_assert_valid(x)
-    return np.log(2.) + tf.log(x)
+    with tf.control_dependencies(self._assertions(x)):
+      return np.log(2.) + tf.math.log(x)
 
-  def _maybe_assert_valid(self, t):
+  def _assertions(self, t):
     if not self.validate_args:
-      return t
-    is_valid = tf.assert_non_negative(
-        t, message="All elements must be non-negative.")
-    return control_flow_ops.with_dependencies([is_valid], t)
+      return []
+    return [assert_util.assert_non_negative(
+        t, message="All elements must be non-negative.")]

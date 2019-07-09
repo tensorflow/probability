@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
-from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
@@ -81,48 +80,47 @@ class ExpSinSquared(psd_kernel.PositiveSemidefiniteKernel):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.name_scope(name, values=[amplitude, period, length_scale]) as name:
-      dtype = dtype_util.common_dtype([amplitude, period, length_scale],
-                                      tf.float32)
+    with tf.compat.v1.name_scope(
+        name, values=[amplitude, period, length_scale]) as name:
+      dtype = util.maybe_get_common_dtype(
+          [amplitude, period, length_scale])
       if amplitude is not None:
         amplitude = tf.convert_to_tensor(
-            amplitude, name='amplitude', dtype=dtype)
+            value=amplitude, name='amplitude', dtype=dtype)
       self._amplitude = _validate_arg_if_not_none(
-          amplitude, tf.assert_positive, validate_args)
+          amplitude, tf.compat.v1.assert_positive, validate_args)
       if period is not None:
-        period = tf.convert_to_tensor(period, name='period', dtype=dtype)
+        period = tf.convert_to_tensor(value=period, name='period', dtype=dtype)
       self._period = _validate_arg_if_not_none(
-          period, tf.assert_positive, validate_args)
+          period, tf.compat.v1.assert_positive, validate_args)
       if length_scale is not None:
         length_scale = tf.convert_to_tensor(
-            length_scale, name='length_scale', dtype=dtype)
+            value=length_scale, name='length_scale', dtype=dtype)
       self._length_scale = _validate_arg_if_not_none(
-          length_scale, tf.assert_positive, validate_args)
-      tf.assert_same_float_dtype(
-          [self._amplitude, self._length_scale, self._period])
+          length_scale, tf.compat.v1.assert_positive, validate_args)
     super(ExpSinSquared, self).__init__(feature_ndims, dtype=dtype, name=name)
 
-  def _apply(self, x1, x2, param_expansion_ndims=0):
+  def _apply(self, x1, x2, example_ndims=0):
     difference = np.pi * tf.abs(x1 - x2)
 
     if self.period is not None:
       # period acts as a batch of periods, and hence we must additionally
       # pad the shape with self.feature_ndims number of ones.
-      period = util.pad_shape_right_with_ones(
-          self.period, ndims=(param_expansion_ndims + self.feature_ndims))
+      period = util.pad_shape_with_ones(
+          self.period, ndims=(example_ndims + self.feature_ndims))
       difference /= period
     log_kernel = util.sum_rightmost_ndims_preserving_shape(
         -2 * tf.sin(difference) ** 2, ndims=self.feature_ndims)
 
     if self.length_scale is not None:
-      length_scale = util.pad_shape_right_with_ones(
-          self.length_scale, ndims=param_expansion_ndims)
+      length_scale = util.pad_shape_with_ones(
+          self.length_scale, ndims=example_ndims)
       log_kernel /= length_scale ** 2
 
     if self.amplitude is not None:
-      amplitude = util.pad_shape_right_with_ones(
-          self.amplitude, ndims=param_expansion_ndims)
-      log_kernel += 2. * tf.log(amplitude)
+      amplitude = util.pad_shape_with_ones(
+          self.amplitude, ndims=example_ndims)
+      log_kernel += 2. * tf.math.log(amplitude)
     return tf.exp(log_kernel)
 
   @property
@@ -151,6 +149,7 @@ class ExpSinSquared(psd_kernel.PositiveSemidefiniteKernel):
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
         tf.broadcast_dynamic_shape(
-            [] if self.amplitude is None else tf.shape(self.amplitude),
-            [] if self.length_scale is None else tf.shape(self.length_scale)),
-        [] if self.period is None else tf.shape(self.period))
+            [] if self.amplitude is None else tf.shape(input=self.amplitude),
+            [] if self.length_scale is None else tf.shape(
+                input=self.length_scale)),
+        [] if self.period is None else tf.shape(input=self.period))

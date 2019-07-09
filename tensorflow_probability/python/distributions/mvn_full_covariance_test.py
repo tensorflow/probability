@@ -21,21 +21,23 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 rng = np.random.RandomState(42)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
 
   def _random_pd_matrix(self, *shape):
     mat = rng.rand(*shape)
-    chol = tfd.matrix_diag_transform(mat, transform=tf.nn.softplus)
-    chol = tf.matrix_band_part(chol, -1, 0)
+    chol = tfd.matrix_diag_transform(mat, transform=tf.math.softplus)
+    chol = tf.linalg.band_part(chol, -1, 0)
     return self.evaluate(tf.matmul(chol, chol, adjoint_b=True))
 
   def testRaisesIfInitializedWithNonSymmetricMatrix(self):
@@ -49,7 +51,7 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
     mu = [1., 2.]
     sigma = [[1., 0.], [0., 1.]]
     mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, name="Billy")
-    self.assertEqual(mvn.name, "Billy/")
+    self.assertStartsWith(mvn.name, "Billy")
 
   def testDoesNotRaiseIfInitializedWithSymmetricMatrix(self):
     mu = rng.rand(10)
@@ -103,8 +105,8 @@ class MultivariateNormalFullCovarianceTest(tf.test.TestCase):
         mu, covariance, validate_args=True)
 
     # Shapes known at graph construction time.
-    self.assertEqual((2,), tuple(mvn.event_shape.as_list()))
-    self.assertEqual((3, 5), tuple(mvn.batch_shape.as_list()))
+    self.assertEqual((2,), tuple(tensorshape_util.as_list(mvn.event_shape)))
+    self.assertEqual((3, 5), tuple(tensorshape_util.as_list(mvn.batch_shape)))
 
     # Shapes known at runtime.
     self.assertEqual((2,), tuple(self.evaluate(mvn.event_shape_tensor())))

@@ -18,15 +18,145 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import inspect
+import os
+
 # Dependency imports
+from absl import flags
 import numpy as np
+import six
+
 import tensorflow as tf
 
+from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
-    "DiscreteScalarDistributionTestHelpers",
-    "VectorDistributionTestHelpers",
+    'numpy_disable',
+    'test_seed',
+    'test_seed_stream',
+    'DiscreteScalarDistributionTestHelpers',
+    'VectorDistributionTestHelpers',
 ]
+
+
+FLAGS = flags.FLAGS
+
+flags.DEFINE_bool('vary_seed', False,
+                  ('Whether to vary the PRNG seed unpredictably.  '
+                   'With --runs_per_test=N, produces N iid runs.'))
+
+flags.DEFINE_string('fixed_seed', None,
+                    ('PRNG seed to initialize every test with.  '
+                     'Takes precedence over --vary-seed when both appear.'))
+
+
+def numpy_disable(test_fn):
+
+  def new_test(self, *args, **kwargs):
+    if not inspect.isclass(tf.Variable):
+      self.skipTest('test disabled for numpy')
+    return test_fn(self, *args, **kwargs)
+
+  return new_test
+
+
+def test_seed(hardcoded_seed=None, set_eager_seed=True):
+  """Returns a command-line-controllable PRNG seed for unit tests.
+
+  If your test will pass a seed to more than one operation, consider using
+  `test_seed_stream` instead.
+
+  When seeding unit-test PRNGs, we want:
+
+  - The seed to be fixed to an arbitrary value most of the time, so the test
+    doesn't flake even if its failure probability is noticeable.
+
+  - To switch to different seeds per run when using --runs_per_test to measure
+    the test's failure probability.
+
+  - To set the seed to a specific value when reproducing a low-probability event
+    (e.g., debugging a crash that only some seeds trigger).
+
+  To those ends, this function returns 17, but respects the command line flags
+  `--fixed_seed=<seed>` and `--vary-seed` (Boolean, default False).
+  `--vary_seed` uses system entropy to produce unpredictable seeds.
+  `--fixed_seed` takes precedence over `--vary_seed` when both are present.
+
+  Note that TensorFlow graph mode operations tend to read seed state from two
+  sources: a "graph-level seed" and an "op-level seed".  tf.test.TestCase will
+  set the former to a fixed value per test, but in general it may be necessary
+  to explicitly set both to ensure reproducibility.
+
+  Args:
+    hardcoded_seed: Optional Python value.  The seed to use instead of 17 if
+      both the `--vary_seed` and `--fixed_seed` flags are unset.  This should
+      usually be unnecessary, since a test should pass with any seed.
+    set_eager_seed: Python bool.  If true (default), invoke `tf.set_random_seed`
+      in Eager mode to get more reproducibility.  Should become unnecessary
+      once b/68017812 is resolved.
+
+  Returns:
+    seed: 17, unless otherwise specified by arguments or command line flags.
+  """
+  if FLAGS.fixed_seed is not None:
+    answer = int(FLAGS.fixed_seed)
+  elif FLAGS.vary_seed:
+    entropy = os.urandom(64)
+    # Why does Python make it so hard to just grab a bunch of bytes from
+    # /dev/urandom and get them interpreted as an integer?  Oh, well.
+    if six.PY2:
+      answer = int(entropy.encode('hex'), 16)
+    else:
+      answer = int.from_bytes(entropy, 'big')
+    tf.compat.v1.logging.warning('Using seed {}'.format(answer))
+  elif hardcoded_seed is not None:
+    answer = hardcoded_seed
+  else:
+    answer = 17
+  # TODO(b/68017812): Remove this clause once eager correctly supports seeding.
+  if tf.executing_eagerly() and set_eager_seed:
+    tf.compat.v1.set_random_seed(answer)
+  return answer
+
+
+def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
+  """Returns a command-line-controllable SeedStream PRNG for unit tests.
+
+  When seeding unit-test PRNGs, we want:
+
+  - The seed to be fixed to an arbitrary value most of the time, so the test
+    doesn't flake even if its failure probability is noticeable.
+
+  - To switch to different seeds per run when using --runs_per_test to measure
+    the test's failure probability.
+
+  - To set the seed to a specific value when reproducing a low-probability event
+    (e.g., debugging a crash that only some seeds trigger).
+
+  To those ends, this function returns a `SeedStream` seeded with `test_seed`
+  (which see).  The latter respects the command line flags `--fixed_seed=<seed>`
+  and `--vary-seed` (Boolean, default False).  `--vary_seed` uses system entropy
+  to produce unpredictable seeds.  `--fixed_seed` takes precedence over
+  `--vary_seed` when both are present.
+
+  Note that TensorFlow graph mode operations tend to read seed state from two
+  sources: a "graph-level seed" and an "op-level seed".  tf.test.TestCase will
+  set the former to a fixed value per test, but in general it may be necessary
+  to explicitly set both to ensure reproducibility.
+
+  Args:
+    salt: Optional string wherewith to salt the returned SeedStream.  Setting
+      this guarantees independent random numbers across tests.
+    hardcoded_seed: Optional Python value.  The seed to use if both the
+      `--vary_seed` and `--fixed_seed` flags are unset.  This should usually be
+      unnecessary, since a test should pass with any seed.
+
+  Returns:
+    strm: A SeedStream instance seeded with 17, unless otherwise specified by
+      arguments or command line flags.
+  """
+  return seed_stream.SeedStream(salt, test_seed(hardcoded_seed))
 
 
 class DiscreteScalarDistributionTestHelpers(object):
@@ -73,15 +203,15 @@ class DiscreteScalarDistributionTestHelpers(object):
       ValueError: if `num_threshold < 1`.
     """
     if num_threshold < 1:
-      raise ValueError("num_threshold({}) must be at least 1.".format(
+      raise ValueError('num_threshold({}) must be at least 1.'.format(
           num_threshold))
     # Histogram only supports vectors so we call it once per batch coordinate.
     y = dist.sample(num_samples, seed=seed)
     y = tf.reshape(y, shape=[num_samples, -1])
     if batch_size is None:
-      batch_size = tf.reduce_prod(dist.batch_shape_tensor())
-    batch_dims = tf.shape(dist.batch_shape_tensor())[0]
-    edges_expanded_shape = 1 + tf.pad([-2], paddings=[[0, batch_dims]])
+      batch_size = tf.reduce_prod(input_tensor=dist.batch_shape_tensor())
+    batch_dims = tf.shape(input=dist.batch_shape_tensor())[0]
+    edges_expanded_shape = 1 + tf.pad(tensor=[-2], paddings=[[0, batch_dims]])
     for b, x in enumerate(tf.unstack(y, num=batch_size, axis=1)):
       counts, edges = self.histogram(x)
       edges = tf.reshape(edges, edges_expanded_shape)
@@ -120,9 +250,10 @@ class DiscreteScalarDistributionTestHelpers(object):
       atol: Python `float`-type indicating the admissible absolute error between
         analytical and sample statistics.
     """
-    x = tf.to_float(dist.sample(num_samples, seed=seed))
-    sample_mean = tf.reduce_mean(x, axis=0)
-    sample_variance = tf.reduce_mean(tf.square(x - sample_mean), axis=0)
+    x = tf.cast(dist.sample(num_samples, seed=seed), dtype=tf.float32)
+    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+    sample_variance = tf.reduce_mean(
+        input_tensor=tf.square(x - sample_mean), axis=0)
     sample_stddev = tf.sqrt(sample_variance)
 
     [
@@ -166,18 +297,21 @@ class DiscreteScalarDistributionTestHelpers(object):
         `counts[i] = sum{ edges[i-1] <= values[j] < edges[i] : j }`.
       edges: 1D `Tensor` characterizing intervals used for counting.
     """
-    with tf.name_scope(name, "histogram", [x]):
-      x = tf.convert_to_tensor(x, name="x")
+    with tf.compat.v2.name_scope(name or 'histogram'):
+      x = tf.convert_to_tensor(value=x, name='x')
       if value_range is None:
-        value_range = [tf.reduce_min(x), 1 + tf.reduce_max(x)]
-      value_range = tf.convert_to_tensor(value_range, name="value_range")
+        value_range = [
+            tf.reduce_min(input_tensor=x), 1 + tf.reduce_max(input_tensor=x)
+        ]
+      value_range = tf.convert_to_tensor(value=value_range, name='value_range')
       lo = value_range[0]
       hi = value_range[1]
       if nbins is None:
-        nbins = tf.to_int32(hi - lo)
-      delta = (hi - lo) / tf.cast(nbins, dtype=value_range.dtype.base_dtype)
+        nbins = tf.cast(hi - lo, dtype=tf.int32)
+      delta = (hi - lo) / tf.cast(
+          nbins, dtype=dtype_util.base_dtype(value_range.dtype))
       edges = tf.range(
-          start=lo, limit=hi, delta=delta, dtype=x.dtype.base_dtype)
+          start=lo, limit=hi, delta=delta, dtype=dtype_util.base_dtype(x.dtype))
       counts = tf.histogram_fixed_width(x, value_range=value_range, nbins=nbins)
       return counts, edges
 
@@ -270,24 +404,21 @@ class VectorDistributionTestHelpers(object):
       # a required dependency of core.
       radius = np.asarray(radius)
       dims = tf.cast(dims, dtype=radius.dtype)
-      return tf.exp((dims / 2.) * np.log(np.pi) - tf.lgamma(1. + dims / 2.) +
-                    dims * tf.log(radius))
+      return tf.exp((dims / 2.) * np.log(np.pi) -
+                    tf.math.lgamma(1. + dims / 2.) + dims * tf.math.log(radius))
 
     def monte_carlo_hypersphere_volume(dist, num_samples, radius, center):
       # https://en.wikipedia.org/wiki/Importance_sampling
       x = dist.sample(num_samples, seed=seed)
       x = tf.identity(x)  # Invalidate bijector cacheing.
       inverse_log_prob = tf.exp(-dist.log_prob(x))
-      importance_weights = tf.where(
-          tf.norm(x - center, axis=-1) <= radius,
-          inverse_log_prob,
+      importance_weights = tf.compat.v1.where(
+          tf.norm(tensor=x - center, axis=-1) <= radius, inverse_log_prob,
           tf.zeros_like(inverse_log_prob))
-      return tf.reduce_mean(importance_weights, axis=0)
+      return tf.reduce_mean(input_tensor=importance_weights, axis=0)
 
     # Build graph.
-    with tf.name_scope(
-        "run_test_sample_consistent_log_prob",
-        values=[num_samples, radius, center] + dist._graph_parents):  # pylint: disable=protected-access
+    with tf.compat.v2.name_scope('run_test_sample_consistent_log_prob'):
       batch_shape = dist.batch_shape_tensor()
       actual_volume = actual_hypersphere_volume(
           dims=dist.event_shape_tensor()[0],
@@ -297,7 +428,7 @@ class VectorDistributionTestHelpers(object):
           num_samples=num_samples,
           radius=radius,
           center=center)
-      init_op = tf.global_variables_initializer()
+      init_op = tf.compat.v1.global_variables_initializer()
 
     # Execute graph.
     sess_run_fn(init_op)
@@ -346,10 +477,10 @@ class VectorDistributionTestHelpers(object):
     """
 
     x = dist.sample(num_samples, seed=seed)
-    sample_mean = tf.reduce_mean(x, axis=0)
+    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
     sample_covariance = tf.reduce_mean(
-        _vec_outer_square(x - sample_mean), axis=0)
-    sample_variance = tf.matrix_diag_part(sample_covariance)
+        input_tensor=_vec_outer_square(x - sample_mean), axis=0)
+    sample_variance = tf.linalg.diag_part(sample_covariance)
     sample_stddev = tf.sqrt(sample_variance)
 
     [
@@ -382,5 +513,5 @@ class VectorDistributionTestHelpers(object):
 
 def _vec_outer_square(x, name=None):
   """Computes the outer-product of a vector, i.e., x.T x."""
-  with tf.name_scope(name, "vec_osquare", [x]):
+  with tf.compat.v2.name_scope(name or 'vec_osquare'):
     return x[..., :, tf.newaxis] * x[..., tf.newaxis, :]

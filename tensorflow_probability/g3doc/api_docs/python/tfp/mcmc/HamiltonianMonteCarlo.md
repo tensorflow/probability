@@ -19,9 +19,15 @@
 
 ## Class `HamiltonianMonteCarlo`
 
+Runs one step of Hamiltonian Monte Carlo.
+
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
 
-Runs one step of Hamiltonian Monte Carlo.
+
+
+Defined in [`python/mcmc/hmc.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/hmc.py).
+
+<!-- Placeholder for "Used in" -->
 
 Hamiltonian Monte Carlo (HMC) is a Markov chain Monte Carlo (MCMC) algorithm
 that takes a series of gradient-informed steps to produce a Metropolis
@@ -50,41 +56,42 @@ distribution using HMC with adaptive step size.
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+tf.enable_eager_execution()
+
 # Target distribution is proportional to: `exp(-x (1 + x))`.
 def unnormalized_log_prob(x):
   return -x - x**2.
 
-# Create state to hold updated `step_size`.
-step_size = tf.get_variable(
-    name='step_size',
-    initializer=1.,
-    use_resource=True,  # For TFE compatibility.
-    trainable=False)
-
 # Initialize the HMC transition kernel.
-hmc = tfp.mcmc.HamiltonianMonteCarlo(
-    target_log_prob_fn=unnormalized_log_prob,
-    num_leapfrog_steps=3,
-    step_size=step_size,
-    step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy())
+num_results = int(10e3)
+num_burnin_steps = int(1e3)
+adaptive_hmc = tfp.mcmc.SimpleStepSizeAdaptation(
+    tfp.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=unnormalized_log_prob,
+        num_leapfrog_steps=3,
+        step_size=1.),
+    num_adaptation_steps=int(num_burnin_steps * 0.8))
 
 # Run the chain (with burn-in).
-samples, kernel_results = tfp.mcmc.sample_chain(
-    num_results=int(10e3),
-    num_burnin_steps=int(1e3),
-    current_state=1.,
-    kernel=hmc)
+@tf.function
+def run_chain():
+  # Run the chain (with burn-in).
+  samples, is_accepted = tfp.mcmc.sample_chain(
+      num_results=num_results,
+      num_burnin_steps=num_burnin_steps,
+      current_state=1.,
+      kernel=adaptive_hmc,
+      trace_fn=lambda _, pkr: pkr.inner_results.is_accepted)
 
-# Initialize all constructed variables.
-init_op = tf.global_variables_initializer()
+  sample_mean = tf.reduce_mean(samples)
+  sample_stddev = tf.math.reduce_std(samples)
+  is_accepted = tf.reduce_mean(tf.cast(is_accepted, dtype=tf.float32))
+  return sample_mean, sample_stddev, is_accepted
 
-with tf.Session() as sess:
-  init_op.run()
-  samples_, kernel_results_ = sess.run([samples, kernel_results])
+sample_mean, sample_stddev, is_accepted = run_chain()
 
 print('mean:{:.4f}  stddev:{:.4f}  acceptance:{:.4f}'.format(
-    samples_.mean(), samples_.std(), kernel_results_.is_accepted.mean()))
-# mean:-0.5003  stddev:0.7711  acceptance:0.6240
+    sample_mean.numpy(), sample_stddev.numpy(), is_accepted.numpy()))
 ```
 
 ##### Estimate parameters of a more complicated posterior.
@@ -117,123 +124,122 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import numpy as np
 
+tf.enable_eager_execution()
+
 tfd = tfp.distributions
 
 def make_training_data(num_samples, dims, sigma):
   dt = np.asarray(sigma).dtype
-  zeros = tf.zeros(dims, dtype=dt)
-  x = tf.transpose(tfd.MultivariateNormalDiag(loc=zeros).sample(
-      num_samples, seed=1))  # [d, n]
-  w = tfd.MultivariateNormalDiag(
-      loc=zeros,
-      scale_identity_multiplier=sigma).sample([1], seed=2)  # [1, d]
-  noise = tfd.Normal(loc=np.array(0, dt), scale=np.array(1, dt)).sample(
-      num_samples, seed=3)  # [n]
-  y = tf.matmul(w, x) + noise  # [1, n]
+  x = np.random.randn(dims, num_samples).astype(dt)
+  w = sigma * np.random.randn(1, dims).astype(dt)
+  noise = np.random.randn(num_samples).astype(dt)
+  y = w.dot(x) + noise
   return y[0], x, w[0]
 
-def make_weights_prior(dims, dtype):
+def make_weights_prior(dims, log_sigma):
   return tfd.MultivariateNormalDiag(
-      loc=tf.zeros([dims], dtype=dtype),
-      scale_identity_multiplier=tf.exp(tf.get_variable(
-          name='log_sigma',
-          initializer=np.array(0, dtype),
-          use_resource=True)))
+      loc=tf.zeros([dims], dtype=log_sigma.dtype),
+      scale_identity_multiplier=tf.exp(log_sigma))
 
 def make_response_likelihood(w, x):
-  w_shape = tf.pad(
-      tf.shape(w),
-      paddings=[[tf.where(tf.rank(w) > 1, 0, 1), 0]],
-      constant_values=1)
-  y_shape = tf.concat([tf.shape(w)[:-1], [tf.shape(x)[-1]]], axis=0)
-  w_expand = tf.reshape(w, w_shape)
-  return tfd.Normal(
-      loc=tf.reshape(tf.matmul(w_expand, x), y_shape),
-      scale=np.array(1, w.dtype.as_numpy_dtype))  # [n]
+  if w.shape.ndims == 1:
+    y_bar = tf.matmul(w[tf.newaxis], x)[0]
+  else:
+    y_bar = tf.matmul(w, x)
+  return tfd.Normal(loc=y_bar, scale=tf.ones_like(y_bar))  # [n]
 
 # Setup assumptions.
 dtype = np.float32
 num_samples = 500
 dims = 10
+tf.compat.v1.random.set_random_seed(10014)
+np.random.seed(10014)
 
 weights_prior_true_scale = np.array(0.3, dtype)
-with tf.Session() as sess:
-  y, x, true_weights = sess.run(
-      make_training_data(num_samples, dims, weights_prior_true_scale))
+y, x, _ = make_training_data(
+    num_samples, dims, weights_prior_true_scale)
 
-prior = make_weights_prior(dims, dtype)
-def unnormalized_posterior_log_prob(w):
-  likelihood = make_response_likelihood(w, x)
-  return (prior.log_prob(w)
-          + tf.reduce_sum(likelihood.log_prob(y), axis=-1))  # [m]
+log_sigma = tf.compat.v2.Variable(
+    name='log_sigma', initial_value=np.array(0, dtype))
 
-weights_chain_start = tf.placeholder(dtype, shape=[dims])
+optimizer = tf.compat.v2.optimizers.SGD(learning_rate=0.01)
 
-step_size = tf.get_variable(
-    name='step_size',
-    initializer=np.array(0.05, dtype),
-    use_resource=True,
-    trainable=False)
+@tf.function
+def mcem_iter(weights_chain_start, step_size):
+  with tf.GradientTape() as tape:
+    tape.watch(log_sigma)
+    prior = make_weights_prior(dims, log_sigma)
 
-num_results = 2
-weights, kernel_results = tfp.mcmc.sample_chain(
-    num_results=num_results,
-    num_burnin_steps=0,
-    current_state=weights_chain_start,
-    kernel=tfp.mcmc.HamiltonianMonteCarlo(
-        target_log_prob_fn=unnormalized_posterior_log_prob,
-        num_leapfrog_steps=2,
-        step_size=step_size,
-        step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy(),
-        state_gradients_are_stopped=True))
+    def unnormalized_posterior_log_prob(w):
+      likelihood = make_response_likelihood(w, x)
+      return (
+          prior.log_prob(w) +
+          tf.reduce_sum(
+              input_tensor=likelihood.log_prob(y), axis=-1))  # [m]
 
-avg_acceptance_ratio = tf.reduce_mean(
-    tf.exp(tf.minimum(kernel_results.log_accept_ratio, 0.)))
+    def trace_fn(_, pkr):
+      return (
+          pkr.inner_results.log_accept_ratio,
+          pkr.inner_results.accepted_results.target_log_prob,
+          pkr.inner_results.accepted_results.step_size)
 
-# We do an optimization step to propagate `log_sigma` after two HMC steps to
-# propagate `weights`.
-loss = -tf.reduce_mean(kernel_results.accepted_results.target_log_prob)
-optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.01)
-train_op = optimizer.minimize(loss)
+    num_results = 2
+    weights, (
+        log_accept_ratio, target_log_prob, step_size) = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        num_burnin_steps=0,
+        current_state=weights_chain_start,
+        kernel=tfp.mcmc.SimpleStepSizeAdaptation(
+            tfp.mcmc.HamiltonianMonteCarlo(
+                target_log_prob_fn=unnormalized_posterior_log_prob,
+                num_leapfrog_steps=2,
+                step_size=step_size,
+                state_gradients_are_stopped=True,
+            ),
+            # Adapt for the entirety of the trajectory.
+            num_adaptation_steps=2),
+        trace_fn=trace_fn,
+        parallel_iterations=1)
 
-with tf.variable_scope(tf.get_variable_scope(), reuse=True):
-  weights_prior_estimated_scale = tf.exp(
-      tf.get_variable(name='log_sigma', dtype=dtype))
+    # We do an optimization step to propagate `log_sigma` after two HMC
+    # steps to propagate `weights`.
+    loss = -tf.reduce_mean(input_tensor=target_log_prob)
 
-init_op = tf.global_variables_initializer()
+  avg_acceptance_ratio = tf.reduce_mean(
+      input_tensor=tf.exp(tf.minimum(log_accept_ratio, 0.)))
+
+  optimizer.apply_gradients(
+      [[tape.gradient(loss, log_sigma), log_sigma]])
+
+  weights_prior_estimated_scale = tf.exp(log_sigma)
+  return (weights_prior_estimated_scale, weights[-1], loss,
+          step_size[-1], avg_acceptance_ratio)
 
 num_iters = int(40)
 
 weights_prior_estimated_scale_ = np.zeros(num_iters, dtype)
 weights_ = np.zeros([num_iters + 1, dims], dtype)
+loss_ = np.zeros([num_iters], dtype)
 weights_[0] = np.random.randn(dims).astype(dtype)
+step_size_ = 0.03
 
-with tf.Session() as sess:
-  init_op.run()
-  for iter_ in range(num_iters):
-    [
-        _,
-        weights_prior_estimated_scale_[iter_],
-        weights_[iter_ + 1],
-        loss_,
-        step_size_,
-        avg_acceptance_ratio_,
-    ] = sess.run([
-        train_op,
-        weights_prior_estimated_scale,
-        weights[-1],
-        loss,
-        step_size,
-        avg_acceptance_ratio,
-    ], feed_dict={weights_chain_start: weights_[iter_]})
-    print('iter:{:>2}  loss:{: 9.3f}  scale:{:.3f}  '
+for iter_ in range(num_iters):
+  [
+      weights_prior_estimated_scale_[iter_],
+      weights_[iter_ + 1],
+      loss_[iter_],
+      step_size_,
+      avg_acceptance_ratio_,
+  ] = mcem_iter(weights_[iter_], step_size_)
+  tf.compat.v1.logging.vlog(
+      1, ('iter:{:>2}  loss:{: 9.3f}  scale:{:.3f}  '
           'step_size:{:.4f}  avg_acceptance_ratio:{:.4f}').format(
-              iter_, loss_, weights_prior_estimated_scale_[iter_],
+              iter_, loss_[iter_], weights_prior_estimated_scale_[iter_],
               step_size_, avg_acceptance_ratio_))
 
-# Should converge to ~0.24.
+# Should converge to ~0.22.
 import matplotlib.pyplot as plt
-plot.plot(weights_prior_estimated_scale_)
+plt.plot(weights_prior_estimated_scale_)
 plt.ylabel('weights_prior_estimated_scale')
 plt.xlabel('iteration')
 ```
@@ -251,43 +257,49 @@ plt.xlabel('iteration')
 
 ``` python
 __init__(
-    target_log_prob_fn,
-    step_size,
-    num_leapfrog_steps,
-    state_gradients_are_stopped=False,
-    step_size_update_fn=None,
-    seed=None,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
-Initializes this transition kernel.
+Initializes this transition kernel. (deprecated arguments)
+
+Warning: SOME ARGUMENTS ARE DEPRECATED: `(step_size_update_fn)`. They will be removed after 2019-05-22.
+Instructions for updating:
+The `step_size_update_fn` argument is deprecated. Use <a href="../../tfp/mcmc/SimpleStepSizeAdaptation.md"><code>tfp.mcmc.SimpleStepSizeAdaptation</code></a> instead.
 
 #### Args:
 
+
 * <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
-    `current_state` (or `*current_state` if it's a list) and returns its
-    (possibly unnormalized) log-density under the target distribution.
+  `current_state` (or `*current_state` if it's a list) and returns its
+  (possibly unnormalized) log-density under the target distribution.
 * <b>`step_size`</b>: `Tensor` or Python `list` of `Tensor`s representing the step
-    size for the leapfrog integrator. Must broadcast with the shape of
-    `current_state`. Larger step sizes lead to faster progress, but
-    too-large step sizes make rejection exponentially more likely. When
-    possible, it's often helpful to match per-variable step sizes to the
-    standard deviations of the target distribution in each variable.
+  size for the leapfrog integrator. Must broadcast with the shape of
+  `current_state`. Larger step sizes lead to faster progress, but
+  too-large step sizes make rejection exponentially more likely. When
+  possible, it's often helpful to match per-variable step sizes to the
+  standard deviations of the target distribution in each variable.
 * <b>`num_leapfrog_steps`</b>: Integer number of steps to run the leapfrog integrator
-    for. Total progress per HMC step is roughly proportional to
-    `step_size * num_leapfrog_steps`.
+  for. Total progress per HMC step is roughly proportional to
+  `step_size * num_leapfrog_steps`.
 * <b>`state_gradients_are_stopped`</b>: Python `bool` indicating that the proposed
-    new state be run through `tf.stop_gradient`. This is particularly useful
-    when combining optimization over samples from the HMC chain.
-    Default value: `False` (i.e., do not apply `stop_gradient`).
+  new state be run through `tf.stop_gradient`. This is particularly useful
+  when combining optimization over samples from the HMC chain.
+  Default value: `False` (i.e., do not apply `stop_gradient`).
 * <b>`step_size_update_fn`</b>: Python `callable` taking current `step_size`
-    (typically a `tf.Variable`) and `kernel_results` (typically
-    `collections.namedtuple`) and returns updated step_size (`Tensor`s).
-    Default value: `None` (i.e., do not update `step_size` automatically).
+  (typically a `tf.Variable`) and `kernel_results` (typically
+  `collections.namedtuple`) and returns updated step_size (`Tensor`s).
+  Default value: `None` (i.e., do not update `step_size` automatically).
 * <b>`seed`</b>: Python integer to seed the random number generator.
+* <b>`store_parameters_in_results`</b>: If `True`, then `step_size` and
+  `num_leapfrog_steps` are written to and read from eponymous fields in
+  the kernel results objects returned from `one_step` and
+  `bootstrap_results`. This allows wrapper kernels to adjust those
+  parameters on the fly. This is incompatible with `step_size_update_fn`,
+  which must be set to `None`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-    Default value: `None` (i.e., 'hmc_kernel').
+  Default value: `None` (i.e., 'hmc_kernel').
 
 
 
@@ -295,21 +307,38 @@ Initializes this transition kernel.
 
 <h3 id="is_calibrated"><code>is_calibrated</code></h3>
 
+Returns `True` if Markov chain converges to specified distribution.
 
+`TransitionKernel`s which are "uncalibrated" are often calibrated by
+composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp.mcmc.MetropolisHastings</code></a> `TransitionKernel`.
 
 <h3 id="name"><code>name</code></h3>
 
 
 
+
 <h3 id="num_leapfrog_steps"><code>num_leapfrog_steps</code></h3>
 
+Returns the num_leapfrog_steps parameter.
 
+If `store_parameters_in_results` argument to the initializer was set to
+`True`, this only returns the value of the `num_leapfrog_steps` placed in
+the kernel results by the `bootstrap_results` method. The actual
+`num_leapfrog_steps` in that situation is governed by the
+`previous_kernel_results` argument to `one_step` method.
+
+#### Returns:
+
+
+* <b>`num_leapfrog_steps`</b>: An integer `Tensor`.
 
 <h3 id="parameters"><code>parameters</code></h3>
 
 Return `dict` of ``__init__`` arguments and their values.
 
+
 <h3 id="seed"><code>seed</code></h3>
+
 
 
 
@@ -317,15 +346,29 @@ Return `dict` of ``__init__`` arguments and their values.
 
 
 
+
 <h3 id="step_size"><code>step_size</code></h3>
 
+Returns the step_size parameter.
 
+If `store_parameters_in_results` argument to the initializer was set to
+`True`, this only returns the value of the `step_size` placed in the kernel
+results by the `bootstrap_results` method. The actual step size in that
+situation is governed by the `previous_kernel_results` argument to
+`one_step` method.
+
+#### Returns:
+
+
+* <b>`step_size`</b>: A floating point `Tensor` or a list of such `Tensors`.
 
 <h3 id="step_size_update_fn"><code>step_size_update_fn</code></h3>
 
 
 
+
 <h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
+
 
 
 
@@ -341,6 +384,7 @@ bootstrap_results(init_state)
 
 Creates initial `previous_kernel_results` using a supplied `state`.
 
+
 <h3 id="one_step"><code>one_step</code></h3>
 
 ``` python
@@ -352,29 +396,33 @@ one_step(
 
 Runs one iteration of Hamiltonian Monte Carlo.
 
+
 #### Args:
 
+
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    current state(s) of the Markov chain(s). The first `r` dimensions index
-    independent chains, `r = tf.rank(target_log_prob_fn(*current_state))`.
+  current state(s) of the Markov chain(s). The first `r` dimensions index
+  independent chains, `r = tf.rank(target_log_prob_fn(*current_state))`.
 * <b>`previous_kernel_results`</b>: `collections.namedtuple` containing `Tensor`s
-    representing values from previous calls to this function (or from the
-    `bootstrap_results` function.)
+  representing values from previous calls to this function (or from the
+  `bootstrap_results` function.)
 
 
 #### Returns:
 
+
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
-    of the Markov chain(s) after taking exactly one step. Has same type and
-    shape as `current_state`.
+  of the Markov chain(s) after taking exactly one step. Has same type and
+  shape as `current_state`.
 * <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
-    advance the chain.
+  advance the chain.
 
 
 #### Raises:
 
+
 * <b>`ValueError`</b>: if there isn't one `step_size` or a list with same length as
-    `current_state`.
+  `current_state`.
 
 
 

@@ -18,8 +18,7 @@ in core TF.
 
 __Layer 1: Statistical Building Blocks__
 
-* Distributions ([`tfp.distributions`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions),
-  [`tf.distributions`](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/python/ops/distributions)):
+* Distributions ([`tfp.distributions`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions)):
   A large collection of probability
   distributions and related statistics with batch and
   [broadcasting](https://docs.scipy.org/doc/numpy-1.14.0/user/basics.broadcasting.html)
@@ -139,9 +138,11 @@ installation guide](https://www.tensorflow.org/install).
 ### Nightly Builds
 
 There are also nightly builds of TensorFlow Probability under the pip package
-`tfp-nightly`, which depends on one of `tf-nightly` and `tf-nightly-gpu`.
-Nightly builds include newer features, but may be less stable than the versioned
-releases.
+`tfp-nightly`, which depends on one of `tf-nightly`, `tf-nightly-gpu`,
+`tf-nightly-2.0-preview` or `tf-nightly-gpu-2.0-preview`. Nightly builds include
+newer features, but may be less stable than the versioned releases. Docs are
+periodically refreshed [here](
+https://github.com/tensorflow/probability/blob/master/tensorflow_probability/g3doc/api_docs/python/tfp.md).
 
 ### Installing from Source
 
@@ -190,7 +191,11 @@ uphold this code.
 
 ## References
 
+If you use TensorFlow Probability in a paper, please cite: 
+
 + _TensorFlow Distributions._ Joshua V. Dillon, Ian Langmore, Dustin Tran,
 Eugene Brevdo, Srinivas Vasudevan, Dave Moore, Brian Patton, Alex Alemi, Matt
 Hoffman, Rif A. Saurous.
 [arXiv preprint arXiv:1711.10604, 2017](https://arxiv.org/abs/1711.10604).
+
+(We're aware there's a lot more to TensorFlow Probability than Distributions, but the Distributions paper lays out our vision and is a fine thing to cite for now.)

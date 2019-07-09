@@ -28,7 +28,7 @@ from tensorflow_probability.python.layers.internal import distribution_tensor_co
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 dtc = distribution_tensor_coercible
 
 
@@ -43,7 +43,7 @@ class FakeBoolDistribution(tfd.Distribution):
         allow_nan_stats=True)
 
   def _mean(self):
-    return tf.convert_to_tensor([True, False], dtype=tf.bool)
+    return tf.convert_to_tensor(value=[True, False], dtype=tf.bool)
 
 
 class Normal(tfd.Normal):
@@ -60,7 +60,7 @@ class Normal(tfd.Normal):
     return super(Normal, self).__add__(x)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class DistributionTensorConversionTest(
     tf.test.TestCase, parameterized.TestCase):
 
@@ -68,15 +68,15 @@ class DistributionTensorConversionTest(
     x = tfd.Normal(loc=0., scale=1.)
     if tf.executing_eagerly():
       with self.assertRaises(ValueError):
-        tf.convert_to_tensor(x)
+        tf.convert_to_tensor(value=x)
     else:
       with self.assertRaises(TypeError):
-        tf.convert_to_tensor(x)
+        tf.convert_to_tensor(value=x)
 
   def testConvertToTensor(self):
     x = dtc._TensorCoercible(tfd.Normal(loc=1.5, scale=1),
                              tfd.Distribution.mean)
-    y = tf.convert_to_tensor(x)
+    y = tf.convert_to_tensor(value=x)
     y1 = x._value()
     self.assertEqual(hash(y), hash(y1))
     self.assertEqual([1.5, 1.5], self.evaluate([y, y1]))
@@ -84,7 +84,7 @@ class DistributionTensorConversionTest(
   def testConvertFromExplicit(self):
     x = dtc._TensorCoercible(tfd.Normal(loc=1.25, scale=1),
                              lambda self: 42.)
-    y = tf.convert_to_tensor(x)
+    y = tf.convert_to_tensor(value=x)
     y1 = x._value()
     self.assertEqual(hash(y), hash(y1))
     self.assertEqual([42., 42.], self.evaluate([y, y1]))
@@ -159,7 +159,7 @@ class DistributionTensorConversionTest(
   def testOperatorUnaryLogical(self):
     loc = np.array([True, False])
     x = dtc._TensorCoercible(FakeBoolDistribution(), tfd.Distribution.mean)
-    self.assertAllEqual(*self.evaluate([~tf.convert_to_tensor(loc), ~x]))
+    self.assertAllEqual(*self.evaluate([~tf.convert_to_tensor(value=loc), ~x]))
 
   def testOperatorBoolNonzero(self):
     loc = np.array([-0.25, 0.5], dtype=np.float32)
@@ -198,7 +198,7 @@ class DistributionTensorConversionTest(
     # Now we show that adding two distributions has random variable semantics.
     y_coerce = dtc._TensorCoercible(y, tfd.Distribution.variance)
     self.assertIsInstance(y_coerce, Normal)
-    var = tf.convert_to_tensor(y_coerce)
+    var = tf.convert_to_tensor(value=y_coerce)
 
     # Note: it is not possible to have user-defined operators and also use the
     # _TensorCoercible class.

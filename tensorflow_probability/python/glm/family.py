@@ -25,8 +25,7 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import dtype_util
-
-tfe = tf.contrib.eager
+from tensorflow_probability.python.math.gradient import value_and_gradient
 
 
 __all__ = [
@@ -75,7 +74,7 @@ class ExponentialFamily(object):
         functions. Default value: `None` (i.e., the subclass name).
     """
     if not name or name[-1] != '/':  # `name` is not a name scope.
-      with tf.name_scope(name or type(self).__name__) as name:
+      with tf.compat.v1.name_scope(name or type(self).__name__) as name:
         pass
     self._name = name
 
@@ -128,7 +127,7 @@ class ExponentialFamily(object):
     """
     with self._name_scope(name, 'call', [predicted_linear_response]):
       predicted_linear_response = tf.convert_to_tensor(
-          predicted_linear_response, name='predicted_linear_response')
+          value=predicted_linear_response, name='predicted_linear_response')
       return self._call(predicted_linear_response)
 
   def _log_prob(self, response, predicted_linear_response):
@@ -156,9 +155,9 @@ class ExponentialFamily(object):
         name, 'log_prob', [response, predicted_linear_response]):
       dtype = dtype_util.common_dtype([response, predicted_linear_response])
       response = tf.convert_to_tensor(
-          response, dtype=dtype, name='response')
+          value=response, dtype=dtype, name='response')
       predicted_linear_response = tf.convert_to_tensor(
-          predicted_linear_response, name='predicted_linear_response')
+          value=predicted_linear_response, name='predicted_linear_response')
       return self._log_prob(response, predicted_linear_response)
 
   def __str__(self):
@@ -174,8 +173,9 @@ class ExponentialFamily(object):
   @contextlib.contextmanager
   def _name_scope(self, name=None, default_name=None, values=None):
     """Helper function to standardize op scope."""
-    with tf.name_scope(self.name):
-      with tf.name_scope(name, default_name, values=values or []) as scope:
+    with tf.compat.v1.name_scope(self.name):
+      with tf.compat.v1.name_scope(
+          name, default_name, values=values or []) as scope:
         yield scope
 
 
@@ -222,28 +222,17 @@ class CustomExponentialFamily(
     return self._inverse_link_fn
 
   def _call(self, r):
-    mean, grad_mean = self._value_and_gradient(self._inverse_link_fn, r)
+    if self._inverse_link_fn is None:
+      # Interpret `None` as the identity function.
+      mean, grad_mean = r, tf.ones_like(r)
+    else:
+      mean, grad_mean = value_and_gradient(self._inverse_link_fn, r)
     variance = self._distribution_fn(mean).variance()
     return mean, variance, grad_mean
 
   def _log_prob(self, y, r):
     mean = self._inverse_link_fn(r)
     return self._distribution_fn(mean).log_prob(y)
-
-  def _value_and_gradient(self, fn, arg):
-    """Calls `fn` and computes the gradient of the result wrt `arg`."""
-    if fn is None:
-      # Interpret `None` as the identity function.
-      return arg, tf.ones_like(arg)
-    if tfe.executing_eagerly():
-      # Not having the lambda sanitzer means we'd get an `IndexError` whenever
-      # the user supplied function has default args.
-      fn1 = lambda r: fn(r)  # pylint: disable=unnecessary-lambda
-      v, g = tfe.value_and_gradients_function(fn1)(arg)
-    else:
-      v = fn(arg)
-      g = tf.gradients(v, [arg])
-    return v, g[0]
 
 
 class Bernoulli(ExponentialFamily):
@@ -360,7 +349,7 @@ class LogNormal(ExponentialFamily):
 
   def _log_prob(self, y, r):
     dtype = r.dtype.as_numpy_dtype
-    log_y = tf.log(y)
+    log_y = tf.math.log(y)
     s2 = np.log(2.).astype(dtype)
     return -log_y + tfd.Normal(
         loc=r - 0.5 * s2,
@@ -382,10 +371,10 @@ class LogNormalSoftplus(ExponentialFamily):
 
   def _log_prob(self, y, r):
     dtype = r.dtype.as_numpy_dtype
-    log_y = tf.log(y)
+    log_y = tf.math.log(y)
     s2 = np.log(2.).astype(dtype)
     return tfd.Normal(
-        loc=tf.log(tf.nn.softplus(r)) - 0.5 * s2,
+        loc=tf.math.log(tf.nn.softplus(r)) - 0.5 * s2,
         scale=np.sqrt(s2)).log_prob(log_y) - log_y
 
 

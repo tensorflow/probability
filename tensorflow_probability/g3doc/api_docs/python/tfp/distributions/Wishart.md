@@ -9,11 +9,17 @@
 <meta itemprop="property" content="event_shape"/>
 <meta itemprop="property" content="input_output_cholesky"/>
 <meta itemprop="property" content="name"/>
+<meta itemprop="property" content="name_scope"/>
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="reparameterization_type"/>
 <meta itemprop="property" content="scale_operator"/>
+<meta itemprop="property" content="submodules"/>
+<meta itemprop="property" content="trainable_variables"/>
 <meta itemprop="property" content="validate_args"/>
+<meta itemprop="property" content="variables"/>
+<meta itemprop="property" content="__getitem__"/>
 <meta itemprop="property" content="__init__"/>
+<meta itemprop="property" content="__iter__"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
 <meta itemprop="property" content="cdf"/>
 <meta itemprop="property" content="copy"/>
@@ -40,15 +46,22 @@
 <meta itemprop="property" content="stddev"/>
 <meta itemprop="property" content="survival_function"/>
 <meta itemprop="property" content="variance"/>
+<meta itemprop="property" content="with_name_scope"/>
 </div>
 
 # tfp.distributions.Wishart
 
 ## Class `Wishart`
 
-
-
 The matrix Wishart distribution on positive definite matrices.
+
+
+
+
+
+Defined in [`python/distributions/wishart.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/wishart.py).
+
+<!-- Placeholder for "Used in" -->
 
 This distribution is defined by a scalar degrees of freedom `df` and a scale
 matrix, which can either be a full symmetric matrix or a lower triangular
@@ -118,38 +131,41 @@ __init__(
 
 Construct Wishart distributions.
 
+
 #### Args:
 
+
 * <b>`df`</b>: `float` or `double` `Tensor`. Degrees of freedom, must be greater than
-    or equal to dimension of the scale matrix.
+  or equal to dimension of the scale matrix.
 * <b>`scale`</b>: `float` or `double` `Tensor`. The symmetric positive definite
-    scale matrix of the distribution. Exactly one of `scale` and
-    'scale_tril` must be passed.
+  scale matrix of the distribution. Exactly one of `scale` and
+  'scale_tril` must be passed.
 * <b>`scale_tril`</b>: `float` or `double` `Tensor`. The Cholesky factorization
-    of the symmetric positive definite scale matrix of the distribution.
-    Exactly one of `scale` and 'scale_tril` must be passed.
+  of the symmetric positive definite scale matrix of the distribution.
+  Exactly one of `scale` and 'scale_tril` must be passed.
 * <b>`input_output_cholesky`</b>: Python `bool`. If `True`, functions whose input or
-    output have the semantics of samples assume inputs are in Cholesky form
-    and return outputs in Cholesky form. In particular, if this flag is
-    `True`, input to `log_prob` is presumed of Cholesky form and output from
-    `sample`, `mean`, and `mode` are of Cholesky form.  Setting this
-    argument to `True` is purely a computational optimization and does not
-    change the underlying distribution; for instance, `mean` returns the
-    Cholesky of the mean, not the mean of Cholesky factors. The `variance`
-    and `stddev` methods are unaffected by this flag.
-    Default value: `False` (i.e., input/output does not have Cholesky
-    semantics).
+  output have the semantics of samples assume inputs are in Cholesky form
+  and return outputs in Cholesky form. In particular, if this flag is
+  `True`, input to `log_prob` is presumed of Cholesky form and output from
+  `sample`, `mean`, and `mode` are of Cholesky form.  Setting this
+  argument to `True` is purely a computational optimization and does not
+  change the underlying distribution; for instance, `mean` returns the
+  Cholesky of the mean, not the mean of Cholesky factors. The `variance`
+  and `stddev` methods are unaffected by this flag.
+  Default value: `False` (i.e., input/output does not have Cholesky
+  semantics).
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-    (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-    result is undefined. When `False`, an exception is raised if one or
-    more of the statistic's batch members are undefined.
+  (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+  result is undefined. When `False`, an exception is raised if one or
+  more of the statistic's batch members are undefined.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if zero or both of 'scale' and 'scale_tril' are passed in.
 
@@ -171,6 +187,7 @@ infinity), so the variance = E[(X - mean)**2] is also undefined.
 
 #### Returns:
 
+
 * <b>`allow_nan_stats`</b>: Python `bool`.
 
 <h3 id="batch_shape"><code>batch_shape</code></h3>
@@ -184,19 +201,23 @@ parameterizations of this distribution.
 
 #### Returns:
 
+
 * <b>`batch_shape`</b>: `TensorShape`, possibly unknown.
 
 <h3 id="df"><code>df</code></h3>
 
 Wishart distribution degree(s) of freedom.
 
+
 <h3 id="dimension"><code>dimension</code></h3>
 
 Dimension of underlying vector space. The `p` in `R^(p*p)`.
 
+
 <h3 id="dtype"><code>dtype</code></h3>
 
 The `DType` of `Tensor`s handled by this `Distribution`.
+
 
 <h3 id="event_shape"><code>event_shape</code></h3>
 
@@ -206,19 +227,28 @@ May be partially defined or unknown.
 
 #### Returns:
 
+
 * <b>`event_shape`</b>: `TensorShape`, possibly unknown.
 
 <h3 id="input_output_cholesky"><code>input_output_cholesky</code></h3>
 
 Boolean indicating if `Tensor` input/outputs are Cholesky factorized.
 
+
 <h3 id="name"><code>name</code></h3>
 
 Name prepended to all ops created by this `Distribution`.
 
+
+<h3 id="name_scope"><code>name_scope</code></h3>
+
+Returns a `tf.name_scope` instance for this class.
+
+
 <h3 id="parameters"><code>parameters</code></h3>
 
 Dictionary of parameters used to instantiate this `Distribution`.
+
 
 <h3 id="reparameterization_type"><code>reparameterization_type</code></h3>
 
@@ -231,17 +261,119 @@ Currently this is one of the static instances
 
 An instance of `ReparameterizationType`.
 
+
 <h3 id="scale_operator"><code>scale_operator</code></h3>
 
 Wishart distribution scale matrix as an Linear Operator.
+
+
+<h3 id="submodules"><code>submodules</code></h3>
+
+Sequence of all sub-modules.
+
+Submodules are modules which are properties of this module, or found as
+properties of modules which are properties of this module (and so on).
+
+```
+a = tf.Module()
+b = tf.Module()
+c = tf.Module()
+a.b = b
+b.c = c
+assert list(a.submodules) == [b, c]
+assert list(b.submodules) == [c]
+assert list(c.submodules) == []
+```
+
+#### Returns:
+
+A sequence of all submodules.
+
+
+<h3 id="trainable_variables"><code>trainable_variables</code></h3>
+
+Sequence of variables owned by this module and it's submodules.
+
+Note: this method uses reflection to find variables on the current instance
+and submodules. For performance reasons you may wish to cache the result
+of calling this method if you don't expect the return value to change.
+
+#### Returns:
+
+A sequence of variables for the current module (sorted by attribute
+name) followed by variables from all submodules recursively (breadth
+first).
+
 
 <h3 id="validate_args"><code>validate_args</code></h3>
 
 Python `bool` indicating possibly expensive checks are enabled.
 
 
+<h3 id="variables"><code>variables</code></h3>
+
+Sequence of variables owned by this module and it's submodules.
+
+Note: this method uses reflection to find variables on the current instance
+and submodules. For performance reasons you may wish to cache the result
+of calling this method if you don't expect the return value to change.
+
+#### Returns:
+
+A sequence of variables for the current module (sorted by attribute
+name) followed by variables from all submodules recursively (breadth
+first).
+
+
+
 
 ## Methods
+
+<h3 id="__getitem__"><code>__getitem__</code></h3>
+
+``` python
+__getitem__(slices)
+```
+
+Slices the batch axes of this distribution, returning a new instance.
+
+```python
+b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]))
+b.batch_shape  # => [3, 5, 7, 9]
+b2 = b[:, tf.newaxis, ..., -2:, 1::2]
+b2.batch_shape  # => [3, 1, 5, 2, 4]
+
+x = tf.random.normal([5, 3, 2, 2])
+cov = tf.matmul(x, x, transpose_b=True)
+chol = tf.cholesky(cov)
+loc = tf.random.normal([4, 1, 3, 1])
+mvn = tfd.MultivariateNormalTriL(loc, chol)
+mvn.batch_shape  # => [4, 5, 3]
+mvn.event_shape  # => [2]
+mvn2 = mvn[:, 3:, ..., ::-1, tf.newaxis]
+mvn2.batch_shape  # => [4, 2, 3, 1]
+mvn2.event_shape  # => [2]
+```
+
+#### Args:
+
+
+* <b>`slices`</b>: slices from the [] operator
+
+
+#### Returns:
+
+
+* <b>`dist`</b>: A new `tfd.Distribution` instance with sliced parameters.
+
+<h3 id="__iter__"><code>__iter__</code></h3>
+
+``` python
+__iter__()
+```
+
+
+
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
@@ -256,10 +388,12 @@ parameterizations of this distribution.
 
 #### Args:
 
+
 * <b>`name`</b>: name to give to the op
 
 
 #### Returns:
+
 
 * <b>`batch_shape`</b>: `Tensor`.
 
@@ -268,7 +402,8 @@ parameterizations of this distribution.
 ``` python
 cdf(
     value,
-    name='cdf'
+    name='cdf',
+    **kwargs
 )
 ```
 
@@ -282,14 +417,17 @@ cdf(x) := P[X <= x]
 
 #### Args:
 
+
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
 
+
 * <b>`cdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="copy"><code>copy</code></h3>
 
@@ -304,20 +442,25 @@ initialization arguments.
 
 #### Args:
 
+
 * <b>`**override_parameters_kwargs`</b>: String/value dictionary of initialization
-    arguments to override with new values.
+  arguments to override with new values.
 
 
 #### Returns:
 
+
 * <b>`distribution`</b>: A new instance of `type(self)` initialized from the union
-    of self.parameters and override_parameters_kwargs, i.e.,
-    `dict(self.parameters, **override_parameters_kwargs)`.
+  of self.parameters and override_parameters_kwargs, i.e.,
+  `dict(self.parameters, **override_parameters_kwargs)`.
 
 <h3 id="covariance"><code>covariance</code></h3>
 
 ``` python
-covariance(name='covariance')
+covariance(
+    name='covariance',
+    **kwargs
+)
 ```
 
 Covariance.
@@ -349,14 +492,17 @@ length-`k'` vector.
 
 #### Args:
 
+
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
 
+
 * <b>`covariance`</b>: Floating-point `Tensor` with shape `[B1, ..., Bn, k', k']`
-    where the first `n` dimensions are batch coordinates and
-    `k' = reduce_prod(self.event_shape)`.
+  where the first `n` dimensions are batch coordinates and
+  `k' = reduce_prod(self.event_shape)`.
 
 <h3 id="cross_entropy"><code>cross_entropy</code></h3>
 
@@ -371,7 +517,7 @@ Computes the (Shannon) cross entropy.
 
 Denote this distribution (`self`) by `P` and the `other` distribution by
 `Q`. Assuming `P, Q` are absolutely continuous with respect to
-one another and permit densities `p(x) dr(x)` and `q(x) dr(x)`, (Shanon)
+one another and permit densities `p(x) dr(x)` and `q(x) dr(x)`, (Shannon)
 cross entropy is defined as:
 
 ```none
@@ -382,22 +528,28 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 #### Args:
 
+
 * <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
 #### Returns:
 
+
 * <b>`cross_entropy`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of (Shanon) cross entropy.
+  representing `n` different calculations of (Shannon) cross entropy.
 
 <h3 id="entropy"><code>entropy</code></h3>
 
 ``` python
-entropy(name='entropy')
+entropy(
+    name='entropy',
+    **kwargs
+)
 ```
 
 Shannon entropy in nats.
+
 
 <h3 id="event_shape_tensor"><code>event_shape_tensor</code></h3>
 
@@ -407,12 +559,15 @@ event_shape_tensor(name='event_shape_tensor')
 
 Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
 
+
 #### Args:
+
 
 * <b>`name`</b>: name to give to the op
 
 
 #### Returns:
+
 
 * <b>`event_shape`</b>: `Tensor`.
 
@@ -424,12 +579,15 @@ is_scalar_batch(name='is_scalar_batch')
 
 Indicates that `batch_shape == []`.
 
+
 #### Args:
+
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
 #### Returns:
+
 
 * <b>`is_scalar_batch`</b>: `bool` scalar `Tensor`.
 
@@ -441,12 +599,15 @@ is_scalar_event(name='is_scalar_event')
 
 Indicates that `event_shape == []`.
 
+
 #### Args:
+
 
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
 
 
 #### Returns:
+
 
 * <b>`is_scalar_event`</b>: `bool` scalar `Tensor`.
 
@@ -472,9 +633,10 @@ KL[p, q] = E_p[log(p(X)/q(X))]
 ```
 
 where `F` denotes the support of the random variable `X ~ p`, `H[., .]`
-denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
+denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 
 #### Args:
+
 
 * <b>`other`</b>: <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a> instance.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
@@ -482,16 +644,18 @@ denotes (Shanon) cross entropy, and `H[.]` denotes (Shanon) entropy.
 
 #### Returns:
 
+
 * <b>`kl_divergence`</b>: `self.dtype` `Tensor` with shape `[B1, ..., Bn]`
-    representing `n` different calculations of the Kullback-Leibler
-    divergence.
+  representing `n` different calculations of the Kullback-Leibler
+  divergence.
 
 <h3 id="log_cdf"><code>log_cdf</code></h3>
 
 ``` python
 log_cdf(
     value,
-    name='log_cdf'
+    name='log_cdf',
+    **kwargs
 )
 ```
 
@@ -509,14 +673,17 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 
 #### Args:
 
+
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
 
+
 * <b>`logcdf`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="log_normalization"><code>log_normalization</code></h3>
 
@@ -526,34 +693,41 @@ log_normalization(name='log_normalization')
 
 Computes the log normalizing constant, log(Z).
 
+
 <h3 id="log_prob"><code>log_prob</code></h3>
 
 ``` python
 log_prob(
     value,
-    name='log_prob'
+    name='log_prob',
+    **kwargs
 )
 ```
 
 Log probability density/mass function.
 
+
 #### Args:
+
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
 
+
 * <b>`log_prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="log_survival_function"><code>log_survival_function</code></h3>
 
 ``` python
 log_survival_function(
     value,
-    name='log_survival_function'
+    name='log_survival_function',
+    **kwargs
 )
 ```
 
@@ -572,8 +746,10 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 #### Args:
 
+
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -581,13 +757,18 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 `Tensor` of shape `sample_shape(x) + self.batch_shape` with values of type
   `self.dtype`.
 
+
 <h3 id="mean"><code>mean</code></h3>
 
 ``` python
-mean(name='mean')
+mean(
+    name='mean',
+    **kwargs
+)
 ```
 
 Mean.
+
 
 <h3 id="mean_log_det"><code>mean_log_det</code></h3>
 
@@ -597,13 +778,18 @@ mean_log_det(name='mean_log_det')
 
 Computes E[log(det(X))] under this Wishart distribution.
 
+
 <h3 id="mode"><code>mode</code></h3>
 
 ``` python
-mode(name='mode')
+mode(
+    name='mode',
+    **kwargs
+)
 ```
 
 Mode.
+
 
 <h3 id="param_shapes"><code>param_shapes</code></h3>
 
@@ -625,14 +811,16 @@ Subclasses should override class method `_param_shapes`.
 
 #### Args:
 
+
 * <b>`sample_shape`</b>: `Tensor` or python list/tuple. Desired shape of a call to
-    `sample()`.
+  `sample()`.
 * <b>`name`</b>: name to prepend ops with.
 
 
 #### Returns:
 
 `dict` of parameter name to `Tensor` shapes.
+
 
 <h3 id="param_static_shapes"><code>param_static_shapes</code></h3>
 
@@ -655,8 +843,9 @@ constant-valued tensors when constant values are fed.
 
 #### Args:
 
+
 * <b>`sample_shape`</b>: `TensorShape` or python list/tuple. Desired shape of a call
-    to `sample()`.
+  to `sample()`.
 
 
 #### Returns:
@@ -664,7 +853,9 @@ constant-valued tensors when constant values are fed.
 `dict` of parameter name to `TensorShape`.
 
 
+
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `sample_shape` is a `TensorShape` and is not fully defined.
 
@@ -673,33 +864,39 @@ constant-valued tensors when constant values are fed.
 ``` python
 prob(
     value,
-    name='prob'
+    name='prob',
+    **kwargs
 )
 ```
 
 Probability density/mass function.
 
+
 #### Args:
+
 
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
 
+
 * <b>`prob`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="quantile"><code>quantile</code></h3>
 
 ``` python
 quantile(
     value,
-    name='quantile'
+    name='quantile',
+    **kwargs
 )
 ```
 
-Quantile function. Aka "inverse cdf" or "percent point function".
+Quantile function. Aka 'inverse cdf' or 'percent point function'.
 
 Given random variable `X` and `p in [0, 1]`, the `quantile` is:
 
@@ -709,14 +906,17 @@ quantile(p) := x such that P[X <= x] == p
 
 #### Args:
 
+
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
 
+
 * <b>`quantile`</b>: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
-    values of type `self.dtype`.
+  values of type `self.dtype`.
 
 <h3 id="sample"><code>sample</code></h3>
 
@@ -724,7 +924,8 @@ quantile(p) := x such that P[X <= x] == p
 sample(
     sample_shape=(),
     seed=None,
-    name='sample'
+    name='sample',
+    **kwargs
 )
 ```
 
@@ -735,12 +936,15 @@ sample.
 
 #### Args:
 
+
 * <b>`sample_shape`</b>: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
 * <b>`seed`</b>: Python integer seed for RNG
 * <b>`name`</b>: name to give to the op.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
+
 
 * <b>`samples`</b>: a `Tensor` with prepended dimensions `sample_shape`.
 
@@ -752,10 +956,14 @@ scale()
 
 Wishart distribution scale matrix.
 
+
 <h3 id="stddev"><code>stddev</code></h3>
 
 ``` python
-stddev(name='stddev')
+stddev(
+    name='stddev',
+    **kwargs
+)
 ```
 
 Standard deviation.
@@ -771,20 +979,24 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 
 #### Args:
 
+
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
 
+
 * <b>`stddev`</b>: Floating-point `Tensor` with shape identical to
-    `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
+  `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 <h3 id="survival_function"><code>survival_function</code></h3>
 
 ``` python
 survival_function(
     value,
-    name='survival_function'
+    name='survival_function',
+    **kwargs
 )
 ```
 
@@ -800,8 +1012,10 @@ survival_function(x) = P[X > x]
 
 #### Args:
 
+
 * <b>`value`</b>: `float` or `double` `Tensor`.
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
@@ -809,10 +1023,14 @@ survival_function(x) = P[X > x]
 `Tensor` of shape `sample_shape(x) + self.batch_shape` with values of type
   `self.dtype`.
 
+
 <h3 id="variance"><code>variance</code></h3>
 
 ``` python
-variance(name='variance')
+variance(
+    name='variance',
+    **kwargs
+)
 ```
 
 Variance.
@@ -828,13 +1046,58 @@ denotes expectation, and `Var.shape = batch_shape + event_shape`.
 
 #### Args:
 
+
 * <b>`name`</b>: Python `str` prepended to names of ops created by this function.
+* <b>`**kwargs`</b>: Named arguments forwarded to subclass implementation.
 
 
 #### Returns:
 
+
 * <b>`variance`</b>: Floating-point `Tensor` with shape identical to
-    `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
+  `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
+
+<h3 id="with_name_scope"><code>with_name_scope</code></h3>
+
+``` python
+with_name_scope(
+    cls,
+    method
+)
+```
+
+Decorator to automatically enter the module name scope.
+
+```
+class MyModule(tf.Module):
+  @tf.Module.with_name_scope
+  def __call__(self, x):
+    if not hasattr(self, 'w'):
+      self.w = tf.Variable(tf.random.normal([x.shape[1], 64]))
+    return tf.matmul(x, self.w)
+```
+
+Using the above module would produce `tf.Variable`s and `tf.Tensor`s whose
+names included the module name:
+
+```
+mod = MyModule()
+mod(tf.ones([8, 32]))
+# ==> <tf.Tensor: ...>
+mod.w
+# ==> <tf.Variable ...'my_module/w:0'>
+```
+
+#### Args:
+
+
+* <b>`method`</b>: The method to wrap.
+
+
+#### Returns:
+
+The original method wrapped such that it enters the module's name scope.
+
 
 
 

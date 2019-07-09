@@ -32,6 +32,9 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":autoregressive",
+        ":decomposition",
+        ":dynamic_regression",
         ":fitting",
         ":forecast",
         ":local_level",
@@ -41,6 +44,73 @@ py_library(
         ":semilocal_linear_trend",
         ":structural_time_series",
         ":sum",
+    ],
+)
+
+py_library(
+    name = "autoregressive",
+    srcs = ["autoregressive.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "autoregressive_test",
+    size = "medium",
+    srcs = ["autoregressive_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "decomposition",
+    srcs = ["decomposition.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "decomposition_test",
+    size = "medium",
+    srcs = ["decomposition_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "dynamic_regression",
+    srcs = ["dynamic_regression.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "dynamic_regression_test",
+    size = "medium",
+    srcs = ["dynamic_regression_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
@@ -164,6 +234,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:docstring_util",
         "//tensorflow_probability/python/sts/internal",
     ],
 )

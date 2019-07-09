@@ -175,12 +175,16 @@ def make_encoder(activation, num_topics, layer_sizes):
   """
   encoder_net = tf.keras.Sequential()
   for num_hidden_units in layer_sizes:
-    encoder_net.add(tf.keras.layers.Dense(
-        num_hidden_units, activation=activation,
-        kernel_initializer=tf.glorot_normal_initializer()))
-  encoder_net.add(tf.keras.layers.Dense(
-      num_topics, activation=tf.nn.softplus,
-      kernel_initializer=tf.glorot_normal_initializer()))
+    encoder_net.add(
+        tf.keras.layers.Dense(
+            num_hidden_units,
+            activation=activation,
+            kernel_initializer=tf.compat.v1.glorot_normal_initializer()))
+  encoder_net.add(
+      tf.keras.layers.Dense(
+          num_topics,
+          activation=tf.nn.softplus,
+          kernel_initializer=tf.compat.v1.glorot_normal_initializer()))
 
   def encoder(bag_of_words):
     net = _clip_dirichlet_parameters(encoder_net(bag_of_words))
@@ -201,9 +205,10 @@ def make_decoder(num_topics, num_words):
     decoder: A `callable` mapping a `Tensor` of encodings to a
       `tfd.Distribution` instance over words.
   """
-  topics_words_logits = tf.get_variable(
-      "topics_words_logits", shape=[num_topics, num_words],
-      initializer=tf.glorot_normal_initializer())
+  topics_words_logits = tf.compat.v1.get_variable(
+      "topics_words_logits",
+      shape=[num_topics, num_words],
+      initializer=tf.compat.v1.glorot_normal_initializer())
   topics_words = tf.nn.softmax(topics_words_logits, axis=-1)
 
   def decoder(topics):
@@ -232,9 +237,12 @@ def make_prior(num_topics, initial_value):
   """
   def _softplus_inverse(x):
     return np.log(np.expm1(x))
-  logit_concentration = tf.get_variable(
-      "logit_concentration", shape=[1, num_topics],
-      initializer=tf.constant_initializer(_softplus_inverse(initial_value)))
+
+  logit_concentration = tf.compat.v1.get_variable(
+      "logit_concentration",
+      shape=[1, num_topics],
+      initializer=tf.compat.v1.initializers.constant(
+          _softplus_inverse(initial_value)))
   concentration = _clip_dirichlet_parameters(
       tf.nn.softplus(logit_concentration))
 
@@ -277,27 +285,29 @@ def model_fn(features, labels, mode, params, config):
   random_reconstruction = decoder(topics)
 
   reconstruction = random_reconstruction.log_prob(features)
-  tf.summary.scalar("reconstruction", tf.reduce_mean(reconstruction))
+  tf.compat.v1.summary.scalar("reconstruction",
+                              tf.reduce_mean(input_tensor=reconstruction))
 
   # Compute the KL-divergence between two Dirichlets analytically.
   # The sampled KL does not work well for "sparse" distributions
   # (see Appendix D of [2]).
   kl = tfd.kl_divergence(topics_posterior, topics_prior)
-  tf.summary.scalar("kl", tf.reduce_mean(kl))
+  tf.compat.v1.summary.scalar("kl", tf.reduce_mean(input_tensor=kl))
 
   # Ensure that the KL is non-negative (up to a very small slack).
   # Negative KL can happen due to numerical instability.
-  with tf.control_dependencies([tf.assert_greater(kl, -1e-3, message="kl")]):
+  with tf.control_dependencies(
+      [tf.compat.v1.assert_greater(kl, -1e-3, message="kl")]):
     kl = tf.identity(kl)
 
   elbo = reconstruction - kl
-  avg_elbo = tf.reduce_mean(elbo)
-  tf.summary.scalar("elbo", avg_elbo)
+  avg_elbo = tf.reduce_mean(input_tensor=elbo)
+  tf.compat.v1.summary.scalar("elbo", avg_elbo)
   loss = -avg_elbo
 
   # Perform variational inference by minimizing the -ELBO.
-  global_step = tf.train.get_or_create_global_step()
-  optimizer = tf.train.AdamOptimizer(params["learning_rate"])
+  global_step = tf.compat.v1.train.get_or_create_global_step()
+  optimizer = tf.compat.v1.train.AdamOptimizer(params["learning_rate"])
 
   # This implements the "burn-in" for prior parameters (see Appendix D of [2]).
   # For the first prior_burn_in_steps steps they are fixed, and then trained
@@ -317,32 +327,35 @@ def model_fn(features, labels, mode, params, config):
         global_step=global_step)
 
   train_op = tf.cond(
-      global_step < params["prior_burn_in_steps"],
+      pred=global_step < params["prior_burn_in_steps"],
       true_fn=train_op_except_prior,
       false_fn=train_op_all)
 
   # The perplexity is an exponent of the average negative ELBO per word.
-  words_per_document = tf.reduce_sum(features, axis=1)
+  words_per_document = tf.reduce_sum(input_tensor=features, axis=1)
   log_perplexity = -elbo / words_per_document
-  tf.summary.scalar("perplexity", tf.exp(tf.reduce_mean(log_perplexity)))
-  (log_perplexity_tensor, log_perplexity_update) = tf.metrics.mean(
-      log_perplexity)
+  tf.compat.v1.summary.scalar(
+      "perplexity", tf.exp(tf.reduce_mean(input_tensor=log_perplexity)))
+  (log_perplexity_tensor,
+   log_perplexity_update) = tf.compat.v1.metrics.mean(log_perplexity)
   perplexity_tensor = tf.exp(log_perplexity_tensor)
 
   # Obtain the topics summary. Implemented as a py_func for simplicity.
-  topics = tf.py_func(
+  topics = tf.compat.v1.py_func(
       functools.partial(get_topics_strings, vocabulary=params["vocabulary"]),
-      [topics_words, alpha], tf.string, stateful=False)
-  tf.summary.text("topics", topics)
+      [topics_words, alpha],
+      tf.string,
+      stateful=False)
+  tf.compat.v1.summary.text("topics", topics)
 
   return tf.estimator.EstimatorSpec(
       mode=mode,
       loss=loss,
       train_op=train_op,
       eval_metric_ops={
-          "elbo": tf.metrics.mean(elbo),
-          "reconstruction": tf.metrics.mean(reconstruction),
-          "kl": tf.metrics.mean(kl),
+          "elbo": tf.compat.v1.metrics.mean(elbo),
+          "reconstruction": tf.compat.v1.metrics.mean(reconstruction),
+          "kl": tf.compat.v1.metrics.mean(kl),
           "perplexity": (perplexity_tensor, log_perplexity_update),
           "topics": (topics, tf.no_op()),
       },
@@ -386,10 +399,10 @@ FILE_TEMPLATE = "{split}.txt.npy"
 def download(directory, filename):
   """Download a file."""
   filepath = os.path.join(directory, filename)
-  if tf.gfile.Exists(filepath):
+  if tf.io.gfile.exists(filepath):
     return filepath
-  if not tf.gfile.Exists(directory):
-    tf.gfile.MakeDirs(directory)
+  if not tf.io.gfile.exists(directory):
+    tf.io.gfile.makedirs(directory)
   url = os.path.join(ROOT_PATH, filename)
   print("Downloading %s to %s" % (url, filepath))
   urllib.request.urlretrieve(url, filepath)
@@ -427,7 +440,9 @@ def newsgroups_dataset(directory, split_name, num_words, shuffle_and_repeat):
   def get_row_py_func(idx):
     def get_row_python(idx_py):
       return np.squeeze(np.array(sparse_matrix[idx_py].todense()), axis=0)
-    py_func = tf.py_func(get_row_python, [idx], tf.float32, stateful=False)
+
+    py_func = tf.compat.v1.py_func(
+        get_row_python, [idx], tf.float32, stateful=False)
     py_func.set_shape((num_words,))
     return py_func
 
@@ -446,12 +461,12 @@ def build_fake_input_fns(batch_size):
   def train_input_fn():
     dataset = tf.data.Dataset.from_tensor_slices(random_sample)
     dataset = dataset.batch(batch_size)
-    return dataset.repeat().make_one_shot_iterator().get_next()
+    return tf.compat.v1.data.make_one_shot_iterator(dataset.repeat()).get_next()
 
   def eval_input_fn():
     dataset = tf.data.Dataset.from_tensor_slices(random_sample)
     dataset = dataset.batch(batch_size)
-    return dataset.make_one_shot_iterator().get_next()
+    return tf.compat.v1.data.make_one_shot_iterator(dataset).get_next()
 
   return train_input_fn, eval_input_fn, vocabulary
 
@@ -484,14 +499,14 @@ def build_input_fns(data_dir, batch_size):
         data_dir, "train", num_words, shuffle_and_repeat=True)
     # Prefetching makes training about 1.5x faster.
     dataset = dataset.batch(batch_size).prefetch(32)
-    return dataset.make_one_shot_iterator().get_next()
+    return tf.compat.v1.data.make_one_shot_iterator(dataset).get_next()
 
   # Build an iterator over the heldout set.
   def eval_input_fn():
     dataset = newsgroups_dataset(
         data_dir, "test", num_words, shuffle_and_repeat=False)
     dataset = dataset.batch(batch_size)
-    return dataset.make_one_shot_iterator().get_next()
+    return tf.compat.v1.data.make_one_shot_iterator(dataset).get_next()
 
   return train_input_fn, eval_input_fn, vocabulary
 
@@ -502,10 +517,11 @@ def main(argv):
   params = FLAGS.flag_values_dict()
   params["layer_sizes"] = [int(units) for units in params["layer_sizes"]]
   params["activation"] = getattr(tf.nn, params["activation"])
-  if FLAGS.delete_existing and tf.gfile.Exists(FLAGS.model_dir):
-    tf.logging.warn("Deleting old log directory at {}".format(FLAGS.model_dir))
-    tf.gfile.DeleteRecursively(FLAGS.model_dir)
-  tf.gfile.MakeDirs(FLAGS.model_dir)
+  if FLAGS.delete_existing and tf.io.gfile.exists(FLAGS.model_dir):
+    tf.compat.v1.logging.warn("Deleting old log directory at {}".format(
+        FLAGS.model_dir))
+    tf.io.gfile.rmtree(FLAGS.model_dir)
+  tf.io.gfile.makedirs(FLAGS.model_dir)
 
   if FLAGS.fake_data:
     train_input_fn, eval_input_fn, vocabulary = build_fake_input_fns(
@@ -542,4 +558,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()

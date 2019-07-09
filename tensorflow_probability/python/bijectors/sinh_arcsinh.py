@@ -20,10 +20,13 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
     "SinhArcsinh",
@@ -32,8 +35,9 @@ __all__ = [
 
 def _sqrtx2p1(x):
   """Implementation of `sqrt(1 + x**2)` which is stable despite large `x`."""
+  sqrt_eps = np.sqrt(np.finfo(dtype_util.as_numpy_dtype(x.dtype)).eps)
   return tf.where(
-      tf.abs(x) * np.sqrt(np.finfo(x.dtype.as_numpy_dtype).eps) <= 1.,
+      tf.abs(x) * sqrt_eps <= 1.,
       tf.sqrt(x**2. + 1.),
       # For large x, calculating x**2 can overflow. This can be alleviated by
       # considering:
@@ -90,7 +94,7 @@ class SinhArcsinh(bijector.Bijector):
                skewness=None,
                tailweight=None,
                validate_args=False,
-               name="SinhArcsinh"):
+               name="sinh_arcsinh"):
     """Instantiates the `SinhArcsinh` bijector.
 
     Args:
@@ -102,26 +106,19 @@ class SinhArcsinh(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._graph_parents = []
-    self._name = name
-    self._validate_args = validate_args
-    with self._name_scope("init", values=[skewness, tailweight]):
+    with tf.name_scope(name) as name:
       tailweight = 1. if tailweight is None else tailweight
       skewness = 0. if skewness is None else skewness
-      self._skewness = tf.convert_to_tensor(skewness, name="skewness")
-      self._tailweight = tf.convert_to_tensor(
-          tailweight, name="tailweight", dtype=self._skewness.dtype)
-      tf.assert_same_float_dtype([self._skewness, self._tailweight])
-      if validate_args:
-        self._tailweight = control_flow_ops.with_dependencies([
-            tf.assert_positive(
-                self._tailweight,
-                message="Argument tailweight was not positive")
-        ], self._tailweight)
-    super(SinhArcsinh, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+      dtype = dtype_util.common_dtype([tailweight, skewness],
+                                      dtype_hint=tf.float32)
+      self._skewness = tensor_util.convert_immutable_to_tensor(
+          skewness, dtype=dtype, name="skewness")
+      self._tailweight = tensor_util.convert_immutable_to_tensor(
+          tailweight, dtype=dtype, name="tailweight")
+      super(SinhArcsinh, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
 
   @property
   def skewness(self):
@@ -148,11 +145,12 @@ class SinhArcsinh(bijector.Bijector):
 
     # This is computed inside the log to avoid catastrophic cancellations
     # from cosh((arcsinh(y) / tailweight) - skewness) and sqrt(x**2 + 1).
-    return (tf.log(
-        tf.cosh(tf.asinh(y) / self.tailweight - self.skewness)
+    tailweight = tf.convert_to_tensor(self.tailweight)
+    return (tf.math.log(
+        tf.cosh(tf.asinh(y) / tailweight - self.skewness)
         # TODO(srvasude): Consider using cosh(arcsinh(x)) in cases
         # where (arcsinh(x) / tailweight) - skewness ~= arcsinh(x).
-        / _sqrtx2p1(y)) - tf.log(self.tailweight))
+        / _sqrtx2p1(y)) - tf.math.log(tailweight))
 
   def _forward_log_det_jacobian(self, x):
     # y = sinh((arcsinh(x) + skewness) * tailweight)
@@ -162,8 +160,19 @@ class SinhArcsinh(bijector.Bijector):
 
     # This is computed inside the log to avoid catastrophic cancellations
     # from cosh((arcsinh(x) + skewness) * tailweight) and sqrt(x**2 + 1).
-    return (tf.log(
-        tf.cosh((tf.asinh(x) + self.skewness) * self.tailweight)
+    tailweight = tf.convert_to_tensor(self.tailweight)
+    return (tf.math.log(
+        tf.cosh((tf.asinh(x) + self.skewness) * tailweight)
         # TODO(srvasude): Consider using cosh(arcsinh(x)) in cases
         # where (arcsinh(x) + skewness) * tailweight ~= arcsinh(x).
-        / _sqrtx2p1(x)) + tf.log(self.tailweight))
+        / _sqrtx2p1(x)) + tf.math.log(tailweight))
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_mutable(self.tailweight):
+      assertions.append(assert_util.assert_positive(
+          self.tailweight,
+          message="Argument `tailweight` must be positive."))
+    return assertions

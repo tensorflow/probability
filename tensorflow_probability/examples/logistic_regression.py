@@ -147,18 +147,18 @@ def build_input_pipeline(x, y, batch_size):
   """
   training_dataset = tf.data.Dataset.from_tensor_slices((x, y))
   training_batches = training_dataset.repeat().batch(batch_size)
-  training_iterator = training_batches.make_one_shot_iterator()
+  training_iterator = tf.compat.v1.data.make_one_shot_iterator(training_batches)
   batch_features, batch_labels = training_iterator.get_next()
   return batch_features, batch_labels
 
 
 def main(argv):
   del argv  # unused
-  if tf.gfile.Exists(FLAGS.model_dir):
-    tf.logging.warning(
+  if tf.io.gfile.exists(FLAGS.model_dir):
+    tf.compat.v1.logging.warning(
         "Warning: deleting old log directory at {}".format(FLAGS.model_dir))
-    tf.gfile.DeleteRecursively(FLAGS.model_dir)
-  tf.gfile.MakeDirs(FLAGS.model_dir)
+    tf.io.gfile.rmtree(FLAGS.model_dir)
+  tf.io.gfile.makedirs(FLAGS.model_dir)
 
   # Generate (and visualize) a toy classification dataset.
   w_true, b_true, x, y = toy_logistic_data(FLAGS.num_examples, 2)
@@ -168,7 +168,7 @@ def main(argv):
   # parameterized by logits from a single linear layer. We use the Flipout
   # Monte Carlo estimator for the layer: this enables lower variance
   # stochastic gradients than naive reparameterization.
-  with tf.name_scope("logistic_regression", values=[features]):
+  with tf.compat.v1.name_scope("logistic_regression", values=[features]):
     layer = tfp.layers.DenseFlipout(
         units=1,
         activation=None,
@@ -178,24 +178,26 @@ def main(argv):
     labels_distribution = tfd.Bernoulli(logits=logits)
 
   # Compute the -ELBO as the loss, averaged over the batch size.
-  neg_log_likelihood = -tf.reduce_mean(labels_distribution.log_prob(labels))
+  neg_log_likelihood = -tf.reduce_mean(
+      input_tensor=labels_distribution.log_prob(labels))
   kl = sum(layer.losses) / FLAGS.num_examples
   elbo_loss = neg_log_likelihood + kl
 
   # Build metrics for evaluation. Predictions are formed from a single forward
   # pass of the probabilistic layers. They are cheap but noisy predictions.
   predictions = tf.cast(logits > 0, dtype=tf.int32)
-  accuracy, accuracy_update_op = tf.metrics.accuracy(
+  accuracy, accuracy_update_op = tf.compat.v1.metrics.accuracy(
       labels=labels, predictions=predictions)
 
-  with tf.name_scope("train"):
-    optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)
+  with tf.compat.v1.name_scope("train"):
+    optimizer = tf.compat.v1.train.AdamOptimizer(
+        learning_rate=FLAGS.learning_rate)
     train_op = optimizer.minimize(elbo_loss)
 
-  init_op = tf.group(tf.global_variables_initializer(),
-                     tf.local_variables_initializer())
+  init_op = tf.group(tf.compat.v1.global_variables_initializer(),
+                     tf.compat.v1.local_variables_initializer())
 
-  with tf.Session() as sess:
+  with tf.compat.v1.Session() as sess:
     sess.run(init_op)
 
     # Fit the model to data.
@@ -219,4 +221,4 @@ def main(argv):
                                           "weights_inferred.png"))
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()

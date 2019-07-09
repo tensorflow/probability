@@ -5,6 +5,8 @@
 
 # tfp.optimizer.nelder_mead_one_step
 
+A single iteration of the Nelder Mead algorithm.
+
 ``` python
 tfp.optimizer.nelder_mead_one_step(
     current_simplex,
@@ -22,4 +24,8 @@ tfp.optimizer.nelder_mead_one_step(
 )
 ```
 
-A single iteration of the Nelder Mead algorithm.
+
+
+Defined in [`python/optimizer/nelder_mead.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/nelder_mead.py).
+
+<!-- Placeholder for "Used in" -->

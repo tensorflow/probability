@@ -24,17 +24,22 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.math import diag_jacobian
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 tfd = tfp.distributions
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
 
   def testBasic(self):
+    if tf.executing_eagerly():
+      return
+
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.Variable([3., 4.], dtype=dtype)
+        var0 = tf.compat.v2.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.compat.v2.Variable([3., 4.], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.53
@@ -42,12 +47,13 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
             3., preconditioner_decay_rate=decay_rate)
         sgd_op = sgd_optimizer.apply_gradients(
             zip([grads0, grads1], [var0, var1]))
-        tf.global_variables_initializer().run()
+
+        self.evaluate(tf.compat.v1.global_variables_initializer())
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
         self.assertAllCloseAccordingToType([3., 4.], self.evaluate(var1))
         # Run 1 step of sgd
-        sgd_op.run()
+        self.evaluate(sgd_op)
         # Validate updated params
         grads_scaled = (0.5 * 0.1 /
                         np.sqrt(decay_rate + (1. - decay_rate) * 0.1**2 + 1e-8))
@@ -62,17 +68,20 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
             [3. - 3. * grads_scaled, 4. - 3. * grads_scaled],
             self.evaluate(var1))
         self.assertAllCloseAccordingToType(
-            1, self.evaluate(sgd_optimizer._counter))
+            1, self.evaluate(sgd_optimizer.iterations))
 
   def testBasicMultiInstance(self):
+    if tf.executing_eagerly():
+      return
+
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.Variable([3., 4.], dtype=dtype)
+        var0 = tf.compat.v2.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.compat.v2.Variable([3., 4.], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
-        vara = tf.Variable([1.1, 2.1], dtype=dtype)
-        varb = tf.Variable([3., 4.], dtype=dtype)
+        vara = tf.compat.v2.Variable([1.1, 2.1], dtype=dtype)
+        varb = tf.compat.v2.Variable([3., 4.], dtype=dtype)
         gradsa = tf.constant([0.1, 0.1], dtype=dtype)
         gradsb = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.5
@@ -84,7 +93,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
             3., preconditioner_decay_rate=decay_rate)
         sgd_op2 = sgd_optimizer2.apply_gradients(
             zip([gradsa, gradsb], [vara, varb]))
-        tf.global_variables_initializer().run()
+        self.evaluate(tf.compat.v1.global_variables_initializer())
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
         self.assertAllCloseAccordingToType([3., 4.], self.evaluate(var1))
@@ -92,8 +101,9 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
         self.assertAllCloseAccordingToType([3., 4.], self.evaluate(varb))
 
         # Run 1 step of sgd
-        sgd_op.run()
-        sgd_op2.run()
+        self.evaluate(sgd_op)
+        self.evaluate(sgd_op2)
+
         # Validate updated params
         grads_scaled = (0.5 * 0.1 /
                         np.sqrt(decay_rate + (1. - decay_rate) * 0.1**2 + 1e-8))
@@ -112,20 +122,19 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
         self.assertAllCloseAccordingToType(
             [3. - 3. * grads_scaled, 4. - 3. * grads_scaled],
             self.evaluate(varb))
-        self.assertNotEqual(sgd_optimizer.variable_scope,
-                            sgd_optimizer2.variable_scope)
-        self.assertNotEqual(sgd_optimizer.variable_scope.name,
-                            sgd_optimizer2.variable_scope.name)
         self.assertAllCloseAccordingToType(
-            1, self.evaluate(sgd_optimizer._counter))
+            1, self.evaluate(sgd_optimizer.iterations))
         self.assertAllCloseAccordingToType(
-            1, self.evaluate(sgd_optimizer2._counter))
+            1, self.evaluate(sgd_optimizer2.iterations))
 
   def testTensorLearningRate(self):
+    if tf.executing_eagerly():
+      return
+
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.Variable([3., 4.], dtype=dtype)
+        var0 = tf.compat.v2.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.compat.v2.Variable([3., 4.], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         lrate = tf.constant(3.0)
@@ -134,12 +143,12 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
             lrate, preconditioner_decay_rate=tf.constant(
                 decay_rate)).apply_gradients(
                     zip([grads0, grads1], [var0, var1]))
-        tf.global_variables_initializer().run()
+        self.evaluate(tf.compat.v1.global_variables_initializer())
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
         self.assertAllCloseAccordingToType([3., 4.], self.evaluate(var1))
         # Run 1 step of sgd
-        sgd_op.run()
+        self.evaluate(sgd_op)
         # Validate updated params
         grads_scaled = (0.5 * 0.1 /
                         np.sqrt(decay_rate + (1. - decay_rate) * 0.1**2 + 1e-8))
@@ -154,38 +163,75 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
             [3. - 3. * grads_scaled, 4. - 3. * grads_scaled],
             self.evaluate(var1))
 
+  @test_util.run_deprecated_v1
   def testGradWrtRef(self):
+    if tf.executing_eagerly():
+      return
+
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
         opt = tfp.optimizer.StochasticGradientLangevinDynamics(3.0)
         values = [1., 3.]
-        vars_ = [tf.Variable([v], dtype=dtype) for v in values]
-        grads_and_vars = opt.compute_gradients(vars_[0] + vars_[1], vars_)
-        tf.global_variables_initializer().run()
+        vars_ = [tf.compat.v2.Variable([v], dtype=dtype) for v in values]
+        loss = lambda: vars_[0] + vars_[1]  # pylint: disable=cell-var-from-loop
+        grads_and_vars = opt._compute_gradients(loss, vars_)
+        self.evaluate(tf.compat.v1.global_variables_initializer())
         for grad, _ in grads_and_vars:
           self.assertAllCloseAccordingToType([1.], self.evaluate(grad))
 
-  def testWithGlobalStep(self):
-    for dtype in [tf.half, tf.float32, tf.float64]:
+  def testBurnin(self):
+    if tf.executing_eagerly():
+      return
+
+    for burnin_dtype in [tf.int8, tf.int16, tf.int32, tf.int64]:
       with self.cached_session():
-        global_step = tf.Variable(0, trainable=False)
-        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.Variable([3., 4.], dtype=dtype)
+        var0 = tf.compat.v2.Variable([1.1, 2.1], dtype=tf.float32)
+        grads0 = tf.constant([0.1, 0.1], dtype=tf.float32)
+        decay_rate = 0.53
+        sgd_optimizer = tfp.optimizer.StochasticGradientLangevinDynamics(
+            3.,
+            preconditioner_decay_rate=decay_rate,
+            burnin=tf.constant(10, dtype=burnin_dtype))
+        sgd_op = sgd_optimizer.apply_gradients([(grads0, var0)])
+
+        self.evaluate(tf.compat.v1.global_variables_initializer())
+        # Validate that iterations is initialized to 0.
+        self.assertAllCloseAccordingToType(
+            0, self.evaluate(sgd_optimizer.iterations))
+        # Run 1 step of sgd
+        self.evaluate(sgd_op)
+        # Validate that iterations is incremented.
+        self.assertAllCloseAccordingToType(
+            1, self.evaluate(sgd_optimizer.iterations))
+
+  def testWithGlobalStep(self):
+    if tf.executing_eagerly():
+      return
+
+    for dtype in [tf.float32, tf.float64]:
+      with self.cached_session():
+        step = tf.compat.v2.Variable(0, dtype=tf.int64)
+
+        var0 = tf.compat.v2.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.compat.v2.Variable([3., 4.], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.1
-        sgd_op = tfp.optimizer.StochasticGradientLangevinDynamics(
-            3., preconditioner_decay_rate=decay_rate).apply_gradients(
-                zip([grads0, grads1], [var0, var1]),
-                global_step=global_step)
-        tf.global_variables_initializer().run()
+
+        sgd_opt = tfp.optimizer.StochasticGradientLangevinDynamics(
+            3., preconditioner_decay_rate=decay_rate)
+        sgd_opt.iterations = step
+        sgd_op = sgd_opt.apply_gradients(zip([grads0, grads1], [var0, var1]))
+
+        self.evaluate(tf.compat.v1.global_variables_initializer())
+
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
         self.assertAllCloseAccordingToType([3., 4.], self.evaluate(var1))
         # Run 1 step of sgd
-        sgd_op.run()
+        self.evaluate(sgd_op)
 
-        # Validate updated params and global_step
+        # Validate updated params and step
         grads_scaled = (0.5 * 0.1 /
                         np.sqrt(decay_rate + (1. - decay_rate) * 0.1**2 + 1e-8))
         # Note that `tfp.math.diag_jacobian(xs=var, ys=grad)` returns zero
@@ -198,13 +244,16 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
         self.assertAllCloseAccordingToType(
             [3. - 3. * grads_scaled, 4. - 3. * grads_scaled],
             self.evaluate(var1))
-        self.assertAllCloseAccordingToType(1, self.evaluate(global_step))
+        self.assertAllCloseAccordingToType(1, self.evaluate(step))
 
   def testSparseBasic(self):
+    if tf.executing_eagerly():
+      return
+
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.Variable([[1.1], [2.1]], dtype=dtype)
-        var1 = tf.Variable([[3.], [4.]], dtype=dtype)
+        var0 = tf.compat.v2.Variable([[1.1], [2.1]], dtype=dtype)
+        var1 = tf.compat.v2.Variable([[3.], [4.]], dtype=dtype)
         grads0 = tf.IndexedSlices(
             tf.constant([0.1], shape=[1, 1], dtype=dtype),
             tf.constant([0]), tf.constant([2, 1]))
@@ -215,12 +264,12 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
         sgd_op = tfp.optimizer.StochasticGradientLangevinDynamics(
             3., preconditioner_decay_rate=decay_rate).apply_gradients(
                 zip([grads0, grads1], [var0, var1]))
-        tf.global_variables_initializer().run()
+        self.evaluate(tf.compat.v1.global_variables_initializer())
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([[1.1], [2.1]], self.evaluate(var0))
         self.assertAllCloseAccordingToType([[3.], [4.]], self.evaluate(var1))
         # Run 1 step of sgd
-        sgd_op.run()
+        self.evaluate(sgd_op)
         # Validate updated params
         grads_scaled = (0.5 * 0.1 /
                         np.sqrt(decay_rate + (1. - decay_rate) * 0.1**2 + 1e-8))
@@ -235,8 +284,10 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
 
   def testPreconditionerComputedCorrectly(self):
     """Test that SGLD step is computed correctly for a 3D Gaussian energy."""
-    with self.cached_session(graph=tf.Graph()) as sess:
-      tf.set_random_seed(42)
+    if tf.executing_eagerly():
+      return
+
+    with self.cached_session():
       dtype = np.float32
       # Target function is the energy function of normal distribution
       true_mean = dtype([0, 0, 0])
@@ -244,10 +295,8 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
       # Target distribution is defined through the Cholesky decomposition
       chol = tf.linalg.cholesky(true_cov)
       target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
-      var_1 = tf.get_variable(
-          'var_1', initializer=[1., 1.])
-      var_2 = tf.get_variable(
-          'var_2', initializer=[1.])
+      var_1 = tf.compat.v2.Variable(name='var_1', initial_value=[1., 1.])
+      var_2 = tf.compat.v2.Variable(name='var_2', initial_value=[1.])
 
       var = [var_1, var_2]
 
@@ -262,7 +311,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
         z = tf.concat([x, y], axis=-1) - true_mean
         return -target.log_prob(z)
 
-      grads = tf.gradients(target_fn(*var), var)
+      grads = tf.gradients(ys=target_fn(*var), xs=var)
 
       # Update value of `var` with one iteration of the SGLD (without the
       # normal perturbation, since `burnin > 0`)
@@ -275,12 +324,12 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
       velocity = [(decay_tensor * tf.ones_like(v)
                    + (1 - decay_tensor) * tf.square(g))
                   for v, g in zip(var, grads)]
-      preconditioner = [tf.rsqrt(vel + diagonal_bias) for vel in velocity]
+      preconditioner = [tf.math.rsqrt(vel + diagonal_bias) for vel in velocity]
       # Compute second order gradients
       _, grad_grads = diag_jacobian(
           xs=var,
           ys=grads)
-      # Compute gradient of the preconsitioner (compute the gradient manually)
+      # Compute gradient of the preconditioner (compute the gradient manually)
       preconditioner_grads = [-(g * g_g * (1. - decay_tensor) * p**3.)
                               for g, g_g, p in zip(grads, grad_grads,
                                                    preconditioner)]
@@ -289,58 +338,61 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
       var_true = [v - learning_rate * 0.5 * (p * g - p_g)
                   for v, p, g, p_g in zip(var, preconditioner, grads,
                                           preconditioner_grads)]
-      sess.run(tf.initialize_all_variables())
-      var_true_ = sess.run(var_true)
-      sess.run(step)
-      var_ = sess.run(var)  # new `var` after one SGLD step
+      self.evaluate(tf.compat.v1.global_variables_initializer())
+      var_true_ = self.evaluate(var_true)
+      self.evaluate(step)
+      var_ = self.evaluate(var)  # new `var` after one SGLD step
       self.assertAllClose(var_true_,
                           var_, atol=0.001, rtol=0.001)
 
   def testDiffusionBehavesCorrectly(self):
     """Test that for the SGLD finds minimum of the 3D Gaussian energy."""
-    with self.cached_session(graph=tf.Graph()) as sess:
+    if tf.executing_eagerly():
+      return
+
+    with self.cached_session():
       # Set up random seed for the optimizer
-      tf.set_random_seed(42)
+      tf.compat.v1.set_random_seed(42)
       dtype = np.float32
       true_mean = dtype([0, 0, 0])
       true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
       # Loss is defined through the Cholesky decomposition
       chol = tf.linalg.cholesky(true_cov)
-      var_1 = tf.get_variable(
-          'var_1', initializer=[1., 1.])
-      var_2 = tf.get_variable(
-          'var_2', initializer=[1.])
+      var_1 = tf.compat.v2.Variable(name='var_1', initial_value=[1., 1.])
+      var_2 = tf.compat.v2.Variable(name='var_2', initial_value=[1.])
 
-      var = tf.concat([var_1, var_2], axis=-1)
-      # Partially defined loss function
-      loss_part = tf.cholesky_solve(chol, tf.expand_dims(var, -1))
       # Loss function
-      loss = 0.5 * tf.linalg.matvec(loss_part, var, transpose_a=True)
+      def loss_fn():
+        var = tf.concat([var_1, var_2], axis=-1)
+        loss_part = tf.linalg.cholesky_solve(chol, tf.expand_dims(var, -1))
+        return tf.linalg.matvec(loss_part, var, transpose_a=True)
 
       # Set up the learning rate with a polynomial decay
-      global_step = tf.Variable(0, trainable=False)
+      global_step = tf.compat.v1.train.get_or_create_global_step()
       starter_learning_rate = .3
       end_learning_rate = 1e-4
       decay_steps = 1e4
-      learning_rate = tf.train.polynomial_decay(starter_learning_rate,
-                                                global_step, decay_steps,
-                                                end_learning_rate, power=1.)
+      learning_rate = tf.compat.v1.train.polynomial_decay(
+          starter_learning_rate,
+          global_step,
+          decay_steps,
+          end_learning_rate,
+          power=1.)
 
       # Set up the optimizer
       optimizer_kernel = tfp.optimizer.StochasticGradientLangevinDynamics(
           learning_rate=learning_rate, preconditioner_decay_rate=0.99)
+      optimizer_kernel.iterations = global_step
+      optimizer = optimizer_kernel.minimize(loss_fn, var_list=[var_1, var_2])
 
-      optimizer = optimizer_kernel.minimize(loss)
-
-      init = tf.global_variables_initializer()
       # Number of training steps
       training_steps = 5000
       # Record the steps as and treat them as samples
       samples = [np.zeros([training_steps, 2]), np.zeros([training_steps, 1])]
-      sess.run(init)
+      self.evaluate(tf.compat.v1.global_variables_initializer())
       for step in range(training_steps):
-        sess.run([optimizer, loss])
-        sample = [sess.run(var_1), sess.run(var_2)]
+        self.evaluate(optimizer)
+        sample = [self.evaluate(var_1), self.evaluate(var_2)]
         samples[0][step, :] = sample[0]
         samples[1][step, :] = sample[1]
 

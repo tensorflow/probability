@@ -112,7 +112,6 @@ import tensorflow_probability as tfp
 from tensorflow_probability.examples import sprites_dataset
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 flags.DEFINE_integer(
     "batch_size",
@@ -198,14 +197,14 @@ class LearnableMultivariateNormalDiag(tf.keras.Model):
         distribution.
     """
     super(LearnableMultivariateNormalDiag, self).__init__()
-    with tf.name_scope(self._name):
+    with tf.compat.v1.name_scope(self._name):
       self.dimensions = dimensions
-      self._mean = tfe.Variable(
-          tf.random_normal([dimensions], stddev=0.1), name="mean")
+      self._mean = tf.compat.v2.Variable(
+          tf.random.normal([dimensions], stddev=0.1), name="mean")
       # Initialize the std dev such that it will be close to 1 after a softplus
       # function.
-      self._untransformed_stddev = tfe.Variable(
-          tf.random_normal([dimensions], mean=0.55, stddev=0.1),
+      self._untransformed_stddev = tf.compat.v2.Variable(
+          tf.random.normal([dimensions], mean=0.55, stddev=0.1),
           name="untransformed_stddev")
 
   def __call__(self, *args, **kwargs):
@@ -226,7 +225,7 @@ class LearnableMultivariateNormalDiag(tf.keras.Model):
       dimensions].
     """
     del inputs  # unused
-    with tf.name_scope(self._name):
+    with tf.compat.v1.name_scope(self._name):
       return tfd.MultivariateNormalDiag(self.loc, self.scale_diag)
 
   @property
@@ -275,9 +274,9 @@ class LearnableMultivariateNormalDiagCell(tf.keras.Model):
     """
     h0 = tf.zeros([1, self.hidden_size])
     c0 = tf.zeros([1, self.hidden_size])
-    combined_shape = tf.concat(
-        (tf.convert_to_tensor(sample_batch_shape, dtype=tf.int32),
-         [self.dimensions]), axis=-1)
+    combined_shape = tf.concat((tf.convert_to_tensor(
+        value=sample_batch_shape, dtype=tf.int32), [self.dimensions]),
+                               axis=-1)
     previous_output = tf.zeros(combined_shape)
     return previous_output, (h0, c0)
 
@@ -308,7 +307,8 @@ class LearnableMultivariateNormalDiagCell(tf.keras.Model):
       inputs = tf.reshape(inputs, [1, -1])
     out, state = self.lstm_cell(inputs, state)
     out = self.output_layer(out)
-    correct_shape = tf.concat((original_shape[:-1], tf.shape(out)[-1:]), 0)
+    correct_shape = tf.concat((original_shape[:-1], tf.shape(input=out)[-1:]),
+                              0)
     out = tf.reshape(out, correct_shape)
     loc = out[..., :self.dimensions]
     scale_diag = tf.nn.softplus(out[..., self.dimensions:]) + 1e-5  # keep > 0
@@ -373,7 +373,7 @@ class Decoder(tf.keras.Model):
     # We explicitly broadcast f to the same shape as z other than the final
     # dimension, because `tf.concat` can't automatically do this.
     dynamic, static = inputs
-    timesteps = tf.shape(dynamic)[-2]
+    timesteps = tf.shape(input=dynamic)[-2]
     static = static[..., tf.newaxis, :] + tf.zeros([timesteps, 1])
     latents = tf.concat([dynamic, static], axis=-1)  # (sample, N, T, latents)
     out = self.dense(latents)
@@ -383,7 +383,7 @@ class Decoder(tf.keras.Model):
     out = self.conv_transpose3(out)
     out = self.conv_transpose4(out)  # (sample*N*T, h, w, c)
     expanded_shape = tf.concat(
-        (tf.shape(latents)[:-1], tf.shape(out)[1:]), axis=0)
+        (tf.shape(input=latents)[:-1], tf.shape(input=out)[1:]), axis=0)
     out = tf.reshape(out, expanded_shape)  # (sample, N, T, h, w, c)
     return tfd.Independent(
         distribution=tfd.Normal(loc=out, scale=1.),
@@ -430,14 +430,14 @@ class Compressor(tf.keras.Model):
       A batch of intermediate representations of shape [sample_shape,
       batch_size, timesteps, hidden_size].
     """
-    image_shape = tf.shape(inputs)[-3:]
+    image_shape = tf.shape(input=inputs)[-3:]
     collapsed_shape = tf.concat(([-1], image_shape), axis=0)
     out = tf.reshape(inputs, collapsed_shape)  # (sample*batch*T, h, w, c)
     out = self.conv1(out)
     out = self.conv2(out)
     out = self.conv3(out)
     out = self.conv4(out)
-    expanded_shape = tf.concat((tf.shape(inputs)[:-3], [-1]), axis=0)
+    expanded_shape = tf.concat((tf.shape(input=inputs)[:-3], [-1]), axis=0)
     return tf.reshape(out, expanded_shape)  # (sample, batch, T, hidden)
 
 
@@ -504,10 +504,10 @@ class EncoderStatic(tf.keras.Model):
     """
     # TODO(dusenberrymw): Remove these reshaping commands after b/113126249 is
     # fixed.
-    collapsed_shape = tf.concat(([-1], tf.shape(inputs)[-2:]), axis=0)
+    collapsed_shape = tf.concat(([-1], tf.shape(input=inputs)[-2:]), axis=0)
     out = tf.reshape(inputs, collapsed_shape)  # (sample*batch_size, T, hidden)
     out = self.bilstm(out)  # (sample*batch_size, hidden)
-    expanded_shape = tf.concat((tf.shape(inputs)[:-2], [-1]), axis=0)
+    expanded_shape = tf.concat((tf.shape(input=inputs)[:-2], [-1]), axis=0)
     out = tf.reshape(out, expanded_shape)  # (sample, batch_size, hidden)
     out = self.output_layer(out)  # (sample, batch_size, 2*latent_size)
     loc = out[..., :self.latent_size]
@@ -638,10 +638,10 @@ class EncoderDynamicFull(tf.keras.Model):
     # batch, timesteps, latent)`, and then broadcasting the sample shapes of
     # both tensors to the same shape.
     features, static_sample = inputs
-    length = tf.shape(features)[-2]
+    length = tf.shape(input=features)[-2]
     static_sample = static_sample[..., tf.newaxis, :] + tf.zeros([length, 1])
-    sample_shape_static = tf.shape(static_sample)[:-3]
-    sample_shape_inputs = tf.shape(features)[:-3]
+    sample_shape_static = tf.shape(input=static_sample)[:-3]
+    sample_shape_inputs = tf.shape(input=features)[:-3]
     broadcast_shape_inputs = tf.concat((sample_shape_static, [1, 1, 1]), 0)
     broadcast_shape_static = tf.concat((sample_shape_inputs, [1, 1, 1]), 0)
     features = features + tf.zeros(broadcast_shape_inputs)
@@ -650,12 +650,12 @@ class EncoderDynamicFull(tf.keras.Model):
     combined = tf.concat((features, static_sample), axis=-1)
     # TODO(dusenberrymw): Remove these reshaping commands after b/113126249 is
     # fixed.
-    collapsed_shape = tf.concat(([-1], tf.shape(combined)[-2:]), axis=0)
+    collapsed_shape = tf.concat(([-1], tf.shape(input=combined)[-2:]), axis=0)
     out = tf.reshape(combined, collapsed_shape)
     out = self.bilstm(out)  # (sample*batch, T, hidden_size)
     out = self.rnn(out)  # (sample*batch, T, hidden_size)
     expanded_shape = tf.concat(
-        (tf.shape(combined)[:-2], tf.shape(out)[1:]), axis=0)
+        (tf.shape(input=combined)[:-2], tf.shape(input=out)[1:]), axis=0)
     out = tf.reshape(out, expanded_shape)  # (sample, batch, T, hidden_size)
     out = self.output_layer(out)  # (sample, batch, T, 2*latent_size)
     loc = out[..., :self.latent_size]
@@ -816,7 +816,7 @@ class DisentangledSequentialVAE(tf.keras.Model):
       sample shape [sample_shape, samples, batch_size, timesteps,
       height, width, channels].
     """
-    batch_size = tf.shape(inputs)[-5]
+    batch_size = tf.shape(input=inputs)[-5]
     length = len(tf.unstack(inputs, axis=-4))  # hack for graph mode
 
     features = self.compressor(inputs)  # (..., batch, timesteps, hidden)
@@ -975,7 +975,11 @@ def image_summary(seqs, name, num=None):
   seqs = tf.unstack(seqs[:num])
   joined_seqs = [tf.concat(tf.unstack(seq), 1) for seq in seqs]
   joined_seqs = tf.expand_dims(tf.concat(joined_seqs, 0), 0)
-  tf.contrib.summary.image(name, joined_seqs, max_images=1)
+  tf.compat.v2.summary.image(
+      name,
+      joined_seqs,
+      max_outputs=1,
+      step=tf.compat.v1.train.get_or_create_global_step())
 
 
 def visualize_reconstruction(inputs, reconstruct, num=3, name="reconstruction"):
@@ -1006,8 +1010,9 @@ def visualize_qualitative_analysis(inputs, model, samples=1, batch_size=3,
     batch_size: Number of sequences to generate.
     length: Number of timesteps to generate for each sequence.
   """
-  average = lambda dist: tf.reduce_mean(dist.mean(), axis=0)  # avg over samples
-  with tf.name_scope("val_reconstruction"):
+  average = lambda dist: tf.reduce_mean(
+      input_tensor=dist.mean(), axis=0)  # avg over samples
+  with tf.compat.v1.name_scope("val_reconstruction"):
     reconstruct = functools.partial(model.reconstruct, inputs=inputs,
                                     samples=samples)
     visualize_reconstruction(inputs, average(reconstruct()))
@@ -1020,7 +1025,7 @@ def visualize_qualitative_analysis(inputs, model, samples=1, batch_size=3,
     visualize_reconstruction(inputs, average(reconstruct(swap_dynamic=True)),
                              name="swap_dynamic")
 
-  with tf.name_scope("generation"):
+  with tf.compat.v1.name_scope("generation"):
     generate = functools.partial(model.generate, batch_size=batch_size,
                                  length=length, samples=samples)
     image_summary(average(generate(fix_static=True)), "fix_static")
@@ -1036,11 +1041,15 @@ def summarize_dist_params(dist, name, name_scope="dist_params"):
     name: The name of the distribution.
     name_scope: The name scope of this summary.
   """
-  with tf.name_scope(name_scope):
-    tf.contrib.summary.histogram(name="{}/{}".format(name, "mean"),
-                                 tensor=dist.mean())
-    tf.contrib.summary.histogram(name="{}/{}".format(name, "stddev"),
-                                 tensor=dist.stddev())
+  with tf.compat.v1.name_scope(name_scope):
+    tf.compat.v2.summary.histogram(
+        name="{}/{}".format(name, "mean"),
+        data=dist.mean(),
+        step=tf.compat.v1.train.get_or_create_global_step())
+    tf.compat.v2.summary.histogram(
+        name="{}/{}".format(name, "stddev"),
+        data=dist.stddev(),
+        step=tf.compat.v1.train.get_or_create_global_step())
 
 
 def summarize_mean_in_nats_and_bits(inputs, units, name,
@@ -1056,23 +1065,29 @@ def summarize_mean_in_nats_and_bits(inputs, units, name,
     nats_name_scope: The name scope of the nats summary.
     bits_name_scope: The name scope of the bits summary.
   """
-  mean = tf.reduce_mean(inputs)
-  with tf.name_scope(nats_name_scope):
-    tf.contrib.summary.scalar(name, mean)
-  with tf.name_scope(bits_name_scope):
-    tf.contrib.summary.scalar(name, mean / units / tf.log(2.))
+  mean = tf.reduce_mean(input_tensor=inputs)
+  with tf.compat.v1.name_scope(nats_name_scope):
+    tf.compat.v2.summary.scalar(
+        name,
+        mean,
+        step=tf.compat.v1.train.get_or_create_global_step())
+  with tf.compat.v1.name_scope(bits_name_scope):
+    tf.compat.v2.summary.scalar(
+        name,
+        mean / units / tf.math.log(2.),
+        step=tf.compat.v1.train.get_or_create_global_step())
 
 
 def main(argv):
   del argv  # unused
 
-  tf.enable_eager_execution()
-  tf.set_random_seed(FLAGS.seed)
+  tf.compat.v1.enable_eager_execution()
+  tf.compat.v1.set_random_seed(FLAGS.seed)
   timestamp = datetime.strftime(datetime.today(), "%y%m%d_%H%M%S")
   FLAGS.logdir = FLAGS.logdir.format(timestamp=timestamp)
   FLAGS.model_dir = FLAGS.model_dir.format(timestamp=timestamp)
-  if not tf.gfile.Exists(FLAGS.model_dir):
-    tf.gfile.MakeDirs(FLAGS.model_dir)
+  if not tf.io.gfile.exists(FLAGS.model_dir):
+    tf.io.gfile.makedirs(FLAGS.model_dir)
 
   sprites_data = sprites_dataset.SpritesDataset(fake_data=FLAGS.fake_data)
 
@@ -1082,9 +1097,10 @@ def main(argv):
       hidden_size=FLAGS.hidden_size, channels=sprites_data.channels,
       latent_posterior=FLAGS.latent_posterior)
 
-  global_step = tf.train.get_or_create_global_step()
-  optimizer = tf.train.AdamOptimizer(
-      tf.train.cosine_decay(FLAGS.learning_rate, global_step, FLAGS.max_steps))
+  global_step = tf.compat.v1.train.get_or_create_global_step()
+  optimizer = tf.compat.v1.train.AdamOptimizer(
+      tf.compat.v1.train.cosine_decay(FLAGS.learning_rate, global_step,
+                                      FLAGS.max_steps))
 
   checkpoint = tf.train.Checkpoint(model=model, global_step=global_step,
                                    optimizer=optimizer)
@@ -1092,16 +1108,20 @@ def main(argv):
       checkpoint, directory=FLAGS.model_dir, max_to_keep=5)
   checkpoint.restore(checkpoint_manager.latest_checkpoint)
 
-  writer = tf.contrib.summary.create_file_writer(FLAGS.logdir)
+  writer = tf.compat.v2.summary.create_file_writer(FLAGS.logdir)
   writer.set_as_default()
 
   dataset = sprites_data.train.map(lambda *x: x[0]).shuffle(1000).repeat()
   dataset = dataset.batch(FLAGS.batch_size).take(FLAGS.max_steps)
-  for inputs in dataset.prefetch(buffer_size=None):
-    with tf.contrib.summary.record_summaries_every_n_global_steps(
-        FLAGS.log_steps, global_step=global_step):
-      if FLAGS.enable_debug_logging:
-        tf.contrib.summary.histogram("image", inputs)
+
+  if FLAGS.enable_debug_logging:
+    for inputs in dataset.prefetch(buffer_size=None):
+      with tf.compat.v2.summary.record_if(
+          lambda: tf.math.equal(0, global_step % FLAGS.log_steps)):
+        tf.compat.v2.summary.histogram(
+            "image",
+            data=inputs,
+            step=tf.compat.v1.train.get_or_create_global_step())
 
       with tf.GradientTape() as tape:
         features = model.compressor(inputs)  # (batch, timesteps, hidden)
@@ -1112,7 +1132,8 @@ def main(argv):
         likelihood = model.decoder((dynamic_sample, static_sample))
 
         reconstruction = tf.reduce_mean(  # integrate samples
-            likelihood.mean()[:FLAGS.num_reconstruction_samples], axis=0)
+            input_tensor=likelihood.mean()[:FLAGS.num_reconstruction_samples],
+            axis=0)
         visualize_reconstruction(inputs, reconstruction,
                                  name="train_reconstruction")
 
@@ -1130,14 +1151,16 @@ def main(argv):
         static_prior_log_prob = static_prior.log_prob(static_sample)
         static_posterior_log_prob = static_posterior.log_prob(static_sample)
         dynamic_prior_log_prob = tf.reduce_sum(
-            dynamic_prior.log_prob(dynamic_sample), axis=-1)  # sum time
+            input_tensor=dynamic_prior.log_prob(dynamic_sample),
+            axis=-1)  # sum time
         dynamic_posterior_log_prob = tf.reduce_sum(
-            dynamic_posterior.log_prob(dynamic_sample), axis=-1)  # sum time
+            input_tensor=dynamic_posterior.log_prob(dynamic_sample),
+            axis=-1)  # sum time
         likelihood_log_prob = tf.reduce_sum(
-            likelihood.log_prob(inputs), axis=-1)  # sum time
+            input_tensor=likelihood.log_prob(inputs), axis=-1)  # sum time
 
         if FLAGS.enable_debug_logging:
-          with tf.name_scope("log_probs"):
+          with tf.compat.v1.name_scope("log_probs"):
             summarize_mean_in_nats_and_bits(
                 static_prior_log_prob, FLAGS.latent_size_static, "static_prior")
             summarize_mean_in_nats_and_bits(
@@ -1153,27 +1176,40 @@ def main(argv):
                 likelihood_log_prob, sprites_data.frame_size ** 2 *
                 sprites_data.channels * sprites_data.length, "likelihood")
 
-        elbo = tf.reduce_mean(static_prior_log_prob -
+        elbo = tf.reduce_mean(input_tensor=static_prior_log_prob -
                               static_posterior_log_prob +
                               dynamic_prior_log_prob -
-                              dynamic_posterior_log_prob +
-                              likelihood_log_prob)
+                              dynamic_posterior_log_prob + likelihood_log_prob)
         loss = -elbo
-        tf.contrib.summary.scalar("elbo", elbo)
+        tf.compat.v2.summary.scalar(
+            "elbo",
+            elbo,
+            step=tf.compat.v1.train.get_or_create_global_step())
 
       grads = tape.gradient(loss, model.variables)
       grads, global_norm = tf.clip_by_global_norm(grads, FLAGS.clip_norm)
       grads_and_vars = list(zip(grads, model.variables))  # allow reuse in py3
       if FLAGS.enable_debug_logging:
-        with tf.name_scope("grads"):
-          tf.contrib.summary.scalar("global_norm_grads", global_norm)
-          tf.contrib.summary.scalar("global_norm_grads_clipped",
-                                    tf.global_norm(grads))
+        with tf.compat.v1.name_scope("grads"):
+          tf.compat.v2.summary.scalar(
+              "global_norm_grads",
+              global_norm,
+              step=tf.compat.v1.train.get_or_create_global_step())
+          tf.compat.v2.summary.scalar(
+              "global_norm_grads_clipped",
+              tf.linalg.global_norm(grads),
+              step=tf.compat.v1.train.get_or_create_global_step())
         for grad, var in grads_and_vars:
-          with tf.name_scope("grads"):
-            tf.contrib.summary.histogram("{}/grad".format(var.name), grad)
-          with tf.name_scope("vars"):
-            tf.contrib.summary.histogram(var.name, var)
+          with tf.compat.v1.name_scope("grads"):
+            tf.compat.v2.summary.histogram(
+                "{}/grad".format(var.name),
+                data=grad,
+                step=tf.compat.v1.train.get_or_create_global_step())
+          with tf.compat.v1.name_scope("vars"):
+            tf.compat.v2.summary.histogram(
+                var.name,
+                data=var,
+                step=tf.compat.v1.train.get_or_create_global_step())
       optimizer.apply_gradients(grads_and_vars, global_step)
 
     is_log_step = global_step.numpy() % FLAGS.log_steps == 0
@@ -1182,7 +1218,7 @@ def main(argv):
       checkpoint_manager.save()
       print("ELBO ({}/{}): {}".format(global_step.numpy(), FLAGS.max_steps,
                                       elbo.numpy()))
-      with tf.contrib.summary.always_record_summaries():
+      with tf.compat.v2.summary.record_if(True):
         val_data = sprites_data.test.take(20)
         inputs = next(iter(val_data.shuffle(20).batch(3)))[0]
         visualize_qualitative_analysis(inputs, model,

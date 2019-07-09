@@ -26,9 +26,9 @@ import tensorflow as tf
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
-from tensorflow_probability.python.mcmc import slice_sampler_utils as ssu
 
-from tensorflow_probability.python.mcmc import util as mcmc_util
+from tensorflow_probability.python.mcmc.internal import slice_sampler_utils as ssu
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [
@@ -280,12 +280,13 @@ class SliceSampler(kernel_base.TransitionKernel):
         `current_state`.
       TypeError: if `not target_log_prob.dtype.is_floating`.
     """
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'slice', 'one_step'),
-        values=[self.step_size, self.max_doublings, self._seed_stream,
-                current_state,
-                previous_kernel_results.target_log_prob]):
-      with tf.name_scope('initialize'):
+        values=[
+            self.step_size, self.max_doublings, self._seed_stream,
+            current_state, previous_kernel_results.target_log_prob
+        ]):
+      with tf.compat.v1.name_scope('initialize'):
         [
             current_state_parts,
             step_sizes,
@@ -298,9 +299,7 @@ class SliceSampler(kernel_base.TransitionKernel):
             maybe_expand=True)
 
         max_doublings = tf.convert_to_tensor(
-            self.max_doublings,
-            dtype=tf.int32,
-            name='max_doublings')
+            value=self.max_doublings, dtype=tf.int32, name='max_doublings')
 
       independent_chain_ndims = distribution_util.prefer_static_rank(
           current_target_log_prob)
@@ -337,40 +336,40 @@ class SliceSampler(kernel_base.TransitionKernel):
       ]
 
   def bootstrap_results(self, init_state):
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name=mcmc_util.make_name(self.name, 'slice', 'bootstrap_results'),
         values=[init_state]):
       if not mcmc_util.is_list_like(init_state):
         init_state = [init_state]
-      init_state = [tf.convert_to_tensor(x) for x in init_state]
+      init_state = [tf.convert_to_tensor(value=x) for x in init_state]
       direction = [tf.zeros_like(x) for x in init_state]
       init_target_log_prob = self.target_log_prob_fn(*init_state)  # pylint:disable=not-callable
       return SliceSamplerKernelResults(
           target_log_prob=init_target_log_prob,
-          bounds_satisfied=tf.zeros(shape=tf.shape(init_target_log_prob),
-                                    dtype=tf.bool),
+          bounds_satisfied=tf.zeros(
+              shape=tf.shape(input=init_target_log_prob), dtype=tf.bool),
           direction=direction,
           upper_bounds=tf.zeros_like(init_target_log_prob),
-          lower_bounds=tf.zeros_like(init_target_log_prob)
-      )
+          lower_bounds=tf.zeros_like(init_target_log_prob))
 
 
 def _choose_random_direction(current_state_parts, batch_rank, seed=None):
   """Chooses a random direction in the event space."""
   seed_gen = distributions.SeedStream(seed, salt='_choose_random_direction')
   # Chooses the random directions across each of the input components.
-  rnd_direction_parts = [tf.random_normal(tf.shape(current_state_part),
-                                          dtype=tf.float32, seed=seed_gen())
-                         for current_state_part in current_state_parts]
+  rnd_direction_parts = [
+      tf.random.normal(
+          tf.shape(input=current_state_part), dtype=tf.float32, seed=seed_gen())
+      for current_state_part in current_state_parts
+  ]
 
   # Sum squares over all of the input components. Note this takes all
   # components into account.
   sum_squares = sum(
-      tf.reduce_sum(rnd_direction**2.,
-                    axis=tf.range(batch_rank, tf.rank(rnd_direction)),
-                    keepdims=True)
-      for rnd_direction
-      in rnd_direction_parts)
+      tf.reduce_sum(
+          input_tensor=rnd_direction**2.,
+          axis=tf.range(batch_rank, tf.rank(rnd_direction)),
+          keepdims=True) for rnd_direction in rnd_direction_parts)
 
   # Normalizes the random direction fragments.
   rnd_direction_parts = [rnd_direction / tf.sqrt(sum_squares)
@@ -431,10 +430,10 @@ def _sample_next(target_log_prob_fn,
     lower_bounds: `Tensor` of batch shape and the dtype of the input state. The
       lower bounds of the slices along the sampling direction.
   """
-  with tf.name_scope(
-      name, 'sample_next',
-      [current_state_parts, step_sizes, max_doublings, current_target_log_prob,
-       batch_rank]):
+  with tf.compat.v1.name_scope(name, 'sample_next', [
+      current_state_parts, step_sizes, max_doublings, current_target_log_prob,
+      batch_rank
+  ]):
     # First step: Choose a random direction.
     # Direction is a list of tensors. The i'th tensor should have the same shape
     # as the i'th state part.
@@ -466,11 +465,12 @@ def _sample_next(target_log_prob_fn,
     reduce_axes = [tf.range(batch_rank, tf.rank(dirn_part))
                    for dirn_part in direction]
 
-    components = [tf.reduce_sum((dirn_part / step_size) ** 2,
-                                axis=reduce_axes[i])
-                  for i, (step_size, dirn_part)
-                  in enumerate(zip(step_sizes, direction))]
-    step_size = tf.rsqrt(tf.add_n(components))
+    components = [
+        tf.reduce_sum(
+            input_tensor=(dirn_part / step_size)**2, axis=reduce_axes[i])
+        for i, (step_size, dirn_part) in enumerate(zip(step_sizes, direction))
+    ]
+    step_size = tf.math.rsqrt(tf.add_n(components))
     # Computes the rank of a tensor. Uses the static rank if possible.
     def _get_rank(x):
       return (len(x.shape.as_list()) if x.shape.dims is not None
@@ -567,10 +567,8 @@ def _right_pad(x, final_rank):
     padded_x: A tensor of rank final_rank.
   """
   padded_shape = tf.concat(
-      [
-          tf.shape(x),
-          tf.ones(final_rank - tf.rank(x), dtype=tf.int32)
-      ],
+      [tf.shape(input=x),
+       tf.ones(final_rank - tf.rank(x), dtype=tf.int32)],
       axis=0)
   static_padded_shape = None
   if x.shape.is_fully_defined() and isinstance(final_rank, int):
@@ -587,8 +585,9 @@ def _prepare_args(target_log_prob_fn, state, step_size,
                   description='target_log_prob'):
   """Processes input args to meet list-like assumptions."""
   state_parts = list(state) if mcmc_util.is_list_like(state) else [state]
-  state_parts = [tf.convert_to_tensor(s, name='current_state')
-                 for s in state_parts]
+  state_parts = [
+      tf.convert_to_tensor(value=s, name='current_state') for s in state_parts
+  ]
 
   target_log_prob = _maybe_call_fn(
       target_log_prob_fn,
@@ -599,8 +598,9 @@ def _prepare_args(target_log_prob_fn, state, step_size,
                 else [step_size])
   step_sizes = [
       tf.convert_to_tensor(
-          s, name='step_size', dtype=target_log_prob.dtype)
-      for s in step_sizes]
+          value=s, name='step_size', dtype=target_log_prob.dtype)
+      for s in step_sizes
+  ]
   if len(step_sizes) == 1:
     step_sizes *= len(state_parts)
   if len(state_parts) != len(step_sizes):

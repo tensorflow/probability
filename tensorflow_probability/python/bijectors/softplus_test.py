@@ -20,16 +20,16 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 rng = np.random.RandomState(42)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SoftplusBijectorTest(tf.test.TestCase):
   """Tests the correctness of the Y = g(X) = Log[1 + exp(X)] transformation."""
 
@@ -50,7 +50,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
 
   def testBijectorForwardInverseEventDimsZero(self):
     bijector = tfb.Softplus()
-    self.assertEqual("softplus", bijector.name)
+    self.assertStartsWith(bijector.name, "softplus")
     x = 2 * rng.randn(2, 10)
     y = self._softplus(x)
 
@@ -78,7 +78,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
 
   def testBijectorForwardInverseEventDimsOne(self):
     bijector = tfb.Softplus()
-    self.assertEqual("softplus", bijector.name)
+    self.assertStartsWith(bijector.name, "softplus")
     x = 2 * rng.randn(2, 10)
     y = self._softplus(x)
 

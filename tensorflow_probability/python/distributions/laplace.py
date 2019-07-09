@@ -18,21 +18,22 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import math
-
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
-from tensorflow.python.framework import tensor_shape
+from tensorflow_probability.python.internal import tensor_util
+
 
 __all__ = [
-    "Laplace",
+    'Laplace',
 ]
 
 
@@ -51,7 +52,7 @@ class Laplace(distribution.Distribution):
   where `loc = mu`, `scale = sigma`, and `Z` is the normalization constant.
 
   Note that the Laplace distribution can be thought of two exponential
-  distributions spliced together "back-to-back."
+  distributions spliced together 'back-to-back.'
 
   The Laplace distribution is a member of the [location-scale family](
   https://en.wikipedia.org/wiki/Location-scale_family), i.e., it can be
@@ -69,7 +70,7 @@ class Laplace(distribution.Distribution):
                scale,
                validate_args=False,
                allow_nan_stats=True,
-               name="Laplace"):
+               name='Laplace'):
     """Construct Laplace distribution with parameters `loc` and `scale`.
 
     The parameters `loc` and `scale` must be shaped in a way that supports
@@ -85,7 +86,7 @@ class Laplace(distribution.Distribution):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`,
-        statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+        statistics (e.g., mean, mode, variance) use the value '`NaN`' to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -94,29 +95,30 @@ class Laplace(distribution.Distribution):
       TypeError: if `loc` and `scale` are of different dtype.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, scale]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies([tf.assert_positive(scale)] if
-                                   validate_args else []):
-        self._loc = tf.identity(loc)
-        self._scale = tf.identity(scale)
-        tf.assert_same_float_dtype([self._loc, self._scale])
+      self._loc = tensor_util.convert_immutable_to_tensor(
+          loc, name='loc', dtype=dtype)
+      self._scale = tensor_util.convert_immutable_to_tensor(
+          scale, name='scale', dtype=dtype)
+      dtype_util.assert_same_float_dtype([self._loc, self._scale])
       super(Laplace, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          graph_parents=[self._loc, self._scale],
           name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("loc", "scale"), ([tf.convert_to_tensor(
-            sample_shape, dtype=tf.int32)] * 2)))
+        zip(('loc', 'scale'),
+            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=0, scale=0)
 
   @property
   def loc(self):
@@ -128,9 +130,10 @@ class Laplace(distribution.Distribution):
     """Distribution parameter for scale."""
     return self._scale
 
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc), tf.shape(self.scale))
+  def _batch_shape_tensor(self, loc=None, scale=None):
+    return prefer_static.broadcast_shape(
+        prefer_static.shape(self.loc if loc is None else loc),
+        prefer_static.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -140,31 +143,33 @@ class Laplace(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    shape = tf.concat([[n], self.batch_shape_tensor()], 0)
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    shape = tf.concat([[n], self._batch_shape_tensor(loc=loc, scale=scale)], 0)
     # Uniform variates must be sampled from the open-interval `(-1, 1)` rather
     # than `[-1, 1)`. In the case of `(0, 1)` we'd use
-    # `np.finfo(self.dtype.as_numpy_dtype).tiny` because it is the smallest,
-    # positive, "normal" number. However, the concept of subnormality exists
-    # only at zero; here we need the smallest usable number larger than -1,
-    # i.e., `-1 + eps/2`.
-    uniform_samples = tf.random_uniform(
+    # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny` because it is the
+    # smallest, positive, 'normal' number. However, the concept of subnormality
+    # exists only at zero; here we need the smallest usable number larger than
+    # -1, i.e., `-1 + eps/2`.
+    dt = dtype_util.as_numpy_dtype(self.dtype)
+    uniform_samples = tf.random.uniform(
         shape=shape,
-        minval=np.nextafter(self.dtype.as_numpy_dtype(-1.),
-                            self.dtype.as_numpy_dtype(0.)),
+        minval=np.nextafter(dt(-1.), dt(1.)),
         maxval=1.,
         dtype=self.dtype,
         seed=seed)
-    return (self.loc - self.scale * tf.sign(uniform_samples) *
-            tf.log1p(-tf.abs(uniform_samples)))
+    return (loc - scale * tf.sign(uniform_samples) *
+            tf.math.log1p(-tf.abs(uniform_samples)))
 
   def _log_prob(self, x):
-    return self._log_unnormalized_prob(x) - self._log_normalization()
-
-  def _prob(self, x):
-    return tf.exp(self._log_prob(x))
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    z = (x - loc) / scale
+    return -tf.abs(z) - np.log(2.) - tf.math.log(scale)
 
   def _log_cdf(self, x):
     return special_math.log_cdf_laplace(self._z(x))
@@ -174,25 +179,21 @@ class Laplace(distribution.Distribution):
 
   def _cdf(self, x):
     z = self._z(x)
-    return (0.5 + 0.5 * tf.sign(z) *
-            (1. - tf.exp(-tf.abs(z))))
-
-  def _log_unnormalized_prob(self, x):
-    return -tf.abs(self._z(x))
-
-  def _log_normalization(self):
-    return math.log(2.) + tf.log(self.scale)
+    return 0.5 - 0.5 * tf.sign(z) * tf.math.expm1(-tf.abs(z))
 
   def _entropy(self):
-    # Use broadcasting rules to calculate the full broadcast scale.
-    scale = self.scale + tf.zeros_like(self.loc)
-    return math.log(2.) + 1. + tf.log(scale)
+    scale = tf.convert_to_tensor(self.scale)
+    return tf.broadcast_to(np.log(2.) + 1 + tf.math.log(scale),
+                           self._batch_shape_tensor(scale=scale))
 
   def _mean(self):
-    return self.loc + tf.zeros_like(self.scale)
+    loc = tf.convert_to_tensor(self.loc)
+    return tf.broadcast_to(loc, self._batch_shape_tensor(loc=loc))
 
   def _stddev(self):
-    return math.sqrt(2.) * self.scale + tf.zeros_like(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    return tf.broadcast_to(np.sqrt(2.) * scale,
+                           self._batch_shape_tensor(scale=scale))
 
   def _median(self):
     return self._mean()
@@ -203,9 +204,16 @@ class Laplace(distribution.Distribution):
   def _z(self, x):
     return (x - self.loc) / self.scale
 
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_mutable(self._scale):
+      assertions.append(assert_util.assert_positive(
+          self._scale, message='Argument `scale` must be positive.'))
+    return assertions
 
-@kullback_leibler.RegisterKL(Laplace, tf.distributions.Laplace)
-@kullback_leibler.RegisterKL(tf.distributions.Laplace, Laplace)
+
 @kullback_leibler.RegisterKL(Laplace, Laplace)
 def _kl_laplace_laplace(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a and b Laplace.
@@ -213,18 +221,19 @@ def _kl_laplace_laplace(a, b, name=None):
   Args:
     a: instance of a Laplace distribution object.
     b: instance of a Laplace distribution object.
-    name: (optional) Name to use for created operations.
-      default is "kl_laplace_laplace".
+    name: Python `str` name to use for created operations.
+      Default value: `None` (i.e., `'kl_laplace_laplace'`).
 
   Returns:
-    Batchwise KL(a || b)
+    kl_div: Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_laplace_laplace",
-                     [a.loc, b.loc, a.scale, b.scale]):
+  with tf.name_scope(name or 'kl_laplace_laplace'):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 38
     distance = tf.abs(a.loc - b.loc)
-    ratio = a.scale / b.scale
-
-    return (-tf.log(ratio) - 1 + distance / b.scale +
-            ratio * tf.exp(-distance / a.scale))
+    a_scale = tf.convert_to_tensor(a.scale)
+    b_scale = tf.convert_to_tensor(b.scale)
+    delta_log_scale = tf.math.log(a_scale) - tf.math.log(b_scale)
+    return (-delta_log_scale +
+            distance / b_scale - 1. +
+            tf.exp(-distance / a_scale + delta_log_scale))

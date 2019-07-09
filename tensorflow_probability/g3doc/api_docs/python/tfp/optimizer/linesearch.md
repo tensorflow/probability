@@ -7,6 +7,13 @@
 
 Line-search optimizers package.
 
+
+
+Defined in [`python/optimizer/linesearch/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/linesearch/__init__.py).
+
+<!-- Placeholder for "Used in" -->
+
+
 ## Functions
 
 [`hager_zhang(...)`](../../tfp/optimizer/linesearch/hager_zhang.md): The Hager Zhang line search algorithm.

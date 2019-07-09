@@ -21,19 +21,19 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import special
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SigmoidBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = (1 + exp(-X))^-1 transformation."""
 
   def testBijector(self):
-    self.assertEqual("sigmoid", tfb.Sigmoid().name)
+    self.assertStartsWith(tfb.Sigmoid().name, "sigmoid")
     x = np.linspace(-10., 10., 100).reshape([2, 5, 10]).astype(np.float32)
     y = special.expit(x)
     ildj = -np.log(y) - np.log1p(-y)
@@ -56,7 +56,7 @@ class SigmoidBijectorTest(tf.test.TestCase):
         tfb.Sigmoid(), lower_x=-7., upper_x=7., eval_func=self.evaluate)
 
   def testBijectiveAndFinite(self):
-    x = np.linspace(-7., 7., 100).astype(np.float32)
+    x = np.linspace(-100., 100., 100).astype(np.float32)
     eps = 1e-3
     y = np.linspace(eps, 1. - eps, 100).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(

@@ -19,9 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import multivariate_student_t
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
@@ -30,8 +31,8 @@ __all__ = [
 
 
 def _add_diagonal_shift(matrix, shift):
-  return tf.matrix_set_diag(
-      matrix, tf.matrix_diag_part(matrix) + shift, name='add_diagonal_shift')
+  return tf.linalg.set_diag(
+      matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
 class StudentTProcess(
@@ -154,8 +155,8 @@ class StudentTProcess(
 
   # Define a kernel with trainable parameters.
   kernel = psd_kernels.ExponentiatedQuadratic(
-      amplitude=tf.nn.softplus(amplitude),
-      length_scale=tf.nn.softplus(length_scale))
+      amplitude=tf.math.softplus(amplitude),
+      length_scale=tf.math.softplus(length_scale))
 
   tp = tfp.StudentTProcess(df=3., kernel, observed_index_points)
   neg_log_likelihood = -tp.log_prob(observed_values)
@@ -229,8 +230,7 @@ class StudentTProcess(
       ValueError: if `mean_fn` is not `None` and is not callable.
     """
     parameters = dict(locals())
-    with tf.name_scope(
-        name, values=[df, index_points, jitter]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [df, index_points, jitter], tf.float32)
       df = tf.convert_to_tensor(df, dtype=dtype, name='df')
@@ -238,10 +238,10 @@ class StudentTProcess(
           index_points, dtype=dtype, name='index_points')
       jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
 
-      with tf.control_dependencies(
-          [tf.assert_greater(df, tf.cast(2., df.dtype),
-                             message='`df` must be greater than 2.')]
-          if validate_args else []):
+      with tf.control_dependencies([
+          assert_util.assert_greater(
+              df, tf.cast(2., df.dtype), message='`df` must be greater than 2.')
+      ] if validate_args else []):
         self._df = tf.identity(df)
 
       self._kernel = kernel
@@ -256,7 +256,7 @@ class StudentTProcess(
       self._mean_fn = mean_fn
       self._jitter = jitter
 
-      with tf.name_scope('init', values=[index_points, jitter]):
+      with tf.name_scope('init'):
         kernel_matrix = _add_diagonal_shift(
             kernel.matrix(self.index_points, self.index_points),
             jitter)

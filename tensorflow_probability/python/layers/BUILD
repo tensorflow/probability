@@ -34,8 +34,12 @@ py_library(
     deps = [
         ":conv_variational",
         ":dense_variational",
+        ":dense_variational_v2",
         ":distribution_layer",
+        ":initializers",
+        ":masked_autoregressive",
         ":util",
+        ":variable_input",
     ],
 )
 
@@ -49,8 +53,8 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:seed_stream",
+        "//tensorflow_probability/python/internal:docstring_util",
         "//tensorflow_probability/python/math",
-        "//tensorflow_probability/python/util:docstring",
     ],
 )
 
@@ -62,6 +66,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -75,8 +80,8 @@ py_library(
         ":util",
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:seed_stream",
+        "//tensorflow_probability/python/internal:docstring_util",
         "//tensorflow_probability/python/math",
-        "//tensorflow_probability/python/util:docstring",
     ],
 )
 
@@ -84,6 +89,31 @@ py_test(
     name = "dense_variational_test",
     size = "small",
     srcs = ["dense_variational_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_library(
+    name = "dense_variational_v2",
+    srcs = [
+        "dense_variational_v2.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:kullback_leibler",
+        "//tensorflow_probability/python/distributions:seed_stream",
+    ],
+)
+
+py_test(
+    name = "dense_variational_v2_test",
+    size = "small",
+    srcs = ["dense_variational_v2_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -96,6 +126,7 @@ py_library(
     srcs = ["distribution_layer.py"],
     srcs_version = "PY2AND3",
     deps = [
+        # cloudpickle dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/distributions",
@@ -105,8 +136,50 @@ py_library(
 
 py_test(
     name = "distribution_layer_test",
-    size = "medium",
+    size = "large",
     srcs = ["distribution_layer_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "initializers",
+    srcs = [
+        "initializers.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "initializers_test",
+    srcs = ["initializers_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "masked_autoregressive",
+    srcs = ["masked_autoregressive.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+py_test(
+    name = "masked_autoregressive_test",
+    size = "medium",
+    srcs = ["masked_autoregressive_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -123,5 +196,25 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "variable_input",
+    srcs = [
+        "variable_input.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "variable_input_test",
+    srcs = ["variable_input_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )

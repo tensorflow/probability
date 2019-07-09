@@ -5,6 +5,8 @@
 
 # tfp.bijectors.masked_autoregressive_default_template
 
+Build the Masked Autoregressive Density Estimator (Germain et al., 2015).
+
 ``` python
 tfp.bijectors.masked_autoregressive_default_template(
     hidden_layers,
@@ -19,7 +21,11 @@ tfp.bijectors.masked_autoregressive_default_template(
 )
 ```
 
-Build the Masked Autoregressive Density Estimator (Germain et al., 2015).
+
+
+Defined in [`python/bijectors/masked_autoregressive.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/masked_autoregressive.py).
+
+<!-- Placeholder for "Used in" -->
 
 This will be wrapped in a make_template to ensure the variables are only
 created once. It takes the input and returns the `loc` ("mu" in [Germain et
@@ -51,36 +57,39 @@ information (for fitting) yet solves the numerical stability problem. I.e.,
 
 #### Args:
 
+
 * <b>`hidden_layers`</b>: Python `list`-like of non-negative integer, scalars
-    indicating the number of units in each hidden layer. Default: `[512, 512].
+  indicating the number of units in each hidden layer. Default: `[512, 512].
 * <b>`shift_only`</b>: Python `bool` indicating if only the `shift` term shall be
-    computed. Default: `False`.
+  computed. Default: `False`.
 * <b>`activation`</b>: Activation function (callable). Explicitly setting to `None`
-    implies a linear activation.
+  implies a linear activation.
 * <b>`log_scale_min_clip`</b>: `float`-like scalar `Tensor`, or a `Tensor` with the
-    same shape as `log_scale`. The minimum value to clip by. Default: -5.
+  same shape as `log_scale`. The minimum value to clip by. Default: -5.
 * <b>`log_scale_max_clip`</b>: `float`-like scalar `Tensor`, or a `Tensor` with the
-    same shape as `log_scale`. The maximum value to clip by. Default: 3.
+  same shape as `log_scale`. The maximum value to clip by. Default: 3.
 * <b>`log_scale_clip_gradient`</b>: Python `bool` indicating that the gradient of
-    `tf.clip_by_value` should be preserved. Default: `False`.
+  `tf.clip_by_value` should be preserved. Default: `False`.
 * <b>`name`</b>: A name for ops managed by this function. Default:
-    "masked_autoregressive_default_template".
+  "masked_autoregressive_default_template".
 * <b>`*args`</b>: `tf.layers.dense` arguments.
 * <b>`**kwargs`</b>: `tf.layers.dense` keyword arguments.
 
 
 #### Returns:
 
+
 * <b>`shift`</b>: `Float`-like `Tensor` of shift terms (the "mu" in
-    [Germain et al.  (2015)][1]).
+  [Germain et al.  (2015)][1]).
 * <b>`log_scale`</b>: `Float`-like `Tensor` of log(scale) terms (the "alpha" in
-    [Germain et al. (2015)][1]).
+  [Germain et al. (2015)][1]).
 
 
 #### Raises:
 
+
 * <b>`NotImplementedError`</b>: if rightmost dimension of `inputs` is unknown prior to
-    graph execution.
+  graph execution.
 
 #### References
 

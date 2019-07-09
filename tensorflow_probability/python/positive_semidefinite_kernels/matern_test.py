@@ -23,7 +23,8 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
+from tensorflow_probability import positive_semidefinite_kernels as tfpk
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 class _MaternTestCase(parameterized.TestCase, tf.test.TestCase):
@@ -109,7 +110,7 @@ class _MaternTestCase(parameterized.TestCase, tf.test.TestCase):
     x = np.ones([4, 3], np.float32)
     y = np.ones([5, 3], np.float32)
 
-    self.assertAllEqual(k.matrix(x, y).shape, [4, 5])
+    self.assertAllEqual([4, 5], k.matrix(x, y).shape)
     self.assertAllEqual(
         k.matrix(tf.stack([x] * 2), tf.stack([y] * 2)).shape, [2, 4, 5])
 
@@ -117,15 +118,15 @@ class _MaternTestCase(parameterized.TestCase, tf.test.TestCase):
         amplitude=np.ones([2, 1, 1], np.float32),
         length_scale=np.ones([1, 3, 1], np.float32))
     self.assertAllEqual(
+        [2, 3, 2, 4, 5],
+        #`--'  |  `--'
+        #  |   |    `- matrix shape
+        #  |   `- from input batch shapes
+        #  `- from broadcasting kernel params
         k.matrix(
             tf.stack([x] * 2),  # shape [2, 4, 3]
             tf.stack([y] * 2)  # shape [2, 5, 3]
-        ).shape,
-        [2, 3, 2, 4, 5])
-    #    `--'  |  `--'
-    #      |   |    `- matrix shape
-    #      |   `- from input batch shapes
-    #      `- from broadcasting kernel params
+        ).shape)
 
   def testGradsAtIdenticalInputsAreZeroNotNaN(self):
     k = self._kernel_type()
@@ -142,27 +143,30 @@ class _MaternTestCase(parameterized.TestCase, tf.test.TestCase):
         self.evaluate(grads))
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MaternOneHalfTest(_MaternTestCase):
 
-  _kernel_type = psd_kernels.MaternOneHalf
+  _kernel_type = tfpk.MaternOneHalf
 
   def _numpy_kernel(self, amplitude, length_scale, x, y):
     norm = np.sqrt(np.sum((x - y)**2)) / length_scale
     return amplitude**2 * np.exp(-norm)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MaternThreeHalvesTest(_MaternTestCase):
 
-  _kernel_type = psd_kernels.MaternThreeHalves
+  _kernel_type = tfpk.MaternThreeHalves
 
   def _numpy_kernel(self, amplitude, length_scale, x, y):
     norm = np.sqrt(3. * np.sum((x - y)**2)) / length_scale
     return amplitude**2 * (1 + norm) * np.exp(-norm)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class MaternFiveHalvesTest(_MaternTestCase):
 
-  _kernel_type = psd_kernels.MaternFiveHalves
+  _kernel_type = tfpk.MaternFiveHalves
 
   def _numpy_kernel(self, amplitude, length_scale, x, y):
     norm = np.sqrt(5. * np.sum((x - y)**2)) / length_scale

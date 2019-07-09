@@ -19,6 +19,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     "assign_moving_mean_variance",
@@ -35,7 +36,7 @@ def assign_moving_mean_variance(
   `variance_var` are given by the following recurrence relations:
 
   ```python
-  variance_var = decay * (variance_var + (1-decay) * (value - mean_var)**2)
+  variance_var = decay * (variance_var + (1 - decay) * (value - mean_var)**2)
   mean_var     = decay * mean_var + (1 - decay) * value
   ```
 
@@ -43,6 +44,7 @@ def assign_moving_mean_variance(
   the lag-1 mean.
 
   For derivation justification, see [Finch (2009; Eq. 143)][1].
+  Parameterization: Finch's `alpha` is `1 - decay`.
 
   Args:
     mean_var: `float`-like `Variable` representing the exponentially weighted
@@ -72,10 +74,10 @@ def assign_moving_mean_variance(
        _Technical Report_, 2009.
        http://people.ds.cam.ac.uk/fanf2/hermes/doc/antiforgery/stats.pdf
   """
-  with tf.name_scope(name, "assign_moving_mean_variance",
-                     [variance_var, mean_var, value, decay]):
-    with tf.colocate_with(variance_var):
-      with tf.colocate_with(mean_var):
+  with tf.compat.v1.name_scope(name, "assign_moving_mean_variance",
+                               [variance_var, mean_var, value, decay]):
+    with tf.compat.v1.colocate_with(variance_var):
+      with tf.compat.v1.colocate_with(mean_var):
         base_dtype = mean_var.dtype.base_dtype
         if not base_dtype.is_floating:
           raise TypeError(
@@ -86,13 +88,24 @@ def assign_moving_mean_variance(
               "mean_var.base_dtype({}) != variance_var.base_dtype({})".format(
                   base_dtype.name,
                   variance_var.dtype.base_dtype.name))
-        value = tf.convert_to_tensor(value, dtype=base_dtype, name="value")
-        decay = tf.convert_to_tensor(decay, dtype=base_dtype, name="decay")
+        value = tf.convert_to_tensor(
+            value=value, dtype=base_dtype, name="value")
+        decay = tf.convert_to_tensor(
+            value=decay, dtype=base_dtype, name="decay")
         delta = value - mean_var
         with tf.control_dependencies([delta]):
-          mean_var = tf.assign_add(mean_var, (1. - decay) * delta)
-          variance_var = tf.assign_sub(
-              variance_var,
+          # We want mean_{t+1} = decay * mean_t + (1. - decay) * value
+          # We compute mean += decay * mean_t - mean_t + (1. - decay) * value =
+          #   = (1. - decay) * (value - mean_t)
+          mean_var = mean_var.assign_add((1. - decay) * delta)
+          # We want variance_{t+1} = decay * (variance_t +
+          #   + (1 - decay) * (value - mean_var)**2).
+          # We compute variance -= variance_t - decay * (variance_t +
+          #     + (1 - decay) * (value - mean_var)**2) =
+          #   = (1 - decay) * variance_t
+          #     - decay * (1 - decay) * (value - mean_var)**2
+          #   = (1 - decay) * (variance_t - decay * (value - mean_var)**2).
+          variance_var = variance_var.assign_sub(
               (1. - decay) * (variance_var - decay * tf.square(delta)))
         return mean_var, variance_var
 
@@ -140,32 +153,37 @@ def assign_log_moving_mean_exp(
     TypeError: if `log_mean_exp_var`, `log_value`, `decay` have different
       `base_dtype`.
   """
-  with tf.name_scope(name, "assign_log_moving_mean_exp",
-                     [log_mean_exp_var, log_value, decay]):
+  with tf.compat.v1.name_scope(name, "assign_log_moving_mean_exp",
+                               [log_mean_exp_var, log_value, decay]):
     # We want to update the variable in a numerically stable and lock-free way.
     # To do this, observe that variable `x` updated by `v` is:
     # x = log(w exp(x) + (1-w) exp(v))
     #   = log(exp(x + log(w)) + exp(v + log1p(-w)))
     #   = x + log(exp(x - x + log(w)) + exp(v - x + log1p(-w)))
     #   = x + lse([log(w), v - x + log1p(-w)])
-    with tf.colocate_with(log_mean_exp_var):
+    with tf.compat.v1.colocate_with(log_mean_exp_var):
       base_dtype = log_mean_exp_var.dtype.base_dtype
       if not base_dtype.is_floating:
         raise TypeError(
             "log_mean_exp_var.base_dtype({}) does not have float type "
             "`dtype`.".format(base_dtype.name))
       log_value = tf.convert_to_tensor(
-          log_value, dtype=base_dtype, name="log_value")
-      decay = tf.convert_to_tensor(decay, dtype=base_dtype, name="decay")
+          value=log_value, dtype=base_dtype, name="log_value")
+      decay = tf.convert_to_tensor(value=decay, dtype=base_dtype, name="decay")
       delta = (log_value - log_mean_exp_var)[tf.newaxis, ...]
-      x = tf.concat(
-          [tf.log(decay) * tf.ones_like(delta), delta + tf.log1p(-decay)],
-          axis=0)
-      x = tf.reduce_logsumexp(x, axis=0)
+      x = tf.concat([
+          tf.math.log(decay) * tf.ones_like(delta),
+          delta + tf.math.log1p(-decay)
+      ],
+                    axis=0)
+      x = tf.reduce_logsumexp(input_tensor=x, axis=0)
       return log_mean_exp_var.assign_add(x)
 
 
-def moving_mean_variance(value, decay, collections=None, name=None):
+@deprecation.deprecated(
+    "2019-03-22", "The `moving_mean_variance` function is deprecated. "
+    "Use `assign_moving_mean_variance` and construct the Variables explicitly.")
+def moving_mean_variance(value, decay, name=None):
   """Compute exponentially weighted moving {mean,variance} of a streaming value.
 
   The exponentially-weighting moving `mean_var` and `variance_var` are updated
@@ -188,9 +206,6 @@ def moving_mean_variance(value, decay, collections=None, name=None):
     value: `float`-like `Tensor`. Same shape as `mean_var` and `variance_var`.
     decay: A `float`-like `Tensor`. The moving mean decay. Typically close to
       `1.`, e.g., `0.999`.
-    collections: Python list of graph-collections keys to which the internal
-      variables `mean_var` and `variance_var` are added.
-      Default value is `[GraphKeys.GLOBAL_VARIABLES]`.
     name: Optional name of the returned operation.
 
   Returns:
@@ -209,29 +224,22 @@ def moving_mean_variance(value, decay, collections=None, name=None):
        _Technical Report_, 2009.
        http://people.ds.cam.ac.uk/fanf2/hermes/doc/antiforgery/stats.pdf
   """
-  if collections is None:
-    collections = [tf.GraphKeys.GLOBAL_VARIABLES]
-  with tf.variable_scope(name, "moving_mean_variance", [value, decay]):
-    value = tf.convert_to_tensor(value, name="value")
+  with tf.compat.v1.variable_scope(name, "moving_mean_variance",
+                                   [value, decay]):
+    value = tf.convert_to_tensor(value=value, name="value")
     base_dtype = value.dtype.base_dtype
     if not base_dtype.is_floating:
       raise TypeError(
           "value.base_dtype({}) does not have float type `dtype`.".format(
               base_dtype.name))
-    decay = tf.convert_to_tensor(decay, dtype=base_dtype, name="decay")
-    variance_var = tf.get_variable(
-        "moving_variance",
-        shape=value.shape,
-        dtype=value.dtype,
-        initializer=tf.zeros_initializer(),
-        trainable=False,
-        collections=collections)
-    mean_var = tf.get_variable(
-        "moving_mean",
-        shape=value.shape,
-        dtype=value.dtype,
-        initializer=tf.zeros_initializer(),
-        trainable=False,
-        collections=collections)
+    decay = tf.convert_to_tensor(value=decay, dtype=base_dtype, name="decay")
+    variance_var = tf.compat.v2.Variable(
+        name="moving_variance",
+        initial_value=tf.zeros(shape=value.shape, dtype=value.dtype),
+        trainable=False)
+    mean_var = tf.compat.v2.Variable(
+        name="moving_mean",
+        initial_value=tf.zeros(shape=value.shape, dtype=value.dtype),
+        trainable=False)
     return assign_moving_mean_variance(
         mean_var, variance_var, value, decay)

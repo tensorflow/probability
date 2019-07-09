@@ -18,10 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -59,15 +61,14 @@ class SoftmaxCentered(bijector.Bijector):
   def __init__(self,
                validate_args=False,
                name="softmax_centered"):
-    self._graph_parents = []
-    self._name = name
-    super(SoftmaxCentered, self).__init__(
-        forward_min_event_ndims=1,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(SoftmaxCentered, self).__init__(
+          forward_min_event_ndims=1,
+          validate_args=validate_args,
+          name=name)
 
   def _forward_event_shape(self, input_shape):
-    if input_shape.ndims is None or input_shape[-1] is None:
+    if not input_shape[-1:].is_fully_defined():
       return input_shape
     return input_shape[:-1].concatenate(input_shape[-1] + 1)
 
@@ -75,7 +76,7 @@ class SoftmaxCentered(bijector.Bijector):
     return tf.concat([input_shape[:-1], [input_shape[-1] + 1]], axis=0)
 
   def _inverse_event_shape(self, output_shape):
-    if output_shape.ndims is None or output_shape[-1] is None:
+    if not output_shape[-1:].is_fully_defined():
       return output_shape
     if output_shape[-1] <= 1:
       raise ValueError("output_shape[-1] = %d <= 1" % output_shape[-1])
@@ -84,10 +85,10 @@ class SoftmaxCentered(bijector.Bijector):
   def _inverse_event_shape_tensor(self, output_shape):
     if self.validate_args:
       # It is not possible for a negative shape so we need only check <= 1.
-      is_greater_one = tf.assert_greater(
+      is_greater_one = assert_util.assert_greater(
           output_shape[-1], 1, message="Need last dimension greater than 1.")
-      output_shape = control_flow_ops.with_dependencies(
-          [is_greater_one], output_shape)
+      with tf.control_dependencies([is_greater_one]):
+        output_shape = tf.identity(output_shape)
     return tf.concat([output_shape[:-1], [output_shape[-1] - 1]], axis=0)
 
   def _forward(self, x):
@@ -96,14 +97,14 @@ class SoftmaxCentered(bijector.Bijector):
     y = distribution_util.pad(x, axis=-1, back=True)
 
     # Set shape hints.
-    if x.shape.ndims is not None:
-      last_dim = tf.dimension_value(x.shape[-1])
-      shape = x.shape[:-1].concatenate(
+    if tensorshape_util.rank(x.shape) is not None:
+      last_dim = tf.compat.dimension_value(x.shape[-1])
+      shape = tensorshape_util.concatenate(
+          x.shape[:-1],
           None if last_dim is None else last_dim + 1)
-      y.shape.assert_is_compatible_with(shape)
-      y.set_shape(shape)
+      tensorshape_util.set_shape(y, shape)
 
-    return tf.nn.softmax(y)
+    return tf.math.softmax(y)
 
   def _inverse(self, y):
     # To derive the inverse mapping note that:
@@ -117,18 +118,18 @@ class SoftmaxCentered(bijector.Bijector):
 
     # Do this first to make sure CSE catches that it'll happen again in
     # _inverse_log_det_jacobian.
-    x = tf.log(y)
+    x = tf.math.log(y)
 
     log_normalization = (-x[..., -1])[..., tf.newaxis]
     x = x[..., :-1] + log_normalization
 
     # Set shape hints.
-    if y.shape.ndims is not None:
-      last_dim = tf.dimension_value(y.shape[-1])
-      shape = y.shape[:-1].concatenate(
+    if tensorshape_util.rank(y.shape) is not None:
+      last_dim = tf.compat.dimension_value(y.shape[-1])
+      shape = tensorshape_util.concatenate(
+          y.shape[:-1],
           None if last_dim is None else last_dim - 1)
-      x.shape.assert_is_compatible_with(shape)
-      x.set_shape(shape)
+      tensorshape_util.set_shape(x, shape)
 
     return x
 
@@ -149,18 +150,18 @@ class SoftmaxCentered(bijector.Bijector):
     #       or by noting that det{ dX/dY } = 1 / det{ dY/dX } from Bijector
     #       docstring "Tip".
     # (2) - https://en.wikipedia.org/wiki/Matrix_determinant_lemma
-    return -tf.reduce_sum(tf.log(y), axis=-1)
+    return -tf.reduce_sum(tf.math.log(y), axis=-1)
 
   def _forward_log_det_jacobian(self, x):
-    # This code is similar to tf.nn.log_softmax but different because we have
+    # This code is similar to tf.math.log_softmax but different because we have
     # an implicit zero column to handle. I.e., instead of:
     #   reduce_sum(logits - reduce_sum(exp(logits), dim))
     # we must do:
     #   log_normalization = 1 + reduce_sum(exp(logits))
     #   -log_normalization + reduce_sum(logits - log_normalization)
-    log_normalization = tf.nn.softplus(
-        tf.reduce_logsumexp(x, axis=-1, keep_dims=True))
+    log_normalization = tf.math.softplus(
+        tf.reduce_logsumexp(x, axis=-1, keepdims=True))
     return tf.squeeze(
-        (-log_normalization + tf.reduce_sum(
-            x - log_normalization, axis=-1, keepdims=True)),
+        (-log_normalization +
+         tf.reduce_sum(x - log_normalization, axis=-1, keepdims=True)),
         axis=-1)

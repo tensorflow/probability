@@ -24,29 +24,31 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class FitTestFast(tf.test.TestCase):
 
   dtype = np.float32
   fast = True
 
-  def make_dataset(self, n, d, link, scale=1.):
+  def make_dataset(self, n, d, link, offset=None, scale=1.):
     seed = tfd.SeedStream(
         seed=213356351, salt='tfp.glm.fisher_scoring_test')
     model_coefficients = tfd.Uniform(
         low=np.array(-0.5, self.dtype),
         high=np.array(0.5, self.dtype)).sample(d, seed=seed())
     radius = np.sqrt(2.)
-    model_coefficients *= radius / tf.linalg.norm(model_coefficients)
+    model_coefficients *= radius / tf.linalg.norm(tensor=model_coefficients)
     model_matrix = tfd.Normal(
         loc=np.array(0, self.dtype),
         scale=np.array(1, self.dtype)).sample([n, d], seed=seed())
-    scale = tf.convert_to_tensor(scale, self.dtype)
+    scale = tf.convert_to_tensor(value=scale, dtype=self.dtype)
     linear_response = tf.tensordot(
         model_matrix, model_coefficients, axes=[[1], [0]])
+    if offset is not None:
+      linear_response += offset
     if link == 'linear':
       response = tfd.Normal(loc=linear_response, scale=scale).sample(
           seed=seed())
@@ -161,6 +163,43 @@ class FitTestFast(tf.test.TestCase):
             maximum_iterations=10))
     self.assertTrue(is_converged)
 
+  def testOffsetWorksCorrectly(self):
+    n = int(1e5)
+    offset = tf.fill([n], 1.0)
+    [
+        model_matrix,
+        response,
+        model_coefficients_true,
+        linear_response_true,
+    ] = self.make_dataset(
+        n=n, d=3, link='probit', offset=offset)
+    model_coefficients, linear_response, is_converged, _ = tfp.glm.fit(
+        model_matrix,
+        response,
+        tfp.glm.BernoulliNormalCDF(),
+        offset=offset,
+        fast_unsafe_numerics=self.fast,
+        maximum_iterations=20)
+    [
+        model_coefficients_,
+        linear_response_,
+        is_converged_,
+        model_coefficients_true_,
+        linear_response_true_,
+    ] = self.evaluate([
+        model_coefficients,
+        linear_response,
+        is_converged,
+        model_coefficients_true,
+        linear_response_true,
+    ])
+
+    self.assertTrue(is_converged_)
+    avg_response_diff = np.mean(linear_response_ - linear_response_true_)
+    self.assertNear(0., avg_response_diff, err=3e-3)
+    self.assertAllClose(
+        model_coefficients_true_, model_coefficients_, atol=0.03, rtol=0.15)
+
 
 class FitTestSlow(FitTestFast):
 
@@ -179,7 +218,8 @@ class FitTestSlow(FitTestFast):
     ] = self.make_dataset(n=n, d=3, link='probit')
     l2_regularizer = np.array(0.07 * n, model_matrix.dtype.as_numpy_dtype)
     if not static_l2:
-      l2_regularizer = tf.placeholder_with_default(l2_regularizer, shape=[])
+      l2_regularizer = tf.compat.v1.placeholder_with_default(
+          l2_regularizer, shape=[])
     [
         expected_model_coefficients,
         expected_linear_response,

@@ -20,16 +20,18 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
-tfe = tf.contrib.eager
 tfd = tfp.distributions
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _HorseshoeTest(object):
 
   def _test_param_shapes(self, sample_shape, expected):
@@ -38,8 +40,7 @@ class _HorseshoeTest(object):
     self.assertAllEqual(expected, self.evaluate(scale_shape))
     scale = self._test_param(np.ones(self.evaluate(scale_shape)))
     self.assertAllEqual(
-        expected,
-        self.evaluate(tf.shape(tfd.Horseshoe(scale).sample())))
+        expected, self.evaluate(tf.shape(input=tfd.Horseshoe(scale).sample())))
 
   def _test_param_static_shapes(self, sample_shape, expected):
     param_shapes = tfd.Horseshoe.param_static_shapes(sample_shape)
@@ -75,7 +76,7 @@ class _HorseshoeTest(object):
     n = 100000
     dist = tfd.Horseshoe(scale=scale)
 
-    sample = dist.sample(n, seed=1)
+    sample = dist.sample(n, seed=tfp_test_util.test_seed())
     self.assertEqual(self.evaluate(sample).shape, (n,))
 
     scale_mle = self._scale_mle(
@@ -99,7 +100,7 @@ class _HorseshoeTest(object):
     n = 100000
     dist = tfd.Horseshoe(scale=scale)
 
-    sample = dist.sample(n, seed=2)
+    sample = dist.sample(n, seed=tfp_test_util.test_seed())
     self.assertEqual(self.evaluate(sample).shape, (n, batch_size, 2))
     template = tf.ones_like(scale)
     scale_candidates = tf.stack(
@@ -151,10 +152,10 @@ class _HorseshoeTest(object):
     self._test_batch_shapes(horseshoe, log_pdf[0])
 
     k = 1 / np.sqrt(2 * np.pi**3)
-    upper_bound = tf.log(k * tf.log1p(
-        2 / (x / scale)**2)) - tf.log(scale)
-    lower_bound = tf.log(k / 2 * tf.log1p(
-        4 / (x / scale)**2)) - tf.log(scale)
+    upper_bound = tf.math.log(
+        k * tf.math.log1p(2 / (x / scale)**2)) - tf.math.log(scale)
+    lower_bound = tf.math.log(
+        k / 2 * tf.math.log1p(4 / (x / scale)**2)) - tf.math.log(scale)
 
     tolerance = 1e-5
     self.assertAllInRange(
@@ -166,9 +167,10 @@ class _HorseshoeTest(object):
     horseshoe = tfd.Horseshoe(scale=scale)
     x = self._test_param(np.linspace(.1, 10.1, 11).reshape((-1, 1)))
     horseshoe_log_pdf = self.evaluate(horseshoe.log_prob(x))
-    num_mc_samples = 1000000
+    num_mc_samples = int(1.5e6)
+    seed = tfp_test_util.test_seed(hardcoded_seed=23145, set_eager_seed=False)
     sigmas = tf.reshape(scale, [-1, 1]) * tfd.HalfCauchy(
-        self.dtype(0.), self.dtype(1.)).sample(num_mc_samples)
+        self.dtype(0.), self.dtype(1.)).sample(num_mc_samples, seed=seed)
     monte_carlo_horseshoe = tfd.MixtureSameFamily(
         tfd.Categorical(logits=self._test_param(np.zeros(num_mc_samples))),
         tfd.Normal(self.dtype(0.), sigmas))
@@ -179,37 +181,27 @@ class _HorseshoeTest(object):
 
   def testHorseshoeLogPDFGradient(self):
     scale = self.dtype(2.3)
-    horseshoe = tfd.Horseshoe(scale=scale)
-    x = self._test_param(np.linspace(.1, 10.1, 11))
-    horseshoe_log_prob_tf_gradient = self._tf_gradient(horseshoe.log_prob, x)
+    x = self._test_param(np.linspace(0.1, 10.1, 11))
+    [
+        horseshoe_log_prob,
+        horseshoe_log_prob_gradient,
+    ] = tfp.math.value_and_gradient(
+        lambda x_: tfd.Horseshoe(scale=scale).log_prob(x_), x)
     # The expected derivative of log_prob can be explicitly derived from
     # PDF formula as shown in Horseshoe class docstring; it will have a
     # relatively simple form assuming PDF is known.
     k = 1 / np.sqrt(2 * np.pi**3)
     horseshoe_log_prob_derivatives_expected = x / scale**2 - 2 * k * tf.exp(
-        -horseshoe.log_prob(x) - tf.log(x * scale))
+        -horseshoe_log_prob - tf.math.log(x * scale))
     horseshoe_log_prob_gradient_expected = tf.reshape(
         horseshoe_log_prob_derivatives_expected,
-        tf.shape(horseshoe_log_prob_tf_gradient))
+        tf.shape(input=horseshoe_log_prob_gradient))
     self.assertAllClose(
         self.evaluate(horseshoe_log_prob_gradient_expected),
-        self.evaluate(horseshoe_log_prob_tf_gradient),
+        self.evaluate(horseshoe_log_prob_gradient),
         # atol is not set to very tight and the max difference is observed
         # to be around 1e-3.
         atol=1.5e-3)
-
-  def _tf_gradient(self, func, x):
-    if tf.executing_eagerly():
-      with tf.GradientTape() as grad_tape:
-        grad_tape.watch(x)
-        y = func(x)
-    else:
-      y = func(x)
-
-    if tf.executing_eagerly():
-      return grad_tape.gradient(y, x)
-    else:
-      return tf.gradients(y, x)
 
   def _scale_mle(self, samples, scale_candidates):
     """Max log-likelihood estimate for scale.
@@ -220,9 +212,11 @@ class _HorseshoeTest(object):
         scale, with shape original_batch_shape + [num_candidates],
         where different candidates for a single scalar parameter are at the
         inner most dimension (axis -1).
+    Returns:
+      scale_mle: max log-likelihood estimate for scale.
     """
     dist = tfd.Horseshoe(scale=scale_candidates)
-    dims = tf.shape(scale_candidates)
+    dims = tf.shape(input=scale_candidates)
     num_candidates = dims[-1]
     original_batch_shape = dims[:-1]
     # log_likelihood has same shape as scale_candidates
@@ -230,23 +224,23 @@ class _HorseshoeTest(object):
     log_likelihood = tf.reduce_sum(
         # dist.log_prob here returns a tensor with shape
         # [num_samples] + original_batch_shape + [num_candidates]
-        dist.log_prob(
+        input_tensor=dist.log_prob(
             tf.reshape(samples,
                        tf.concat([[-1], original_batch_shape, [1]], axis=0))),
         axis=0)
     # max log-likelihood candidate location mask
     mask = tf.one_hot(
-        tf.argmax(log_likelihood, axis=-1),
+        tf.argmax(input=log_likelihood, axis=-1),
         depth=num_candidates,
         dtype=self.dtype)
-    return tf.reduce_sum(scale_candidates * mask, axis=-1)
+    return tf.reduce_sum(input_tensor=scale_candidates * mask, axis=-1)
 
   def _test_param(self, param):
     if isinstance(param, np.ndarray):
       param_ = param.astype(self.dtype)
     else:
       param_ = np.array(param, dtype=self.dtype)
-    return tf.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=param_, shape=param_.shape if self.use_static_shape else None)
 
 

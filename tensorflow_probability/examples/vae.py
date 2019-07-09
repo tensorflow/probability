@@ -185,7 +185,7 @@ FLAGS = flags.FLAGS
 
 def _softplus_inverse(x):
   """Helper which computes the function inverse of `tf.nn.softplus`."""
-  return tf.log(tf.math.expm1(x))
+  return tf.math.log(tf.math.expm1(x))
 
 
 def make_encoder(activation, latent_size, base_depth):
@@ -254,7 +254,7 @@ def make_decoder(activation, latent_size, output_shape, base_depth):
   ])
 
   def decoder(codes):
-    original_shape = tf.shape(codes)
+    original_shape = tf.shape(input=codes)
     # Collapse the sample and batch dimension and convert to rank-4 tensor for
     # use with a convolutional decoder network.
     codes = tf.reshape(codes, (-1, 1, 1, latent_size))
@@ -285,10 +285,11 @@ def make_mixture_prior(latent_size, mixture_components):
         loc=tf.zeros([latent_size]),
         scale_identity_multiplier=1.0)
 
-  loc = tf.get_variable(name="loc", shape=[mixture_components, latent_size])
-  raw_scale_diag = tf.get_variable(
+  loc = tf.compat.v1.get_variable(
+      name="loc", shape=[mixture_components, latent_size])
+  raw_scale_diag = tf.compat.v1.get_variable(
       name="raw_scale_diag", shape=[mixture_components, latent_size])
-  mixture_logits = tf.get_variable(
+  mixture_logits = tf.compat.v1.get_variable(
       name="mixture_logits", shape=[mixture_components])
 
   return tfd.MixtureSameFamily(
@@ -301,23 +302,24 @@ def make_mixture_prior(latent_size, mixture_components):
 
 def pack_images(images, rows, cols):
   """Helper utility to make a field of images."""
-  shape = tf.shape(images)
+  shape = tf.shape(input=images)
   width = shape[-3]
   height = shape[-2]
   depth = shape[-1]
   images = tf.reshape(images, (-1, width, height, depth))
-  batch = tf.shape(images)[0]
+  batch = tf.shape(input=images)[0]
   rows = tf.minimum(rows, batch)
   cols = tf.minimum(batch // rows, cols)
   images = images[:rows * cols]
   images = tf.reshape(images, (rows, cols, width, height, depth))
-  images = tf.transpose(images, [0, 2, 1, 3, 4])
+  images = tf.transpose(a=images, perm=[0, 2, 1, 3, 4])
   images = tf.reshape(images, [1, rows * width, cols * height, depth])
   return images
 
 
 def image_tile_summary(name, tensor, rows=8, cols=8):
-  tf.summary.image(name, pack_images(tensor, rows, cols), max_outputs=1)
+  tf.compat.v1.summary.image(
+      name, pack_images(tensor, rows, cols), max_outputs=1)
 
 
 def model_fn(features, labels, mode, params, config):
@@ -350,14 +352,15 @@ def model_fn(features, labels, mode, params, config):
   latent_prior = make_mixture_prior(params["latent_size"],
                                     params["mixture_components"])
 
-  image_tile_summary("input", tf.to_float(features), rows=1, cols=16)
+  image_tile_summary(
+      "input", tf.cast(features, dtype=tf.float32), rows=1, cols=16)
 
   approx_posterior = encoder(features)
   approx_posterior_sample = approx_posterior.sample(params["n_samples"])
   decoder_likelihood = decoder(approx_posterior_sample)
   image_tile_summary(
       "recon/sample",
-      tf.to_float(decoder_likelihood.sample()[:3, :16]),
+      tf.cast(decoder_likelihood.sample()[:3, :16], dtype=tf.float32),
       rows=3,
       cols=16)
   image_tile_summary(
@@ -368,40 +371,44 @@ def model_fn(features, labels, mode, params, config):
 
   # `distortion` is just the negative log likelihood.
   distortion = -decoder_likelihood.log_prob(features)
-  avg_distortion = tf.reduce_mean(distortion)
-  tf.summary.scalar("distortion", avg_distortion)
+  avg_distortion = tf.reduce_mean(input_tensor=distortion)
+  tf.compat.v1.summary.scalar("distortion", avg_distortion)
 
   if params["analytic_kl"]:
     rate = tfd.kl_divergence(approx_posterior, latent_prior)
   else:
     rate = (approx_posterior.log_prob(approx_posterior_sample)
             - latent_prior.log_prob(approx_posterior_sample))
-  avg_rate = tf.reduce_mean(rate)
-  tf.summary.scalar("rate", avg_rate)
+  avg_rate = tf.reduce_mean(input_tensor=rate)
+  tf.compat.v1.summary.scalar("rate", avg_rate)
 
   elbo_local = -(rate + distortion)
 
-  elbo = tf.reduce_mean(elbo_local)
+  elbo = tf.reduce_mean(input_tensor=elbo_local)
   loss = -elbo
-  tf.summary.scalar("elbo", elbo)
+  tf.compat.v1.summary.scalar("elbo", elbo)
 
   importance_weighted_elbo = tf.reduce_mean(
-      tf.reduce_logsumexp(elbo_local, axis=0) -
-      tf.log(tf.to_float(params["n_samples"])))
-  tf.summary.scalar("elbo/importance_weighted", importance_weighted_elbo)
+      input_tensor=tf.reduce_logsumexp(input_tensor=elbo_local, axis=0) -
+      tf.math.log(tf.cast(params["n_samples"], dtype=tf.float32)))
+  tf.compat.v1.summary.scalar("elbo/importance_weighted",
+                              importance_weighted_elbo)
 
   # Decode samples from the prior for visualization.
   random_image = decoder(latent_prior.sample(16))
   image_tile_summary(
-      "random/sample", tf.to_float(random_image.sample()), rows=4, cols=4)
+      "random/sample",
+      tf.cast(random_image.sample(), dtype=tf.float32),
+      rows=4,
+      cols=4)
   image_tile_summary("random/mean", random_image.mean(), rows=4, cols=4)
 
   # Perform variational inference by minimizing the -ELBO.
-  global_step = tf.train.get_or_create_global_step()
-  learning_rate = tf.train.cosine_decay(params["learning_rate"], global_step,
-                                        params["max_steps"])
-  tf.summary.scalar("learning_rate", learning_rate)
-  optimizer = tf.train.AdamOptimizer(learning_rate)
+  global_step = tf.compat.v1.train.get_or_create_global_step()
+  learning_rate = tf.compat.v1.train.cosine_decay(
+      params["learning_rate"], global_step, params["max_steps"])
+  tf.compat.v1.summary.scalar("learning_rate", learning_rate)
+  optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate)
   train_op = optimizer.minimize(loss, global_step=global_step)
 
   return tf.estimator.EstimatorSpec(
@@ -409,10 +416,14 @@ def model_fn(features, labels, mode, params, config):
       loss=loss,
       train_op=train_op,
       eval_metric_ops={
-          "elbo": tf.metrics.mean(elbo),
-          "elbo/importance_weighted": tf.metrics.mean(importance_weighted_elbo),
-          "rate": tf.metrics.mean(avg_rate),
-          "distortion": tf.metrics.mean(avg_distortion),
+          "elbo":
+              tf.compat.v1.metrics.mean(elbo),
+          "elbo/importance_weighted":
+              tf.compat.v1.metrics.mean(importance_weighted_elbo),
+          "rate":
+              tf.compat.v1.metrics.mean(avg_rate),
+          "distortion":
+              tf.compat.v1.metrics.mean(avg_distortion),
       },
   )
 
@@ -424,10 +435,10 @@ FILE_TEMPLATE = "binarized_mnist_{split}.amat"
 def download(directory, filename):
   """Downloads a file."""
   filepath = os.path.join(directory, filename)
-  if tf.gfile.Exists(filepath):
+  if tf.io.gfile.exists(filepath):
     return filepath
-  if not tf.gfile.Exists(directory):
-    tf.gfile.MakeDirs(directory)
+  if not tf.io.gfile.exists(directory):
+    tf.io.gfile.makedirs(directory)
   url = os.path.join(ROOT_PATH, filename)
   print("Downloading %s to %s" % (url, filepath))
   urllib.request.urlretrieve(url, filepath)
@@ -441,9 +452,9 @@ def static_mnist_dataset(directory, split_name):
   str_to_arr = lambda string: np.array([c == b"1" for c in string.split()])
 
   def _parser(s):
-    booltensor = tf.py_func(str_to_arr, [s], tf.bool)
+    booltensor = tf.compat.v1.py_func(str_to_arr, [s], tf.bool)
     reshaped = tf.reshape(booltensor, [28, 28, 1])
-    return tf.to_float(reshaped), tf.constant(0, tf.int32)
+    return tf.cast(reshaped, dtype=tf.float32), tf.constant(0, tf.int32)
 
   return dataset.map(_parser)
 
@@ -455,12 +466,12 @@ def build_fake_input_fns(batch_size):
   def train_input_fn():
     dataset = tf.data.Dataset.from_tensor_slices(
         random_sample).map(lambda row: (row, 0)).batch(batch_size).repeat()
-    return dataset.make_one_shot_iterator().get_next()
+    return tf.compat.v1.data.make_one_shot_iterator(dataset).get_next()
 
   def eval_input_fn():
     dataset = tf.data.Dataset.from_tensor_slices(
         random_sample).map(lambda row: (row, 0)).batch(batch_size)
-    return dataset.make_one_shot_iterator().get_next()
+    return tf.compat.v1.data.make_one_shot_iterator(dataset).get_next()
 
   return train_input_fn, eval_input_fn
 
@@ -472,13 +483,13 @@ def build_input_fns(data_dir, batch_size):
   def train_input_fn():
     dataset = static_mnist_dataset(data_dir, "train")
     dataset = dataset.shuffle(50000).repeat().batch(batch_size)
-    return dataset.make_one_shot_iterator().get_next()
+    return tf.compat.v1.data.make_one_shot_iterator(dataset).get_next()
 
   # Build an iterator over the heldout set.
   def eval_input_fn():
     eval_dataset = static_mnist_dataset(data_dir, "valid")
     eval_dataset = eval_dataset.batch(batch_size)
-    return eval_dataset.make_one_shot_iterator().get_next()
+    return tf.compat.v1.data.make_one_shot_iterator(eval_dataset).get_next()
 
   return train_input_fn, eval_input_fn
 
@@ -488,10 +499,11 @@ def main(argv):
 
   params = FLAGS.flag_values_dict()
   params["activation"] = getattr(tf.nn, params["activation"])
-  if FLAGS.delete_existing and tf.gfile.Exists(FLAGS.model_dir):
-    tf.logging.warn("Deleting old log directory at {}".format(FLAGS.model_dir))
-    tf.gfile.DeleteRecursively(FLAGS.model_dir)
-  tf.gfile.MakeDirs(FLAGS.model_dir)
+  if FLAGS.delete_existing and tf.io.gfile.exists(FLAGS.model_dir):
+    tf.compat.v1.logging.warn("Deleting old log directory at {}".format(
+        FLAGS.model_dir))
+    tf.io.gfile.rmtree(FLAGS.model_dir)
+  tf.io.gfile.makedirs(FLAGS.model_dir)
 
   if FLAGS.fake_data:
     train_input_fn, eval_input_fn = build_fake_input_fns(FLAGS.batch_size)
@@ -515,4 +527,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()

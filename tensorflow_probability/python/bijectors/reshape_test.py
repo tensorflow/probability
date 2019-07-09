@@ -24,7 +24,7 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _ReshapeBijectorTest(object):
@@ -50,20 +50,22 @@ class _ReshapeBijectorTest(object):
         event_shape_out=shape_out,
         event_shape_in=shape_in,
         validate_args=True)
-    (x_,
-     y_,
-     fldj_,
-     ildj_,
-     fest_,
-     iest_) = self.evaluate((
-         bijector.inverse(expected_y),
-         bijector.forward(expected_x),
-         bijector.forward_log_det_jacobian(expected_x, event_ndims=2),
-         bijector.inverse_log_det_jacobian(expected_y, event_ndims=2),
-         bijector.forward_event_shape_tensor(expected_x.shape),
-         bijector.inverse_event_shape_tensor(expected_y.shape),
-     ))
-    self.assertEqual("reshape", bijector.name)
+    [
+        x_,
+        y_,
+        fldj_,
+        ildj_,
+        fest_,
+        iest_,
+    ] = self.evaluate([
+        bijector.inverse(expected_y),
+        bijector.forward(expected_x),
+        bijector.forward_log_det_jacobian(expected_x, event_ndims=2),
+        bijector.inverse_log_det_jacobian(expected_y, event_ndims=2),
+        bijector.forward_event_shape_tensor(expected_x.shape),
+        bijector.inverse_event_shape_tensor(expected_y.shape),
+    ])
+    self.assertStartsWith(bijector.name, "reshape")
     self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
     self.assertAllClose(0., fldj_, rtol=1e-6, atol=0)
@@ -177,12 +179,10 @@ class _ReshapeBijectorTest(object):
         event_shape_out=shape_out,
         event_shape_in=shape_in,
         validate_args=True)
-    (x_,
-     y_,
-    ) = self.evaluate((
+    x_, y_, = self.evaluate([
         bijector.inverse(expected_y),
         bijector.forward(expected_x),
-    ))
+    ])
     self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
 
@@ -194,12 +194,10 @@ class _ReshapeBijectorTest(object):
         event_shape_out=shape_out,
         event_shape_in=shape_in,
         validate_args=True)
-    (x_,
-     y_,
-    ) = self.evaluate((
+    x_, y_, = self.evaluate([
         bijector.inverse(expected_y),
         bijector.forward(expected_x),
-    ))
+    ])
     self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
 
@@ -208,12 +206,10 @@ class _ReshapeBijectorTest(object):
     expected_y = np.reshape(expected_x, [4, 2, 2])
     _, shape_out = self.build_shapes([-1,], [-1, 2])
     bijector = tfb.Reshape(shape_out, validate_args=True)
-    (x_,
-     y_,
-    ) = self.evaluate((
+    x_, y_, = self.evaluate([
         bijector.inverse(expected_y),
         bijector.forward(expected_x),
-    ))
+    ])
     self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
 
@@ -221,7 +217,7 @@ class _ReshapeBijectorTest(object):
     raise NotImplementedError("Subclass failed to implement `build_shapes`.")
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
 
   def build_shapes(self, shape_in, shape_out):
@@ -314,7 +310,7 @@ class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
 
   def testInputOutputMismatchOpError(self):
     self._testInputOutputMismatchOpError(
-        "(Input to reshape|Cannot reshape a tensor with)")
+        "(Input to reshape|Cannot reshape a tensor with|cannot reshape array)")
 
 
 class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
@@ -322,8 +318,12 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
   def build_shapes(self, shape_in, shape_out):
     shape_in = np.array(shape_in, np.int32)
     shape_out = np.array(shape_out, np.int32)
-    return (tf.placeholder_with_default(shape_in, shape=[len(shape_in)]),
-            tf.placeholder_with_default(shape_out, shape=[len(shape_out)]))
+    return (
+        tf.compat.v1.placeholder_with_default(
+            shape_in, shape=[len(shape_in)]),
+        tf.compat.v1.placeholder_with_default(
+            shape_out, shape=[len(shape_out)]),
+    )
 
   def assertRaisesError(self, msg):
     if tf.executing_eagerly():
@@ -357,7 +357,8 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
         bijector.forward_event_shape(tf.TensorShape(None)).ndims)
 
   def testInputOutputMismatchOpError(self):
-    self._testInputOutputMismatchOpError("Input to reshape is a tensor with")
+    self._testInputOutputMismatchOpError(
+        "(Input to reshape|Cannot reshape a tensor with|cannot reshape array)")
 
   def testMultipleUnspecifiedDimensionsOpError(self):
     with self.assertRaisesError("must have at most one `-1`."):
@@ -381,7 +382,7 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
 
   def testUnknownShapeRank(self):
     if tf.executing_eagerly(): return
-    unknown_shape = tf.placeholder_with_default([2, 2], shape=None)
+    unknown_shape = tf.compat.v1.placeholder_with_default([2, 2], shape=None)
     known_shape = [2, 2]
 
     with self.assertRaisesRegexp(NotImplementedError,

@@ -5,6 +5,8 @@
 
 # tfp.math.pinv
 
+Compute the Moore-Penrose pseudo-inverse of a matrix.
+
 ``` python
 tfp.math.pinv(
     a,
@@ -14,14 +16,18 @@ tfp.math.pinv(
 )
 ```
 
-Compute the Moore-Penrose pseudo-inverse of a matrix.
+
+
+Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/linalg.py).
+
+<!-- Placeholder for "Used in" -->
 
 Calculate the [generalized inverse of a matrix](
 https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse) using its
 singular-value decomposition (SVD) and including all large singular values.
 
-The pseudo-inverse of a matrix `A`, is defined as: "the matrix that 'solves'
-[the least-squares problem] `A @ x = b`," i.e., if `x_hat` is a solution, then
+The pseudo-inverse of a matrix `A`, is defined as: 'the matrix that 'solves'
+[the least-squares problem] `A @ x = b`,' i.e., if `x_hat` is a solution, then
 `A_pinv` is the matrix such that `x_hat = A_pinv @ b`. It can be shown that if
 `U @ Sigma @ V.T = A` is the singular value decomposition of `A`, then
 `A_pinv = V @ inv(Sigma) U^T`. [(Strang, 1980)][1]
@@ -34,26 +40,29 @@ default `rcond` is `1e-15`. Here the default is
 
 #### Args:
 
+
 * <b>`a`</b>: (Batch of) `float`-like matrix-shaped `Tensor`(s) which are to be
-    pseudo-inverted.
+  pseudo-inverted.
 * <b>`rcond`</b>: `Tensor` of small singular value cutoffs.  Singular values smaller
-    (in modulus) than `rcond` * largest_singular_value (again, in modulus) are
-    set to zero. Must broadcast against `tf.shape(a)[:-2]`.
-    Default value: `10. * max(num_rows, num_cols) * np.finfo(a.dtype).eps`.
+  (in modulus) than `rcond` * largest_singular_value (again, in modulus) are
+  set to zero. Must broadcast against `tf.shape(a)[:-2]`.
+  Default value: `10. * max(num_rows, num_cols) * np.finfo(a.dtype).eps`.
 * <b>`validate_args`</b>: When `True`, additional assertions might be embedded in the
-    graph.
-    Default value: `False` (i.e., no graph assertions are added).
+  graph.
+  Default value: `False` (i.e., no graph assertions are added).
 * <b>`name`</b>: Python `str` prefixed to ops created by this function.
-    Default value: "pinv".
+  Default value: 'pinv'.
 
 
 #### Returns:
 
+
 * <b>`a_pinv`</b>: The pseudo-inverse of input `a`. Has same shape as `a` except
-    rightmost two dimensions are transposed.
+  rightmost two dimensions are transposed.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if input `a` does not have `float`-like `dtype`.
 * <b>`ValueError`</b>: if input `a` has fewer than 2 dimensions.
@@ -84,5 +93,5 @@ tf.matmul(tfp.math.pinv(a), a)
 
 #### References
 
-[1]: G. Strang. "Linear Algebra and Its Applications, 2nd Ed." Academic Press,
+[1]: G. Strang. 'Linear Algebra and Its Applications, 2nd Ed.' Academic Press,
      Inc., 1980, pp. 139-142.

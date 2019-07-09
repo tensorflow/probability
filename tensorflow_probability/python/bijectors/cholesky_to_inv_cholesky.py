@@ -18,10 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -56,22 +58,25 @@ class CholeskyToInvCholesky(bijector.Bijector):
   matrices.
   """
 
-  def __init__(self, validate_args=False, name=None):
-    super(CholeskyToInvCholesky, self).__init__(
-        forward_min_event_ndims=2,
-        validate_args=validate_args,
-        name=name or "cholesky_to_inv_cholesky")
-    self._cholesky = CholeskyOuterProduct()
+  def __init__(self, validate_args=False, name="cholesky_to_inv_cholesky"):
+    with tf.name_scope(name) as name:
+      self._cholesky = CholeskyOuterProduct()
+      super(CholeskyToInvCholesky, self).__init__(
+          forward_min_event_ndims=2,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):
       x_shape = tf.shape(x)
       identity_matrix = tf.eye(
-          x_shape[-1], batch_shape=x_shape[:-2], dtype=x.dtype.base_dtype)
+          x_shape[-1],
+          batch_shape=x_shape[:-2],
+          dtype=dtype_util.base_dtype(x.dtype))
       # Note `matrix_triangular_solve` implicitly zeros upper triangular of `x`.
-      y = tf.matrix_triangular_solve(x, identity_matrix)
+      y = tf.linalg.triangular_solve(x, identity_matrix)
       y = tf.matmul(y, y, adjoint_a=True)
-      return tf.cholesky(y)
+      return tf.linalg.cholesky(y)
 
   _inverse = _forward
 
@@ -94,9 +99,11 @@ class CholeskyToInvCholesky(bijector.Bijector):
     y = self._forward(x)
     return (
         (self._cholesky.forward_log_det_jacobian(x, event_ndims=2) -
-         (n + 1.) * tf.reduce_sum(tf.log(tf.matrix_diag_part(x)), axis=-1)) -
+         (n + 1.) * tf.reduce_sum(tf.math.log(tf.linalg.diag_part(x)), axis=-1))
+        -
         (self._cholesky.forward_log_det_jacobian(y, event_ndims=2) -
-         (n + 1.) * tf.reduce_sum(tf.log(tf.matrix_diag_part(y)), axis=-1)))
+         (n + 1.) * tf.reduce_sum(tf.math.log(tf.linalg.diag_part(y)), axis=-1))
+    )
 
   _inverse_log_det_jacobian = _forward_log_det_jacobian
 
@@ -104,18 +111,15 @@ class CholeskyToInvCholesky(bijector.Bijector):
     if not self.validate_args:
       return []
     x_shape = tf.shape(x)
-    is_matrix = tf.assert_rank_at_least(
-        x, 2,
-        message="Input must have rank at least 2.")
-    is_square = tf.assert_equal(
-        x_shape[-2], x_shape[-1],
-        message="Input must be a square matrix.")
-    diag_part_x = tf.matrix_diag_part(x)
-    is_lower_triangular = tf.assert_equal(
-        tf.matrix_band_part(x, 0, -1),  # Preserves triu, zeros rest.
-        tf.matrix_diag(diag_part_x),
+    is_matrix = assert_util.assert_rank_at_least(
+        x, 2, message="Input must have rank at least 2.")
+    is_square = assert_util.assert_equal(
+        x_shape[-2], x_shape[-1], message="Input must be a square matrix.")
+    diag_part_x = tf.linalg.diag_part(x)
+    is_lower_triangular = assert_util.assert_equal(
+        tf.linalg.band_part(x, 0, -1),  # Preserves triu, zeros rest.
+        tf.linalg.diag(diag_part_x),
         message="Input must be lower triangular.")
-    is_positive_diag = tf.assert_positive(
-        diag_part_x,
-        message="Input must have all positive diagonal entries.")
+    is_positive_diag = assert_util.assert_positive(
+        diag_part_x, message="Input must have all positive diagonal entries.")
     return [is_matrix, is_square, is_lower_triangular, is_positive_diag]

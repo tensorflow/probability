@@ -5,6 +5,8 @@
 
 # tfp.edward2.as_random_variable
 
+Wrap an existing distribution as a traceable random variable.
+
 ``` python
 tfp.edward2.as_random_variable(
     distribution,
@@ -13,7 +15,11 @@ tfp.edward2.as_random_variable(
 )
 ```
 
-Wrap an existing distribution as a traceable random variable.
+
+
+Defined in [`python/edward2/generated_random_variables.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/generated_random_variables.py).
+
+<!-- Placeholder for "Used in" -->
 
 This enables the use of custom or user-provided distributions in
 Edward models. Unlike a bare `RandomVariable` object, this method
@@ -30,16 +36,18 @@ on overriding distribution parameters.
 
 #### Args:
 
+
 * <b>`distribution`</b>: tfd.Distribution governing the distribution of the random
-    variable, such as sampling and log-probabilities.
+  variable, such as sampling and log-probabilities.
 * <b>`sample_shape`</b>: tf.TensorShape of samples to draw from the random variable.
-    Default is `()` corresponding to a single sample.
+  Default is `()` corresponding to a single sample.
 * <b>`value`</b>: Fixed tf.Tensor to associate with random variable. Must have shape
-    `sample_shape + distribution.batch_shape + distribution.event_shape`.
-    Default is to sample from random variable according to `sample_shape`.
+  `sample_shape + distribution.batch_shape + distribution.event_shape`.
+  Default is to sample from random variable according to `sample_shape`.
 
 
 #### Returns:
+
 
 * <b>`rv`</b>: a `RandomVariable` wrapping the provided distribution.
 
@@ -50,8 +58,8 @@ from tensorflow_probability import distributions as tfd
 from tensorflow_probability import edward2 as ed
 
 def model():
-  # equivalent to ed.Normal(0., 1., name="x")
-  return ed.as_random_variable(tfd.Normal(0., 1., name="x"))
+  # equivalent to ed.Normal(0., 1., name='x')
+  return ed.as_random_variable(tfd.Normal(0., 1., name='x'))
 
 log_joint = ed.make_log_joint_fn(model)
 output = log_joint(x=2.)

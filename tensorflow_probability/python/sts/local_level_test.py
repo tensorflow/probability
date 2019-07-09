@@ -25,11 +25,11 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.sts import LocalLevelStateSpaceModel
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 tfl = tf.linalg
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _LocalLevelStateSpaceModelTest(object):
 
   def test_logprob(self):
@@ -81,7 +81,7 @@ class _LocalLevelStateSpaceModelTest(object):
     self.assertAllEqual(self.evaluate(ssm.batch_shape_tensor()), batch_shape)
 
     y = ssm.sample()
-    self.assertAllEqual(self.evaluate(tf.shape(y))[:-2], batch_shape)
+    self.assertAllEqual(self.evaluate(tf.shape(input=y))[:-2], batch_shape)
 
   def _build_placeholder(self, ndarray):
     """Convert a numpy array to a TF placeholder.
@@ -96,25 +96,25 @@ class _LocalLevelStateSpaceModelTest(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LocalLevelStateSpaceModelTestStaticShape32(
     tf.test.TestCase, _LocalLevelStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LocalLevelStateSpaceModelTestDynamicShape32(
     tf.test.TestCase, _LocalLevelStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class LocalLevelStateSpaceModelTestStaticShape64(
     tf.test.TestCase, _LocalLevelStateSpaceModelTest):
   dtype = np.float64

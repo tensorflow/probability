@@ -19,8 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python import bijectors
+from tensorflow_probability.python import debugging
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python import edward2
+from tensorflow_probability.python import experimental
 from tensorflow_probability.python import glm
 from tensorflow_probability.python import layers
 from tensorflow_probability.python import math
@@ -34,12 +36,14 @@ from tensorflow_probability.python import trainable_distributions
 from tensorflow_probability.python import util
 from tensorflow_probability.python import vi
 
-from tensorflow.python.util.all_util import remove_undocumented
+from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'bijectors',
+    'debugging',
     'distributions',
     'edward2',
+    'experimental',
     'glm',
     'layers',
     'math',

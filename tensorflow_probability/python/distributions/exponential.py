@@ -20,10 +20,11 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
@@ -89,44 +90,50 @@ class Exponential(gamma.Gamma):
     # true in the parent class "Gamma."  Therefore, passing
     # allow_nan_stats=True
     # through to the parent class results in unnecessary asserts.
-    with tf.name_scope(name, values=[rate]) as name:
-      self._rate = tf.convert_to_tensor(
+    with tf.name_scope(name) as name:
+      self._rate = tensor_util.convert_immutable_to_tensor(
           rate,
           name="rate",
-          dtype=dtype_util.common_dtype([rate], preferred_dtype=tf.float32))
-    super(Exponential, self).__init__(
-        concentration=1.,
-        rate=self._rate,
-        allow_nan_stats=allow_nan_stats,
-        validate_args=validate_args,
-        name=name)
-    self._parameters = parameters
-    self._graph_parents += [self._rate]
+          dtype=dtype_util.common_dtype([rate], dtype_hint=tf.float32))
+      super(Exponential, self).__init__(
+          concentration=1.,
+          rate=self._rate,
+          allow_nan_stats=allow_nan_stats,
+          validate_args=validate_args,
+          name=name)
+      self._parameters = parameters
 
   @staticmethod
   def _param_shapes(sample_shape):
     return {"rate": tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(rate=0)
 
   @property
   def rate(self):
     return self._rate
 
   def _log_survival_function(self, value):
-    return self._log_prob(value) - tf.log(self._rate)
+    rate = tf.convert_to_tensor(self._rate)
+    return self._log_prob(value, rate=rate) - tf.math.log(rate)
 
   def _sample_n(self, n, seed=None):
-    shape = tf.concat([[n], tf.shape(self._rate)], 0)
+    rate = tf.convert_to_tensor(self.rate)
+    shape = tf.concat([[n], tf.shape(rate)], 0)
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
-    # than `[0, 1)`. To do so, we use `np.finfo(self.dtype.as_numpy_dtype).tiny`
+    # than `[0, 1)`. To do so, we use
+    # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny`
     # because it is the smallest, positive, "normal" number. A "normal" number
     # is such that the mantissa has an implicit leading 1. Normal, positive
     # numbers x, y have the reasonable property that, `x + y >= max(x, y)`. In
     # this case, a subnormal number (i.e., np.nextafter) can cause us to sample
     # 0.
-    sampled = tf.random_uniform(
+    sampled = tf.random.uniform(
         shape,
-        minval=np.finfo(self.dtype.as_numpy_dtype).tiny,
+        minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,
         seed=seed,
         dtype=self.dtype)
-    return -tf.log(sampled) / self._rate
+    return -tf.math.log(sampled) / rate

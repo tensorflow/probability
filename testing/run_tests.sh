@@ -53,9 +53,13 @@ install_bazel() {
 
 install_python_packages() {
   # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
-  # Some tests use methods from the additional libraries below, so we install
-  # them although they're not official dependencies of the TFP library.
-  pip install tf-nightly scipy hypothesis matplotlib
+  pip install tf-nightly
+
+  # The following unofficial dependencies are used only by tests.
+  pip install scipy hypothesis matplotlib mock
+
+  # Install additional TFP dependencies.
+  pip install decorator cloudpickle
 
   # Upgrade numpy to the latest to address issues that happen when testing with
   # Python 3 (https://github.com/tensorflow/tensorflow/issues/16488).
@@ -68,6 +72,10 @@ call_with_log_folding install_python_packages
 # Get a shard of tests.
 shard_tests=$(bazel query 'tests(//tensorflow_probability/...)' |
   awk -v n=${NUM_SHARDS} -v s=${SHARD} 'NR%n == s' )
+MAYBE_FORCE_PY2_FLAG=""
+if [[ $(python -V 2>&1) =~ Python\ 2.* ]]; then
+  MAYBE_FORCE_PY2_FLAG="--noincompatible_py3_is_default"
+fi
 
 # Run tests. Notes on less obvious options:
 #   --notest_keep_going -- stop running tests as soon as anything fails. This is
@@ -85,8 +93,9 @@ echo "${shard_tests}" \
     --copt=-O3 \
     --copt=-march=native \
     --notest_keep_going \
-    --test_tag_filters=-gpu,-requires-gpu-sm35 \
+    --test_tag_filters=-gpu,-requires-gpu-sm35,-no-oss-ci \
     --test_timeout 300,450,1200,3600 \
     --action_env=PATH \
     --action_env=LD_LIBRARY_PATH \
-    --test_output=errors
+    --test_output=errors \
+    ${MAYBE_FORCE_PY2_FLAG}

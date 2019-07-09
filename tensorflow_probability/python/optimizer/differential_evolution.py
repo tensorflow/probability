@@ -14,20 +14,21 @@
 # ============================================================================
 """The differential evolution global optimization algorithm.
 
-Differential evolution (DE) is a population based global optimization scheme.
-It is applicable to problems with continuous parameter space and because it
-does not require gradient computation, it is also applicable to
+Differential evolution (DE) is a population-based global optimization scheme.
+It is applicable to problems with a continuous parameter space. Because it
+does not require computing gradients, it is also applicable to
 non-differentiable functions. For more details see:
 https://en.wikipedia.org/wiki/Differential_evolution
 
 DE starts with a population of candidate solutions (represented as vectors).
-It generates new trial solutions by adding the weighted difference between
-two population vectors to a third vector. This is the mutation operation. The
-mutated vectors parameters are mixed with the parameters of a third
-vector to yield the final candidate solution. This is the crossover step. If
-the trial vector yields a lower cost value it replaces the target vector. This
-process is repeated for each member of the population to complete one
-generation.
+It generates new trial solutions by a combination of
+- "mutation", namely adding the weighted difference between
+  two population vectors to a target vector, and
+- "crossover", namely mixing the target with the content of a third.
+
+If the trial vector thus constructed yields a lower cost value it
+replaces the target vector it was made from. This process is repeated for
+each member of the population to complete one generation.
 
 There are a number of different schemes that fall under the DE umbrella.
 The established notation for representing these schemes
@@ -133,7 +134,7 @@ def one_step(
       arguments as a rank 1 real `Tensor`. This specifies the function to be
       minimized. The input to this callable may be either a single `Tensor`
       or a Python `list` of `Tensor`s. The signature must match the format of
-      the argument `population`. (i.e. objective_function(*population) must
+      the argument `population`. (i.e., objective_function(*population) must
       return the value of the function to be minimized).
     population:  `Tensor` or Python `list` of `Tensor`s representing the
       current population vectors. Each `Tensor` must be of the same real dtype.
@@ -171,15 +172,13 @@ def one_step(
     next_population_values: A `Tensor` of same shape and dtype as input
       `population_values`. The function values for the `next_population`.
   """
-  with tf.name_scope(name, 'one_step',
-                     [population,
-                      population_values,
-                      differential_weight,
-                      crossover_prob]):
+  with tf.compat.v1.name_scope(
+      name, 'one_step',
+      [population, population_values, differential_weight, crossover_prob]):
     population, _ = _ensure_list(population)
     if population_values is None:
       population_values = objective_function(*population)
-    population_size = tf.shape(population[0])[0]
+    population_size = tf.shape(input=population[0])[0]
     seed_stream = distributions.SeedStream(seed, salt='one_step')
     mixing_indices = _get_mixing_indices(population_size, seed=seed_stream())
     # Construct the mutated solution vectors. There is one for each member of
@@ -200,16 +199,16 @@ def one_step(
 
     infinity = tf.zeros_like(population_values) + np.inf
 
-    population_values = tf.where(tf.debugging.is_nan(population_values),
-                                 x=infinity,
-                                 y=population_values)
+    population_values = tf.compat.v1.where(
+        tf.math.is_nan(population_values), x=infinity, y=population_values)
 
     to_replace = candidate_values < population_values
     next_population = [
-        tf.where(to_replace, x=candidates_part, y=population_part)
+        tf.compat.v1.where(to_replace, x=candidates_part, y=population_part)
         for candidates_part, population_part in zip(candidates, population)
     ]
-    next_values = tf.where(to_replace, x=candidate_values, y=population_values)
+    next_values = tf.compat.v1.where(
+        to_replace, x=candidate_values, y=population_values)
 
   return next_population, next_values
 
@@ -371,18 +370,14 @@ def minimize(objective_function,
     raise ValueError('Only one of initial population or initial position '
                      'should be specified')
 
-  with tf.name_scope(name,
-                     default_name='minimize',
-                     values=[
-                         initial_population,
-                         initial_position,
-                         population_size,
-                         population_stddev,
-                         max_iterations,
-                         func_tolerance,
-                         position_tolerance,
-                         differential_weight,
-                         crossover_prob]):
+  with tf.compat.v1.name_scope(
+      name,
+      default_name='minimize',
+      values=[
+          initial_population, initial_position, population_size,
+          population_stddev, max_iterations, func_tolerance, position_tolerance,
+          differential_weight, crossover_prob
+      ]):
     (
         was_iterable,
         population,
@@ -436,12 +431,13 @@ def minimize(objective_function,
       return ~should_stop
 
     initial_vars = _MinimizeLoopVars(
-        converged=tf.convert_to_tensor(False),
-        failed=tf.convert_to_tensor(False),
-        num_iterations=tf.convert_to_tensor(0),
+        converged=tf.convert_to_tensor(value=False),
+        failed=tf.convert_to_tensor(value=False),
+        num_iterations=tf.convert_to_tensor(value=0),
         population=population,
         population_values=population_values)
-    final_state = tf.while_loop(evolve_cond, evolve_body, (initial_vars,))[0]
+    final_state = tf.while_loop(
+        cond=evolve_cond, body=evolve_body, loop_vars=(initial_vars,))[0]
     best_position, best_values = _find_best_in_population(
         final_state.population,
         final_state.population_values)
@@ -488,19 +484,16 @@ def _get_initial_args(objective_function,
                                         seed=seed)
 
   differential_weight = tf.convert_to_tensor(
-      differential_weight,
-      dtype=population[0].dtype.base_dtype)
+      value=differential_weight, dtype=population[0].dtype.base_dtype)
 
-  crossover_prob = tf.convert_to_tensor(crossover_prob)
+  crossover_prob = tf.convert_to_tensor(value=crossover_prob)
   population_values = objective_function(*population)
   if max_iterations is not None:
-    max_iterations = tf.convert_to_tensor(max_iterations)
+    max_iterations = tf.convert_to_tensor(value=max_iterations)
   func_tolerance = tf.convert_to_tensor(
-      func_tolerance,
-      dtype=population_values.dtype.base_dtype)
+      value=func_tolerance, dtype=population_values.dtype.base_dtype)
   position_tolerance = tf.convert_to_tensor(
-      position_tolerance,
-      dtype=population[0].dtype.base_dtype)
+      value=position_tolerance, dtype=population[0].dtype.base_dtype)
   return (was_iterable,
           population,
           population_values,
@@ -513,13 +506,13 @@ def _get_initial_args(objective_function,
 
 def _check_failure(population_values):
   """Checks if all the population values are NaN/infinite."""
-  return tf.math.reduce_all(tf.math.is_inf(population_values))
+  return tf.math.reduce_all(input_tensor=tf.math.is_inf(population_values))
 
 
 def _find_best_in_population(population, values):
   """Finds the population member with the lowest value."""
-  best_value = tf.math.reduce_min(values)
-  best_index = tf.where(tf.math.equal(values, best_value))[0, 0]
+  best_value = tf.math.reduce_min(input_tensor=values)
+  best_index = tf.compat.v1.where(tf.math.equal(values, best_value))[0, 0]
 
   return ([population_part[best_index] for population_part in population],
           best_value)
@@ -531,8 +524,9 @@ def _check_convergence(population,
                        position_tolerance):
   """Checks whether the convergence criteria have been met."""
   # Check func tolerance
-  value_range = tf.math.abs(tf.math.reduce_max(population_values) -
-                            tf.math.reduce_min(population_values))
+  value_range = tf.math.abs(
+      tf.math.reduce_max(input_tensor=population_values) -
+      tf.math.reduce_min(input_tensor=population_values))
   value_converged = value_range <= func_tolerance
   # Ideally, we would compute the position convergence by computing the
   # pairwise distance between every member of the population and checking if
@@ -551,9 +545,11 @@ def _check_convergence(population,
   # the first point and other points.
   half_tol = position_tolerance / 2
   def part_converged(part):
-    return tf.math.reduce_max(tf.math.abs(part - part[0])) <= half_tol
+    return tf.math.reduce_max(input_tensor=tf.math.abs(part -
+                                                       part[0])) <= half_tol
+
   x_converged = tf.math.reduce_all(
-      [part_converged(part) for part in population])
+      input_tensor=[part_converged(part) for part in population])
   return value_converged | x_converged
 
 
@@ -586,13 +582,13 @@ def _get_starting_population(initial_population,
     A list of `Tensor`s. The initial population.
   """
   if initial_population is not None:
-    return [tf.convert_to_tensor(part) for part in initial_population]
+    return [tf.convert_to_tensor(value=part) for part in initial_population]
   # Constructs the population by adding normal noise to the initial position.
   seed_stream = distributions.SeedStream(seed, salt='get_starting_population')
   population = []
   for part in initial_position:
-    part = tf.convert_to_tensor(part)
-    part_event_shape = tf.shape(part)
+    part = tf.convert_to_tensor(value=part)
+    part_event_shape = tf.shape(input=part)
     # We only draw population_size-1 random vectors because we want to ensure
     # that the supplied position is part of the population. The first member
     # is set to be the initial_position.
@@ -633,7 +629,7 @@ def _binary_crossover(population,
       `population`).
     mutants: A Python list of `Tensor`s with the same structure as `population`.
       The mutated population.
-    crossover_prob: A postive real scalar `Tensor` bounded above by 1.0. The
+    crossover_prob: A positive real scalar `Tensor` bounded above by 1.0. The
       probability of a crossover being performed for each axis.
     seed: `int` or None. The random seed for this `Op`. If `None`, no seed is
       applied.
@@ -642,7 +638,7 @@ def _binary_crossover(population,
     A list of `Tensor`s of the same structure, dtype and shape as `population`.
     The recombined population.
   """
-  sizes = [tf.to_double(tf.size(x)) for x in population]
+  sizes = [tf.cast(tf.size(input=x), dtype=tf.float64) for x in population]
   seed_stream = distributions.SeedStream(seed, salt='binary_crossover')
   force_crossover_group = distributions.Categorical(sizes).sample(
       [population_size, 1], seed=seed_stream())
@@ -650,7 +646,7 @@ def _binary_crossover(population,
   for i, population_part in enumerate(population):
     pop_part_flat = tf.reshape(population_part, [population_size, -1])
     mutant_part_flat = tf.reshape(mutants[i], [population_size, -1])
-    part_size = tf.size(population_part) // population_size
+    part_size = tf.size(input=population_part) // population_size
     force_crossovers = tf.one_hot(
         tf.random.uniform([population_size],
                           minval=0,
@@ -668,11 +664,9 @@ def _binary_crossover(population,
         dtype=crossover_prob.dtype.base_dtype,
         seed=seed_stream()) < crossover_prob
     do_binary_crossover |= force_crossovers
-    recombinant_flat = tf.where(
-        do_binary_crossover,
-        x=mutant_part_flat,
-        y=pop_part_flat)
-    recombinant = tf.reshape(recombinant_flat, tf.shape(population_part))
+    recombinant_flat = tf.compat.v1.where(
+        do_binary_crossover, x=mutant_part_flat, y=pop_part_flat)
+    recombinant = tf.reshape(recombinant_flat, tf.shape(input=population_part))
     recombinants.append(recombinant)
   return recombinants
 
@@ -709,8 +703,9 @@ def _get_mutants(population,
   def _mutant_part(population_part):
     donors = tf.gather(population_part, mixing_indices)
     donors = tf.transpose(
-        tf.reshape(donors, [population_size, 3, -1]), [0, 2, 1])
-    return tf.math.reduce_sum(donors * weights, axis=-1)
+        a=tf.reshape(donors, [population_size, 3, -1]), perm=[0, 2, 1])
+    return tf.math.reduce_sum(input_tensor=donors * weights, axis=-1)
+
   return [_mutant_part(population_part) for population_part in population]
 
 
@@ -739,8 +734,9 @@ def _get_mixing_indices(size, seed=None, name=None):
     samples without replacement between 0 and size - 1 (inclusive) with the
     `i`th row not including the number `i`.
   """
-  with tf.name_scope(name, default_name='get_mixing_indices', values=[size]):
-    size = tf.convert_to_tensor(size)
+  with tf.compat.v1.name_scope(
+      name, default_name='get_mixing_indices', values=[size]):
+    size = tf.convert_to_tensor(value=size)
     dtype = size.dtype
     seed_stream = distributions.SeedStream(seed, salt='get_mixing_indices')
     first = tf.random.uniform([size],
@@ -757,18 +753,18 @@ def _get_mixing_indices(size, seed=None, name=None):
                               seed=seed_stream())
 
     # Shift second if it is on top of or to the right of first
-    second = tf.where(first < second, x=second, y=second + 1)
+    second = tf.compat.v1.where(first < second, x=second, y=second + 1)
     smaller = tf.math.minimum(first, second)
     larger = tf.math.maximum(first, second)
     # Shift the third one so it does not coincide with either the first or the
     # second number. Assuming first < second, shift by 1 if the number is in
     # [first, second) and by 2 if the number is greater than or equal to the
     # second.
-    third = tf.where(third < smaller, x=third, y=third + 1)
-    third = tf.where(third < larger, x=third, y=third + 1)
+    third = tf.compat.v1.where(third < smaller, x=third, y=third + 1)
+    third = tf.compat.v1.where(third < larger, x=third, y=third + 1)
     sample = tf.stack([first, second, third], axis=1)
     to_avoid = tf.expand_dims(tf.range(size), axis=-1)
-    sample = tf.where(sample < to_avoid, x=sample, y=sample + 1)
+    sample = tf.compat.v1.where(sample < to_avoid, x=sample, y=sample + 1)
     return sample
 
 

@@ -43,23 +43,22 @@ def mvn(*args, **kwargs):
 
 def text_messages_joint_log_prob(count_data, lambda_1, lambda_2, tau):
   """Joint log probability function."""
-  alpha = (1. / tf.reduce_mean(count_data))
+  alpha = (1. / tf.reduce_mean(input_tensor=count_data))
   rv_lambda = tfd.Exponential(rate=alpha)
 
   rv_tau = tfd.Uniform()
 
   lambda_ = tf.gather(
       [lambda_1, lambda_2],
-      indices=tf.to_int32(tau * tf.to_float(tf.size(count_data)) <=
-                          tf.to_float(tf.range(tf.size(count_data)))))
+      indices=tf.cast(
+          tau * tf.cast(tf.size(input=count_data), dtype=tf.float32) <= tf.cast(
+              tf.range(tf.size(input=count_data)), dtype=tf.float32),
+          dtype=tf.int32))
   rv_observation = tfd.Poisson(rate=lambda_)
 
-  return (
-      rv_lambda.log_prob(lambda_1)
-      + rv_lambda.log_prob(lambda_2)
-      + rv_tau.log_prob(tau)
-      + tf.reduce_sum(rv_observation.log_prob(count_data))
-  )
+  return (rv_lambda.log_prob(lambda_1) + rv_lambda.log_prob(lambda_2) +
+          rv_tau.log_prob(tau) +
+          tf.reduce_sum(input_tensor=rv_observation.log_prob(count_data)))
 
 
 def benchmark_text_messages_hmc(
@@ -69,16 +68,19 @@ def benchmark_text_messages_hmc(
   """Runs HMC on the text-messages unnormalized posterior."""
 
   if not tf.executing_eagerly():
-    tf.reset_default_graph()
+    tf.compat.v1.reset_default_graph()
 
   # Build a static, pretend dataset.
-  count_data = tf.to_float(
-      tf.concat([tfd.Poisson(rate=15.).sample(43),
-                 tfd.Poisson(rate=25.).sample(31)], axis=0))
+  count_data = tf.cast(
+      tf.concat(
+          [tfd.Poisson(rate=15.).sample(43),
+           tfd.Poisson(rate=25.).sample(31)],
+          axis=0),
+      dtype=tf.float32)
   if tf.executing_eagerly():
     count_data = count_data.numpy()
   else:
-    with tf.Session():
+    with tf.compat.v1.Session():
       count_data = count_data.eval()
 
   # Define a closure over our joint_log_prob.
@@ -86,16 +88,15 @@ def benchmark_text_messages_hmc(
     return text_messages_joint_log_prob(count_data, lambda1, lambda2, tau)
 
   if tf.executing_eagerly():
-    sample_chain = tf.contrib.eager.defun(tfp.mcmc.sample_chain)
+    sample_chain = tf.function(tfp.mcmc.sample_chain)
   else:
     sample_chain = tfp.mcmc.sample_chain
 
   # Initialize the step_size. (It will be automatically adapted.)
-  step_size = tf.get_variable(
+  step_size = tf.compat.v2.Variable(
       name='step_size',
-      initializer=tf.constant(0.05, dtype=tf.float32),
-      trainable=False,
-      use_resource=True)
+      initial_value=tf.constant(0.05, dtype=tf.float32),
+      trainable=False)
 
   def computation():
     """The benchmark computation."""
@@ -132,8 +133,8 @@ def benchmark_text_messages_hmc(
   # trial.
   is_accepted_tensor = computation()
   if not tf.executing_eagerly():
-    session = tf.Session()
-    session.run(tf.global_variables_initializer())
+    session = tf.compat.v1.Session()
+    session.run(tf.compat.v1.global_variables_initializer())
     session.run(is_accepted_tensor)
 
   start_time = time.time()

@@ -24,32 +24,31 @@ import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def trainable_lu_factorization(
     event_size, batch_shape=(), seed=None, dtype=tf.float32, name=None):
-  with tf.name_scope(name, 'trainable_lu_factorization',
-                     [event_size, batch_shape]):
+  with tf.compat.v1.name_scope(name, 'trainable_lu_factorization',
+                               [event_size, batch_shape]):
     event_size = tf.convert_to_tensor(
-        event_size, preferred_dtype=tf.int32, name='event_size')
+        value=event_size, dtype_hint=tf.int32, name='event_size')
     batch_shape = tf.convert_to_tensor(
-        batch_shape, preferred_dtype=event_size.dtype, name='batch_shape')
-    random_matrix = tf.random_uniform(
+        value=batch_shape, dtype_hint=event_size.dtype, name='batch_shape')
+    random_matrix = tf.random.uniform(
         shape=tf.concat([batch_shape, [event_size, event_size]], axis=0),
         dtype=dtype,
         seed=seed)
     random_orthonormal = tf.linalg.qr(random_matrix)[0]
     lower_upper, permutation = tf.linalg.lu(random_orthonormal)
-    lower_upper = tf.Variable(
+    lower_upper = tf.compat.v2.Variable(
         initial_value=lower_upper,
         trainable=True,
-        use_resource=True,
         name='lower_upper')
     return lower_upper, permutation
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MatvecLUTest(tf.test.TestCase):
 
   def test_invertible_from_trainable_lu_factorization(self):
@@ -57,9 +56,9 @@ class MatvecLUTest(tf.test.TestCase):
     conv1x1 = tfb.MatvecLU(*trainable_lu_factorization(channels, seed=42),
                            validate_args=True)
 
-    self.evaluate(tf.global_variables_initializer())
+    self.evaluate(tf.compat.v1.global_variables_initializer())
 
-    x = tf.random_uniform(shape=[2, 28, 28, channels])
+    x = tf.random.uniform(shape=[2, 28, 28, channels])
 
     fwd = conv1x1.forward(x)
     rev_fwd = conv1x1.inverse(fwd)
@@ -93,8 +92,8 @@ class MatvecLUTest(tf.test.TestCase):
                            permutation=permutation,
                            validate_args=True)
 
-    channels = tf.dimension_value(lower_upper.shape[-1])
-    x = tf.random_uniform(shape=[2, 28, 28, channels])
+    channels = tf.compat.dimension_value(lower_upper.shape[-1])
+    x = tf.random.uniform(shape=[2, 28, 28, channels])
 
     fwd = conv1x1.forward(x)
     rev_fwd = conv1x1.inverse(fwd)

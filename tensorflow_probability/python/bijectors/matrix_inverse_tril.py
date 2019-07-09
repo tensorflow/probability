@@ -18,8 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
@@ -58,80 +61,51 @@ class MatrixInverseTriL(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._graph_parents = []
-    self._name = name
-    super(MatrixInverseTriL, self).__init__(
-        forward_min_event_ndims=2,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(MatrixInverseTriL, self).__init__(
+          forward_min_event_ndims=2,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):
       shape = tf.shape(x)
-      return tf.matrix_triangular_solve(
-          x, tf.eye(shape[-1], batch_shape=shape[:-2]), lower=True)
+      return tf.linalg.triangular_solve(
+          x,
+          tf.eye(shape[-1], batch_shape=shape[:-2], dtype=x.dtype),
+          lower=True)
 
   def _inverse(self, y):
     return self._forward(y)
 
   def _forward_log_det_jacobian(self, x):
-    # Calculation of the Jacobian:
-    #
-    # Let X = (x_{ij}), 0 <= i,j < n, be a matrix of indeterminates.  Let Z =
-    # X^{-1} where Z = (z_{ij}).  Then
-    #
-    #     dZ/dx_{ij} = (d/dt | t=0) Y(t)^{-1},
-    #
-    # where Y(t) = X + t*E_{ij} and E_{ij} is the matrix with a 1 in the (i,j)
-    # entry and zeros elsewhere.  By the product rule,
-    #
-    #     0 = d/dt [Identity matrix]
-    #       = d/dt [Y Y^{-1}]
-    #       = Y d/dt[Y^{-1}] + dY/dt Y^{-1}
-    #
-    # so
-    #
-    #     d/dt[Y^{-1}] = -Y^{-1} dY/dt Y^{-1}
-    #                  = -Y^{-1} E_{ij} Y^{-1}.
-    #
-    # Evaluating at t=0,
-    #
-    #     dZ/dx_{ij} = -Z E_{ij} Z.
-    #
-    # Taking the (r,s) entry of each side,
-    #
-    #     dz_{rs}/dx_{ij} = -z_{ri}z_{sj}.
-    #
-    # Now, let J be the Jacobian dZ/dX, arranged as the n^2-by-n^2 matrix whose
-    # (r*n + s, i*n + j) entry is dz_{rs}/dx_{ij}.  Considering J as an n-by-n
-    # block matrix with n-by-n blocks, the above expression for dz_{rs}/dx_{ij}
-    # shows that the block at position (r,i) is -z_{ri}Z.  Hence
-    #
-    #          J = -KroneckerProduct(Z, Z),
-    #     det(J) = (-1)^(n^2) (det Z)^(2n)
-    #            = (-1)^n (det X)^(-2n).
+    # For a discussion of this (non-obvious) result, see Note 7.2.2 (and the
+    # sections leading up to it, for context) in
+    # http://neutrino.aquaphoenix.com/ReactionDiffusion/SERC5chap7.pdf
     with tf.control_dependencies(self._assertions(x)):
-      return (-2. * tf.cast(tf.shape(x)[-1], x.dtype.base_dtype) *
-              tf.reduce_sum(tf.log(tf.abs(tf.matrix_diag_part(x))), axis=-1))
+      matrix_dim = tf.cast(tf.shape(x)[-1],
+                           dtype_util.base_dtype(x.dtype))
+      return -(matrix_dim + 1) * tf.reduce_sum(
+          tf.math.log(tf.abs(tf.linalg.diag_part(x))), axis=-1)
 
   def _assertions(self, x):
     if not self.validate_args:
       return []
     shape = tf.shape(x)
-    is_matrix = tf.assert_rank_at_least(
+    is_matrix = assert_util.assert_rank_at_least(
         x, 2, message="Input must have rank at least 2.")
-    is_square = tf.assert_equal(
+    is_square = assert_util.assert_equal(
         shape[-2], shape[-1], message="Input must be a square matrix.")
-    above_diagonal = tf.matrix_band_part(
-        tf.matrix_set_diag(x, tf.zeros(shape[:-1], dtype=tf.float32)), 0, -1)
-    is_lower_triangular = tf.assert_equal(
+    above_diagonal = tf.linalg.band_part(
+        tf.linalg.set_diag(x, tf.zeros(shape[:-1], dtype=tf.float32)), 0, -1)
+    is_lower_triangular = assert_util.assert_equal(
         above_diagonal,
         tf.zeros_like(above_diagonal),
         message="Input must be lower triangular.")
     # A lower triangular matrix is nonsingular iff all its diagonal entries are
     # nonzero.
-    diag_part = tf.matrix_diag_part(x)
-    is_nonsingular = tf.assert_none_equal(
+    diag_part = tf.linalg.diag_part(x)
+    is_nonsingular = assert_util.assert_none_equal(
         diag_part,
         tf.zeros_like(diag_part),
         message="Input must have all diagonal entries nonzero.")

@@ -32,52 +32,28 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":docstring",
-        ":variables",
+        ":deferred_tensor",
     ],
 )
 
 py_library(
-    name = "docstring",
-    srcs = [
-        "docstring.py",
-    ],
+    name = "deferred_tensor",
+    srcs = ["deferred_tensor.py"],
     srcs_version = "PY2AND3",
     deps = [
-        # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:name_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
 py_test(
-    name = "docstring_test",
+    name = "deferred_tensor_test",
     size = "small",
-    srcs = ["docstring_test.py"],
+    srcs = ["deferred_tensor_test.py"],
     deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_library(
-    name = "variables",
-    srcs = [
-        "variables.py",
-    ],
-    srcs_version = "PY2AND3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "variables_test",
-    size = "small",
-    srcs = ["variables_test.py"],
-    tags = ["notf2"],
-    deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

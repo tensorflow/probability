@@ -85,7 +85,7 @@ def benchmark_eight_schools_hmc(
         avg_effect, avg_stddev, school_effects_standard)
 
   if tf.executing_eagerly():
-    sample_chain = tf.contrib.eager.defun(tfp.mcmc.sample_chain)
+    sample_chain = tf.function(tfp.mcmc.sample_chain)
   else:
     sample_chain = tfp.mcmc.sample_chain
 
@@ -110,7 +110,7 @@ def benchmark_eight_schools_hmc(
   # trial.
   is_accepted_tensor = computation()
   if not tf.executing_eagerly():
-    session = tf.Session()
+    session = tf.compat.v1.Session()
     session.run(is_accepted_tensor)
 
   start_time = time.time()

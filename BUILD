@@ -16,6 +16,7 @@ sh_binary(
     name = "pip_pkg",
     srcs = ["pip_pkg.sh"],
     data = [
+        "README.md",
         "setup.py",
         "//tensorflow_probability",
     ],

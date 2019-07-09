@@ -21,7 +21,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 
 __all__ = [
@@ -47,13 +47,14 @@ def random_rademacher(shape, dtype=tf.float32, seed=None, name=None):
     rademacher: `Tensor` with specified `shape` and `dtype` consisting of `-1`
       or `+1` chosen uniformly-at-random.
   """
-  with tf.name_scope(name, 'random_rademacher', [shape, seed]):
-    random_bernoulli = tf.random_uniform(
-        shape,
-        minval=0,
-        maxval=2,
-        dtype=tf.int32,
-        seed=seed)
+  with tf.name_scope(name or 'random_rademacher'):
+    # Choose the dtype to cause `2 * random_bernoulli - 1` to run in the same
+    # memory (host or device) as the downstream cast will want to put it.  The
+    # convention on GPU is that int32 are in host memory and int64 are in device
+    # memory.
+    generation_dtype = tf.int64 if tf.as_dtype(dtype) != tf.int32 else tf.int32
+    random_bernoulli = tf.random.uniform(
+        shape, minval=0, maxval=2, dtype=generation_dtype, seed=seed)
     return tf.cast(2 * random_bernoulli - 1, dtype)
 
 
@@ -85,18 +86,14 @@ def random_rayleigh(shape, scale=None, dtype=tf.float32, seed=None, name=None):
     rayleigh: `Tensor` with specified `shape` and `dtype` consisting of positive
       real values drawn from a Rayleigh distribution with specified `scale`.
   """
-  with tf.name_scope(name, 'random_rayleigh', [shape, scale, seed]):
+  with tf.name_scope(name or 'random_rayleigh'):
     if scale is not None:
       # Its important to expand the shape to match scale's, otherwise we won't
       # have independent draws.
       scale = tf.convert_to_tensor(scale, dtype=dtype, name='scale')
-      shape = tf.broadcast_dynamic_shape(shape, tf.shape(scale))
-    x = tf.sqrt(-2. * tf.log(tf.random_uniform(
-        shape,
-        minval=0,
-        maxval=1,
-        dtype=dtype,
-        seed=seed)))
+      shape = tf.broadcast_dynamic_shape(shape, tf.shape(input=scale))
+    x = tf.sqrt(-2. * tf.math.log(
+        tf.random.uniform(shape, minval=0, maxval=1, dtype=dtype, seed=seed)))
     if scale is None:
       return x
     return x * scale

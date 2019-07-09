@@ -74,9 +74,11 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     "erfinv",
@@ -131,9 +133,9 @@ def ndtr(x, name="ndtr"):
     TypeError: if `x` is not floating-type.
   """
 
-  with tf.name_scope(name, values=[x]):
+  with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name="x")
-    if x.dtype.as_numpy_dtype not in [np.float32, np.float64]:
+    if dtype_util.as_numpy_dtype(x.dtype) not in [np.float32, np.float64]:
       raise TypeError(
           "x.dtype=%s is not handled, see docstring for supported types."
           % x.dtype)
@@ -147,8 +149,9 @@ def _ndtr(x):
   w = x * half_sqrt_2
   z = tf.abs(w)
   y = tf.where(
-      tf.less(z, half_sqrt_2), 1. + tf.erf(w),
-      tf.where(tf.greater(w, 0.), 2. - tf.math.erfc(z), tf.math.erfc(z)))
+      z < half_sqrt_2,
+      1. + tf.math.erf(w),
+      tf.where(w > 0., 2. - tf.math.erfc(z), tf.math.erfc(z)))
   return 0.5 * y
 
 
@@ -172,9 +175,9 @@ def ndtri(p, name="ndtri"):
     TypeError: if `p` is not floating-type.
   """
 
-  with tf.name_scope(name, values=[p]):
+  with tf.name_scope(name):
     p = tf.convert_to_tensor(p, name="p")
-    if p.dtype.as_numpy_dtype not in [np.float32, np.float64]:
+    if dtype_util.as_numpy_dtype(p.dtype) not in [np.float32, np.float64]:
       raise TypeError(
           "p.dtype=%s is not handled, see docstring for supported types."
           % p.dtype)
@@ -240,7 +243,7 @@ def _ndtri(p):
 
   def _create_polynomial(var, coeffs):
     """Compute n_th order polynomial via Horner's method."""
-    coeffs = np.array(coeffs, var.dtype.as_numpy_dtype)
+    coeffs = np.array(coeffs, dtype_util.as_numpy_dtype(var.dtype))
     if not coeffs.size:
       return tf.zeros_like(var)
     return coeffs[0] + _create_polynomial(var, coeffs[1:]) * var
@@ -251,8 +254,7 @@ def _ndtri(p):
   # number that doesn't result in NaNs is fine.
   sanitized_mcp = tf.where(
       maybe_complement_p <= 0.,
-      tf.fill(tf.shape(p), np.array(0.5, p.dtype.as_numpy_dtype)),
-      maybe_complement_p)
+      dtype_util.as_numpy_dtype(p.dtype)(0.5), maybe_complement_p)
 
   # Compute x for p > exp(-2): x/sqrt(2pi) = w + w**3 P0(w**2)/Q0(w**2).
   w = sanitized_mcp - 0.5
@@ -264,8 +266,8 @@ def _ndtri(p):
   # Compute x for p <= exp(-2): x = z - log(z)/z - (1/z) P(1/z) / Q(1/z),
   # where z = sqrt(-2. * log(p)), and P/Q are chosen between two different
   # arrays based on whether p < exp(-32).
-  z = tf.sqrt(-2. * tf.log(sanitized_mcp))
-  first_term = z - tf.log(z) / z
+  z = tf.sqrt(-2. * tf.math.log(sanitized_mcp))
+  first_term = z - tf.math.log(z) / z
   second_term_small_p = (
       _create_polynomial(1. / z, p2) /
       _create_polynomial(1. / z, q2) / z)
@@ -280,9 +282,8 @@ def _ndtri(p):
 
   x = tf.where(p > 1. - np.exp(-2.), x, -x)
   infinity_scalar = tf.constant(np.inf, dtype=p.dtype)
-  infinity = tf.fill(tf.shape(p), infinity_scalar)
-  x_nan_replaced = tf.where(
-      p <= 0.0, -infinity, tf.where(p >= 1.0, infinity, x))
+  x_nan_replaced = tf.where(p <= 0.0, -infinity_scalar,
+                            tf.where(p >= 1.0, infinity_scalar, x))
   return x_nan_replaced
 
 
@@ -343,13 +344,13 @@ def log_ndtr(x, series_order=3, name="log_ndtr"):
   if series_order > 30:
     raise ValueError("series_order must be <= 30.")
 
-  with tf.name_scope(name, values=[x]):
+  with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name="x")
 
-    if x.dtype.as_numpy_dtype == np.float64:
+    if dtype_util.base_equal(x.dtype, tf.float64):
       lower_segment = LOGNDTR_FLOAT64_LOWER
       upper_segment = LOGNDTR_FLOAT64_UPPER
-    elif x.dtype.as_numpy_dtype == np.float32:
+    elif dtype_util.base_equal(x.dtype, tf.float32):
       lower_segment = LOGNDTR_FLOAT32_LOWER
       upper_segment = LOGNDTR_FLOAT32_UPPER
     else:
@@ -370,11 +371,11 @@ def log_ndtr(x, series_order=3, name="log_ndtr"):
     #   regardless of whether dy is finite. Note that the minimum is a NOP if
     #   the branch is chosen.
     return tf.where(
-        tf.greater(x, upper_segment),
+        x > upper_segment,
         -_ndtr(-x),  # log(1-x) ~= -x, x << 1
         tf.where(
-            tf.greater(x, lower_segment),
-            tf.log(_ndtr(tf.maximum(x, lower_segment))),
+            x > lower_segment,
+            tf.math.log(_ndtr(tf.maximum(x, lower_segment))),
             _log_ndtr_lower(tf.minimum(x, lower_segment), series_order)))
 
 
@@ -382,21 +383,21 @@ def _log_ndtr_lower(x, series_order):
   """Asymptotic expansion version of `Log[cdf(x)]`, appropriate for `x<<-1`."""
   x_2 = tf.square(x)
   # Log of the term multiplying (1 + sum)
-  log_scale = -0.5 * x_2 - tf.log(-x) - 0.5 * np.log(2. * np.pi)
-  return log_scale + tf.log(_log_ndtr_asymptotic_series(x, series_order))
+  log_scale = -0.5 * x_2 - tf.math.log(-x) - 0.5 * np.log(2. * np.pi)
+  return log_scale + tf.math.log(_log_ndtr_asymptotic_series(x, series_order))
 
 
 def _log_ndtr_asymptotic_series(x, series_order):
   """Calculates the asymptotic series used in log_ndtr."""
-  dtype = x.dtype.as_numpy_dtype
+  npdt = dtype_util.as_numpy_dtype(x.dtype)
   if series_order <= 0:
-    return np.array(1, dtype)
+    return npdt(1)
   x_2 = tf.square(x)
   even_sum = tf.zeros_like(x)
   odd_sum = tf.zeros_like(x)
   x_2n = x_2  # Start with x^{2*1} = x^{2*n} with n = 1.
   for n in range(1, series_order + 1):
-    y = np.array(_double_factorial(2 * n - 1), dtype) / x_2n
+    y = npdt(_double_factorial(2 * n - 1)) / x_2n
     if n % 2:
       odd_sum += y
     else:
@@ -419,13 +420,12 @@ def erfinv(x, name="erfinv"):
     TypeError: if `x` is not floating-type.
   """
 
-  with tf.name_scope(name, values=[x]):
+  with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name="x")
-    if x.dtype.as_numpy_dtype not in [np.float32, np.float64]:
-      raise TypeError(
-          "x.dtype=%s is not handled, see docstring for supported types."
-          % x.dtype)
-    return ndtri((x + 1.0) / 2.0) / np.sqrt(2)
+    if dtype_util.as_numpy_dtype(x.dtype) not in [np.float32, np.float64]:
+      raise TypeError("x.dtype={} is not handled, see docstring for supported "
+                      "types.".format(dtype_util.name(x.dtype)))
+    return ndtri((x + 1.) / 2.) / np.sqrt(2.)
 
 
 def _double_factorial(n):
@@ -462,7 +462,7 @@ def log_cdf_laplace(x, name="log_cdf_laplace"):
     TypeError: if `x.dtype` is not handled.
   """
 
-  with tf.name_scope(name, values=[x]):
+  with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name="x")
 
     # For x < 0, L(x) = 0.5 * exp{x} exactly, so Log[L(x)] = log(0.5) + x.
@@ -476,6 +476,6 @@ def log_cdf_laplace(x, name="log_cdf_laplace"):
 
     # log1p(z) = log(1 + z) approx z for |z| << 1. This approxmation is used
     # internally by log1p, rather than being done explicitly here.
-    upper_solution = tf.log1p(-0.5 * safe_exp_neg_x)
+    upper_solution = tf.math.log1p(-0.5 * safe_exp_neg_x)
 
     return tf.where(x < 0., lower_solution, upper_solution)

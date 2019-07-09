@@ -20,14 +20,17 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class JacobianTest(tf.test.TestCase):
 
   def testJacobianDiagonal3DListInput(self):
@@ -49,12 +52,8 @@ class JacobianTest(tf.test.TestCase):
     sample_shape = [3, 5]
     state = [tf.ones(sample_shape + [2], dtype=dtype),
              tf.ones(sample_shape + [1], dtype=dtype)]
-    fn_val = target_fn(*state)
-    grad_fn = tfe.gradients_function(target_fn)
-    if tfe.executing_eagerly():
-      grads = grad_fn(*state)
-    else:
-      grads = tf.gradients(fn_val, state)
+    fn_val, grads = tfp.math.value_and_gradient(target_fn, state)
+    grad_fn = lambda *args: tfp.math.value_and_gradient(target_fn, args)[1]
 
     _, diag_jacobian_shape_passed = tfp.math.diag_jacobian(
         xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(fn_val))
@@ -98,12 +97,8 @@ class JacobianTest(tf.test.TestCase):
       return target.log_prob(z)
 
     state = [tf.ones(sample_shape + [2, 2], dtype=dtype)]
-    fn_val = target_fn(*state)
-    grad_fn = tfe.gradients_function(target_fn)
-    if tfe.executing_eagerly():
-      grads = grad_fn(state)
-    else:
-      grads = tf.gradients(fn_val, state)
+    fn_val, grads = tfp.math.value_and_gradient(target_fn, state)
+    grad_fn = lambda *args: tfp.math.value_and_gradient(target_fn, args)[1]
 
     _, diag_jacobian_shape_passed = tfp.math.diag_jacobian(
         xs=state, ys=grads, fn=grad_fn, sample_shape=tf.shape(fn_val))

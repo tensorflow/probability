@@ -20,13 +20,16 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 class Mixture(distribution.Distribution):
@@ -112,9 +115,7 @@ class Mixture(distribution.Distribution):
         have matching static event shapes.
     """
     parameters = dict(locals())
-    # TODO(b/117098119): Remove tf.distribution references once they're gone.
-    if not isinstance(cat, categorical.Categorical) and not isinstance(
-        cat, tf.distributions.Categorical):
+    if not isinstance(cat, categorical.Categorical):
       raise TypeError("cat must be a Categorical distribution, but saw: %s" %
                       cat)
     if not components:
@@ -122,10 +123,7 @@ class Mixture(distribution.Distribution):
     if not isinstance(components, (list, tuple)):
       raise TypeError("components must be a list or tuple, but saw: %s" %
                       components)
-    # TODO(b/117098119): Remove tf.distribution references once they're gone.
-    if not all(
-        isinstance(c, distribution.Distribution) or
-        isinstance(cat, tf.distributions.Distribution) for c in components):
+    if not all(isinstance(c, distribution.Distribution) for c in components):
       raise TypeError(
           "all entries in components must be Distribution instances"
           " but saw: %s" % components)
@@ -136,18 +134,25 @@ class Mixture(distribution.Distribution):
                       "dtypes: %s" % [(d.name, d.dtype) for d in components])
     static_event_shape = components[0].event_shape
     static_batch_shape = cat.batch_shape
-    for d in components:
-      static_event_shape = static_event_shape.merge_with(d.event_shape)
-      static_batch_shape = static_batch_shape.merge_with(d.batch_shape)
-    if static_event_shape.ndims is None:
+    for di, d in enumerate(components):
+      if not tensorshape_util.is_compatible_with(static_batch_shape,
+                                                 d.batch_shape):
+        raise ValueError(
+            "components[{}] batch shape must be compatible with cat "
+            "shape and other component batch shapes".format(di))
+      static_event_shape = tensorshape_util.merge_with(
+          static_event_shape, d.event_shape)
+      static_batch_shape = tensorshape_util.merge_with(
+          static_batch_shape, d.batch_shape)
+    if tensorshape_util.rank(static_event_shape) is None:
       raise ValueError(
           "Expected to know rank(event_shape) from components, but "
           "none of the components provide a static number of ndims")
 
     # Ensure that all batch and event ndims are consistent.
-    with tf.name_scope(name, values=[cat.logits]) as name:
-      num_components = cat.event_size
-      static_num_components = tf.contrib.util.constant_value(num_components)
+    with tf.name_scope(name) as name:
+      num_components = cat._num_categories()
+      static_num_components = tf.get_static_value(num_components)
       if static_num_components is None:
         raise ValueError(
             "Could not infer number of classes from cat and unable "
@@ -166,12 +171,12 @@ class Mixture(distribution.Distribution):
         check_message = ("components[%d] batch shape must match cat "
                          "batch shape")
         self._assertions = [
-            tf.assert_equal(
+            assert_util.assert_equal(
                 cat_batch_rank, batch_ranks[di], message=check_message % di)
             for di in range(len(components))
         ]
         self._assertions += [
-            tf.assert_equal(
+            assert_util.assert_equal(
                 cat_batch_shape, batch_shapes[di], message=check_message % di)
             for di in range(len(components))
         ]
@@ -238,7 +243,7 @@ class Mixture(distribution.Distribution):
       The expanded tensor.
     """
     expanded_x = x
-    for _ in range(self.event_shape.ndims):
+    for _ in range(tensorshape_util.rank(self.event_shape)):
       expanded_x = tf.expand_dims(expanded_x, -1)
     return expanded_x
 
@@ -284,7 +289,7 @@ class Mixture(distribution.Distribution):
           for (cat_lp, d_lp) in zip(cat_log_probs, distribution_log_probs)
       ]
       concat_log_probs = tf.stack(final_log_probs, 0)
-      log_sum_exp = tf.reduce_logsumexp(concat_log_probs, [0])
+      log_sum_exp = tf.reduce_logsumexp(concat_log_probs, axis=[0])
       return log_sum_exp
 
   def _log_cdf(self, x):
@@ -297,57 +302,60 @@ class Mixture(distribution.Distribution):
           for (cat_lp, d_lcdf) in zip(cat_log_probs, distribution_log_cdfs)
       ]
       concatted_log_cdfs = tf.stack(final_log_cdfs, axis=0)
-      mixture_log_cdf = tf.reduce_logsumexp(concatted_log_cdfs, [0])
+      mixture_log_cdf = tf.reduce_logsumexp(concatted_log_cdfs, axis=[0])
       return mixture_log_cdf
 
   def _sample_n(self, n, seed=None):
     if self._use_static_graph:
-      # This sampling approach is almost the same as the approach used by
-      # `MixtureSameFamily`. The differences are due to having a list of
-      # `Distribution` objects rather than a single object, and maintaining
-      # random seed management that is consistent with the non-static code path.
-      samples = []
-      cat_samples = self.cat.sample(n, seed=seed)
-      stream = seed_stream.SeedStream(seed, salt="Mixture")
+      with tf.control_dependencies(self._assertions):
+        # This sampling approach is almost the same as the approach used by
+        # `MixtureSameFamily`. The differences are due to having a list of
+        # `Distribution` objects rather than a single object, and maintaining
+        # random seed management that is consistent with the non-static code
+        # path.
+        samples = []
+        cat_samples = self.cat.sample(n, seed=seed)
+        stream = seed_stream.SeedStream(seed, salt="Mixture")
 
-      for c in range(self.num_components):
-        samples.append(self.components[c].sample(n, seed=stream()))
-      x = tf.stack(samples, -self._static_event_shape.ndims - 1)  # [n, B, k, E]
-      npdt = x.dtype.as_numpy_dtype
-      mask = tf.one_hot(
-          indices=cat_samples,  # [n, B]
-          depth=self._num_components,  # == k
-          on_value=np.ones([], dtype=npdt),
-          off_value=np.zeros([], dtype=npdt))  # [n, B, k]
-      mask = distribution_util.pad_mixture_dimensions(
-          mask, self, self._cat,
-          self._static_event_shape.ndims)                   # [n, B, k, [1]*e]
-      return tf.reduce_sum(
-          x * mask, axis=-1 - self._static_event_shape.ndims)  # [n, B, E]
+        for c in range(self.num_components):
+          samples.append(self.components[c].sample(n, seed=stream()))
+        stack_axis = -1 - tensorshape_util.rank(self._static_event_shape)
+        x = tf.stack(samples, axis=stack_axis)  # [n, B, k, E]
+        npdt = dtype_util.as_numpy_dtype(x.dtype)
+        mask = tf.one_hot(
+            indices=cat_samples,  # [n, B]
+            depth=self._num_components,  # == k
+            on_value=npdt(1),
+            off_value=npdt(0))  # [n, B, k]
+        mask = distribution_util.pad_mixture_dimensions(
+            mask, self, self._cat,
+            tensorshape_util.rank(self._static_event_shape))  # [n, B, k, [1]*e]
+        return tf.reduce_sum(x * mask, axis=stack_axis)  # [n, B, E]
 
     with tf.control_dependencies(self._assertions):
       n = tf.convert_to_tensor(n, name="n")
-      static_n = tf.contrib.util.constant_value(n)
+      static_n = tf.get_static_value(n)
       n = int(static_n) if static_n is not None else n
       cat_samples = self.cat.sample(n, seed=seed)
 
       static_samples_shape = cat_samples.shape
-      if static_samples_shape.is_fully_defined():
-        samples_shape = static_samples_shape.as_list()
-        samples_size = static_samples_shape.num_elements()
+      if tensorshape_util.is_fully_defined(static_samples_shape):
+        samples_shape = tensorshape_util.as_list(static_samples_shape)
+        samples_size = tensorshape_util.num_elements(static_samples_shape)
       else:
         samples_shape = tf.shape(cat_samples)
         samples_size = tf.size(cat_samples)
       static_batch_shape = self.batch_shape
-      if static_batch_shape.is_fully_defined():
-        batch_shape = static_batch_shape.as_list()
-        batch_size = static_batch_shape.num_elements()
+      if tensorshape_util.is_fully_defined(static_batch_shape):
+        batch_shape = tensorshape_util.as_list(static_batch_shape)
+        batch_size = tensorshape_util.num_elements(static_batch_shape)
       else:
         batch_shape = self.batch_shape_tensor()
         batch_size = tf.reduce_prod(batch_shape)
       static_event_shape = self.event_shape
-      if static_event_shape.is_fully_defined():
-        event_shape = np.array(static_event_shape.as_list(), dtype=np.int32)
+      if tensorshape_util.is_fully_defined(static_event_shape):
+        event_shape = np.array(
+            tensorshape_util.as_list(static_event_shape), dtype=np.int32)
       else:
         event_shape = self.event_shape_tensor()
 
@@ -429,8 +437,9 @@ class Mixture(distribution.Distribution):
       ret = tf.reshape(
           lhs_flat_ret, tf.concat(
               [samples_shape, self.event_shape_tensor()], 0))
-      ret.set_shape(
-          tf.TensorShape(static_samples_shape).concatenate(self.event_shape))
+      tensorshape_util.set_shape(
+          ret,
+          tensorshape_util.concatenate(static_samples_shape, self.event_shape))
       return ret
 
   def entropy_lower_bound(self, name="entropy_lower_bound"):
@@ -472,7 +481,7 @@ class Mixture(distribution.Distribution):
     Returns:
       A lower bound on the Mixture's entropy.
     """
-    with self._name_scope(name, values=[self.cat.logits]):
+    with self._name_and_control_scope(name):
       with tf.control_dependencies(self._assertions):
         distribution_entropies = [d.entropy() for d in self.components]
         cat_probs = self._cat_probs(log_probs=False)
@@ -484,7 +493,8 @@ class Mixture(distribution.Distribution):
 
   def _cat_probs(self, log_probs):
     """Get a list of num_components batchwise probabilities."""
-    which_softmax = tf.nn.log_softmax if log_probs else tf.nn.softmax
-    cat_probs = which_softmax(self.cat.logits)
-    cat_probs = tf.unstack(cat_probs, num=self.num_components, axis=-1)
-    return cat_probs
+    if log_probs:
+      x = tf.math.log_softmax(self.cat.logits_parameter())
+    else:
+      x = self.cat.probs_parameter()
+    return tf.unstack(x, num=self.num_components, axis=-1)

@@ -20,12 +20,12 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 
 __all__ = [
     "Cauchy",
@@ -118,15 +118,15 @@ class Cauchy(distribution.Distribution):
       TypeError: if `loc` and `scale` have different `dtype`.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, scale]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies([tf.assert_positive(scale)]
-                                   if validate_args else []):
+      with tf.control_dependencies(
+          [assert_util.assert_positive(scale)] if validate_args else []):
         self._loc = tf.identity(loc)
         self._scale = tf.identity(scale)
-        tf.assert_same_float_dtype([self._loc, self._scale])
+        dtype_util.assert_same_float_dtype([self._loc, self._scale])
     super(Cauchy, self).__init__(
         dtype=self._scale.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -141,6 +141,10 @@ class Cauchy(distribution.Distribution):
     return dict(
         zip(("loc", "scale"),
             ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=0, scale=0)
 
   @property
   def loc(self):
@@ -162,11 +166,11 @@ class Cauchy(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)
-    probs = tf.random_uniform(
+    probs = tf.random.uniform(
         shape=shape, minval=0., maxval=1., dtype=self.dtype, seed=seed)
     return self._quantile(probs)
 
@@ -177,16 +181,16 @@ class Cauchy(distribution.Distribution):
     return tf.atan(self._z(x)) / np.pi + 0.5
 
   def _log_cdf(self, x):
-    return tf.log1p(2 / np.pi * tf.atan(self._z(x))) - np.log(2)
+    return tf.math.log1p(2 / np.pi * tf.atan(self._z(x))) - np.log(2)
 
   def _log_unnormalized_prob(self, x):
-    return -tf.log1p(tf.square(self._z(x)))
+    return -tf.math.log1p(tf.square(self._z(x)))
 
   def _log_normalization(self):
-    return np.log(np.pi) + tf.log(self.scale)
+    return np.log(np.pi) + tf.math.log(self.scale)
 
   def _entropy(self):
-    h = np.log(4 * np.pi) + tf.log(self.scale)
+    h = np.log(4 * np.pi) + tf.math.log(self.scale)
     return h * tf.ones_like(self.loc)
 
   def _quantile(self, p):
@@ -197,24 +201,24 @@ class Cauchy(distribution.Distribution):
 
   def _z(self, x):
     """Standardize input `x`."""
-    with tf.name_scope("standardize", values=[x]):
+    with tf.name_scope("standardize"):
       return (x - self.loc) / self.scale
 
   def _inv_z(self, z):
     """Reconstruct input `x` from a its normalized version."""
-    with tf.name_scope("reconstruct", values=[z]):
+    with tf.name_scope("reconstruct"):
       return z * self.scale + self.loc
 
   def _mean(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
       raise ValueError("`mean` is undefined for Cauchy distribution.")
 
   def _stddev(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
       raise ValueError("`stddev` is undefined for Cauchy distribution.")

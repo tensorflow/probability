@@ -20,8 +20,13 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python.bijectors import reshape as reshape_bijector
 from tensorflow_probability.python.distributions import uniform as uniform_distribution
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 def assert_finite(array):
@@ -81,7 +86,7 @@ def assert_scalar_congruency(bijector,
   # Should be monotonic over this interval
   ten_x_pts = np.linspace(lower_x, upper_x, num=10).astype(np.float32)
   if bijector.dtype is not None:
-    ten_x_pts = ten_x_pts.astype(bijector.dtype.as_numpy_dtype)
+    ten_x_pts = ten_x_pts.astype(dtype_util.as_numpy_dtype(bijector.dtype))
   forward_on_10_pts = bijector.forward(ten_x_pts)
 
   # Set the lower/upper limits in the range of the bijector.
@@ -229,3 +234,69 @@ def assert_bijective_and_finite(bijector,
   np.testing.assert_allclose(y_from_y, y, atol=atol, rtol=rtol)
   np.testing.assert_allclose(-ildj_f_x, fldj_x, atol=atol, rtol=rtol)
   np.testing.assert_allclose(-ildj_y, fldj_g_y, atol=atol, rtol=rtol)
+
+
+def get_fldj_theoretical(bijector,
+                         x,
+                         event_ndims,
+                         inverse_event_ndims=None,
+                         input_to_unconstrained=None,
+                         output_to_unconstrained=None):
+  """Numerically approximate the forward log det Jacobian of a bijector.
+
+  We compute the Jacobian of the chain
+  output_to_unconst_vec(bijector(inverse(input_to_unconst_vec))) so that
+  we're working with a full rank matrix.  We then adjust the resulting Jacobian
+  for the unconstraining bijectors.
+
+  Bijectors that constrain / unconstrain their inputs/outputs may not be
+  testable with this method, since the composition above may reduce the test
+  to something trivial.  However, bijectors that map within constrained spaces
+  should be fine.
+
+  Args:
+    bijector: the bijector whose Jacobian we wish to approximate
+    x: the value for which we want to approximate the Jacobian. x must have
+      a a single batch dimension for compatibility with tape.batch_jacobian.
+    event_ndims: number of dimensions in an event
+    inverse_event_ndims: Integer describing the number of event dimensions for
+      the bijector codomain. If None, then the value of `event_ndims` is used.
+    input_to_unconstrained: bijector that maps the input to the above bijector
+      to an unconstrained 1-D vector.  If unspecified, flatten the input into
+      a 1-D vector according to its event_ndims.
+    output_to_unconstrained: bijector that maps the output of the above bijector
+      to an unconstrained 1-D vector.  If unspecified, flatten the input into
+      a 1-D vector according to its event_ndims.
+
+  Returns:
+    A numerical approximation to the log det Jacobian of bijector.forward
+    evaluated at x.
+  """
+  if inverse_event_ndims is None:
+    inverse_event_ndims = event_ndims
+  if input_to_unconstrained is None:
+    input_to_unconstrained = reshape_bijector.Reshape(
+        event_shape_in=x.shape[tensorshape_util.rank(x.shape) - event_ndims:],
+        event_shape_out=[-1])
+  if output_to_unconstrained is None:
+    output_to_unconstrained = reshape_bijector.Reshape(
+        event_shape_in=x.shape[tensorshape_util.rank(x.shape) - event_ndims:],
+        event_shape_out=[-1])
+
+  x = tf.convert_to_tensor(x)
+  x_unconstrained = 1 * input_to_unconstrained.forward(x)
+
+  with tf.GradientTape(persistent=True) as tape:
+    tape.watch(x_unconstrained)
+    f_x = bijector.forward(input_to_unconstrained.inverse(x_unconstrained))
+    f_x_unconstrained = output_to_unconstrained.forward(f_x)
+  jacobian = tape.batch_jacobian(
+      f_x_unconstrained, x_unconstrained, experimental_use_pfor=False)
+
+  log_det_jacobian = 0.5 * tf.linalg.slogdet(
+      tf.matmul(jacobian, jacobian, adjoint_a=True)).log_abs_determinant
+
+  return (log_det_jacobian + input_to_unconstrained.forward_log_det_jacobian(
+      x, event_ndims=event_ndims) -
+          output_to_unconstrained.forward_log_det_jacobian(
+              f_x, event_ndims=inverse_event_ndims))

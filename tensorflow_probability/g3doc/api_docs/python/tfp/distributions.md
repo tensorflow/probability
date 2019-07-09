@@ -3,12 +3,18 @@
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="FULLY_REPARAMETERIZED"/>
 <meta itemprop="property" content="NOT_REPARAMETERIZED"/>
-<meta itemprop="property" content="__all__"/>
 </div>
 
 # Module: tfp.distributions
 
-Statistical distributions and bijective transformations.
+Statistical distributions.
+
+
+
+Defined in [`python/distributions/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/__init__.py).
+
+<!-- Placeholder for "Used in" -->
+
 
 ## Classes
 
@@ -20,13 +26,15 @@ Statistical distributions and bijective transformations.
 
 [`class Beta`](../tfp/distributions/Beta.md): Beta distribution.
 
-[`class BetaWithSoftplusConcentration`](../tfp/distributions/BetaWithSoftplusConcentration.md): Beta with softplus transform of `concentration1` and `concentration0`.
-
 [`class Binomial`](../tfp/distributions/Binomial.md): Binomial distribution.
 
-[`class Categorical`](../tfp/distributions/Categorical.md): Categorical distribution.
+[`class Blockwise`](../tfp/distributions/Blockwise.md): Blockwise distribution.
+
+[`class Categorical`](../tfp/distributions/Categorical.md): Categorical distribution over integers.
 
 [`class Cauchy`](../tfp/distributions/Cauchy.md): The Cauchy distribution with location `loc` and scale `scale`.
+
+[`class Chi`](../tfp/distributions/Chi.md): Chi distribution.
 
 [`class Chi2`](../tfp/distributions/Chi2.md): Chi2 distribution.
 
@@ -44,17 +52,15 @@ Statistical distributions and bijective transformations.
 
 [`class Distribution`](../tfp/distributions/Distribution.md): A generic probability distribution base class.
 
+[`class Empirical`](../tfp/distributions/Empirical.md): Empirical distribution.
+
 [`class ExpRelaxedOneHotCategorical`](../tfp/distributions/ExpRelaxedOneHotCategorical.md): ExpRelaxedOneHotCategorical distribution with temperature and logits.
 
 [`class Exponential`](../tfp/distributions/Exponential.md): Exponential distribution.
 
-[`class ExponentialWithSoftplusRate`](../tfp/distributions/ExponentialWithSoftplusRate.md): Exponential with softplus transform on `rate`.
-
 [`class Gamma`](../tfp/distributions/Gamma.md): Gamma distribution.
 
 [`class GammaGamma`](../tfp/distributions/GammaGamma.md): Gamma-Gamma distribution.
-
-[`class GammaWithSoftplusConcentrationRate`](../tfp/distributions/GammaWithSoftplusConcentrationRate.md): `Gamma` with softplus of `concentration` and `rate`.
 
 [`class GaussianProcess`](../tfp/distributions/GaussianProcess.md): Marginal distribution of a Gaussian process at finitely many points.
 
@@ -68,21 +74,29 @@ Statistical distributions and bijective transformations.
 
 [`class HalfNormal`](../tfp/distributions/HalfNormal.md): The Half Normal distribution with scale `scale`.
 
+[`class HiddenMarkovModel`](../tfp/distributions/HiddenMarkovModel.md): Hidden Markov model distribution.
+
+[`class Horseshoe`](../tfp/distributions/Horseshoe.md): Horseshoe distribution.
+
 [`class Independent`](../tfp/distributions/Independent.md): Independent distribution from batch of distributions.
 
 [`class InverseGamma`](../tfp/distributions/InverseGamma.md): InverseGamma distribution.
 
-[`class InverseGammaWithSoftplusConcentrationRate`](../tfp/distributions/InverseGammaWithSoftplusConcentrationRate.md): `InverseGamma` with softplus of `concentration` and `rate`.
-
 [`class InverseGaussian`](../tfp/distributions/InverseGaussian.md): Inverse Gaussian distribution.
+
+[`class JointDistribution`](../tfp/distributions/JointDistribution.md): Joint distribution over one or more component distributions.
+
+[`class JointDistributionCoroutine`](../tfp/distributions/JointDistributionCoroutine.md): Joint distribution parameterized by a distribution-making generator.
+
+[`class JointDistributionNamed`](../tfp/distributions/JointDistributionNamed.md): Joint distribution parameterized by named distribution-making functions.
+
+[`class JointDistributionSequential`](../tfp/distributions/JointDistributionSequential.md): Joint distribution parameterized by distribution-making functions.
 
 [`class Kumaraswamy`](../tfp/distributions/Kumaraswamy.md): Kumaraswamy distribution.
 
 [`class LKJ`](../tfp/distributions/LKJ.md): The LKJ distribution on correlation matrices.
 
 [`class Laplace`](../tfp/distributions/Laplace.md): The Laplace distribution with location `loc` and `scale` parameters.
-
-[`class LaplaceWithSoftplusScale`](../tfp/distributions/LaplaceWithSoftplusScale.md): Laplace with softplus applied to `scale`.
 
 [`class LinearGaussianStateSpaceModel`](../tfp/distributions/LinearGaussianStateSpaceModel.md): Observation distribution from a linear Gaussian state space model.
 
@@ -114,8 +128,6 @@ Statistical distributions and bijective transformations.
 
 [`class Normal`](../tfp/distributions/Normal.md): The Normal distribution with location `loc` and `scale` parameters.
 
-[`class NormalWithSoftplusScale`](../tfp/distributions/NormalWithSoftplusScale.md): Normal with softplus applied to `scale`.
-
 [`class OneHotCategorical`](../tfp/distributions/OneHotCategorical.md): OneHotCategorical distribution.
 
 [`class Pareto`](../tfp/distributions/Pareto.md): Pareto distribution.
@@ -134,13 +146,15 @@ Statistical distributions and bijective transformations.
 
 [`class ReparameterizationType`](../tfp/distributions/ReparameterizationType.md): Instances of this class represent how sampling is reparameterized.
 
+[`class Sample`](../tfp/distributions/Sample.md): Sample distribution via independent draws.
+
 [`class SeedStream`](../tfp/distributions/SeedStream.md): Local PRNG for amplifying seed entropy into seeds for base operations.
 
 [`class SinhArcsinh`](../tfp/distributions/SinhArcsinh.md): The SinhArcsinh transformation of a distribution on `(-inf, inf)`.
 
 [`class StudentT`](../tfp/distributions/StudentT.md): Student's t-distribution.
 
-[`class StudentTWithAbsDfSoftplusScale`](../tfp/distributions/StudentTWithAbsDfSoftplusScale.md): StudentT with `df = floor(abs(df))` and `scale = softplus(scale)`.
+[`class StudentTProcess`](../tfp/distributions/StudentTProcess.md): Marginal distribution of a Student's T process at finitely many points.
 
 [`class TransformedDistribution`](../tfp/distributions/TransformedDistribution.md): A Transformed Distribution.
 
@@ -149,6 +163,8 @@ Statistical distributions and bijective transformations.
 [`class TruncatedNormal`](../tfp/distributions/TruncatedNormal.md): The Truncated Normal distribution.
 
 [`class Uniform`](../tfp/distributions/Uniform.md): Uniform distribution with `low` and `high` parameters.
+
+[`class VariationalGaussianProcess`](../tfp/distributions/VariationalGaussianProcess.md): Posterior predictive of a variational Gaussian process.
 
 [`class VectorDeterministic`](../tfp/distributions/VectorDeterministic.md): Vector `Deterministic` distribution on `R^k`.
 
@@ -170,27 +186,27 @@ Statistical distributions and bijective transformations.
 
 ## Functions
 
+[`InverseGammaWithSoftplusConcentrationRate(...)`](../tfp/distributions/InverseGammaWithSoftplusConcentrationRate.md): `InverseGamma` with softplus of `concentration` and `scale`. (deprecated)
+
+[`InverseGammaWithSoftplusConcentrationScale(...)`](../tfp/distributions/InverseGammaWithSoftplusConcentrationScale.md): `InverseGamma` with softplus of `concentration` and `scale`. (deprecated)
+
 [`assign_log_moving_mean_exp(...)`](../tfp/distributions/assign_log_moving_mean_exp.md): Compute the log of the exponentially weighted moving mean of the exp.
 
 [`assign_moving_mean_variance(...)`](../tfp/distributions/assign_moving_mean_variance.md): Compute exponentially weighted moving {mean,variance} of a streaming value.
 
-[`auto_correlation(...)`](../tfp/distributions/auto_correlation.md): Auto correlation along one axis.
+[`fill_triangular(...)`](../tfp/distributions/fill_triangular.md): Creates a (batch of) triangular matrix from a vector of inputs. (deprecated)
 
-[`fill_triangular(...)`](../tfp/distributions/fill_triangular.md): Creates a (batch of) triangular matrix from a vector of inputs.
-
-[`fill_triangular_inverse(...)`](../tfp/distributions/fill_triangular_inverse.md): Creates a vector from a (batch of) triangular matrix.
+[`fill_triangular_inverse(...)`](../tfp/distributions/fill_triangular_inverse.md): Creates a vector from a (batch of) triangular matrix. (deprecated)
 
 [`kl_divergence(...)`](../tfp/distributions/kl_divergence.md): Get the KL-divergence KL(distribution_a || distribution_b).
 
 [`matrix_diag_transform(...)`](../tfp/distributions/matrix_diag_transform.md): Transform diagonal of [batch-]matrix, leave rest of matrix unchanged.
 
-[`moving_mean_variance(...)`](../tfp/distributions/moving_mean_variance.md): Compute exponentially weighted moving {mean,variance} of a streaming value.
+[`moving_mean_variance(...)`](../tfp/distributions/moving_mean_variance.md): Compute exponentially weighted moving {mean,variance} of a streaming value. (deprecated)
 
 [`normal_conjugates_known_scale_posterior(...)`](../tfp/distributions/normal_conjugates_known_scale_posterior.md): Posterior Normal distribution with conjugate prior on the mean.
 
 [`normal_conjugates_known_scale_predictive(...)`](../tfp/distributions/normal_conjugates_known_scale_predictive.md): Posterior predictive Normal distribution w. conjugate prior on the mean.
-
-[`percentile(...)`](../tfp/distributions/percentile.md): Compute the `q`-th percentile(s) of `x`.
 
 [`quadrature_scheme_lognormal_gauss_hermite(...)`](../tfp/distributions/quadrature_scheme_lognormal_gauss_hermite.md): Use Gauss-Hermite quadrature to form quadrature on positive-reals.
 
@@ -200,17 +216,13 @@ Statistical distributions and bijective transformations.
 
 [`quadrature_scheme_softmaxnormal_quantiles(...)`](../tfp/distributions/quadrature_scheme_softmaxnormal_quantiles.md): Use SoftmaxNormal quantiles to form quadrature on `K - 1` simplex.
 
-[`reduce_weighted_logsumexp(...)`](../tfp/distributions/reduce_weighted_logsumexp.md): Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`.
+[`reduce_weighted_logsumexp(...)`](../tfp/distributions/reduce_weighted_logsumexp.md): Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`. (deprecated)
 
-[`softplus_inverse(...)`](../tfp/distributions/softplus_inverse.md): Computes the inverse softplus, i.e., x = softplus_inverse(softplus(x)).
+[`softplus_inverse(...)`](../tfp/distributions/softplus_inverse.md): Computes the inverse softplus, i.e., x = softplus_inverse(softplus(x)). (deprecated)
 
 [`tridiag(...)`](../tfp/distributions/tridiag.md): Creates a matrix with values set above, below, and on the diagonal.
 
 ## Other Members
 
-<h3 id="FULLY_REPARAMETERIZED"><code>FULLY_REPARAMETERIZED</code></h3>
-
-<h3 id="NOT_REPARAMETERIZED"><code>NOT_REPARAMETERIZED</code></h3>
-
-<h3 id="__all__"><code>__all__</code></h3>
-
+* `FULLY_REPARAMETERIZED` <a id="FULLY_REPARAMETERIZED"></a>
+* `NOT_REPARAMETERIZED` <a id="NOT_REPARAMETERIZED"></a>

@@ -18,9 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     "AbsoluteValue",
@@ -75,35 +77,33 @@ class AbsoluteValue(bijector.Bijector):
         `inverse_log_det_jacobian` are non-negative.
       name: Python `str` name given to ops managed by this object.
     """
-    self._graph_parents = []
-    self._name = name
-
-    with self._name_scope("init"):
+    with tf.name_scope(name) as name:
       super(AbsoluteValue, self).__init__(
           forward_min_event_ndims=0,
-          is_constant_jacobian=True,
           validate_args=validate_args,
           name=name)
 
   def _forward(self, x):
-    return tf.abs(x)
+    return tf.math.abs(x)
 
   def _inverse(self, y):
-    if self.validate_args:
-      y = control_flow_ops.with_dependencies(
-          [tf.assert_non_negative(y, message="Argument y was negative")], y)
-    return -y, y
+    with tf.control_dependencies(self._assertions(y)):
+      return -y, y
 
   def _inverse_log_det_jacobian(self, y):
     # If event_ndims = 2,
     # F^{-1}(y) = (-y, y), so DF^{-1}(y) = (-1, 1),
     # so Log|DF^{-1}(y)| = Log[1, 1] = [0, 0].
-    zeros = tf.constant(0., dtype=y.dtype)
-    if self.validate_args:
-      zeros = control_flow_ops.with_dependencies(
-          [tf.assert_non_negative(y, message="Argument y was negative")], zeros)
-    return zeros, zeros
+    with tf.control_dependencies(self._assertions(y)):
+      zero = tf.zeros([], dtype=dtype_util.base_dtype(y.dtype))
+      return zero, zero
 
   @property
   def _is_injective(self):
     return False
+
+  def _assertions(self, t):
+    if not self.validate_args:
+      return []
+    return [assert_util.assert_non_negative(
+        t, message="Argument y was negative")]

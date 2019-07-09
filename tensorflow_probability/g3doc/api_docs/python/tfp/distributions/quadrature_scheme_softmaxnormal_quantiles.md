@@ -5,6 +5,8 @@
 
 # tfp.distributions.quadrature_scheme_softmaxnormal_quantiles
 
+Use SoftmaxNormal quantiles to form quadrature on `K - 1` simplex.
+
 ``` python
 tfp.distributions.quadrature_scheme_softmaxnormal_quantiles(
     normal_loc,
@@ -15,7 +17,11 @@ tfp.distributions.quadrature_scheme_softmaxnormal_quantiles(
 )
 ```
 
-Use SoftmaxNormal quantiles to form quadrature on `K - 1` simplex.
+
+
+Defined in [`python/distributions/vector_diffeomixture.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/vector_diffeomixture.py).
+
+<!-- Placeholder for "Used in" -->
 
 A `SoftmaxNormal` random variable `Y` may be generated via
 
@@ -26,23 +32,25 @@ X = Normal(normal_loc, normal_scale)
 
 #### Args:
 
+
 * <b>`normal_loc`</b>: `float`-like `Tensor` with shape `[b1, ..., bB, K-1]`, B>=0.
-    The location parameter of the Normal used to construct the SoftmaxNormal.
+  The location parameter of the Normal used to construct the SoftmaxNormal.
 * <b>`normal_scale`</b>: `float`-like `Tensor`. Broadcastable with `normal_loc`.
-    The scale parameter of the Normal used to construct the SoftmaxNormal.
+  The scale parameter of the Normal used to construct the SoftmaxNormal.
 * <b>`quadrature_size`</b>: Python `int` scalar representing the number of quadrature
-    points.
+  points.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 
 #### Returns:
 
+
 * <b>`grid`</b>: Shape `[b1, ..., bB, K, quadrature_size]` `Tensor` representing the
-    convex combination of affine parameters for `K` components.
-    `grid[..., :, n]` is the `n`-th grid point, living in the `K - 1` simplex.
+  convex combination of affine parameters for `K` components.
+  `grid[..., :, n]` is the `n`-th grid point, living in the `K - 1` simplex.
 * <b>`probs`</b>:  Shape `[b1, ..., bB, K, quadrature_size]` `Tensor` representing the
-    associated with each grid point.
+  associated with each grid point.
