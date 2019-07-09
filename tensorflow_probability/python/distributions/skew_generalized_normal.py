@@ -41,39 +41,36 @@ class SkewGeneralizedNormal(Normal):
   probability of points outside its support
   '''
   def __init__(self,
-      loc,
-      scale,
-      peak,
-      validate_args = False,
-      allow_nan_stats = True,
-      name = "GeneralizedGaussian"):
+               loc,
+               scale,
+               peak,
+               validate_args=False,
+               allow_nan_stats=True,
+               name="GeneralizedGaussian"):
+
+    parameters = dict(locals())
 
 
-
-   parameters =  parameters = dict(locals())
-
-
-   with tf.name_scope(name, values=[loc, scale, peak]) as name:
-    dtype = dtype_util.common_dtype([loc, scale], tf.float32)
-    loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-    scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-    peak = tf.convert_to_tensor(peak, name="peak", dtype=dtype)
+    with tf.name_scope(name, values=[loc, scale, peak]) as name:
+      dtype = dtype_util.common_dtype([loc, scale], tf.float32)
+      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
+      peak = tf.convert_to_tensor(peak, name="peak", dtype=dtype)
 
     with tf.control_dependencies([tf.assert_positive(scale)] if
             validate_args else []):
-     self._loc = tf.identity(loc)
-     self._scale = tf.identity(scale)
-     self._peak = tf.identity(peak)
+      self._loc = tf.identity(loc)
+      self._scale = tf.identity(scale)
+      self._peak = tf.identity(peak)
 
-     tf.assert_same_float_dtype([self._loc, self._scale, self._peak])
-   super(Normal, self).__init__(
-    dtype=dtype,
-    reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-    validate_args=validate_args,
-    allow_nan_stats=allow_nan_stats,
-    parameters=parameters,
-    graph_parents=[self._loc, self._scale, self._peak],
-    name=name)
+      tf.assert_same_float_dtype([self._loc, self._scale, self._peak])
+    super(Normal, self).__init__(dtype=dtype,
+                                 reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+                                 validate_args=validate_args,
+                                 allow_nan_stats=allow_nan_stats,
+                                 parameters=parameters,
+                                 graph_parents=[self._loc, self._scale, self._peak],
+                                 name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
