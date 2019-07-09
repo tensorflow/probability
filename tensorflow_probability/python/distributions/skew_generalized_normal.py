@@ -13,7 +13,7 @@ from tensorflow.python.framework import tensor_shape
 from tensorflow_probability.python.distributions.normal import Normal
 
 __all__ = [
-  "SkewGeneralizedNormal",
+    "SkewGeneralizedNormal",
 ]
 
 
@@ -97,10 +97,10 @@ class SkewGeneralizedNormal(Normal):
         tf.shape(self.scale))
 
   def _batch_shape(self):
-    loc_scale_broadcast = tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
-    loc_peak_broadcast = tf.broadcast_static_shape(self.loc.shape, self.peak.shape)
-    peak_scale_broadcast = tf.broadcast_static_shape(self.peak.shape, self.scale.shape)
-    assert loc_scale_broadcast == loc_peak_broadcast == peak_scale_broadcast
+    loc_scale_s = tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
+    loc_peak_s = tf.broadcast_static_shape(self.loc.shape, self.peak.shape)
+    peak_scale_s = tf.broadcast_static_shape(self.peak.shape, self.scale.shape)
+    assert loc_scale_s == loc_peak_s == peak_scale_s
     return tf.broadcast_static_shape(
         self.loc.shape,
         self.scale.shape)
@@ -126,15 +126,17 @@ class SkewGeneralizedNormal(Normal):
     return self._n_log_prob(self._y(x)) - log_smpe
 
   def _prob(self, x):
-    nan_tensor = tf.exp(self._log_prob(x))
-    return tf.where(tf.is_nan(nan_tensor), tf.zeros_like(nan_tensor), nan_tensor
+    log_prob_nan = tf.exp(self._log_prob(x))
+    return tf.where(tf.is_nan(log_prob_nan), tf.zeros_like(log_prob_nan), log_prob_nan
                     )
 
   def _log_cdf(self, x):
     return special_math.log_ndtr(self._y(x))
 
   def _y(self, x):
-    return (-1./self.peak) * tf.log(1. - self.peak*(x - self.loc)/self.scale)
+    inv_peak = (-1./self.peak)
+    inv_scaled_offset = 1. - self.peak * (x - self.loc) / self.scale
+    return inv_peak * tf.log(inv_scaled_offset)
 
   def _cdf(self, x):
     return special_math.ndtr(self._y(x))
@@ -152,12 +154,12 @@ class SkewGeneralizedNormal(Normal):
     return 0.5 * math.log(2. * math.pi) + 1.
 
   def _mean(self):
-    _ones = tf.ones_like(self.scale)
-    return self._z((tf.exp(tf.square(self.peak)/2.) - 1.)/self.peak) * _ones
+    broadcast_ones = tf.ones_like(self.scale)
+    return self._z((tf.exp(tf.square(self.peak)/2.) - 1.)/self.peak) * broadcast_ones
 
   def _quantile(self, p):
-    quantile_kernel = (1. - tf.exp(-self.peak * special_math.ndtri(p)))/self.peak
-    return self._inv_z(quantile_kernel)
+    quantile_z = (1. - tf.exp(-self.peak * special_math.ndtri(p)))/self.peak
+    return self._inv_z(quantile_z)
 
   def _stddev(self):
     broadcast_ones = tf.ones_like(self.loc)
@@ -168,7 +170,8 @@ class SkewGeneralizedNormal(Normal):
 
   def _mode(self):
     broad_ones = tf.ones_like(self.scale)
-    return (((1. - tf.exp(-tf.square(self.peak)))*self.scale)/self.peak + self.loc) * broad_ones
+    mode = (((1. - tf.exp(-tf.square(self.peak)))*self.scale)/self.peak + self.loc)
+    return mode * broad_ones
 
   def _z(self, x):
     """Standardize input `x` to a unit normal."""
