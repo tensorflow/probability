@@ -462,9 +462,9 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:gumbel",
         "//tensorflow_probability/python/bijectors:invert",
-        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -639,6 +639,8 @@ py_library(
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math",
     ],
 )
 
@@ -2425,7 +2427,7 @@ py_test(
     srcs = ["distribution_properties_test.py"],
     args = ["--tf_mode=graph"],
     main = "distribution_properties_test.py",
-    shard_count = 5,
+    shard_count = 6,
     tags = ["hypothesis"],
     deps = [":distribution_properties_testlib"],
 )

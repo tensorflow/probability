@@ -27,9 +27,9 @@ from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
-from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 
 class Gumbel(transformed_distribution.TransformedDistribution):
@@ -102,7 +102,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
                scale,
                validate_args=False,
                allow_nan_stats=True,
-               name="Gumbel"):
+               name='Gumbel'):
     """Construct Gumbel distributions with location and scale `loc` and `scale`.
 
     The parameters `loc` and `scale` must be shaped in a way that supports
@@ -118,7 +118,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
         outputs.
         Default value: `False`.
       allow_nan_stats: Python `bool`, default `True`. When `True`,
-        statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+        statistics (e.g., mean, mode, variance) use the value `NaN` to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
         Default value: `True`.
@@ -131,28 +131,26 @@ class Gumbel(transformed_distribution.TransformedDistribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], dtype_hint=tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies(
-          [assert_util.assert_positive(scale)] if validate_args else []):
-        loc = tf.identity(loc, name="loc")
-        scale = tf.identity(scale, name="scale")
-        dtype_util.assert_same_float_dtype([loc, scale])
-        self._gumbel_bijector = gumbel_bijector.Gumbel(
-            loc=loc, scale=scale, validate_args=validate_args)
+      loc = tensor_util.convert_immutable_to_tensor(
+          loc, name='loc', dtype=dtype)
+      scale = tensor_util.convert_immutable_to_tensor(
+          scale, name='scale', dtype=dtype)
+      dtype_util.assert_same_float_dtype([loc, scale])
+      # Positive scale is asserted by the incorporated Gumbel bijector.
+      self._gumbel_bijector = gumbel_bijector.Gumbel(
+          loc=loc, scale=scale, validate_args=validate_args)
 
       # Because the uniform sampler generates samples in `[0, 1)` this would
       # cause samples to lie in `(inf, -inf]` instead of `(inf, -inf)`. To fix
       # this, we use `np.finfo(dtype_util.as_numpy_dtype(self.dtype).tiny`
-      # because it is the smallest, positive, "normal" number.
+      # because it is the smallest, positive, 'normal' number.
       super(Gumbel, self).__init__(
           distribution=uniform.Uniform(
               low=np.finfo(dtype_util.as_numpy_dtype(dtype)).tiny,
-              high=tf.ones([], dtype=loc.dtype),
+              high=tf.ones([], dtype=dtype),
               allow_nan_stats=allow_nan_stats),
-          # The Gumbel bijector encodes the quantile
-          # function as the forward, and hence needs to
-          # be inverted.
+          # The Gumbel bijector encodes the quantile function as the forward,
+          # and hence needs to be inverted.
           bijector=invert_bijector.Invert(self._gumbel_bijector),
           batch_shape=distribution_util.get_broadcast_shape(loc, scale),
           parameters=parameters,
@@ -161,7 +159,7 @@ class Gumbel(transformed_distribution.TransformedDistribution):
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("loc", "scale"),
+        zip(('loc', 'scale'),
             ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
@@ -184,8 +182,9 @@ class Gumbel(transformed_distribution.TransformedDistribution):
     return 1. + tf.math.log(scale) + np.euler_gamma
 
   def _log_prob(self, x):
-    z = (x - self.loc) / self.scale
-    return -(z + tf.exp(-z)) - tf.math.log(self.scale)
+    scale = tf.convert_to_tensor(self.scale)
+    z = (x - self.loc) / scale
+    return -(z + tf.exp(-z)) - tf.math.log(scale)
 
   def _mean(self):
     return self.loc + self.scale * np.euler_gamma
@@ -196,6 +195,9 @@ class Gumbel(transformed_distribution.TransformedDistribution):
   def _mode(self):
     return self.loc * tf.ones_like(self.scale)
 
+  def _parameter_control_dependencies(self, is_init):
+    return self._gumbel_bijector._parameter_control_dependencies(is_init)  # pylint: disable=protected-access
+
 
 @kullback_leibler.RegisterKL(Gumbel, Gumbel)
 def _kl_gumbel_gumbel(a, b, name=None):
@@ -205,20 +207,24 @@ def _kl_gumbel_gumbel(a, b, name=None):
     a: instance of a Gumbel distribution object.
     b: instance of a Gumbel distribution object.
     name: (optional) Name to use for created operations.
-      default is "kl_gumbel_gumbel".
+      default is 'kl_gumbel_gumbel'.
 
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name or "kl_gumbel_gumbel"):
+  with tf.name_scope(name or 'kl_gumbel_gumbel'):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 64
     # The paper uses beta to refer to scale and mu to refer to loc.
     # There is actually an error in the solution as printed; this is based on
     # the second-to-last step of the derivation. The value as printed would be
     # off by (a.loc - b.loc) / b.scale.
-    return (tf.math.log(b.scale) - tf.math.log(a.scale) + np.euler_gamma *
-            (a.scale / b.scale - 1.) +
-            tf.math.expm1((b.loc - a.loc) / b.scale +
-                          tf.math.lgamma(a.scale / b.scale + 1.)) +
-            (a.loc - b.loc) / b.scale)
+    a_loc = tf.convert_to_tensor(a.loc)
+    b_loc = tf.convert_to_tensor(b.loc)
+    a_scale = tf.convert_to_tensor(a.scale)
+    b_scale = tf.convert_to_tensor(b.scale)
+    return (tf.math.log(b_scale) - tf.math.log(a_scale) + np.euler_gamma *
+            (a_scale / b_scale - 1.) +
+            tf.math.expm1((b_loc - a_loc) / b_scale +
+                          tf.math.lgamma(a_scale / b_scale + 1.)) +
+            (a_loc - b_loc) / b_scale)

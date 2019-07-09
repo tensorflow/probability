@@ -21,7 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
@@ -93,7 +92,7 @@ class KumaraswamyTest(test_case.TestCase):
   def testVariableConcentration1(self):
     x = tf.Variable(1.)
     b = tfb.Kumaraswamy(concentration0=1., concentration1=x, validate_args=True)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(x.initializer)
     self.assertIs(x, b.concentration1)
     self.assertEqual((), self.evaluate(b.forward(1.)).shape)
     with self.assertRaisesOpError(
@@ -104,7 +103,7 @@ class KumaraswamyTest(test_case.TestCase):
   def testVariableConcentration0(self):
     x = tf.Variable(1.)
     b = tfb.Kumaraswamy(concentration0=x, concentration1=1., validate_args=True)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(x.initializer)
     self.assertIs(x, b.concentration0)
     self.assertEqual((), self.evaluate(b.forward(1.)).shape)
     with self.assertRaisesOpError(
@@ -114,7 +113,7 @@ class KumaraswamyTest(test_case.TestCase):
 
   def testShapeGetterRaisesException(self):
     x = tf.Variable(-1.)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(x.initializer)
     with self.assertRaisesOpError(
         'Argument `concentration1` must be positive.'):
       b = tfb.Kumaraswamy(concentration0=1.,

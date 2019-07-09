@@ -57,10 +57,12 @@ TF2_FRIENDLY_DISTS = (
     'Exponential',
     'Gamma',
     'GeneralizedPareto',
+    'Gumbel',
     'HalfNormal',
     'Laplace',
     'LogNormal',
     'Logistic',
+    'Kumaraswamy',
     'Normal',
     'Multinomial',
     'Poisson',
@@ -445,8 +447,13 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
         pass
 
     with tf.GradientTape() as tape:
+      # TDs do bijector assertions twice (once by distribution.sample, and once
+      # by bijector.forward).
+      max_permissible = (
+          3 if isinstance(dist, tfd.TransformedDistribution) else 2)
       with tfp_hps.assert_no_excessive_var_usage(
-          'method `sample` of `{}`'.format(dist)):
+          'method `sample` of `{}`'.format(dist),
+          max_permissible=max_permissible):
         sample = dist.sample()
     if dist.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
       grads = tape.gradient(sample, dist.variables)
@@ -504,9 +511,13 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
             max_size=3)):
       logging.info('%s.%s', dist_name, evaluative)
       try:
+        # No validation => 1 convert. But for TD we allow 2:
+        # dist.log_prob(bijector.inverse(samp)) + bijector.ildj(samp)
+        max_permissible = (
+            2 if isinstance(dist, tfd.TransformedDistribution) else 1)
         with tfp_hps.assert_no_excessive_var_usage(
             'evaluative `{}` of `{}`'.format(evaluative, dist),
-            max_permissible=1):  # No validation => 1 convert
+            max_permissible=max_permissible):
           getattr(dist, evaluative)(sample)
       except NotImplementedError:
         pass
