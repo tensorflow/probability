@@ -1609,6 +1609,7 @@ py_test(
 py_test(
     name = "generalized_pareto_test",
     srcs = ["generalized_pareto_test.py"],
+    tags = ["hypothesis"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2434,5 +2435,8 @@ py_test(
 
 test_suite(
     name = "distribution_properties_test",
-    tags = ["hypothesis"],
+    tests = [
+        ":distribution_properties_test_eager",
+        ":distribution_properties_test_graph",
+    ],
 )

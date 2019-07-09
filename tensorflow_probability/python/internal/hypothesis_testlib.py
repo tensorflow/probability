@@ -28,11 +28,10 @@ from hypothesis.extra import numpy as hpnp
 import hypothesis.strategies as hps
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import tensorshape_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 
 def derandomize_hypothesis():
@@ -92,11 +91,8 @@ def constrained_tensors(constraint_fn, shape):
   float32s = hps.floats(-200, 200, allow_nan=False, allow_infinity=False)
 
   def mapper(x):
-    result = assert_util.assert_finite(
+    return assert_util.assert_finite(
         constraint_fn(tf.convert_to_tensor(x)), message='param non-finite')
-    if tf.executing_eagerly():
-      return result.numpy()
-    return result
 
   return hpnp.arrays(
       dtype=np.float32, shape=shape, elements=float32s).map(mapper)
@@ -192,17 +188,17 @@ def broadcasting_params(draw,
         constraint_fn_for(param), (tensorshape_util.as_list(param_batch_shape) +
                                    [event_dim] * param_event_rank))
     params_kwargs[param] = tf.convert_to_tensor(
-        draw(param_strategy), dtype=tf.float32, name=param)
+        draw(param_strategy), dtype_hint=tf.float32, name=param)
     if enable_vars and draw(hps.booleans()):
       params_kwargs[param] = tf.Variable(params_kwargs[param], name=param)
       alt_value = tf.convert_to_tensor(
           draw(param_strategy),
-          dtype=tf.float32,
+          dtype_hint=tf.float32,
           name='{}_alt_value'.format(param))
       setattr(params_kwargs[param], '_tfp_alt_value', alt_value)
       if draw(hps.booleans()):
-        params_kwargs[param] = tfp.util.DeferredTensor(usage_counting_identity,
-                                                       params_kwargs[param])
+        params_kwargs[param] = DeferredTensor(usage_counting_identity,
+                                              params_kwargs[param])
   return params_kwargs
 
 
@@ -343,4 +339,4 @@ def positive_definite(x):
 
 def lower_tril_positive_definite(x):
   return tf.linalg.band_part(
-      tfd.matrix_diag_transform(x, softplus_plus_eps()), -1, 0)
+      distribution_util.matrix_diag_transform(x, softplus_plus_eps()), -1, 0)

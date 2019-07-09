@@ -25,6 +25,7 @@ from absl import logging
 import hypothesis.strategies as hps
 import six
 
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
@@ -142,6 +143,9 @@ def bijector_supports():
       'Ordered':
           BijectorSupport(Support.VECTOR_STRICTLY_INCREASING,
                           Support.VECTOR_UNCONSTRAINED),
+      'RationalQuadraticSpline':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_UNCONSTRAINED),
       'Reciprocal':
           BijectorSupport(Support.SCALAR_NON_ZERO, Support.SCALAR_NON_ZERO),
       'Sigmoid':
@@ -208,3 +212,32 @@ def distribution_filter_for(bijector):
     return additional_check(dist)
 
   return distribution_filter
+
+
+def padded(t, lhs, rhs=None):
+  """Left pads and optionally right pads the innermost axis of `t`."""
+  t = tf.convert_to_tensor(t)
+  lhs = tf.convert_to_tensor(lhs, dtype=t.dtype)
+  zeros = tf.zeros([tf.rank(t) - 1, 2], dtype=tf.int32)
+  lhs_paddings = tf.concat([zeros, [[1, 0]]], axis=0)
+  result = tf.pad(t, paddings=lhs_paddings, constant_values=lhs)
+  if rhs is not None:
+    rhs = tf.convert_to_tensor(rhs, dtype=t.dtype)
+    rhs_paddings = tf.concat([zeros, [[0, 1]]], axis=0)
+    result = tf.pad(result, paddings=rhs_paddings, constant_values=rhs)
+  return result
+
+
+def spline_bin_size_constraint(x, lo=-1, hi=1, dtype=tf.float32):
+  """Maps innermost axis of `x` to positive values."""
+  nbins = tf.cast(tf.shape(x)[-1], dtype)
+  min_width = 1e-2
+  scale = hi - lo - nbins * min_width
+  return tf.math.softmax(tf.cast(x, dtype)) * scale + min_width
+
+
+def spline_slope_constraint(s, dtype=tf.float32):
+  """Maps `s` to all positive with `s[..., 0] == s[..., -1] == 1`."""
+  # Slice off a position since this is nknots - 2 vs nknots - 1 for bin sizes.
+  min_slope = 1e-2
+  return tf.math.softplus(tf.cast(s[..., :-1], dtype)) + min_slope

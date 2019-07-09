@@ -51,6 +51,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'Kumaraswamy',
     'NormalCDF',
     'Ordered',
+    'RationalQuadraticSpline',
     'Reciprocal',
     'Sigmoid',
     'SinhArcsinh',
@@ -64,6 +65,7 @@ BIJECTOR_PARAMS_NDIMS = {
     'Gumbel': dict(loc=0, scale=0),
     'Kumaraswamy': dict(concentration1=0, concentration0=0),
     'SinhArcsinh': dict(skewness=0, tailweight=0),
+    'RationalQuadraticSpline': dict(bin_widths=2, bin_heights=2, knot_slopes=2),
 }
 
 MUTEX_PARAMS = (
@@ -111,11 +113,14 @@ def broadcasting_params(draw,
 
 
 @hps.composite
-def bijectors(draw, bijector_name=None, batch_shape=None, enable_vars=False):
+def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
+              enable_vars=False):
   if bijector_name is None:
     bijector_name = draw(hps.one_of(map(hps.just, TF2_FRIENDLY_BIJECTORS)))
   if batch_shape is None:
     batch_shape = draw(tfp_hps.batch_shapes())
+  if event_dim is None:
+    event_dim = draw(hps.integers(min_value=2, max_value=6))
   if bijector_name == 'Invert':
     underlying_name = draw(
         hps.one_of(map(hps.just,
@@ -124,11 +129,13 @@ def bijectors(draw, bijector_name=None, batch_shape=None, enable_vars=False):
         bijectors(
             bijector_name=underlying_name,
             batch_shape=batch_shape,
+            event_dim=event_dim,
             enable_vars=enable_vars))
     return tfb.Invert(underlying, validate_args=True), batch_shape
 
   bijector_params = draw(
-      broadcasting_params(bijector_name, batch_shape, enable_vars=enable_vars))
+      broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,
+                          enable_vars=enable_vars))
   ctor = getattr(tfb, bijector_name)
   return ctor(validate_args=True, **bijector_params), batch_shape
 
@@ -241,11 +248,11 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
   def testBijector(self, bijector_name, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
       return
-    bijector, batch_shape = data.draw(
-        bijectors(bijector_name=bijector_name, enable_vars=True))
-    del batch_shape
-
     event_dim = data.draw(hps.integers(min_value=2, max_value=6))
+    bijector, batch_shape = data.draw(
+        bijectors(bijector_name=bijector_name, event_dim=event_dim,
+                  enable_vars=True))
+    del batch_shape
 
     # Forward mapping.
     shp = bijector.inverse_event_shape([event_dim] *
@@ -331,6 +338,9 @@ CONSTRAINTS = {
     'scale': tfp_hps.softplus_plus_eps(),
     'tailweight': tfp_hps.softplus_plus_eps(),
     'AffineScalar.scale': tfp_hps.softplus_plus_eps(),
+    'bin_widths': bijector_hps.spline_bin_size_constraint,
+    'bin_heights': bijector_hps.spline_bin_size_constraint,
+    'knot_slopes': bijector_hps.spline_slope_constraint,
 }
 
 

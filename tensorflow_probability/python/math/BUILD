@@ -167,6 +167,7 @@ py_test(
     size = "medium",
     srcs = ["linalg_test.py"],
     shard_count = 5,
+    tags = ["hypothesis"],
     deps = [
         # absl/testing:parameterized dep,
         # hypothesis dep,

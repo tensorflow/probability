@@ -145,7 +145,7 @@ class RealNVP(bijector_lib.Bijector):
 
     Args:
       num_masked: Python `int` indicating that the first `d` units of the event
-        should be masked. Must be in the closed interval `[1, D-1]`, where `D`
+        should be masked. Must be in the closed interval `[0, D-1]`, where `D`
         is the event size of the base distribution.
       shift_and_log_scale_fn: Python `callable` which computes `shift` and
         `log_scale` from both the forward domain (`x`) and the inverse domain
@@ -169,13 +169,13 @@ class RealNVP(bijector_lib.Bijector):
       name: Python `str`, name given to ops managed by this object.
 
     Raises:
-      ValueError: If num_masked < 1.
+      ValueError: If num_masked < 0.
       ValueError: If both or none of `shift_and_log_scale_fn` and `bijector_fn`
           are specified.
     """
     name = name or 'real_nvp'
-    if num_masked <= 0:
-      raise ValueError('num_masked must be a positive integer.')
+    if num_masked < 0:
+      raise ValueError('num_masked must be a non-negative integer.')
     self._num_masked = num_masked
     # At construction time, we don't know input_depth.
     self._input_depth = None

@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl import logging
 import numpy as np
 
 import tensorflow.compat.v2 as tf
@@ -31,7 +32,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 def assert_finite(array):
   if not np.isfinite(array).all():
-    raise AssertionError("array was not all finite. %s" % array[:15])
+    raise AssertionError('array was not all finite. %s' % array[:15])
 
 
 def assert_strictly_increasing(array):
@@ -269,7 +270,7 @@ def get_fldj_theoretical(bijector,
       a 1-D vector according to its event_ndims.
 
   Returns:
-    A numerical approximation to the log det Jacobian of bijector.forward
+    A gradient-based approximation to the log det Jacobian of bijector.forward
     evaluated at x.
   """
   if inverse_event_ndims is None:
@@ -292,6 +293,7 @@ def get_fldj_theoretical(bijector,
     f_x_unconstrained = output_to_unconstrained.forward(f_x)
   jacobian = tape.batch_jacobian(
       f_x_unconstrained, x_unconstrained, experimental_use_pfor=False)
+  logging.vlog(1, 'Jacobian: %s', jacobian)
 
   log_det_jacobian = 0.5 * tf.linalg.slogdet(
       tf.matmul(jacobian, jacobian, adjoint_a=True)).log_abs_determinant
