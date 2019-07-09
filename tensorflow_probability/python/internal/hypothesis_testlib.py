@@ -132,8 +132,42 @@ def broadcasting_params(draw,
                         enable_vars=False,
                         params_event_ndims=None,
                         constraint_fn_for=lambda param: identity_fn,
-                        mutex_params=frozenset()):
-  """Draws a dict of parameters which should yield the given batch shape."""
+                        mutex_params=()):
+  """Draws a dict of parameters which should yield the given batch shape.
+
+  The dtypes of the returned parameters are determined by their respective
+  constraint functions.
+
+  Args:
+    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    batch_shape: A `TensorShape`.  The returned parameters' batch shapes will
+      broadcast to this.
+    event_dim: Optional Python int giving the size of each parameter's event
+      dimensions (except where overridded by any applicable constraint
+      functions).  This is shared across all parameters, permitting square event
+      matrices, compatible location and scale Tensors, etc. If omitted,
+      Hypothesis will choose one.
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test.  If `False`, the returned parameters are
+      all Tensors, never Variables or DeferredTensor.
+    params_event_ndims: Python `dict` mapping the name of each parameter to a
+      Python `int` giving the event ndims for that parameter.
+    constraint_fn_for: Python callable mapping parameter name to constraint
+      function.  The latter is itself a Python callable which converts an
+      unconstrained Tensor (currently with float32 values from -200 to +200)
+      into one that meets the parameter's validity constraints.
+    mutex_params: Python iterable of Python sets.  Each set gives a clique of
+      mutually exclusive parameters (e.g., the 'probs' and 'logits' of a
+      Categorical).  At most one parameter from each set will appear in the
+      result.
+
+  Returns:
+    params: A Hypothesis strategy for drawing Python `dict`s mapping parameter
+      name to a Tensor, Variable, or DeferredTensor.  The batch shapes of the
+      returned parameters broadcast together to the supplied `batch_shape`.
+      Only parameters whose names appear as keys in `params_event_ndims` will
+      appear (but possibly not all of them, depending on `mutex_params`).
+  """
   if event_dim is None:
     event_dim = draw(hps.integers(min_value=2, max_value=6))
 
