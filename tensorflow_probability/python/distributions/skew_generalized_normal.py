@@ -61,6 +61,7 @@ class SkewGeneralizedNormal(Normal):
         self._peak = tf.identity(peak)
 
         tf.assert_same_float_dtype([self._loc, self._scale, self._peak])
+
     super(Normal, self).__init__(
         dtype=dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -172,7 +173,7 @@ class SkewGeneralizedNormal(Normal):
   def _mode(self):
     broad_ones = tf.ones_like(self.scale)
     unit_mode = ((1. - tf.exp(-tf.square(self.peak)))*self.scale)/self.peak
-    return (mode + self.loc) * broad_ones
+    return (unit_mode + self.loc) * broad_ones
 
   def _z(self, x):
     """Standardize input `x` to a unit normal."""
