@@ -5,6 +5,8 @@
 
 # tfp.distributions.quadrature_scheme_lognormal_gauss_hermite
 
+Use Gauss-Hermite quadrature to form quadrature on positive-reals.
+
 ``` python
 tfp.distributions.quadrature_scheme_lognormal_gauss_hermite(
     loc,
@@ -15,29 +17,35 @@ tfp.distributions.quadrature_scheme_lognormal_gauss_hermite(
 )
 ```
 
-Use Gauss-Hermite quadrature to form quadrature on positive-reals.
+
+
+Defined in [`python/distributions/poisson_lognormal.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/poisson_lognormal.py).
+
+<!-- Placeholder for "Used in" -->
 
 Note: for a given `quadrature_size`, this method is generally less accurate
 than `quadrature_scheme_lognormal_quantiles`.
 
 #### Args:
 
+
 * <b>`loc`</b>: `float`-like (batch of) scalar `Tensor`; the location parameter of
-    the LogNormal prior.
+  the LogNormal prior.
 * <b>`scale`</b>: `float`-like (batch of) scalar `Tensor`; the scale parameter of
-    the LogNormal prior.
+  the LogNormal prior.
 * <b>`quadrature_size`</b>: Python `int` scalar representing the number of quadrature
-    points.
+  points.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
-    parameters are checked for validity despite possibly degrading runtime
-    performance. When `False` invalid inputs may silently render incorrect
-    outputs.
+  parameters are checked for validity despite possibly degrading runtime
+  performance. When `False` invalid inputs may silently render incorrect
+  outputs.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 
 #### Returns:
 
+
 * <b>`grid`</b>: (Batch of) length-`quadrature_size` vectors representing the
-    `log_rate` parameters of a `Poisson`.
+  `log_rate` parameters of a `Poisson`.
 * <b>`probs`</b>: (Batch of) length-`quadrature_size` vectors representing the
-    weight associate with each `grid` value.
+  weight associate with each `grid` value.

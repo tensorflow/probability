@@ -20,13 +20,14 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
-tfe = tf.contrib.eager
 
-
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class AffineLinearOperatorTest(tf.test.TestCase):
 
   def testIdentity(self):
@@ -35,7 +36,7 @@ class AffineLinearOperatorTest(tf.test.TestCase):
     y = x
     ildj = 0.
 
-    self.assertEqual(affine.name, "affine_linear_operator")
+    self.assertStartsWith(affine.name, "affine_linear_operator")
     self.assertAllClose(y, self.evaluate(affine.forward(x)))
     self.assertAllClose(x, self.evaluate(affine.inverse(y)))
     self.assertAllClose(
@@ -59,7 +60,7 @@ class AffineLinearOperatorTest(tf.test.TestCase):
     y = diag * x + shift
     ildj = -np.sum(np.log(np.abs(diag)), axis=-1)
 
-    self.assertEqual(affine.name, "affine_linear_operator")
+    self.assertStartsWith(affine.name, "affine_linear_operator")
     self.assertAllClose(y, self.evaluate(affine.forward(x)))
     self.assertAllClose(x, self.evaluate(affine.inverse(y)))
     self.assertAllClose(
@@ -94,7 +95,7 @@ class AffineLinearOperatorTest(tf.test.TestCase):
     ildj = -np.sum(np.log(np.abs(np.diagonal(
         tril, axis1=-2, axis2=-1))))
 
-    self.assertEqual(affine.name, "affine_linear_operator")
+    self.assertStartsWith(affine.name, "affine_linear_operator")
     self.assertAllClose(y, self.evaluate(affine.forward(x)))
     self.assertAllClose(x, self.evaluate(affine.inverse(y)))
     self.assertAllClose(
@@ -132,7 +133,7 @@ class AffineLinearOperatorTest(tf.test.TestCase):
     ildj = -np.sum(np.log(np.abs(np.diagonal(
         tril, axis1=-2, axis2=-1))))
 
-    self.assertEqual(affine.name, "affine_linear_operator")
+    self.assertStartsWith(affine.name, "affine_linear_operator")
     self.assertAllClose(y, self.evaluate(affine.forward(x)))
     self.assertAllClose(x, self.evaluate(affine.inverse(y)))
     self.assertAllClose(
@@ -144,6 +145,12 @@ class AffineLinearOperatorTest(tf.test.TestCase):
         self.evaluate(-affine.inverse_log_det_jacobian(y, event_ndims=2)),
         self.evaluate(affine.forward_log_det_jacobian(x, event_ndims=2)))
 
+  def testVariableGradient(self):
+    b = tfb.AffineLinearOperator(shift=tf.Variable(-1.))
+
+    with tf.GradientTape() as tape:
+      y = b.forward(.1)
+    self.assertIsNotNone(tape.gradient(y, b.shift))
 
 if __name__ == "__main__":
   tf.test.main()

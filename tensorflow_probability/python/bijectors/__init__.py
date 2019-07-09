@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Bijector Ops."""
+"""Bijective transformations."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -26,10 +26,13 @@ from tensorflow_probability.python.bijectors.affine_linear_operator import Affin
 from tensorflow_probability.python.bijectors.affine_scalar import AffineScalar
 from tensorflow_probability.python.bijectors.batch_normalization import BatchNormalization
 from tensorflow_probability.python.bijectors.bijector import Bijector
+from tensorflow_probability.python.bijectors.bijector import ConditionalBijector
+from tensorflow_probability.python.bijectors.blockwise import Blockwise
 from tensorflow_probability.python.bijectors.chain import Chain
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
 from tensorflow_probability.python.bijectors.cholesky_to_inv_cholesky import CholeskyToInvCholesky
-from tensorflow_probability.python.bijectors.conditional_bijector import ConditionalBijector
+from tensorflow_probability.python.bijectors.correlation_cholesky import CorrelationCholesky
+from tensorflow_probability.python.bijectors.cumsum import Cumsum
 from tensorflow_probability.python.bijectors.discrete_cosine_transform import DiscreteCosineTransform
 from tensorflow_probability.python.bijectors.exp import Exp
 from tensorflow_probability.python.bijectors.expm1 import Expm1
@@ -38,7 +41,10 @@ from tensorflow_probability.python.bijectors.gumbel import Gumbel
 from tensorflow_probability.python.bijectors.identity import Identity
 from tensorflow_probability.python.bijectors.inline import Inline
 from tensorflow_probability.python.bijectors.invert import Invert
+from tensorflow_probability.python.bijectors.iterated_sigmoid_centered import IteratedSigmoidCentered
 from tensorflow_probability.python.bijectors.kumaraswamy import Kumaraswamy
+from tensorflow_probability.python.bijectors.masked_autoregressive import AutoregressiveLayer
+from tensorflow_probability.python.bijectors.masked_autoregressive import AutoregressiveNetwork
 from tensorflow_probability.python.bijectors.masked_autoregressive import masked_autoregressive_default_template
 from tensorflow_probability.python.bijectors.masked_autoregressive import masked_dense
 from tensorflow_probability.python.bijectors.masked_autoregressive import MaskedAutoregressiveFlow
@@ -55,6 +61,7 @@ from tensorflow_probability.python.bijectors.reshape import Reshape
 from tensorflow_probability.python.bijectors.scale_tril import ScaleTriL
 from tensorflow_probability.python.bijectors.sigmoid import Sigmoid
 from tensorflow_probability.python.bijectors.sinh_arcsinh import SinhArcsinh
+from tensorflow_probability.python.bijectors.softfloor import Softfloor
 from tensorflow_probability.python.bijectors.softmax_centered import SoftmaxCentered
 from tensorflow_probability.python.bijectors.softplus import Softplus
 from tensorflow_probability.python.bijectors.softsign import Softsign
@@ -71,12 +78,17 @@ __all__ = [
     "Affine",
     "AffineLinearOperator",
     "AffineScalar",
+    "AutoregressiveLayer",
+    "AutoregressiveNetwork",
     "BatchNormalization",
     "Bijector",
+    "Blockwise",
+    # "CategoricalToDiscrete",  # Omitted pending further discussion.
     "Chain",
     "CholeskyOuterProduct",
     "CholeskyToInvCholesky",
     "ConditionalBijector",
+    "Cumsum",
     "DiscreteCosineTransform",
     "Exp",
     "Expm1",
@@ -85,6 +97,7 @@ __all__ = [
     "Identity",
     "Inline",
     "Invert",
+    "IteratedSigmoidCentered",
     "Kumaraswamy",
     "MaskedAutoregressiveFlow",
     "MatrixInverseTriL",
@@ -99,6 +112,7 @@ __all__ = [
     "ScaleTriL",
     "Sigmoid",
     "SinhArcsinh",
+    "Softfloor",
     "SoftmaxCentered",
     "Softplus",
     "Softsign",

@@ -24,36 +24,36 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class LangevinTest(tf.test.TestCase):
 
   def testLangevin1DNormal(self):
     """Sampling from the Standard Normal Distribution."""
     dtype = np.float32
 
-    with self.cached_session(graph=tf.Graph()) as sess:
-      target = tfd.Normal(loc=dtype(0), scale=dtype(1))
-      samples, _ = tfp.mcmc.sample_chain(
-          num_results=1000,
-          current_state=dtype(1),
-          kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-              target_log_prob_fn=target.log_prob,
-              step_size=0.75,
-              seed=42),
-          num_burnin_steps=500,
-          parallel_iterations=1)  # For determinism.
+    target = tfd.Normal(loc=dtype(0), scale=dtype(1))
+    samples, _ = tfp.mcmc.sample_chain(
+        num_results=1000,
+        current_state=dtype(1),
+        kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+            target_log_prob_fn=target.log_prob,
+            step_size=0.75,
+            seed=42),
+        num_burnin_steps=500,
+        parallel_iterations=1)  # For determinism.
 
-      sample_mean = tf.reduce_mean(samples, axis=0)
-      sample_std = tf.sqrt(
-          tf.reduce_mean(tf.squared_difference(samples, sample_mean),
-                         axis=0))
+    sample_mean = tf.reduce_mean(input_tensor=samples, axis=0)
+    sample_std = tf.sqrt(
+        tf.reduce_mean(
+            input_tensor=tf.math.squared_difference(samples, sample_mean),
+            axis=0))
 
-      sess.graph.finalize()  # No more graph building.
-
-      [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
+    sample_mean_, sample_std_ = self.evaluate([sample_mean, sample_std])
 
     self.assertAllClose(sample_mean_, 0., atol=0.1, rtol=0.1)
     self.assertAllClose(sample_std_, 1., atol=0.1, rtol=0.1)
@@ -65,43 +65,43 @@ class LangevinTest(tf.test.TestCase):
     true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
     num_results = 500
     num_chains = 500
-    with self.cached_session(graph=tf.Graph()) as sess:
-      # Target distribution is defined through the Cholesky decomposition
-      chol = tf.linalg.cholesky(true_cov)
-      target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
-      # Assume that the state is passed as a list of tensors `x` and `y`.
-      # Then the target log-density is defined as follows:
-      def target_log_prob(x, y):
-        # Stack the input tensors together
-        z = tf.concat([x, y], axis=-1)
-        return target.log_prob(z)
+    # Target distribution is defined through the Cholesky decomposition
+    chol = tf.linalg.cholesky(true_cov)
+    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
-      # Initial state of the chain
-      init_state = [np.ones([num_chains, 2], dtype=dtype),
-                    np.ones([num_chains, 1], dtype=dtype)]
+    # Assume that the state is passed as a list of tensors `x` and `y`.
+    # Then the target log-density is defined as follows:
+    def target_log_prob(x, y):
+      # Stack the input tensors together
+      z = tf.concat([x, y], axis=-1)
+      return target.log_prob(z)
 
-      # Run MALA with normal proposal for `num_results` iterations for
-      # `num_chains` independent chains:
-      states, _ = tfp.mcmc.sample_chain(
-          num_results=num_results,
-          current_state=init_state,
-          kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-              target_log_prob_fn=target_log_prob,
-              step_size=.1,
-              seed=42),
-          num_burnin_steps=200,
-          num_steps_between_results=1,
-          parallel_iterations=1)
+    # Initial state of the chain
+    init_state = [np.ones([num_chains, 2], dtype=dtype),
+                  np.ones([num_chains, 1], dtype=dtype)]
 
-      states = tf.concat(states, axis=-1)
-      sample_mean = tf.reduce_mean(states, axis=[0, 1])
-      x = tf.expand_dims(states - sample_mean, -1)
-      sample_cov = tf.reduce_mean(
-          tf.matmul(x, tf.transpose(x, [0, 1, 3, 2])), [0, 1])
+    # Run MALA with normal proposal for `num_results` iterations for
+    # `num_chains` independent chains:
+    states, _ = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        current_state=init_state,
+        kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+            target_log_prob_fn=target_log_prob,
+            step_size=.1,
+            seed=42),
+        num_burnin_steps=200,
+        num_steps_between_results=1,
+        parallel_iterations=1)
 
-      [sample_mean_, sample_cov_] = sess.run([
-          sample_mean, sample_cov])
+    states = tf.concat(states, axis=-1)
+    sample_mean = tf.reduce_mean(input_tensor=states, axis=[0, 1])
+    x = tf.expand_dims(states - sample_mean, -1)
+    sample_cov = tf.reduce_mean(
+        input_tensor=tf.matmul(x, tf.transpose(a=x, perm=[0, 1, 3, 2])),
+        axis=[0, 1])
+
+    sample_mean_, sample_cov_ = self.evaluate([sample_mean, sample_cov])
 
     self.assertAllClose(np.squeeze(sample_mean_), true_mean, atol=0.1, rtol=0.1)
     self.assertAllClose(np.squeeze(sample_cov_), true_cov, atol=0.1, rtol=0.1)
@@ -113,55 +113,54 @@ class LangevinTest(tf.test.TestCase):
     true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
     num_results = 500
     num_chains = 500
-    with self.cached_session(graph=tf.Graph()) as sess:
-      # Targeg distribution is defined through the Cholesky decomposition
-      chol = tf.linalg.cholesky(true_cov)
-      target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
-      # Assume that the state is passed as a list of 1-d tensors `x` and `y`.
-      # Then the target log-density is defined as follows:
-      def target_log_prob(x, y):
-        # Stack the input tensors together
-        z = tf.concat([x, y], axis=-1)
-        return target.log_prob(z)
+    # Targeg distribution is defined through the Cholesky decomposition
+    chol = tf.linalg.cholesky(true_cov)
+    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
-      # Here we define the volatility function to be non-caonstant
-      def volatility_fn(x, y):
-        # Stack the input tensors together
-        return [1. / (0.5 + 0.1 * tf.abs(x + y)),
-                1. / (0.5 + 0.1 * tf.abs(y))]
+    # Assume that the state is passed as a list of 1-d tensors `x` and `y`.
+    # Then the target log-density is defined as follows:
+    def target_log_prob(x, y):
+      # Stack the input tensors together
+      z = tf.concat([x, y], axis=-1)
+      return target.log_prob(z)
 
-      # Initial state of the chain
-      init_state = [np.ones([num_chains, 2], dtype=dtype),
-                    np.ones([num_chains, 1], dtype=dtype)]
+    # Here we define the volatility function to be non-caonstant
+    def volatility_fn(x, y):
+      # Stack the input tensors together
+      return [1. / (0.5 + 0.1 * tf.abs(x + y)),
+              1. / (0.5 + 0.1 * tf.abs(y))]
 
-      # Run Random Walk Metropolis with normal proposal for `num_results`
-      # iterations for `num_chains` independent chains:
-      states, _ = tfp.mcmc.sample_chain(
-          num_results=num_results,
-          current_state=init_state,
-          kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-              target_log_prob_fn=target_log_prob,
-              volatility_fn=volatility_fn,
-              step_size=.1,
-              seed=42),
-          num_burnin_steps=200,
-          num_steps_between_results=1,
-          parallel_iterations=1)
+    # Initial state of the chain
+    init_state = [np.ones([num_chains, 2], dtype=dtype),
+                  np.ones([num_chains, 1], dtype=dtype)]
 
-      states = tf.concat(states, axis=-1)
-      sample_mean = tf.reduce_mean(states, axis=[0, 1])
-      x = tf.expand_dims(states - sample_mean, -1)
-      sample_cov = tf.reduce_mean(
-          tf.matmul(x, tf.transpose(x, [0, 1, 3, 2])), [0, 1])
+    # Run Random Walk Metropolis with normal proposal for `num_results`
+    # iterations for `num_chains` independent chains:
+    states, _ = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        current_state=init_state,
+        kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+            target_log_prob_fn=target_log_prob,
+            volatility_fn=volatility_fn,
+            step_size=.1,
+            seed=42),
+        num_burnin_steps=200,
+        num_steps_between_results=1,
+        parallel_iterations=1)
 
-      [sample_mean_, sample_cov_] = sess.run([
-          sample_mean, sample_cov])
+    states = tf.concat(states, axis=-1)
+    sample_mean = tf.reduce_mean(input_tensor=states, axis=[0, 1])
+    x = tf.expand_dims(states - sample_mean, -1)
+    sample_cov = tf.reduce_mean(
+        input_tensor=tf.matmul(x, tf.transpose(a=x, perm=[0, 1, 3, 2])),
+        axis=[0, 1])
+
+    sample_mean_, sample_cov_ = self.evaluate([sample_mean, sample_cov])
 
     self.assertAllClose(np.squeeze(sample_mean_), true_mean, atol=0.1, rtol=0.1)
     self.assertAllClose(np.squeeze(sample_cov_), true_cov, atol=0.1, rtol=0.1)
 
-  @tfe.run_test_in_graph_and_eager_modes()
   def testLangevinCorrectVolatilityGradient(self):
     """Check that the gradient of the volatility is computed correctly."""
     # Consider the example target distribution as in `testLangevin3DNormal`

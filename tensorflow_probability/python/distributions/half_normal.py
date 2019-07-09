@@ -20,18 +20,19 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
-from tensorflow.python.framework import tensor_shape
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
-    "HalfNormal",
+    'HalfNormal',
 ]
 
 
@@ -86,7 +87,7 @@ class HalfNormal(distribution.Distribution):
                scale,
                validate_args=False,
                allow_nan_stats=True,
-               name="HalfNormal"):
+               name='HalfNormal'):
     """Construct HalfNormals with scale `scale`.
 
     Args:
@@ -97,32 +98,31 @@ class HalfNormal(distribution.Distribution):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`,
-        statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+        statistics (e.g., mean, mode, variance) use the value '`NaN`' to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[scale]) as name:
-      scale = tf.convert_to_tensor(
-          scale,
-          name="scale",
-          dtype=dtype_util.common_dtype([scale], preferred_dtype=tf.float32))
-      with tf.control_dependencies([tf.assert_positive(scale)]
-                                   if validate_args else []):
-        self._scale = tf.identity(scale, name="scale")
-    super(HalfNormal, self).__init__(
-        dtype=self._scale.dtype,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._scale],
-        name=name)
+    with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([scale], dtype_hint=tf.float32)
+      self._scale = tensor_util.convert_immutable_to_tensor(
+          scale, name='scale', dtype=dtype)
+      super(HalfNormal, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {"scale": tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
+    return {'scale': tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(scale=0)
 
   @property
   def scale(self):
@@ -139,25 +139,27 @@ class HalfNormal(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    shape = tf.concat([[n], self.batch_shape_tensor()], 0)
-    sampled = tf.random_normal(
+    scale = tf.convert_to_tensor(self.scale)
+    shape = tf.concat([[n], tf.shape(scale)], 0)
+    sampled = tf.random.normal(
         shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=seed)
-    return tf.abs(sampled * self.scale)
+    return tf.abs(sampled * scale)
 
   def _prob(self, x):
-    coeff = np.sqrt(2) / self.scale / np.sqrt(np.pi)
-    pdf = coeff * tf.exp(-0.5 * (x / self.scale)**2)
+    scale = tf.convert_to_tensor(self.scale)
+    coeff = np.sqrt(2) / scale / np.sqrt(np.pi)
+    pdf = coeff * tf.exp(-0.5 * (x / scale)**2)
     return pdf * tf.cast(x >= 0, self.dtype)
 
   def _cdf(self, x):
     truncated_x = tf.nn.relu(x)
-    return tf.erf(truncated_x / self.scale / np.sqrt(2.0))
+    return tf.math.erf(truncated_x / self.scale / np.sqrt(2.0))
 
   def _entropy(self):
-    return 0.5 * tf.log(np.pi * self.scale**2.0 / 2.0) + 0.5
+    return 0.5 * tf.math.log(np.pi * self.scale**2.0 / 2.0) + 0.5
 
   def _mean(self):
     return self.scale * np.sqrt(2.0) / np.sqrt(np.pi)
@@ -171,6 +173,15 @@ class HalfNormal(distribution.Distribution):
   def _variance(self):
     return self.scale ** 2.0 * (1.0 - 2.0 / np.pi)
 
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_mutable(self._scale):
+      assertions.append(assert_util.assert_positive(
+          self._scale, message='Argument `scale` must be positive.'))
+    return assertions
+
 
 @kullback_leibler.RegisterKL(HalfNormal, HalfNormal)
 def _kl_half_normal_half_normal(a, b, name=None):
@@ -179,15 +190,16 @@ def _kl_half_normal_half_normal(a, b, name=None):
   Args:
     a: Instance of a `HalfNormal` distribution object.
     b: Instance of a `HalfNormal` distribution object.
-    name: (optional) Name to use for created operations.
-      default is "kl_half_normal_half_normal".
+    name: Python `str` name to use for created operations.
+      Default value: `None` (i.e., `'kl_half_normal_half_normal'`).
 
   Returns:
-    Batchwise KL(a || b)
+    kl_div: Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_half_normal_half_normal",
-                     [a.scale, b.scale]):
+  with tf.name_scope(name or 'kl_half_normal_half_normal'):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 119
-    return (tf.log(b.scale) - tf.log(a.scale) +
-            (a.scale ** 2 - b.scale **2) / (2 * b.scale**2))
+    a_scale = tf.convert_to_tensor(a.scale)
+    b_scale = tf.convert_to_tensor(b.scale)
+    return (tf.math.log(b_scale) - tf.math.log(a_scale) +
+            (a_scale**2 - b_scale**2) / (2. * b_scale**2))

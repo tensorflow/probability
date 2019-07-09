@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import affine as affine_bijector
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import sinh_arcsinh as sinh_arcsinh_bijector
@@ -26,7 +26,6 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "VectorSinhArcsinhDiag",
@@ -106,7 +105,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
                distribution=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="MultivariateNormalLinearOperator"):
+               name="VectorSinhArcsinhDiag"):
     """Construct VectorSinhArcsinhDiag distribution on `R^k`.
 
     The arguments `scale_diag` and `scale_identity_multiplier` combine to
@@ -167,11 +166,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
     """
     parameters = dict(locals())
 
-    with tf.name_scope(
-        name,
-        values=[
-            loc, scale_diag, scale_identity_multiplier, skewness, tailweight
-        ]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [loc, scale_diag, scale_identity_multiplier, skewness, tailweight],
           tf.float32)
@@ -214,7 +209,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
         asserts = distribution_util.maybe_check_scalar_distribution(
             distribution, dtype, validate_args)
         if asserts:
-          scale_diag_part = control_flow_ops.with_dependencies(
+          scale_diag_part = distribution_util.with_dependencies(
               asserts, scale_diag_part)
 
       # Make the SAS bijector, 'F'.
@@ -227,7 +222,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
         f_noskew = f
       else:
         f_noskew = sinh_arcsinh_bijector.SinhArcsinh(
-            skewness=skewness.dtype.as_numpy_dtype(0.),
+            skewness=dtype_util.as_numpy_dtype(skewness.dtype)(0.),
             tailweight=tailweight)
 
       # Make the Affine bijector, Z --> loc + C * Z.

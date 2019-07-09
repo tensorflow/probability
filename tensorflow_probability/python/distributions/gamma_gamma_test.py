@@ -18,14 +18,16 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class GammaGammaTest(tf.test.TestCase):
 
   def testGammaGammaShape(self):
@@ -147,7 +149,7 @@ class GammaGammaTest(tf.test.TestCase):
     self.assertAllClose(self.evaluate(gg.mean()), expected_mean)
 
   def testGammaGammaSample(self):
-    with tf.Session():
+    with tf1.Session():
       alpha_v = 2.0
       alpha0_v = 3.0
       beta0_v = 5.0
@@ -157,29 +159,40 @@ class GammaGammaTest(tf.test.TestCase):
           concentration=alpha_v,
           mixing_concentration=alpha0_v,
           mixing_rate=beta0_v)
-      samples = gg.sample(n, seed=123456)
+      samples = gg.sample(n, seed=tfp_test_util.test_seed())
       sample_values = self.evaluate(samples)
       self.assertEqual(samples.shape, (n,))
       self.assertEqual(sample_values.shape, (n,))
       self.assertAllClose(
-          sample_values.mean(), self.evaluate(gg.mean()), rtol=.01)
+          sample_values.mean(), self.evaluate(gg.mean()), rtol=.02)
 
-  def testGammaGammaSampleMultidimensionalMean(self):
-    alpha_v = np.array([np.arange(3, 103, dtype=np.float32)])  # 1 x 100
-    alpha0_v = 2.
-    beta0_v = np.array([np.arange(1, 11, dtype=np.float32)]).T  # 10 x 1
-    n = 10000
+  def testGammaGammaSampleConcentrationCausesBroadcast(self):
+    gg = tfd.GammaGamma(concentration=[1., 2.],
+                        mixing_concentration=1.,
+                        mixing_rate=1.)
+    n = 3
+    samples = self.evaluate(gg.sample(n, seed=tfp_test_util.test_seed()))
+    self.assertAllEqual((n, 2), samples.shape)
+
+  def testGammaGammaSampleMultidimensional(self):
+    alpha_v = np.array([np.arange(5, 25, 2, dtype=np.float32)])  # 1 x 10
+    alpha0_v = 5.
+    beta0_v = np.array([np.arange(5, 15, 2, dtype=np.float32)]).T  # 5 x 1
+    n = 75000
 
     gg = tfd.GammaGamma(
         concentration=alpha_v,
         mixing_concentration=alpha0_v,
         mixing_rate=beta0_v)
-    samples = gg.sample(n, seed=123456)
+    samples = gg.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.shape, (n, 10, 100))
-    self.assertEqual(sample_values.shape, (n, 10, 100))
+    expected_shape = (n, beta0_v.shape[0], alpha_v.shape[-1])
+    self.assertEqual(samples.shape, expected_shape)
+    self.assertEqual(sample_values.shape, expected_shape)
     self.assertAllClose(
-        sample_values.mean(axis=0), self.evaluate(gg.mean()), rtol=.08)
+        self.evaluate(gg.variance()), sample_values.var(axis=0), rtol=.6)
+    self.assertAllClose(
+        self.evaluate(gg.mean()), sample_values.mean(axis=0), rtol=.02)
 
 
 if __name__ == '__main__':

@@ -5,6 +5,8 @@
 
 # tfp.distributions.normal_conjugates_known_scale_posterior
 
+Posterior Normal distribution with conjugate prior on the mean.
+
 ``` python
 tfp.distributions.normal_conjugates_known_scale_posterior(
     prior,
@@ -14,7 +16,11 @@ tfp.distributions.normal_conjugates_known_scale_posterior(
 )
 ```
 
-Posterior Normal distribution with conjugate prior on the mean.
+
+
+Defined in [`python/distributions/normal_conjugate_posteriors.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/normal_conjugate_posteriors.py).
+
+<!-- Placeholder for "Used in" -->
 
 This model assumes that `n` observations (with sum `s`) come from a
 Normal with unknown mean `loc` (described by the Normal `prior`)
@@ -41,10 +47,11 @@ will broadcast in the case of multidimensional sets of parameters.
 
 #### Args:
 
+
 * <b>`prior`</b>: `Normal` object of type `dtype`:
-    the prior distribution having parameters `(loc0, scale0)`.
+  the prior distribution having parameters `(loc0, scale0)`.
 * <b>`scale`</b>: tensor of type `dtype`, taking values `scale > 0`.
-    The known stddev parameter(s).
+  The known stddev parameter(s).
 * <b>`s`</b>: Tensor of type `dtype`. The sum(s) of observations.
 * <b>`n`</b>: Tensor of type `int`. The number(s) of observations.
 
@@ -55,7 +62,9 @@ A new Normal posterior distribution object for the unknown observation
 mean `loc`.
 
 
+
 #### Raises:
 
+
 * <b>`TypeError`</b>: if dtype of `s` does not match `dtype`, or `prior` is not a
-    Normal object.
+  Normal object.

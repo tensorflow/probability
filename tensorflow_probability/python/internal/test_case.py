@@ -22,7 +22,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 __all__ = [
     "TestCase",
@@ -52,28 +52,18 @@ class TestCase(tf.test.TestCase):
     all_true = np.ones_like(is_nan, dtype=np.bool)
     self.assertAllEqual(all_true, is_nan)
 
-  def compute_gradients(self, f, args, grad_ys=None):
-    """Computes gradients using tf.GradientTape or tf.gradients.
+  def assertAllNotNone(self, a):
+    """Assert that no entry in a collection is None.
 
-    Arguments:
-      f: Function to be differentiated.
-      args: List of `Tensor` arguments to be passed to the function `f`.
-        Gradients are computed with respect to these arguments.
-      grad_ys: Optional. A `Tensor` with the same shape as the `Tensor` returned
-        by `f` that contains the incoming gradients with respect to the result
-        of `f`.
-
-    Returns:
-      grads: List containing gradients of `f` with respect to `args`. It has the
-        same length as `args`.
+    Args:
+      a: A Python iterable collection, whose entries must be verified as not
+      being `None`.
     """
-    if tf.executing_eagerly():
-      grad_fn = tf.contrib.eager.gradients_function(f)
-      if grad_ys is not None:
-        grads = grad_fn(*args, dy=grad_ys)
-      else:
-        grads = grad_fn(*args)
-    else:
-      res = f(*args)
-      grads = tf.gradients(res, args, grad_ys=grad_ys)
-    return self.evaluate(grads)
+    each_not_none = [x is not None for x in a]
+    if all(each_not_none):
+      return
+
+    msg = (
+        "Expected no entry to be `None` but found `None` in positions {}"
+        .format([i for i, x in enumerate(each_not_none) if not x]))
+    raise AssertionError(msg)

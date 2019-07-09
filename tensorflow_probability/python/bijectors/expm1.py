@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 
 
@@ -55,10 +55,11 @@ class Expm1(bijector.Bijector):
   def __init__(self,
                validate_args=False,
                name="expm1"):
-    super(Expm1, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(Expm1, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
     """Returns the forward `Bijector` evaluation, i.e., X = g(Y)."""
@@ -66,11 +67,11 @@ class Expm1(bijector.Bijector):
 
   def _inverse(self, y):
     """Returns the inverse `Bijector` evaluation, i.e., Y = g^-1(X)."""
-    return tf.log1p(y)
+    return tf.math.log1p(y)
 
   def _inverse_log_det_jacobian(self, y):
     """Returns the (log o det o Jacobian o g^-1)(y)."""
-    return -tf.log1p(y)
+    return -tf.math.log1p(y)
 
   def _forward_log_det_jacobian(self, x):
     """Returns the (log o det o Jacobian o g)(x)."""

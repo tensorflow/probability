@@ -7,7 +7,16 @@
 
 TensorFlow Probability MCMC python package.
 
+
+
+Defined in [`python/mcmc/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/__init__.py).
+
+<!-- Placeholder for "Used in" -->
+
+
 ## Classes
+
+[`class CheckpointableStatesAndTrace`](../tfp/mcmc/CheckpointableStatesAndTrace.md): States and auxiliary trace of an MCMC chain.
 
 [`class HamiltonianMonteCarlo`](../tfp/mcmc/HamiltonianMonteCarlo.md): Runs one step of Hamiltonian Monte Carlo.
 
@@ -19,7 +28,11 @@ TensorFlow Probability MCMC python package.
 
 [`class ReplicaExchangeMC`](../tfp/mcmc/ReplicaExchangeMC.md): Runs one step of the Replica Exchange Monte Carlo.
 
+[`class SimpleStepSizeAdaptation`](../tfp/mcmc/SimpleStepSizeAdaptation.md): Adapts the inner kernel's `step_size` based on `log_accept_prob`.
+
 [`class SliceSampler`](../tfp/mcmc/SliceSampler.md): Runs one step of the slice sampler using a hit and run approach.
+
+[`class StatesAndTrace`](../tfp/mcmc/StatesAndTrace.md): States and auxiliary trace of an MCMC chain.
 
 [`class TransformedTransitionKernel`](../tfp/mcmc/TransformedTransitionKernel.md): TransformedTransitionKernel applies a bijector to the MCMC's state space.
 
@@ -37,7 +50,7 @@ TensorFlow Probability MCMC python package.
 
 [`effective_sample_size(...)`](../tfp/mcmc/effective_sample_size.md): Estimate a lower bound on effective sample size for each independent chain.
 
-[`make_simple_step_size_update_policy(...)`](../tfp/mcmc/make_simple_step_size_update_policy.md): Create a function implementing a step-size update policy.
+[`make_simple_step_size_update_policy(...)`](../tfp/mcmc/make_simple_step_size_update_policy.md): Create a function implementing a step-size update policy. (deprecated)
 
 [`potential_scale_reduction(...)`](../tfp/mcmc/potential_scale_reduction.md): Gelman and Rubin (1992)'s potential scale reduction for chain convergence.
 

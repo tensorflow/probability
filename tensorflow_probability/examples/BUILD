@@ -30,6 +30,7 @@ exports_files(["LICENSE"])
 py_binary(
     name = "bayesian_neural_network",
     srcs = ["bayesian_neural_network.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [":bayesian_neural_network_lib"],
 )
@@ -58,6 +59,7 @@ py_test(
     ],
     main = "bayesian_neural_network.py",
     srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
     deps = [
         ":bayesian_neural_network_lib",
     ],
@@ -66,6 +68,7 @@ py_test(
 py_binary(
     name = "grammar_vae",
     srcs = ["grammar_vae.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [":grammar_vae_lib"],
 )
@@ -103,6 +106,7 @@ py_test(
 py_binary(
     name = "disentangled_vae",
     srcs = ["disentangled_vae.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [":disentangled_vae_lib"],
 )
@@ -138,6 +142,9 @@ py_test(
     ],
     main = "disentangled_vae.py",
     srcs_version = "PY2AND3",
+    tags = [
+        "tf2-kokoro-broken",
+    ],
     deps = [
         ":disentangled_vae_lib",
     ],
@@ -150,6 +157,7 @@ py_test(
     main = "disentangled_vae_test.py",
     shard_count = 2,
     srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
     deps = [
         ":disentangled_vae_lib",
         # numpy dep,
@@ -161,6 +169,7 @@ py_test(
 py_binary(
     name = "deep_exponential_family",
     srcs = ["deep_exponential_family.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [":deep_exponential_family_lib"],
 )
@@ -189,6 +198,7 @@ py_test(
     ],
     main = "deep_exponential_family.py",
     srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
     deps = [
         ":deep_exponential_family_lib",
     ],
@@ -197,6 +207,7 @@ py_test(
 py_binary(
     name = "latent_dirichlet_allocation_distributions",
     srcs = ["latent_dirichlet_allocation_distributions.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [":latent_dirichlet_allocation_distributions_lib"],
 )
@@ -237,6 +248,7 @@ py_test(
 py_binary(
     name = "latent_dirichlet_allocation_edward2",
     srcs = ["latent_dirichlet_allocation_edward2.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [":latent_dirichlet_allocation_edward2_lib"],
 )
@@ -276,6 +288,7 @@ py_test(
 py_binary(
     name = "logistic_regression",
     srcs = ["logistic_regression.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [":logistic_regression_lib"],
 )
@@ -306,6 +319,7 @@ py_test(
     ],
     main = "logistic_regression.py",
     srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
     deps = [
         ":logistic_regression_lib",
     ],
@@ -325,6 +339,7 @@ py_library(
 py_binary(
     name = "vae",
     srcs = ["vae.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [":vae_lib"],
 )
@@ -364,6 +379,7 @@ py_test(
 py_binary(
     name = "vq_vae",
     srcs = ["vq_vae.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [":vq_vae_lib"],
 )
@@ -392,6 +408,7 @@ py_test(
     ],
     main = "vq_vae.py",
     srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
     deps = [
         ":vq_vae_lib",
     ],
@@ -400,6 +417,7 @@ py_test(
 py_binary(
     name = "cifar10_bnn",
     srcs = ["cifar10_bnn.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [":cifar10_bnn_lib"],
 )
@@ -429,6 +447,7 @@ py_test(
     ],
     main = "cifar10_bnn.py",
     srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
     deps = [
         ":cifar10_bnn_lib",
     ],

@@ -16,14 +16,17 @@
 
 from __future__ import absolute_import
 from __future__ import division
-from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
-
-from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -100,7 +103,7 @@ class HiddenMarkovModel(distribution.Distribution):
 
   # The log pdf of a week of temperature 0 is:
 
-  model.log_prob(tfp.zeros(shape=[7]))
+  model.log_prob(tf.zeros(shape=[7]))
   ```
 
   #### References
@@ -156,62 +159,78 @@ class HiddenMarkovModel(distribution.Distribution):
     parameters = dict(locals())
 
     # pylint: disable=protected-access
-    with tf.name_scope(name=name, values=(
-        initial_distribution._graph_parents +
-        transition_distribution._graph_parents +
-        observation_distribution._graph_parents)) as name:
+    with tf.name_scope(name) as name:
       self._runtime_assertions = []  # pylint: enable=protected-access
 
-      if num_steps < 1:
-        raise ValueError("num_steps ({}) must be at least 1.".format(num_steps))
+      num_steps = tf.convert_to_tensor(value=num_steps, name="num_steps")
+      if validate_args:
+        self._runtime_assertions += [
+            assert_util.assert_equal(
+                tf.rank(num_steps),
+                0,
+                message="`num_steps` must be a scalar")]
+        self._runtime_assertions += [
+            assert_util.assert_greater_equal(
+                num_steps,
+                1,
+                message="`num_steps` must be at least 1.")
+        ]
 
       self._initial_distribution = initial_distribution
       self._observation_distribution = observation_distribution
       self._transition_distribution = transition_distribution
 
-      if (initial_distribution.event_shape is not None
-          and initial_distribution.event_shape.ndims != 0):
+      if (initial_distribution.event_shape is not None and
+          tensorshape_util.rank(initial_distribution.event_shape) != 0):
         raise ValueError(
             "`initial_distribution` must have scalar `event_dim`s")
       elif validate_args:
         self._runtime_assertions += [
-            tf.assert_equal(
-                tf.shape(initial_distribution.event_shape_tensor())[0], 0,
+            assert_util.assert_equal(
+                tf.shape(initial_distribution.event_shape_tensor())[0],
+                0,
                 message="`initial_distribution` must have scalar"
-                        "`event_dim`s")]
+                "`event_dim`s")
+        ]
 
-      if (transition_distribution.event_shape is not None
-          and transition_distribution.event_shape.ndims != 0):
+      if (transition_distribution.event_shape is not None and
+          tensorshape_util.rank(transition_distribution.event_shape) != 0):
         raise ValueError(
             "`transition_distribution` must have scalar `event_dim`s")
       elif validate_args:
         self._runtime_assertions += [
-            tf.assert_equal(
-                tf.shape(transition_distribution.event_shape_tensor())[0], 0,
+            assert_util.assert_equal(
+                tf.shape(transition_distribution.event_shape_tensor())[0],
+                0,
                 message="`transition_distribution` must have scalar"
-                        "`event_dim`s")]
+                "`event_dim`s")
+        ]
 
-      if (transition_distribution.batch_shape is not None
-          and transition_distribution.batch_shape.ndims == 0):
+      if (transition_distribution.batch_shape is not None and
+          tensorshape_util.rank(transition_distribution.batch_shape) == 0):
         raise ValueError(
             "`transition_distribution` can't have scalar batches")
       elif validate_args:
         self._runtime_assertions += [
-            tf.assert_greater(
-                tf.size(transition_distribution.batch_shape_tensor()), 0,
+            assert_util.assert_greater(
+                tf.size(transition_distribution.batch_shape_tensor()),
+                0,
                 message="`transition_distribution` can't have scalar "
-                        "batches")]
+                "batches")
+        ]
 
-      if (observation_distribution.batch_shape is not None
-          and observation_distribution.batch_shape.ndims == 0):
+      if (observation_distribution.batch_shape is not None and
+          tensorshape_util.rank(observation_distribution.batch_shape) == 0):
         raise ValueError(
             "`observation_distribution` can't have scalar batches")
       elif validate_args:
         self._runtime_assertions += [
-            tf.assert_greater(
-                tf.size(observation_distribution.batch_shape_tensor()), 0,
+            assert_util.assert_greater(
+                tf.size(observation_distribution.batch_shape_tensor()),
+                0,
                 message="`observation_distribution` can't have scalar "
-                        "batches")]
+                "batches")
+        ]
 
       # Infer number of hidden states and check consistency
       # between transitions and observations
@@ -224,15 +243,16 @@ class HiddenMarkovModel(distribution.Distribution):
                                observation_distribution.batch_shape[-1]) or
                               observation_distribution.batch_shape_tensor()[-1])
 
-      if (tf.contrib.framework.is_tensor(self._num_states) or
-          tf.contrib.framework.is_tensor(observation_states)):
+      if (tf.is_tensor(self._num_states) or tf.is_tensor(observation_states)):
         if validate_args:
           self._runtime_assertions += [
-              tf.assert_equal(
-                  self._num_states, observation_states,
+              assert_util.assert_equal(
+                  self._num_states,
+                  observation_states,
                   message="`transition_distribution` and "
-                          "`observation_distribution` must agree on "
-                          "last dimension of batch size")]
+                  "`observation_distribution` must agree on "
+                  "last dimension of batch size")
+          ]
       elif self._num_states != observation_states:
         raise ValueError("`transition_distribution` and "
                          "`observation_distribution` must agree on "
@@ -246,11 +266,16 @@ class HiddenMarkovModel(distribution.Distribution):
       self._num_steps = num_steps
       self._num_states = tf.shape(self._log_init)[-1]
 
-      self._underlying_event_rank = (
-          self._observation_distribution.event_shape.ndims)
+      self._underlying_event_rank = tf.size(
+          self._observation_distribution.event_shape_tensor())
 
-      self.static_event_shape = tf.TensorShape(
-          [num_steps]).concatenate(self._observation_distribution.event_shape)
+      num_steps_ = tf.get_static_value(num_steps)
+      if num_steps_ is not None:
+        self.static_event_shape = tf.TensorShape(
+            [num_steps_]).concatenate(
+                self._observation_distribution.event_shape)
+      else:
+        self.static_event_shape = None
 
       with tf.control_dependencies(self._runtime_assertions):
         self.static_batch_shape = tf.broadcast_static_shape(
@@ -262,14 +287,13 @@ class HiddenMarkovModel(distribution.Distribution):
       # pylint: disable=protected-access
       super(HiddenMarkovModel, self).__init__(
           dtype=self._observation_distribution.dtype,
-          reparameterization_type=tf.distributions.NOT_REPARAMETERIZED,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          graph_parents=(
-              self._initial_distribution._graph_parents +
-              self._transition_distribution._graph_parents +
-              self._observation_distribution._graph_parents),
+          graph_parents=(self._initial_distribution._graph_parents +
+                         self._transition_distribution._graph_parents +
+                         self._observation_distribution._graph_parents),
           name=name)
       # pylint: enable=protected-access
 
@@ -339,8 +363,7 @@ class HiddenMarkovModel(distribution.Distribution):
       # init_state :: n batch_size
 
       transition_repeat = (
-          tf.reduce_prod(self.batch_shape_tensor()) //
-          tf.reduce_prod(
+          tf.reduce_prod(self.batch_shape_tensor()) // tf.reduce_prod(
               self._transition_distribution.batch_shape_tensor()[:-1]))
 
       def generate_step(state, _):
@@ -361,18 +384,19 @@ class HiddenMarkovModel(distribution.Distribution):
 
         return tf.reduce_sum(old_states_one_hot * new_states, axis=-1)
 
-      if self._num_steps > 1:
+      def _scan_multiple_steps():
         dummy_index = tf.zeros(self._num_steps - 1, dtype=tf.float32)
         hidden_states = tf.scan(generate_step, dummy_index,
                                 initializer=init_state)
 
         # TODO(b/115618503): add/use prepend_initializer to tf.scan
-        hidden_states = tf.concat([[init_state],
-                                   hidden_states], axis=0)
-      else:
-        hidden_states = init_state[tf.newaxis, ...]
+        return tf.concat([[init_state],
+                          hidden_states], axis=0)
 
-      # hidden_states :: num_steps n batch_size num_states
+      hidden_states = prefer_static.cond(
+          self._num_steps > 1,
+          _scan_multiple_steps,
+          lambda: init_state[tf.newaxis, ...])
 
       hidden_one_hot = tf.one_hot(hidden_states, num_states,
                                   dtype=self._observation_distribution.dtype)
@@ -383,8 +407,7 @@ class HiddenMarkovModel(distribution.Distribution):
       # transition distributions we generate more samples and
       # reshape.
       observation_repeat = (
-          batch_size //
-          tf.reduce_prod(
+          batch_size // tf.reduce_prod(
               self._observation_distribution.batch_shape_tensor()[:-1]))
 
       possible_observations = self._observation_distribution.sample(
@@ -413,13 +436,14 @@ class HiddenMarkovModel(distribution.Distribution):
 
       # hidden_one_hot :: steps n batch_size num_states "inner_shape"
 
-      observations = tf.reduce_sum(hidden_one_hot * possible_observations,
-                                   axis=-1 - tf.size(inner_shape))
+      observations = tf.reduce_sum(
+          hidden_one_hot * possible_observations,
+          axis=-1 - tf.size(inner_shape))
 
       # observations :: steps n batch_size inner_shape
 
-      observations = util.move_dimension(observations,
-                                         0, 1 + tf.size(batch_shape))
+      observations = distribution_util.move_dimension(observations, 0,
+                                                      1 + tf.size(batch_shape))
 
       # returned :: n batch_shape steps inner_shape
 
@@ -431,18 +455,18 @@ class HiddenMarkovModel(distribution.Distribution):
       # `observation_batch_shape` is the shape of that tensor with the
       # sequence part removed.
       # `observation_batch_shape` is then broadcast to the full batch shape
-      # to give the `working_shape` that defines the shape of the result.
+      # to give the `batch_shape` that defines the shape of the result.
 
-      observation_tensor_shape = util.prefer_static_shape(value)
+      observation_tensor_shape = tf.shape(value)
       observation_batch_shape = observation_tensor_shape[
           :-1 - self._underlying_event_rank]
       # value :: observation_batch_shape num_steps observation_event_shape
-      working_shape = tf.broadcast_dynamic_shape(observation_batch_shape,
-                                                 self.batch_shape_tensor())
+      batch_shape = tf.broadcast_dynamic_shape(observation_batch_shape,
+                                               self.batch_shape_tensor())
       log_init = tf.broadcast_to(self._log_init,
-                                 tf.concat([working_shape,
+                                 tf.concat([batch_shape,
                                             [self._num_states]], axis=0))
-      # log_init :: working_shape num_states
+      # log_init :: batch_shape num_states
       log_transition = self._log_trans
 
       # `observation_event_shape` is the shape of each sequence of observations
@@ -450,29 +474,29 @@ class HiddenMarkovModel(distribution.Distribution):
       observation_event_shape = observation_tensor_shape[
           -1 - self._underlying_event_rank:]
       working_obs = tf.broadcast_to(value,
-                                    tf.concat([working_shape,
+                                    tf.concat([batch_shape,
                                                observation_event_shape],
                                               axis=0))
-      # working_obs :: working_shape observation_event_shape
+      # working_obs :: batch_shape observation_event_shape
       r = self._underlying_event_rank
 
       # Move index into sequence of observations to front so we can apply
       # tf.foldl
-      working_obs = util.move_dimension(working_obs,
-                                        -1 - r, 0)[..., tf.newaxis]
-      # working_obs :: num_steps working_shape underlying_event_shape
+      working_obs = distribution_util.move_dimension(working_obs, -1 - r,
+                                                     0)[..., tf.newaxis]
+      # working_obs :: num_steps batch_shape underlying_event_shape
       observation_probs = (
           self._observation_distribution.log_prob(working_obs))
 
-      def forward_step(log_prev_step, log_observation):
+      def forward_step(log_prev_step, log_prob_observation):
         return _log_vector_matrix(log_prev_step,
-                                  log_transition) + log_observation
+                                  log_transition) + log_prob_observation
 
       fwd_prob = tf.foldl(forward_step, observation_probs, initializer=log_init)
-      # fwd_prob :: working_shape num_states
+      # fwd_prob :: batch_shape num_states
 
       log_prob = tf.reduce_logsumexp(fwd_prob, axis=-1)
-      # log_prob :: working_shape
+      # log_prob :: batch_shape
 
       return log_prob
 
@@ -485,7 +509,9 @@ class HiddenMarkovModel(distribution.Distribution):
                                                   axis=0))
     # initial_log_probs :: batch_shape num_states
 
-    if self._num_steps > 1:
+    def _scan_multiple_steps():
+      """Perform `scan` operation when `num_steps` > 1."""
+
       transition_log_probs = self._log_trans
 
       def forward_step(log_probs, _):
@@ -497,12 +523,13 @@ class HiddenMarkovModel(distribution.Distribution):
                                   initializer=initial_log_probs,
                                   name="forward_log_probs")
 
-      forward_log_probs = tf.concat([[initial_log_probs], forward_log_probs],
-                                    axis=0)
-    else:
-      forward_log_probs = initial_log_probs[tf.newaxis, ...]
+      return tf.concat([[initial_log_probs], forward_log_probs],
+                       axis=0)
 
-    # returns :: num_steps batch_shape num_states
+    forward_log_probs = prefer_static.cond(
+        self._num_steps > 1,
+        _scan_multiple_steps,
+        lambda: initial_log_probs[tf.newaxis, ...])
 
     return tf.exp(forward_log_probs)
 
@@ -526,9 +553,9 @@ class HiddenMarkovModel(distribution.Distribution):
       batch_size = tf.reduce_prod(self.batch_shape_tensor())
       flat_probs_shape = [self._num_steps, batch_size, self._num_states]
       flat_means_shape = [
-          batch_size,
-          self._num_states,
-          tf.reduce_prod(observation_event_shape)]
+          batch_size, self._num_states,
+          tf.reduce_prod(observation_event_shape)
+      ]
 
       flat_probs = tf.reshape(probs, flat_probs_shape)
       # flat_probs :: num_steps batch_size num_states
@@ -564,10 +591,9 @@ class HiddenMarkovModel(distribution.Distribution):
       batch_size = tf.reduce_prod(self.batch_shape_tensor())
       flat_probs_shape = [self._num_steps, batch_size, self._num_states]
       flat_means_shape = [
-          batch_size,
-          1,
-          self._num_states,
-          tf.reduce_prod(observation_event_shape)]
+          batch_size, 1, self._num_states,
+          tf.reduce_prod(observation_event_shape)
+      ]
 
       flat_probs = tf.reshape(probs, flat_probs_shape)
       # flat_probs :: num_steps batch_size num_states
@@ -603,7 +629,102 @@ class HiddenMarkovModel(distribution.Distribution):
       # returns :: batch_shape num_steps observation_event_shape
       return tf.reshape(flat_variance, unflat_mean_shape)
 
-  def posterior_marginals(self, observations):
+  def _observation_mask_shape_preconditions(self,
+                                            observation_tensor_shape,
+                                            mask_tensor_shape):
+    shape_condition = [assert_util.assert_equal(
+        observation_tensor_shape[-1 - self._underlying_event_rank],
+        self._num_steps,
+        message="The tensor `observations` must consist of sequences"
+                "of observations from `HiddenMarkovModel` of length"
+                "`num_steps`.")]
+    if mask_tensor_shape is not None:
+      shape_condition.append(assert_util.assert_equal(
+          mask_tensor_shape[-1],
+          self._num_steps,
+          message="The tensor `mask` must consist of sequences"
+                  "of length `num_steps`."))
+    return tf.control_dependencies(shape_condition)
+
+  def _observation_log_probs(self, observations, mask):
+    """Compute and shape tensor of log probs associated with observations.."""
+
+    # Let E be the underlying event shape
+    #     M the number of steps in the HMM
+    #     N the number of states of the HMM
+    #
+    # Then the incoming observations have shape
+    #
+    # observations : batch_o [M] E
+    #
+    # and the mask (if present) has shape
+    #
+    # mask : batch_m [M]
+    #
+    # Let this HMM distribution have batch shape batch_d
+    # We need to broadcast all three of these batch shapes together
+    # into the shape batch.
+    #
+    # We need to move the step dimension to the first dimension to make
+    # them suitable for folding or scanning over.
+    #
+    # When we call `log_prob` for our observations we need to
+    # do this for each state the observation could correspond to.
+    # We do this by expanding the dimensions by 1 so we end up with:
+    #
+    # observations : [M] batch [1] [E]
+    #
+    # After calling `log_prob` we get
+    #
+    # observation_log_probs : [M] batch [N]
+    #
+    # We wish to use `mask` to select from this so we also
+    # reshape and broadcast it up to shape
+    #
+    # mask : [M] batch [N]
+
+    observation_tensor_shape = tf.shape(observations)
+    observation_batch_shape = observation_tensor_shape[
+        :-1 - self._underlying_event_rank]
+    observation_event_shape = observation_tensor_shape[
+        -1 - self._underlying_event_rank:]
+
+    if mask is not None:
+      mask_tensor_shape = tf.shape(mask)
+      mask_batch_shape = mask_tensor_shape[:-1]
+
+    batch_shape = tf.broadcast_dynamic_shape(observation_batch_shape,
+                                             self.batch_shape_tensor())
+
+    if mask is not None:
+      batch_shape = tf.broadcast_dynamic_shape(batch_shape,
+                                               mask_batch_shape)
+    observations = tf.broadcast_to(observations,
+                                   tf.concat([batch_shape,
+                                              observation_event_shape],
+                                             axis=0))
+    observation_rank = tf.rank(observations)
+    underlying_event_rank = self._underlying_event_rank
+    observations = distribution_util.move_dimension(
+        observations, observation_rank - underlying_event_rank - 1, 0)
+    observations = tf.expand_dims(
+        observations,
+        observation_rank - underlying_event_rank)
+    observation_log_probs = self._observation_distribution.log_prob(
+        observations)
+
+    if mask is not None:
+      mask = tf.broadcast_to(mask,
+                             tf.concat([batch_shape, [self._num_steps]],
+                                       axis=0))
+      mask = distribution_util.move_dimension(mask, -1, 0)
+      observation_log_probs = tf.where(mask[..., tf.newaxis],
+                                       tf.zeros_like(observation_log_probs),
+                                       observation_log_probs)
+
+    return observation_log_probs
+
+  def posterior_marginals(self, observations, mask=None, name=None):
     """Compute marginal posterior distribution for each state.
 
     This function computes, for each time step, the marginal
@@ -611,9 +732,9 @@ class HiddenMarkovModel(distribution.Distribution):
     each possible state given the observations that were made
     at each time step.
     So if the hidden states are `z[0],...,z[num_steps - 1]` and
-    the observations are `x[0],...,x[num_steps - 1]`, then
-    this function computes `P(z[i] | x[0],...,x[num_steps - 1])`
-    for all `i` from `0` to `num_steps-1`.
+    the observations are `x[0], ..., x[num_steps - 1]`, then
+    this function computes `P(z[i] | x[0], ..., x[num_steps - 1])`
+    for all `i` from `0` to `num_steps - 1`.
 
     This operation is sometimes called smoothing. It uses a form
     of the forward-backward algorithm.
@@ -624,99 +745,255 @@ class HiddenMarkovModel(distribution.Distribution):
 
     Args:
       observations: A tensor representing a batch of observations
-      made on the hidden Markov model.  The rightmost dimension
-      of this tensor gives the steps in a sequence of observations
-      from a single sample from the hidden Markov model. The size
-      of this dimension should match the `num_steps` parameter
-      of the hidden Markov model object. The other dimensions are
-      the dimensions of the batch and these are broadcast with
-      the hidden Markov model's parameters.
+        made on the hidden Markov model.  The rightmost dimension of this tensor
+        gives the steps in a sequence of observations from a single sample from
+        the hidden Markov model. The size of this dimension should match the
+        `num_steps` parameter of the hidden Markov model object. The other
+        dimensions are the dimensions of the batch and these are broadcast with
+        the hidden Markov model's parameters.
+      mask: optional bool-type `tensor` with rightmost dimension matching
+        `num_steps` indicating which observations the result of this
+        function should be conditioned on. When the mask has value
+        `True` the corresponding observations aren't used.
+        if `mask` is `None` then all of the observations are used.
+        the `mask` dimensions left of the last are broadcast with the
+        hmm batch as well as with the observations.
+      name: Python `str` name prefixed to Ops created by this class.
+        Default value: "HiddenMarkovModel".
 
     Returns:
-      A `Categorical` distribution object representing the marginal
-      probability of the hidden Markov model being in each state at
-      each step. The rightmost dimension of the `Categorical`
-      distributions batch will equal the `num_steps` parameter
-      providing one marginal distribution for each step. The
-      other dimensions are the dimensions corresponding to the
-      batch of observations.
+      posterior_marginal: A `Categorical` distribution object representing the
+        marginal probability of the hidden Markov model being in each state at
+        each step. The rightmost dimension of the `Categorical` distributions
+        batch will equal the `num_steps` parameter providing one marginal
+        distribution for each step. The other dimensions are the dimensions
+        corresponding to the batch of observations.
 
     Raises:
       ValueError: if rightmost dimension of `observations` does not
       have size `num_steps`.
     """
 
-    with tf.name_scope("posterior_marginals", values=[observations]):
+    with tf.name_scope(name or "posterior_marginals"):
       with tf.control_dependencies(self._runtime_assertions):
-
         observation_tensor_shape = tf.shape(observations)
+        mask_tensor_shape = tf.shape(mask) if mask is not None else None
 
-        with tf.control_dependencies([tf.assert_equal(
-            observation_tensor_shape[-1], self._num_steps,
-            message="Last dimension of `observation` must match `num_steps`"
-                    "of `HiddenMarkovModel`")]):
-          observation_batch_shape = observation_tensor_shape[
-              :-1 - self._underlying_event_rank]
-          observation_event_shape = observation_tensor_shape[
-              -1 - self._underlying_event_rank:]
-
-          working_shape = tf.broadcast_dynamic_shape(observation_batch_shape,
-                                                     self.batch_shape)
-          log_init = tf.broadcast_to(self._log_init,
-                                     tf.concat([working_shape,
-                                                [self._num_states]],
-                                               axis=0))
+        with self._observation_mask_shape_preconditions(
+            observation_tensor_shape, mask_tensor_shape):
+          observation_log_probs = self._observation_log_probs(
+              observations, mask)
+          log_prob = self._log_init + observation_log_probs[0]
           log_transition = self._log_trans
+          log_adjoint_prob = tf.zeros_like(log_prob)
 
-          observations = tf.broadcast_to(observations,
-                                         tf.concat([working_shape,
-                                                    observation_event_shape],
-                                                   axis=0))
-          observation_rank = tf.rank(observations)
-          underlying_event_rank = self._underlying_event_rank
-          observations = util.move_dimension(
-              observations,
-              observation_rank - underlying_event_rank - 1, 0)[
-                  ..., tf.newaxis]
-          observation_log_probs = self._observation_distribution.log_prob(
-              observations)
+          def _scan_multiple_steps_forwards():
+            def forward_step(log_previous_step, log_prob_observation):
+              return _log_vector_matrix(log_previous_step,
+                                        log_transition) + log_prob_observation
 
-          log_adjoint_prob = tf.zeros_like(log_init)
+            forward_log_probs = tf.scan(forward_step, observation_log_probs[1:],
+                                        initializer=log_prob,
+                                        name="forward_log_probs")
+            return tf.concat([[log_prob], forward_log_probs], axis=0)
 
-          def forward_step(log_previous_step, log_observation):
-            return _log_vector_matrix(log_previous_step,
-                                      log_transition) + log_observation
-
-          log_prob = log_init + observation_log_probs[0]
-
-          forward_log_probs = tf.scan(forward_step, observation_log_probs[1:],
-                                      initializer=log_prob,
-                                      name="forward_log_probs")
-
-          forward_log_probs = tf.concat([[log_prob], forward_log_probs], axis=0)
-
-          def backward_step(log_previous_step, log_observation):
-            return _log_matrix_vector(log_transition,
-                                      log_observation + log_previous_step)
-
-          backward_log_adjoint_probs = tf.scan(
-              backward_step,
-              observation_log_probs[1:],
-              initializer=log_adjoint_prob,
-              reverse=True,
-              name="backward_log_adjoint_probs")
+          forward_log_probs = prefer_static.cond(
+              self._num_steps > 1,
+              _scan_multiple_steps_forwards,
+              lambda: tf.convert_to_tensor([log_prob]))
 
           total_log_prob = tf.reduce_logsumexp(forward_log_probs[-1], axis=-1)
 
-          backward_log_adjoint_probs = tf.concat([backward_log_adjoint_probs,
-                                                  [log_adjoint_prob]], axis=0)
+          def _scan_multiple_steps_backwards():
+            """Perform `scan` operation when `num_steps` > 1."""
+
+            def backward_step(log_previous_step, log_prob_observation):
+              return _log_matrix_vector(
+                  log_transition,
+                  log_prob_observation + log_previous_step)
+
+            backward_log_adjoint_probs = tf.scan(
+                backward_step,
+                observation_log_probs[1:],
+                initializer=log_adjoint_prob,
+                reverse=True,
+                name="backward_log_adjoint_probs")
+
+            return tf.concat([backward_log_adjoint_probs,
+                              [log_adjoint_prob]], axis=0)
+
+          backward_log_adjoint_probs = prefer_static.cond(
+              self._num_steps > 1,
+              _scan_multiple_steps_backwards,
+              lambda: tf.convert_to_tensor([log_adjoint_prob]))
 
           log_likelihoods = forward_log_probs + backward_log_adjoint_probs
 
-          marginal_log_probs = util.move_dimension(
+          marginal_log_probs = distribution_util.move_dimension(
               log_likelihoods - total_log_prob[..., tf.newaxis], 0, -2)
 
           return categorical.Categorical(logits=marginal_log_probs)
+
+  def posterior_mode(self, observations, mask=None, name=None):
+    """Compute maximum likelihood sequence of hidden states.
+
+    When this function is provided with a sequence of observations
+    `x[0], ..., x[num_steps - 1]`, it returns the sequence of hidden
+    states `z[0], ..., z[num_steps - 1]`, drawn from the underlying
+    Markov chain, that is most likely to yield those observations.
+
+    It uses the [Viterbi algorithm](
+    https://en.wikipedia.org/wiki/Viterbi_algorithm).
+
+    Note: the behavior of this function is undefined if the
+    `observations` argument represents impossible observations
+    from the model.
+
+    Note: if there isn't a unique most likely sequence then one
+    of the equally most likely sequences is chosen.
+
+    Args:
+      observations: A tensor representing a batch of observations made on the
+        hidden Markov model.  The rightmost dimensions of this tensor correspond
+        to the dimensions of the observation distributions of the underlying
+        Markov chain.  The next dimension from the right indexes the steps in a
+        sequence of observations from a single sample from the hidden Markov
+        model.  The size of this dimension should match the `num_steps`
+        parameter of the hidden Markov model object.  The other dimensions are
+        the dimensions of the batch and these are broadcast with the hidden
+        Markov model's parameters.
+      mask: optional bool-type `tensor` with rightmost dimension matching
+        `num_steps` indicating which observations the result of this
+        function should be conditioned on. When the mask has value
+        `True` the corresponding observations aren't used.
+        if `mask` is `None` then all of the observations are used.
+        the `mask` dimensions left of the last are broadcast with the
+        hmm batch as well as with the observations.
+      name: Python `str` name prefixed to Ops created by this class.
+        Default value: "HiddenMarkovModel".
+
+    Returns:
+      posterior_mode: A `Tensor` representing the most likely sequence of hidden
+        states. The rightmost dimension of this tensor will equal the
+        `num_steps` parameter providing one hidden state for each step. The
+        other dimensions are those of the batch.
+
+    Raises:
+      ValueError: if the `observations` tensor does not consist of
+      sequences of `num_steps` observations.
+
+    #### Examples
+
+    ```python
+    tfd = tfp.distributions
+
+    # A simple weather model.
+
+    # Represent a cold day with 0 and a hot day with 1.
+    # Suppose the first day of a sequence has a 0.8 chance of being cold.
+
+    initial_distribution = tfd.Categorical(probs=[0.8, 0.2])
+
+    # Suppose a cold day has a 30% chance of being followed by a hot day
+    # and a hot day has a 20% chance of being followed by a cold day.
+
+    transition_distribution = tfd.Categorical(probs=[[0.7, 0.3],
+                                                     [0.2, 0.8]])
+
+    # Suppose additionally that on each day the temperature is
+    # normally distributed with mean and standard deviation 0 and 5 on
+    # a cold day and mean and standard deviation 15 and 10 on a hot day.
+
+    observation_distribution = tfd.Normal(loc=[0., 15.], scale=[5., 10.])
+
+    # This gives the hidden Markov model:
+
+    model = tfd.HiddenMarkovModel(
+        initial_distribution=initial_distribution,
+        transition_distribution=transition_distribution,
+        observation_distribution=observation_distribution,
+        num_steps=7)
+
+    # Suppose we observe gradually rising temperatures over a week:
+    temps = [-2., 0., 2., 4., 6., 8., 10.]
+
+    # We can now compute the most probable sequence of hidden states:
+
+    model.posterior_mode(temps)
+
+    # The result is [0 0 0 0 0 1 1] telling us that the transition
+    # from "cold" to "hot" most likely happened between the
+    # 5th and 6th days.
+    ```
+    """
+
+    with tf.name_scope(name or "posterior_mode"):
+      observations = tf.convert_to_tensor(observations, name="observations")
+      if mask is not None:
+        mask = tf.convert_to_tensor(mask, name="mask", dtype_hint=tf.bool)
+      with tf.control_dependencies(self._runtime_assertions):
+        observation_tensor_shape = tf.shape(observations)
+        mask_tensor_shape = tf.shape(mask) if mask is not None else None
+
+        with self._observation_mask_shape_preconditions(
+            observation_tensor_shape, mask_tensor_shape):
+          observation_log_probs = self._observation_log_probs(
+              observations, mask)
+          log_prob = self._log_init + observation_log_probs[0]
+
+          def _reduce_multiple_steps():
+            """Perform `reduce_max` operation when `num_steps` > 1."""
+
+            def forward_step(previous_step_pair, log_prob_observation):
+              log_prob_previous = previous_step_pair[0]
+              log_prob = (log_prob_previous[..., tf.newaxis] +
+                          self._log_trans +
+                          log_prob_observation[..., tf.newaxis, :])
+              most_likely_given_successor = tf.argmax(log_prob, axis=-2)
+              max_log_p_given_successor = tf.reduce_max(input_tensor=log_prob,
+                                                        axis=-2)
+              return (max_log_p_given_successor, most_likely_given_successor)
+
+            forward_log_probs, all_most_likely_given_successor = tf.scan(
+                forward_step,
+                observation_log_probs[1:],
+                initializer=(log_prob,
+                             tf.zeros(tf.shape(log_prob),
+                                      dtype=tf.int64)),
+                name="forward_log_probs")
+
+            most_likely_end = tf.argmax(forward_log_probs[-1], axis=-1)
+
+            # We require the operation that gives C from A and B where
+            # C[i...j] = A[i...j, B[i...j]]
+            # and A = most_likely_given_successor
+            #     B = most_likely_successor.
+            # tf.gather requires indices of known shape so instead we use
+            # reduction with tf.one_hot(B) to pick out elements from B
+            def backward_step(most_likely_successor,
+                              most_likely_given_successor):
+              return tf.reduce_sum(
+                  input_tensor=(most_likely_given_successor *
+                                tf.one_hot(most_likely_successor,
+                                           self._num_states,
+                                           dtype=tf.int64)),
+                  axis=-1)
+
+            backward_scan = tf.scan(
+                backward_step,
+                all_most_likely_given_successor,
+                most_likely_end,
+                reverse=True)
+            most_likely_sequences = tf.concat([backward_scan,
+                                               [most_likely_end]],
+                                              axis=0)
+            return distribution_util.move_dimension(
+                most_likely_sequences, 0, -1)
+
+          return prefer_static.cond(
+              self.num_steps > 1,
+              _reduce_multiple_steps,
+              lambda: tf.argmax(log_prob, axis=-1)[..., tf.newaxis])
 
 
 def _log_vector_matrix(vs, ms):
@@ -744,4 +1021,4 @@ def _extract_log_probs(num_states, dist):
                       tf.concat([[num_states],
                                  tf.ones_like(dist.batch_shape_tensor())],
                                 axis=0))
-  return util.move_dimension(dist.log_prob(states), 0, -1)
+  return distribution_util.move_dimension(dist.log_prob(states), 0, -1)

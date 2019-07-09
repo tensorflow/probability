@@ -5,6 +5,8 @@
 
 # tfp.distributions.assign_log_moving_mean_exp
 
+Compute the log of the exponentially weighted moving mean of the exp.
+
 ``` python
 tfp.distributions.assign_log_moving_mean_exp(
     log_mean_exp_var,
@@ -14,7 +16,11 @@ tfp.distributions.assign_log_moving_mean_exp(
 )
 ```
 
-Compute the log of the exponentially weighted moving mean of the exp.
+
+
+Defined in [`python/distributions/internal/moving_stats.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/internal/moving_stats.py).
+
+<!-- Placeholder for "Used in" -->
 
 If `log_value` is a draw from a stationary random variable, this function
 approximates `log(E[exp(log_value)])`, i.e., a weighted log-sum-exp. More
@@ -39,23 +45,26 @@ update to the tf.Variable is presumed efficient due to being lock-free.)
 
 #### Args:
 
+
 * <b>`log_mean_exp_var`</b>: `float`-like `Variable` representing the log of the
-    exponentially weighted moving mean of the exp. Same shape as `log_value`.
+  exponentially weighted moving mean of the exp. Same shape as `log_value`.
 * <b>`log_value`</b>: `float`-like `Tensor` representing a new (streaming) observation.
-    Same shape as `log_mean_exp_var`.
+  Same shape as `log_mean_exp_var`.
 * <b>`decay`</b>: A `float`-like `Tensor`. The moving mean decay. Typically close to
-    `1.`, e.g., `0.999`.
+  `1.`, e.g., `0.999`.
 * <b>`name`</b>: Optional name of the returned operation.
 
 
 #### Returns:
 
+
 * <b>`log_mean_exp_var`</b>: A reference to the input 'Variable' tensor with the
-    `log_value`-updated log of the exponentially weighted moving mean of exp.
+  `log_value`-updated log of the exponentially weighted moving mean of exp.
 
 
 #### Raises:
 
+
 * <b>`TypeError`</b>: if `log_mean_exp_var` does not have float type `dtype`.
 * <b>`TypeError`</b>: if `log_mean_exp_var`, `log_value`, `decay` have different
-    `base_dtype`.
+  `base_dtype`.

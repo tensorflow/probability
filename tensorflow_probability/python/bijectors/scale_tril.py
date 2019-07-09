@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import affine_scalar
 from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import fill_triangular
@@ -75,6 +75,7 @@ class ScaleTriL(chain.Chain):
                                             #  = log(expm1(1.)) = 0.5413
        diag_shift=None)
   ```
+
   """
 
   def __init__(self,
@@ -93,14 +94,14 @@ class ScaleTriL(chain.Chain):
         value forces the output diagonal entries to be positive, but
         prevents inverting the transformation for matrices with
         diagonal entries less than this value.
-        Default value: `1e-5` (i.e., no shift is applied).
+        Default value: `1e-5`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
         Default value: `False` (i.e., arguments are not validated).
       name: Python `str` name given to ops managed by this object.
         Default value: `scale_tril`.
     """
-    with tf.name_scope(name, values=[diag_shift]) as name:
+    with tf.name_scope(name) as name:
       if diag_bijector is None:
         diag_bijector = softplus.Softplus(validate_args=validate_args)
 

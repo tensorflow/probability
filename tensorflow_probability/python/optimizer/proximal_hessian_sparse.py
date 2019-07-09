@@ -26,8 +26,9 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.math.generic import soft_threshold
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
-from tensorflow_probability.python.math.numeric import soft_threshold
 
 __all__ = [
     'minimize',
@@ -67,7 +68,7 @@ def _get_shape(x, out_type=tf.int32):
   # is known statically. Otherwise return a Tensor representing the shape.
   if x.shape.is_fully_defined():
     return np.array(x.shape.as_list(), dtype=out_type.as_numpy_dtype)
-  return tf.shape(x, out_type=out_type)
+  return tf.shape(input=x, out_type=out_type)
 
 
 def _sparse_or_dense_matmul_onehot(sparse_or_dense_matrix, col_index):
@@ -84,7 +85,7 @@ def _sparse_or_dense_matmul_onehot(sparse_or_dense_matrix, col_index):
       `sparse_or_dense_matrix`.
   """
   if isinstance(sparse_or_dense_matrix,
-                (tf.SparseTensor, tf.SparseTensorValue)):
+                (tf.SparseTensor, tf.compat.v1.SparseTensorValue)):
     # TODO(b/111924846): Implement better (ideally in a way that allows us to
     # eliminate the `num_rows` arg, if possible).
     num_rows = _get_shape(sparse_or_dense_matrix)[-2]
@@ -94,22 +95,22 @@ def _sparse_or_dense_matmul_onehot(sparse_or_dense_matrix, col_index):
     slice_size = tf.concat([batch_shape, [num_rows, 1]], axis=0)
     # We momentarily lose static shape information in tf.sparse_slice. However
     # we regain it in the following tf.reshape.
-    sparse_slice = tf.sparse_slice(sparse_or_dense_matrix,
+    sparse_slice = tf.sparse.slice(sparse_or_dense_matrix,
                                    tf.cast(slice_start, tf.int64),
                                    tf.cast(slice_size, tf.int64))
 
     output_shape = tf.concat([batch_shape, [num_rows]], axis=0)
-    return tf.reshape(tf.sparse_tensor_to_dense(sparse_slice), output_shape)
+    return tf.reshape(tf.sparse.to_dense(sparse_slice), output_shape)
   else:
     return tf.gather(sparse_or_dense_matrix, col_index, axis=-1)
 
 
 def _one_hot_like(x, indices, on_value=None):
   output_dtype = x.dtype.base_dtype
-  if tf.dimension_value(x.shape[-1]) is None:
-    depth = tf.shape(x)[-1]
+  if tf.compat.dimension_value(x.shape[-1]) is None:
+    depth = tf.shape(input=x)[-1]
   else:
-    depth = tf.dimension_value(x.shape[-1])
+    depth = tf.compat.dimension_value(x.shape[-1])
   if on_value is not None:
     on_value = tf.cast(on_value, output_dtype)
   return tf.one_hot(indices, depth=depth, on_value=on_value, dtype=output_dtype)
@@ -233,7 +234,7 @@ def minimize_one_step(gradient_unregularized_loss,
       tolerance,
       learning_rate,
   ]
-  with tf.name_scope(name, 'minimize_one_step', graph_deps):
+  with tf.compat.v1.name_scope(name, 'minimize_one_step', graph_deps):
     x_shape = _get_shape(x_start)
     batch_shape = x_shape[:-1]
     dims = x_shape[-1]
@@ -245,8 +246,9 @@ def minimize_one_step(gradient_unregularized_loss,
       #
       # evaluated at x = x_start.
       inner_square = tf.reduce_sum(
-          _sparse_or_dense_matmul_onehot(hessian_unregularized_loss_outer,
-                                         coord)**2, axis=-1)
+          input_tensor=_sparse_or_dense_matmul_onehot(
+              hessian_unregularized_loss_outer, coord)**2,
+          axis=-1)
       unregularized_component = (
           hessian_unregularized_loss_middle[..., coord] * inner_square)
       l2_component = _mul_or_none(2., l2_regularizer)
@@ -263,7 +265,7 @@ def minimize_one_step(gradient_unregularized_loss,
     #     ||x_update_end - x_update_start||_2**2
     #     < x_update_diff_norm_sq_convergence_threshold.
     x_update_diff_norm_sq_convergence_threshold = (
-        tolerance * (1. + tf.norm(x_start, ord=2, axis=-1))**2)
+        tolerance * (1. + tf.norm(tensor=x_start, ord=2, axis=-1))**2)
 
     # Reshape update vectors so that the coordinate sweeps happen along the
     # first dimension. This is so that we can use tensor_scatter_update to make
@@ -281,7 +283,7 @@ def minimize_one_step(gradient_unregularized_loss,
           x_update_diff_norm_sq < x_update_diff_norm_sq_convergence_threshold)
       converged = sweep_complete & small_delta
       allowed_more_iterations = iter_ < maximum_full_sweeps * dims
-      return allowed_more_iterations & tf.reduce_any(~converged)
+      return allowed_more_iterations & tf.reduce_any(input_tensor=~converged)
 
     def _loop_body(  # pylint: disable=missing-docstring
         iter_, x_update_diff_norm_sq, x_update, hess_matmul_x_update):
@@ -351,7 +353,7 @@ def minimize_one_step(gradient_unregularized_loss,
       # computed incrementally, where x_update_end and x_update_start are as
       # defined in the convergence criteria.  Accordingly, we reset
       # x_update_diff_norm_sq to zero at the beginning of each sweep.
-      x_update_diff_norm_sq = tf.where(
+      x_update_diff_norm_sq = tf.compat.v1.where(
           tf.equal(coord, 0), tf.zeros_like(x_update_diff_norm_sq),
           x_update_diff_norm_sq)
 
@@ -388,12 +390,13 @@ def minimize_one_step(gradient_unregularized_loss,
         # Move the batch dimensions of `hessian_column_with_l2` to rightmost in
         # order to conform to `hess_matmul_x_update`.
         n = tf.rank(hessian_column_with_l2)
-        perm = tf.manip.roll(tf.range(n), shift=1, axis=0)
-        hessian_column_with_l2 = tf.transpose(hessian_column_with_l2, perm)
+        perm = tf.roll(tf.range(n), shift=1, axis=0)
+        hessian_column_with_l2 = tf.transpose(
+            a=hessian_column_with_l2, perm=perm)
 
         # Update the entire batch at `coord` even if `delta` may be 0 at some
         # batch coordinates. In those cases, adding `delta` is a no-op.
-        x_update = tf.tensor_scatter_add(x_update, [[coord]], [delta])
+        x_update = tf.tensor_scatter_nd_add(x_update, [[coord]], [delta])
 
         with tf.control_dependencies([x_update]):
           x_update_diff_norm_sq_ = x_update_diff_norm_sq + delta**2
@@ -411,7 +414,7 @@ def minimize_one_step(gradient_unregularized_loss,
           return [x_update_diff_norm_sq_, x_update, hess_matmul_x_update_]
 
       inputs_to_update = [x_update_diff_norm_sq, x_update, hess_matmul_x_update]
-      return [iter_ + 1] + tf.contrib.framework.smart_cond(
+      return [iter_ + 1] + prefer_static.cond(
           # Note on why checking delta (a difference of floats) for equality to
           # zero is ok:
           #
@@ -437,7 +440,7 @@ def minimize_one_step(gradient_unregularized_loss,
           # e.g. if the loss function is piecewise linear and one of the pieces
           # has slope 1.  But since LossSmoothComponent is strictly convex, (i)
           # should not systematically happen.
-          tf.reduce_all(tf.equal(delta, 0.)),
+          tf.reduce_all(input_tensor=tf.equal(delta, 0.)),
           lambda: inputs_to_update,
           lambda: _do_update(*inputs_to_update))
 
@@ -457,11 +460,11 @@ def minimize_one_step(gradient_unregularized_loss,
     # Convert back x_update to the shape of x_start by transposing the leftmost
     # dimension to the rightmost.
     n = tf.rank(x_update)
-    perm = tf.manip.roll(tf.range(n), shift=-1, axis=0)
-    x_update = tf.transpose(x_update, perm)
+    perm = tf.roll(tf.range(n), shift=-1, axis=0)
+    x_update = tf.transpose(a=x_update, perm=perm)
 
-    converged = tf.reduce_all(
-        x_update_diff_norm_sq < x_update_diff_norm_sq_convergence_threshold)
+    converged = tf.reduce_all(input_tensor=x_update_diff_norm_sq <
+                              x_update_diff_norm_sq_convergence_threshold)
     return x_start + x_update, converged, iter_ / dims
 
 
@@ -556,7 +559,7 @@ def minimize(grad_and_hessian_loss_fn,
       tolerance,
       learning_rate,
   ],
-  with tf.name_scope(name, 'minimize', graph_deps):
+  with tf.compat.v1.name_scope(name, 'minimize', graph_deps):
 
     def _loop_cond(x_start, converged, iter_):
       del x_start

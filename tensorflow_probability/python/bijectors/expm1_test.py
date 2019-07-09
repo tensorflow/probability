@@ -20,20 +20,20 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class Expm1BijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = expm1(X) transformation."""
 
   def testBijector(self):
     bijector = tfb.Expm1()
-    self.assertEqual("expm1", bijector.name)
+    self.assertStartsWith(bijector.name, "expm1")
     x = [[[-1.], [1.4]]]
     y = np.expm1(x)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))

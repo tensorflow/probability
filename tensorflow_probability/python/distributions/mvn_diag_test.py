@@ -21,16 +21,20 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MultivariateNormalDiagTest(test_case.TestCase):
   """Well tested because this is a simple override of the base class."""
 
@@ -51,7 +55,7 @@ class MultivariateNormalDiagTest(test_case.TestCase):
 
   def testDistWithBatchShapeOneThenTransformedThroughSoftplus(self):
     # This complex combination of events resulted in a loss of static shape
-    # information when tf.contrib.util.constant_value(self._needs_rotation) was
+    # information when tf.get_static_value(self._needs_rotation) was
     # being used incorrectly (resulting in always rotating).
     # Batch shape = [1], event shape = [3]
     mu = tf.zeros((1, 3))
@@ -87,8 +91,9 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     mu = [-1., 1]
     diag = [1., -2]
     dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
-    samps = self.evaluate(dist.sample(int(1e3), seed=0))
-    cov_mat = self.evaluate(tf.matrix_diag(diag))**2
+    samps = self.evaluate(
+        dist.sample(int(1e3), seed=tfp_test_util.test_seed(hardcoded_seed=0)))
+    cov_mat = self.evaluate(tf.linalg.diag(diag))**2
 
     self.assertAllClose(mu, samps.mean(axis=0), atol=0., rtol=0.05)
     self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.05, rtol=0.05)
@@ -114,8 +119,8 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     self.assertAllClose(mu, self.evaluate(mean))
 
     n = int(1e3)
-    samps = self.evaluate(dist.sample(n, seed=0))
-    cov_mat = self.evaluate(tf.matrix_diag(diag))**2
+    samps = self.evaluate(dist.sample(n, seed=tfp_test_util.test_seed()))
+    cov_mat = self.evaluate(tf.linalg.diag(diag))**2
     sample_cov = np.matmul(
         samps.transpose([1, 2, 0]), samps.transpose([1, 0, 2])) / n
 
@@ -181,8 +186,8 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     diag = [-1.0, -2.0]
     dist = tfd.MultivariateNormalDiagWithSoftplusScale(
         mu, diag, validate_args=True)
-    samps = self.evaluate(dist.sample(1000, seed=0))
-    cov_mat = self.evaluate(tf.matrix_diag(tf.nn.softplus(diag))**2)
+    samps = self.evaluate(dist.sample(1000, seed=tfp_test_util.test_seed()))
+    cov_mat = self.evaluate(tf.linalg.diag(tf.math.softplus(diag))**2)
 
     self.assertAllClose(mu, samps.mean(axis=0), atol=0.1)
     self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.1)
@@ -191,13 +196,13 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     num_draws = 50
     dims = 3
     x = np.zeros([num_draws, dims], dtype=np.float32)
-    x_pl = tf.placeholder_with_default(input=x, shape=[None, dims], name="x")
-    mu_var = tf.get_variable(
+    x_pl = tf1.placeholder_with_default(input=x, shape=[None, dims], name="x")
+    mu_var = tf1.get_variable(
         name="mu",
         shape=[dims],
         dtype=tf.float32,
-        initializer=tf.constant_initializer(1.))
-    self.evaluate([tf.global_variables_initializer()])
+        initializer=tf1.initializers.constant(1.))
+    self.evaluate([tf1.global_variables_initializer()])
 
     def neg_log_likelihood(mu):
       mvn = tfd.MultivariateNormalDiag(
@@ -209,14 +214,13 @@ class MultivariateNormalDiagTest(test_case.TestCase):
       # http://stackoverflow.com/q/45109305. (The underlying issue was not
       # related to `Distributions` but that `reduce_prod` didn't correctly
       # handle negative indexes.)
-      return -tf.reduce_sum(tf.log(mvn.prob(x_pl)))
+      return -tf.reduce_sum(input_tensor=tf.math.log(mvn.prob(x_pl)))
 
-    grad_neg_log_likelihood = self.compute_gradients(
-        neg_log_likelihood, args=[mu_var])
+    _, grad_neg_log_likelihood = tfp.math.value_and_gradient(
+        neg_log_likelihood, mu_var)
 
-    self.assertEqual(1, len(grad_neg_log_likelihood))
     self.assertAllClose(
-        grad_neg_log_likelihood[0],
+        self.evaluate(grad_neg_log_likelihood),
         np.tile(num_draws, dims),
         rtol=1e-6,
         atol=0.)
@@ -227,11 +231,12 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     loc = np.float32(self._rng.rand(1, 1, 2))
     scale_diag = np.float32(self._rng.rand(1, 1, 2))
     mvn = tfd.MultivariateNormalDiag(
-        loc=tf.placeholder_with_default(input=loc, shape=[None, None, 2]),
-        scale_diag=tf.placeholder_with_default(
+        loc=tf1.placeholder_with_default(input=loc, shape=[None, None, 2]),
+        scale_diag=tf1.placeholder_with_default(
             input=scale_diag, shape=[None, None, 2]))
-    self.assertListEqual(mvn.batch_shape.as_list(), [None, None])
-    self.assertListEqual(mvn.event_shape.as_list(), [2])
+    self.assertListEqual(
+        tensorshape_util.as_list(mvn.batch_shape), [None, None])
+    self.assertListEqual(tensorshape_util.as_list(mvn.event_shape), [2])
 
   def testDynamicEventShape(self):
     if tf.executing_eagerly():
@@ -239,11 +244,11 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     loc = np.float32(self._rng.rand(2, 3, 2))
     scale_diag = np.float32(self._rng.rand(2, 3, 2))
     mvn = tfd.MultivariateNormalDiag(
-        loc=tf.placeholder_with_default(input=loc, shape=[2, 3, None]),
-        scale_diag=tf.placeholder_with_default(
+        loc=tf1.placeholder_with_default(input=loc, shape=[2, 3, None]),
+        scale_diag=tf1.placeholder_with_default(
             input=scale_diag, shape=[2, 3, None]))
-    self.assertListEqual(mvn.batch_shape.as_list(), [2, 3])
-    self.assertListEqual(mvn.event_shape.as_list(), [None])
+    self.assertListEqual(tensorshape_util.as_list(mvn.batch_shape), [2, 3])
+    self.assertListEqual(tensorshape_util.as_list(mvn.event_shape), [None])
 
   def testKLDivIdenticalGradientDefined(self):
     dims = 3
@@ -252,7 +257,8 @@ class MultivariateNormalDiagTest(test_case.TestCase):
       mvn = tfd.MultivariateNormalDiag(
           loc=loc, scale_diag=np.ones([dims], dtype=np.float32))
       return tfd.kl_divergence(mvn, mvn)
-    gradients = self.compute_gradients(self_kl_divergence, args=[loc])
+    _, gradients = self.evaluate(tfp.math.value_and_gradient(
+        self_kl_divergence, loc))
     self.assertAllEqual(
         np.ones_like(gradients, dtype=np.bool),
         np.isfinite(gradients))

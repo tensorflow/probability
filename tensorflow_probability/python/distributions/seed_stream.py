@@ -21,6 +21,11 @@ from __future__ import print_function
 import hashlib
 
 
+__all__ = [
+    'SeedStream',
+]
+
+
 class SeedStream(object):
   """Local PRNG for amplifying seed entropy into seeds for base operations.
 
@@ -194,7 +199,7 @@ class SeedStream(object):
     self._counter += 1
     if self._seed is None:
       return None
-    composite = str((self._seed, self._counter, self._salt)).encode("utf-8")
+    composite = str((self._seed, self._counter, self._salt)).encode('utf-8')
     return int(hashlib.sha512(composite).hexdigest(), 16)
 
   @property

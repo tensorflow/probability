@@ -21,19 +21,23 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
 class _GumbelTest(object):
 
   def make_tensor(self, x):
     x = tf.cast(x, self._dtype)
-    return tf.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=x, shape=x.shape if self._use_static_shape else None)
 
   def testGumbelShape(self):
@@ -179,7 +183,7 @@ class _GumbelTest(object):
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale))
 
-    samples = gumbel.sample(n, seed=123456)
+    samples = gumbel.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual((n,), sample_values.shape)
     self.assertAllClose(
@@ -199,7 +203,7 @@ class _GumbelTest(object):
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale))
 
-    samples = gumbel.sample(n, seed=12345)
+    samples = gumbel.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertAllClose(
         stats.gumbel_r.mean(loc=loc, scale=scale),
@@ -208,7 +212,6 @@ class _GumbelTest(object):
         atol=0)
 
   def testGumbelSampleMultidimensionalVar(self):
-    # TODO(b/122670222): This test can fail with different seed/n values.
     batch_size = 6
     loc = np.array([[2.0, 4.0, 5.0]] * batch_size, dtype=self._dtype)
     scale = np.array([1.0, 0.8, 0.5], dtype=self._dtype)
@@ -218,7 +221,7 @@ class _GumbelTest(object):
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale))
 
-    samples = gumbel.sample(n, seed=12345)
+    samples = gumbel.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertAllClose(
         stats.gumbel_r.var(loc=loc, scale=scale),
@@ -250,8 +253,9 @@ class _GumbelTest(object):
 
     kl = tfd.kl_divergence(a, b)
 
-    x = a.sample(int(1e5), seed=0)
-    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
+    x = a.sample(int(1e5), seed=tfp_test_util.test_seed())
+    kl_sample = tf.reduce_mean(
+        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 
     # As noted in the Gumbel-Gumbel KL divergence implementation, there is an
     # error in the reference paper we use to implement our divergence. This
@@ -262,7 +266,8 @@ class _GumbelTest(object):
     summand = (a_loc - b_loc) / b_scale
     relative_error = (tf.abs(kl - kl_sample) /
                       tf.minimum(tf.abs(kl), tf.abs(kl_sample)))
-    exists_missing_summand_test = tf.reduce_any(summand > 2 * relative_error)
+    exists_missing_summand_test = tf.reduce_any(
+        input_tensor=summand > 2 * relative_error)
     exists_missing_summand_test_ = self.evaluate(exists_missing_summand_test)
     self.assertTrue(exists_missing_summand_test_,
                     msg=('No test case exists where (a.loc - b.loc) / b.scale '
@@ -282,19 +287,19 @@ class _GumbelTest(object):
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class GumbelTestStaticShape(test_case.TestCase, _GumbelTest):
   _dtype = np.float32
   _use_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class GumbelTestFloat64StaticShape(test_case.TestCase, _GumbelTest):
   _dtype = np.float64
   _use_static_shape = True
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class GumbelTestDynamicShape(test_case.TestCase, _GumbelTest):
   _dtype = np.float32
   _use_static_shape = False

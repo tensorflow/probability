@@ -5,26 +5,33 @@
 
 # tfp.trainable_distributions.softplus_and_shift
 
+Converts (batch of) scalars to (batch of) positive valued scalars. (deprecated)
+
 ``` python
 tfp.trainable_distributions.softplus_and_shift(
-    x,
-    shift=1e-05,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
-Converts (batch of) scalars to (batch of) positive valued scalars.
+<!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-09-01.
+Instructions for updating:
+`softplus_and_shift` is deprecated; use `tfp.bijectors.{Chain, AffineScalar, Softplus}`.
 
 #### Args:
 
+
 * <b>`x`</b>: (Batch of) `float`-like `Tensor` representing scalars which will be
-    transformed into positive elements.
+  transformed into positive elements.
 * <b>`shift`</b>: `Tensor` added to `softplus` transformation of elements.
-    Default value: `1e-5`.
+  Default value: `1e-5`.
 * <b>`name`</b>: A `name_scope` name for operations created by this function.
-    Default value: `None` (i.e., "positive_tril_with_shift").
+  Default value: `None` (i.e., "positive_tril_with_shift").
 
 
 #### Returns:
+
 
 * <b>`scale`</b>: (Batch of) scalars`with `x.dtype` and `x.shape`.

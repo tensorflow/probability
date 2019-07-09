@@ -20,7 +20,9 @@ from __future__ import print_function
 
 import collections
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     'secant_root',
@@ -193,7 +195,7 @@ def secant_root(objective_fn,
   value_at_position = tf.convert_to_tensor(
       value_at_position or objective_fn(position),
       name='value_at_position',
-      dtype=position.dtype.base_dtype)
+      dtype=dtype_util.base_dtype(position.dtype))
 
   zero = tf.zeros_like(position)
   position_tolerance = tf.convert_to_tensor(
@@ -289,9 +291,7 @@ def secant_root(objective_fn,
     return (next_position, value_at_next_position, num_iterations, next_step,
             is_finished)
 
-  with tf.name_scope(
-      name, 'secant_root',
-      [position, next_position, value_at_position, max_iterations]):
+  with tf.name_scope(name or 'secant_root'):
 
     assertions = []
     if validate_args:
@@ -306,8 +306,8 @@ def secant_root(objective_fn,
 
     with tf.control_dependencies(assertions):
       root, value_at_root, num_iterations, _, _ = tf.while_loop(
-          _should_continue,
-          _body,
+          cond=_should_continue,
+          body=_body,
           loop_vars=[
               position, value_at_position, num_iterations, step, finished
           ])

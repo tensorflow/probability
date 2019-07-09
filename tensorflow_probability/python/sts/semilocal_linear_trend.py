@@ -174,25 +174,24 @@ class SemiLocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         Default value: "SemiLocalLinearTrendStateSpaceModel".
     """
 
-    with tf.name_scope(name, 'SemiLocalLinearTrendStateSpaceModel', values=[
-        level_scale, slope_mean, slope_scale, autoregressive_coef]) as name:
+    with tf.compat.v1.name_scope(
+        name,
+        'SemiLocalLinearTrendStateSpaceModel',
+        values=[level_scale, slope_mean, slope_scale,
+                autoregressive_coef]) as name:
 
       dtype = initial_state_prior.dtype
 
-      level_scale = tf.convert_to_tensor(level_scale,
-                                         dtype=dtype,
-                                         name='level_scale')
-      slope_mean = tf.convert_to_tensor(slope_mean,
-                                        dtype=dtype,
-                                        name='slope_mean')
-      slope_scale = tf.convert_to_tensor(slope_scale,
-                                         dtype=dtype,
-                                         name='slope_scale')
-      autoregressive_coef = tf.convert_to_tensor(autoregressive_coef,
-                                                 dtype=dtype,
-                                                 name='autoregressive_coef')
+      level_scale = tf.convert_to_tensor(
+          value=level_scale, dtype=dtype, name='level_scale')
+      slope_mean = tf.convert_to_tensor(
+          value=slope_mean, dtype=dtype, name='slope_mean')
+      slope_scale = tf.convert_to_tensor(
+          value=slope_scale, dtype=dtype, name='slope_scale')
+      autoregressive_coef = tf.convert_to_tensor(
+          value=autoregressive_coef, dtype=dtype, name='autoregressive_coef')
       observation_noise_scale = tf.convert_to_tensor(
-          observation_noise_scale,
+          value=observation_noise_scale,
           dtype=dtype,
           name='observation_noise_scale')
 
@@ -367,7 +366,9 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
         `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
         supported when `T > 1`), specifying an observed time series.
         Any priors not explicitly set will be given default values according to
-        the scale of the observed time series (or batch of time series).
+        the scale of the observed time series (or batch of time series). May
+        optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
+        a mask `Tensor` to specify timesteps with missing observations.
         Default value: `None`.
       constrain_ar_coef_stationary: if `True`, perform inference using a
         parameterization that restricts `autoregressive_coef` to the interval
@@ -384,11 +385,11 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
         Default value: 'SemiLocalLinearTrend'.
     """
 
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, 'SemiLocalLinearTrend', values=[observed_time_series]) as name:
 
       if observed_time_series is not None:
-        observed_stddev, observed_initial = sts_util.empirical_statistics(
+        _, observed_stddev, observed_initial = sts_util.empirical_statistics(
             observed_time_series)
       else:
         observed_stddev, observed_initial = 1., 0.
@@ -396,14 +397,14 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
       if level_scale_prior is None:
-        level_scale_prior = tfd.LogNormal(loc=tf.log(.01 * observed_stddev),
-                                          scale=2.)
+        level_scale_prior = tfd.LogNormal(
+            loc=tf.math.log(.01 * observed_stddev), scale=2.)
       if slope_mean_prior is None:
         slope_mean_prior = tfd.Normal(loc=0.,
                                       scale=observed_stddev)
       if slope_scale_prior is None:
-        slope_scale_prior = tfd.LogNormal(loc=tf.log(.01 * observed_stddev),
-                                          scale=2.)
+        slope_scale_prior = tfd.LogNormal(
+            loc=tf.math.log(.01 * observed_stddev), scale=2.)
       if autoregressive_coef_prior is None:
         autoregressive_coef_prior = tfd.Normal(
             loc=0., scale=tf.ones_like(observed_initial))
@@ -434,11 +435,13 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
       else:
         autoregressive_coef_bijector = tfb.Identity()  # unconstrained
 
+      stddev_preconditioner = tfb.AffineScalar(scale=observed_stddev)
+      scaled_softplus = tfb.Chain([stddev_preconditioner, tfb.Softplus()])
       super(SemiLocalLinearTrend, self).__init__(
           parameters=[
-              Parameter('level_scale', level_scale_prior, tfb.Softplus()),
-              Parameter('slope_mean', slope_mean_prior, tfb.Identity()),
-              Parameter('slope_scale', slope_scale_prior, tfb.Softplus()),
+              Parameter('level_scale', level_scale_prior, scaled_softplus),
+              Parameter('slope_mean', slope_mean_prior, stddev_preconditioner),
+              Parameter('slope_scale', slope_scale_prior, scaled_softplus),
               Parameter('autoregressive_coef',
                         autoregressive_coef_prior,
                         autoregressive_coef_bijector),

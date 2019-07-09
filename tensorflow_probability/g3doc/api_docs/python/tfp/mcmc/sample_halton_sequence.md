@@ -5,6 +5,8 @@
 
 # tfp.mcmc.sample_halton_sequence
 
+Returns a sample from the `dim` dimensional Halton sequence.
+
 ``` python
 tfp.mcmc.sample_halton_sequence(
     dim,
@@ -17,7 +19,11 @@ tfp.mcmc.sample_halton_sequence(
 )
 ```
 
-Returns a sample from the `dim` dimensional Halton sequence.
+
+
+Defined in [`python/mcmc/sample_halton_sequence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/sample_halton_sequence.py).
+
+<!-- Placeholder for "Used in" -->
 
 Warning: The sequence elements take values only between 0 and 1. Care must be
 taken to appropriately transform the domain of a function if it differs from
@@ -97,49 +103,52 @@ print ("Leaped Estimated: %f, True Value: %f" % values)
 
 #### Args:
 
+
 * <b>`dim`</b>: Positive Python `int` representing each sample's `event_size.` Must
-    not be greater than 1000.
+  not be greater than 1000.
 * <b>`num_results`</b>: (Optional) Positive scalar `Tensor` of dtype int32. The number
-    of samples to generate. Either this parameter or sequence_indices must
-    be specified but not both. If this parameter is None, then the behaviour
-    is determined by the `sequence_indices`.
-    Default value: `None`.
+  of samples to generate. Either this parameter or sequence_indices must
+  be specified but not both. If this parameter is None, then the behaviour
+  is determined by the `sequence_indices`.
+  Default value: `None`.
 * <b>`sequence_indices`</b>: (Optional) `Tensor` of dtype int32 and rank 1. The
-    elements of the sequence to compute specified by their position in the
-    sequence. The entries index into the Halton sequence starting with 0 and
-    hence, must be whole numbers. For example, sequence_indices=[0, 5, 6] will
-    produce the first, sixth and seventh elements of the sequence. If this
-    parameter is None, then the `num_results` parameter must be specified
-    which gives the number of desired samples starting from the first sample.
-    Default value: `None`.
+  elements of the sequence to compute specified by their position in the
+  sequence. The entries index into the Halton sequence starting with 0 and
+  hence, must be whole numbers. For example, sequence_indices=[0, 5, 6] will
+  produce the first, sixth and seventh elements of the sequence. If this
+  parameter is None, then the `num_results` parameter must be specified
+  which gives the number of desired samples starting from the first sample.
+  Default value: `None`.
 * <b>`dtype`</b>: (Optional) The dtype of the sample. One of: `float16`, `float32` or
-    `float64`.
-    Default value: `tf.float32`.
+  `float64`.
+  Default value: `tf.float32`.
 * <b>`randomized`</b>: (Optional) bool indicating whether to produce a randomized
-    Halton sequence. If True, applies the randomization described in
-    [Owen (2017)][1].
-    Default value: `True`.
+  Halton sequence. If True, applies the randomization described in
+  [Owen (2017)][1].
+  Default value: `True`.
 * <b>`seed`</b>: (Optional) Python integer to seed the random number generator. Only
-    used if `randomized` is True. If not supplied and `randomized` is True,
-    no seed is set.
-    Default value: `None`.
+  used if `randomized` is True. If not supplied and `randomized` is True,
+  no seed is set.
+  Default value: `None`.
 * <b>`name`</b>:  (Optional) Python `str` describing ops managed by this function. If
-    not supplied the name of this function is used.
-    Default value: "sample_halton_sequence".
+  not supplied the name of this function is used.
+  Default value: "sample_halton_sequence".
 
 
 #### Returns:
 
+
 * <b>`halton_elements`</b>: Elements of the Halton sequence. `Tensor` of supplied dtype
-    and `shape` `[num_results, dim]` if `num_results` was specified or shape
-    `[s, dim]` where s is the size of `sequence_indices` if `sequence_indices`
-    were specified.
+  and `shape` `[num_results, dim]` if `num_results` was specified or shape
+  `[s, dim]` where s is the size of `sequence_indices` if `sequence_indices`
+  were specified.
 
 
 #### Raises:
 
+
 * <b>`ValueError`</b>: if both `sequence_indices` and `num_results` were specified or
-    if dimension `dim` is less than 1 or greater than 1000.
+  if dimension `dim` is less than 1 or greater than 1000.
 
 #### References
 

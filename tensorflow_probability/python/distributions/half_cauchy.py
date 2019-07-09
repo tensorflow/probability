@@ -21,12 +21,12 @@ from __future__ import print_function
 import functools
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
 
 __all__ = [
     "HalfCauchy",
@@ -56,10 +56,9 @@ def check_arg_in_support(f):
     dist = args[0]
     x = args[1]
     with tf.control_dependencies([
-        tf.assert_greater_equal(
-            x, dist.loc,
-            message="x is not in the support of the distribution"
-        )] if dist.validate_args else []):
+        assert_util.assert_greater_equal(
+            x, dist.loc, message="x is not in the support of the distribution")
+    ] if dist.validate_args else []):
       return f(*args, **kwargs)
   return _check_arg_and_apply_f
 
@@ -114,15 +113,15 @@ class HalfCauchy(distribution.Distribution):
       TypeError: if `loc` and `scale` have different `dtype`.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, scale]) as name:
-      dtype = dtype_util.common_dtype([loc, scale], preferred_dtype=tf.float32)
+    with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([loc, scale], dtype_hint=tf.float32)
       loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies([tf.assert_positive(scale)]
-                                   if validate_args else []):
+      with tf.control_dependencies(
+          [assert_util.assert_positive(scale)] if validate_args else []):
         self._loc = tf.identity(loc, name="loc")
         self._scale = tf.identity(scale, name="loc")
-      tf.assert_same_float_dtype([self._loc, self._scale])
+      dtype_util.assert_same_float_dtype([self._loc, self._scale])
     super(HalfCauchy, self).__init__(
         dtype=self._scale.dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -137,6 +136,10 @@ class HalfCauchy(distribution.Distribution):
     return dict(
         zip(("loc", "scale"),
             ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=0, scale=0)
 
   @property
   def loc(self):
@@ -158,19 +161,20 @@ class HalfCauchy(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     shape = tf.concat([[n], self._batch_shape_tensor()], 0)
-    probs = tf.random_uniform(
+    probs = tf.random.uniform(
         shape, minval=0., maxval=1., dtype=self.dtype, seed=seed)
     return self._quantile(probs)
 
   @check_arg_in_support
   def _log_prob(self, x):
     def log_prob_on_support(x):
-      return (np.log(2 / np.pi) - tf.log(self.scale) -
-              tf.log1p(self._z(x) ** 2))
+      return (np.log(2 / np.pi) - tf.math.log(self.scale) -
+              tf.math.log1p(self._z(x)**2))
+
     return self._extend_support_with_default_value(
         x, log_prob_on_support, default_value=-np.inf)
 
@@ -178,21 +182,21 @@ class HalfCauchy(distribution.Distribution):
   def _log_cdf(self, x):
     return self._extend_support_with_default_value(
         x,
-        lambda x: np.log(2 / np.pi) + tf.log(tf.atan(self._z(x))),
+        lambda x: np.log(2 / np.pi) + tf.math.log(tf.atan(self._z(x))),
         default_value=-np.inf)
 
   def _z(self, x):
     """Standardize input `x`."""
-    with tf.name_scope("standardize", values=[x]):
+    with tf.name_scope("standardize"):
       return (x - self.loc) / self.scale
 
   def _inv_z(self, z):
     """Reconstruct input `x` from a its normalized version."""
-    with tf.name_scope("reconstruct", values=[z]):
+    with tf.name_scope("reconstruct"):
       return z * self.scale + self.loc
 
   def _entropy(self):
-    h = np.log(2 * np.pi) + tf.log(self.scale)
+    h = np.log(2 * np.pi) + tf.math.log(self.scale)
     return h * tf.ones_like(self.loc)
 
   def _quantile(self, p):
@@ -204,19 +208,19 @@ class HalfCauchy(distribution.Distribution):
   def _mean(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError("`mean` is undefined for the half-Cauchy distribution.")
 
   def _stddev(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError("`stddev` is undefined for the half-Cauchy distribution.")
 
   def _variance(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
-                     self.dtype.as_numpy_dtype(np.nan))
+                     dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError(
         "`variance` is undefined for the half-Cauchy distribution.")
 
@@ -236,19 +240,17 @@ class HalfCauchy(distribution.Distribution):
     Returns:
       `Tensor` representing an extension of `f(x)`.
     """
-    with tf.name_scope(name="extend_support_with_default_value", values=[x]):
+    with tf.name_scope("extend_support_with_default_value"):
       x = tf.convert_to_tensor(x, dtype=self.dtype, name="x")
       loc = self.loc + tf.zeros_like(self.scale) + tf.zeros_like(x)
       x = x + tf.zeros_like(loc)
       # Substitute out-of-support values in x with values that are in the
       # support of the distribution before applying f.
-      y = f(tf.where(x < loc, self._inv_z(0.5) + tf.zeros_like(x), x))
+      y = f(tf.where(x < self.loc, self._inv_z(0.5), x))
       if default_value == 0.:
         default_value = tf.zeros_like(y)
       elif default_value == 1.:
         default_value = tf.ones_like(y)
       else:
-        default_value = tf.fill(
-            dims=tf.shape(y),
-            value=np.array(default_value, dtype=self.dtype.as_numpy_dtype))
-      return tf.where(x < loc, default_value, y)
+        default_value = dtype_util.as_numpy_dtype(self.dtype)(default_value)
+      return tf.where(x < self.loc, default_value, y)

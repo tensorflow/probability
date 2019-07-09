@@ -1,0 +1,298 @@
+# Copyright 2018 The TensorFlow Probability Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+"""Generalized Pareto distribution."""
+
+from __future__ import absolute_import
+from __future__ import division
+# [internal] enable type annotations
+from __future__ import print_function
+
+import functools
+
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
+
+
+class GeneralizedPareto(distribution.Distribution):
+  """The Generalized Pareto distribution.
+
+  The Generalized Pareto distributions are a family of continuous distributions
+  on the reals. Special cases include `Exponential` (when `loc = 0`,
+  `concentration = 0`), `Pareto` (when `concentration > 0`,
+  `loc = scale / concentration`), and `Uniform` (when `concentration = -1`).
+
+  This distribution is often used to model the tails of other distributions.
+
+  As a member of the location-scale family,
+  `X ~ GeneralizedPareto(loc=loc, scale=scale, concentration=conc)` maps to
+  `Y ~ GeneralizedPareto(loc=0, scale=1, concentration=conc)` via
+  `Y = (X - loc) / scale`.
+
+  For positive concentrations, the distribution is equivalent to a hierarchical
+  Exponential-Gamma model with `X|rate ~ Exponential(rate)` and
+  `rate ~ Gamma(concentration=1 / concentration, scale=scale / concentration)`.
+  In the following, `samp1` and `samps2` are identically distributed:
+
+  ```python
+  genp = tfd.GeneralizedPareto(loc=0, scale=scale, concentration=conc)
+  samps1 = genp.sample(1000)
+  jd = tfd.JointDistributionNamed(dict(
+      rate=tfd.Gamma(1 / genp.concentration, genp.scale / genp.concentration),
+      x=lambda rate: tfd.Exponential(rate)))
+  samps2 = jd.sample(1000)['x']
+  ```
+
+  The support of the distribution is always lower bounded by `loc`. When
+  `concentration < 0`, the support is also upper bounded by
+  `loc + scale / abs(concentration)`.
+
+  #### Mathematical Details
+
+  The probability density function (pdf) is,
+
+  ```none
+  pdf(x; mu, sigma, shp, x > mu) =
+      (1 + shp * (x - mu) / sigma)**(-1 / shp - 1) / sigma
+  ```
+
+  where:
+
+  * `concentration = shp`, any real value,
+  * `scale = sigma`, `sigma > 0`,
+  * `loc = mu`.
+
+  The cumulative density function (cdf) is,
+
+  ```none
+  cdf(x; mu, sigma, shp, x > mu) = 1 - (1 + shp * (x - mu) / sigma)**(-1 / shp)
+  ```
+
+  Distribution parameters are automatically broadcast in all functions; see
+  examples for details.
+
+  Samples of this distribution are reparameterized (pathwise differentiable).
+
+  #### Examples
+
+  ```python
+  import tensorflow_probability as tfp
+  tfd = tfp.distributions
+
+  dist = tfd.GeneralizedPareto(loc=1., scale=2., concentration=0.03)
+  dist2 = tfd.GeneralizedPareto(loc=-2., scale=[3., 4.],
+                                concentration=[[-.4], [0.2]])
+  ```
+
+  Compute the gradients of samples w.r.t. the parameters:
+
+  ```python
+  loc = tf.Variable(3.0)
+  scale = tf.Variable(2.0)
+  conc = tf.Variable(0.1)
+  dist = tfd.GeneralizedPareto(loc, scale, conc)
+  with tf.GradientTape() as tape:
+    samples = dist.sample(5)  # Shape [5]
+    loss = tf.reduce_mean(tf.square(samples))  # Arbitrary loss function
+  # Unbiased stochastic gradients of the loss function
+  grads = tape.gradient(loss, dist.variables)
+  ```
+
+  """
+
+  def __init__(self,
+               loc,
+               scale,
+               concentration,
+               validate_args=False,
+               allow_nan_stats=True,
+               name=None):
+    """Construct a Generalized Pareto distribution.
+
+    Args:
+      loc: The location / shift of the distribution. GeneralizedPareto is a
+        location-scale distribution. This parameter lower bounds the
+        distribution's support. Must broadcast with `scale`, `concentration`.
+        Floating point `Tensor`.
+      scale: The scale of the distribution. GeneralizedPareto is a
+        location-scale distribution, so doubling the `scale` doubles a sample
+        and halves the density. Strictly positive floating point `Tensor`. Must
+        broadcast with `loc`, `concentration`.
+      concentration: The shape parameter of the distribution. The larger the
+        magnitude, the more the distribution concentrates near `loc` (for
+        `concentration >= 0`) or near `loc - (scale/concentration)` (for
+        `concentration < 0`). Floating point `Tensor`.
+      validate_args: Python `bool`, default `False`. When `True` distribution
+        parameters are checked for validity despite possibly degrading runtime
+        performance. When `False` invalid inputs may silently render incorrect
+        outputs.
+      allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
+        (e.g., mean, variance) use the value "`NaN`" to indicate the result is
+        undefined. When `False`, an exception is raised if one or more of the
+        statistic's batch members are undefined.
+      name: Python `str` name prefixed to Ops created by this class.
+
+    Raises:
+      TypeError: if `loc`, `scale`, or `concentration` have different dtypes.
+    """
+    parameters = dict(locals())
+    with tf.name_scope(name or 'GeneralizedPareto') as name:
+      dtype = dtype_util.common_dtype([loc, scale, concentration],
+                                      dtype_hint=tf.float32)
+      self._loc = tensor_util.convert_immutable_to_tensor(
+          loc, dtype=dtype, name='loc')
+      self._scale = tensor_util.convert_immutable_to_tensor(
+          scale, dtype=dtype, name='scale')
+      self._concentration = tensor_util.convert_immutable_to_tensor(
+          concentration, dtype=dtype, name='concentration')
+      super(GeneralizedPareto, self).__init__(
+          dtype=dtype,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          parameters=parameters,
+          name=name)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=0, scale=0, concentration=0)
+
+  @property
+  def loc(self):
+    return self._loc
+
+  @property
+  def scale(self):
+    return self._scale
+
+  @property
+  def concentration(self):
+    return self._concentration
+
+  def _event_shape(self):
+    return []
+
+  def _batch_shape(self):
+    return functools.reduce(
+        tf.broadcast_static_shape,
+        (self.loc.shape, self.scale.shape, self.concentration.shape))
+
+  def _batch_shape_tensor(self, loc=None, scale=None, concentration=None):
+    return functools.reduce(
+        prefer_static.broadcast_shape,
+        (prefer_static.shape(self.loc if loc is None else loc),
+         prefer_static.shape(self.scale if scale is None else scale),
+         prefer_static.shape(
+             self.concentration if concentration is None else concentration)))
+
+  def _sample_n(self, n, seed=None):
+    # Inversion samples via inverse CDF.
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    concentration = tf.convert_to_tensor(self.concentration)
+    # Pre-broadcast to ensure we draw enough randomness.
+    sample_shp = tf.concat(
+        [[n],
+         self._batch_shape_tensor(
+             loc=loc, scale=scale, concentration=concentration)],
+        axis=0)
+    logu = tf.math.log1p(
+        -tf.random.uniform(sample_shp, dtype=self.dtype, seed=seed))
+    eq_zero = tf.equal(concentration, 0)
+    safe_conc = tf.where(eq_zero, tf.constant(1, dtype=self.dtype),
+                         concentration)
+    where_nonzero = loc + scale / safe_conc * tf.math.expm1(-safe_conc * logu)
+    where_zero = loc - scale * logu
+    return tf.where(eq_zero, where_zero, where_nonzero)
+
+  def _log_prob(self, x):
+    scale = tf.convert_to_tensor(self.scale)
+    concentration = tf.convert_to_tensor(self.concentration)
+    z = self._z(x, scale, concentration)
+    eq_zero = tf.equal(concentration, 0)  # Concentration = 0 ==> Exponential.
+    nonzero_conc = tf.where(eq_zero, tf.constant(1, self.dtype), concentration)
+    where_nonzero = (1 / nonzero_conc + 1) * tf.math.log1p(nonzero_conc * z)
+    return -tf.math.log(scale) - tf.where(eq_zero, z, where_nonzero)
+
+  def _log_cdf(self, x):
+    scale = tf.convert_to_tensor(self.scale)
+    concentration = tf.convert_to_tensor(self.concentration)
+    z = self._z(x, scale, concentration)
+    eq_zero = tf.equal(concentration, 0)  # Concentration = 0 ==> Exponential.
+    nonzero_conc = tf.where(eq_zero, tf.constant(1, self.dtype), concentration)
+    where_nonzero = tf.math.log1p(-(1 + nonzero_conc * z)**(-1 / nonzero_conc))
+    where_zero = tf.math.log1p(-tf.exp(-z))
+    return tf.where(eq_zero, where_zero, where_nonzero)
+
+  def _z(self, x, scale, concentration):
+    loc = tf.convert_to_tensor(self.loc)
+    if self.validate_args:
+      valid = (x >= loc) & ((concentration >= 0) |
+                            (x <= loc - scale / concentration))
+      with tf.control_dependencies([
+          assert_util.assert_equal(
+              valid, True, message='`x` outside distribution\'s support.')
+      ]):
+        x = tf.identity(x)
+    return (x - loc) / scale
+
+  def _mean(self):
+    concentration = tf.convert_to_tensor(self.concentration)
+    lim = tf.ones([], dtype=self.dtype)
+    valid = concentration < lim
+    safe_conc = tf.where(valid, concentration, tf.constant(.5, self.dtype))
+    result = lambda: self.loc + self.scale / (1 - safe_conc)
+    if self.allow_nan_stats:
+      return tf.where(valid, result(), tf.constant(float('nan'), self.dtype))
+    with tf.control_dependencies([
+        assert_util.assert_less(
+            concentration,
+            lim,
+            message='`mean` is undefined when `concentration >= 1`')
+    ]):
+      return result()
+
+  def _variance(self):
+    concentration = tf.convert_to_tensor(self.concentration)
+    lim = tf.constant(.5, self.dtype)
+    valid = concentration < lim
+    safe_conc = tf.where(valid, concentration, tf.constant(.25, self.dtype))
+    result = lambda: self.scale**2 / ((1 - safe_conc)**2 * (1 - 2 * safe_conc))
+    if self.allow_nan_stats:
+      return tf.where(valid, result(), tf.constant(float('nan'), self.dtype))
+    with tf.control_dependencies([
+        assert_util.assert_less(
+            concentration,
+            lim,
+            message='`variance` is undefined when `concentration >= 0.5`')
+    ]):
+      return result()
+
+  def _entropy(self):
+    return tf.math.log(self.scale) + self.concentration + 1
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if tensor_util.is_mutable(self.scale) != is_init:
+      assertions.append(
+          assert_util.assert_positive(
+              self.scale, message='Argument `scale` must be positive.'))
+    return assertions

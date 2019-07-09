@@ -18,12 +18,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
-    "AffineLinearOperator",
+    'AffineLinearOperator',
 ]
 
 
@@ -68,7 +71,7 @@ class AffineLinearOperator(bijector.Bijector):
                scale=None,
                adjoint=False,
                validate_args=False,
-               name="affine_linear_operator"):
+               name='affine_linear_operator'):
     """Instantiates the `AffineLinearOperator` bijector.
 
     Args:
@@ -87,38 +90,19 @@ class AffineLinearOperator(bijector.Bijector):
       TypeError: if `shift.dtype` does not match `scale.dtype`.
       ValueError: if not `scale.is_non_singular`.
     """
-    self._graph_parents = []
-    self._name = name
-    self._validate_args = validate_args
-    graph_parents = []
-    with self._name_scope("init", values=[shift]):
-      # In the absence of `loc` and `scale`, we'll assume `dtype` is `float32`.
-      dtype = tf.float32
-
-      if shift is not None:
-        shift = tf.convert_to_tensor(shift, name="shift")
-        graph_parents += [shift]
-        dtype = shift.dtype.base_dtype
-      self._shift = shift
-
+    with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([shift, scale], dtype_hint=tf.float32)
+      self._shift = tensor_util.convert_immutable_to_tensor(
+          shift, dtype=dtype, name='shift')
       if scale is not None:
-        if (shift is not None and
-            shift.dtype.base_dtype != scale.dtype.base_dtype):
-          raise TypeError(
-              "shift.dtype({}) is incompatible with scale.dtype({}).".format(
-                  shift.dtype, scale.dtype))
         if not isinstance(scale, tf.linalg.LinearOperator):
-          raise TypeError("scale is not an instance of tf.LinearOperator")
+          raise TypeError('scale is not an instance of tf.LinearOperator')
         if validate_args and not scale.is_non_singular:
-          raise ValueError("Scale matrix must be non-singular.")
-        graph_parents += scale.graph_parents
-        if scale.dtype is not None:
-          dtype = scale.dtype.base_dtype
+          raise ValueError('Scale matrix must be non-singular.')
       self._scale = scale
       self._adjoint = adjoint
       super(AffineLinearOperator, self).__init__(
           forward_min_event_ndims=1,
-          graph_parents=graph_parents,
           is_constant_jacobian=True,
           dtype=dtype,
           validate_args=validate_args,
@@ -163,7 +147,7 @@ class AffineLinearOperator(bijector.Bijector):
     # `log_det_jacobian` need only be specified for a single input, as this will
     # be tiled to match `event_ndims`.
     if self.scale is None:
-      return tf.constant(0., dtype=x.dtype.base_dtype)
+      return tf.constant(0., dtype=dtype_util.base_dtype(x.dtype))
 
     with tf.control_dependencies(self._maybe_collect_assertions()
                                  if self.validate_args else []):

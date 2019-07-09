@@ -19,15 +19,18 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ZipfTest(test_case.TestCase):
 
   def assertBetween(self, x, minimum, maximum):
@@ -112,11 +115,11 @@ class ZipfTest(test_case.TestCase):
     x = np.array([-3., -0., 0., 2., 3., 4., 5., 6., 7.], dtype=np.float32)
     zipf = tfd.Zipf(power=power)
     log_pmf = zipf.log_prob(x)
-    self.assertEqual(log_pmf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), log_pmf.shape)
     self.assertAllClose(self.evaluate(log_pmf), stats.zipf.logpmf(x, power_v))
 
     pmf = zipf.prob(x)
-    self.assertEqual(pmf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), pmf.shape)
     self.assertAllClose(self.evaluate(pmf), stats.zipf.pmf(x, power_v))
 
   def testZipfLogPmf_NonIntegerArgs(self):
@@ -127,7 +130,7 @@ class ZipfTest(test_case.TestCase):
 
     zipf = tfd.Zipf(power=power)
     log_pmf = zipf.log_prob(x)
-    self.assertEqual(log_pmf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), log_pmf.shape)
 
     # Check that log_pmf(x) of tfd.Zipf is between the values of
     # stats.zipf.logpmf for ceil(x) and floor(x).
@@ -140,7 +143,7 @@ class ZipfTest(test_case.TestCase):
     # Check that pmf(x) of tfd.Zipf is between the values of stats.zipf.pmf for
     # ceil(x) and floor(x).
     pmf = zipf.prob(x)
-    self.assertEqual(pmf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), pmf.shape)
 
     pmf_values = self.evaluate(pmf)
     self.assertAllBetween(pmf_values, stats.zipf.pmf(ceil_x, power_v),
@@ -154,13 +157,13 @@ class ZipfTest(test_case.TestCase):
 
     zipf = tfd.Zipf(power=power, interpolate_nondiscrete=False)
     log_pmf = zipf.log_prob(x)
-    self.assertEqual(log_pmf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), log_pmf.shape)
 
     log_pmf_values = self.evaluate(log_pmf)
     self.assertAllClose(log_pmf_values, stats.zipf.logpmf(x, power_v))
 
     pmf = zipf.prob(x)
-    self.assertEqual(pmf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), pmf.shape)
 
     pmf_values = self.evaluate(pmf)
     self.assertAllClose(pmf_values, stats.zipf.pmf(x, power_v))
@@ -173,11 +176,11 @@ class ZipfTest(test_case.TestCase):
 
     zipf = tfd.Zipf(power=power)
     log_pmf = zipf.log_prob(x)
-    self.assertEqual(log_pmf.get_shape(), (6, 3))
+    self.assertEqual((6, 3), log_pmf.shape)
     self.assertAllClose(self.evaluate(log_pmf), stats.zipf.logpmf(x, power_v))
 
     pmf = zipf.prob(x)
-    self.assertEqual(pmf.get_shape(), (6, 3))
+    self.assertEqual((6, 3), pmf.shape)
     self.assertAllClose(self.evaluate(pmf), stats.zipf.pmf(x, power_v))
 
   def testZipfLogPmfMultidimensional_NonIntegerArgs(self):
@@ -190,13 +193,13 @@ class ZipfTest(test_case.TestCase):
 
     zipf = tfd.Zipf(power=power)
     log_pmf = zipf.log_prob(x)
-    self.assertEqual(log_pmf.get_shape(), (6, 3))
+    self.assertEqual((6, 3), log_pmf.shape)
     self.assertAllBetween(
         self.evaluate(log_pmf), stats.zipf.logpmf(ceil_x, power_v),
         stats.zipf.logpmf(floor_x, power_v))
 
     pmf = zipf.prob(x)
-    self.assertEqual(pmf.get_shape(), (6, 3))
+    self.assertEqual((6, 3), pmf.shape)
     self.assertAllBetween(
         self.evaluate(pmf), stats.zipf.pmf(ceil_x, power_v),
         stats.zipf.pmf(floor_x, power_v))
@@ -209,11 +212,11 @@ class ZipfTest(test_case.TestCase):
 
     zipf = tfd.Zipf(power=power)
     log_cdf = zipf.log_cdf(x)
-    self.assertEqual(log_cdf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), log_cdf.shape)
     self.assertAllClose(self.evaluate(log_cdf), stats.zipf.logcdf(x, power_v))
 
     cdf = zipf.cdf(x)
-    self.assertEqual(cdf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), cdf.shape)
     self.assertAllClose(self.evaluate(cdf), stats.zipf.cdf(x, power_v))
 
   def testZipfCdf_NonIntegerArgsNoInterpolation(self):
@@ -224,11 +227,11 @@ class ZipfTest(test_case.TestCase):
 
     zipf = tfd.Zipf(power=power, interpolate_nondiscrete=False)
     log_cdf = zipf.log_cdf(x)
-    self.assertEqual(log_cdf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), log_cdf.shape)
     self.assertAllClose(self.evaluate(log_cdf), stats.zipf.logcdf(x, power_v))
 
     cdf = zipf.cdf(x)
-    self.assertEqual(cdf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), cdf.shape)
     self.assertAllClose(self.evaluate(cdf), stats.zipf.cdf(x, power_v))
 
   def testZipfCdf_NonIntegerArgsInterpolated(self):
@@ -241,13 +244,13 @@ class ZipfTest(test_case.TestCase):
 
     zipf = tfd.Zipf(power=power)
     log_cdf = zipf.log_cdf(x)
-    self.assertEqual(log_cdf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), log_cdf.shape)
     self.assertAllBetween(
         self.evaluate(log_cdf), stats.zipf.logcdf(floor_x, power_v),
         stats.zipf.logcdf(ceil_x, power_v))
 
     cdf = zipf.cdf(x)
-    self.assertEqual(cdf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), cdf.shape)
     self.assertAllBetween(
         self.evaluate(cdf), stats.zipf.cdf(floor_x, power_v),
         stats.zipf.cdf(ceil_x, power_v))
@@ -262,13 +265,13 @@ class ZipfTest(test_case.TestCase):
 
     zipf = tfd.Zipf(power=power)
     log_cdf = zipf.log_cdf(x)
-    self.assertEqual(log_cdf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), log_cdf.shape)
     self.assertAllBetween(
         self.evaluate(log_cdf), stats.zipf.logcdf(floor_x, power_v),
         stats.zipf.logcdf(ceil_x, power_v))
 
     cdf = zipf.cdf(x)
-    self.assertEqual(cdf.get_shape(), (batch_size,))
+    self.assertEqual((batch_size,), cdf.shape)
     self.assertAllBetween(
         self.evaluate(cdf), stats.zipf.cdf(floor_x, power_v),
         stats.zipf.cdf(ceil_x, power_v))
@@ -281,11 +284,11 @@ class ZipfTest(test_case.TestCase):
 
     zipf = tfd.Zipf(power=power)
     log_cdf = zipf.log_cdf(x)
-    self.assertEqual(log_cdf.get_shape(), (6, 3))
+    self.assertEqual((6, 3), log_cdf.shape)
     self.assertAllClose(self.evaluate(log_cdf), stats.zipf.logcdf(x, power_v))
 
     cdf = zipf.cdf(x)
-    self.assertEqual(cdf.get_shape(), (6, 3))
+    self.assertEqual((6, 3), cdf.shape)
     self.assertAllClose(self.evaluate(cdf), stats.zipf.cdf(x, power_v))
 
   def testZipfCdfMultidimensional_NonIntegerArgs(self):
@@ -298,13 +301,13 @@ class ZipfTest(test_case.TestCase):
 
     zipf = tfd.Zipf(power=power)
     log_cdf = zipf.log_cdf(x)
-    self.assertEqual(log_cdf.get_shape(), (6, 3))
+    self.assertEqual((6, 3), log_cdf.shape)
     self.assertAllBetween(
         self.evaluate(log_cdf), stats.zipf.logcdf(floor_x, power_v),
         stats.zipf.logcdf(ceil_x, power_v))
 
     cdf = zipf.cdf(x)
-    self.assertEqual(cdf.get_shape(), (6, 3))
+    self.assertEqual((6, 3), cdf.shape)
     self.assertAllBetween(
         self.evaluate(cdf), stats.zipf.cdf(floor_x, power_v),
         stats.zipf.cdf(ceil_x, power_v))
@@ -312,27 +315,27 @@ class ZipfTest(test_case.TestCase):
   def testZipfMean(self):
     power_v = [2.0, 3.0, 2.5]
     zipf = tfd.Zipf(power=power_v)
-    self.assertEqual(zipf.mean().get_shape(), (3,))
+    self.assertEqual((3,), zipf.mean().shape)
     self.assertAllClose(self.evaluate(zipf.mean()), stats.zipf.mean(power_v))
 
   def testZipfVariance(self):
     power_v = [4.0, 3.0, 5.5]  # var is undefined for power <= 3
     zipf = tfd.Zipf(power=power_v)
-    self.assertEqual(zipf.variance().get_shape(), (3,))
+    self.assertEqual((3,), zipf.variance().shape)
     stat_vars = np.vectorize(stats.zipf.var)(power_v)
     self.assertAllClose(self.evaluate(zipf.variance()), stat_vars)
 
   def testZipfStd(self):
     power_v = [4.0, 3.5, 4.5]
     zipf = tfd.Zipf(power=power_v)
-    self.assertEqual(zipf.stddev().get_shape(), (3,))
+    self.assertEqual((3,), zipf.stddev().shape)
     stat_stddevs = np.vectorize(stats.zipf.std)(power_v)
     self.assertAllClose(self.evaluate(zipf.stddev()), stat_stddevs)
 
   def testZipfMode(self):
     power_v = [10.0, 3.0, 2.5, 3.2, 1.1, 0.05]
     zipf = tfd.Zipf(power=power_v)
-    self.assertEqual(zipf.mode().get_shape(), (6,))
+    self.assertEqual((6,), zipf.mode().shape)
     self.assertAllClose(self.evaluate(zipf.mode()), np.ones_like(power_v))
 
   def testZipfSample(self):
@@ -343,10 +346,10 @@ class ZipfTest(test_case.TestCase):
       power = tf.constant(power_v, dtype=power_dtype)
       for dtype in [tf.int32, tf.int64, tf.float32, tf.float64]:
         zipf = tfd.Zipf(power=power, dtype=dtype)
-        samples = zipf.sample(n, seed=12)
+        samples = zipf.sample(n, seed=tfp_test_util.test_seed())
         sample_values = self.evaluate(samples)
-        self.assertEqual(samples.get_shape(), (n,))
-        self.assertEqual(sample_values.shape, (n,))
+        self.assertEqual((n,), samples.shape)
+        self.assertEqual((n,), sample_values.shape)
         self.assertAllClose(
             sample_values.mean(), stats.zipf.mean(power_v), rtol=.01)
         self.assertAllClose(
@@ -361,17 +364,17 @@ class ZipfTest(test_case.TestCase):
 
       for dtype in [tf.int32, tf.int64, tf.float32, tf.float64]:
         zipf = tfd.Zipf(power=power, dtype=dtype, validate_args=True)
-        samples = zipf.sample(n, seed=12)
+        samples = zipf.sample(n, seed=tfp_test_util.test_seed())
         self.evaluate(samples)
 
   def testZipfSampleMultidimensionalMean(self):
     power_v = np.array([np.arange(5, 15, dtype=np.float32)])  # 1 x 10
     zipf = tfd.Zipf(power=power_v)
     n = int(100e3)
-    samples = zipf.sample(n, seed=42)
+    samples = zipf.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.get_shape(), (n, 1, 10))
-    self.assertEqual(sample_values.shape, (n, 1, 10))
+    self.assertEqual((n, 1, 10,), samples.shape)
+    self.assertEqual((n, 1, 10,), sample_values.shape)
 
     # stats.zipf wants float64 params.
     stats_mean = np.vectorize(stats.zipf.mean)(power_v.astype(np.float64))
@@ -381,10 +384,10 @@ class ZipfTest(test_case.TestCase):
     power_v = np.array([np.arange(5, 10, dtype=np.float32)])  # 1 x 5
     zipf = tfd.Zipf(power=power_v)
     n = int(100e4)
-    samples = zipf.sample(n, seed=1729)
+    samples = zipf.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.get_shape(), (n, 1, 5))
-    self.assertEqual(sample_values.shape, (n, 1, 5))
+    self.assertEqual((n, 1, 5), samples.shape)
+    self.assertEqual((n, 1, 5), sample_values.shape)
 
     # stats.zipf wants float64 params.
     stats_std = np.vectorize(stats.zipf.std)(power_v.astype(np.float64))
@@ -393,15 +396,15 @@ class ZipfTest(test_case.TestCase):
   # Test that sampling with the same seed twice gives the same results.
   def testZipfSampleMultipleTimes(self):
     n = 1000
-    seed = 64
+    seed = tfp_test_util.test_seed()
     power = 1.5
 
     zipf1 = tfd.Zipf(power=power, name="zipf1")
-    tf.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     samples1 = self.evaluate(zipf1.sample(n, seed=seed))
 
     zipf2 = tfd.Zipf(power=power, name="zipf2")
-    tf.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     samples2 = self.evaluate(zipf2.sample(n, seed=seed))
 
     self.assertAllEqual(samples1, samples2)
@@ -409,7 +412,7 @@ class ZipfTest(test_case.TestCase):
   def testZipfSample_AvoidsInfiniteLoop(self):
     zipf = tfd.Zipf(power=1.)
     n = 1000
-    self.evaluate(zipf.sample(n, seed=52))
+    self.evaluate(zipf.sample(n, seed=tfp_test_util.test_seed()))
 
 
 if __name__ == "__main__":

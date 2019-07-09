@@ -27,36 +27,40 @@ from tensorflow_probability.python.vi.csiszar_divergence import kl_reverse
 from tensorflow_probability.python.vi.csiszar_divergence import log1p_abs
 from tensorflow_probability.python.vi.csiszar_divergence import modified_gan
 from tensorflow_probability.python.vi.csiszar_divergence import monte_carlo_csiszar_f_divergence
+from tensorflow_probability.python.vi.csiszar_divergence import monte_carlo_variational_loss
 from tensorflow_probability.python.vi.csiszar_divergence import pearson
 from tensorflow_probability.python.vi.csiszar_divergence import squared_hellinger
 from tensorflow_probability.python.vi.csiszar_divergence import symmetrized_csiszar_function
 from tensorflow_probability.python.vi.csiszar_divergence import t_power
 from tensorflow_probability.python.vi.csiszar_divergence import total_variation
 from tensorflow_probability.python.vi.csiszar_divergence import triangular
+from tensorflow_probability.python.vi.optimization import fit_surrogate_posterior
 
-from tensorflow.python.util.all_util import remove_undocumented
+from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 
 _allowed_symbols = [
-    "amari_alpha",
-    "arithmetic_geometric",
-    "chi_square",
-    "csiszar_vimco",
-    "csiszar_vimco_helper",
-    "dual_csiszar_function",
-    "jensen_shannon",
-    "jeffreys",
-    "kl_forward",
-    "kl_reverse",
-    "log1p_abs",
-    "modified_gan",
-    "monte_carlo_csiszar_f_divergence",
-    "pearson",
-    "squared_hellinger",
-    "symmetrized_csiszar_function",
-    "total_variation",
-    "triangular",
-    "t_power",
+    'amari_alpha',
+    'arithmetic_geometric',
+    'chi_square',
+    'csiszar_vimco',
+    'csiszar_vimco_helper',
+    'dual_csiszar_function',
+    'fit_surrogate_posterior',
+    'jensen_shannon',
+    'jeffreys',
+    'kl_forward',
+    'kl_reverse',
+    'log1p_abs',
+    'modified_gan',
+    'monte_carlo_csiszar_f_divergence',
+    'monte_carlo_variational_loss',
+    'pearson',
+    'squared_hellinger',
+    'symmetrized_csiszar_function',
+    'total_variation',
+    'triangular',
+    't_power',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

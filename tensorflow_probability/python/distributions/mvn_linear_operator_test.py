@@ -21,14 +21,16 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
 
   def setUp(self):
@@ -36,8 +38,8 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
 
   def _random_tril_matrix(self, shape):
     mat = self.rng.rand(*shape)
-    chol = tfd.matrix_diag_transform(mat, transform=tf.nn.softplus)
-    return tf.matrix_band_part(chol, -1, 0)
+    chol = tfd.matrix_diag_transform(mat, transform=tf.math.softplus)
+    return tf.linalg.band_part(chol, -1, 0)
 
   def _random_loc_and_scale(self, batch_shape, event_shape):
     # This ensures covariance is positive def.
@@ -53,7 +55,7 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
     loc = [1., 2.]
     scale = tf.linalg.LinearOperatorIdentity(2)
     mvn = tfd.MultivariateNormalLinearOperator(loc, scale, name="Billy")
-    self.assertEqual(mvn.name, "Billy/")
+    self.assertStartsWith(mvn.name, "Billy")
 
   def testLogPDFScalarBatch(self):
     loc = self.rng.rand(2)
@@ -89,8 +91,8 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
     mvn = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
 
     # Shapes known at graph construction time.
-    self.assertEqual((2,), tuple(mvn.event_shape.as_list()))
-    self.assertEqual((3, 5), tuple(mvn.batch_shape.as_list()))
+    self.assertEqual((2,), tuple(tensorshape_util.as_list(mvn.event_shape)))
+    self.assertEqual((3, 5), tuple(tensorshape_util.as_list(mvn.batch_shape)))
 
     # Shapes known at runtime.
     self.assertEqual((2,), tuple(self.evaluate(mvn.event_shape_tensor())))

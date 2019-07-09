@@ -34,6 +34,8 @@ DEST=$(dirname "${1}/does_not_exist")
 DEST=$(cd "$DEST" && pwd)
 
 cd bazel-bin/pip_pkg.runfiles/tensorflow_probability
+echo >>tensorflow_probability/python/version.py \
+  "if __version__.endswith('dev'): __version__ += '$(date --utc +%Y%m%d)'"
 # Pass through remaining arguments (following the first argument, which
 # specifies the output dir) to setup.py, e.g.,
 #  ./pip_pkg /tmp/tensorflow_probability_pkg --gpu --release

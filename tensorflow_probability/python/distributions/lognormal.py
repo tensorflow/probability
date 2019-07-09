@@ -19,15 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
-from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
-    "LogNormal",
+    'LogNormal',
 ]
 
 
@@ -35,11 +34,11 @@ class LogNormal(transformed_distribution.TransformedDistribution):
   """The log-normal distribution."""
 
   def __init__(self,
-               loc=None,
-               scale=None,
+               loc,
+               scale,
                validate_args=False,
                allow_nan_stats=True,
-               name="LogNormal"):
+               name='LogNormal'):
     """Construct a log-normal distribution.
 
     The LogNormal distribution models positive-valued random variables
@@ -61,15 +60,18 @@ class LogNormal(transformed_distribution.TransformedDistribution):
         undefined statistics will return NaN for this statistic.
       name: The name to give Ops created by the initializer.
     """
-    with tf.name_scope(name, values=[loc, scale]) as name:
-      dtype = dtype_util.common_dtype([loc, scale], tf.float32)
+    parameters = dict(locals())
+    with tf.name_scope(name) as name:
       super(LogNormal, self).__init__(
-          distribution=normal.Normal(
-              loc=tf.convert_to_tensor(loc, name="loc", dtype=dtype),
-              scale=tf.convert_to_tensor(scale, name="scale", dtype=dtype)),
+          distribution=normal.Normal(loc=loc, scale=scale),
           bijector=exp_bijector.Exp(),
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=0, scale=0)
 
   @property
   def loc(self):
@@ -94,5 +96,4 @@ class LogNormal(transformed_distribution.TransformedDistribution):
 
   def _entropy(self):
     return (self.distribution.mean() + 0.5 +
-            tf.log(self.distribution.stddev()) +
-            0.5 * np.log(2 * np.pi))
+            tf.math.log(self.distribution.stddev()) + 0.5 * np.log(2 * np.pi))

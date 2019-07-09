@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import vector_laplace_linear_operator as vllo
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -212,8 +212,7 @@ class VectorLaplaceDiag(vllo.VectorLaplaceLinearOperator):
     """
     parameters = dict(locals())
     with tf.name_scope(name):
-      with tf.name_scope(
-          "init", values=[loc, scale_diag, scale_identity_multiplier]):
+      with tf.name_scope("init"):
         dtype = dtype_util.common_dtype(
             [loc, scale_diag, scale_identity_multiplier], tf.float32)
         # No need to validate_args while making diag_scale.  The returned
@@ -233,3 +232,7 @@ class VectorLaplaceDiag(vllo.VectorLaplaceLinearOperator):
         allow_nan_stats=allow_nan_stats,
         name=name)
     self._parameters = parameters
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=1, scale_diag=1, scale_identity_multiplier=0)

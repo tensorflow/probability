@@ -20,10 +20,13 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
 
+import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -81,10 +84,10 @@ class FillTriangular(bijector.Bijector):
         name=name)
 
   def _forward(self, x):
-    return distribution_util.fill_triangular(x, upper=self._upper)
+    return tfp_math.fill_triangular(x, upper=self._upper)
 
   def _inverse(self, y):
-    return distribution_util.fill_triangular_inverse(y, upper=self._upper)
+    return tfp_math.fill_triangular_inverse(y, upper=self._upper)
 
   def _forward_log_det_jacobian(self, x):
     return tf.zeros_like(x[..., 0])
@@ -93,24 +96,25 @@ class FillTriangular(bijector.Bijector):
     return tf.zeros_like(y[..., 0, 0])
 
   def _forward_event_shape(self, input_shape):
-    batch_shape, d = input_shape[:-1], tf.dimension_value(input_shape[-1])
+    batch_shape, d = input_shape[:-1], tf.compat.dimension_value(
+        input_shape[-1])
     if d is None:
       n = None
     else:
       n = vector_size_to_square_matrix_size(d, self.validate_args)
-    return batch_shape.concatenate([n, n])
+    return tensorshape_util.concatenate(batch_shape, [n, n])
 
   def _inverse_event_shape(self, output_shape):
     batch_shape, n1, n2 = (output_shape[:-2],
-                           tf.dimension_value(output_shape[-2]),
-                           tf.dimension_value(output_shape[-1]))
+                           tf.compat.dimension_value(output_shape[-2]),
+                           tf.compat.dimension_value(output_shape[-1]))
     if n1 is None or n2 is None:
       m = None
     elif n1 != n2:
       raise ValueError("Matrix must be square. (saw [{}, {}])".format(n1, n2))
     else:
       m = n1 * (n1 + 1) / 2
-    return batch_shape.concatenate([m])
+    return tensorshape_util.concatenate(batch_shape, [m])
 
   def _forward_event_shape_tensor(self, input_shape_tensor):
     batch_shape, d = input_shape_tensor[:-1], input_shape_tensor[-1]
@@ -120,7 +124,7 @@ class FillTriangular(bijector.Bijector):
   def _inverse_event_shape_tensor(self, output_shape_tensor):
     batch_shape, n = output_shape_tensor[:-2], output_shape_tensor[-1]
     if self.validate_args:
-      is_square_matrix = tf.assert_equal(
+      is_square_matrix = assert_util.assert_equal(
           n, output_shape_tensor[-2], message="Matrix must be square.")
       with tf.control_dependencies([is_square_matrix]):
         n = tf.identity(n)
@@ -136,12 +140,12 @@ def vector_size_to_square_matrix_size(d, validate_args, name=None):
       raise ValueError("Vector length is not a triangular number.")
     return int(n)
   else:
-    with tf.name_scope(name, "vector_size_to_square_matrix_size", [d]) as name:
-      n = (-1. + tf.sqrt(1 + 8. * tf.to_float(d))) / 2.
+    with tf.name_scope(name or "vector_size_to_square_matrix_size") as name:
+      n = (-1. + tf.sqrt(1 + 8. * tf.cast(d, dtype=tf.float32))) / 2.
       if validate_args:
         with tf.control_dependencies([
-            tf.assert_equal(
-                tf.to_float(tf.to_int32(n)),
+            assert_util.assert_equal(
+                tf.cast(tf.cast(n, dtype=tf.int32), dtype=tf.float32),
                 n,
                 message="Vector length is not a triangular number")
         ]):

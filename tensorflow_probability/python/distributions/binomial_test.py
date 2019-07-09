@@ -19,15 +19,20 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BinomialTest(tf.test.TestCase):
+
+  def setUp(self):
+    self._rng = np.random.RandomState(42)
 
   def testSimpleShapes(self):
     p = np.float32(np.random.beta(1, 1))
@@ -93,7 +98,7 @@ class BinomialTest(tf.test.TestCase):
     self.evaluate(binom.prob([3., 1, 2]))
     self.evaluate(binom.cdf([2., 3, 2]))
     self.evaluate(binom.cdf([3., 1, 2]))
-    placeholder = tf.placeholder_with_default(input=[1.0, 2.5, 1.5], shape=[3])
+    placeholder = tf1.placeholder_with_default(input=[1.0, 2.5, 1.5], shape=[3])
     # Both equality and integer checking fail.
     with self.assertRaisesOpError("cannot contain fractional components."):
       self.evaluate(binom.prob(placeholder))
@@ -187,6 +192,70 @@ class BinomialTest(tf.test.TestCase):
     expected_modes = [1., 2, 7]
     self.assertEqual((3,), binom.mode().shape)
     self.assertAllClose(expected_modes, self.evaluate(binom.mode()))
+
+  def testSampleUnbiasedNonScalarBatch(self):
+    probs = self._rng.rand(4, 3).astype(np.float32)
+    counts = np.float32([4, 11., 20.])
+    dist = tfd.Binomial(total_count=counts, probs=probs)
+    n = int(1e5)
+    x = dist.sample(n, seed=tfp_test_util.test_seed())
+    sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)
+    [
+        sample_mean_,
+        sample_variance_,
+    ] = self.evaluate([
+        sample_mean,
+        sample_variance,
+    ])
+    self.assertAllEqual([4, 3], sample_mean.shape)
+    self.assertAllClose(
+        stats.binom.mean(counts, probs), sample_mean_, atol=0., rtol=0.10)
+    self.assertAllEqual([4, 3], sample_variance.shape)
+    self.assertAllClose(
+        stats.binom.var(counts, probs), sample_variance_, atol=0., rtol=0.20)
+
+  def testSampleUnbiasedScalarBatch(self):
+    counts = np.float32(5.)
+    probs = self._rng.rand(4).astype(np.float32)
+    dist = tfd.Binomial(total_count=counts, probs=probs)
+    n = int(1e5)
+    x = dist.sample(n, seed=tfp_test_util.test_seed())
+    sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)
+    [
+        sample_mean_,
+        sample_variance_,
+    ] = self.evaluate([
+        sample_mean,
+        sample_variance,
+    ])
+    self.assertAllEqual([4], sample_mean.shape)
+    self.assertAllClose(
+        stats.binom.mean(counts, probs), sample_mean_, atol=0., rtol=0.10)
+    self.assertAllEqual([4], sample_variance.shape)
+    self.assertAllClose(
+        stats.binom.var(counts, probs), sample_variance_, atol=0., rtol=0.20)
+
+  def testParamTensorFromLogits(self):
+    x = tf.constant([-1., 0.5, 1.])
+    d = tfd.Binomial(total_count=1, logits=x, validate_args=True)
+    logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
+    self.assertAllClose(
+        *self.evaluate([logit(d.prob(1.)), d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([d.prob(1.), d.probs_parameter()]),
+        atol=0, rtol=1e-4)
+
+  def testParamTensorFromProbs(self):
+    x = tf.constant([0.1, 0.5, 0.4])
+    d = tfd.Binomial(total_count=1, probs=x, validate_args=True)
+    logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
+    self.assertAllClose(
+        *self.evaluate([logit(d.prob(1.)), d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([d.prob(1.), d.probs_parameter()]),
+        atol=0, rtol=1e-4)
 
 
 if __name__ == "__main__":

@@ -19,13 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import square as square_bijector
 from tensorflow_probability.python.distributions import chi2
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 
 
@@ -78,21 +79,28 @@ class Chi(transformed_distribution.TransformedDistribution):
       name: Python `str` name prefixed to Ops created by this class.
         Default value: `'Chi'`.
     """
-    with tf.name_scope(name, values=[df]) as name:
+    parameters = dict(locals())
+    with tf.name_scope(name) as name:
       df = tf.convert_to_tensor(
           df,
           name="df",
-          dtype=dtype_util.common_dtype([df], preferred_dtype=tf.float32))
-      validation_assertions = [tf.assert_positive(df)] if validate_args else []
+          dtype=dtype_util.common_dtype([df], dtype_hint=tf.float32))
+      validation_assertions = (
+          [assert_util.assert_positive(df)] if validate_args else [])
       with tf.control_dependencies(validation_assertions):
         self._df = tf.identity(df, name="df")
 
       super(Chi, self).__init__(
           distribution=chi2.Chi2(df=self._df,
                                  validate_args=validate_args,
-                                 allow_nan_stats=allow_nan_stats,
-                                 name=name),
-          bijector=invert_bijector.Invert(square_bijector.Square()))
+                                 allow_nan_stats=allow_nan_stats),
+          bijector=invert_bijector.Invert(square_bijector.Square()),
+          parameters=parameters,
+          name=name)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(df=0)
 
   @property
   def df(self):
@@ -100,16 +108,16 @@ class Chi(transformed_distribution.TransformedDistribution):
     return self._df
 
   def _mean(self):
-    return np.sqrt(2) * tf.exp(tf.lgamma(0.5 * (self.df + 1)) -
-                               tf.lgamma(0.5 * self.df))
+    return np.sqrt(2) * tf.exp(
+        tf.math.lgamma(0.5 * (self.df + 1)) - tf.math.lgamma(0.5 * self.df))
 
   def _variance(self):
     return self.df - tf.square(self._mean())
 
   def _entropy(self):
-    return (tf.lgamma(self.df / 2) +
-            0.5 * (self.df - np.log(2) -
-                   (self.df - 1) * tf.digamma(0.5 * self.df)))
+    return (tf.math.lgamma(self.df / 2) + 0.5 *
+            (self.df - np.log(2) -
+             (self.df - 1) * tf.math.digamma(0.5 * self.df)))
 
 
 @kullback_leibler.RegisterKL(Chi, Chi)
@@ -125,10 +133,10 @@ def _kl_chi_chi(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name, "kl_chi_chi", [a.df, b.df]):
+  with tf.name_scope(name or "kl_chi_chi"):
     # Consistent with
     # https://mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 118
     # The paper introduces an additional scaling parameter; setting that
     # parameter to 1 and simplifying yields the expression we use here.
-    return (0.5 * tf.digamma(0.5 * a.df) * (a.df - b.df) +
-            tf.lgamma(0.5 * b.df) - tf.lgamma(0.5 * a.df))
+    return (0.5 * tf.math.digamma(0.5 * a.df) * (a.df - b.df) +
+            tf.math.lgamma(0.5 * b.df) - tf.math.lgamma(0.5 * a.df))

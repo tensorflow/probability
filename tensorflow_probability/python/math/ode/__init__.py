@@ -14,19 +14,20 @@
 # ============================================================================
 """TensorFlow Probability ODE solvers."""
 
-# TODO(parsiad): Add `from tensorflow_probability.python.math import ode` to the
-# parent __init__.py file to make this module visible.
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.math.ode.base import ChosenBySolver
 from tensorflow_probability.python.math.ode.base import Diagnostics
-from tensorflow_probability.python.math.ode.base import Solution
+from tensorflow_probability.python.math.ode.base import Results
 from tensorflow_probability.python.math.ode.base import Solver
+from tensorflow_probability.python.math.ode.bdf import BDF
 
 __all__ = [
+    'BDF',
+    'ChosenBySolver',
     'Diagnostics',
-    'Solution',
+    'Results',
     'Solver',
 ]

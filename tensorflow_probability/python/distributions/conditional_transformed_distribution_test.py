@@ -20,22 +20,20 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import transformed_distribution_test
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _ChooseLocation(tfp.bijectors.ConditionalBijector):
   """A Bijector which chooses between one of two location parameters."""
 
   def __init__(self, loc, name="ChooseLocation"):
-    self._graph_parents = []
-    self._name = name
-    with self._name_scope("init", values=[loc]):
+    with tf.name_scope(name) as name:
       self._loc = tf.convert_to_tensor(loc, name="loc")
       super(_ChooseLocation, self).__init__(
           graph_parents=[self._loc],
@@ -59,7 +57,7 @@ class _ChooseLocation(tfp.bijectors.ConditionalBijector):
     return tf.gather(self._loc, z)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class ConditionalTransformedDistributionTest(
     transformed_distribution_test.TransformedDistributionTest):
 

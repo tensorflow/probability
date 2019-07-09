@@ -18,10 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import logistic
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
@@ -133,7 +134,7 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
                probs=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="RelaxedBernoulli"):
+               name='RelaxedBernoulli'):
     """Construct RelaxedBernoulli distributions.
 
     Args:
@@ -162,12 +163,13 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
       ValueError: If both `probs` and `logits` are passed, or if neither.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[logits, probs, temperature]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([logits, probs, temperature], tf.float32)
       self._temperature = tf.convert_to_tensor(
-          temperature, name="temperature", dtype=dtype)
+          temperature, name='temperature', dtype=dtype)
       if validate_args:
-        with tf.control_dependencies([tf.assert_positive(temperature)]):
+        with tf.control_dependencies(
+            [assert_util.assert_positive(temperature)]):
           self._temperature = tf.identity(self._temperature)
       self._logits, self._probs = distribution_util.get_logits_and_probs(
           logits=logits, probs=probs, validate_args=validate_args, dtype=dtype)
@@ -177,7 +179,7 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
               1. / self._temperature,
               validate_args=validate_args,
               allow_nan_stats=allow_nan_stats,
-              name=name + "/Logistic"),
+              name=name + '/Logistic'),
           bijector=sigmoid_bijector.Sigmoid(validate_args=validate_args),
           validate_args=validate_args,
           name=name)
@@ -185,7 +187,11 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {"logits": tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
+    return {'logits': tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(temperature=0, logits=0, probs=0)
 
   @property
   def temperature(self):
@@ -194,10 +200,24 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
 
   @property
   def logits(self):
-    """Log-odds of `1`."""
+    """Input argument `logits`."""
     return self._logits
 
   @property
   def probs(self):
-    """Probability of `1`."""
+    """Input argument `probs`."""
     return self._probs
+
+  def logits_parameter(self, name=None):
+    """Logits computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'logits_parameter'):
+      if self.logits is None:
+        return tf.math.log(self.probs) - tf.math.log1p(-self.probs)
+      return tf.identity(self.logits)
+
+  def probs_parameter(self, name=None):
+    """Probs computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'probs_parameter'):
+      if self.logits is None:
+        return tf.identity(self.probs)
+      return tf.math.sigmoid(self.logits)

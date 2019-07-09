@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import affine_scalar as affine_scalar_bijector
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import sinh_arcsinh as sinh_arcsinh_bijector
@@ -26,7 +26,6 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.ops import control_flow_ops
 
 __all__ = [
     "SinhArcsinh",
@@ -136,7 +135,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
     """
     parameters = dict(locals())
 
-    with tf.name_scope(name, values=[loc, scale, skewness, tailweight]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale, skewness, tailweight],
                                       tf.float32)
       loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
@@ -165,7 +164,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
         asserts = distribution_util.maybe_check_scalar_distribution(
             distribution, dtype, validate_args)
         if asserts:
-          loc = control_flow_ops.with_dependencies(asserts, loc)
+          loc = distribution_util.with_dependencies(asserts, loc)
 
       # Make the SAS bijector, 'F'.
       f = sinh_arcsinh_bijector.SinhArcsinh(
@@ -174,7 +173,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
         f_noskew = f
       else:
         f_noskew = sinh_arcsinh_bijector.SinhArcsinh(
-            skewness=skewness.dtype.as_numpy_dtype(0.),
+            skewness=dtype_util.as_numpy_dtype(skewness.dtype)(0),
             tailweight=tailweight)
 
       # Make the AffineScalar bijector, Z --> loc + scale * Z (2 / F_0(2))

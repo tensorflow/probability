@@ -20,20 +20,20 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SquareBijectorTest(tf.test.TestCase):
   """Tests the correctness of the Y = X ** 2 transformation."""
 
   def testBijectorScalar(self):
     bijector = tfb.Square(validate_args=True)
-    self.assertEqual("square", bijector.name)
+    self.assertStartsWith(bijector.name, "square")
     x = [[[1., 5],
           [2, 1]],
          [[np.sqrt(2.), 3],

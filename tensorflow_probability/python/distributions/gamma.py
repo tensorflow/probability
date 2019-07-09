@@ -20,15 +20,16 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow.python.framework import tensor_shape
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
     "Gamma",
@@ -143,32 +144,31 @@ class Gamma(distribution.Distribution):
       TypeError: if `concentration` and `rate` are different dtypes.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[concentration, rate]) as name:
-      dtype = dtype_util.common_dtype([concentration, rate], tf.float32)
-      concentration = tf.convert_to_tensor(
-          concentration, name="concentration", dtype=dtype)
-      rate = tf.convert_to_tensor(rate, name="rate", dtype=dtype)
-      with tf.control_dependencies([
-          tf.assert_positive(concentration),
-          tf.assert_positive(rate),
-      ] if validate_args else []):
-        self._concentration = tf.identity(concentration)
-        self._rate = tf.identity(rate)
-        tf.assert_same_float_dtype([self._concentration, self._rate])
-    super(Gamma, self).__init__(
-        dtype=dtype,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        parameters=parameters,
-        graph_parents=[self._concentration, self._rate],
-        name=name)
+    with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype(
+          [concentration, rate], dtype_hint=tf.float32)
+      self._concentration = tensor_util.convert_immutable_to_tensor(
+          concentration, dtype=dtype, name="concentration")
+      self._rate = tensor_util.convert_immutable_to_tensor(
+          rate, dtype=dtype, name="rate")
+
+      super(Gamma, self).__init__(
+          dtype=dtype,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("concentration", "rate"), ([tf.convert_to_tensor(
-            sample_shape, dtype=tf.int32)] * 2)))
+        zip(("concentration", "rate"),
+            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(concentration=0, rate=0)
 
   @property
   def concentration(self):
@@ -180,10 +180,11 @@ class Gamma(distribution.Distribution):
     """Rate parameter."""
     return self._rate
 
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.concentration),
-        tf.shape(self.rate))
+  def _batch_shape_tensor(self, concentration=None, rate=None):
+    return prefer_static.broadcast_shape(
+        prefer_static.shape(
+            self.concentration if concentration is None else concentration),
+        prefer_static.shape(self.rate if rate is None else rate))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -194,42 +195,40 @@ class Gamma(distribution.Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   @distribution_util.AppendDocstring(
       """Note: See `tf.random_gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
-    return tf.random_gamma(
+    return tf.random.gamma(
         shape=[n],
         alpha=self.concentration,
         beta=self.rate,
         dtype=self.dtype,
         seed=seed)
 
-  def _log_prob(self, x):
-    return self._log_unnormalized_prob(x) - self._log_normalization()
+  def _log_prob(self, x, concentration=None, rate=None):
+    concentration = tf.convert_to_tensor(
+        self.concentration if concentration is None else concentration)
+    rate = tf.convert_to_tensor(self.rate if rate is None else rate)
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
+      log_unnormalized_prob = tf.math.xlogy(concentration - 1., x) - rate * x
+      log_normalization = (tf.math.lgamma(concentration) -
+                           concentration * tf.math.log(rate))
+      return log_unnormalized_prob - log_normalization
 
   def _cdf(self, x):
-    x = self._maybe_assert_valid_sample(x)
-    # Note that igamma returns the regularized incomplete gamma function,
-    # which is what we want for the CDF.
-    return tf.igamma(self.concentration, self.rate * x)
-
-  def _log_unnormalized_prob(self, x):
-    x = self._maybe_assert_valid_sample(x)
-    return tf.math.xlogy(self.concentration - 1., x) - self.rate * x
-
-  def _log_normalization(self):
-    return (tf.lgamma(self.concentration)
-            - self.concentration * tf.log(self.rate))
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
+      # Note that igamma returns the regularized incomplete gamma function,
+      # which is what we want for the CDF.
+      return tf.math.igamma(self.concentration, self.rate * x)
 
   def _entropy(self):
-    return (self.concentration
-            - tf.log(self.rate)
-            + tf.lgamma(self.concentration)
-            + ((1. - self.concentration) *
-               tf.digamma(self.concentration)))
+    concentration = tf.convert_to_tensor(self.concentration)
+    return (concentration - tf.math.log(self.rate) +
+            tf.math.lgamma(concentration) +
+            ((1. - concentration) * tf.math.digamma(concentration)))
 
   def _mean(self):
     return self.concentration / self.rate
@@ -245,56 +244,67 @@ class Gamma(distribution.Distribution):
       `shape > 1`, and `NaN` otherwise. If `self.allow_nan_stats` is `False`,
       an exception will be raised rather than returning `NaN`.""")
   def _mode(self):
-    mode = (self.concentration - 1.) / self.rate
+    concentration = tf.convert_to_tensor(self.concentration)
+    rate = tf.convert_to_tensor(self.rate)
+    mode = (concentration - 1.) / rate
     if self.allow_nan_stats:
-      nan = tf.fill(
-          self.batch_shape_tensor(),
-          np.array(np.nan, dtype=self.dtype.as_numpy_dtype()),
-          name="nan")
-      return tf.where(self.concentration > 1., mode, nan)
+      assertions = []
     else:
-      return control_flow_ops.with_dependencies([
-          tf.assert_less(
-              tf.ones([], self.dtype),
-              self.concentration,
-              message="mode not defined when any concentration <= 1"),
-          ], mode)
+      assertions = [assert_util.assert_less(
+          tf.ones([], self.dtype), concentration,
+          message="Mode not defined when any concentration <= 1.")]
+    with tf.control_dependencies(assertions):
+      return tf.where(
+          concentration > 1.,
+          mode,
+          dtype_util.as_numpy_dtype(self.dtype)(np.nan))
 
   def _maybe_assert_valid_sample(self, x):
-    tf.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
     if not self.validate_args:
-      return x
-    return control_flow_ops.with_dependencies([
-        tf.assert_positive(x),
-    ], x)
+      return []
+    return [assert_util.assert_positive(x, message="Sample must be positive.")]
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_mutable(self.concentration):
+      assertions.append(assert_util.assert_positive(
+          self.concentration,
+          message="Argument `concentration` must be positive."))
+    if is_init != tensor_util.is_mutable(self.rate):
+      assertions.append(assert_util.assert_positive(
+          self.rate,
+          message="Argument `rate` must be positive."))
+    return assertions
 
 
-# TODO(b/117098119): Remove tf.distribution references once they're gone.
-@kullback_leibler.RegisterKL(Gamma, tf.distributions.Gamma)
-@kullback_leibler.RegisterKL(tf.distributions.Gamma, Gamma)
 @kullback_leibler.RegisterKL(Gamma, Gamma)
 def _kl_gamma_gamma(g0, g1, name=None):
   """Calculate the batched KL divergence KL(g0 || g1) with g0 and g1 Gamma.
 
   Args:
-    g0: instance of a Gamma distribution object.
-    g1: instance of a Gamma distribution object.
-    name: (optional) Name to use for created operations.
-      Default is "kl_gamma_gamma".
+    g0: Instance of a `Gamma` distribution object.
+    g1: Instance of a `Gamma` distribution object.
+    name: Python `str` name to use for created operations.
+      Default value: `None` (i.e., `'kl_gamma_gamma'`).
 
   Returns:
     kl_gamma_gamma: `Tensor`. The batchwise KL(g0 || g1).
   """
-  with tf.name_scope(name, "kl_gamma_gamma", values=[
-      g0.concentration, g0.rate, g1.concentration, g1.rate]):
+  with tf.name_scope(name or "kl_gamma_gamma"):
     # Result from:
     #   http://www.fil.ion.ucl.ac.uk/~wpenny/publications/densities.ps
     # For derivation see:
     #   http://stats.stackexchange.com/questions/11646/kullback-leibler-divergence-between-two-gamma-distributions   pylint: disable=line-too-long
-    return (((g0.concentration - g1.concentration)
-             * tf.digamma(g0.concentration))
-            + tf.lgamma(g1.concentration)
-            - tf.lgamma(g0.concentration)
-            + g1.concentration * tf.log(g0.rate)
-            - g1.concentration * tf.log(g1.rate)
-            + g0.concentration * (g1.rate / g0.rate - 1.))
+    g0_concentration = tf.convert_to_tensor(g0.concentration)
+    g0_rate = tf.convert_to_tensor(g0.rate)
+    g1_concentration = tf.convert_to_tensor(g1.concentration)
+    g1_rate = tf.convert_to_tensor(g1.rate)
+    return (((g0_concentration - g1_concentration) *
+             tf.math.digamma(g0_concentration)) +
+            tf.math.lgamma(g1_concentration) -
+            tf.math.lgamma(g0_concentration) +
+            g1_concentration * tf.math.log(g0_rate) -
+            g1_concentration * tf.math.log(g1_rate) + g0_concentration *
+            (g1_rate / g0_rate - 1.))

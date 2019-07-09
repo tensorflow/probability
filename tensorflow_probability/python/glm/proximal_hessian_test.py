@@ -24,13 +24,12 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from tensorflow.contrib.layers.python.ops import sparse_ops
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _ProximalHessianTest(object):
 
   # https://tminka.github.io/papers/logreg/minka-logreg.pdf
@@ -63,15 +62,16 @@ class _ProximalHessianTest(object):
 
     radius = np.sqrt(2.)
     model_coefficients *= (
-        radius / tf.linalg.norm(model_coefficients, axis=-1)[..., tf.newaxis])
+        radius /
+        tf.linalg.norm(tensor=model_coefficients, axis=-1)[..., tf.newaxis])
 
     mask = tfd.Bernoulli(probs=0.5, dtype=tf.bool).sample(batch_shape + [d])
-    model_coefficients = tf.where(mask, model_coefficients,
-                                  tf.zeros_like(model_coefficients))
+    model_coefficients = tf.compat.v1.where(mask, model_coefficients,
+                                            tf.zeros_like(model_coefficients))
     model_matrix = tfd.Normal(
         loc=np.array(0, dtype), scale=np.array(1, dtype)).sample(
             batch_shape + [n, d], seed=seed())
-    scale = tf.convert_to_tensor(scale, dtype)
+    scale = tf.convert_to_tensor(value=scale, dtype=dtype)
     linear_response = tf.matmul(model_matrix,
                                 model_coefficients[..., tf.newaxis])[..., 0]
 
@@ -89,7 +89,7 @@ class _ProximalHessianTest(object):
     return self.evaluate([model_matrix, response, model_coefficients, mask])
 
   def _make_placeholder(self, x):
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=x, shape=(x.shape if self.use_static_shape else None))
 
   def _adjust_dtype_and_shape_hints(self, x):
@@ -120,7 +120,7 @@ class _ProximalHessianTest(object):
       model_coefficients_start = np.zeros(model_matrix.shape[:-2] +
                                           model_matrix.shape[-1:])
     if convert_to_sparse_tensor:
-      model_matrix = sparse_ops.dense_to_sparse_tensor(model_matrix)
+      model_matrix = tfp.math.dense_to_sparse(model_matrix)
 
     model_matrix = self._adjust_dtype_and_shape_hints(model_matrix)
     response = self._adjust_dtype_and_shape_hints(response)
@@ -160,7 +160,8 @@ class _ProximalHessianTest(object):
         model_matrix=x_,
         response=y_,
         model=model,
-        model_coefficients_start=tf.convert_to_tensor(model_coefficients_1_),
+        model_coefficients_start=tf.convert_to_tensor(
+            value=model_coefficients_1_),
         l1_regularizer=800.,
         l2_regularizer=None,
         maximum_full_sweeps=1,
@@ -170,7 +171,8 @@ class _ProximalHessianTest(object):
 
     def _joint_log_prob(model_coefficients_):
       predicted_linear_response_ = tf.linalg.matvec(x_, model_coefficients_)
-      return tf.reduce_sum(model.log_prob(y_, predicted_linear_response_))
+      return tf.reduce_sum(
+          input_tensor=model.log_prob(y_, predicted_linear_response_))
 
     self.assertAllGreater(
         _joint_log_prob(model_coefficients_2_) -

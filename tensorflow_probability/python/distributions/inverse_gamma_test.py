@@ -19,22 +19,24 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class InverseGammaTest(test_case.TestCase):
 
   def testInverseGammaShape(self):
     alpha = tf.constant([3.0] * 5)
     beta = tf.constant(11.0)
-    inv_gamma = tfd.InverseGamma(concentration=alpha, rate=beta)
+    inv_gamma = tfd.InverseGamma(concentration=alpha, scale=beta)
 
     self.assertEqual(self.evaluate(inv_gamma.batch_shape_tensor()), (5,))
     self.assertEqual(inv_gamma.batch_shape, tf.TensorShape([5]))
@@ -48,7 +50,7 @@ class InverseGammaTest(test_case.TestCase):
     alpha_v = 2.0
     beta_v = 3.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
-    inv_gamma = tfd.InverseGamma(concentration=alpha, rate=beta)
+    inv_gamma = tfd.InverseGamma(concentration=alpha, scale=beta)
     expected_log_pdf = stats.invgamma.logpdf(x, alpha_v, scale=beta_v)
     log_pdf = inv_gamma.log_prob(x)
     self.assertEqual(log_pdf.shape, (6,))
@@ -65,7 +67,7 @@ class InverseGammaTest(test_case.TestCase):
     alpha_v = np.array([2.0, 4.0])
     beta_v = np.array([3.0, 4.0])
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
-    inv_gamma = tfd.InverseGamma(concentration=alpha, rate=beta)
+    inv_gamma = tfd.InverseGamma(concentration=alpha, scale=beta)
     expected_log_pdf = stats.invgamma.logpdf(x, alpha_v, scale=beta_v)
     log_pdf = inv_gamma.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
@@ -84,7 +86,7 @@ class InverseGammaTest(test_case.TestCase):
     alpha_v = np.array([2.0, 4.0])
     beta_v = 3.0
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
-    inv_gamma = tfd.InverseGamma(concentration=alpha, rate=beta)
+    inv_gamma = tfd.InverseGamma(concentration=alpha, scale=beta)
     expected_log_pdf = stats.invgamma.logpdf(x, alpha_v, scale=beta_v)
     log_pdf = inv_gamma.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
@@ -104,7 +106,7 @@ class InverseGammaTest(test_case.TestCase):
     beta = tf.constant([beta_v] * batch_size)
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
 
-    inv_gamma = tfd.InverseGamma(concentration=alpha, rate=beta)
+    inv_gamma = tfd.InverseGamma(concentration=alpha, scale=beta)
     expected_cdf = stats.invgamma.cdf(x, alpha_v, scale=beta_v)
 
     cdf = inv_gamma.cdf(x)
@@ -114,7 +116,7 @@ class InverseGammaTest(test_case.TestCase):
   def testInverseGammaMode(self):
     alpha_v = np.array([5.5, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
-    inv_gamma = tfd.InverseGamma(concentration=alpha_v, rate=beta_v)
+    inv_gamma = tfd.InverseGamma(concentration=alpha_v, scale=beta_v)
     expected_modes = beta_v / (alpha_v + 1)
     self.assertEqual(inv_gamma.mode().shape, (3,))
     self.assertAllClose(self.evaluate(inv_gamma.mode()), expected_modes)
@@ -122,7 +124,7 @@ class InverseGammaTest(test_case.TestCase):
   def testInverseGammaMeanAllDefined(self):
     alpha_v = np.array([5.5, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
-    inv_gamma = tfd.InverseGamma(concentration=alpha_v, rate=beta_v)
+    inv_gamma = tfd.InverseGamma(concentration=alpha_v, scale=beta_v)
     expected_means = stats.invgamma.mean(alpha_v, scale=beta_v)
     self.assertEqual(inv_gamma.mean().shape, (3,))
     self.assertAllClose(self.evaluate(inv_gamma.mean()), expected_means)
@@ -132,7 +134,7 @@ class InverseGammaTest(test_case.TestCase):
     alpha_v = np.array([1.0, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
     inv_gamma = tfd.InverseGamma(
-        concentration=alpha_v, rate=beta_v, allow_nan_stats=False)
+        concentration=alpha_v, scale=beta_v, allow_nan_stats=False)
     with self.assertRaisesOpError("x < y"):
       self.evaluate(inv_gamma.mean())
 
@@ -141,7 +143,7 @@ class InverseGammaTest(test_case.TestCase):
     alpha_v = np.array([0.5, 1.0, 3.0, 2.5])
     beta_v = np.array([1.0, 2.0, 4.0, 5.0])
     inv_gamma = tfd.InverseGamma(
-        concentration=alpha_v, rate=beta_v, allow_nan_stats=True)
+        concentration=alpha_v, scale=beta_v, allow_nan_stats=True)
     expected_means = beta_v / (alpha_v - 1)
     expected_means[0] = np.nan
     expected_means[1] = np.nan
@@ -151,7 +153,7 @@ class InverseGammaTest(test_case.TestCase):
   def testInverseGammaVarianceAllDefined(self):
     alpha_v = np.array([7.0, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
-    inv_gamma = tfd.InverseGamma(concentration=alpha_v, rate=beta_v)
+    inv_gamma = tfd.InverseGamma(concentration=alpha_v, scale=beta_v)
     expected_variances = stats.invgamma.var(alpha_v, scale=beta_v)
     self.assertEqual(inv_gamma.variance().shape, (3,))
     self.assertAllClose(self.evaluate(inv_gamma.variance()), expected_variances)
@@ -160,7 +162,7 @@ class InverseGammaTest(test_case.TestCase):
     alpha_v = np.array([1.5, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
     inv_gamma = tfd.InverseGamma(
-        concentration=alpha_v, rate=beta_v, allow_nan_stats=False)
+        concentration=alpha_v, scale=beta_v, allow_nan_stats=False)
     with self.assertRaisesOpError("x < y"):
       self.evaluate(inv_gamma.variance())
 
@@ -168,7 +170,7 @@ class InverseGammaTest(test_case.TestCase):
     alpha_v = np.array([1.5, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
     inv_gamma = tfd.InverseGamma(
-        concentration=alpha_v, rate=beta_v, allow_nan_stats=True)
+        concentration=alpha_v, scale=beta_v, allow_nan_stats=True)
     expected_variances = stats.invgamma.var(alpha_v, scale=beta_v)
     expected_variances[0] = np.nan
     self.assertEqual(inv_gamma.variance().shape, (3,))
@@ -178,7 +180,7 @@ class InverseGammaTest(test_case.TestCase):
     alpha_v = np.array([1.0, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
     expected_entropy = stats.invgamma.entropy(alpha_v, scale=beta_v)
-    inv_gamma = tfd.InverseGamma(concentration=alpha_v, rate=beta_v)
+    inv_gamma = tfd.InverseGamma(concentration=alpha_v, scale=beta_v)
     self.assertEqual(inv_gamma.entropy().shape, (3,))
     self.assertAllClose(self.evaluate(inv_gamma.entropy()), expected_entropy)
 
@@ -188,8 +190,9 @@ class InverseGammaTest(test_case.TestCase):
     alpha = tf.constant(alpha_v)
     beta = tf.constant(beta_v)
     n = 100000
-    inv_gamma = tfd.InverseGamma(concentration=alpha, rate=beta)
-    samples = inv_gamma.sample(n, seed=137)
+    inv_gamma = tfd.InverseGamma(concentration=alpha, scale=beta)
+    samples = inv_gamma.sample(
+        n, seed=tfp_test_util.test_seed(hardcoded_seed=137))
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -208,19 +211,19 @@ class InverseGammaTest(test_case.TestCase):
     alpha = tf.constant(4.0)
     beta = tf.constant(3.0)
     def inverse_gamma_sampler(alpha, beta):
-      inv_gamma = tfd.InverseGamma(concentration=alpha, rate=beta)
+      inv_gamma = tfd.InverseGamma(concentration=alpha, scale=beta)
       return inv_gamma.sample(100)
-    grad_alpha, grad_beta = self.compute_gradients(
-        inverse_gamma_sampler, args=[alpha, beta])
+    _, [grad_alpha, grad_beta] = tfp.math.value_and_gradient(
+        inverse_gamma_sampler, [alpha, beta])
     self.assertIsNotNone(grad_alpha)
     self.assertIsNotNone(grad_beta)
 
   def testInverseGammaSampleMultiDimensional(self):
     alpha_v = np.array([np.arange(3, 103, dtype=np.float32)])  # 1 x 100
     beta_v = np.array([np.arange(1, 11, dtype=np.float32)]).T  # 10 x 1
-    inv_gamma = tfd.InverseGamma(concentration=alpha_v, rate=beta_v)
+    inv_gamma = tfd.InverseGamma(concentration=alpha_v, scale=beta_v)
     n = 10000
-    samples = inv_gamma.sample(n, seed=137)
+    samples = inv_gamma.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 10, 100))
     self.assertEqual(sample_values.shape, (n, 10, 100))
@@ -252,9 +255,9 @@ class InverseGammaTest(test_case.TestCase):
     return ks < 0.02
 
   def testInverseGammaPdfOfSampleMultiDims(self):
-    inv_gamma = tfd.InverseGamma(concentration=[7., 11.], rate=[[5.], [6.]])
+    inv_gamma = tfd.InverseGamma(concentration=[7., 11.], scale=[[5.], [6.]])
     num = 50000
-    samples = inv_gamma.sample(num, seed=137)
+    samples = inv_gamma.sample(num, seed=tfp_test_util.test_seed())
     pdfs = inv_gamma.prob(samples)
     sample_vals, pdf_vals = self.evaluate([samples, pdfs])
     self.assertEqual(samples.shape, (num, 2, 2))
@@ -289,25 +292,38 @@ class InverseGammaTest(test_case.TestCase):
     beta_v = tf.constant(1.0, name="beta")
     with self.assertRaisesOpError("Concentration must be positive"):
       inv_gamma = tfd.InverseGamma(
-          concentration=alpha_v, rate=beta_v, validate_args=True)
+          concentration=alpha_v, scale=beta_v, validate_args=True)
       self.evaluate(inv_gamma.mean())
     alpha_v = tf.constant(1.0, name="alpha")
     beta_v = tf.constant(0.0, name="beta")
-    with self.assertRaisesOpError("Rate must be positive"):
+    with self.assertRaisesOpError("Scale must be positive"):
       inv_gamma = tfd.InverseGamma(
-          concentration=alpha_v, rate=beta_v, validate_args=True)
+          concentration=alpha_v, scale=beta_v, validate_args=True)
       self.evaluate(inv_gamma.mean())
 
-  def testInverseGammaWithSoftplusConcentrationRate(self):
+  def testInverseGammaWithSoftplusConcentrationScale(self):
     alpha = tf.constant([-0.1, -2.9], name="alpha")
     beta = tf.constant([1.0, -4.8], name="beta")
-    inv_gamma = tfd.InverseGammaWithSoftplusConcentrationRate(
-        concentration=alpha, rate=beta, validate_args=True)
+    inv_gamma = tfd.InverseGammaWithSoftplusConcentrationScale(
+        concentration=alpha, scale=beta, validate_args=True)
     self.assertAllClose(
-        self.evaluate(tf.nn.softplus(alpha)),
+        self.evaluate(tf.math.softplus(alpha)),
         self.evaluate(inv_gamma.concentration))
     self.assertAllClose(
-        self.evaluate(tf.nn.softplus(beta)), self.evaluate(inv_gamma.rate))
+        self.evaluate(tf.math.softplus(beta)), self.evaluate(inv_gamma.scale))
+
+  def testRateArgBackwardsCompatiblity(self):
+    concentration = 1.
+    scale = 2.
+    inv_gamma = tfd.InverseGamma(concentration=concentration, rate=scale)
+    self.assertEqual(scale, self.evaluate(inv_gamma.scale))
+    self.assertEqual(scale, self.evaluate(inv_gamma.rate))
+
+  def testInverseGammaWithSoftplusConcentrationRate(self):
+    isp_concentration = -1.
+    isp_scale = -2.
+    tfd.InverseGammaWithSoftplusConcentrationRate(
+        concentration=isp_concentration, rate=isp_scale)
 
 
 if __name__ == "__main__":

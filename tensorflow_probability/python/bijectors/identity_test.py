@@ -19,20 +19,20 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IdentityTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = X transformation."""
 
   def testBijector(self):
     bijector = tfb.Identity(validate_args=True)
-    self.assertEqual("identity", bijector.name)
+    self.assertStartsWith(bijector.name, "identity")
     x = [[[0.], [1.]]]
     self.assertAllEqual(x, self.evaluate(bijector.forward(x)))
     self.assertAllEqual(x, self.evaluate(bijector.inverse(x)))

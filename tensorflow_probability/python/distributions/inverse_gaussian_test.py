@@ -18,11 +18,13 @@ from __future__ import print_function
 
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def _scipy_invgauss(loc, concentration):
@@ -33,12 +35,12 @@ def _scipy_invgauss(loc, concentration):
   return stats.invgauss(mu=loc/concentration, scale=concentration)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _InverseGaussianTest(object):
 
   def make_tensor(self, x):
     x = tf.cast(x, self.dtype)
-    return tf.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=x, shape=x.shape if self.use_static_shape else None)
 
   def testInverseGaussianShape(self):
@@ -283,7 +285,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
         self.make_tensor(concentration_v))
-    samples = inverse_gaussian.sample(n, seed=12345678)
+    samples = inverse_gaussian.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     if self.use_static_shape:
@@ -302,7 +304,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
         self.make_tensor(concentration_v))
-    samples = inverse_gaussian.sample(n, seed=12345678)
+    samples = inverse_gaussian.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     if self.use_static_shape:
@@ -321,7 +323,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
         self.make_tensor(concentration_v))
-    samples = inverse_gaussian.sample(n, seed=12345678)
+    samples = inverse_gaussian.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     if self.use_static_shape:
@@ -340,7 +342,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
         self.make_tensor(concentration_v))
-    samples = inverse_gaussian.sample(n, seed=12345678)
+    samples = inverse_gaussian.sample(n, seed=tfp_test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     if self.use_static_shape:

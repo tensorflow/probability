@@ -19,23 +19,86 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python import positive_semidefinite_kernels as tfpk
+from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'GaussianProcessRegressionModel',
 ]
 
 
-def _add_diagonal_shift(matrix, shift):
-  diag_plus_shift = tf.matrix_diag_part(matrix) + shift
-  return tf.matrix_set_diag(matrix, diag_plus_shift)
+def _is_empty_observation_data(
+    feature_ndims, observation_index_points, observations):
+  """Returns `True` if given observation data is empty.
+
+  Emptiness means either
+    1. Both `observation_index_points` and `observations` are `None`, or
+    2. the "number of observations" shape is 0. The shape of
+    `observation_index_points` is `[..., N, f1, ..., fF]`, where `N` is the
+    number of observations and the `f`s are feature dims. Thus, we look at the
+    shape element just to the left of the leftmost feature dim. If that shape is
+    zero, we consider the data empty.
+
+  We don't check the shape of observations; validations are checked elsewhere in
+  the calling code, to ensure these shapes are consistent.
+
+  Args:
+    feature_ndims: the number of feature dims, as reported by the GP kernel.
+    observation_index_points: the observation data locations in the index set.
+    observations: the observation data.
+
+  Returns:
+    is_empty: True if the data were deemed to be empty.
+  """
+  # If both input locations and observations are `None`, we consider this
+  # "empty" observation data.
+  if observation_index_points is None and observations is None:
+    return True
+  num_obs = tf.compat.dimension_value(
+      observation_index_points.shape[-(feature_ndims + 1)])
+  if num_obs is not None and num_obs == 0:
+    return True
+  return False
 
 
-class GaussianProcessRegressionModel(
-    mvn_linear_operator.MultivariateNormalLinearOperator):
+def _validate_observation_data(
+    kernel, observation_index_points, observations):
+  """Ensure that observation data and locations have consistent shapes.
+
+  This basically means that the batch shapes are broadcastable. We can only
+  ensure this when those shapes are fully statically defined.
+
+
+  Args:
+    kernel: The GP kernel.
+    observation_index_points: the observation data locations in the index set.
+    observations: the observation data.
+
+  Raises:
+    ValueError: if the observations' batch shapes are not broadcastable.
+  """
+  # Check that observation index points and observation counts broadcast.
+  ndims = kernel.feature_ndims
+  if (tensorshape_util.is_fully_defined(
+      observation_index_points.shape[:-ndims]) and
+      tensorshape_util.is_fully_defined(observations.shape)):
+    index_point_count = observation_index_points.shape[:-ndims]
+    observation_count = observations.shape
+    try:
+      tf.broadcast_static_shape(index_point_count, observation_count)
+    except ValueError:
+      # Re-raise with our own more contextual error message.
+      raise ValueError(
+          'Observation index point and observation counts are not '
+          'broadcastable: {} and {}, respectively.'.format(
+              index_point_count, observation_count))
+
+
+class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
   """Posterior predictive distribution in a conjugate GP regression model.
 
   This class represents the distribution over function values at a set of points
@@ -288,14 +351,14 @@ class GaussianProcessRegressionModel(
 
   # Now we can sample from the posterior predictive distribution at a new set
   # of index points.
+  index_points = np.linspace(-1., 1., 200)[..., np.newaxis]
   gprm = tfd.GaussianProcessRegressionModel(
       # Batch of `num_results` kernels parameterized by the MCMC samples.
       kernel=psd_kernels.ExponentiatedQuadratic(amplitudes, length_scales),
-      index_points=np.linspace(-2., 2., 200)[..., np.newaxis],
+      index_points=index_points,
       observation_index_points=observation_index_points,
       observations=observations,
-      # We reshape this to align batch dimensions.
-      observation_noise_variance=observation_noise_variances[..., np.newaxis])
+      observation_noise_variance=observation_noise_variances)
   samples = gprm.sample()
 
   with tf.Session() as sess:
@@ -321,7 +384,7 @@ class GaussianProcessRegressionModel(
 
   def __init__(self,
                kernel,
-               index_points,
+               index_points=None,
                observation_index_points=None,
                observations=None,
                observation_noise_variance=0.,
@@ -411,23 +474,26 @@ class GaussianProcessRegressionModel(
           index_points, observation_index_points, observations,
           observation_noise_variance, predictive_noise_variance, jitter
       ], tf.float32)
-      index_points = tf.convert_to_tensor(
-          index_points, name='index_points', dtype=dtype)
-      observation_index_points = (
-          None if observation_index_points is None else
-          tf.convert_to_tensor(observation_index_points,
-                               dtype=dtype,
-                               name='observation_index_points'))
-      observations = (None if observations is None else
-                      tf.convert_to_tensor(
-                          observations, dtype=dtype, name='observations'))
+      if index_points is not None:
+        index_points = tf.convert_to_tensor(
+            index_points, dtype=dtype, name='index_points')
+      observation_index_points = (None if observation_index_points is None else
+                                  tf.convert_to_tensor(
+                                      observation_index_points,
+                                      dtype=dtype,
+                                      name='observation_index_points'))
+      observations = (None if observations is None else tf.convert_to_tensor(
+          observations, dtype=dtype, name='observations'))
       observation_noise_variance = tf.convert_to_tensor(
-          observation_noise_variance, dtype=dtype,
+          observation_noise_variance,
+          dtype=dtype,
           name='observation_noise_variance')
       predictive_noise_variance = (
-          observation_noise_variance if predictive_noise_variance is None
-          else tf.convert_to_tensor(predictive_noise_variance, dtype=dtype,
-                                    name='predictive_noise_variance'))
+          observation_noise_variance
+          if predictive_noise_variance is None else tf.convert_to_tensor(
+              predictive_noise_variance,
+              dtype=dtype,
+              name='predictive_noise_variance'))
       jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
 
       if (observation_index_points is None) != (observations is None):
@@ -444,156 +510,64 @@ class GaussianProcessRegressionModel(
           raise ValueError('`mean_fn` must be a Python callable')
 
       self._name = name
-      self._kernel = kernel
-      self._index_points = index_points
       self._observation_index_points = observation_index_points
       self._observations = observations
       self._observation_noise_variance = observation_noise_variance
       self._predictive_noise_variance = predictive_noise_variance
       self._jitter = jitter
-      self._mean_fn = mean_fn
       self._validate_args = validate_args
 
-      with tf.name_scope('init', values=[index_points, jitter]):
-        (loc,
-         covariance) = self._compute_marginal_distribution_loc_and_covariance()
-        self._covariance_matrix = covariance
+      with tf.name_scope('init'):
+        conditional_kernel = tfpk.SchurComplement(
+            base_kernel=kernel,
+            fixed_inputs=observation_index_points,
+            diag_shift=jitter + observation_noise_variance[..., tf.newaxis])
 
-        graph_parents = [index_points, observation_noise_variance, jitter]
+        # Special logic for mean_fn only; SchurComplement already handles the
+        # case of empty observations (ie, falls back to base_kernel).
+        if _is_empty_observation_data(
+            feature_ndims=kernel.feature_ndims,
+            observation_index_points=observation_index_points,
+            observations=observations):
+          conditional_mean_fn = mean_fn
+        else:
+          _validate_observation_data(
+              kernel=kernel,
+              observation_index_points=observation_index_points,
+              observations=observations)
+
+          def conditional_mean_fn(x):
+            k_x_obs_linop = tf.linalg.LinearOperatorFullMatrix(
+                kernel.matrix(x, observation_index_points))
+            chol_linop = tf.linalg.LinearOperatorLowerTriangular(
+                conditional_kernel.divisor_matrix_cholesky)
+
+            diff = observations - mean_fn(observation_index_points)
+            return mean_fn(x) + k_x_obs_linop.matvec(
+                chol_linop.solvevec(chol_linop.solvevec(diff), adjoint=True))
+
+        graph_parents = [observation_noise_variance, jitter]
         def _maybe_append(x):
           if x is not None:
             graph_parents.append(x)
+        _maybe_append(index_points)
         _maybe_append(observation_index_points)
         _maybe_append(observations)
 
-        scale = tf.linalg.LinearOperatorLowerTriangular(
-            tf.linalg.cholesky(covariance))
         super(GaussianProcessRegressionModel, self).__init__(
-            loc=loc, scale=scale, validate_args=validate_args,
+            kernel=conditional_kernel,
+            mean_fn=conditional_mean_fn,
+            index_points=index_points,
+            jitter=jitter,
+            # What the GP super class calls "observation noise variance" we call
+            # here the "predictive noise variance". We use the observation noise
+            # variance for the fit/solve process above, and predictive for
+            # downstream computations like sampling.
+            observation_noise_variance=predictive_noise_variance,
+            validate_args=validate_args,
             allow_nan_stats=allow_nan_stats, name=name)
         self._parameters = parameters
         self._graph_parents = graph_parents
-
-  def _compute_marginal_distribution_loc_and_covariance(self):
-    # If the observed inputs/outputs are empty (None), we can avoid a lot of
-    # computation by just using the prior predictive model.
-    if self._is_empty_observation_data():
-      loc, covariance = self._compute_prior_predictive_loc_and_covariance()
-    else:
-      with tf.control_dependencies(self._validate_observation_data()):
-        (loc,
-         covariance) = self._compute_posterior_predictive_loc_and_covariance()
-    return loc, covariance
-
-  def _compute_prior_predictive_loc_and_covariance(self):
-    covariance = _add_diagonal_shift(
-        self.kernel.matrix(self.index_points, self.index_points),
-        self.jitter + self.observation_noise_variance)
-
-    loc = self._mean_fn(self.index_points)
-    return loc, covariance
-
-  def _compute_posterior_predictive_loc_and_covariance(self):
-    # Need to compute two things: posterior mean and posterior covariance; call
-    # them loc and covariance, resp. Let `v` be observation noise variance,
-    # `k_ij` the kernel matrix over index points (sets) where `i, j \in {t, x}`,
-    # `t` are the "test" points, and `x` are the observed points (`I` is the
-    # identity matrix of context-appropriate dimension).
-    #
-    # loc = k_tx @ inv(k_xx + vI) @ (y - m(x))
-    # covariance = chol(k_tt - k_tx @ inv(k_xx + vI) @ k_xt)
-    #
-    # As written above, this involves a Cholesky decomposition and two dense
-    # solves (each, implicitly, a Cholesky and two triangular solves). We can
-    # potentially save some ops by doing the Cholesky explicitly. In graph mode,
-    # this might not save much (CSE should clean up the extra Cholesky), but in
-    # eager mode we save one Cholesky decomposition.
-
-    # Compute the 3 kernel matrices we'll need: k_tt, k_tx, and k_xx. Go ahead
-    # and add diagonal noise to k_xx.
-    k_tt = self.kernel.matrix(self.index_points, self.index_points)
-    k_tx = self.kernel.matrix(self.index_points, self.observation_index_points)
-
-    k_xx_plus_noise = _add_diagonal_shift(
-        self.kernel.matrix(self.observation_index_points,
-                           self.observation_index_points),
-        self.jitter + self.observation_noise_variance)
-
-    # Use LinearOperators for, among other things, their ability to broadcast
-    # matmuls and solves. Also, go ahead and Cholesky factor the prior
-    # predictive covariance, which may make the below solves a bit faster in
-    # eager mode (in graph mode CSE should hopefully clean up any duplication).
-    chol_k_xx_plus_noise = tf.linalg.LinearOperatorLowerTriangular(
-        tf.linalg.cholesky(k_xx_plus_noise))
-    k_tx_linop = tf.linalg.LinearOperatorFullMatrix(k_tx)
-
-    # k_tx @ inv(k_xx + vI) @ (y - m(x))
-    # = k_tx @ inv(chol(k_xx + vI)^t) @ inv(chol(k_xx + vI)) @ (y - m(t))
-    loc = (self._mean_fn(self.index_points) +
-           k_tx_linop.matvec(
-               chol_k_xx_plus_noise.solvevec(
-                   adjoint=True,
-                   rhs=chol_k_xx_plus_noise.solvevec(
-                       self.observations -
-                       self._mean_fn(self.observation_index_points)))))
-
-    # k_tt - k_tx @ inv(k_xx + vI) @ k_xt + vI
-    # = k_tt - k_tx @ inv(chol(k_xx + vI)^t) @ inv(chol(k_xx + vI)) @ k_xt + vI
-    posterior_covariance_full = (
-        k_tt -
-        k_tx_linop.matmul(
-            chol_k_xx_plus_noise.solve(
-                chol_k_xx_plus_noise.solve(k_tx, adjoint_arg=True),
-                adjoint=True)))
-    posterior_covariance_full = _add_diagonal_shift(
-        posterior_covariance_full,
-        self.jitter + self.predictive_noise_variance)
-
-    return loc, posterior_covariance_full
-
-  def _is_empty_observation_data(self):
-    # If both input locations and observations are `None`, we consider this
-    # "empty" observation data.
-    if self.observation_index_points is None and self.observations is None:
-      return True
-    ndims = self.kernel.feature_ndims
-    if (self.observation_index_points.shape[-ndims:].is_fully_defined() and
-        tf.dimension_value(self.observation_index_points.shape[-ndims]) == 0):
-      return True
-    if (self.observations.shape[-ndims:].is_fully_defined() and
-        tf.dimension_value(self.observations.shape[-ndims]) == 0):
-      return True
-    return False
-
-  def _validate_observation_data(self):
-    # Check that observation index points and observation counts broadcast.
-    assertions = []
-    msg = ('Observation index point and observation counts are not '
-           'broadcastable.')
-    ndims = self.kernel.feature_ndims
-    if (self.observation_index_points.shape[:-ndims].is_fully_defined() and
-        self.observations.shape.is_fully_defined()):
-      index_point_count = self.observation_index_points.shape[:-ndims]
-      observation_count = self.observations.shape
-      try:
-        tf.broadcast_static_shape(index_point_count, observation_count)
-      except ValueError:
-        # Re-raise with our own more contextual error message.
-        raise ValueError(msg[:-1] + ': {} and {}, respectively.'.format(
-            index_point_count, observation_count))
-    return assertions
-
-  @property
-  def mean_fn(self):
-    return self._mean_fn
-
-  @property
-  def kernel(self):
-    return self._kernel
-
-  @property
-  def index_points(self):
-    return self._index_points
 
   @property
   def observation_index_points(self):
@@ -604,16 +578,5 @@ class GaussianProcessRegressionModel(
     return self._observations
 
   @property
-  def observation_noise_variance(self):
-    return self._observation_noise_variance
-
-  @property
   def predictive_noise_variance(self):
     return self._predictive_noise_variance
-
-  @property
-  def jitter(self):
-    return self._jitter
-
-  def _covariance(self):
-    return self._covariance_matrix

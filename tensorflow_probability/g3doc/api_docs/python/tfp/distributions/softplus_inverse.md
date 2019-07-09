@@ -5,14 +5,20 @@
 
 # tfp.distributions.softplus_inverse
 
+Computes the inverse softplus, i.e., x = softplus_inverse(softplus(x)). (deprecated)
+
 ``` python
 tfp.distributions.softplus_inverse(
-    x,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
-Computes the inverse softplus, i.e., x = softplus_inverse(softplus(x)).
+<!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+This function has moved to <a href="../../tfp/math.md"><code>tfp.math</code></a>.
 
 Mathematically this op is equivalent to:
 
@@ -21,6 +27,7 @@ softplus_inverse = log(exp(x) - 1.)
 ```
 
 #### Args:
+
 
 * <b>`x`</b>: `Tensor`. Non-negative (not enforced), floating-point.
 * <b>`name`</b>: A name for the operation (optional).

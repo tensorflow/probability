@@ -20,14 +20,14 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
-from tensorflow.python.framework import tensor_shape
 
 __all__ = [
     "InverseGaussian",
@@ -100,18 +100,19 @@ class InverseGaussian(distribution.Distribution):
         Default value: 'InverseGaussian'.
     """
     parameters = dict(locals())
-    with tf.name_scope(name, values=[loc, concentration]):
+    with tf.name_scope(name):
       dtype = dtype_util.common_dtype([loc, concentration],
-                                      preferred_dtype=tf.float32)
+                                      dtype_hint=tf.float32)
       loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       concentration = tf.convert_to_tensor(
           concentration, name="concentration", dtype=dtype)
-      with tf.control_dependencies(
-          [tf.assert_positive(loc),
-           tf.assert_positive(concentration)] if validate_args else []):
+      with tf.control_dependencies([
+          assert_util.assert_positive(loc),
+          assert_util.assert_positive(concentration)
+      ] if validate_args else []):
         self._loc = tf.identity(loc, name="loc")
         self._concentration = tf.identity(concentration, name="concentration")
-      tf.assert_same_float_dtype([self._loc, self._concentration])
+      dtype_util.assert_same_float_dtype([self._loc, self._concentration])
     super(InverseGaussian, self).__init__(
         dtype=self._loc.dtype,
         reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
@@ -120,6 +121,10 @@ class InverseGaussian(distribution.Distribution):
         parameters=parameters,
         graph_parents=[self._loc, self._concentration],
         name=name)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=0, concentration=0)
 
   @property
   def loc(self):
@@ -140,46 +145,45 @@ class InverseGaussian(distribution.Distribution):
         self.loc.shape, self.concentration.shape)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
     # See https://en.wikipedia.org/wiki/Inverse_Gaussian_distribution or
     # https://www.jstor.org/stable/2683801
     seed = seed_stream.SeedStream(seed, "inverse_gaussian")
     shape = tf.concat([[n], self.batch_shape_tensor()], axis=0)
-    sampled_chi2 = (tf.random_normal(
-        shape, mean=0., stddev=1., seed=seed(), dtype=self.dtype)) ** 2.
-    sampled_uniform = tf.random_uniform(
+    sampled_chi2 = (tf.random.normal(
+        shape, mean=0., stddev=1., seed=seed(), dtype=self.dtype))**2.
+    sampled_uniform = tf.random.uniform(
         shape, minval=0., maxval=1., seed=seed(), dtype=self.dtype)
     sampled = (
         self.loc + self.loc ** 2. * sampled_chi2 / (2. * self.concentration) -
         self.loc / (2. * self.concentration) *
         (4. * self.loc * self.concentration * sampled_chi2 +
          (self.loc * sampled_chi2) ** 2) ** 0.5)
-    return tf.where(
-        sampled_uniform <= self.loc / (self.loc + sampled),
-        sampled,
-        self.loc ** 2 / sampled)
+    return tf.where(sampled_uniform <= self.loc / (self.loc + sampled),
+                    sampled, self.loc**2 / sampled)
 
   def _log_prob(self, x):
     with tf.control_dependencies([
-        tf.assert_greater(
-            x, tf.cast(0., x.dtype.base_dtype),
-            message="x must be positive."
-        )] if self.validate_args else []):
+        assert_util.assert_greater(
+            x,
+            dtype_util.as_numpy_dtype(x.dtype)(0),
+            message="x must be positive.")
+    ] if self.validate_args else []):
 
-      return (0.5 * (tf.log(self.concentration) -
-                     np.log(2. * np.pi) -
-                     3. * tf.log(x))  +
-              (-self.concentration * (x - self.loc) ** 2.) /
-              (2. * self.loc ** 2. * x))
+      return (0.5 * (tf.math.log(self.concentration) - np.log(2. * np.pi) -
+                     3. * tf.math.log(x)) + (-self.concentration *
+                                             (x - self.loc)**2.) /
+              (2. * self.loc**2. * x))
 
   def _cdf(self, x):
     with tf.control_dependencies([
-        tf.assert_greater(
-            x, tf.cast(0., x.dtype.base_dtype),
-            message="x must be positive."
-        )] if self.validate_args else []):
+        assert_util.assert_greater(
+            x,
+            dtype_util.as_numpy_dtype(x.dtype)(0),
+            message="x must be positive.")
+    ] if self.validate_args else []):
 
       return (
           special_math.ndtr(

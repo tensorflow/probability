@@ -15,9 +15,15 @@
 
 ## Class `MetropolisHastings`
 
+Runs one step of the Metropolis-Hastings algorithm.
+
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
 
-Runs one step of the Metropolis-Hastings algorithm.
+
+
+Defined in [`python/mcmc/metropolis_hastings.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/metropolis_hastings.py).
+
+<!-- Placeholder for "Used in" -->
 
 The [Metropolis-Hastings algorithm](
 https://en.wikipedia.org/wiki/Metropolis%E2%80%93Hastings_algorithm) is a
@@ -46,7 +52,7 @@ The most common use-case for `log_acceptance_correction` is in the
 Metropolis-Hastings algorithm, i.e.,
 
 ```none
-accept_prob(x' | x) = p(x') / p(x) (g(x|x') / g(x|x'))
+accept_prob(x' | x) = p(x') / p(x) (g(x|x') / g(x'|x))
 
 where,
   p  represents the target distribution,
@@ -89,21 +95,24 @@ __init__(
 
 Instantiates this object.
 
+
 #### Args:
 
+
 * <b>`inner_kernel`</b>: `TransitionKernel`-like object which has
-    `collections.namedtuple` `kernel_results` and which contains a
-    `target_log_prob` member and optionally a `log_acceptance_correction`
-    member.
+  `collections.namedtuple` `kernel_results` and which contains a
+  `target_log_prob` member and optionally a `log_acceptance_correction`
+  member.
 * <b>`seed`</b>: Python integer to seed the random number generator.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
-    Default value: `None` (i.e., "mh_kernel").
+  Default value: `None` (i.e., "mh_kernel").
 
 
 #### Returns:
 
+
 * <b>`metropolis_hastings_kernel`</b>: Instance of `TransitionKernel` which wraps the
-    input transition kernel with the Metropolis-Hastings algorithm.
+  input transition kernel with the Metropolis-Hastings algorithm.
 
 
 
@@ -113,11 +122,16 @@ Instantiates this object.
 
 
 
+
 <h3 id="is_calibrated"><code>is_calibrated</code></h3>
 
+Returns `True` if Markov chain converges to specified distribution.
 
+`TransitionKernel`s which are "uncalibrated" are often calibrated by
+composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp.mcmc.MetropolisHastings</code></a> `TransitionKernel`.
 
 <h3 id="name"><code>name</code></h3>
+
 
 
 
@@ -125,7 +139,9 @@ Instantiates this object.
 
 Return `dict` of ``__init__`` arguments and their values.
 
+
 <h3 id="seed"><code>seed</code></h3>
+
 
 
 
@@ -141,22 +157,26 @@ bootstrap_results(init_state)
 
 Returns an object with the same type as returned by `one_step`.
 
+
 #### Args:
 
+
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    initial state(s) of the Markov chain(s).
+  initial state(s) of the Markov chain(s).
 
 
 #### Returns:
 
+
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
-    `Tensor`s representing internal calculations made within this function.
+  `Tensor`s representing internal calculations made within this function.
 
 
 #### Raises:
 
+
 * <b>`ValueError`</b>: if `inner_kernel` results doesn't contain the member
-    "target_log_prob".
+  "target_log_prob".
 
 <h3 id="one_step"><code>one_step</code></h3>
 
@@ -169,27 +189,31 @@ one_step(
 
 Takes one step of the TransitionKernel.
 
+
 #### Args:
 
+
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    current state(s) of the Markov chain(s).
+  current state(s) of the Markov chain(s).
 * <b>`previous_kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or
-    `list` of `Tensor`s representing internal calculations made within the
-    previous call to this function (or as returned by `bootstrap_results`).
+  `list` of `Tensor`s representing internal calculations made within the
+  previous call to this function (or as returned by `bootstrap_results`).
 
 
 #### Returns:
 
+
 * <b>`next_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
-    next state(s) of the Markov chain(s).
+  next state(s) of the Markov chain(s).
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
-    `Tensor`s representing internal calculations made within this function.
+  `Tensor`s representing internal calculations made within this function.
 
 
 #### Raises:
 
+
 * <b>`ValueError`</b>: if `inner_kernel` results doesn't contain the member
-    "target_log_prob".
+  "target_log_prob".
 
 
 

@@ -5,11 +5,17 @@
 
 # tfp.edward2.interceptable
 
+Decorator that wraps `func` so that its execution is intercepted.
+
 ``` python
 tfp.edward2.interceptable(func)
 ```
 
-Decorator that wraps `func` so that its execution is intercepted.
+
+
+Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
+
+<!-- Placeholder for "Used in" -->
 
 The wrapper passes `func` to the interceptor for the current thread.
 
@@ -18,6 +24,7 @@ That is, `func` terminates without forwarding its execution to another
 interceptor.
 
 #### Args:
+
 
 * <b>`func`</b>: Function to wrap.
 

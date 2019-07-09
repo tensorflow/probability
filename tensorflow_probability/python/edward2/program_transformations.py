@@ -211,7 +211,7 @@ def make_log_joint_fn(model):
       rv_kwargs["value"] = value
 
       rv = rv_constructor(*rv_args, **rv_kwargs)
-      log_prob = tf.reduce_sum(rv.distribution.log_prob(rv.value))
+      log_prob = tf.reduce_sum(input_tensor=rv.distribution.log_prob(rv.value))
       log_probs.append(log_prob)
       return rv
 

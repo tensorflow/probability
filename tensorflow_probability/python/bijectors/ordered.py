@@ -18,10 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow.compat.v2 as tf
 
-import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import assert_util
 
 
 __all__ = [
@@ -30,8 +30,7 @@ __all__ = [
 
 
 class Ordered(bijector.Bijector):
-  """Bijector which maps a tensor x_k that has increasing elements in the last
-  dimension to an unconstrained tensor y_k.
+  """Maps a vector of increasing elements to an unconstrained vector.
 
   Both the domain and the codomain of the mapping is [-inf, inf], however,
   the input of the forward mapping must be strictly increasing.
@@ -55,43 +54,21 @@ class Ordered(bijector.Bijector):
   """
 
   def __init__(self, validate_args=False, name="ordered"):
-    super(Ordered, self).__init__(
-        forward_min_event_ndims=1,
-        validate_args=validate_args,
-        name=name)
-
-  def _forward_event_shape(self, input_shape):
-    if input_shape.ndims is None or input_shape[-1] is None:
-      return input_shape
-    return tf.TensorShape([input_shape[-1]])
-
-  def _forward_event_shape_tensor(self, input_shape):
-    return (input_shape[-1])[..., tf.newaxis]
-
-  def _inverse_event_shape(self, output_shape):
-    if output_shape.ndims is None or output_shape[-1] is None:
-      return output_shape
-    if output_shape[-1] <= 1:
-      raise ValueError("output_shape[-1] = %d <= 1" % output_shape[-1])
-    return tf.TensorShape([output_shape[-1]])
-
-  def _inverse_event_shape_tensor(self, output_shape):
-    if self.validate_args:
-      is_greater_one = tf.assert_greater(
-          output_shape[-1], 1, message="Need last dimension greater than 1.")
-      output_shape = control_flow_ops.with_dependencies(
-          [is_greater_one], output_shape)
-    return (output_shape[-1])[..., tf.newaxis]
+    with tf.name_scope(name) as name:
+      super(Ordered, self).__init__(
+          forward_min_event_ndims=1,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
-    x = self._maybe_assert_valid_x(x)
-    y0 = x[..., 0, tf.newaxis]
-    yk = tf.log(x[..., 1:] - x[..., :-1])
-    y = tf.concat([y0, yk], axis=-1)
-    return y
+    with tf.control_dependencies(self._assertions(x)):
+      y0 = x[..., :1]
+      yk = tf.math.log(x[..., 1:] - x[..., :-1])
+      y = tf.concat([y0, yk], axis=-1)
+      return y
 
   def _inverse(self, y):
-    x0 = y[..., 0, tf.newaxis]
+    x0 = y[..., :1]
     xk = tf.exp(y[..., 1:])
     x = tf.concat([x0, xk], axis=-1)
     return tf.cumsum(x, axis=-1)
@@ -108,13 +85,12 @@ class Ordered(bijector.Bijector):
     return tf.reduce_sum(y[..., 1:], axis=-1)
 
   def _forward_log_det_jacobian(self, x):
-    x = self._maybe_assert_valid_x(x)
-    return -tf.reduce_sum(tf.log(x[..., 1:] - x[..., :-1]), axis=-1)
+    with tf.control_dependencies(self._assertions(x)):
+      return -tf.reduce_sum(tf.math.log(x[..., 1:] - x[..., :-1]), axis=-1)
 
-  def _maybe_assert_valid_x(self, x):
+  def _assertions(self, t):
     if not self.validate_args:
-      return x
-    is_valid = tf.assert_positive(
-        x[..., 1:] - x[..., :-1],
-        message="Forward transformation input must be strictly increasing.")
-    return control_flow_ops.with_dependencies([is_valid], x)
+      return []
+    return [assert_util.assert_positive(
+        t[..., 1:] - t[..., :-1],
+        message="Forward transformation input must be strictly increasing.")]

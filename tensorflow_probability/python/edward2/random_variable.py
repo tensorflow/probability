@@ -133,7 +133,7 @@ class RandomVariable(object):
   def sample_shape(self):
     """Sample shape of random variable as a `TensorShape`."""
     if isinstance(self._sample_shape, tf.Tensor):
-      return tf.TensorShape(tf.contrib.util.constant_value(self._sample_shape))
+      return tf.TensorShape(tf.get_static_value(self._sample_shape))
     return tf.TensorShape(self._sample_shape)
 
   def sample_shape_tensor(self, name="sample_shape_tensor"):
@@ -145,10 +145,11 @@ class RandomVariable(object):
     Returns:
       sample_shape: `Tensor`.
     """
-    with tf.name_scope(name):
+    with tf.compat.v1.name_scope(name):
       if isinstance(self._sample_shape, tf.Tensor):
         return self._sample_shape
-      return tf.convert_to_tensor(self.sample_shape.as_list(), dtype=tf.int32)
+      return tf.convert_to_tensor(
+          value=self.sample_shape.as_list(), dtype=tf.int32)
 
   @property
   def shape(self):

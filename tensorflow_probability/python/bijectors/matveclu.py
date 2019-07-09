@@ -18,14 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.math.linalg import lu_reconstruct
 from tensorflow_probability.python.math.linalg import lu_solve
-
-
-from tensorflow.python.ops.linalg import linear_operator_util
 
 
 __all__ = [
@@ -53,9 +50,9 @@ class MatvecLU(bijector.Bijector):
     with tf.name_scope(name, 'trainable_lu_factorization',
                        [event_size, batch_shape]):
       event_size = tf.convert_to_tensor(
-          event_size, preferred_dtype=tf.int32, name='event_size')
+          event_size, dtype_hint=tf.int32, name='event_size')
       batch_shape = tf.convert_to_tensor(
-          batch_shape, preferred_dtype=event_size.dtype, name='batch_shape')
+          batch_shape, dtype_hint=event_size.dtype, name='batch_shape')
       random_matrix = tf.random_uniform(
           shape=tf.concat([batch_shape, [event_size, event_size]], axis=0),
           dtype=dtype,
@@ -63,7 +60,7 @@ class MatvecLU(bijector.Bijector):
       random_orthonormal = tf.linalg.qr(random_matrix)[0]
       lower_upper, permutation = tf.linalg.lu(random_orthonormal)
       lower_upper = tf.Variable(
-          initial_value=lower_upper,
+          initial_lower_upper,
           trainable=True,
           use_resource=True,
           name='lower_upper')
@@ -118,11 +115,11 @@ class MatvecLU(bijector.Bijector):
       ValueError: If both/neither `channels` and `lower_upper`/`permutation` are
         specified.
     """
-    with tf.name_scope(name, 'MatvecLU', [lower_upper, permutation]) as name:
+    with tf.name_scope(name or 'MatvecLU') as name:
       self._lower_upper = tf.convert_to_tensor(
-          lower_upper, preferred_dtype=tf.float32, name='lower_upper')
+          lower_upper, dtype_hint=tf.float32, name='lower_upper')
       self._permutation = tf.convert_to_tensor(
-          permutation, preferred_dtype=tf.int32, name='permutation')
+          permutation, dtype_hint=tf.int32, name='permutation')
     super(MatvecLU, self).__init__(
         is_constant_jacobian=True,
         forward_min_event_ndims=1,
@@ -141,8 +138,7 @@ class MatvecLU(bijector.Bijector):
     w = lu_reconstruct(lower_upper=self.lower_upper,
                        perm=self.permutation,
                        validate_args=self.validate_args)
-    return linear_operator_util.matmul_with_broadcast(
-        w, x[..., tf.newaxis])[..., 0]
+    return tf.linalg.matvec(w, x)
 
   def _inverse(self, y):
     return lu_solve(
@@ -152,5 +148,6 @@ class MatvecLU(bijector.Bijector):
         validate_args=self.validate_args)[..., 0]
 
   def _forward_log_det_jacobian(self, unused_x):
-    return tf.reduce_sum(tf.log(tf.abs(tf.diag_part(self.lower_upper))),
-                         axis=-1)
+    return tf.reduce_sum(
+        tf.math.log(tf.abs(tf.linalg.tensor_diag_part(self.lower_upper))),
+        axis=-1)

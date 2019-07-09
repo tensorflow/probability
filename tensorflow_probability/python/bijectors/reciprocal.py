@@ -18,11 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = ["Reciprocal"]
 
@@ -55,27 +55,27 @@ class Reciprocal(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._name = name
-    super(Reciprocal, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(Reciprocal, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
-    x = self._maybe_assert_valid(x)
-    return 1. / x
+    with tf.control_dependencies(self._assertions(x)):
+      return 1. / x
 
   _inverse = _forward
 
   def _forward_log_det_jacobian(self, x):
-    x = self._maybe_assert_valid(x)
-    return -2. * tf.log(tf.abs(x))
+    with tf.control_dependencies(self._assertions(x)):
+      return -2. * tf.math.log(tf.math.abs(x))
 
   _inverse_log_det_jacobian = _forward_log_det_jacobian
 
-  def _maybe_assert_valid(self, t):
+  def _assertions(self, t):
     if not self.validate_args:
-      return t
-    is_valid = tf.assert_none_equal(
-        t, 0., message="All elements must be non-zero.")
-    return control_flow_ops.with_dependencies([is_valid], t)
+      return []
+    return [assert_util.assert_none_equal(
+        t, dtype_util.as_numpy_dtype(t.dtype)(0.),
+        message="All elements must be non-zero.")]

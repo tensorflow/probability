@@ -24,19 +24,19 @@ from scipy.stats import special_ortho_group
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class DifferentialEvolutionTest(tf.test.TestCase):
   """Tests for Differential Evolution optimization algorithm."""
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_2d(self):
     """Can minimize a two dimensional quadratic function."""
     minimum = np.array([1.0, 1.0])
     scales = np.array([2.0, 3.0])
     def quadratic(x):
-      return tf.reduce_sum(scales * (x - minimum) ** 2, axis=-1)
+      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2, axis=-1)
 
     start = tf.constant([0.6, 0.8])
     results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
@@ -47,15 +47,14 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_with_initial_simplex(self):
     """Can minimize a quadratic function with initial simplex."""
     minimum = np.array([1.0, 1.0])
     scales = np.array([2.0, 3.0])
     def quadratic(x):
-      return tf.reduce_sum(scales * (x - minimum) ** 2, axis=-1)
+      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2, axis=-1)
 
-    initial_population = tf.random_uniform([40, 2], seed=1243)
+    initial_population = tf.random.uniform([40, 2], seed=1243)
     results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
         quadratic,
         initial_population=initial_population,
@@ -64,7 +63,6 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_bowl_10d(self):
     """Can minimize a ten dimensional quadratic function."""
     dim = 10
@@ -73,7 +71,7 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     scales = np.exp(np.random.randn(dim))
 
     def quadratic(x):
-      return tf.reduce_sum(scales * (x - minimum) ** 2, axis=-1)
+      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2, axis=-1)
 
     start = tf.ones_like(minimum)
     results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
@@ -85,7 +83,6 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_with_skew(self):
     """Can minimize a general quadratic function."""
     dim = 3
@@ -97,7 +94,7 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     def quadratic_single(x):
       y = x - minimum
       yp = tf.tensordot(hessian, y, axes=[1, 0])
-      value = tf.reduce_sum(y * yp) / 2
+      value = tf.reduce_sum(input_tensor=y * yp) / 2
       return value
 
     def objective_func(population):
@@ -113,7 +110,6 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_quadratic_with_strong_skew(self):
     """Can minimize a strongly skewed quadratic function."""
     np.random.seed(89793)
@@ -124,7 +120,7 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     def quadratic(x):
       y = x - minimum
       yp = tf.tensordot(hessian, y, axes=[1, 0])
-      return tf.reduce_sum(y * yp) / 2
+      return tf.reduce_sum(input_tensor=y * yp) / 2
 
     def objective_func(population):
       return tf.map_fn(quadratic, population)
@@ -139,12 +135,11 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_sqrt_quadratic_function(self):
     """Can minimize the square root function."""
     minimum = np.array([0.0, 0.0, 0.0, 0.0])
     def sqrt_quad(x):
-      return tf.sqrt(tf.reduce_sum(x ** 2, axis=-1))
+      return tf.sqrt(tf.reduce_sum(input_tensor=x**2, axis=-1))
 
     start = tf.constant([1.2, 0.4, -1.8, 2.9])
     results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
@@ -156,12 +151,11 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_abs_function(self):
     """Can minimize the absolute value function."""
     minimum = np.array([0.0, 0.0, 0.0])
     def abs_func(x):
-      return tf.reduce_sum(tf.abs(x), axis=-1)
+      return tf.reduce_sum(input_tensor=tf.abs(x), axis=-1)
 
     start = tf.constant([0.6, 1.8, -4.3], dtype=tf.float64)
     results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
@@ -173,7 +167,6 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_rosenbrock_2d(self):
     """Tests Differential Evolution on the Rosenbrock function.
 
@@ -208,7 +201,6 @@ class DifferentialEvolutionTest(tf.test.TestCase):
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, [1.0, 1.0], 1e-5)
 
-  @tfe.run_test_in_graph_and_eager_modes
   def test_docstring_example(self):
     """Tests that results with batch evaluate same as non-batch evaluate."""
     def easom(z):
@@ -230,8 +222,8 @@ class DifferentialEvolutionTest(tf.test.TestCase):
         value: Scalar real `Tensor`. The value of the Easom function at the
           supplied argument.
       """
-      f1 = tf.reduce_prod(tf.cos(z), axis=-1)
-      f2 = tf.exp(-tf.reduce_sum((z-np.pi) ** 2, axis=-1))
+      f1 = tf.reduce_prod(input_tensor=tf.cos(z), axis=-1)
+      f2 = tf.exp(-tf.reduce_sum(input_tensor=(z - np.pi)**2, axis=-1))
       return -f1 * f2
     start = tf.constant([1.3, 2.2], dtype=tf.float64)
     results = self.evaluate(tfp.optimizer.differential_evolution_minimize(

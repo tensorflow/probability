@@ -5,6 +5,8 @@
 
 # tfp.edward2.tape
 
+Context manager for recording interceptable executions onto a tape.
+
 ``` python
 tfp.edward2.tape(
     *args,
@@ -12,7 +14,7 @@ tfp.edward2.tape(
 )
 ```
 
-Context manager for recording interceptable executions onto a tape.
+<!-- Placeholder for "Used in" -->
 
 Similar to `tf.GradientTape`, operations are recorded if they are executed
 within this context manager. In addition, the operation must be registered
@@ -20,10 +22,11 @@ within this context manager. In addition, the operation must be registered
 
 #### Yields:
 
+
 * <b>`tape`</b>: OrderedDict where operations are recorded in sequence. Keys are
-    the `name` keyword argument to the operation (typically, a random
-    variable's `name`) and values are the corresponding output of the
-    operation. If the operation has no name, it is not recorded.
+  the `name` keyword argument to the operation (typically, a random
+  variable's `name`) and values are the corresponding output of the
+  operation. If the operation has no name, it is not recorded.
 
 #### Examples
 

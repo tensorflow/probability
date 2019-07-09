@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 
 
@@ -44,25 +44,26 @@ class Tanh(bijector.Bijector):
   """
 
   def __init__(self, validate_args=False, name="tanh"):
-    super(Tanh, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(Tanh, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
-    return tf.nn.tanh(x)
+    return tf.math.tanh(x)
 
   def _inverse(self, y):
     return tf.atanh(y)
 
-  def _inverse_log_det_jacobian(self, y):
-    return -tf.log1p(-tf.square(y))
+  # We implicitly rely on _forward_log_det_jacobian rather than explicitly
+  # implement _inverse_log_det_jacobian since directly using
+  # `-tf.math.log1p(-tf.square(y))` has lower numerical precision.
 
   def _forward_log_det_jacobian(self, x):
     #  This formula is mathematically equivalent to
     #  `tf.log1p(-tf.square(tf.tanh(x)))`, however this code is more numerically
     #  stable.
-
     #  Derivation:
     #    log(1 - tanh(x)^2)
     #    = log(sech(x)^2)
@@ -70,4 +71,4 @@ class Tanh(bijector.Bijector):
     #    = 2 * log(2e^-x / (e^-2x + 1))
     #    = 2 * (log(2) - x - log(e^-2x + 1))
     #    = 2 * (log(2) - x - softplus(-2x))
-    return 2. * (np.log(2.) - x - tf.nn.softplus(-2. * x))
+    return 2. * (np.log(2.) - x - tf.math.softplus(-2. * x))

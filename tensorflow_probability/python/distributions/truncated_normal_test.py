@@ -18,28 +18,22 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 import itertools
 
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+from scipy import stats as sp_stats
+
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
-tfe = tf.contrib.eager
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
 
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-stats = try_import("scipy.stats")
 
 tfd = tfp.distributions
 
@@ -47,7 +41,7 @@ EPSILON = 1e-5
 
 
 def scipy_trunc_norm_dist(loc, scale, low, high):
-  """Construct a scipy.stats.truncnorm for the (scalar) parameters given.
+  """Construct a scipy.sp_stats.truncnorm for the (scalar) parameters given.
 
   Note: scipy's definition of the parameters is slightly different.
   https://github.com/scipy/scipy/issues/7591
@@ -63,7 +57,7 @@ def scipy_trunc_norm_dist(loc, scale, low, high):
   """
   a = (low - loc) / scale
   b = (high - loc) / scale
-  return stats.truncnorm(a, b, loc=loc, scale=scale)
+  return sp_stats.truncnorm(a, b, loc=loc, scale=scale)
 
 
 class _TruncatedNormalTestCase(test_case.TestCase):
@@ -108,7 +102,7 @@ class _TruncatedNormalTestCase(test_case.TestCase):
     self.assertAllClose(hist_a, hist_b, rtol=rtol, atol=atol)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
                                         parameterized.TestCase):
 
@@ -135,8 +129,8 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
     low = tf.zeros(tn_param_shapes["low"])
     sample_shape = self.evaluate(
         tf.shape(
-            tfd.TruncatedNormal(loc=loc, scale=scale, low=low,
-                                high=high).sample()))
+            input=tfd.TruncatedNormal(loc=loc, scale=scale, low=low,
+                                      high=high).sample()))
     self.assertAllEqual(desired_shape, sample_shape)
 
   def testParamShapes(self):
@@ -152,10 +146,10 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
   def testShapeWithPlaceholders(self):
     if tf.executing_eagerly():
       return
-    loc = tf.placeholder_with_default(input=5., shape=None)
-    scale = tf.placeholder_with_default(input=[1., 2], shape=None)
-    ub = tf.placeholder_with_default(input=[10., 11.], shape=None)
-    lb = tf.placeholder_with_default(input=[-1.], shape=None)
+    loc = tf1.placeholder_with_default(input=5., shape=None)
+    scale = tf1.placeholder_with_default(input=[1., 2], shape=None)
+    ub = tf1.placeholder_with_default(input=[10., 11.], shape=None)
+    lb = tf1.placeholder_with_default(input=[-1.], shape=None)
     dist = tfd.TruncatedNormal(loc, scale, lb, ub)
 
     self.assertEqual(dist.batch_shape, tf.TensorShape(None))
@@ -164,7 +158,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
     self.assertAllEqual(self.evaluate(dist.batch_shape_tensor()), [2])
     self.assertAllEqual(self.evaluate(dist.sample(5)).shape, [5, 2])
 
-    ub = tf.placeholder_with_default(input=[[5., 11.]], shape=None)
+    ub = tf1.placeholder_with_default(input=[[5., 11.]], shape=None)
     dist = tfd.TruncatedNormal(loc, scale, lb, ub)
     self.assertAllEqual(self.evaluate(dist.sample(5)).shape, [5, 1, 2])
 
@@ -176,7 +170,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
     ub = [[1.0, 11.0], [5., 20.]]
     dist = tfd.TruncatedNormal(
         loc=[[0., 10.], [0., 10.]], scale=[[1., 1.], [5., 5.]], low=lb, high=ub)
-    x = self.evaluate(dist.sample(n, seed=4))
+    x = self.evaluate(dist.sample(n, seed=tfp_test_util.test_seed()))
     self.assertEqual(x.shape, (n, 2, 2))
 
     means = np.mean(x, axis=0)
@@ -199,7 +193,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
   def testMomentsEmpirically(self, loc, scale, low, high):
     n = int(2e5)
     dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
-    x = self.evaluate(dist.sample(n, seed=1))
+    x = self.evaluate(dist.sample(n, seed=tfp_test_util.test_seed()))
     empirical_mean = np.mean(x)
     empirical_var = np.var(x)
     expected_mean = self.evaluate(dist.mean())
@@ -244,61 +238,34 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
 
   @parameterized.parameters((np.float32), (np.float64))
   def testReparametrizable(self, dtype=np.float32):
-    # This test checks that the gradients are correct.
-    # The gradient checker only works in graph mode and with static shapes.
-    if tf.executing_eagerly():
-      return
-
     loc = tf.Variable(dtype(0.1))
     scale = tf.Variable(dtype(1.1))
     low = tf.Variable(dtype(-10.0))
     high = tf.Variable(dtype(5.0))
-    dist = tfd.TruncatedNormal(loc=loc, scale=scale,
-                               low=low,
-                               high=high)
+    self.evaluate(tf1.global_variables_initializer())
 
-    n = int(2e5)
-    self.evaluate(tf.global_variables_initializer())
-    empirical_abs_mean = tf.reduce_mean(tf.abs(dist.sample(n, seed=6)))
+    def f(loc, scale, low, high):
+      dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
 
-    loc_err = tf.test.compute_gradient_error(
-        loc,
-        loc.shape,
-        empirical_abs_mean, [1],
-        x_init_value=self.evaluate(loc),
-        delta=0.1)
-    scale_err = tf.test.compute_gradient_error(
-        scale,
-        scale.shape,
-        empirical_abs_mean, [1],
-        x_init_value=self.evaluate(scale),
-        delta=0.1)
-    low_err = tf.test.compute_gradient_error(
-        low,
-        low.shape,
-        empirical_abs_mean, [1],
-        x_init_value=self.evaluate(low),
-        delta=0.1)
-    high_err = tf.test.compute_gradient_error(
-        high,
-        high.shape,
-        empirical_abs_mean, [1],
-        x_init_value=self.evaluate(high),
-        delta=0.1)
+      n = int(2e5)
+      return tf.reduce_mean(
+          input_tensor=tf.abs(dist.sample(n, seed=tfp_test_util.test_seed())))
+
+    err = gradient_checker_v2.max_error(
+        *gradient_checker_v2.compute_gradient(
+            f, [loc, scale, low, high], delta=0.1))
+
     # These gradients are noisy due to sampling.
-    self.assertLess(loc_err, 0.05)
-    self.assertLess(scale_err, 0.05)
-    self.assertLess(low_err, 0.05)
-    self.assertLess(high_err, 0.05)
+    self.assertLess(err, 0.05)
 
   def testReparametrizableBatch(self):
     def samples_sum(loc):
       dist = tfp.distributions.TruncatedNormal(
           loc=loc, scale=1., low=-1., high=1.)
-      return tf.reduce_sum(dist.sample(100))
+      return tf.reduce_sum(input_tensor=dist.sample(100))
+
     loc = tf.constant([0., 1.])
-    dy_loc = self.compute_gradients(
-        samples_sum, args=[loc])[0]
+    _, dy_loc = self.evaluate(tfp.math.value_and_gradient(samples_sum, loc))
     self.assertAllGreaterEqual(dy_loc, 0.)
 
   @parameterized.parameters(
@@ -307,58 +274,52 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
                          "survival_function", "log_survival_function"))
   )
   def testGradientsFx(self, dtype, fn_name):
-    # This test checks that the gradients are correct.
-    # The gradient checker only works in graph mode and with static shapes.
-    if tf.executing_eagerly():
-      return
     loc = tf.Variable(dtype(0.1))
     scale = tf.Variable(dtype(3.0))
     low = tf.Variable(dtype(-10.0))
     high = tf.Variable(dtype(5.0))
-    dist = tfd.TruncatedNormal(loc=loc, scale=scale,
-                               low=low,
-                               high=high)
+
     x = np.array([-1.0, 0.01, 0.1, 1., 4.9]).astype(dtype)
-    self.evaluate(tf.global_variables_initializer())
-    func = getattr(dist, fn_name)
-    mean_value = tf.reduce_mean(func(x))
-    loc_err = tf.test.compute_gradient_error(
-        loc, loc.shape, mean_value, [1], x_init_value=self.evaluate(loc))
-    scale_err = tf.test.compute_gradient_error(
-        scale, scale.shape, mean_value, [1], x_init_value=self.evaluate(scale))
-    self.assertLess(loc_err, 1e-2)
-    self.assertLess(scale_err, 1e-2)
+    self.evaluate(tf1.global_variables_initializer())
+
+    def f(loc, scale):
+      dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
+      func = getattr(dist, fn_name)
+      return tf.reduce_mean(input_tensor=func(x))
+
+    err = gradient_checker_v2.max_error(
+        *gradient_checker_v2.compute_gradient(f, [loc, scale]))
+    self.assertLess(err, 1e-2)
 
   @parameterized.parameters(
       itertools.product((np.float32, np.float64),
                         ("entropy", "mean", "variance", "mode"))
   )
   def testGradientsNx(self, dtype, fn_name):
-    # This test checks that the gradients are correct.
-    # The gradient checker only works in graph mode and with static shapes.
-    if tf.executing_eagerly():
-      return
     loc = tf.Variable(dtype(0.1))
     scale = tf.Variable(dtype(3.0))
     low = tf.Variable(dtype(-10.0))
     high = tf.Variable(dtype(5.0))
-    dist = tfd.TruncatedNormal(loc=loc, scale=scale,
-                               low=low,
-                               high=high)
-    self.evaluate(tf.global_variables_initializer())
-    func = getattr(dist, fn_name)
-    v = func()
-    loc_err = tf.test.compute_gradient_error(
-        loc, loc.shape, v, [1], x_init_value=self.evaluate(loc))
-    self.assertLess(loc_err, 0.005)
+
+    self.evaluate(tf1.global_variables_initializer())
+
+    def f(loc, scale):
+      dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
+      func = getattr(dist, fn_name)
+      return func()
 
     if fn_name not in ["mode"]:
-      scale_err = tf.test.compute_gradient_error(
-          scale, scale.shape, v, [1], x_init_value=self.evaluate(scale))
-      self.assertLess(scale_err, 0.01)
+      err = gradient_checker_v2.max_error(
+          *gradient_checker_v2.compute_gradient(f, [loc, scale]))
+      self.assertLess(err, 0.005)
+    else:
+      err = gradient_checker_v2.max_error(
+          *gradient_checker_v2.compute_gradient(
+              lambda x: f(x, scale), [loc]))
+      self.assertLess(err, 0.005)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 @parameterized.parameters(
     (0.0, 1.0),
     (10.0, 1.0),
@@ -392,7 +353,8 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase,
     self.assertAllGreaterEqual(truncated_samples, lb)
     self.assertAllLessEqual(truncated_samples, ub)
 
-    normal_samples = self.evaluate(normal_dist.sample(n, seed=2)).flatten()
+    normal_samples = self.evaluate(normal_dist.sample(
+        n, seed=tfp_test_util.test_seed())).flatten()
     # Rejection sample the normal distribution
     rejection_samples = normal_samples[normal_samples >= lb]
     rejection_samples = rejection_samples[rejection_samples <= ub]
@@ -431,73 +393,73 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase,
     self.assertAllClose(tr_cdf, n_cdf, rtol=1e-4, atol=1e-4)
 
 
-if stats:
-  @tfe.run_all_tests_in_graph_and_eager_modes
-  @parameterized.parameters(
-      (0., 1., -1., 1.),
-      (1., 1., 0., 2.),
-      (-0.5, 0.5, -0.9, -0.4),
-      (10., 3.0, 9.9, 25.),
-      (2., 1.5, 0.1, 1.9),
-      (-2., 0.2, -1.5, -0.5))
-  class TruncatedNormalTestCompareWithScipy(_TruncatedNormalTestCase,
-                                            parameterized.TestCase):
+@test_util.run_all_in_graph_and_eager_modes
+@parameterized.parameters(
+    (0., 1., -1., 1.),
+    (1., 1., 0., 2.),
+    (-0.5, 0.5, -0.9, -0.4),
+    (10., 3.0, 9.9, 25.),
+    (2., 1.5, 0.1, 1.9),
+    (-2., 0.2, -1.5, -0.5))
+class TruncatedNormalTestCompareWithScipy(_TruncatedNormalTestCase,
+                                          parameterized.TestCase):
 
-    def constructDists(self, loc, scale, low, high):
-      tf_dist = tfd.TruncatedNormal(loc=loc, scale=scale,
-                                    low=low,
-                                    high=high)
-      sp_dist = scipy_trunc_norm_dist(loc, scale, low, high)
-      return tf_dist, sp_dist
+  def constructDists(self, loc, scale, low, high):
+    tf_dist = tfd.TruncatedNormal(loc=loc, scale=scale,
+                                  low=low,
+                                  high=high)
+    sp_dist = scipy_trunc_norm_dist(loc, scale, low, high)
+    return tf_dist, sp_dist
 
-    def testSampling(self, loc, scale, low, high):
-      n = int(1000000)
-      tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
-      tf_samples = self.evaluate(tf_dist.sample(n, seed=3)).flatten()
-      self.assertAllGreaterEqual(tf_samples, low)
-      self.assertAllLessEqual(tf_samples, high)
+  def testSampling(self, loc, scale, low, high):
+    n = int(1000000)
+    tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
+    tf_samples = self.evaluate(tf_dist.sample(
+        n, seed=tfp_test_util.test_seed())).flatten()
+    self.assertAllGreaterEqual(tf_samples, low)
+    self.assertAllLessEqual(tf_samples, high)
 
-      sp_samples = sp_dist.rvs(size=n)
-      self.assertEmpiricalDistributionsEqual(
-          tf_samples, sp_samples, atol=0.05, rtol=0.05)
+    sp_samples = sp_dist.rvs(size=n)
+    self.assertEmpiricalDistributionsEqual(
+        tf_samples, sp_samples, atol=0.05, rtol=0.05)
 
-    def testEntropy(self, loc, scale, low, high):
-      tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
-      self.assertAlmostEqual(
-          self.evaluate(tf_dist.entropy()), sp_dist.entropy(), places=2)
+  def testEntropy(self, loc, scale, low, high):
+    tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
+    self.assertAlmostEqual(
+        self.evaluate(tf_dist.entropy()), sp_dist.entropy(), places=2)
 
-    def testLogProb(self, loc, scale, low, high):
-      test_x = list(np.float32(np.random.uniform(low, high, 10)))
-      test_x += [
-          low, high, low + EPSILON, low - EPSILON, high + EPSILON,
-          high - EPSILON
-      ]
+  def testLogProb(self, loc, scale, low, high):
+    test_x = list(np.float32(np.random.uniform(low, high, 10)))
+    test_x += [
+        low, high, low + EPSILON, low - EPSILON, high + EPSILON,
+        high - EPSILON
+    ]
 
-      tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
+    tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
 
-      tf_log_prob = self.evaluate(tf_dist.log_prob(test_x))
-      sp_log_prob = sp_dist.logpdf(test_x)
-      self.assertAllClose(tf_log_prob, sp_log_prob, rtol=1e-4, atol=1e-4)
+    tf_log_prob = self.evaluate(tf_dist.log_prob(test_x))
+    sp_log_prob = sp_dist.logpdf(test_x)
+    self.assertAllClose(tf_log_prob, sp_log_prob, rtol=1e-4, atol=1e-4)
 
-    def testCDF(self, loc, scale, low, high):
-      test_x = list(np.float32(np.random.uniform(low, high, 10)))
-      test_x += [
-          low, high, low + EPSILON, low - EPSILON, high + EPSILON,
-          high - EPSILON, low - 100., high + 100.
-      ]
+  def testCDF(self, loc, scale, low, high):
+    test_x = list(np.float32(np.random.uniform(low, high, 10)))
+    test_x += [
+        low, high, low + EPSILON, low - EPSILON, high + EPSILON,
+        high - EPSILON, low - 100., high + 100.
+    ]
 
-      tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
+    tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
 
-      tf_cdf = self.evaluate(tf_dist.cdf(test_x))
-      sp_cdf = sp_dist.cdf(test_x)
-      self.assertAllClose(tf_cdf, sp_cdf, rtol=1e-4, atol=1e-4)
+    tf_cdf = self.evaluate(tf_dist.cdf(test_x))
+    sp_cdf = sp_dist.cdf(test_x)
+    self.assertAllClose(tf_cdf, sp_cdf, rtol=1e-4, atol=1e-4)
 
-    def testMoments(self, loc, scale, low, high):
-      tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
-      self.assertAlmostEqual(
-          self.evaluate(tf_dist.mean()), sp_dist.mean(), places=3)
-      self.assertAlmostEqual(
-          self.evaluate(tf_dist.variance()), sp_dist.var(), places=3)
+  def testMoments(self, loc, scale, low, high):
+    tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
+    self.assertAlmostEqual(
+        self.evaluate(tf_dist.mean()), sp_dist.mean(), places=3)
+    self.assertAlmostEqual(
+        self.evaluate(tf_dist.variance()), sp_dist.var(), places=3)
 
 
 if __name__ == "__main__":

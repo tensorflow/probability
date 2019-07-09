@@ -20,7 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import _augment_sample_shape
@@ -30,16 +31,21 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import buil
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_kalman_cov_step
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_kalman_filter_step
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_kalman_mean_step
+from tensorflow_probability.python.distributions.linear_gaussian_ssm import build_pushforward_latents_step
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import kalman_transition
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import KalmanFilterState
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
 
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case as tfp_test_case
+
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 tfd = tfp.distributions
-tfe = tf.contrib.eager
 tfl = tf.linalg
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _IIDNormalTest(object):
 
   def setUp(self):
@@ -78,7 +84,7 @@ class _IIDNormalTest(object):
 
     return model
 
-  def test_iid_normal_sample(self):
+  def testIIDNormalSample(self):
     num_timesteps = 10
     latent_size = 3
     observation_size = 2
@@ -110,7 +116,7 @@ class _IIDNormalTest(object):
                             np.ones(result_shape) * marginal_variance,
                             rtol=5*stderr_variance)
 
-  def test_iid_normal_logprob(self):
+  def testIIDNormalLogprob(self):
 
     # In the case where the latent states are iid normal (achieved by
     # setting the transition matrix to zero, so there's no dependence
@@ -132,10 +138,10 @@ class _IIDNormalTest(object):
         lp_kalman = iid_latents.log_prob(x)
 
         marginal_variance = tf.convert_to_tensor(
-            transition_variance_val + observation_variance_val,
+            value=transition_variance_val + observation_variance_val,
             dtype=self.dtype)
         lp_iid = tf.reduce_sum(
-            tfd.Normal(
+            input_tensor=tfd.Normal(
                 loc=tf.zeros([], dtype=self.dtype),
                 scale=tf.sqrt(marginal_variance)).log_prob(x),
             axis=(-2, -1))
@@ -158,29 +164,29 @@ class _IIDNormalTest(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IIDNormalTestStatic32(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = True
   dtype = np.float32
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IIDNormalTestStatic64(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = True
   dtype = np.float64
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class IIDNormalTestDynamic32(_IIDNormalTest, tf.test.TestCase):
   use_static_shape = False
   dtype = np.float32
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SanityChecks(tf.test.TestCase):
 
   def test_deterministic_system(self):
@@ -215,7 +221,7 @@ class SanityChecks(tf.test.TestCase):
     self.assertAllClose(mean_[..., 0], expected_observations)
     self.assertAllClose(sample_[..., 0], expected_observations)
 
-  def test_variance(self):
+  def testVariance(self):
 
     num_timesteps = 5
     prior_scale = 17.
@@ -246,7 +252,7 @@ class SanityChecks(tf.test.TestCase):
     variance_ = self.evaluate(model.variance())
     self.assertAllClose(variance_[..., 0], observation_variance)
 
-  def test_time_varying_operators(self):
+  def testTimeVaryingOperators(self):
 
     num_timesteps = 5
     prior_mean = 1.3
@@ -295,7 +301,7 @@ class SanityChecks(tf.test.TestCase):
     lp_ = self.evaluate(model.log_prob(sample_))
     self.assertGreater(lp_, 0.)
 
-  def test_time_varying_noise(self):
+  def testTimeVaryingNoise(self):
 
     num_timesteps = 5
     prior_mean = 0.
@@ -308,7 +314,7 @@ class SanityChecks(tf.test.TestCase):
 
     def observation_noise(t):
       t = tf.cast(t, tf.float32)
-      return tfd.MultivariateNormalDiag(scale_diag=[tf.log(t+1.)])
+      return tfd.MultivariateNormalDiag(scale_diag=[tf.math.log(t + 1.)])
 
     model = tfd.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
@@ -331,7 +337,7 @@ class SanityChecks(tf.test.TestCase):
     self.assertAllClose(observation_variances, variance_[..., 0])
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class BatchTest(tf.test.TestCase):
   """Test that methods broadcast batch dimensions for each parameter."""
 
@@ -363,19 +369,21 @@ class BatchTest(tf.test.TestCase):
 
     return tfd.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
-        transition_matrix=tf.random_normal(
-            transition_matrix_batch_shape + [latent_size, latent_size]),
+        transition_matrix=tf.random.normal(transition_matrix_batch_shape +
+                                           [latent_size, latent_size]),
         transition_noise=tfd.MultivariateNormalDiag(
-            scale_diag=tf.nn.softplus(tf.random_normal(
-                transition_noise_batch_shape + [latent_size]))),
-        observation_matrix=tf.random_normal(
-            observation_matrix_batch_shape + [observation_size, latent_size]),
+            scale_diag=tf.math.softplus(
+                tf.random.normal(transition_noise_batch_shape +
+                                 [latent_size]))),
+        observation_matrix=tf.random.normal(observation_matrix_batch_shape +
+                                            [observation_size, latent_size]),
         observation_noise=tfd.MultivariateNormalDiag(
-            scale_diag=tf.nn.softplus(tf.random_normal(
-                observation_noise_batch_shape + [observation_size]))),
+            scale_diag=tf.math.softplus(
+                tf.random.normal(observation_noise_batch_shape +
+                                 [observation_size]))),
         initial_state_prior=tfd.MultivariateNormalDiag(
-            scale_diag=tf.nn.softplus(tf.random_normal(
-                prior_batch_shape + [latent_size]))),
+            scale_diag=tf.math.softplus(
+                tf.random.normal(prior_batch_shape + [latent_size]))),
         validate_args=True)
 
   def _sanity_check_shapes(self, model,
@@ -390,40 +398,47 @@ class BatchTest(tf.test.TestCase):
     # lists.
     sample_shape = list(sample_shape)
 
-    self.assertEqual(model.event_shape.as_list(), event_shape)
-    self.assertEqual(model.batch_shape.as_list(), batch_shape)
+    self.assertEqual(tensorshape_util.as_list(model.event_shape), event_shape)
+    self.assertEqual(tensorshape_util.as_list(model.batch_shape), batch_shape)
 
     y = model.sample(sample_shape)
-    self.assertEqual(y.shape.as_list(),
-                     sample_shape + batch_shape + event_shape)
+    self.assertEqual(
+        tensorshape_util.as_list(y.shape),
+        sample_shape + batch_shape + event_shape)
 
     lp = model.log_prob(y)
-    self.assertEqual(lp.shape.as_list(), sample_shape + batch_shape)
+    self.assertEqual(
+        tensorshape_util.as_list(lp.shape), sample_shape + batch_shape)
 
     (posterior_means, posterior_covs) = model.posterior_marginals(y)
-    self.assertEqual(posterior_means.shape.as_list(),
-                     sample_shape + batch_shape + [num_timesteps, latent_size])
-    self.assertEqual(posterior_covs.shape.as_list(),
-                     batch_shape + [num_timesteps, latent_size, latent_size])
+    self.assertEqual(
+        tensorshape_util.as_list(posterior_means.shape),
+        sample_shape + batch_shape + [num_timesteps, latent_size])
+    self.assertEqual(
+        tensorshape_util.as_list(posterior_covs.shape),
+        batch_shape + [num_timesteps, latent_size, latent_size])
 
     # Try an argument with no batch shape to ensure we broadcast
     # correctly.
-    unbatched_y = tf.random_normal(event_shape)
+    unbatched_y = tf.random.normal(event_shape)
     lp = model.log_prob(unbatched_y)
-    self.assertEqual(lp.shape.as_list(), batch_shape)
+    self.assertEqual(tensorshape_util.as_list(lp.shape), batch_shape)
 
-    self.assertEqual(model.mean().shape.as_list(),
-                     batch_shape + event_shape)
-    self.assertEqual(model.variance().shape.as_list(),
-                     batch_shape + event_shape)
+    self.assertEqual(
+        tensorshape_util.as_list(model.mean().shape), batch_shape + event_shape)
+    self.assertEqual(
+        tensorshape_util.as_list(model.variance().shape),
+        batch_shape + event_shape)
 
     (posterior_means, posterior_covs) = model.posterior_marginals(unbatched_y)
-    self.assertEqual(posterior_means.shape.as_list(),
-                     batch_shape + [num_timesteps, latent_size])
-    self.assertEqual(posterior_covs.shape.as_list(),
-                     batch_shape + [num_timesteps, latent_size, latent_size])
+    self.assertEqual(
+        tensorshape_util.as_list(posterior_means.shape),
+        batch_shape + [num_timesteps, latent_size])
+    self.assertEqual(
+        tensorshape_util.as_list(posterior_covs.shape),
+        batch_shape + [num_timesteps, latent_size, latent_size])
 
-  def test_constant_batch_shape(self):
+  def testConstantBatchShape(self):
     """Simple case where all components have the same batch shape."""
     num_timesteps = 5
     latent_size = 3
@@ -446,7 +461,7 @@ class BatchTest(tf.test.TestCase):
     self._sanity_check_shapes(model, batch_shape, event_shape,
                               num_timesteps, latent_size)
 
-  def test_broadcast_batch_shape(self):
+  def testBroadcastBatchShape(self):
     """Broadcasting when only one component has batch shape."""
 
     num_timesteps = 5
@@ -495,8 +510,272 @@ class BatchTest(tf.test.TestCase):
     self._sanity_check_shapes(model, batch_shape, event_shape,
                               num_timesteps, latent_size)
 
+  def testLatentsToObservationsWorksWithBatchShape(self):
+    num_timesteps = 5
+    latent_size = 3
+    observation_size = 2
+    batch_shape = [3, 4]
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+    model = self._build_random_model(num_timesteps,
+                                     latent_size,
+                                     observation_size,
+                                     prior_batch_shape=batch_shape,
+                                     transition_matrix_batch_shape=batch_shape,
+                                     transition_noise_batch_shape=batch_shape,
+                                     observation_matrix_batch_shape=batch_shape,
+                                     observation_noise_batch_shape=batch_shape)
+    latent_means, observation_means = model._joint_mean()
+    latent_covs, observation_covs = model._joint_covariances()
+    (pushforward_means, pushforward_covs) = model.latents_to_observations(
+        latent_means, latent_covs)
+
+    (observation_means_, observation_covs_,
+     pushforward_means_, pushforward_covs_) = self.evaluate((
+         observation_means, observation_covs,
+         pushforward_means, pushforward_covs))
+    self.assertAllClose(pushforward_means_, observation_means_)
+    self.assertAllClose(pushforward_covs_, observation_covs_)
+
+
+class MissingObservationsTests(tfp_test_case.TestCase):
+
+  # One test requires derivative with respect to
+  # transition_noise.scale_diag so we allow this to be
+  # passed in as an argument if needed.
+  def make_model(self, scale_diag=None):
+    if scale_diag is None:
+      scale_diag = np.array([1.], dtype=np.float32)
+
+    # Define a simple random-walk model.
+    num_timesteps = 8
+    transition_matrix = np.array([[1.]], dtype=np.float32)
+    transition_noise = tfd.MultivariateNormalDiag(
+        scale_diag=scale_diag)
+    observation_matrix = np.array([[1.]], dtype=np.float32)
+    observation_noise = tfd.MultivariateNormalDiag(
+        scale_diag=np.array([0.5], dtype=np.float32))
+    initial_state_prior = tfd.MultivariateNormalDiag(
+        loc=np.zeros(shape=[1], dtype=np.float32),
+        scale_diag=np.array([1.], dtype=np.float32))
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=transition_matrix,
+        transition_noise=transition_noise,
+        observation_matrix=observation_matrix,
+        observation_noise=observation_noise,
+        initial_state_prior=initial_state_prior,
+        initial_step=0)
+
+    return (num_timesteps, transition_matrix, transition_noise,
+            observation_matrix, observation_noise,
+            initial_state_prior, model)
+
+  def testForwardFilterWithDynamicShapeMask(self):
+    (_, transition_matrix, _,
+     observation_matrix, observation_noise,
+     initial_state_prior, model) = self.make_model()
+
+    observed_time_series_ = np.array(
+        [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
+    observed_time_series_ = observed_time_series_[..., np.newaxis]
+    observation_mask_ = np.array(
+        [False, False, True, False, True, True, False, True]).astype(np.bool)
+
+    # Pass inputs with dynamic shape. Ideally we would run all tests with
+    # both static and dynamic shape, but since LGSSM tests are unusually
+    # heavyweight, we split the load: this test uses dynamic shape and others
+    # use static shape, so we expect to catch any pervasive problems with both
+    # approaches.
+    observed_time_series = tf1.placeholder_with_default(
+        input=observed_time_series_, shape=None)
+    observation_mask = tf1.placeholder_with_default(
+        input=observation_mask_, shape=None)
+
+    # In a random walk, skipping a timestep just adds variance, so we can
+    # construct a model of the four 'unmasked' timesteps by directly collapsing
+    # out the masked timesteps. We test that the filtering distributions and
+    # likelihoods from the masked model match those from the collapsed
+    # model at observed timesteps.
+    collapsed_transition_variances = tf.constant([1., 2., 3., 2.],
+                                                 dtype=np.float32)
+
+    def collapsed_transition_noise_model(t):
+      return tfd.MultivariateNormalDiag(
+          scale_diag=[tf.sqrt(collapsed_transition_variances[t])])
+
+    collapsed_model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=4,
+        transition_matrix=transition_matrix,
+        transition_noise=collapsed_transition_noise_model,
+        observation_matrix=observation_matrix,
+        observation_noise=observation_noise,
+        initial_state_prior=initial_state_prior,
+        initial_step=0)
+
+    (log_likelihoods_, filtered_means_, filtered_covs_, predicted_means_,
+     predicted_covs_, observation_means_, observation_covs_) = self.evaluate(
+         model.forward_filter(
+             x=observed_time_series, mask=observation_mask))
+
+    (log_likelihoods_collapsed_, filtered_means_collapsed_,
+     filtered_covs_collapsed_, predicted_means_collapsed_,
+     predicted_covs_collapsed_, observation_means_collapsed_,
+     observation_covs_collapsed_) = self.evaluate(
+         collapsed_model.forward_filter(
+             x=observed_time_series[~observation_mask_]))
+
+    self.assertAllClose(log_likelihoods_[~observation_mask_],
+                        log_likelihoods_collapsed_)
+    self.assertAllEqual(log_likelihoods_[observation_mask_],
+                        np.zeros(log_likelihoods_[observation_mask_].shape))
+    self.assertAllClose(filtered_means_[~observation_mask_],
+                        filtered_means_collapsed_)
+    self.assertAllClose(filtered_covs_[~observation_mask_],
+                        filtered_covs_collapsed_)
+
+    # Check the predictive distributions over latents at the final timestep.
+    # We don't bother checking the other timesteps because the collapsing
+    # makes it nontrivial to compute which ones should match up.
+    self.assertAllClose(predicted_means_[-1],
+                        predicted_means_collapsed_[-1])
+    self.assertAllClose(predicted_covs_[-1],
+                        predicted_covs_collapsed_[-1])
+
+    self.assertAllClose(observation_means_[~observation_mask_],
+                        observation_means_collapsed_)
+    self.assertAllClose(observation_covs_[~observation_mask_],
+                        observation_covs_collapsed_)
+
+    # Also test that auxiliary methods `log_prob` and `posterior_marginals`
+    # pass the mask through correctly.
+    lp_, lp_collapsed_ = self.evaluate((
+        model.log_prob(observed_time_series, mask=observation_mask),
+        collapsed_model.log_prob(observed_time_series[~observation_mask_])))
+    self.assertAllClose(lp_, lp_collapsed_)
+
+    ((posterior_means_, posterior_covs_),
+     (posterior_means_collapsed_, posterior_covs_collapsed_)) = self.evaluate((
+         model.posterior_marginals(
+             observed_time_series, mask=observation_mask),
+         collapsed_model.posterior_marginals(
+             observed_time_series[~observation_mask_])))
+    self.assertAllClose(posterior_means_[~observation_mask_],
+                        posterior_means_collapsed_)
+    self.assertAllClose(posterior_covs_[~observation_mask_],
+                        posterior_covs_collapsed_)
+
+  def testGradientsOfMaskedNaNsAreFinite(self):
+    def lp_from_scale_diag(scale_diag):
+      (_, _, _, _, _, _,
+       model) = self.make_model(scale_diag)
+
+      observed_time_series = np.array(  # contains a (masked) NaN.
+          [1.0, 2.0, -1000., 0.4,
+           np.nan, 1000., 4.2, np.inf]).astype(np.float32)
+      observed_time_series = observed_time_series[..., np.newaxis]
+      observation_mask = np.array(
+          [False, False, True, False, True, True, False, True]).astype(np.bool)
+
+      # Check that we've avoided the NaN-gradient gotcha described in
+      # https://stackoverflow.com/questions/33712178/tensorflow-nan-bug/42497444#42497444
+      log_likelihoods, _, _, _, _, _, _ = model.forward_filter(
+          x=observed_time_series, mask=observation_mask)
+      lp = tf.reduce_sum(input_tensor=log_likelihoods)
+      return lp
+
+    _, grads_ = self.evaluate(
+        tfp.math.value_and_gradient(
+            lp_from_scale_diag,
+            [tf.constant(np.array([1.], dtype=np.float32))]))
+    self.assertAllFinite(grads_)
+
+  def testMaskWhenModelHasBatchShape(self):
+    # When the inputs (x, mask) have shape *smaller* than the model's batch
+    # shape, they should be broadcast up so we return a result for each
+    # model in the batch.
+    (num_timesteps, transition_matrix, transition_noise,
+     observation_matrix, observation_noise,
+     _, _) = self.make_model()
+
+    num_timesteps = 8
+    batch_shape = [4, 3]
+    batch_model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=transition_matrix,
+        transition_noise=transition_noise,
+        observation_matrix=observation_matrix,
+        observation_noise=observation_noise,
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            scale_diag=np.random.randn(*(
+                batch_shape + [1])).astype(np.float32)),
+        initial_step=0)
+
+    mask = np.random.randn(num_timesteps) > 0
+    observed_time_series = np.random.randn(num_timesteps, 1).astype(np.float32)
+    observed_time_series[mask[..., np.newaxis]] = np.inf
+
+    (log_likelihoods, filtered_means, filtered_covs, _, _, _,
+     _) = batch_model.forward_filter(
+         x=observed_time_series, mask=mask)
+    # Test that shapes are as expected, and are statically inferred.
+    self.assertAllEqual(
+        tensorshape_util.as_list(filtered_means.shape),
+        batch_shape + [num_timesteps, 1])
+    self.assertAllEqual(
+        tensorshape_util.as_list(filtered_covs.shape),
+        batch_shape + [num_timesteps, 1, 1])
+
+    (log_likelihoods_, filtered_means_, filtered_covs_) = self.evaluate(
+        (log_likelihoods, filtered_means, filtered_covs))
+    self.assertTrue(np.all(np.isfinite(log_likelihoods_)))
+    self.assertTrue(np.all(np.isfinite(filtered_means_)))
+    self.assertTrue(np.all(np.isfinite(filtered_covs_)))
+
+  def testMaskWhenTimeSeriesHasSampleShape(self):
+    # When the inputs (x, mask) have shape *larger* than the model's batch
+    # shape, we return means with a sample dimension for every sample dimension
+    # in the observed time series `x`, and covariances with a sample dimension
+    # for every sample dimension in the mask.
+
+    (num_timesteps, _, _, _, _,
+     _, model) = self.make_model()
+
+    sample_shape = [5, 2]
+    mask_sample_shape = [2]
+
+    mask = np.random.randn(*np.concatenate(
+        [mask_sample_shape, [num_timesteps]], axis=0)) > 0
+    observed_time_series = np.random.randn(*np.concatenate(
+        [sample_shape, [num_timesteps, 1]], axis=0)).astype(
+            np.float32)
+    observed_time_series[:, mask[..., np.newaxis]] = np.inf
+
+    (log_likelihoods, filtered_means, filtered_covs, _, _, _,
+     _) = model.forward_filter(
+         x=observed_time_series, mask=mask)
+    self.assertAllEqual(
+        tensorshape_util.as_list(filtered_means.shape),
+        sample_shape + [num_timesteps, 1])
+    self.assertAllEqual(
+        tensorshape_util.as_list(filtered_covs.shape),
+        mask_sample_shape + [num_timesteps, 1, 1])
+
+    (log_likelihoods_, filtered_means_, filtered_covs_) = self.evaluate(
+        (log_likelihoods, filtered_means, filtered_covs))
+    self.assertTrue(np.all(np.isfinite(log_likelihoods_)))
+    self.assertTrue(np.all(np.isfinite(filtered_means_)))
+    self.assertTrue(np.all(np.isfinite(filtered_covs_)))
+
+    big_mask = np.random.randn(*np.concatenate(
+        [[1, 2, 3], sample_shape, [num_timesteps]], axis=0)) > 0
+    with self.assertRaisesRegexp(ValueError,
+                                 "mask cannot have higher rank than x"):
+      (log_likelihoods, filtered_means, filtered_covs, _, _, _,
+       _) = model.forward_filter(
+           x=observed_time_series, mask=big_mask)
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class KalmanSmootherTest(tf.test.TestCase):
 
   def build_kf(self):
@@ -617,7 +896,7 @@ class KalmanSmootherTest(tf.test.TestCase):
                           [0.07458252, -0.34516996, 1.33941529]]])
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _KalmanStepsTest(object):
 
   def setUp(self):
@@ -948,8 +1227,31 @@ class _KalmanStepsTest(object):
                                np.dot(new_cov, self.observation_matrix.T)) +
                         np.diag(self.observation_noise_scale_diag**2))
 
+  def testPushforwardLatentsStepIsCorrect(self):
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+    latent_mean_ = np.asarray([1.1, -3.], dtype=np.float32)[..., np.newaxis]
+    latent_cov_ = np.asarray([[.5, -.2], [-.2, .9]], dtype=np.float32)
+    latent_mean_tensor = self.build_tensor(latent_mean_)
+    latent_cov_tensor = self.build_tensor(latent_cov_)
+
+    pushforward_step = build_pushforward_latents_step(
+        self.get_observation_matrix_for_timestep,
+        self.get_observation_noise_for_timestep)
+    obs_mean, obs_cov = self.evaluate(
+        pushforward_step(_=None,  # Loop body ignores previous observations.
+                         latent_t_mean_cov=(
+                             0, latent_mean_tensor, latent_cov_tensor)))
+
+    self.assertAllClose(obs_mean,
+                        np.dot(self.observation_matrix, latent_mean_) +
+                        self.observation_bias[:, np.newaxis])
+    self.assertAllClose(obs_cov,
+                        np.dot(self.observation_matrix,
+                               np.dot(latent_cov_, self.observation_matrix.T)) +
+                        np.diag(self.observation_noise_scale_diag**2))
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class KalmanStepsTestStatic(tf.test.TestCase, _KalmanStepsTest):
 
   use_static_shape = True
@@ -958,10 +1260,10 @@ class KalmanStepsTestStatic(tf.test.TestCase, _KalmanStepsTest):
     return _KalmanStepsTest.setUp(self)
 
   def build_tensor(self, tensor):
-    return tf.convert_to_tensor(tensor)
+    return tf.convert_to_tensor(value=tensor)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class KalmanStepsTestDynamic(tf.test.TestCase, _KalmanStepsTest):
 
   use_static_shape = False
@@ -970,11 +1272,11 @@ class KalmanStepsTestDynamic(tf.test.TestCase, _KalmanStepsTest):
     return _KalmanStepsTest.setUp(self)
 
   def build_tensor(self, tensor):
-    return tf.placeholder_with_default(input=tf.convert_to_tensor(tensor),
-                                       shape=None)
+    return tf1.placeholder_with_default(
+        input=tf.convert_to_tensor(value=tensor), shape=None)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class _AugmentSampleShapeTest(object):
 
   def testAugmentsShape(self):
@@ -1017,7 +1319,7 @@ class _AugmentSampleShapeTest(object):
                                 validate_args=True))
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class AugmentSampleShapeTestStatic(tf.test.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
@@ -1026,7 +1328,7 @@ class AugmentSampleShapeTestStatic(tf.test.TestCase, _AugmentSampleShapeTest):
   def build_inputs(self, full_batch_shape, partial_batch_shape):
 
     full_batch_shape = np.asarray(full_batch_shape, dtype=np.int32)
-    dist = tfd.Normal(tf.random_normal(partial_batch_shape), 1.)
+    dist = tfd.Normal(tf.random.normal(partial_batch_shape), 1.)
 
     return full_batch_shape, dist
 
@@ -1034,7 +1336,7 @@ class AugmentSampleShapeTestStatic(tf.test.TestCase, _AugmentSampleShapeTest):
     return x
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class AugmentSampleShapeTestDynamic(tf.test.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
@@ -1044,14 +1346,12 @@ class AugmentSampleShapeTestDynamic(tf.test.TestCase, _AugmentSampleShapeTest):
       return self.assertRaisesOpError(msg)
 
   def build_inputs(self, full_batch_shape, partial_batch_shape):
-    full_batch_shape = tf.placeholder_with_default(
-        input=np.asarray(full_batch_shape, dtype=np.int32),
-        shape=None)
+    full_batch_shape = tf1.placeholder_with_default(
+        input=np.asarray(full_batch_shape, dtype=np.int32), shape=None)
 
-    partial_batch_shape = tf.placeholder_with_default(
-        input=np.asarray(partial_batch_shape, dtype=np.int32),
-        shape=None)
-    dist = tfd.Normal(tf.random_normal(partial_batch_shape), 1.)
+    partial_batch_shape = tf1.placeholder_with_default(
+        input=np.asarray(partial_batch_shape, dtype=np.int32), shape=None)
+    dist = tfd.Normal(tf.random.normal(partial_batch_shape), 1.)
 
     return full_batch_shape, dist
 

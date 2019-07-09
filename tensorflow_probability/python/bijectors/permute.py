@@ -20,10 +20,14 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow.python.ops import control_flow_ops
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -83,37 +87,37 @@ class Permute(bijector.Bijector):
       name: Python `str`, name given to ops managed by this object.
 
     Raises:
-      TypeError: if `not permutation.dtype.is_integer`.
+      TypeError: if `not dtype_util.is_integer(permutation.dtype)`.
       ValueError: if `permutation` does not contain exactly one of each of
         `{0, 1, ..., d}`.
       NotImplementedError: if `axis` is not known prior to graph execution.
       NotImplementedError: if `axis` is not negative.
     """
-    with tf.name_scope(name, "permute", values=[permutation, axis]):
+    with tf.name_scope(name or "permute") as name:
       axis = tf.convert_to_tensor(axis, name="axis")
-      if not axis.dtype.is_integer:
+      if not dtype_util.is_integer(axis.dtype):
         raise TypeError("axis.dtype ({}) should be `int`-like.".format(
-            axis.dtype.name))
+            dtype_util.name(axis.dtype)))
       permutation = tf.convert_to_tensor(permutation, name="permutation")
-      if not permutation.dtype.is_integer:
+      if not dtype_util.is_integer(permutation.dtype):
         raise TypeError("permutation.dtype ({}) should be `int`-like.".format(
-            permutation.dtype.name))
-      p = tf.contrib.util.constant_value(permutation)
+            dtype_util.name(permutation.dtype)))
+      p = tf.get_static_value(permutation)
       if p is not None:
         if set(p) != set(np.arange(p.size)):
           raise ValueError("Permutation over `d` must contain exactly one of "
                            "each of `{0, 1, ..., d}`.")
       elif validate_args:
-        p, _ = tf.nn.top_k(
+        p, _ = tf.math.top_k(
             -permutation, k=tf.shape(permutation)[-1], sorted=True)
-        permutation = control_flow_ops.with_dependencies([
-            tf.assert_equal(
+        permutation = distribution_util.with_dependencies([
+            assert_util.assert_equal(
                 -p,
                 tf.range(tf.size(p)),
                 message=("Permutation over `d` must contain exactly one of "
                          "each of `{0, 1, ..., d}`.")),
         ], permutation)
-      axis_ = tf.contrib.util.constant_value(axis)
+      axis_ = tf.get_static_value(axis)
       if axis_ is None:
         raise NotImplementedError("`axis` must be known prior to graph "
                                   "execution.")
@@ -128,7 +132,7 @@ class Permute(bijector.Bijector):
           forward_min_event_ndims=forward_min_event_ndims,
           is_constant_jacobian=True,
           validate_args=validate_args,
-          name=name or "permute")
+          name=name)
 
   @property
   def permutation(self):
@@ -139,16 +143,21 @@ class Permute(bijector.Bijector):
     return self._axis
 
   def _forward(self, x):
-    return tf.gather(x, self.permutation, axis=self.axis)
+    y = tf.gather(x, self.permutation, axis=self.axis)
+    tensorshape_util.set_shape(y, x.shape)
+    return y
 
   def _inverse(self, y):
-    return tf.gather(y, tf.invert_permutation(self.permutation), axis=self.axis)
+    x = tf.gather(
+        y, tf.math.invert_permutation(self.permutation), axis=self.axis)
+    tensorshape_util.set_shape(x, y.shape)
+    return x
 
   def _inverse_log_det_jacobian(self, y):
     # is_constant_jacobian = True for this bijector, hence the
     # `log_det_jacobian` need only be specified for a single input, as this will
     # be tiled to match `event_ndims`.
-    return tf.constant(0., dtype=y.dtype.base_dtype)
+    return tf.constant(0., dtype=dtype_util.base_dtype(y.dtype))
 
   def _forward_log_det_jacobian(self, x):
-    return tf.constant(0., dtype=x.dtype.base_dtype)
+    return tf.constant(0., dtype=dtype_util.base_dtype(x.dtype))

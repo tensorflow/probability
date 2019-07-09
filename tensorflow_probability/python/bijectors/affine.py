@@ -18,11 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow.python.ops import control_flow_ops
 
 
 __all__ = [
@@ -166,10 +167,6 @@ class Affine(bijector.Bijector):
       ValueError: if `perturb_diag` is specified but not `perturb_factor`.
       TypeError: if `shift` has different `dtype` from `scale` arguments.
     """
-    self._graph_parents = []
-    self._name = name
-    self._validate_args = validate_args
-
     # Ambiguous definition of low rank update.
     if scale_perturb_diag is not None and scale_perturb_factor is None:
       raise ValueError("When scale_perturb_diag is specified, "
@@ -183,9 +180,9 @@ class Affine(bijector.Bijector):
                                          scale_diag is None and
                                          scale_perturb_factor is None)
 
-    with self._name_scope("init", values=[
-        shift, scale_identity_multiplier, scale_diag, scale_tril,
-        scale_perturb_diag, scale_perturb_factor]):
+    with tf.name_scope(name) as name:
+      self._name = name
+      self._validate_args = validate_args
 
       if dtype is None:
         dtype = dtype_util.common_dtype([
@@ -218,7 +215,7 @@ class Affine(bijector.Bijector):
 
       if scale is not None and not self._is_only_identity_multiplier:
         if (shift is not None and
-            shift.dtype.base_dtype != scale.dtype.base_dtype):
+            not dtype_util.base_equal(shift.dtype, scale.dtype)):
           raise TypeError(
               "shift.dtype({}) is incompatible with scale.dtype({}).".format(
                   shift.dtype, scale.dtype))
@@ -227,10 +224,6 @@ class Affine(bijector.Bijector):
       self._adjoint = adjoint
       super(Affine, self).__init__(
           forward_min_event_ndims=1,
-          graph_parents=(
-              [self._scale] if tf.contrib.framework.is_tensor(self._scale)
-              else self._scale.graph_parents +
-              [self._shift] if self._shift is not None else []),
           is_constant_jacobian=True,
           dtype=dtype,
           validate_args=validate_args,
@@ -280,10 +273,10 @@ class Affine(bijector.Bijector):
 
     if self._is_only_identity_multiplier:
       if validate_args:
-        return control_flow_ops.with_dependencies([
-            tf.assert_none_equal(identity_multiplier,
-                                 tf.zeros([], identity_multiplier.dtype),
-                                 ["identity_multiplier should be non-zero."])
+        return distribution_util.with_dependencies([
+            assert_util.assert_none_equal(
+                identity_multiplier, tf.zeros([], identity_multiplier.dtype),
+                ["identity_multiplier should be non-zero."])
         ], identity_multiplier)
       return identity_multiplier
 
@@ -327,9 +320,9 @@ class Affine(bijector.Bijector):
   def _forward(self, x):
     y = x
     if self._is_only_identity_multiplier:
-      s = (tf.conj(self._scale)
-           if self.adjoint and self._scale.dtype.is_complex
-           else self._scale)
+      s = (
+          tf.math.conj(self._scale) if self.adjoint and
+          dtype_util.is_complex(self._scale.dtype) else self._scale)
       y *= s
       if self.shift is not None:
         return y + self.shift
@@ -346,9 +339,9 @@ class Affine(bijector.Bijector):
     if self.shift is not None:
       x -= self.shift
     if self._is_only_identity_multiplier:
-      s = (tf.conj(self._scale)
-           if self.adjoint and self._scale.dtype.is_complex
-           else self._scale)
+      s = (
+          tf.math.conj(self._scale) if self.adjoint and
+          dtype_util.is_complex(self._scale.dtype) else self._scale)
       return x / s
     # Solve fails if the op is singular so we may safely skip this assertion.
     x = self.scale.solvevec(x, adjoint=self.adjoint)
@@ -361,7 +354,7 @@ class Affine(bijector.Bijector):
     if self._is_only_identity_multiplier:
       # We don't pad in this case and instead let the fldj be applied
       # via broadcast.
-      log_abs_diag = tf.log(tf.abs(self._scale))
+      log_abs_diag = tf.math.log(tf.abs(self._scale))
       event_size = tf.shape(x)[-1]
       event_size = tf.cast(event_size, dtype=log_abs_diag.dtype)
       return log_abs_diag * event_size

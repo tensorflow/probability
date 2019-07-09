@@ -18,18 +18,22 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
-from tensorflow_probability.python.bijectors import conditional_bijector
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python.bijectors import affine_scalar
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
-    "RealNVP",
-    "real_nvp_default_template"
+    'RealNVP',
+    'real_nvp_default_template'
 ]
 
 
-class RealNVP(conditional_bijector.ConditionalBijector):
-  """RealNVP "affine coupling layer" for vector-valued events.
+class RealNVP(bijector_lib.Bijector):
+  """RealNVP 'affine coupling layer' for vector-valued events.
 
   Real NVP models a normalizing flow on a `D`-dimensional distribution via a
   single `D-d`-dimensional conditional distribution [(Dinh et al., 2017)][1]:
@@ -58,8 +62,8 @@ class RealNVP(conditional_bijector.ConditionalBijector):
   inverse computations in parallel. However, the lack of an autoregressive
   transformations makes it less expressive on a per-bijector basis.
 
-  A "valid" `shift_and_log_scale_fn` must compute each `shift` (aka `loc` or
-  "mu" in [Papamakarios et al. (2016)][4]) and `log(scale)` (aka "alpha" in
+  A 'valid' `shift_and_log_scale_fn` must compute each `shift` (aka `loc` or
+  'mu' in [Papamakarios et al. (2016)][4]) and `log(scale)` (aka 'alpha' in
   [Papamakarios et al. (2016)][4]) such that each are broadcastable with the
   arguments to `forward` and `inverse`, i.e., such that the calculations in
   `forward`, `inverse` [below] are possible. For convenience,
@@ -74,13 +78,16 @@ class RealNVP(conditional_bijector.ConditionalBijector):
   Calling `real_nvp_default_template` with `shift_only=True` returns one such
   NICE-compatible `shift_and_log_scale_fn`.
 
+  The `bijector_fn` argument allows specifying a more general coupling relation,
+  such as the LSTM-inspired activation from [5], or Neural Spline Flow [6].
+
   Caching: the scalar input depth `D` of the base distribution is not known at
   construction time. The first call to any of `forward(x)`, `inverse(x)`,
   `inverse_log_det_jacobian(x)`, or `forward_log_det_jacobian(x)` memoizes
   `D`, which is re-used in subsequent calls. This shape must be known prior to
   graph execution (which is the case if using tf.layers).
 
-  #### Example Use
+  #### Examples
 
   ```python
   tfd = tfp.distributions
@@ -118,11 +125,19 @@ class RealNVP(conditional_bijector.ConditionalBijector):
   [4]: George Papamakarios, Theo Pavlakou, and Iain Murray. Masked
        Autoregressive Flow for Density Estimation. In _Neural Information
        Processing Systems_, 2017. https://arxiv.org/abs/1705.07057
+
+  [5]: Kingma, D. P., Salimans, T., & Welling, M. Improving Variational
+       Inference with Inverse Autoregressive Flow. In _Neural Information
+       Processing Systems_, 2016. https://arxiv.org/abs/1606.04934
+
+  [6]: Durkan, C., Bekasov, A., Murray, I., & Papamakarios, G. Neural
+       Spline Flows, 2019. Retrieved from http://arxiv.org/abs/1906.04032
   """
 
   def __init__(self,
                num_masked,
-               shift_and_log_scale_fn,
+               shift_and_log_scale_fn=None,
+               bijector_fn=None,
                is_constant_jacobian=False,
                validate_args=False,
                name=None):
@@ -134,12 +149,16 @@ class RealNVP(conditional_bijector.ConditionalBijector):
         is the event size of the base distribution.
       shift_and_log_scale_fn: Python `callable` which computes `shift` and
         `log_scale` from both the forward domain (`x`) and the inverse domain
-        (`y`). Calculation must respect the "autoregressive property" (see class
+        (`y`). Calculation must respect the 'autoregressive property' (see class
         docstring). Suggested default
         `masked_autoregressive_default_template(hidden_layers=...)`.
         Typically the function contains `tf.Variables` and is wrapped using
         `tf.make_template`. Returning `None` for either (both) `shift`,
         `log_scale` is equivalent to (but more efficient than) returning zero.
+      bijector_fn: Python `callable` which returns a `tfb.Bijector` which
+        transforms the last `D-d` unit with the signature `(masked_units_tensor,
+        output_units, **condition_kwargs)`. The bijector must operate on scalar
+        or vector events and must not alter the rank of its imput.
       is_constant_jacobian: Python `bool`. Default: `False`. When `True` the
         implementation assumes `log_scale` does not depend on the forward domain
         (`x`) or inverse domain (`y`) values. (No validation is made;
@@ -151,14 +170,33 @@ class RealNVP(conditional_bijector.ConditionalBijector):
 
     Raises:
       ValueError: If num_masked < 1.
+      ValueError: If both or none of `shift_and_log_scale_fn` and `bijector_fn`
+          are specified.
     """
-    name = name or "real_nvp"
+    name = name or 'real_nvp'
     if num_masked <= 0:
-      raise ValueError("num_masked must be a positive integer.")
+      raise ValueError('num_masked must be a positive integer.')
     self._num_masked = num_masked
     # At construction time, we don't know input_depth.
     self._input_depth = None
+    if bool(shift_and_log_scale_fn) == bool(bijector_fn):
+      raise ValueError('Exactly one of `shift_and_log_scale_fn` and '
+                       '`bijector_fn` should be specified.')
+    if shift_and_log_scale_fn:
+      def _bijector_fn(x0, input_depth, **condition_kwargs):
+        shift, log_scale = shift_and_log_scale_fn(x0, input_depth,
+                                                  **condition_kwargs)
+        return affine_scalar.AffineScalar(shift=shift, log_scale=log_scale)
+
+      bijector_fn = _bijector_fn
+
+    if validate_args:
+      bijector_fn = _validate_bijector_fn(bijector_fn)
+
+    # Still do this assignment for variable tracking.
     self._shift_and_log_scale_fn = shift_and_log_scale_fn
+    self._bijector_fn = bijector_fn
+
     super(RealNVP, self).__init__(
         forward_min_event_ndims=1,
         is_constant_jacobian=is_constant_jacobian,
@@ -167,59 +205,44 @@ class RealNVP(conditional_bijector.ConditionalBijector):
 
   def _cache_input_depth(self, x):
     if self._input_depth is None:
-      self._input_depth = tf.dimension_value(x.shape.with_rank_at_least(1)[-1])
+      self._input_depth = tf.compat.dimension_value(
+          tensorshape_util.with_rank_at_least(x.shape, 1)[-1])
       if self._input_depth is None:
         raise NotImplementedError(
-            "Rightmost dimension must be known prior to graph execution.")
+            'Rightmost dimension must be known prior to graph execution.')
       if self._num_masked >= self._input_depth:
         raise ValueError(
-            "Number of masked units must be smaller than the event size.")
+            'Number of masked units must be smaller than the event size.')
 
   def _forward(self, x, **condition_kwargs):
     self._cache_input_depth(x)
-    # Performs scale and shift.
     x0, x1 = x[..., :self._num_masked], x[..., self._num_masked:]
-    shift, log_scale = self._shift_and_log_scale_fn(
-        x0, self._input_depth - self._num_masked, **condition_kwargs)
-    y1 = x1
-    if log_scale is not None:
-      y1 *= tf.exp(log_scale)
-    if shift is not None:
-      y1 += shift
+    y1 = self._bijector_fn(x0, self._input_depth - self._num_masked,
+                           **condition_kwargs).forward(x1)
     y = tf.concat([x0, y1], axis=-1)
     return y
 
   def _inverse(self, y, **condition_kwargs):
     self._cache_input_depth(y)
-    # Performs un-shift and un-scale.
     y0, y1 = y[..., :self._num_masked], y[..., self._num_masked:]
-    shift, log_scale = self._shift_and_log_scale_fn(
-        y0, self._input_depth - self._num_masked, **condition_kwargs)
-    x1 = y1
-    if shift is not None:
-      x1 -= shift
-    if log_scale is not None:
-      x1 *= tf.exp(-log_scale)
+    x1 = self._bijector_fn(y0, self._input_depth - self._num_masked,
+                           **condition_kwargs).inverse(y1)
     x = tf.concat([y0, x1], axis=-1)
     return x
 
-  def _inverse_log_det_jacobian(self, y, **condition_kwargs):
-    self._cache_input_depth(y)
-    y0 = y[..., :self._num_masked]
-    _, log_scale = self._shift_and_log_scale_fn(
-        y0, self._input_depth - self._num_masked, **condition_kwargs)
-    if log_scale is None:
-      return tf.constant(0., dtype=y.dtype, name="ildj")
-    return -tf.reduce_sum(log_scale, axis=-1)
-
   def _forward_log_det_jacobian(self, x, **condition_kwargs):
     self._cache_input_depth(x)
-    x0 = x[..., :self._num_masked]
-    _, log_scale = self._shift_and_log_scale_fn(
-        x0, self._input_depth - self._num_masked, **condition_kwargs)
-    if log_scale is None:
-      return tf.constant(0., dtype=x.dtype, name="fldj")
-    return tf.reduce_sum(log_scale, axis=-1)
+    x0, x1 = x[..., :self._num_masked], x[..., self._num_masked:]
+    return self._bijector_fn(x0, self._input_depth - self._num_masked,
+                             **condition_kwargs).forward_log_det_jacobian(
+                                 x1, event_ndims=1)
+
+  def _inverse_log_det_jacobian(self, y, **condition_kwargs):
+    self._cache_input_depth(y)
+    y0, y1 = y[..., :self._num_masked], y[..., self._num_masked:]
+    return self._bijector_fn(y0, self._input_depth - self._num_masked,
+                             **condition_kwargs).inverse_log_det_jacobian(
+                                 y1, event_ndims=1)
 
 
 def real_nvp_default_template(hidden_layers,
@@ -232,11 +255,11 @@ def real_nvp_default_template(hidden_layers,
 
   This will be wrapped in a make_template to ensure the variables are only
   created once. It takes the `d`-dimensional input x[0:d] and returns the `D-d`
-  dimensional outputs `loc` ("mu") and `log_scale` ("alpha").
+  dimensional outputs `loc` ('mu') and `log_scale` ('alpha').
 
   The default template does not support conditioning and will raise an
   exception if `condition_kwargs` are passed to it. To use conditioning in
-  real nvp bijector, implement a conditioned shift/scale template that
+  Real NVP bijector, implement a conditioned shift/scale template that
   handles the `condition_kwargs`.
 
   Arguments:
@@ -247,14 +270,14 @@ def real_nvp_default_template(hidden_layers,
     activation: Activation function (callable). Explicitly setting to `None`
       implies a linear activation.
     name: A name for ops managed by this function. Default:
-      "real_nvp_default_template".
+      'real_nvp_default_template'.
     *args: `tf.layers.dense` arguments.
     **kwargs: `tf.layers.dense` keyword arguments.
 
   Returns:
-    shift: `Float`-like `Tensor` of shift terms ("mu" in
+    shift: `Float`-like `Tensor` of shift terms ('mu' in
       [Papamakarios et al.  (2016)][1]).
-    log_scale: `Float`-like `Tensor` of log(scale) terms ("alpha" in
+    log_scale: `Float`-like `Tensor` of log(scale) terms ('alpha' in
       [Papamakarios et al. (2016)][1]).
 
   Raises:
@@ -268,27 +291,27 @@ def real_nvp_default_template(hidden_layers,
        Processing Systems_, 2017. https://arxiv.org/abs/1705.07057
   """
 
-  with tf.name_scope(name, "real_nvp_default_template"):
+  with tf.name_scope(name or 'real_nvp_default_template'):
 
     def _fn(x, output_units, **condition_kwargs):
       """Fully connected MLP parameterized via `real_nvp_template`."""
       if condition_kwargs:
         raise NotImplementedError(
-            "Conditioning not implemented in the default template.")
+            'Conditioning not implemented in the default template.')
 
-      if x.shape.rank == 1:
+      if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
         reshape_output = lambda x: x[0]
       else:
         reshape_output = lambda x: x
       for units in hidden_layers:
-        x = tf.layers.dense(
+        x = tf1.layers.dense(
             inputs=x,
             units=units,
             activation=activation,
             *args,  # pylint: disable=keyword-arg-before-vararg
             **kwargs)
-      x = tf.layers.dense(
+      x = tf1.layers.dense(
           inputs=x,
           units=(1 if shift_only else 2) * output_units,
           activation=None,
@@ -299,4 +322,21 @@ def real_nvp_default_template(hidden_layers,
       shift, log_scale = tf.split(x, 2, axis=-1)
       return reshape_output(shift), reshape_output(log_scale)
 
-    return tf.make_template("real_nvp_default_template", _fn)
+    return tf1.make_template('real_nvp_default_template', _fn)
+
+
+def _validate_bijector_fn(bijector_fn):
+  """Validates the output of `bijector_fn`."""
+
+  def _wrapper(x, output_units, **condition_kwargs):
+    bijector = bijector_fn(x, output_units, **condition_kwargs)
+    if bijector.forward_min_event_ndims != bijector.inverse_min_event_ndims:
+      # We need to be able to re-combine the state parts.
+      raise ValueError('Bijectors which alter `event_ndims` are not supported.')
+    if bijector.forward_min_event_ndims > 1:
+      # Mostly because we can't propagate this up to the RealNVP bijector.
+      raise ValueError(
+          'Bijectors with `forward_min_event_ndims` > 1 are not supported.')
+    return bijector
+
+  return _wrapper

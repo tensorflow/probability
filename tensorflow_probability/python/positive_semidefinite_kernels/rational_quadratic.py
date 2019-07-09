@@ -21,10 +21,8 @@ from __future__ import print_function
 import functools
 
 import tensorflow as tf
-from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
-from tensorflow.python.framework import tensor_shape
 
 __all__ = [
     "RationalQuadratic",
@@ -110,52 +108,53 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         name, values=[amplitude, scale_mixture_rate, length_scale]) as name:
-      dtype = dtype_util.common_dtype([
-          amplitude, scale_mixture_rate, length_scale], tf.float32)
+      dtype = util.maybe_get_common_dtype(
+          [amplitude, scale_mixture_rate, length_scale])
 
       if amplitude is not None:
         amplitude = tf.convert_to_tensor(
-            amplitude, name="amplitude", dtype=dtype)
+            value=amplitude, name="amplitude", dtype=dtype)
       self._amplitude = _validate_arg_if_not_none(
-          amplitude, tf.assert_positive, validate_args)
+          amplitude, tf.compat.v1.assert_positive, validate_args)
 
       if scale_mixture_rate is not None:
         scale_mixture_rate = tf.convert_to_tensor(
-            scale_mixture_rate, name="scale_mixture_rate", dtype=dtype)
+            value=scale_mixture_rate, name="scale_mixture_rate", dtype=dtype)
       self._scale_mixture_rate = _validate_arg_if_not_none(
-          scale_mixture_rate, tf.assert_positive, validate_args)
+          scale_mixture_rate, tf.compat.v1.assert_positive, validate_args)
 
       if length_scale is not None:
         length_scale = tf.convert_to_tensor(
-            length_scale, name="length_scale", dtype=dtype)
+            value=length_scale, name="length_scale", dtype=dtype)
       self._length_scale = _validate_arg_if_not_none(
-          length_scale, tf.assert_positive, validate_args)
+          length_scale, tf.compat.v1.assert_positive, validate_args)
 
-    super(RationalQuadratic, self).__init__(feature_ndims, name)
+    super(RationalQuadratic, self).__init__(
+        feature_ndims, dtype=dtype, name=name)
 
-  def _apply(self, x1, x2, param_expansion_ndims=0):
+  def _apply(self, x1, x2, example_ndims=0):
     difference = util.sum_rightmost_ndims_preserving_shape(
-        tf.squared_difference(x1, x2), ndims=self.feature_ndims)
+        tf.math.squared_difference(x1, x2), ndims=self.feature_ndims)
     difference /= 2
 
     if self.length_scale is not None:
-      length_scale = util.pad_shape_right_with_ones(
-          self.length_scale, ndims=param_expansion_ndims)
+      length_scale = util.pad_shape_with_ones(
+          self.length_scale, ndims=example_ndims)
       difference /= length_scale ** 2
 
     scale_mixture_rate = 1.
     if self.scale_mixture_rate is not None:
-      scale_mixture_rate = util.pad_shape_right_with_ones(
-          self.scale_mixture_rate, ndims=param_expansion_ndims)
+      scale_mixture_rate = util.pad_shape_with_ones(
+          self.scale_mixture_rate, ndims=example_ndims)
       difference /= scale_mixture_rate
 
     result = (1. + difference) ** -scale_mixture_rate
 
     if self.amplitude is not None:
-      amplitude = util.pad_shape_right_with_ones(
-          self.amplitude, ndims=param_expansion_ndims)
+      amplitude = util.pad_shape_with_ones(
+          self.amplitude, ndims=example_ndims)
       result *= amplitude ** 2
     return result
 
@@ -176,23 +175,21 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
 
   def _batch_shape(self):
     shape_list = [
-        x.shape for x in [
+        x.shape for x in [  # pylint: disable=g-complex-comprehension
             self.amplitude,
             self.scale_mixture_rate,
             self.length_scale
         ] if x is not None
     ]
     if not shape_list:
-      return tensor_shape.scalar()
+      return tf.TensorShape([])
     return functools.reduce(tf.broadcast_static_shape, shape_list)
 
   def _batch_shape_tensor(self):
     shape_list = [
-        tf.shape(x) for x in [
-            self.amplitude,
-            self.scale_mixture_rate,
-            self.length_scale
-        ] if x is not None
+        tf.shape(input=x)
+        for x in [self.amplitude, self.scale_mixture_rate, self.length_scale]
+        if x is not None
     ]
     if not shape_list:
       return tf.constant([], dtype=tf.int32)

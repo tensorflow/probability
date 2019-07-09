@@ -18,9 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
-from tensorflow.python.util import deprecation
-from tensorflow.python.util import tf_inspect
+import inspect
+import six
+
+import tensorflow.compat.v2 as tf
+from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
 _DIVERGENCES = {}
@@ -29,6 +31,7 @@ _DIVERGENCES = {}
 __all__ = [
     "RegisterKL",
     "kl_divergence",
+    "augment_kl_xent_docs",
 ]
 
 
@@ -85,27 +88,30 @@ def kl_divergence(distribution_a, distribution_b,
   """
   kl_fn = _registered_kl(type(distribution_a), type(distribution_b))
   if kl_fn is None:
-    # TODO(b/117098119): For backwards compatibility, we check TF's registry as
-    # well. This typically happens when this function is called on a pair of
-    # TF's distributions.
-    with deprecation.silence():
-      return tf.distributions.kl_divergence(distribution_a, distribution_b)
+    raise NotImplementedError(
+        "No KL(distribution_a || distribution_b) registered for distribution_a "
+        "type {} and distribution_b type {}".format(
+            type(distribution_a).__name__, type(distribution_b).__name__))
 
-  with tf.name_scope("KullbackLeibler"):
-    kl_t = kl_fn(distribution_a, distribution_b, name=name)
-    if allow_nan_stats:
-      return kl_t
+  name = name or "KullbackLeibler"
+  with tf.name_scope(name):
+    # pylint: disable=protected-access
+    with distribution_a._name_and_control_scope(name + "_a"):
+      with distribution_b._name_and_control_scope(name + "_b"):
+        kl_t = kl_fn(distribution_a, distribution_b, name=name)
+        if allow_nan_stats:
+          return kl_t
 
     # Check KL for NaNs
     kl_t = tf.identity(kl_t, name="kl")
 
     with tf.control_dependencies([
         tf.Assert(
-            tf.logical_not(
-                tf.reduce_any(tf.is_nan(kl_t))),
-            ["KL calculation between %s and %s returned NaN values "
-             "(and was called with allow_nan_stats=False). Values:"
-             % (distribution_a.name, distribution_b.name), kl_t])]):
+            tf.logical_not(tf.reduce_any(tf.math.is_nan(kl_t))),
+            [("KL calculation between {} and {} returned NaN values "
+              "(and was called with allow_nan_stats=False). Values:".format(
+                  distribution_a.name, distribution_b.name)), kl_t])
+    ]):
       return tf.identity(kl_t, name="checked_kl")
 
 
@@ -136,7 +142,7 @@ def cross_entropy(ref, other,
     cross_entropy: `ref.dtype` `Tensor` with shape `[B1, ..., Bn]`
       representing `n` different calculations of (Shanon) cross entropy.
   """
-  with tf.name_scope(name, "cross_entropy"):
+  with tf.name_scope(name or "cross_entropy"):
     return ref.entropy() + kl_divergence(
         ref, other, allow_nan_stats=allow_nan_stats)
 
@@ -181,11 +187,90 @@ class RegisterKL(object):
                        % (self._key[0].__name__, self._key[1].__name__,
                           _DIVERGENCES[self._key]))
     _DIVERGENCES[self._key] = kl_fn
-    # TODO(b/117098119): For backwards compatibility, we register the
-    # distributions in both this registry and the deprecated TF's registry.
-    #
-    # Additionally, for distributions which have deprecated copies, we register
-    # all 3 combinations in their respective files (see test for the list).
-    with deprecation.silence():
-      tf.distributions.RegisterKL(*self._key)(kl_fn)
     return kl_fn
+
+
+def _dist_classes(distributions_module):
+  dist_classes = []
+  for attr in dir(distributions_module):
+    value = getattr(distributions_module, attr)
+    if (inspect.isclass(value) and
+        issubclass(value, distributions_module.Distribution)):
+      dist_classes.append(value)
+  return dist_classes
+
+
+def _summarize_registered_kls(dist_classes):
+  """Returns a str of registered KLs, to append to the doc for kl_divergence."""
+  maxdists = 6  # Only show up to N subclasses per p/q.
+  ps, qs = [], []
+  for p, q in sorted(_DIVERGENCES,
+                     key=lambda p_q: (p_q[0].__name__, p_q[1].__name__)):
+    subps = sorted([d for d in dist_classes if issubclass(d, p) and d is not p],
+                   key=lambda d: d.__name__)
+    subqs = sorted([d for d in dist_classes if issubclass(d, q) and d is not q],
+                   key=lambda d: d.__name__)
+    ps.append(p.__name__)
+    for subp in subps[:maxdists]:
+      ps.append("{} +".format(subp.__name__))
+    if len(subps) > maxdists:
+      ps.append("{} more +".format(len(subps) - maxdists))
+    ps.extend([""] * (len(subqs[:maxdists + 1]) - len(subps[:maxdists + 1])))
+
+    qs.append(q.__name__)
+    for subq in subqs[:maxdists]:
+      qs.append("+ {}".format(subq.__name__))
+    if len(subqs) > maxdists:
+      qs.append("+ {} more".format(len(subqs) - maxdists))
+    qs.extend([""] * (len(subps[:maxdists + 1]) - len(subqs[:maxdists + 1])))
+  maxp = max(map(len, ps))
+  rows = []
+  for p, q in [("distribution_a", "distribution_b")] + list(zip(ps, qs)):
+    rows.append("{}{} {} {}".format(
+        " " * (maxp - len(p)), p, "  " if "+" in (p + q) else "||", q))
+  return """
+  Built-in KL(distribution_a || distribution_b) registrations:
+
+  ```text
+  {}
+  {}
+  {}
+  ```
+  """.format(rows[0], "=" * max(map(len, rows)), "\n  ".join(rows[1:]))
+
+
+def augment_kl_xent_docs(distributions_module):
+  """Augments doc on tfd.kl_divergence, EachDist.kl_divergence/cross_entropy."""
+  dist_classes = _dist_classes(distributions_module)
+  kl_divergence.__doc__ += _summarize_registered_kls(dist_classes)
+
+  if not six.PY3:
+    return  # Cannot update __doc__ on instancemethod objects in PY2.
+
+  for dist_class in dist_classes:
+    others = []
+    for p, q in _DIVERGENCES:
+      if issubclass(dist_class, p):
+        others.extend(
+            subq.__name__ for subq in dist_classes if issubclass(subq, q))
+    others = sorted(set(others))
+
+    def merge_doc(original, additional):
+      for line in original.split("\n"):
+        if "args:" == line.strip().lower():
+          indent = line.lower().split("args")[0]
+          yield "{}{}\n{}".format(indent, additional, indent)
+        yield line
+
+    if others:
+      others_str = ", ".join("`{}`".format(other) for other in others)
+      dist_class.kl_divergence.__doc__ = "\n".join(
+          merge_doc(
+              dist_class.kl_divergence.__doc__,
+              "`other` types with built-in registrations: {}".format(
+                  others_str)))
+      dist_class.cross_entropy.__doc__ = "\n".join(
+          merge_doc(
+              dist_class.cross_entropy.__doc__,
+              "`other` types with built-in registrations: {}".format(
+                  others_str)))

@@ -13,7 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Install tensorflow_probability."""
-import datetime
 import os
 import sys
 
@@ -31,6 +30,8 @@ from version import __version__  # pylint: disable=g-import-not-at-top
 REQUIRED_PACKAGES = [
     'six >= 1.10.0',
     'numpy >= 1.13.3',
+    'decorator',
+    'cloudpickle == 1.1.1',
 ]
 
 if '--release' in sys.argv:
@@ -43,11 +44,7 @@ else:
 if release:
   project_name = 'tensorflow-probability'
 else:
-  # Nightly releases use date-based versioning of the form
-  # '0.0.1.dev20180305'
   project_name = 'tfp-nightly'
-  datestring = datetime.datetime.now().strftime('%Y%m%d')
-  __version__ += datestring
 
 
 class BinaryDistribution(Distribution):
@@ -56,11 +53,16 @@ class BinaryDistribution(Distribution):
   def has_ext_modules(self):
     return False
 
+with open('README.md', 'r') as fh:
+  long_description = fh.read()
+
 setup(
     name=project_name,
     version=__version__,
     description='Probabilistic modeling and statistical '
                 'inference in TensorFlow',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     author='Google LLC',
     author_email='no-reply@google.com',
     url='http://github.com/tensorflow/probability',

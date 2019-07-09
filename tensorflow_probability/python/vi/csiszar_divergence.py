@@ -21,30 +21,37 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
-from tensorflow_probability.python import distributions as tfd
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python import monte_carlo
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import nest_util
+from tensorflow_probability.python.internal.reparameterization import FULLY_REPARAMETERIZED
+from tensorflow_probability.python.stats.leave_one_out import log_soomean_exp
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
-    "amari_alpha",
-    "arithmetic_geometric",
-    "chi_square",
-    "csiszar_vimco",
-    "csiszar_vimco_helper",
-    "dual_csiszar_function",
-    "jeffreys",
-    "jensen_shannon",
-    "kl_forward",
-    "kl_reverse",
-    "log1p_abs",
-    "modified_gan",
-    "monte_carlo_csiszar_f_divergence",
-    "pearson",
-    "squared_hellinger",
-    "symmetrized_csiszar_function",
-    "t_power",
-    "total_variation",
-    "triangular",
+    'amari_alpha',
+    'arithmetic_geometric',
+    'chi_square',
+    'csiszar_vimco',
+    'csiszar_vimco_helper',
+    'dual_csiszar_function',
+    'jeffreys',
+    'jensen_shannon',
+    'kl_forward',
+    'kl_reverse',
+    'log1p_abs',
+    'modified_gan',
+    'monte_carlo_csiszar_f_divergence',
+    'monte_carlo_variational_loss',
+    'pearson',
+    'squared_hellinger',
+    'symmetrized_csiszar_function',
+    't_power',
+    'total_variation',
+    'triangular',
 ]
 
 
@@ -92,14 +99,14 @@ def amari_alpha(logu, alpha=1., self_normalized=False, name=None):
     TypeError: if `alpha` is `None` or a `Tensor`.
     TypeError: if `self_normalized` is `None` or a `Tensor`.
   """
-  with tf.name_scope(name, "amari_alpha", [logu]):
-    if alpha is None or tf.contrib.framework.is_tensor(alpha):
-      raise TypeError("`alpha` cannot be `None` or `Tensor` type.")
-    if (self_normalized is None or
-        tf.contrib.framework.is_tensor(self_normalized)):
-      raise TypeError("`self_normalized` cannot be `None` or `Tensor` type.")
+  with tf.name_scope(name or 'amari_alpha'):
+    if tf.get_static_value(alpha) is None:
+      raise TypeError('Argument `alpha` cannot be `None` or `Tensor` type.')
+    if tf.get_static_value(self_normalized) is None:
+      raise TypeError(
+          'Argument `self_normalized` cannot be `None` or `Tensor` type.')
 
-    logu = tf.convert_to_tensor(logu, name="logu")
+    logu = tf.convert_to_tensor(logu, name='logu')
 
     if alpha == 0.:
       f = -logu
@@ -163,7 +170,7 @@ def kl_reverse(logu, self_normalized=False, name=None):
     TypeError: if `self_normalized` is `None` or a `Tensor`.
   """
 
-  with tf.name_scope(name, "kl_reverse", [logu]):
+  with tf.name_scope(name or 'kl_reverse'):
     return amari_alpha(logu, alpha=0., self_normalized=self_normalized)
 
 
@@ -211,7 +218,7 @@ def kl_forward(logu, self_normalized=False, name=None):
     TypeError: if `self_normalized` is `None` or a `Tensor`.
   """
 
-  with tf.name_scope(name, "kl_forward", [logu]):
+  with tf.name_scope(name or 'kl_forward'):
     return amari_alpha(logu, alpha=1., self_normalized=self_normalized)
 
 
@@ -264,13 +271,15 @@ def jensen_shannon(logu, self_normalized=False, name=None):
       evaluated at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "jensen_shannon", [logu]):
-    logu = tf.convert_to_tensor(logu, name="logu")
-    npdt = logu.dtype.as_numpy_dtype
+  with tf.name_scope(name or 'jensen_shannon'):
+    logu = tf.convert_to_tensor(logu, name='logu')
     y = tf.nn.softplus(logu)
     if self_normalized:
-      y -= np.log(2).astype(npdt)
-    return tf.exp(logu) * logu - (1. + tf.exp(logu)) * y
+      y -= np.log(2.)
+    # TODO(jvdillon): Maybe leverage the fact that:
+    # (x-sp(x))*exp(x) approx= expm1(-1.1x + 0.5) for x>12?
+    # Basically, take advantage of x approx= softplus(x) for x>>0.
+    return (logu - y) * tf.exp(logu) - y
 
 
 def arithmetic_geometric(logu, self_normalized=False, name=None):
@@ -318,11 +327,11 @@ def arithmetic_geometric(logu, self_normalized=False, name=None):
       Csiszar-function evaluated at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "arithmetic_geometric", [logu]):
-    logu = tf.convert_to_tensor(logu, name="logu")
+  with tf.name_scope(name or 'arithmetic_geometric'):
+    logu = tf.convert_to_tensor(logu, name='logu')
     y = tf.nn.softplus(logu) - 0.5 * logu
     if self_normalized:
-      y -= np.log(2.).astype(logu.dtype.as_numpy_dtype)
+      y -= np.log(2.)
     return (1. + tf.exp(logu)) * y
 
 
@@ -353,8 +362,8 @@ def total_variation(logu, name=None):
       evaluated at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "total_variation", [logu]):
-    logu = tf.convert_to_tensor(logu, name="logu")
+  with tf.name_scope(name or 'total_variation'):
+    logu = tf.convert_to_tensor(logu, name='logu')
     return 0.5 * tf.abs(tf.math.expm1(logu))
 
 
@@ -385,8 +394,8 @@ def pearson(logu, name=None):
       `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "pearson", [logu]):
-    logu = tf.convert_to_tensor(logu, name="logu")
+  with tf.name_scope(name or 'pearson'):
+    logu = tf.convert_to_tensor(logu, name='logu')
     return tf.square(tf.math.expm1(logu))
 
 
@@ -420,8 +429,8 @@ def squared_hellinger(logu, name=None):
       evaluated at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "squared_hellinger", [logu]):
-    logu = tf.convert_to_tensor(logu, name="logu")
+  with tf.name_scope(name or 'squared_hellinger'):
+    logu = tf.convert_to_tensor(logu, name='logu')
     return pearson(0.5 * logu)
 
 
@@ -455,8 +464,8 @@ def triangular(logu, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "triangular", [logu]):
-    logu = tf.convert_to_tensor(logu, name="logu")
+  with tf.name_scope(name or 'triangular'):
+    logu = tf.convert_to_tensor(logu, name='logu')
     return pearson(logu) / (1. + tf.exp(logu))
 
 
@@ -492,16 +501,14 @@ def t_power(logu, t, self_normalized=False, name=None):
     t_power_of_u: `float`-like `Tensor` of the Csiszar-function evaluated
       at `u = exp(logu)`.
   """
-  with tf.name_scope(name, "t_power", [logu, t]):
-    logu = tf.convert_to_tensor(logu, name="logu")
-    t = tf.convert_to_tensor(t, dtype=logu.dtype.base_dtype, name="t")
+  with tf.name_scope(name or 't_power'):
+    logu = tf.convert_to_tensor(logu, name='logu')
+    t = tf.convert_to_tensor(
+        t, dtype=dtype_util.base_dtype(logu.dtype), name='t')
     fu = tf.math.expm1(t * logu)
     if self_normalized:
-      fu -= t * tf.math.expm1(logu)
-    fu *= tf.where(tf.logical_and(0. < t, t < 1.),
-                   -tf.ones_like(t),
-                   tf.ones_like(t))
-    return fu
+      fu = fu - t * tf.math.expm1(logu)
+    return tf.where((0 < t) & (t < 1), -fu, fu)
 
 
 def log1p_abs(logu, name=None):
@@ -543,8 +550,8 @@ def log1p_abs(logu, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "log1p_abs", [logu]):
-    logu = tf.convert_to_tensor(logu, name="logu")
+  with tf.name_scope(name or 'log1p_abs'):
+    logu = tf.convert_to_tensor(logu, name='logu')
     return tf.math.expm1(tf.abs(logu))
 
 
@@ -581,8 +588,8 @@ def jeffreys(logu, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "jeffreys", [logu]):
-    logu = tf.convert_to_tensor(logu, name="logu")
+  with tf.name_scope(name or 'jeffreys'):
+    logu = tf.convert_to_tensor(logu, name='logu')
     return 0.5 * tf.math.expm1(logu) * logu
 
 
@@ -613,8 +620,8 @@ def chi_square(logu, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "chi_square", [logu]):
-    logu = tf.convert_to_tensor(logu, name="logu")
+  with tf.name_scope(name or 'chi_square'):
+    logu = tf.convert_to_tensor(logu, name='logu')
     return tf.math.expm1(2. * logu)
 
 
@@ -654,8 +661,8 @@ def modified_gan(logu, self_normalized=False, name=None):
       at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "chi_square", [logu]):
-    logu = tf.convert_to_tensor(logu, name="logu")
+  with tf.name_scope(name or 'chi_square'):
+    logu = tf.convert_to_tensor(logu, name='logu')
     y = tf.nn.softplus(logu) - logu
     if self_normalized:
       y += 0.5 * tf.math.expm1(logu)
@@ -706,7 +713,7 @@ def dual_csiszar_function(logu, csiszar_function, name=None):
       `f` at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "dual_csiszar_function", [logu]):
+  with tf.name_scope(name or 'dual_csiszar_function'):
     return tf.exp(logu) * csiszar_function(-logu)
 
 
@@ -775,12 +782,194 @@ def symmetrized_csiszar_function(logu, csiszar_function, name=None):
       symmetrization of `g` evaluated at `u = exp(logu)`.
   """
 
-  with tf.name_scope(name, "symmetrized_csiszar_function", [logu]):
-    logu = tf.convert_to_tensor(logu, name="logu")
-    return 0.5 * (csiszar_function(logu)
-                  + dual_csiszar_function(logu, csiszar_function))
+  with tf.name_scope(name or 'symmetrized_csiszar_function'):
+    logu = tf.convert_to_tensor(logu, name='logu')
+    return 0.5 * (csiszar_function(logu) +
+                  dual_csiszar_function(logu, csiszar_function))
 
 
+def monte_carlo_variational_loss(target_log_prob_fn,
+                                 surrogate_posterior,
+                                 discrepancy_fn=kl_reverse,
+                                 sample_size=None,
+                                 use_reparametrization=None,
+                                 seed=None,
+                                 name=None):
+  """Monte-Carlo approximation of an f-Divergence variational loss.
+
+  Variational losses measure the divergence between an unnormalized target
+  distribution `p` (provided via `target_log_prob_fn`) and a surrogate
+  distribution `q` (provided as `surrogate_posterior`). When the
+  target distribution is an unnormalized posterior from conditioning a model on
+  data, minimizing the loss with respect to the parameters of
+  `surrogate_posterior` performs approximate posterior inference.
+
+  This function defines divergences of the form
+  `E_q[discrepancy_fn(log p(z) - log q(z))]`, sometimes known as f-divergences
+  [1, 2]. In the special case `discrepancy_fn(logu) == -logu` (the default
+  `tfp.vi.kl_reverse`), this is the reverse Kullback-Liebler divergence
+  `KL[q||p]`, whose negation applied to an unnormalized `p` is the widely-used
+  evidence lower bound (ELBO) [3]. Other cases of interest available under
+  `tfp.vi` include the forward `KL[p||q]` (given by `tfp.vi.kl_forward(logu)
+  == exp(logu) * logu`), total variation distance, Amari
+  alpha-divergences, and [more](https://en.wikipedia.org/wiki/F-divergence).
+
+  Args:
+    target_log_prob_fn: Python callable that takes a set of `Tensor` arguments
+      and returns a `Tensor` log-density. Given
+      `q_sample = surrogate_posterior.sample(sample_size)`, this
+      will be called as `target_log_prob_fn(*q_sample)` if `q_sample` is a list
+      or a tuple, `target_log_prob_fn(**q_sample)` if `q_sample` is a
+      dictionary, or `target_log_prob_fn(q_sample)` if `q_sample` is a `Tensor`.
+      It should support batched evaluation, i.e., should return a result of
+      shape `[sample_size]`.
+    surrogate_posterior: A `tfp.distributions.Distribution`
+      instance defining a variational posterior (could be a
+      `tfd.JointDistribution`). Crucially, the distribution's `log_prob` and
+      (if reparameterizeable) `sample` methods must directly invoke all ops
+      that generate gradients to the underlying variables. One way to ensure
+      this is to use `tfp.util.DeferredTensor` to represent any parameters
+      defined as transformations of unconstrained variables, so that the
+      transformations execute at runtime instead of at distribution creation.
+    discrepancy_fn: Python `callable` representing a Csiszar `f` function in
+      in log-space. That is, `discrepancy_fn(log(u)) = f(u)`, where `f` is
+      convex in `u`.
+      Default value: `tfp.vi.kl_reverse`.
+    sample_size: Integer scalar number of Monte Carlo samples used to
+      approximate the variational divergence.
+    use_reparametrization: Python `bool`. When `None` (the default),
+      automatically set to:
+      `surrogate_posterior.reparameterization_type ==
+      tfd.FULLY_REPARAMETERIZED`. When `True` uses the standard Monte-Carlo
+      average. When `False` uses the score-gradient trick. (See above for
+      details.)  When `False`, consider using `csiszar_vimco`.
+    seed: Python `int` seed for `surrogate_posterior.sample`.
+    name: Python `str` name prefixed to Ops created by this function.
+
+  Returns:
+    monte_carlo_variational_loss: `float`-like `Tensor` Monte Carlo
+      approximation of the Csiszar f-Divergence.
+
+  Raises:
+    ValueError: if `surrogate_posterior` is not a reparameterized
+      distribution and `use_reparametrization = True`. A distribution is said to
+      be "reparameterized" when its samples are generated by transforming the
+      samples of another distribution that does not depend on the first
+      distribution's parameters. This property ensures the gradient with respect
+      to parameters is valid.
+    TypeError: if `target_log_prob_fn` is not a Python `callable`.
+
+  #### Csiszar f-divergences
+
+  A Csiszar function `f` is a convex function from `R^+` (the positive reals)
+  to `R`. The Csiszar f-Divergence is given by:
+
+  ```none
+  D_f[p(X), q(X)] := E_{q(X)}[ f( p(X) / q(X) ) ]
+                  ~= m**-1 sum_j^m f( p(x_j) / q(x_j) ),
+                             where x_j ~iid q(X)
+  ```
+
+  For example, `f = lambda u: -log(u)` recovers `KL[q||p]`, while `f =
+  lambda u: u * log(u)` recovers the forward `KL[p||q]`. These and other
+  functions are available in `tfp.vi`.
+
+  #### Tricks: Reparameterization and Score-Gradient
+
+  When q is "reparameterized", i.e., a diffeomorphic transformation of a
+  parameterless distribution (e.g.,
+  `Normal(Y; m, s) <=> Y = sX + m, X ~ Normal(0,1)`), we can swap gradient and
+  expectation, i.e.,
+  `grad[Avg{ s_i : i=1...n }] = Avg{ grad[s_i] : i=1...n }` where `S_n=Avg{s_i}`
+  and `s_i = f(x_i), x_i ~iid q(X)`.
+
+  However, if q is not reparameterized, TensorFlow's gradient will be incorrect
+  since the chain-rule stops at samples of unreparameterized distributions. In
+  this circumstance using the Score-Gradient trick results in an unbiased
+  gradient, i.e.,
+
+  ```none
+  grad[ E_q[f(X)] ]
+  = grad[ int dx q(x) f(x) ]
+  = int dx grad[ q(x) f(x) ]
+  = int dx [ q'(x) f(x) + q(x) f'(x) ]
+  = int dx q(x) [q'(x) / q(x) f(x) + f'(x) ]
+  = int dx q(x) grad[ f(x) q(x) / stop_grad[q(x)] ]
+  = E_q[ grad[ f(x) q(x) / stop_grad[q(x)] ] ]
+  ```
+
+  Unless `q.reparameterization_type != tfd.FULLY_REPARAMETERIZED` it is
+  usually preferable to set `use_reparametrization = True`.
+
+  #### Example Application:
+
+  The Csiszar f-Divergence is a useful framework for variational inference.
+  I.e., observe that,
+
+  ```none
+  f(p(x)) =  f( E_{q(Z | x)}[ p(x, Z) / q(Z | x) ] )
+          <= E_{q(Z | x)}[ f( p(x, Z) / q(Z | x) ) ]
+          := D_f[p(x, Z), q(Z | x)]
+  ```
+
+  The inequality follows from the fact that the "perspective" of `f`, i.e.,
+  `(s, t) |-> t f(s / t))`, is convex in `(s, t)` when `s/t in domain(f)` and
+  `t` is a real. Since the above framework includes the popular Evidence Lower
+  BOund (ELBO) as a special case, i.e., `f(u) = -log(u)`, we call this framework
+  "Evidence Divergence Bound Optimization" (EDBO).
+
+  #### References:
+
+  [1]: https://en.wikipedia.org/wiki/F-divergence
+  [2]: Ali, Syed Mumtaz, and Samuel D. Silvey. "A general class of coefficients
+       of divergence of one distribution from another." Journal of the Royal
+       Statistical Society: Series B (Methodological) 28.1 (1966): 131-142.
+  [3]: Bishop, Christopher M. Pattern Recognition and Machine Learning.
+       Springer, 2006.
+
+  """
+  with tf.name_scope(name or 'monte_carlo_variational_loss'):
+
+    def divergence_fn(q_samples):
+      target_log_prob = nest_util.call_fn(target_log_prob_fn, q_samples)
+      return discrepancy_fn(
+          target_log_prob - surrogate_posterior.log_prob(
+              q_samples))
+
+    # If Q is joint, drawing samples forces it to build its components. It's
+    # important to do this *before* checking its reparameterization type.
+    q_samples = surrogate_posterior.sample(sample_size, seed=seed)
+
+    reparameterization_types = tf.nest.flatten(
+        surrogate_posterior.reparameterization_type)
+    if use_reparametrization is None:
+      use_reparametrization = all(
+          reparameterization_type == FULLY_REPARAMETERIZED
+          for reparameterization_type in reparameterization_types)
+    elif (use_reparametrization and
+          any(reparameterization_type != FULLY_REPARAMETERIZED
+              for reparameterization_type in reparameterization_types)):
+      # TODO(jvdillon): Consider only raising an exception if the gradient is
+      # requested.
+      raise ValueError(
+          'Distribution `surrogate_posterior` must be reparameterized, i.e.,'
+          'a diffeomorphic transformation of a parameterless distribution. '
+          '(Otherwise this function has a biased gradient.)')
+    if not callable(target_log_prob_fn):
+      raise TypeError('`target_log_prob_fn` must be a Python `callable`'
+                      'function.')
+
+    return monte_carlo.expectation(
+        f=divergence_fn,
+        samples=q_samples,
+        # Log-prob is only used if use_reparametrization=False.
+        log_prob=surrogate_posterior.log_prob,
+        use_reparametrization=use_reparametrization)
+
+
+@deprecation.deprecated(
+    '2019-10-01', '`monte_carlo_csiszar_f_divergence` is deprecated. Use '
+                  '`monte_carlo_variational_loss` instead.')
 def monte_carlo_csiszar_f_divergence(
     f,
     p_log_prob,
@@ -882,25 +1071,14 @@ def monte_carlo_csiszar_f_divergence(
       to parameters) is valid.
     TypeError: if `p_log_prob` is not a Python `callable`.
   """
-  with tf.name_scope(name, "monte_carlo_csiszar_f_divergence", [num_draws]):
-    if use_reparametrization is None:
-      use_reparametrization = (q.reparameterization_type
-                               == tfd.FULLY_REPARAMETERIZED)
-    elif (use_reparametrization and
-          q.reparameterization_type != tfd.FULLY_REPARAMETERIZED):
-      # TODO(jvdillon): Consider only raising an exception if the gradient is
-      # requested.
-      raise ValueError(
-          "Distribution `q` must be reparameterized, i.e., a diffeomorphic "
-          "transformation of a parameterless distribution. (Otherwise this "
-          "function has a biased gradient.)")
-    if not callable(p_log_prob):
-      raise TypeError("`p_log_prob` must be a Python `callable` function.")
-    return monte_carlo.expectation(
-        f=lambda q_samples: f(p_log_prob(q_samples) - q.log_prob(q_samples)),
-        samples=q.sample(num_draws, seed=seed),
-        log_prob=q.log_prob,  # Only used if use_reparametrization=False.
-        use_reparametrization=use_reparametrization)
+  return monte_carlo_variational_loss(
+      target_log_prob_fn=p_log_prob,
+      surrogate_posterior=q,
+      discrepancy_fn=f,
+      sample_size=num_draws,
+      use_reparametrization=use_reparametrization,
+      seed=seed,
+      name=name)
 
 
 def csiszar_vimco(f,
@@ -976,15 +1154,17 @@ def csiszar_vimco(f,
        objectives. In _International Conference on Machine Learning_, 2016.
        https://arxiv.org/abs/1602.06725
   """
-  with tf.name_scope(name, "csiszar_vimco", [num_draws, num_batch_draws]):
+  with tf.name_scope(name or 'csiszar_vimco'):
     if num_draws < 2:
-      raise ValueError("Must specify num_draws > 1.")
+      raise ValueError('Must specify num_draws > 1.')
     stop = tf.stop_gradient  # For readability.
-    x = stop(q.sample(sample_shape=[num_draws, num_batch_draws],
-                      seed=seed))
+
+    q_sample = q.sample(sample_shape=[num_draws, num_batch_draws], seed=seed)
+    x = tf.nest.map_structure(stop, q_sample)
     logqx = q.log_prob(x)
-    logu = p_log_prob(x) - logqx
-    f_log_avg_u, f_log_sooavg_u = [f(r) for r in csiszar_vimco_helper(logu)]
+    logu = nest_util.call_fn(p_log_prob, x) - logqx
+    f_log_sooavg_u, f_log_avg_u = map(f, log_soomean_exp(logu, axis=0))
+
     dotprod = tf.reduce_sum(
         logqx * stop(f_log_avg_u - f_log_sooavg_u),
         axis=0)  # Sum over iid samples.
@@ -998,10 +1178,16 @@ def csiszar_vimco(f,
     # portions of the IEEE754 standard, see the StackOverflow question,
     # "Is there a floating point value of x, for which x-x == 0 is false?"
     # http://stackoverflow.com/q/2686644
-    f_log_avg_u += dotprod - stop(dotprod)  # Add zeros_like(dot_prod).
+    # Following is same as adding zeros_like(dot_prod).
+    f_log_avg_u = f_log_avg_u + dotprod - stop(dotprod)
     return tf.reduce_mean(f_log_avg_u, axis=0)  # Avg over batches.
 
 
+@deprecation.deprecated(
+    '2019-10-01',
+    '`csiszar_vimco_helper` is deprecated. Instead use: '
+    '`log_avg_u, log_sooavg_u = tfp.math.log_soomean_exp(logu, axis=0)[::-1]`. '
+    '(Note: `tfp.math.log_soomean_exp` reverses the order of return values.)')
 def csiszar_vimco_helper(logu, name=None):
   """Helper to `csiszar_vimco`; computes `log_avg_u`, `log_sooavg_u`.
 
@@ -1031,80 +1217,6 @@ def csiszar_vimco_helper(logu, name=None):
       ```
 
   """
-  with tf.name_scope(name, "csiszar_vimco_helper", [logu]):
-    logu = tf.convert_to_tensor(logu, name="logu")
-
-    n = tf.dimension_value(logu.shape.with_rank_at_least(1)[0])
-    if n is None:
-      n = tf.shape(logu)[0]
-      log_n = tf.log(tf.cast(n, dtype=logu.dtype))
-      nm1 = tf.cast(n - 1, dtype=logu.dtype)
-    else:
-      log_n = np.log(n).astype(logu.dtype.as_numpy_dtype)
-      nm1 = np.asarray(n - 1, dtype=logu.dtype.as_numpy_dtype)
-
-    # Throughout we reduce across axis=0 since this is presumed to be iid
-    # samples.
-
-    log_max_u = tf.reduce_max(logu, axis=0)
-    log_sum_u_minus_log_max_u = tf.reduce_logsumexp(
-        logu - log_max_u, axis=0)
-
-    # log_loosum_u[i] =
-    # = logsumexp(logu[j] : j != i)
-    # = log( exp(logsumexp(logu)) - exp(logu[i]) )
-    # = log( exp(logsumexp(logu - logu[i])) exp(logu[i])  - exp(logu[i]))
-    # = logu[i] + log(exp(logsumexp(logu - logu[i])) - 1)
-    # = logu[i] + log(exp(logsumexp(logu) - logu[i]) - 1)
-    # = logu[i] + softplus_inverse(logsumexp(logu) - logu[i])
-    d = log_sum_u_minus_log_max_u + (log_max_u - logu)
-    # We use `d != 0` rather than `d > 0.` because `d < 0.` should never
-    # happens; if it does we want to complain loudly (which `softplus_inverse`
-    # will).
-    d_ok = tf.not_equal(d, 0.)
-    safe_d = tf.where(d_ok, d, tf.ones_like(d))
-    d_ok_result = logu + tfd.softplus_inverse(safe_d)
-
-    inf = np.array(np.inf, dtype=logu.dtype.as_numpy_dtype)
-
-    # When not(d_ok) and is_positive_and_largest then we manually compute the
-    # log_loosum_u. (We can efficiently do this for any one point but not all,
-    # hence we still need the above calculation.) This is good because when
-    # this condition is met, we cannot use the above calculation; its -inf.
-    # We now compute the log-leave-out-max-sum, replicate it to every
-    # point and make sure to select it only when we need to.
-    is_positive_and_largest = tf.logical_and(
-        logu > 0.,
-        tf.equal(logu, log_max_u[tf.newaxis, ...]))
-    log_lomsum_u = tf.reduce_logsumexp(
-        tf.where(is_positive_and_largest,
-                 tf.fill(tf.shape(logu), -inf),
-                 logu),
-        axis=0, keep_dims=True)
-    log_lomsum_u = tf.tile(
-        log_lomsum_u,
-        multiples=1 + tf.pad([n-1], [[0, tf.rank(logu)-1]]))
-
-    d_not_ok_result = tf.where(
-        is_positive_and_largest,
-        log_lomsum_u,
-        tf.fill(tf.shape(d), -inf))
-
-    log_loosum_u = tf.where(d_ok, d_ok_result, d_not_ok_result)
-
-    # The swap-one-out-sum ("soosum") is n different sums, each of which
-    # replaces the i-th item with the i-th-left-out average, i.e.,
-    # soo_sum_u[i] = [exp(logu) - exp(logu[i])] + exp(mean(logu[!=i]))
-    #              =  exp(log_loosum_u[i])      + exp(looavg_logu[i])
-    looavg_logu = (tf.reduce_sum(logu, axis=0) - logu) / nm1
-    log_soosum_u = tf.reduce_logsumexp(
-        tf.stack([log_loosum_u, looavg_logu]),
-        axis=0)
-
-    log_avg_u = log_sum_u_minus_log_max_u + log_max_u - log_n
-    log_sooavg_u = log_soosum_u - log_n
-
-    log_avg_u.set_shape(logu.shape.with_rank_at_least(1)[1:])
-    log_sooavg_u.set_shape(logu.shape)
-
-    return log_avg_u, log_sooavg_u
+  with tf.name_scope(name or 'csiszar_vimco_helper'):
+    logu = tf.convert_to_tensor(logu, name='logu')
+    return log_soomean_exp(logu, axis=0)[::-1]

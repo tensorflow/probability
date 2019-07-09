@@ -48,6 +48,9 @@ class ReparameterizationType(object):
   def __repr__(self):
     return "<Reparameteriation Type: %s>" % self._rep_type
 
+  def __hash__(self):
+    return hash(self._rep_type)
+
   def __eq__(self, other):
     """Determine if this `ReparameterizationType` is equal to another.
 

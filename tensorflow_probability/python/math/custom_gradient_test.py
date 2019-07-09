@@ -21,56 +21,37 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
+
+@test_util.run_all_in_graph_and_eager_modes
 class CustomGradientTest(tf.test.TestCase):
 
   def test_works_correctly(self):
     f = lambda x: x**2 / 2
     g = lambda x: (x - 1)**3 / 3
-    x_ = np.linspace(-100, 100, int(1e4)) + [0.]
-
-    x = tf.constant(x_)
-    with tf.GradientTape() as tape:
-      tape.watch(x)
-      fx = tfp.math.custom_gradient(f(x), g(x), x)
-    gx = tape.gradient(fx, x)
-    [fx_, gx_] = self.evaluate([fx, gx])
-
-    self.assertAllClose(f(x_), fx_)
-    self.assertAllClose(g(x_), gx_)
+    x = np.concatenate([np.linspace(-100, 100, int(1e3)), [0.]], axis=0)
+    fx, gx = self.evaluate(tfp.math.value_and_gradient(
+        lambda x_: tfp.math.custom_gradient(f(x_), g(x_), x_), x))
+    self.assertAllClose(f(x), fx)
+    self.assertAllClose(g(x), gx)
 
   def test_works_correctly_both_f_g_zero(self):
     f = lambda x: x**2 / 2
     g = lambda x: x**3 / 3
-    x_ = np.linspace(-100, 100, int(1e4)) + [0.]
-
-    x = tf.constant(x_)
-    with tf.GradientTape() as tape:
-      tape.watch(x)
-      fx = tfp.math.custom_gradient(f(x), g(x), x)
-    gx = tape.gradient(fx, x)
-    fx_, gx_ = self.evaluate([fx, gx])
-
-    self.assertAllClose(f(x_), fx_)
-    self.assertAllClose(g(x_), gx_)
+    x = np.concatenate([np.linspace(-100, 100, int(1e3)), [0.]], axis=0)
+    fx, gx = self.evaluate(tfp.math.value_and_gradient(
+        lambda x_: tfp.math.custom_gradient(f(x_), g(x_), x_), x))
+    self.assertAllClose(f(x), fx)
+    self.assertAllClose(g(x), gx)
 
   def test_works_correctly_vector_of_vars(self):
-    x = tf.get_variable(
-        name='x',
-        shape=[],
-        dtype=tf.float32,
-        initializer=tf.constant_initializer(2),
-        use_resource=True)
-    y = tf.get_variable(
-        name='y',
-        shape=[],
-        dtype=tf.float32,
-        initializer=tf.constant_initializer(3),
-        use_resource=True)
-    self.evaluate(tf.global_variables_initializer())
+    x = tf.Variable(2, name='x', dtype=tf.float32)
+    y = tf.Variable(3, name='y', dtype=tf.float32)
+    self.evaluate([x.initializer, y.initializer])
 
     f = lambda z: z[0] * z[1]
     g = lambda z: z[0]**2 * z[1]**2 / 2
@@ -78,8 +59,7 @@ class CustomGradientTest(tf.test.TestCase):
     with tf.GradientTape() as tape:
       z = tf.stack([x, y])
       fz = tfp.math.custom_gradient(f(z), g(z), z)
-    gz = tape.gradient(fz, tf.trainable_variables())
-    print(tf.trainable_variables(), gz)
+    gz = tape.gradient(fz, [x, y])
     [z_, fz_, gx_, gy_] = self.evaluate([z, fz, gz[0], gz[1]])
 
     self.assertEqual(f(z_), fz_)
@@ -89,26 +69,16 @@ class CustomGradientTest(tf.test.TestCase):
   def test_works_correctly_side_vars(self):
     x_ = np.float32(2.1)  # Adding extra tenth to force imprecision.
     y_ = np.float32(3.1)
-    x = tf.get_variable(
-        name='x',
-        shape=[],
-        dtype=tf.float32,
-        initializer=tf.constant_initializer(x_),
-        use_resource=True)
-    y = tf.get_variable(
-        name='y',
-        shape=[],
-        dtype=tf.float32,
-        initializer=tf.constant_initializer(y_),
-        use_resource=True)
-    self.evaluate(tf.global_variables_initializer())
+    x = tf.Variable(x_, name='x')
+    y = tf.Variable(y_, name='y')
+    self.evaluate([x.initializer, y.initializer])
 
     f = lambda x: x * y
     g = lambda z: tf.square(x) * y
 
     with tf.GradientTape() as tape:
       fx = tfp.math.custom_gradient(f(x), g(x), x)
-    gx = tape.gradient(fx, tf.trainable_variables())
+    gx = tape.gradient(fx, [x, y])
     [x_, fx_, gx_] = self.evaluate([x, fx, gx[0]])
     gy_ = gx[1]
 
@@ -119,19 +89,9 @@ class CustomGradientTest(tf.test.TestCase):
   def test_works_correctly_fx_gx_manually_stopped(self):
     x_ = np.float32(2.1)  # Adding extra tenth to force imprecision.
     y_ = np.float32(3.1)
-    x = tf.get_variable(
-        name='x',
-        shape=[],
-        dtype=tf.float32,
-        initializer=tf.constant_initializer(x_),
-        use_resource=True)
-    y = tf.get_variable(
-        name='y',
-        shape=[],
-        dtype=tf.float32,
-        initializer=tf.constant_initializer(y_),
-        use_resource=True)
-    self.evaluate([tf.global_variables_initializer()])
+    x = tf.Variable(x_, name='x')
+    y = tf.Variable(y_, name='y')
+    self.evaluate([x.initializer, y.initializer])
 
     stop = tf.stop_gradient  # For readability.
 
@@ -144,7 +104,7 @@ class CustomGradientTest(tf.test.TestCase):
       fx = tfp.math.custom_gradient(f(x), g(x), x + stop(y),
                                     fx_gx_manually_stopped=True)
 
-    gx = tape.gradient(fx, tf.trainable_variables())
+    gx = tape.gradient(fx, [x, y])
     [x_, fx_, gx_, gy_] = self.evaluate([x, fx, gx[0], gx[1]])
 
     self.assertEqual(x_ * y_, fx_)

@@ -40,6 +40,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -50,5 +51,6 @@ py_test(
         ":hager_zhang_lib",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/math:gradient",
     ],
 )

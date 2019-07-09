@@ -20,23 +20,25 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-tfe = tf.contrib.eager
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 rng = np.random.RandomState(42)
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class SoftmaxCenteredBijectorTest(tf.test.TestCase):
   """Tests correctness of the Y = g(X) = exp(X) / sum(exp(X)) transformation."""
 
   def testBijectorVector(self):
     softmax = tfb.SoftmaxCentered()
-    self.assertEqual("softmax_centered", softmax.name)
+    self.assertStartsWith(softmax.name, "softmax_centered")
     x = np.log([[2., 3, 4], [4., 8, 12]])
     y = [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]]
     self.assertAllClose(y, self.evaluate(softmax.forward(x)))
@@ -54,12 +56,12 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
 
   def testBijectorUnknownShape(self):
     softmax = tfb.SoftmaxCentered()
-    self.assertEqual("softmax_centered", softmax.name)
+    self.assertStartsWith(softmax.name, "softmax_centered")
     x_ = np.log([[2., 3, 4], [4., 8, 12]]).astype(np.float32)
     y_ = np.array(
         [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]], dtype=np.float32)
-    x = tf.placeholder_with_default(x_, shape=[2, None])
-    y = tf.placeholder_with_default(y_, shape=[2, None])
+    x = tf1.placeholder_with_default(x_, shape=[2, None])
+    y = tf1.placeholder_with_default(y_, shape=[2, None])
     self.assertAllClose(y_, self.evaluate(softmax.forward(x)))
     self.assertAllClose(x_, self.evaluate(softmax.inverse(y)))
     self.assertAllClose(
@@ -78,34 +80,34 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
     y = tf.TensorShape([5])
     bijector = tfb.SoftmaxCentered(validate_args=True)
     self.assertAllEqual(y, bijector.forward_event_shape(x))
-    self.assertAllEqual(y.as_list(),
-                        self.evaluate(
-                            bijector.forward_event_shape_tensor(
-                                x.as_list())))
+    self.assertAllEqual(
+        tensorshape_util.as_list(y),
+        self.evaluate(
+            bijector.forward_event_shape_tensor(tensorshape_util.as_list(x))))
     self.assertAllEqual(x, bijector.inverse_event_shape(y))
-    self.assertAllEqual(x.as_list(),
-                        self.evaluate(
-                            bijector.inverse_event_shape_tensor(
-                                y.as_list())))
+    self.assertAllEqual(
+        tensorshape_util.as_list(x),
+        self.evaluate(
+            bijector.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
   def testShapeGetersWithBatchShape(self):
     x = tf.TensorShape([2, 4])
     y = tf.TensorShape([2, 5])
     bijector = tfb.SoftmaxCentered(validate_args=True)
     self.assertAllEqual(y, bijector.forward_event_shape(x))
-    self.assertAllEqual(y.as_list(),
-                        self.evaluate(
-                            bijector.forward_event_shape_tensor(
-                                x.as_list())))
+    self.assertAllEqual(
+        tensorshape_util.as_list(y),
+        self.evaluate(
+            bijector.forward_event_shape_tensor(tensorshape_util.as_list(x))))
     self.assertAllEqual(x, bijector.inverse_event_shape(y))
-    self.assertAllEqual(x.as_list(),
-                        self.evaluate(
-                            bijector.inverse_event_shape_tensor(
-                                y.as_list())))
+    self.assertAllEqual(
+        tensorshape_util.as_list(x),
+        self.evaluate(
+            bijector.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
   def testShapeGettersWithDynamicShape(self):
-    x = tf.placeholder_with_default(input=[2, 4], shape=None)
-    y = tf.placeholder_with_default(input=[2, 5], shape=None)
+    x = tf1.placeholder_with_default([2, 4], shape=None)
+    y = tf1.placeholder_with_default([2, 5], shape=None)
     bijector = tfb.SoftmaxCentered(validate_args=True)
     self.assertAllEqual(
         [2, 5], self.evaluate(bijector.forward_event_shape_tensor(x)))

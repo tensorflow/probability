@@ -5,6 +5,8 @@
 
 # tfp.edward2.get_next_interceptor
 
+Yields the top-most interceptor on the thread-local interceptor stack.
+
 ``` python
 tfp.edward2.get_next_interceptor(
     *args,
@@ -12,7 +14,7 @@ tfp.edward2.get_next_interceptor(
 )
 ```
 
-Yields the top-most interceptor on the thread-local interceptor stack.
+<!-- Placeholder for "Used in" -->
 
 Operations may be intercepted by multiple nested interceptors. Once reached,
 an operation can be forwarded through nested interceptors until resolved.

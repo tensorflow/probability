@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
@@ -72,19 +71,20 @@ class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.name_scope(name, values=[amplitude, length_scale]) as name:
-      dtype = dtype_util.common_dtype([amplitude, length_scale], tf.float32)
+    with tf.compat.v1.name_scope(
+        name, values=[amplitude, length_scale]) as name:
+      dtype = util.maybe_get_common_dtype(
+          [amplitude, length_scale])
       if amplitude is not None:
         amplitude = tf.convert_to_tensor(
-            amplitude, name='amplitude', dtype=dtype)
+            value=amplitude, name='amplitude', dtype=dtype)
       self._amplitude = _validate_arg_if_not_none(
-          amplitude, tf.assert_positive, validate_args)
+          amplitude, tf.compat.v1.assert_positive, validate_args)
       if length_scale is not None:
         length_scale = tf.convert_to_tensor(
-            length_scale, name='length_scale', dtype=dtype)
+            value=length_scale, name='length_scale', dtype=dtype)
       self._length_scale = _validate_arg_if_not_none(
-          length_scale, tf.assert_positive, validate_args)
-      tf.assert_same_float_dtype([self._amplitude, self._length_scale])
+          length_scale, tf.compat.v1.assert_positive, validate_args)
     super(ExponentiatedQuadratic, self).__init__(
         feature_ndims, dtype=dtype, name=name)
 
@@ -106,20 +106,20 @@ class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        [] if self.amplitude is None else tf.shape(self.amplitude),
-        [] if self.length_scale is None else tf.shape(self.length_scale))
+        [] if self.amplitude is None else tf.shape(input=self.amplitude),
+        [] if self.length_scale is None else tf.shape(input=self.length_scale))
 
-  def _apply(self, x1, x2, param_expansion_ndims=0):
+  def _apply(self, x1, x2, example_ndims=0):
     exponent = -0.5 * util.sum_rightmost_ndims_preserving_shape(
-        tf.squared_difference(x1, x2), self.feature_ndims)
+        tf.math.squared_difference(x1, x2), self.feature_ndims)
     if self.length_scale is not None:
-      length_scale = util.pad_shape_right_with_ones(
-          self.length_scale, param_expansion_ndims)
+      length_scale = util.pad_shape_with_ones(
+          self.length_scale, example_ndims)
       exponent /= length_scale**2
 
     if self.amplitude is not None:
-      amplitude = util.pad_shape_right_with_ones(
-          self.amplitude, param_expansion_ndims)
-      exponent += 2. * tf.log(amplitude)
+      amplitude = util.pad_shape_with_ones(
+          self.amplitude, example_ndims)
+      exponent += 2. * tf.math.log(amplitude)
 
     return tf.exp(exponent)

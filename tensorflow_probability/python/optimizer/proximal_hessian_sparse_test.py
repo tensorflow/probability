@@ -25,14 +25,13 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
 class _ProximalHessianTest(object):
 
   def _make_placeholder(self, x):
-    return tf.placeholder_with_default(
+    return tf.compat.v1.placeholder_with_default(
         input=x, shape=(x.shape if self.use_static_shape else None))
 
   def _adjust_dtype_and_shape_hints(self, x):
@@ -190,7 +189,7 @@ class _ProximalHessianTest(object):
 
     def _grad_and_hessian_unregularized_loss_fn(x):
       grad = 2 * (x - a)
-      hessian_outer = tf.diag(tf.ones_like(a))
+      hessian_outer = tf.linalg.tensor_diag(tf.ones_like(a))
       hessian_middle = 2. * tf.ones_like(a)
       return grad, hessian_outer, hessian_middle
 
@@ -212,24 +211,28 @@ class _ProximalHessianTest(object):
     self.assertAllClose(w_, expected_w, atol=0., rtol=0.03)
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ProximalHessianTestStaticShapeFloat32(tf.test.TestCase,
                                             _ProximalHessianTest):
   dtype = tf.float32
   use_static_shape = True
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ProximalHessianTestDynamicShapeFloat32(tf.test.TestCase,
                                              _ProximalHessianTest):
   dtype = tf.float32
   use_static_shape = False
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ProximalHessianTestStaticShapeFloat64(tf.test.TestCase,
                                             _ProximalHessianTest):
   dtype = tf.float64
   use_static_shape = True
 
 
+@test_util.run_all_in_graph_and_eager_modes
 class ProximalHessianTestDynamicShapeFloat64(tf.test.TestCase,
                                              _ProximalHessianTest):
   dtype = tf.float64

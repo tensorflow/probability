@@ -20,11 +20,11 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
-from tensorflow.python.framework import tensor_shape
-from tensorflow.python.framework import tensor_util
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -101,7 +101,7 @@ class BatchReshape(distribution_lib.Distribution):
     """
     parameters = dict(locals())
     name = name or "BatchReshape" + distribution.name
-    with tf.name_scope(name, values=[batch_shape]) as name:
+    with tf.name_scope(name) as name:
       # The unexpanded batch shape may contain up to one dimension of -1.
       self._batch_shape_unexpanded = tf.convert_to_tensor(
           batch_shape, dtype=tf.int32, name="batch_shape")
@@ -141,9 +141,9 @@ class BatchReshape(distribution_lib.Distribution):
   def _event_shape(self):
     return self.distribution.event_shape
 
-  def _sample_n(self, n, seed=None):
+  def _sample_n(self, n, seed=None, **kwargs):
     with tf.control_dependencies(self._runtime_assertions):
-      x = self.distribution.sample(sample_shape=n, seed=seed)
+      x = self.distribution.sample(sample_shape=n, seed=seed, **kwargs)
       new_shape = tf.concat(
           [
               [n],
@@ -153,76 +153,89 @@ class BatchReshape(distribution_lib.Distribution):
           axis=0)
       return tf.reshape(x, new_shape)
 
-  def _log_prob(self, x):
+  def _log_prob(self, x, **kwargs):
     return self._call_reshape_input_output(
-        self.distribution.log_prob, x)
+        self.distribution.log_prob, x, extra_kwargs=kwargs)
 
-  def _prob(self, x):
+  def _prob(self, x, **kwargs):
     return self._call_reshape_input_output(
-        self.distribution.prob, x)
+        self.distribution.prob, x, extra_kwargs=kwargs)
 
-  def _log_cdf(self, x):
+  def _log_cdf(self, x, **kwargs):
     return self._call_reshape_input_output(
-        self.distribution.log_cdf, x)
+        self.distribution.log_cdf, x, extra_kwargs=kwargs)
 
-  def _cdf(self, x):
+  def _cdf(self, x, **kwargs):
     return self._call_reshape_input_output(
-        self.distribution.cdf, x)
+        self.distribution.cdf, x, extra_kwargs=kwargs)
 
-  def _log_survival_function(self, x):
+  def _log_survival_function(self, x, **kwargs):
     return self._call_reshape_input_output(
-        self.distribution.log_survival_function, x)
+        self.distribution.log_survival_function, x, extra_kwargs=kwargs)
 
-  def _survival_function(self, x):
+  def _survival_function(self, x, **kwargs):
     return self._call_reshape_input_output(
-        self.distribution.survival_function, x)
+        self.distribution.survival_function, x, extra_kwargs=kwargs)
 
-  def _entropy(self):
+  def _entropy(self, **kwargs):
     return self._call_and_reshape_output(
         self.distribution.entropy,
         [],
-        [tensor_shape.scalar()])
+        [tf.TensorShape([])],
+        extra_kwargs=kwargs)
 
-  def _mean(self):
-    return self._call_and_reshape_output(self.distribution.mean)
+  def _mean(self, **kwargs):
+    return self._call_and_reshape_output(self.distribution.mean,
+                                         extra_kwargs=kwargs)
 
-  def _mode(self):
-    return self._call_and_reshape_output(self.distribution.mode)
+  def _mode(self, **kwargs):
+    return self._call_and_reshape_output(self.distribution.mode,
+                                         extra_kwargs=kwargs)
 
-  def _stddev(self):
-    return self._call_and_reshape_output(self.distribution.stddev)
+  def _stddev(self, **kwargs):
+    return self._call_and_reshape_output(self.distribution.stddev,
+                                         extra_kwargs=kwargs)
 
-  def _variance(self):
-    return self._call_and_reshape_output(self.distribution.variance)
+  def _variance(self, **kwargs):
+    return self._call_and_reshape_output(self.distribution.variance,
+                                         extra_kwargs=kwargs)
 
-  def _covariance(self):
+  def _covariance(self, **kwargs):
     return self._call_and_reshape_output(
         self.distribution.covariance,
         [self.event_shape_tensor()]*2,
-        [self.event_shape]*2)
+        [self.event_shape]*2,
+        extra_kwargs=kwargs)
 
   def _sample_shape(self, x):
     """Computes graph and static `sample_shape`."""
-    x_ndims = (tf.rank(x) if x.shape.ndims is None else x.shape.ndims)
+    x_ndims = (
+        tf.rank(x) if tensorshape_util.rank(x.shape) is None else
+        tensorshape_util.rank(x.shape))
     event_ndims = (
         tf.size(self.event_shape_tensor())
-        if self.event_shape.ndims is None else self.event_shape.ndims)
+        if tensorshape_util.rank(self.event_shape) is None else
+        tensorshape_util.rank(self.event_shape))
     batch_ndims = (
         tf.size(self._batch_shape_unexpanded)
-        if self.batch_shape.ndims is None else self.batch_shape.ndims)
+        if tensorshape_util.rank(self.batch_shape) is None else
+        tensorshape_util.rank(self.batch_shape))
     sample_ndims = x_ndims - batch_ndims - event_ndims
     if isinstance(sample_ndims, int):
       static_sample_shape = x.shape[:sample_ndims]
     else:
       static_sample_shape = tf.TensorShape(None)
-    if static_sample_shape.is_fully_defined():
-      sample_shape = np.int32(static_sample_shape.as_list())
+    if tensorshape_util.is_fully_defined(static_sample_shape):
+      sample_shape = np.int32(static_sample_shape)
     else:
       sample_shape = tf.shape(x)[:sample_ndims]
     return sample_shape, static_sample_shape
 
-  def _call_reshape_input_output(self, fn, x):
+  def _call_reshape_input_output(self, fn, x, extra_kwargs=None):
     """Calls `fn`, appropriately reshaping its input `x` and output."""
+    # Note: we take `extra_kwargs` as a dict rather than `**extra_kwargs`
+    # because it is possible the user provided extra kwargs would itself
+    # have `fn` and/or `x` as a key.
     with tf.control_dependencies(self._runtime_assertions +
                                  self._validate_sample_arg(x)):
       sample_shape, static_sample_shape = self._sample_shape(x)
@@ -233,25 +246,32 @@ class BatchReshape(distribution_lib.Distribution):
               self.event_shape_tensor(),
           ],
           axis=0)
-      result = fn(tf.reshape(x, old_shape))
+      x_reshape = tf.reshape(x, old_shape)
+      result = fn(x_reshape, **extra_kwargs) if extra_kwargs else fn(x_reshape)
       new_shape = tf.concat(
           [
               sample_shape,
               self._batch_shape_unexpanded,
           ], axis=0)
       result = tf.reshape(result, new_shape)
-      if (static_sample_shape.ndims is not None and
-          self.batch_shape.ndims is not None):
-        new_shape = static_sample_shape.concatenate(self.batch_shape)
-        result.set_shape(result.shape.merge_with(new_shape))
+      if (tensorshape_util.rank(static_sample_shape) is not None and
+          tensorshape_util.rank(self.batch_shape) is not None):
+        new_shape = tensorshape_util.concatenate(static_sample_shape,
+                                                 self.batch_shape)
+        tensorshape_util.set_shape(result, new_shape)
       return result
 
   def _call_and_reshape_output(
       self,
       fn,
       event_shape_list=None,
-      static_event_shape_list=None):
+      static_event_shape_list=None,
+      extra_kwargs=None):
     """Calls `fn` and appropriately reshapes its output."""
+    # Note: we take `extra_kwargs` as a dict rather than `**extra_kwargs`
+    # because it is possible the user provided extra kwargs would itself
+    # have `fn`, `event_shape_list`, `static_event_shape_list` and/or
+    # `extra_kwargs` as keys.
     with tf.control_dependencies(self._runtime_assertions):
       if event_shape_list is None:
         event_shape_list = [self._event_shape_tensor()]
@@ -259,27 +279,32 @@ class BatchReshape(distribution_lib.Distribution):
         static_event_shape_list = [self.event_shape]
       new_shape = tf.concat(
           [self._batch_shape_unexpanded] + event_shape_list, axis=0)
-      result = tf.reshape(fn(), new_shape)
-      if (self.batch_shape.ndims is not None and
-          self.event_shape.ndims is not None):
+      result = tf.reshape(fn(**extra_kwargs) if extra_kwargs else fn(),
+                          new_shape)
+      if (tensorshape_util.rank(self.batch_shape) is not None and
+          tensorshape_util.rank(self.event_shape) is not None):
         event_shape = tf.TensorShape([])
         for rss in static_event_shape_list:
-          event_shape = event_shape.concatenate(rss)
-        static_shape = result.shape.merge_with(
-            self.batch_shape.concatenate(event_shape))
-        result.set_shape(static_shape)
+          event_shape = tensorshape_util.concatenate(event_shape, rss)
+        static_shape = tensorshape_util.concatenate(
+            self.batch_shape, event_shape)
+        tensorshape_util.set_shape(result, static_shape)
       return result
 
   def _validate_sample_arg(self, x):
     """Helper which validates sample arg, e.g., input to `log_prob`."""
-    with tf.name_scope(name="validate_sample_arg", values=[x]):
-      x_ndims = (tf.rank(x) if x.shape.ndims is None else x.shape.ndims)
+    with tf.name_scope("validate_sample_arg"):
+      x_ndims = (
+          tf.rank(x) if tensorshape_util.rank(x.shape) is None else
+          tensorshape_util.rank(x.shape))
       event_ndims = (
           tf.size(self.event_shape_tensor())
-          if self.event_shape.ndims is None else self.event_shape.ndims)
+          if tensorshape_util.rank(self.event_shape) is None else
+          tensorshape_util.rank(self.event_shape))
       batch_ndims = (
           tf.size(self._batch_shape_unexpanded)
-          if self.batch_shape.ndims is None else self.batch_shape.ndims)
+          if tensorshape_util.rank(self.batch_shape) is None else
+          tensorshape_util.rank(self.batch_shape))
       expected_batch_event_ndims = batch_ndims + event_ndims
 
       if (isinstance(x_ndims, int) and
@@ -292,7 +317,7 @@ class BatchReshape(distribution_lib.Distribution):
         ndims_assertion = []
       elif self.validate_args:
         ndims_assertion = [
-            tf.assert_greater_equal(
+            assert_util.assert_greater_equal(
                 x_ndims,
                 expected_batch_event_ndims,
                 message=("Broadcasting is not supported; too few "
@@ -300,10 +325,10 @@ class BatchReshape(distribution_lib.Distribution):
                 name="assert_batch_and_event_ndims_large_enough"),
         ]
 
-      if (self.batch_shape.is_fully_defined() and
-          self.event_shape.is_fully_defined()):
-        expected_batch_event_shape = np.int32(self.batch_shape.concatenate(
-            self.event_shape).as_list())
+      if (tensorshape_util.is_fully_defined(self.batch_shape) and
+          tensorshape_util.is_fully_defined(self.event_shape)):
+        expected_batch_event_shape = np.int32(
+            tensorshape_util.concatenate(self.batch_shape, self.event_shape))
       else:
         expected_batch_event_shape = tf.concat(
             [
@@ -315,8 +340,8 @@ class BatchReshape(distribution_lib.Distribution):
       if isinstance(sample_ndims, int):
         sample_ndims = max(sample_ndims, 0)
       if (isinstance(sample_ndims, int) and
-          x.shape[sample_ndims:].is_fully_defined()):
-        actual_batch_event_shape = np.int32(x.shape[sample_ndims:].as_list())
+          tensorshape_util.is_fully_defined(x.shape[sample_ndims:])):
+        actual_batch_event_shape = np.int32(x.shape[sample_ndims:])
       else:
         sample_ndims = tf.maximum(sample_ndims, 0)
         actual_batch_event_shape = tf.shape(x)[sample_ndims:]
@@ -339,7 +364,7 @@ class BatchReshape(distribution_lib.Distribution):
         # TF itself might raise an exception owing to this assertion being
         # ill-defined, ie, one cannot even compare different rank Tensors.
         with tf.control_dependencies(ndims_assertion):
-          shape_assertion = tf.assert_equal(
+          shape_assertion = assert_util.assert_equal(
               expected_batch_event_shape,
               actual_batch_event_shape,
               message=("Broadcasting is not supported; "
@@ -354,28 +379,28 @@ class BatchReshape(distribution_lib.Distribution):
 
 def calculate_reshape(original_shape, new_shape, validate=False, name=None):
   """Calculates the reshaped dimensions (replacing up to one -1 in reshape)."""
-  batch_shape_static = tensor_util.constant_value_as_shape(new_shape)
-  if batch_shape_static.is_fully_defined():
-    return np.int32(batch_shape_static.as_list()), batch_shape_static, []
-  with tf.name_scope(name, "calculate_reshape", [original_shape, new_shape]):
+  batch_shape_static = tensorshape_util.constant_value_as_shape(new_shape)
+  if tensorshape_util.is_fully_defined(batch_shape_static):
+    return np.int32(batch_shape_static), batch_shape_static, []
+  with tf.name_scope(name or "calculate_reshape"):
     original_size = tf.reduce_prod(original_shape)
     implicit_dim = tf.equal(new_shape, -1)
     size_implicit_dim = (
         original_size // tf.maximum(1, -tf.reduce_prod(new_shape)))
-    new_ndims = tf.shape(new_shape)
     expanded_new_shape = tf.where(  # Assumes exactly one `-1`.
-        implicit_dim, tf.fill(new_ndims, size_implicit_dim), new_shape)
-    validations = [] if not validate else [
-        tf.assert_rank(
+        implicit_dim, size_implicit_dim, new_shape)
+    validations = [] if not validate else [  # pylint: disable=g-long-ternary
+        assert_util.assert_rank(
             original_shape, 1, message="Original shape must be a vector."),
-        tf.assert_rank(new_shape, 1, message="New shape must be a vector."),
-        tf.assert_less_equal(
-            tf.count_nonzero(implicit_dim, dtype=tf.int32),
+        assert_util.assert_rank(
+            new_shape, 1, message="New shape must be a vector."),
+        assert_util.assert_less_equal(
+            tf.math.count_nonzero(implicit_dim, dtype=tf.int32),
             1,
             message="At most one dimension can be unknown."),
-        tf.assert_positive(
+        assert_util.assert_positive(
             expanded_new_shape, message="Shape elements must be >=-1."),
-        tf.assert_equal(
+        assert_util.assert_equal(
             tf.reduce_prod(expanded_new_shape),
             original_size,
             message="Shape sizes do not match."),
@@ -385,14 +410,16 @@ def calculate_reshape(original_shape, new_shape, validate=False, name=None):
 
 def validate_init_args_statically(distribution, batch_shape):
   """Helper to __init__ which makes or raises assertions."""
-  if batch_shape.shape.ndims is not None:
-    if batch_shape.shape.ndims != 1:
+  if tensorshape_util.rank(batch_shape.shape) is not None:
+    if tensorshape_util.rank(batch_shape.shape) != 1:
       raise ValueError("`batch_shape` must be a vector "
-                       "(saw rank: {}).".format(batch_shape.shape.ndims))
+                       "(saw rank: {}).".format(
+                           tensorshape_util.rank(batch_shape.shape)))
 
-  batch_shape_static = tensor_util.constant_value_as_shape(batch_shape)
-  batch_size_static = batch_shape_static.num_elements()
-  dist_batch_size_static = distribution.batch_shape.num_elements()
+  batch_shape_static = tensorshape_util.constant_value_as_shape(batch_shape)
+  batch_size_static = tensorshape_util.num_elements(batch_shape_static)
+  dist_batch_size_static = tensorshape_util.num_elements(
+      distribution.batch_shape)
 
   if batch_size_static is not None and dist_batch_size_static is not None:
     if batch_size_static != dist_batch_size_static:
@@ -400,7 +427,8 @@ def validate_init_args_statically(distribution, batch_shape):
                        "`distribution.batch_shape` size ({}).".format(
                            batch_size_static, dist_batch_size_static))
 
-  if batch_shape_static.dims is not None:
-    if any(tf.dimension_value(dim) is not None and
-           tf.dimension_value(dim) < 1 for dim in batch_shape_static):
+  if tensorshape_util.dims(batch_shape_static) is not None:
+    if any(
+        tf.compat.dimension_value(dim) is not None and
+        tf.compat.dimension_value(dim) < 1 for dim in batch_shape_static):
       raise ValueError("`batch_shape` elements must be >=-1.")

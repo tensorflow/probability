@@ -20,18 +20,18 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
-tfe = tf.contrib.eager
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@tfe.run_all_tests_in_graph_and_eager_modes
+@test_util.run_all_in_graph_and_eager_modes
 class CholeskyToInvCholeskyTest(tf.test.TestCase):
 
   def testBijector(self):
     bijector = tfb.CholeskyToInvCholesky()
-    self.assertEqual("cholesky_to_inv_cholesky", bijector.name)
+    self.assertStartsWith(bijector.name, "cholesky_to_inv_cholesky")
     x = np.array([[3., 0.], [2., 7.]], dtype=np.float32)
     m = x.dot(x.T)
     m_inv = np.linalg.inv(m)
@@ -79,50 +79,58 @@ class CholeskyToInvCholeskyTest(tf.test.TestCase):
       A numerical approximation to the log det Jacobian of bijector.forward
       evaluated at x.
     """
-    x_vector = input_to_vector.forward(x)
+    x_vector = input_to_vector.forward(x)                         # [B, n]
     n = tf.shape(x_vector)[-1]
-    x_plus_eps_vector = x_vector + eps * tf.eye(n, dtype=x_vector.dtype)
-    x_plus_eps = input_to_vector.inverse(x_plus_eps_vector)
+    x_plus_eps_vector = (
+        x_vector[..., tf.newaxis, :] +
+        eps * tf.eye(n, dtype=x_vector.dtype))                    # [B, n, n]
+    x_plus_eps = input_to_vector.inverse(x_plus_eps_vector)       # [B, n, d, d]
+    f_x_plus_eps = bijector.forward(x_plus_eps)                   # [B, n, d, d]
+    f_x_plus_eps_vector = output_to_vector.forward(f_x_plus_eps)  # [B, n, n]
 
-    f_x = bijector.forward(x)
-    f_x_vector = output_to_vector.forward(f_x)
-    f_x_plus_eps = bijector.forward(x_plus_eps)
-    f_x_plus_eps_vector = output_to_vector.forward(f_x_plus_eps)
+    f_x = bijector.forward(x)                                     # [B, d, d]
+    f_x_vector = output_to_vector.forward(f_x)                    # [B, n]
 
-    jacobian_numerical = (f_x_plus_eps_vector - f_x_vector) / eps
+    jacobian_numerical = (f_x_plus_eps_vector -
+                          f_x_vector[..., tf.newaxis, :]) / eps
+
     return (
-        tf.log(tf.abs(tf.matrix_determinant(jacobian_numerical))) +
+        tf.math.log(tf.abs(tf.linalg.det(jacobian_numerical))) +
         input_to_vector.forward_log_det_jacobian(x, event_ndims=event_ndims) -
-        output_to_vector.forward_log_det_jacobian(f_x, event_ndims=event_ndims))
+        output_to_vector.forward_log_det_jacobian(f_x, event_ndims=event_ndims)
+    )
 
   def testJacobian(self):
-    cholesky_to_vector = tfb.Chain([
-        tfb.Invert(tfb.FillTriangular()),
-        tfb.TransformDiagonal(tfb.Invert(tfb.Exp()))
-    ])
+    cholesky_to_vector = tfb.Invert(
+        tfb.ScaleTriL(diag_bijector=tfb.Exp(), diag_shift=None))
     bijector = tfb.CholeskyToInvCholesky()
     for x in [np.array([[2.]],
                        dtype=np.float64),
-              np.array([[2., 0.], [3., 4.]],
+              np.array([[2., 0.],
+                        [3., 4.]],
                        dtype=np.float64),
-              np.array([[2., 0., 0.], [3., 4., 0.], [5., 6., 7.]],
+              np.array([[2., 0., 0.],
+                        [3., 4., 0.],
+                        [5., 6., 7.]],
                        dtype=np.float64)]:
       fldj = bijector.forward_log_det_jacobian(x, event_ndims=2)
       fldj_numerical = self._get_fldj_numerical(
-          bijector, x, event_ndims=2, eps=1.e-6,
+          bijector, x, event_ndims=2,
           input_to_vector=cholesky_to_vector,
           output_to_vector=cholesky_to_vector)
       fldj_, fldj_numerical_ = self.evaluate([fldj, fldj_numerical])
-      self.assertAllClose(fldj_, fldj_numerical_)
+      self.assertAllClose(fldj_, fldj_numerical_, rtol=1e-2)
 
   def testJacobianWithTensors(self):
     bijector = tfb.CholeskyToInvCholesky()
     x = np.array([
-        [[3., 0.], [1., 4.]],
-        [[2., 0.], [7., 1.]]], dtype=np.float32)
+        [[3., 0.],
+         [1., 4.]],
+        [[2., 0.],
+         [7., 1.]]], dtype=np.float32)
     fldj = bijector.forward_log_det_jacobian(x, event_ndims=2)
-    fldj0 = bijector.forward_log_det_jacobian(x[0, :], event_ndims=2)
-    fldj1 = bijector.forward_log_det_jacobian(x[1, :], event_ndims=2)
+    fldj0 = bijector.forward_log_det_jacobian(x[0], event_ndims=2)
+    fldj1 = bijector.forward_log_det_jacobian(x[1], event_ndims=2)
     fldj_, fldj0_, fldj1_ = self.evaluate([fldj, fldj0, fldj1])
     self.assertAllClose(fldj_[0], fldj0_)
     self.assertAllClose(fldj_[1], fldj1_)
