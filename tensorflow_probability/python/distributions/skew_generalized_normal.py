@@ -10,6 +10,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
 from tensorflow.python.framework import tensor_shape
+from tensorflow_probability.python.distributions.distribution import Distribution
 from tensorflow_probability.python.distributions.normal import Normal
 
 __all__ = [
@@ -17,7 +18,7 @@ __all__ = [
 ]
 
 
-class SkewGeneralizedNormal(Normal):
+class SkewGeneralizedNormal(Normal, Distribution):
   '''
   The skew-generalized normal distribution.
   Also known as the generalized Gaussian distribution of the second type.
@@ -62,7 +63,7 @@ class SkewGeneralizedNormal(Normal):
 
         tf.assert_same_float_dtype([self._loc, self._scale, self._peak])
 
-    super(Normal, self).__init__(
+    super(Distribution, self).__init__(
         dtype=dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
