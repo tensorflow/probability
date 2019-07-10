@@ -204,10 +204,10 @@ class Reshape(bijector.Bijector):
     return x
 
   def _inverse_log_det_jacobian(self, y):
-    return tf.constant(0., dtype=y.dtype)
+    return tf.zeros([], dtype=y.dtype)
 
   def _forward_log_det_jacobian(self, x):
-    return tf.constant(0., dtype=x.dtype)
+    return tf.zeros([], dtype=x.dtype)
 
   def _forward_event_shape(self, input_shape):
     return _replace_event_shape_in_tensorshape(
