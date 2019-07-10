@@ -152,9 +152,9 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       dtype_hint=tf.float32)
-      concentration1 = tensor_util.convert_immutable_to_tensor(
+      concentration1 = tensor_util.convert_nonref_to_tensor(
           concentration1, name="concentration1", dtype=dtype)
-      concentration0 = tensor_util.convert_immutable_to_tensor(
+      concentration0 = tensor_util.convert_nonref_to_tensor(
           concentration0, name="concentration0", dtype=dtype)
       super(Kumaraswamy, self).__init__(
           distribution=uniform.Uniform(

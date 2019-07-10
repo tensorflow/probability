@@ -664,7 +664,7 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
     # Check that the distribution passes Variables through to the accessor
     # properties (without converting them to Tensor or anything like that).
     for k, v in six.iteritems(dist.parameters):
-      if not tensor_util.is_mutable(v):
+      if not tensor_util.is_ref(v):
         continue
       self.assertIs(getattr(dist, k), v)
 
@@ -862,9 +862,9 @@ class DistributionSlicingTest(tf.test.TestCase):
     self.assertAllClose(packetized_lp, packetized_sliced_lp, rtol=rtol)
     possibly_nonpacket_lp = lp[slices].reshape(-1)[-3:]
     possibly_nonpacket_sliced_lp = sliced_lp.reshape(-1)[-3:]
-    rtol = 0.4
     self.assertAllClose(
-        possibly_nonpacket_lp, possibly_nonpacket_sliced_lp, rtol=rtol)
+        possibly_nonpacket_lp, possibly_nonpacket_sliced_lp,
+        rtol=0.4, atol=1e-4)
 
   def _run_test(self, data):
     tf1.set_random_seed(

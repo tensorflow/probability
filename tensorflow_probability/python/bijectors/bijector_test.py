@@ -100,7 +100,7 @@ class ForwardOnlyBijector(tfb.Bijector):
 
   def __init__(self, scale=2, validate_args=False, name=None):
     with tf.name_scope(name or 'forward_only') as name:
-      self._scale = tensor_util.convert_immutable_to_tensor(
+      self._scale = tensor_util.convert_nonref_to_tensor(
           scale,
           dtype_hint=tf.float32)
       super(ForwardOnlyBijector, self).__init__(
@@ -120,7 +120,7 @@ class InverseOnlyBijector(tfb.Bijector):
 
   def __init__(self, scale=2., validate_args=False, name=None):
     with tf.name_scope(name or 'inverse_only') as name:
-      self._scale = tensor_util.convert_immutable_to_tensor(
+      self._scale = tensor_util.convert_nonref_to_tensor(
           scale,
           dtype_hint=tf.float32)
       super(InverseOnlyBijector, self).__init__(
@@ -348,7 +348,7 @@ class BijectorCompositionTest(test_case.TestCase):
         tfb.Exp(),
         tfb.AffineScalar(scale=-1.),
     ])
-    self.assertTrue(isinstance(sigmoid, tfb.Chain))
+    self.assertIsInstance(sigmoid, tfb.Chain)
     self.assertAllClose(
         *self.evaluate([tf.math.sigmoid(x), sigmoid.forward(x)]),
         atol=0, rtol=1e-3)

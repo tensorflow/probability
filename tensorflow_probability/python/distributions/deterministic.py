@@ -89,11 +89,11 @@ class _BaseDeterministic(distribution.Distribution):
     """
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, atol, rtol], dtype_hint=tf.float32)
-      self._loc = tensor_util.convert_immutable_to_tensor(
+      self._loc = tensor_util.convert_nonref_to_tensor(
           loc, dtype_hint=dtype, name="loc")
-      self._atol = tensor_util.convert_immutable_to_tensor(
+      self._atol = tensor_util.convert_nonref_to_tensor(
           0 if atol is None else atol, dtype=dtype, name="atol")
-      self._rtol = tensor_util.convert_immutable_to_tensor(
+      self._rtol = tensor_util.convert_nonref_to_tensor(
           0 if rtol is None else rtol, dtype=dtype, name="rtol")
       self._is_vector = is_vector
 
@@ -169,11 +169,11 @@ class _BaseDeterministic(distribution.Distribution):
       assert not assertions  # Should never happen
       return []
 
-    if is_init != tensor_util.is_mutable(self.atol):
+    if is_init != tensor_util.is_ref(self.atol):
       assertions.append(
           assert_util.assert_non_negative(
               self.atol, message="Argument 'atol' must be non-negative"))
-    if is_init != tensor_util.is_mutable(self.rtol):
+    if is_init != tensor_util.is_ref(self.rtol):
       assertions.append(
           assert_util.assert_non_negative(
               self.rtol, message="Argument 'rtol' must be non-negative"))

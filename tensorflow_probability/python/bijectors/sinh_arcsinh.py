@@ -111,9 +111,9 @@ class SinhArcsinh(bijector.Bijector):
       skewness = 0. if skewness is None else skewness
       dtype = dtype_util.common_dtype([tailweight, skewness],
                                       dtype_hint=tf.float32)
-      self._skewness = tensor_util.convert_immutable_to_tensor(
+      self._skewness = tensor_util.convert_nonref_to_tensor(
           skewness, dtype=dtype, name="skewness")
-      self._tailweight = tensor_util.convert_immutable_to_tensor(
+      self._tailweight = tensor_util.convert_nonref_to_tensor(
           tailweight, dtype=dtype, name="tailweight")
       super(SinhArcsinh, self).__init__(
           forward_min_event_ndims=0,
@@ -171,7 +171,7 @@ class SinhArcsinh(bijector.Bijector):
     if not self.validate_args:
       return []
     assertions = []
-    if is_init != tensor_util.is_mutable(self.tailweight):
+    if is_init != tensor_util.is_ref(self.tailweight):
       assertions.append(assert_util.assert_positive(
           self.tailweight,
           message="Argument `tailweight` must be positive."))

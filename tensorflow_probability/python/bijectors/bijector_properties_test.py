@@ -226,8 +226,8 @@ def codomain_tensors(draw, bijector, shape=None):
 def assert_no_none_grad(bijector, method, wrt_vars, grads):
   for var, grad in zip(wrt_vars, grads):
     if 'log_det_jacobian' in method:
-      if tensor_util.is_mutable(var):
-        # We check tensor_util.is_mutable to accounts for xs/ys being in vars.
+      if tensor_util.is_ref(var):
+        # We check tensor_util.is_ref to accounts for xs/ys being in vars.
         var_name = var.name.rstrip('_0123456789:')
       else:
         var_name = '[arg]'

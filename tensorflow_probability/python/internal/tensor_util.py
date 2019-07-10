@@ -22,49 +22,22 @@ import inspect
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
+
 __all__ = [
-    'convert_immutable_to_tensor',
-    'is_mutable',
+    'convert_nonref_to_tensor',
+    'is_ref',
 ]
 
 
-def convert_immutable_to_tensor(value, dtype=None, dtype_hint=None, name=None):
-  """Converts the given `value` to a `Tensor` only if input is immutable.
+def convert_nonref_to_tensor(value, dtype=None, dtype_hint=None, name=None):
+  """Converts the given `value` to a `Tensor` if input is nonreference type.
 
   This function converts Python objects of various types to `Tensor` objects
-  except if the input is mutable. A mutable object is characterized by
-  `tensor_util.is_mutable` and is, roughly speaking, any object which is a
-  `tf.Variable` or known to depend on a `tf.Variable`. It accepts `Tensor`
-  objects, numpy arrays, Python lists, and Python scalars. This function does
-  not descend through structured input--it only verifies if the input is mutable
-  per `tensor_util.is_mutable`. For example:
-
-  ```python
-  from tensorflow_probability.python.internal import tensor_util
-
-  x = tf.Variable(0.)
-  y = tensor_util.convert_immutable_to_tensor(x)
-  x is y
-  # ==> True
-
-  x = tf.constant(0.)
-  y = tensor_util.convert_immutable_to_tensor(x)
-  x is y
-  # ==> True
-
-  x = np.array(0.)
-  y = tensor_util.convert_immutable_to_tensor(x)
-  x is y
-  # ==> False
-  tf.is_tensor(y)
-  # ==> True
-  ```
-
-  This function can be useful when composing a new operation in Python
-  (such as `my_func` in the example above). All standard Python op
-  constructors apply this function to each of their Tensor-valued
-  inputs, which allows those ops to accept numpy arrays, Python lists,
-  and scalars in addition to `Tensor` objects.
+  except if the input has nonreference semantics. Reference semantics are
+  characterized by `tensor_util.is_ref` and is any object which is a
+  `tf.Variable` or instance of `tf.Module`. This function accepts any input
+  which `tf.convert_to_tensor` would also.
 
   Note: This function diverges from default Numpy behavior for `float` and
     `string` types when `None` is present in a Python list or scalar. Rather
@@ -88,46 +61,79 @@ def convert_immutable_to_tensor(value, dtype=None, dtype_hint=None, name=None):
     TypeError: If no conversion function is registered for `value` to `dtype`.
     RuntimeError: If a registered conversion function returns an invalid value.
     ValueError: If the `value` is a tensor not of given `dtype` in graph mode.
+
+
+  #### Examples:
+
+  ```python
+  from tensorflow_probability.python.internal import tensor_util
+
+  x = tf.Variable(0.)
+  y = tensor_util.convert_nonref_to_tensor(x)
+  x is y
+  # ==> True
+
+  x = tf.constant(0.)
+  y = tensor_util.convert_nonref_to_tensor(x)
+  x is y
+  # ==> True
+
+  x = np.array(0.)
+  y = tensor_util.convert_nonref_to_tensor(x)
+  x is y
+  # ==> False
+  tf.is_tensor(y)
+  # ==> True
+
+  x = tfp.util.DeferredTensor(lambda x: x, 13.37)
+  y = tensor_util.convert_nonref_to_tensor(x)
+  x is y
+  # ==> True
+  tf.is_tensor
+  # ==> False
+  tf.equal(y, 13.37)
+  # ==> True
+  ```
+
   """
   # We explicitly do not use a tf.name_scope to avoid graph clutter.
   if value is None:
     return None
-  if is_mutable(value):
-    if not hasattr(value, 'dtype'):
-      raise ValueError(
-          'Mutable type ({}) must implement `dtype` property '
-          '({}).'.format(type(value).__name__, value))
-    if not hasattr(value, 'shape'):
-      raise ValueError(
-          'Mutable type ({}) must implement `shape` property '
-          '({}).'.format(type(value).__name__, value))
-    if dtype is not None and dtype.base_dtype != value.dtype.base_dtype:
+  if is_ref(value):
+    if dtype is None:
+      return value
+    dtype_base = dtype_util.base_dtype(dtype)
+    value_dtype_base = dtype_util.base_dtype(value.dtype)
+    if dtype_base != value_dtype_base:
       raise TypeError('Mutable type must be of dtype "{}" but is "{}".'.format(
-          dtype.base_dtype.name, value.dtype.base_dtype.name))
+          dtype_util.name(dtype_base), dtype_util.name(value_dtype_base)))
     return value
   return tf.convert_to_tensor(
       value, dtype=dtype, dtype_hint=dtype_hint, name=name)
 
 
-def is_mutable(x):
-  """Evaluates if the object is known to have `tf.Variable` ancestors.
+def is_ref(x):
+  """Evaluates if the object has reference semantics.
 
-  An object is deemed mutable if it is a `tf.Variable` instance or has a
-  properties `variables` or `trainable_variables` one of which is non-empty (as
-  might be the case for a subclasses of `tf.Module` or a Keras layer).
+  An object is deemed "reference" if it is a `tf.Variable` instance or is
+  derived from a `tf.Module` with `dtype` and `shape` properties.
 
   Args:
-    x: Python object which may or may not have a `tf.Variable` ancestor.
+    x: Any object.
 
   Returns:
-    is_mutable: Python `bool` indicating input is mutable or is known to depend
-      on mutable objects.
+    is_ref: Python `bool` indicating input is has nonreference semantics, i.e.,
+      is a `tf.Variable` or a `tf.Module` with `dtype` and `shape` properties.
   """
   # TODO(b/134430874): Consider making this recurse through nests, e.g.,
-  # `tensor_util.is_mutable([tf.Variable(0.), np.array(1.)])`
+  # `tensor_util.is_ref([tf.Variable(0.), np.array(1.)])`
   # returns True. Note: we'd need to actually create a tf.Module on user's
   # behalf and it would need a `dtype` and `shape`. (I.e., there would be some
   # work to support this.)
-  return ((inspect.isclass(tf.Variable) and isinstance(x, tf.Variable)) or
-          getattr(x, 'variables', ()) or
-          getattr(x, 'trainable_variables', ()))
+  return (
+      # Note: we check that tf.Variable is a class because we might be using a
+      # different backend other than TF.
+      (inspect.isclass(tf.Variable) and isinstance(x, tf.Variable))
+      or
+      (isinstance(x, tf.Module) and hasattr(x, 'dtype') and hasattr(x, 'shape'))
+  )

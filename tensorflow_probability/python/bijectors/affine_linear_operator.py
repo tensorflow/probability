@@ -92,7 +92,7 @@ class AffineLinearOperator(bijector.Bijector):
     """
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([shift, scale], dtype_hint=tf.float32)
-      self._shift = tensor_util.convert_immutable_to_tensor(
+      self._shift = tensor_util.convert_nonref_to_tensor(
           shift, dtype=dtype, name='shift')
       if scale is not None:
         if not isinstance(scale, tf.linalg.LinearOperator):

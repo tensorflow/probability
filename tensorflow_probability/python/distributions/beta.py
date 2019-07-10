@@ -175,9 +175,9 @@ class Beta(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       dtype_hint=tf.float32)
-      self._concentration1 = tensor_util.convert_immutable_to_tensor(
+      self._concentration1 = tensor_util.convert_nonref_to_tensor(
           concentration1, dtype=dtype, name="concentration1")
-      self._concentration0 = tensor_util.convert_immutable_to_tensor(
+      self._concentration0 = tensor_util.convert_nonref_to_tensor(
           concentration0, dtype=dtype, name="concentration0")
       super(Beta, self).__init__(
           dtype=dtype,
@@ -339,7 +339,7 @@ class Beta(distribution.Distribution):
       return []
     assertions = []
     for concentration in [self.concentration0, self.concentration1]:
-      if is_init != tensor_util.is_mutable(concentration):
+      if is_init != tensor_util.is_ref(concentration):
         assertions.append(assert_util.assert_positive(
             concentration,
             message="Concentration parameter must be positive."))

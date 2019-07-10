@@ -131,9 +131,9 @@ class Gumbel(transformed_distribution.TransformedDistribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], dtype_hint=tf.float32)
-      loc = tensor_util.convert_immutable_to_tensor(
+      loc = tensor_util.convert_nonref_to_tensor(
           loc, name='loc', dtype=dtype)
-      scale = tensor_util.convert_immutable_to_tensor(
+      scale = tensor_util.convert_nonref_to_tensor(
           scale, name='scale', dtype=dtype)
       dtype_util.assert_same_float_dtype([loc, scale])
       # Positive scale is asserted by the incorporated Gumbel bijector.

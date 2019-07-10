@@ -185,9 +185,9 @@ class Categorical(distribution.Distribution):
     if (probs is None) == (logits is None):
       raise ValueError('Must pass probs or logits, but not both.')
     with tf.name_scope(name) as name:
-      self._probs = tensor_util.convert_immutable_to_tensor(
+      self._probs = tensor_util.convert_nonref_to_tensor(
           probs, dtype_hint=tf.float32, name='probs')
-      self._logits = tensor_util.convert_immutable_to_tensor(
+      self._logits = tensor_util.convert_nonref_to_tensor(
           logits, dtype_hint=tf.float32, name='logits')
       super(Categorical, self).__init__(
           dtype=dtype,
@@ -413,13 +413,13 @@ def maybe_assert_categorical_param_correctness(
     return []
 
   if logits is not None:
-    if is_init != tensor_util.is_mutable(logits):
+    if is_init != tensor_util.is_ref(logits):
       logits = tf.convert_to_tensor(logits)
       assertions.extend(
           distribution_util.assert_categorical_event_shape(logits))
 
   if probs is not None:
-    if is_init != tensor_util.is_mutable(probs):
+    if is_init != tensor_util.is_ref(probs):
       probs = tf.convert_to_tensor(probs)
       assertions.extend([
           assert_util.assert_non_negative(probs),

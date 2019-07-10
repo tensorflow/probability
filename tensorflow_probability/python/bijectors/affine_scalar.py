@@ -97,11 +97,11 @@ class AffineScalar(bijector.Bijector):
         raise ValueError('At most one of `scale` and `log_scale` should be '
                          'specified')
 
-      self._shift = tensor_util.convert_immutable_to_tensor(
+      self._shift = tensor_util.convert_nonref_to_tensor(
           shift, dtype=dtype, name='shift')
-      self._scale = tensor_util.convert_immutable_to_tensor(
+      self._scale = tensor_util.convert_nonref_to_tensor(
           scale, dtype=dtype, name='scale')
-      self._log_scale = tensor_util.convert_immutable_to_tensor(
+      self._log_scale = tensor_util.convert_nonref_to_tensor(
           log_scale, dtype=dtype, name='log_scale')
 
       super(AffineScalar, self).__init__(
@@ -162,7 +162,7 @@ class AffineScalar(bijector.Bijector):
       return []
     assertions = []
     if (self.scale is not None and
-        is_init != tensor_util.is_mutable(self.scale)):
+        is_init != tensor_util.is_ref(self.scale)):
       assertions.append(
           assert_util.assert_none_equal(
               self.scale,

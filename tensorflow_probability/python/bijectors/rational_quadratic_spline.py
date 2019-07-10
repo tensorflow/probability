@@ -185,13 +185,13 @@ class RationalQuadraticSpline(bijector.Bijector):
       dtype = dtype_util.common_dtype(
           [bin_widths, bin_heights, knot_slopes, range_min],
           dtype_hint=tf.float32)
-      self._bin_widths = tensor_util.convert_immutable_to_tensor(
+      self._bin_widths = tensor_util.convert_nonref_to_tensor(
           bin_widths, dtype=dtype, name='bin_widths')
-      self._bin_heights = tensor_util.convert_immutable_to_tensor(
+      self._bin_heights = tensor_util.convert_nonref_to_tensor(
           bin_heights, dtype=dtype, name='bin_heights')
-      self._knot_slopes = tensor_util.convert_immutable_to_tensor(
+      self._knot_slopes = tensor_util.convert_nonref_to_tensor(
           knot_slopes, dtype=dtype, name='knot_slopes')
-      self._range_min = tensor_util.convert_immutable_to_tensor(
+      self._range_min = tensor_util.convert_nonref_to_tensor(
           range_min, dtype=dtype, name='range_min')
       super(RationalQuadraticSpline, self).__init__(
           dtype=dtype,
@@ -353,7 +353,7 @@ class RationalQuadraticSpline(bijector.Bijector):
               '{}; got {}.'.format(num_interior_knots, self.knot_slopes.shape))
     elif self.validate_args:
       if is_init != any(
-          tensor_util.is_mutable(t)
+          tensor_util.is_ref(t)
           for t in (self.bin_widths, self.bin_heights, self.knot_slopes)):
         bw = tf.convert_to_tensor(self.bin_widths) if bw is None else bw
         bh = tf.convert_to_tensor(self.bin_heights) if bh is None else bh
@@ -371,8 +371,8 @@ class RationalQuadraticSpline(bijector.Bijector):
       assert not assertions
       return assertions
 
-    if (is_init != tensor_util.is_mutable(self.bin_widths) or
-        is_init != tensor_util.is_mutable(self.bin_heights)):
+    if (is_init != tensor_util.is_ref(self.bin_widths) or
+        is_init != tensor_util.is_ref(self.bin_heights)):
       bw = tf.convert_to_tensor(self.bin_widths) if bw is None else bw
       bh = tf.convert_to_tensor(self.bin_heights) if bh is None else bh
       assertions += [
@@ -382,19 +382,19 @@ class RationalQuadraticSpline(bijector.Bijector):
               message='`sum(bin_widths, axis=-1)` must equal '
               '`sum(bin_heights, axis=-1)`.'),
       ]
-    if is_init != tensor_util.is_mutable(self.bin_widths):
+    if is_init != tensor_util.is_ref(self.bin_widths):
       bw = tf.convert_to_tensor(self.bin_widths) if bw is None else bw
       assertions += [
           assert_util.assert_positive(
               bw, message='`bin_widths` must be positive.'),
       ]
-    if is_init != tensor_util.is_mutable(self.bin_heights):
+    if is_init != tensor_util.is_ref(self.bin_heights):
       bh = tf.convert_to_tensor(self.bin_heights) if bh is None else bh
       assertions += [
           assert_util.assert_positive(
               bh, message='`bin_heights` must be positive.'),
       ]
-    if is_init != tensor_util.is_mutable(self.knot_slopes):
+    if is_init != tensor_util.is_ref(self.knot_slopes):
       kd = _ensure_at_least_1d(self.knot_slopes) if kd is None else kd
       assertions += [
           assert_util.assert_positive(

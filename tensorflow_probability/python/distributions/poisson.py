@@ -97,9 +97,9 @@ class Poisson(distribution.Distribution):
       if not dtype_util.is_floating(dtype):
         raise TypeError('[log_]rate.dtype ({}) is a not a float-type.'.format(
             dtype_util.name(dtype)))
-      self._rate = tensor_util.convert_immutable_to_tensor(
+      self._rate = tensor_util.convert_nonref_to_tensor(
           rate, name='rate', dtype=dtype)
-      self._log_rate = tensor_util.convert_immutable_to_tensor(
+      self._log_rate = tensor_util.convert_nonref_to_tensor(
           log_rate, name='log_rate', dtype=dtype)
 
       self._interpolate_nondiscrete = interpolate_nondiscrete
@@ -240,7 +240,7 @@ class Poisson(distribution.Distribution):
       return []
     assertions = []
     if self._rate is not None:
-      if is_init != tensor_util.is_mutable(self._rate):
+      if is_init != tensor_util.is_ref(self._rate):
         assertions.append(assert_util.assert_positive(
             self._rate,
             message='Argument `rate` must be positive.'))

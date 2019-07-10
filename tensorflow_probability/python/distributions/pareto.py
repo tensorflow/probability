@@ -83,9 +83,9 @@ class Pareto(distribution.Distribution):
     with tf.name_scope(name):
       dtype = dtype_util.common_dtype([concentration, scale],
                                       dtype_hint=tf.float32)
-      self._concentration = tensor_util.convert_immutable_to_tensor(
+      self._concentration = tensor_util.convert_nonref_to_tensor(
           concentration, name='concentration', dtype=dtype)
-      self._scale = tensor_util.convert_immutable_to_tensor(
+      self._scale = tensor_util.convert_nonref_to_tensor(
           scale, name='scale', dtype=dtype)
       super(Pareto, self).__init__(
           dtype=self._concentration.dtype,
@@ -242,11 +242,11 @@ class Pareto(distribution.Distribution):
     if not self.validate_args:
       return []
     assertions = []
-    if is_init != tensor_util.is_mutable(self.concentration):
+    if is_init != tensor_util.is_ref(self.concentration):
       assertions.append(
           assert_util.assert_positive(
               self.concentration, message='`concentration` must be positive.'))
-    if is_init != tensor_util.is_mutable(self.scale):
+    if is_init != tensor_util.is_ref(self.scale):
       assertions.append(
           assert_util.assert_positive(
               self.scale, message='`scale` must be positive.'))
