@@ -47,29 +47,27 @@ class MatvecLU(bijector.Bijector):
   ```python
   def trainable_lu_factorization(
       event_size, batch_shape=(), seed=None, dtype=tf.float32, name=None):
-    with tf.name_scope(name, 'trainable_lu_factorization',
-                       [event_size, batch_shape]):
+    with tf.name_scope(name or 'trainable_lu_factorization'):
       event_size = tf.convert_to_tensor(
           event_size, dtype_hint=tf.int32, name='event_size')
       batch_shape = tf.convert_to_tensor(
           batch_shape, dtype_hint=event_size.dtype, name='batch_shape')
-      random_matrix = tf.random_uniform(
+      random_matrix = tf.random.uniform(
           shape=tf.concat([batch_shape, [event_size, event_size]], axis=0),
           dtype=dtype,
           seed=seed)
       random_orthonormal = tf.linalg.qr(random_matrix)[0]
       lower_upper, permutation = tf.linalg.lu(random_orthonormal)
       lower_upper = tf.Variable(
-          initial_lower_upper,
+          initial_value=lower_upper,
           trainable=True,
-          use_resource=True,
           name='lower_upper')
       return lower_upper, permutation
 
   channels = 3
   conv1x1 = tfb.MatvecLU(*trainable_lu_factorization(channels),
                          validate_args=True)
-  x = tf.random_uniform(shape=[2, 28, 28, channels])
+  x = tf.random.uniform(shape=[2, 28, 28, channels])
   fwd = conv1x1.forward(x)
   rev_fwd = conv1x1.inverse(fwd)
   # ==> x
