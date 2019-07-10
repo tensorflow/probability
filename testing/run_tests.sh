@@ -53,7 +53,7 @@ install_bazel() {
 
 install_python_packages() {
   # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
-  pip install tf-nightly==1.15.0.dev20190709
+  pip install tf-nightly
 
   # The following unofficial dependencies are used only by tests.
   pip install scipy hypothesis matplotlib mock
