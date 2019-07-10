@@ -124,9 +124,9 @@ def identity_fn(x):
 @hps.composite
 def broadcasting_params(draw,
                         batch_shape,
+                        params_event_ndims,
                         event_dim=None,
                         enable_vars=False,
-                        params_event_ndims=None,
                         constraint_fn_for=lambda param: identity_fn,
                         mutex_params=()):
   """Draws a dict of parameters which should yield the given batch shape.
@@ -138,6 +138,8 @@ def broadcasting_params(draw,
     draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
     batch_shape: A `TensorShape`.  The returned parameters' batch shapes will
       broadcast to this.
+    params_event_ndims: Python `dict` mapping the name of each parameter to a
+      Python `int` giving the event ndims for that parameter.
     event_dim: Optional Python int giving the size of each parameter's event
       dimensions (except where overridded by any applicable constraint
       functions).  This is shared across all parameters, permitting square event
@@ -146,8 +148,6 @@ def broadcasting_params(draw,
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
       initialization in slicing_test.  If `False`, the returned parameters are
       all Tensors, never Variables or DeferredTensor.
-    params_event_ndims: Python `dict` mapping the name of each parameter to a
-      Python `int` giving the event ndims for that parameter.
     constraint_fn_for: Python callable mapping parameter name to constraint
       function.  The latter is itself a Python callable which converts an
       unconstrained Tensor (currently with float32 values from -200 to +200)

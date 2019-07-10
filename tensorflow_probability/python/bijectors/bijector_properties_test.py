@@ -105,9 +105,9 @@ def broadcasting_params(draw,
   return draw(
       tfp_hps.broadcasting_params(
           batch_shape,
+          params_event_ndims,
           event_dim=event_dim,
           enable_vars=enable_vars,
-          params_event_ndims=params_event_ndims,
           constraint_fn_for=_constraint,
           mutex_params=MUTEX_PARAMS))
 

@@ -95,28 +95,41 @@ SPECIAL_DISTS = (
 )
 
 
-def instantiable_dists():
-  """Computes the table of mechanically instantiable Distributions.
+class DistInfo(collections.namedtuple(
+    'DistInfo', ['cls', 'params_event_ndims'])):
+  """Sufficient information to instantiate a Distribution.
 
-  A Distribution is generically instantiable if
+  To wit
+  - The Python class `cls` giving the class, and
+  - A Python dict `params_event_ndims` giving the event dimensions for the
+    parameters (so that parameters can be built with predictable batch shapes).
+
+  Specifically, the `params_event_ndims` dict maps string parameter names to
+  Python integers.  Each integer gives how many (trailing) dimensions of that
+  parameter are part of the event.
+  """
+  __slots__ = ()
+
+
+def instantiable_base_dists():
+  """Computes the table of mechanically instantiable base Distributions.
+
+  A Distribution is mechanically instantiable if
   - The class appears as a symbol binding in `tfp.distributions`;
   - The class defines a `_params_event_ndims` method (necessary
     to generate parameter Tensors with predictable batch shapes); and
   - The name is not blacklisted in `SPECIAL_DISTS`.
 
-  Additionally, the following Distributions are hardcoded with special
-  instantiation rules:
-  - Empirical (for each choice of event_ndims among 0, 1, and 2)
-  - Independent
-  - MixtureSameFamily
-  - TransformedDistribution
+  Additionally, the Empricial distribution is hardcoded with special
+  instantiation rules for each choice of event_ndims among 0, 1, and 2.
+
+  Compound distributions like TransformedDistribution have their own
+  instantiation rules hard-coded in the `distributions` strategy.
 
   Returns:
-    instantiable_dists: A Python dict mapping distribution name (as a string) to
-      the information necessary to instantiate it.  To wit, a 2-tuple containing
-      the Python class and a Python dict `params_event_ndims`, which maps string
-      parameter names to Python integers giving how many (trailing) dimensions
-      of that parameter are part of the event.
+    instantiable_base_dists: A Python dict mapping distribution name (as a
+      string) to a `DistInfo` carrying the information necessary to instantiate
+      it.
   """
   result = {}
   for (dist_name, dist_class) in six.iteritems(tfd.__dict__):
@@ -130,28 +143,25 @@ def instantiable_dists():
       logging.warning('Unable to test tfd.%s: %s', dist_name,
                       traceback.format_exc())
       continue
-    result[dist_name] = (dist_class, params_event_ndims)
+    result[dist_name] = DistInfo(dist_class, params_event_ndims)
 
-  del result['InverseGamma'][1]['rate']  # deprecated parameter
+  del result['InverseGamma'].params_event_ndims['rate']  # deprecated parameter
 
   # Empirical._params_event_ndims depends on `self.event_ndims`, so we have to
   # explicitly list these entries.
-  result['Empirical|event_ndims=0'] = (  #
+  result['Empirical|event_ndims=0'] = DistInfo(  #
       functools.partial(tfd.Empirical, event_ndims=0), dict(samples=1))
-  result['Empirical|event_ndims=1'] = (  #
+  result['Empirical|event_ndims=1'] = DistInfo(  #
       functools.partial(tfd.Empirical, event_ndims=1), dict(samples=2))
-  result['Empirical|event_ndims=2'] = (  #
+  result['Empirical|event_ndims=2'] = DistInfo(  #
       functools.partial(tfd.Empirical, event_ndims=2), dict(samples=3))
 
-  result['Independent'] = (tfd.Independent, None)
-  result['MixtureSameFamily'] = (tfd.MixtureSameFamily, None)
-  result['TransformedDistribution'] = (tfd.TransformedDistribution, None)
   return result
 
 
-# INSTANTIABLE_DISTS is a map from str->(DistClass, params_event_ndims)
-INSTANTIABLE_DISTS = instantiable_dists()
-del instantiable_dists
+# INSTANTIABLE_BASE_DISTS is a map from str->(DistClass, params_event_ndims)
+INSTANTIABLE_BASE_DISTS = instantiable_base_dists()
+del instantiable_base_dists
 
 
 # pylint is unable to handle @hps.composite (e.g. complains "No value for
@@ -255,6 +265,10 @@ def stringify_slices(slices):
   return pretty_slices
 
 
+def depths():
+  return hps.integers(min_value=0, max_value=4)
+
+
 @hps.composite
 def broadcasting_params(draw,
                         dist_name,
@@ -262,7 +276,7 @@ def broadcasting_params(draw,
                         event_dim=None,
                         enable_vars=False):
   """Strategy for drawing parameters broadcasting to `batch_shape`."""
-  _, params_event_ndims = INSTANTIABLE_DISTS[dist_name]
+  params_event_ndims = INSTANTIABLE_BASE_DISTS[dist_name].params_event_ndims
 
   def _constraint(param):
     return constraint_for(dist_name, param)
@@ -270,20 +284,20 @@ def broadcasting_params(draw,
   return draw(
       tfp_hps.broadcasting_params(
           batch_shape,
+          params_event_ndims,
           event_dim=event_dim,
           enable_vars=enable_vars,
-          params_event_ndims=params_event_ndims,
           constraint_fn_for=_constraint,
           mutex_params=MUTEX_PARAMS))
 
 
 @hps.composite
-def independents(draw, batch_shape=None, event_dim=None, enable_vars=False):
+def independents(
+    draw, batch_shape=None, event_dim=None,
+    enable_vars=False, depth=None):
   """Strategy for drawing `Independent` distributions.
 
-  The underlying distribution is drawn from the `distributions` strategy, except
-  that it may not itself be `Independent`.  (Apparently Hypothesis can enter an
-  infinite recursion otherwise.)
+  The underlying distribution is drawn from the `distributions` strategy.
 
   Args:
     draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
@@ -299,11 +313,15 @@ def independents(draw, batch_shape=None, event_dim=None, enable_vars=False):
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
       initialization in slicing_test.  If `False`, the returned parameters are
       all Tensors, never Variables or DeferredTensor.
+    depth: Python `int` giving maximum nesting depth of compound Distributions.
 
   Returns:
     dists: A strategy for drawing `Independent` distributions with the specified
       `batch_shape` (or an arbitrary one if omitted).
   """
+  if depth is None:
+    depth = draw(depths())
+
   reinterpreted_batch_ndims = draw(hps.integers(min_value=0, max_value=2))
   if batch_shape is None:
     batch_shape = draw(
@@ -320,7 +338,7 @@ def independents(draw, batch_shape=None, event_dim=None, enable_vars=False):
           batch_shape=batch_shape,
           event_dim=event_dim,
           enable_vars=enable_vars,
-          eligibility_filter=lambda name: name != 'Independent'))
+          depth=depth - 1))
   logging.info(
       'underlying distribution: %s; parameters used: %s', underlying,
       [k for k, v in six.iteritems(underlying.parameters) if v is not None])
@@ -340,7 +358,8 @@ def independents(draw, batch_shape=None, event_dim=None, enable_vars=False):
 def transformed_distributions(draw,
                               batch_shape=None,
                               event_dim=None,
-                              enable_vars=False):
+                              enable_vars=False,
+                              depth=None):
   """Strategy for drawing `TransformedDistribution`s.
 
   The transforming bijector is drawn from the
@@ -364,11 +383,15 @@ def transformed_distributions(draw,
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
       initialization in slicing_test.  If `False`, the returned parameters are
       all Tensors, never Variables or DeferredTensor.
+    depth: Python `int` giving maximum nesting depth of compound Distributions.
 
   Returns:
     dists: A strategy for drawing `TransformedDistribution`s with the specified
       `batch_shape` (or an arbitrary one if omitted).
   """
+  if depth is None:
+    depth = draw(depths())
+
   bijector = draw(bijector_hps.unconstrained_bijectors())
   logging.info('TD bijector: %s', bijector)
   if batch_shape is None:
@@ -382,7 +405,8 @@ def transformed_distributions(draw,
   underlyings = distributions(
       batch_shape=underlying_batch_shape,
       event_dim=event_dim,
-      enable_vars=enable_vars).filter(
+      enable_vars=enable_vars,
+      depth=depth - 1).filter(
           bijector_hps.distribution_filter_for(bijector))
   to_transform = draw(underlyings)
   logging.info(
@@ -406,12 +430,11 @@ def transformed_distributions(draw,
 def mixtures_same_family(draw,
                          batch_shape=None,
                          event_dim=None,
-                         enable_vars=False):
+                         enable_vars=False,
+                         depth=None):
   """Strategy for drawing `MixtureSameFamily` distributions.
 
-  The component distribution is drawn from the `distributions` strategy, except
-  that it may not itself be `MixtureSameFamily`.  (Apparently Hypothesis can
-  enter an infinite recursion otherwise.)
+  The component distribution is drawn from the `distributions` strategy.
 
   The Categorical mixture distributions are either shared across all batch
   members, or drawn independently for the full batch (as required by
@@ -430,11 +453,15 @@ def mixtures_same_family(draw,
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
       initialization in slicing_test.  If `False`, the returned parameters are
       all Tensors, never Variables or DeferredTensor.
+    depth: Python `int` giving maximum nesting depth of compound Distributions.
 
   Returns:
     dists: A strategy for drawing `MixtureSameFamily` distributions with the
       specified `batch_shape` (or an arbitrary one if omitted).
   """
+  if depth is None:
+    depth = draw(depths())
+
   if batch_shape is None:
     # Ensure the components dist has at least one batch dim (a component dim).
     batch_shape = draw(tfp_hps.batch_shapes(min_ndims=1, min_lastdimsize=2))
@@ -448,17 +475,18 @@ def mixtures_same_family(draw,
           batch_shape=batch_shape,
           event_dim=event_dim,
           enable_vars=enable_vars,
-          eligibility_filter=lambda name: name != 'MixtureSameFamily'))
+          depth=depth - 1))
   logging.info(
       'component distribution: %s; parameters used: %s', component_dist,
       [k for k, v in six.iteritems(component_dist.parameters) if v is not None])
   # scalar or same-shaped categorical?
   mixture_batch_shape = draw(
       hps.one_of(hps.just(batch_shape[:-1]), hps.just(tf.TensorShape([]))))
-  mixture_dist = draw(distributions(
+  mixture_dist = draw(base_distributions(
       dist_name='Categorical',
       batch_shape=mixture_batch_shape,
-      event_dim=tensorshape_util.as_list(batch_shape)[-1]))
+      event_dim=tensorshape_util.as_list(batch_shape)[-1],
+      enable_vars=enable_vars))
   logging.info(
       'mixture distribution: %s; parameters used: %s', mixture_dist,
       [k for k, v in six.iteritems(mixture_dist.parameters) if v is not None])
@@ -481,17 +509,17 @@ def assert_shapes_unchanged(target_shaped_dict, possibly_bcast_dict):
 
 
 @hps.composite
-def distributions(draw,
-                  dist_name=None,
-                  batch_shape=None,
-                  event_dim=None,
-                  enable_vars=False,
-                  eligibility_filter=lambda name: True):
-  """Strategy for drawing arbitrary Distributions.
+def base_distributions(draw,
+                       dist_name=None,
+                       batch_shape=None,
+                       event_dim=None,
+                       enable_vars=False,
+                       eligibility_filter=lambda name: True):
+  """Strategy for drawing arbitrary base Distributions.
 
-  This may draw compound distributions (i.e., `Independent`,
-  `MixtureSameFamily`, and/or `TransformedDistribution`), in which case the
-  underlying distributions are drawn recursively from this strategy as well.
+  This does not draw compound distributions like `Independent`,
+  `MixtureSameFamily`, or `TransformedDistribution`; only base Distributions
+  that do not accept other Distributions as arguments.
 
   Args:
     draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
@@ -514,19 +542,8 @@ def distributions(draw,
       (or an arbitrary one if omitted).
   """
   if dist_name is None:
-    dist_name = draw(
-        hps.one_of(
-            map(hps.just,
-                [k for k in INSTANTIABLE_DISTS.keys() if eligibility_filter(k)])
-            ))
-
-  dist_cls, _ = INSTANTIABLE_DISTS[dist_name]
-  if dist_name == 'Independent':
-    return draw(independents(batch_shape, event_dim, enable_vars))
-  if dist_name == 'MixtureSameFamily':
-    return draw(mixtures_same_family(batch_shape, event_dim, enable_vars))
-  if dist_name == 'TransformedDistribution':
-    return draw(transformed_distributions(batch_shape, event_dim, enable_vars))
+    names = [k for k in INSTANTIABLE_BASE_DISTS.keys() if eligibility_filter(k)]
+    dist_name = draw(hps.one_of(map(hps.just, names)))
 
   if batch_shape is None:
     batch_shape = draw(tfp_hps.batch_shapes())
@@ -537,12 +554,74 @@ def distributions(draw,
   params_constrained = constraint_for(dist_name)(params_kwargs)
   assert_shapes_unchanged(params_kwargs, params_constrained)
   params_constrained['validate_args'] = True
+  dist_cls = INSTANTIABLE_BASE_DISTS[dist_name].cls
   result_dist = dist_cls(**params_constrained)
   if batch_shape != result_dist.batch_shape:
     msg = ('Distributions strategy generated a bad batch shape '
            'for {}, should have been {}.').format(result_dist, batch_shape)
     raise AssertionError(msg)
   return result_dist
+
+
+@hps.composite
+def distributions(draw,
+                  dist_name=None,
+                  batch_shape=None,
+                  event_dim=None,
+                  enable_vars=False,
+                  depth=None,
+                  eligibility_filter=lambda name: True):
+  """Strategy for drawing arbitrary Distributions.
+
+  This may draw compound distributions (i.e., `Independent`,
+  `MixtureSameFamily`, and/or `TransformedDistribution`), in which case the
+  underlying distributions are drawn recursively from this strategy as well.
+
+  Args:
+    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    dist_name: Optional Python `str`.  If given, the produced distributions
+      will all have this type.
+    batch_shape: An optional `TensorShape`.  The batch shape of the resulting
+      Distribution.  Hypothesis will pick a batch shape if omitted.
+    event_dim: Optional Python int giving the size of each of the
+      distribution's parameters' event dimensions.  This is shared across all
+      parameters, permitting square event matrices, compatible location and
+      scale Tensors, etc. If omitted, Hypothesis will choose one.
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test.  If `False`, the returned parameters are
+      all Tensors, never Variables or DeferredTensor.
+    depth: Python `int` giving maximum nesting depth of compound Distributions.
+      If `None`, Hypothesis will bias choose one, with a bias towards shallow
+      nests.
+    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+      class names so they will not be drawn at the top level.
+
+  Returns:
+    dists: A strategy for drawing Distributions with the specified `batch_shape`
+      (or an arbitrary one if omitted).
+  """
+  if depth is None:
+    depth = draw(depths())
+
+  if dist_name is None and depth > 0:
+    bases = hps.just(None)
+    compounds = hps.one_of(
+        map(hps.just, ['Independent', 'MixtureSameFamily',
+                       'TransformedDistribution']))
+    dist_name = draw(hps.one_of([bases, compounds]))
+
+  if dist_name is None or dist_name in INSTANTIABLE_BASE_DISTS:
+    return draw(base_distributions(
+        dist_name, batch_shape, event_dim, enable_vars, eligibility_filter))
+  if dist_name == 'Independent':
+    return draw(independents(
+        batch_shape, event_dim, enable_vars, depth))
+  if dist_name == 'MixtureSameFamily':
+    return draw(mixtures_same_family(
+        batch_shape, event_dim, enable_vars, depth))
+  if dist_name == 'TransformedDistribution':
+    return draw(transformed_distributions(
+        batch_shape, event_dim, enable_vars, depth))
 
 
 def maybe_seed(seed):
@@ -791,7 +870,7 @@ class DistributionSlicingTest(tf.test.TestCase):
     tf1.set_random_seed(
         data.draw(
             hpnp.arrays(dtype=np.int64, shape=[]).filter(lambda x: x != 0)))
-    dist = data.draw(distributions())
+    dist = data.draw(distributions(enable_vars=False))
     logging.info(
         'distribution: %s; parameters used: %s', dist,
         [k for k, v in six.iteritems(dist.parameters) if v is not None])
