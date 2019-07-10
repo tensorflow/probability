@@ -1039,8 +1039,9 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # Squish the initial step back on top of the other (scanned) timesteps
       latent_means = _safe_concat([initial_latent_mean[tf.newaxis, ...],
                                    latent_means], axis=0)
-      observation_means = _safe_concat([initial_observation_mean[tf.newaxis, ...],
-                                        observation_means], axis=0)
+      observation_means = _safe_concat([
+          initial_observation_mean[tf.newaxis, ...],
+          observation_means], axis=0)
 
       # Put dimensions back in order. The samples we've computed have
       # shape `[num_timesteps, batch_shape, size, 1]`, where `size`
