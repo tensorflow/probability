@@ -65,6 +65,7 @@ TF2_FRIENDLY_DISTS = (
     'Kumaraswamy',
     'Normal',
     'Multinomial',
+    'Pareto',
     'Poisson',
     'ProbitBernoulli',
     'StudentT'
