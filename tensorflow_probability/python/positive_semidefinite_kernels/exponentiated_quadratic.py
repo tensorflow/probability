@@ -60,13 +60,13 @@ class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
     Args:
       amplitude: floating point `Tensor` that controls the maximum value
         of the kernel. Must be broadcastable with `length_scale` and inputs to
-        `apply` and `matrix` methods. Must be greater than zero. A value of 
+        `apply` and `matrix` methods. Must be greater than zero. A value of
         `None` is treated like 1.
       length_scale: floating point `Tensor` that controls how sharp or wide the
         kernel shape is. This provides a characteristic "unit" of length against
         which `||x - y||` can be compared for scale. Must be broadcastable with
-        `amplitude` and inputs to `apply` and `matrix` methods. A value of `None` 
-        is treated like 1.
+        `amplitude` and inputs to `apply` and `matrix` methods. A value of
+        `None` is treated like 1.
       feature_ndims: Python `int` number of rightmost dims to include in the
         squared difference norm in the exponential.
       validate_args: If `True`, parameters are checked for validity despite
