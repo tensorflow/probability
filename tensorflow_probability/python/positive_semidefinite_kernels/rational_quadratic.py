@@ -93,15 +93,20 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
     Args:
       amplitude: Positive floating point `Tensor` that controls the maximum
         value of the kernel. Must be broadcastable with `length_scale` and
-        `scale_mixture_rate` and inputs to `apply` and `matrix` methods.
+        `scale_mixture_rate` and inputs to `apply` and `matrix` methods. A
+        value of `None` is treated like 1.
+        Default value: None
       length_scale: Positive floating point `Tensor` that controls how sharp or
         wide the kernel shape is. This provides a characteristic "unit" of
         length against which `||x - y||` can be compared for scale. Must be
         broadcastable with `amplitude`, `scale_mixture_rate`  and inputs to
-        `apply` and `matrix` methods.
+        `apply` and `matrix` methods. A value of `None` is treated like 1.
+        Default value: None
       scale_mixture_rate: Positive floating point `Tensor` that controls how the
         ExponentiatedQuadratic kernels are mixed.  Must be broadcastable with
         `amplitude`, `length_scale` and inputs to `apply` and `matrix` methods.
+        A value of `None` is treated like 1.
+        Default value: None
       feature_ndims: Python `int` number of rightmost dims to include in the
         squared difference norm in the exponential.
       validate_args: If `True`, parameters are checked for validity despite
