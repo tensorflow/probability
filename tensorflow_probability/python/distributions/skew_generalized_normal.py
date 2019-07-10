@@ -49,7 +49,7 @@ class SkewGeneralizedNormal(Normal, Distribution):
     parameters = dict(locals())
 
 
-    with tf.name_scope(name, values=[loc, scale, peak]) as name:
+    with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
       loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
@@ -61,9 +61,9 @@ class SkewGeneralizedNormal(Normal, Distribution):
         self._scale = tf.identity(scale)
         self._peak = tf.identity(peak)
 
-        tf.assert_same_float_dtype([self._loc, self._scale, self._peak])
+        tf.debugging.assert_same_float_dtype([self._loc, self._scale, self._peak])
 
-    super(Distribution, self).__init__(
+    super(Normal, self).__init__(
         dtype=dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
@@ -116,7 +116,7 @@ class SkewGeneralizedNormal(Normal, Distribution):
 #-
   def _sample_n(self, n, seed=None):
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)
-    sampled = tf.random_uniform(
+    sampled = tf.random.uniform(
         shape=shape, minval=0., maxval=1., dtype=self.loc.dtype, seed=seed)
     return self._quantile(sampled)
 
@@ -124,12 +124,12 @@ class SkewGeneralizedNormal(Normal, Distribution):
     return self._n_log_unnormalized_prob(x) - self._n_log_normalization()
 
   def _log_prob(self, x):
-    log_smpe = tf.log(self.scale - (self.peak * (x - self.loc)))
+    log_smpe = tf.math.log(self.scale - (self.peak * (x - self.loc)))
     return self._n_log_prob(self._y(x)) - log_smpe
 
   def _prob(self, x):
     log_prob = tf.exp(self._log_prob(x))
-    return tf.where(tf.is_nan(log_prob), tf.zeros_like(log_prob), log_prob
+    return tf.where(tf.math.is_nan(log_prob), tf.zeros_like(log_prob), log_prob
                     )
 
   def _log_cdf(self, x):
@@ -138,7 +138,7 @@ class SkewGeneralizedNormal(Normal, Distribution):
   def _y(self, x):
     inv_peak = (-1./self.peak)
     inv_offset = 1. - self.peak * (x - self.loc) / self.scale
-    return inv_peak * tf.log(inv_offset)
+    return inv_peak * tf.math.log(inv_offset)
 
   def _cdf(self, x):
     return special_math.ndtr(self._y(x))
@@ -183,5 +183,5 @@ class SkewGeneralizedNormal(Normal, Distribution):
 
   def _inv_z(self, z):
     """Reconstruct input `x` from a its normalized version."""
-    with tf.name_scope("reconstruct", values=[z]):
+    with tf.name_scope("reconstruct"):
       return z * self.scale + self.loc
