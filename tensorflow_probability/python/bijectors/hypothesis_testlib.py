@@ -121,6 +121,9 @@ def bijector_supports():
       'MatrixInverseTriL':
           BijectorSupport(Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE,
                           Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
+      'MatvecLU':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_UNCONSTRAINED),
       'NormalCDF':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'Exp':

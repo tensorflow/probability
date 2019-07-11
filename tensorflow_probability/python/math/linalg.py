@@ -39,6 +39,7 @@ __all__ = [
     'fill_triangular_inverse',
     'lu_matrix_inverse',
     'lu_reconstruct',
+    'lu_reconstruct_assertions',  # Internally visible for MatvecLU.
     'lu_solve',
     'matrix_rank',
     'pinv',
@@ -597,7 +598,7 @@ def lu_matrix_inverse(lower_upper, perm, validate_args=False, name=None):
     lower_upper = tf.convert_to_tensor(
         lower_upper, dtype_hint=tf.float32, name='lower_upper')
     perm = tf.convert_to_tensor(perm, dtype_hint=tf.int32, name='perm')
-    assertions = _lu_reconstruct_assertions(lower_upper, perm, validate_args)
+    assertions = lu_reconstruct_assertions(lower_upper, perm, validate_args)
     if assertions:
       with tf.control_dependencies(assertions):
         lower_upper = tf.identity(lower_upper)
@@ -647,7 +648,7 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
         lower_upper, dtype_hint=tf.float32, name='lower_upper')
     perm = tf.convert_to_tensor(perm, dtype_hint=tf.int32, name='perm')
 
-    assertions = _lu_reconstruct_assertions(lower_upper, perm, validate_args)
+    assertions = lu_reconstruct_assertions(lower_upper, perm, validate_args)
     if assertions:
       with tf.control_dependencies(assertions):
         lower_upper = tf.identity(lower_upper)
@@ -681,7 +682,7 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
     return x
 
 
-def _lu_reconstruct_assertions(lower_upper, perm, validate_args):
+def lu_reconstruct_assertions(lower_upper, perm, validate_args):
   """Returns list of assertions related to `lu_reconstruct` assumptions."""
   assertions = []
 
@@ -717,7 +718,7 @@ def _lu_reconstruct_assertions(lower_upper, perm, validate_args):
 
 def _lu_solve_assertions(lower_upper, perm, rhs, validate_args):
   """Returns list of assertions related to `lu_solve` assumptions."""
-  assertions = _lu_reconstruct_assertions(lower_upper, perm, validate_args)
+  assertions = lu_reconstruct_assertions(lower_upper, perm, validate_args)
 
   message = 'Input `rhs` must have at least 2 dimensions.'
   if rhs.shape.ndims is not None:

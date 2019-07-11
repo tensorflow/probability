@@ -21,7 +21,10 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.linalg import lu_reconstruct
+from tensorflow_probability.python.math.linalg import lu_reconstruct_assertions
 from tensorflow_probability.python.math.linalg import lu_solve
 
 
@@ -35,10 +38,6 @@ class MatvecLU(bijector.Bijector):
 
   This bijector is identical to the "Convolution1x1" used in Glow
   [(Kingma and Dhariwal, 2018)[1].
-
-  Warning: this bijector never verifies the scale matrix (as parameterized by LU
-  decomposition) is invertible. Ensuring this is the case is the caller's
-  responsibility.
 
   #### Examples
 
@@ -114,15 +113,16 @@ class MatvecLU(bijector.Bijector):
         specified.
     """
     with tf.name_scope(name or 'MatvecLU') as name:
-      self._lower_upper = tf.convert_to_tensor(
+      self._lower_upper = tensor_util.convert_nonref_to_tensor(
           lower_upper, dtype_hint=tf.float32, name='lower_upper')
-      self._permutation = tf.convert_to_tensor(
+      self._permutation = tensor_util.convert_nonref_to_tensor(
           permutation, dtype_hint=tf.int32, name='permutation')
-    super(MatvecLU, self).__init__(
-        is_constant_jacobian=True,
-        forward_min_event_ndims=1,
-        validate_args=validate_args,
-        name=name)
+      super(MatvecLU, self).__init__(
+          dtype=self._lower_upper.dtype,
+          is_constant_jacobian=True,
+          forward_min_event_ndims=1,
+          validate_args=validate_args,
+          name=name)
 
   @property
   def lower_upper(self):
@@ -132,20 +132,53 @@ class MatvecLU(bijector.Bijector):
   def permutation(self):
     return self._permutation
 
+  def _broadcast_params(self):
+    lower_upper = tf.convert_to_tensor(self.lower_upper)
+    perm = tf.convert_to_tensor(self.permutation)
+    shape = tf.broadcast_dynamic_shape(tf.shape(lower_upper)[:-1],
+                                       tf.shape(perm))
+    lower_upper = tf.broadcast_to(
+        lower_upper, tf.concat([shape, shape[-1:]], 0))
+    perm = tf.broadcast_to(perm, shape)
+    return lower_upper, perm
+
   def _forward(self, x):
-    w = lu_reconstruct(lower_upper=self.lower_upper,
-                       perm=self.permutation,
+    lu, perm = self._broadcast_params()
+    w = lu_reconstruct(lower_upper=lu,
+                       perm=perm,
                        validate_args=self.validate_args)
     return tf.linalg.matvec(w, x)
 
   def _inverse(self, y):
+    lu, perm = self._broadcast_params()
     return lu_solve(
-        lower_upper=self.lower_upper,
-        perm=self.permutation,
+        lower_upper=lu,
+        perm=perm,
         rhs=y[..., tf.newaxis],
         validate_args=self.validate_args)[..., 0]
 
   def _forward_log_det_jacobian(self, unused_x):
     return tf.reduce_sum(
-        tf.math.log(tf.abs(tf.linalg.tensor_diag_part(self.lower_upper))),
+        tf.math.log(tf.abs(tf.linalg.diag_part(self.lower_upper))),
         axis=-1)
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+
+    lu, perm = None, None
+    assertions = []
+    if (is_init != tensor_util.is_ref(self.lower_upper) or
+        is_init != tensor_util.is_ref(self.permutation)):
+      lu, perm = self._broadcast_params()
+      assertions.extend(lu_reconstruct_assertions(
+          lu, perm, self.validate_args))
+
+    if is_init != tensor_util.is_ref(self.lower_upper):
+      lu = tf.convert_to_tensor(self.lower_upper) if lu is None else lu
+      assertions.append(assert_util.assert_none_equal(
+          tf.linalg.diag_part(lu), tf.zeros([], dtype=lu.dtype),
+          message='Invertible `lower_upper` must have nonzero diagonal.'))
+
+    return assertions
+

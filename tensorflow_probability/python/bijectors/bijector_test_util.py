@@ -257,8 +257,8 @@ def get_fldj_theoretical(bijector,
 
   Args:
     bijector: the bijector whose Jacobian we wish to approximate
-    x: the value for which we want to approximate the Jacobian. x must have
-      a a single batch dimension for compatibility with tape.batch_jacobian.
+    x: the value for which we want to approximate the Jacobian. Must have rank
+      at least `event_ndims`.
     event_ndims: number of dimensions in an event
     inverse_event_ndims: Integer describing the number of event dimensions for
       the bijector codomain. If None, then the value of `event_ndims` is used.
@@ -270,8 +270,8 @@ def get_fldj_theoretical(bijector,
       a 1-D vector according to its event_ndims.
 
   Returns:
-    A gradient-based approximation to the log det Jacobian of bijector.forward
-    evaluated at x.
+    fldj: A gradient-based evaluation of the log det Jacobian of
+      `bijector.forward` at `x`.
   """
   if inverse_event_ndims is None:
     inverse_event_ndims = event_ndims
@@ -286,19 +286,33 @@ def get_fldj_theoretical(bijector,
 
   x = tf.convert_to_tensor(x)
   x_unconstrained = 1 * input_to_unconstrained.forward(x)
+  # Collapse any batch dimensions (including scalar) to a single axis.
+  batch_shape = x_unconstrained.shape[:-1]
+  x_unconstrained = tf.reshape(x_unconstrained, [-1, x_unconstrained.shape[-1]])
 
   with tf.GradientTape(persistent=True) as tape:
     tape.watch(x_unconstrained)
-    f_x = bijector.forward(input_to_unconstrained.inverse(x_unconstrained))
+    # Unflatten any batch dimensions now under the tape.
+    unflattened_x_unconstrained = tf.reshape(
+        x_unconstrained,
+        tensorshape_util.concatenate(batch_shape, x_unconstrained.shape[-1:]))
+    f_x = bijector.forward(input_to_unconstrained.inverse(
+        unflattened_x_unconstrained))
     f_x_unconstrained = output_to_unconstrained.forward(f_x)
+    # Flatten any batch dimensions to a single axis.
+    f_x_unconstrained = tf.reshape(f_x_unconstrained,
+                                   [-1, f_x_unconstrained.shape[-1]])
   jacobian = tape.batch_jacobian(
       f_x_unconstrained, x_unconstrained, experimental_use_pfor=False)
+  jacobian = tf.reshape(
+      jacobian, tensorshape_util.concatenate(batch_shape, jacobian.shape[-2:]))
   logging.vlog(1, 'Jacobian: %s', jacobian)
 
   log_det_jacobian = 0.5 * tf.linalg.slogdet(
       tf.matmul(jacobian, jacobian, adjoint_a=True)).log_abs_determinant
 
-  return (log_det_jacobian + input_to_unconstrained.forward_log_det_jacobian(
-      x, event_ndims=event_ndims) -
-          output_to_unconstrained.forward_log_det_jacobian(
-              f_x, event_ndims=inverse_event_ndims))
+  input_correction = input_to_unconstrained.forward_log_det_jacobian(
+      x, event_ndims=event_ndims)
+  output_correction = output_to_unconstrained.forward_log_det_jacobian(
+      f_x, event_ndims=inverse_event_ndims)
+  return log_det_jacobian + input_correction - output_correction

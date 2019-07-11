@@ -413,6 +413,8 @@ py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math:linalg",
     ],
 )
@@ -845,6 +847,7 @@ py_test(
     size = "small",
     srcs = ["matveclu_test.py"],
     deps = [
+        ":bijector_test_util",
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
