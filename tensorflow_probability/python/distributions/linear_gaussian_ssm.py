@@ -38,9 +38,9 @@ tfl = tf.linalg
 
 
 def _safe_concat(values, axis):
-  """Concat that works even when some arguments are `None`."""
+  """Concat that works even when some arguments are empty."""
   return tf.concat(
-      [t for t in values if t.shape.rank is not None], axis=axis)
+      [t for t in values if tf.equal(tf.size(t), 0) is None], axis=axis)
 
 
 def _check_equal_shape(name,
