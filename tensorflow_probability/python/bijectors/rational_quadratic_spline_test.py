@@ -40,7 +40,7 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 @hps.composite
 def rq_splines(draw, batch_shape=None, dtype=tf.float32):
   if batch_shape is None:
-    batch_shape = draw(tfp_hps.batch_shapes())
+    batch_shape = draw(tfp_hps.shapes())
 
   lo = draw(hps.floats(min_value=-5, max_value=.5))
   hi = draw(hps.floats(min_value=-.5, max_value=5))
@@ -167,7 +167,7 @@ class RationalQuadraticSplineTest(test_case.TestCase):
   @tfp_hps.tfp_hp_settings(max_examples=5)
   def testTheoreticalFldj(self, data):
     # get_fldj_theoretical test rig requires 1-d batches.
-    batch_shape = data.draw(tfp_hps.batch_shapes(min_ndims=1, max_ndims=1))
+    batch_shape = data.draw(tfp_hps.shapes(min_ndims=1, max_ndims=1))
     bijector = data.draw(rq_splines(batch_shape=batch_shape, dtype=tf.float64))
     self.assertEqual(tf.float64, bijector.dtype)
     bw, bh, kd = self.evaluate(

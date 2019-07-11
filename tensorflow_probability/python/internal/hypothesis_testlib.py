@@ -62,9 +62,26 @@ def usage_counting_identity(var):
   return tf.identity(var)
 
 
+def defer_and_count_usage(var):
+  return DeferredTensor(usage_counting_identity, var)
+
+
 @contextlib.contextmanager
-def assert_no_excessive_var_usage(cls_and_method, max_permissible=2):
-  """Fails if too many convert_to_tensor calls happen to any DeferredTensor."""
+def assert_no_excessive_var_usage(name, max_permissible=2):
+  """Fails if a tagged DeferredTensor is convert_to_tensor'd too much.
+
+  To set this up, wrap some Variables in `defer_and_count_usage`.  Then, if any
+  of them is accessed more than `max_permissible` times in the wrapped block,
+  this will signal an informative error.
+
+  Args:
+    name: Python `str` naming this var usage counter.
+    max_permissible: Python `int` giving the maximum OK number of times
+      each tagged DeferredTensor may be read.
+
+  Yields:
+    Nothing (it's a context manager).
+  """
   VAR_USAGES.clear()
   yield
   # TODO(jvdillon): Reduce max_permissible to 1?
@@ -73,17 +90,26 @@ def assert_no_excessive_var_usage(cls_and_method, max_permissible=2):
     for var, usages in VAR_USAGES.items():
       if len(usages) > max_permissible:
         print('While executing {}, saw {} Tensor conversions of {}:'.format(
-            cls_and_method, len(usages), var))
+            name, len(usages), var))
         for i, usage in enumerate(usages):
           print('Conversion {} of {}:\n{}'.format(i + 1, len(usages),
                                                   ''.join(usage)))
     raise AssertionError(
         'Excessive tensor conversions detected for {}: {}'.format(
-            cls_and_method, var_nusages))
+            name, var_nusages))
 
 
 def constrained_tensors(constraint_fn, shape):
-  """Draws the value of a single constrained parameter."""
+  """Strategy for drawing a constrained Tensor.
+
+  Args:
+    constraint_fn: Function mapping the unconstrained space to the desired
+      constrained space.
+    shape: Shape of the desired Tensors
+
+  Returns:
+    tensors: A strategy for drawing constrained Tensors of the given shape.
+  """
   # TODO(bjp): Allow a wider range of floats.
   # float32s = hps.floats(
   #     np.finfo(np.float32).min / 2, np.finfo(np.float32).max / 2,
@@ -102,8 +128,20 @@ def constrained_tensors(constraint_fn, shape):
 
 
 @hps.composite
-def batch_shapes(draw, min_ndims=0, max_ndims=3, min_lastdimsize=1):
-  """Draws array shapes with some control over rank/dim sizes."""
+def shapes(draw, min_ndims=0, max_ndims=3, min_lastdimsize=1):
+  """Strategy for drawing TensorShapes with some control over rank/dim sizes.
+
+  Args:
+    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    min_ndims: Python `int` giving the minimum rank.
+    max_ndims: Python `int` giving the maximum rank.
+    min_lastdimsize: Python `int`.  The trailing dimension will always be at
+      least this large.  Ignored if the rank turns out to be 0.
+
+  Returns:
+    shapes: A strategy for drawing fully-specified TensorShapes obeying
+      these constraints.
+  """
   rank = draw(hps.integers(min_value=min_ndims, max_value=max_ndims))
   shape = tf.TensorShape(None).with_rank(rank)
   if rank > 0:
@@ -129,7 +167,10 @@ def broadcasting_params(draw,
                         enable_vars=False,
                         constraint_fn_for=lambda param: identity_fn,
                         mutex_params=()):
-  """Draws a dict of parameters which should yield the given batch shape.
+  """Streategy for drawing parameters which jointly have the given batch shape.
+
+  Specifically, the batch shapes of the returned parameters will broadcast to
+  the requested batch shape.
 
   The dtypes of the returned parameters are determined by their respective
   constraint functions.
@@ -197,14 +238,13 @@ def broadcasting_params(draw,
           name='{}_alt_value'.format(param))
       setattr(params_kwargs[param], '_tfp_alt_value', alt_value)
       if draw(hps.booleans()):
-        params_kwargs[param] = DeferredTensor(usage_counting_identity,
-                                              params_kwargs[param])
+        params_kwargs[param] = defer_and_count_usage(params_kwargs[param])
   return params_kwargs
 
 
 @hps.composite
 def broadcasting_named_shapes(draw, batch_shape, param_names):
-  """Draws a set of parameter batch shapes that broadcast to `batch_shape`.
+  """Strategy for drawing a set of batch shapes that broadcast to `batch_shape`.
 
   For each parameter we need to choose its batch rank, and whether or not each
   axis i is 1 or batch_shape[i]. This function chooses a set of shapes that
@@ -212,19 +252,19 @@ def broadcasting_named_shapes(draw, batch_shape, param_names):
   promise that the broadcast of the set of all shapes matches `batch_shape`.
 
   Args:
-    draw: Hypothesis sampler.
-    batch_shape: `tf.TensorShape`, the target (fully-defined) batch shape .
+    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    batch_shape: `tf.TensorShape`, the target (fully-defined) batch shape.
     param_names: Iterable of `str`, the parameters whose batch shapes need
       determination.
 
   Returns:
-    param_batch_shapes: `dict` of `str->tf.TensorShape` where the set of
-        shapes broadcast to `batch_shape`. The shapes are fully defined.
+    param_batch_shapes: A strategy for drawing `dict`s of `str->tf.TensorShape`
+      where the set of shapes broadcast to `batch_shape`. The shapes are fully
+      defined.
   """
   n = len(param_names)
   return dict(
-      zip(
-          draw(hps.permutations(param_names)),
+      zip(draw(hps.permutations(param_names)),
           draw(broadcasting_shapes(batch_shape, n))))
 
 
@@ -271,18 +311,17 @@ def _compute_rank_and_fullsize_reqd(draw, target_shape, current_shape, is_last):
   return next_rank, force_fullsize_dim
 
 
-@hps.composite
-def broadcast_compatible_shape(draw, batch_shape):
-  """Draws a shape which is broadcast-compatible with `batch_shape`."""
+def broadcast_compatible_shape(shape):
+  """Strategy for drawing shapes broadcast-compatible with `shape`."""
   # broadcasting_shapes draws a sequence of shapes, so that the last "completes"
   # the broadcast to fill out batch_shape. Here we just draw two and take the
   # first (incomplete) one.
-  return draw(broadcasting_shapes(batch_shape, 2))[0]
+  return broadcasting_shapes(shape, 2).map(lambda shapes: shapes[0])
 
 
 @hps.composite
 def broadcasting_shapes(draw, target_shape, n):
-  """Draws a set of `n` shapes that broadcast to `target_shape`.
+  """Strategy for drawing a set of `n` shapes that broadcast to `target_shape`.
 
   For each shape we need to choose its rank, and whether or not each axis i is 1
   or target_shape[i]. This function chooses a set of `n` shapes that have
@@ -290,13 +329,14 @@ def broadcasting_shapes(draw, target_shape, n):
   that the broadcast of the set of all shapes matches `target_shape`.
 
   Args:
-    draw: Hypothesis sampler.
+    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
     target_shape: The target (fully-defined) batch shape.
-    n: `int`, the number of shapes to draw.
+    n: Python `int`, the number of shapes to draw.
 
   Returns:
-    shapes: Sequence of `tf.TensorShape` such that the set of shapes broadcast
-      to `target_shape`. The shapes are fully defined.
+    shapes: A strategy for drawing sequences of `tf.TensorShape` such that the
+      set of shapes in each sequence broadcast to `target_shape`. The shapes are
+      fully defined.
   """
   target_shape = tf.TensorShape(target_shape)
   target_rank = target_shape.ndims

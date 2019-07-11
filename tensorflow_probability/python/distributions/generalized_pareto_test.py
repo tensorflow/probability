@@ -44,7 +44,7 @@ tfd = tfp.distributions
 @hps.composite
 def generalized_paretos(draw, batch_shape=None):
   if batch_shape is None:
-    batch_shape = draw(tfp_hps.batch_shapes())
+    batch_shape = draw(tfp_hps.shapes())
 
   constraints = dict(
       loc=tfp_hps.identity_fn,

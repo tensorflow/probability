@@ -115,35 +115,60 @@ def broadcasting_params(draw,
 @hps.composite
 def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
               enable_vars=False):
+  """Strategy for drawing Bijectors.
+
+  The emitted bijector may be a basic bijector or an `Invert` of a basic
+  bijector, but not a compound like `Chain`.
+
+  Args:
+    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    bijector_name: Optional Python `str`.  If given, the produced bijectors
+      will all have this type.  If omitted, Hypothesis chooses one from
+      the whitelist `TF2_FRIENDLY_BIJECTORS`.
+    batch_shape: An optional `TensorShape`.  The batch shape of the resulting
+      bijector.  Hypothesis will pick one if omitted.
+    event_dim: Optional Python int giving the size of each of the underlying
+      distribution's parameters' event dimensions.  This is shared across all
+      parameters, permitting square event matrices, compatible location and
+      scale Tensors, etc. If omitted, Hypothesis will choose one.
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test.  If `False`, the returned parameters are
+      all Tensors, never Variables or DeferredTensor.
+
+  Returns:
+    bijectors: A strategy for drawing bijectors with the specified `batch_shape`
+      (or an arbitrary one if omitted).
+  """
   if bijector_name is None:
     bijector_name = draw(hps.one_of(map(hps.just, TF2_FRIENDLY_BIJECTORS)))
   if batch_shape is None:
-    batch_shape = draw(tfp_hps.batch_shapes())
+    batch_shape = draw(tfp_hps.shapes())
   if event_dim is None:
     event_dim = draw(hps.integers(min_value=2, max_value=6))
   if bijector_name == 'Invert':
     underlying_name = draw(
         hps.one_of(map(hps.just,
                        set(TF2_FRIENDLY_BIJECTORS) - {'Invert'})))
-    underlying, batch_shape = draw(
+    underlying = draw(
         bijectors(
             bijector_name=underlying_name,
             batch_shape=batch_shape,
             event_dim=event_dim,
             enable_vars=enable_vars))
-    return tfb.Invert(underlying, validate_args=True), batch_shape
+    return tfb.Invert(underlying, validate_args=True)
 
   bijector_params = draw(
       broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,
                           enable_vars=enable_vars))
   ctor = getattr(tfb, bijector_name)
-  return ctor(validate_args=True, **bijector_params), batch_shape
+  return ctor(validate_args=True, **bijector_params)
 
 
 Support = bijector_hps.Support
 
 
 def scalar_constrainer(support):
+  """Helper for `constrainer` for scalar supports."""
 
   def nonzero(x):
     return tf.where(tf.equal(x, 0), 1e-6, x)
@@ -161,6 +186,7 @@ def scalar_constrainer(support):
 
 
 def vector_constrainer(support):
+  """Helper for `constrainer` for vector supports."""
 
   def l1norm(x):
     x = tf.concat([x, tf.ones_like(x[..., :1]) * 1e-6], axis=-1)
@@ -179,7 +205,7 @@ def vector_constrainer(support):
 
 
 def matrix_constrainer(support):
-
+  """Helper for `constrainer` for matrix supports."""
   constrainers = {
       Support.MATRIX_POSITIVE_DEFINITE:
           tfp_hps.positive_definite,
@@ -190,6 +216,7 @@ def matrix_constrainer(support):
 
 
 def constrainer(support):
+  """Determines a constraining transformation into the given support."""
   if support.startswith('SCALAR_'):
     return scalar_constrainer(support)
   if support.startswith('VECTOR_'):
@@ -201,10 +228,26 @@ def constrainer(support):
 
 @hps.composite
 def domain_tensors(draw, bijector, shape=None):
+  """Strategy for drawing Tensors in the domain of a bijector.
+
+  If the bijector's domain is constrained, this proceeds by drawing an
+  unconstrained Tensor and then transforming it to fit.  The constraints are
+  declared in `bijectors.hypothesis_testlib.bijector_supports`.  The
+  transformations are defined by `constrainer`.
+
+  Args:
+    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    bijector: A `Bijector` in whose domain the Tensors will be.
+    shape: An optional `TensorShape`.  The shape of the resulting
+      Tensors.  Hypothesis will pick one if omitted.
+
+  Returns:
+    tensors: A strategy for drawing domain Tensors for the desired bijector.
+  """
   if is_invert(bijector):
     return draw(codomain_tensors(bijector.bijector, shape))
   if shape is None:
-    shape = draw(tfp_hps.batch_shapes())
+    shape = draw(tfp_hps.shapes())
   bijector_name = type(bijector).__name__
   support = bijector_hps.bijector_supports()[bijector_name].forward
   constraint_fn = constrainer(support)
@@ -213,10 +256,26 @@ def domain_tensors(draw, bijector, shape=None):
 
 @hps.composite
 def codomain_tensors(draw, bijector, shape=None):
+  """Strategy for drawing Tensors in the codomain of a bijector.
+
+  If the bijector's codomain is constrained, this proceeds by drawing an
+  unconstrained Tensor and then transforming it to fit.  The constraints are
+  declared in `bijectors.hypothesis_testlib.bijector_supports`.  The
+  transformations are defined by `constrainer`.
+
+  Args:
+    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    bijector: A `Bijector` in whose codomain the Tensors will be.
+    shape: An optional `TensorShape`.  The shape of the resulting
+      Tensors.  Hypothesis will pick one if omitted.
+
+  Returns:
+    tensors: A strategy for drawing codomain Tensors for the desired bijector.
+  """
   if is_invert(bijector):
     return draw(domain_tensors(bijector.bijector, shape))
   if shape is None:
-    shape = draw(tfp_hps.batch_shapes())
+    shape = draw(tfp_hps.shapes())
   bijector_name = type(bijector).__name__
   support = bijector_hps.bijector_supports()[bijector_name].inverse
   constraint_fn = constrainer(support)
@@ -249,12 +308,13 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
       return
     event_dim = data.draw(hps.integers(min_value=2, max_value=6))
-    bijector, batch_shape = data.draw(
+    bijector = data.draw(
         bijectors(bijector_name=bijector_name, event_dim=event_dim,
                   enable_vars=True))
-    del batch_shape
 
-    # Forward mapping.
+    # Forward mapping: Check differentiation through forward mapping with
+    # respect to the input and parameter variables.  Also check that any
+    # variables are not referenced overmuch.
     shp = bijector.inverse_event_shape([event_dim] *
                                        bijector.inverse_min_event_ndims)
     shp = tensorshape_util.concatenate(
@@ -273,7 +333,9 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
     grads = tape.gradient(ys, wrt_vars)
     assert_no_none_grad(bijector, 'forward', wrt_vars, grads)
 
-    # FLDJ.
+    # FLDJ: Check differentiation through forward log det jacobian with
+    # respect to the input and parameter variables.  Also check that any
+    # variables are not referenced overmuch.
     event_ndims = data.draw(
         hps.integers(
             min_value=bijector.forward_min_event_ndims,
@@ -292,7 +354,9 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
     grads = tape.gradient(ldj, wrt_vars)
     assert_no_none_grad(bijector, 'forward_log_det_jacobian', wrt_vars, grads)
 
-    # Inverse mapping.
+    # Inverse mapping: Check differentiation through inverse mapping with
+    # respect to the codomain "input" and parameter variables.  Also check that
+    # any variables are not referenced overmuch.
     shp = bijector.forward_event_shape([event_dim] *
                                        bijector.forward_min_event_ndims)
     shp = tensorshape_util.concatenate(
@@ -312,7 +376,9 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
     grads = tape.gradient(xs, wrt_vars)
     assert_no_none_grad(bijector, 'inverse', wrt_vars, grads)
 
-    # ILDJ.
+    # ILDJ: Check differentiation through inverse log det jacobian with respect
+    # to the codomain "input" and parameter variables.  Also check that any
+    # variables are not referenced overmuch.
     event_ndims = data.draw(
         hps.integers(
             min_value=bijector.inverse_min_event_ndims,

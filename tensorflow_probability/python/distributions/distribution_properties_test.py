@@ -325,14 +325,13 @@ def independents(
   reinterpreted_batch_ndims = draw(hps.integers(min_value=0, max_value=2))
   if batch_shape is None:
     batch_shape = draw(
-        tfp_hps.batch_shapes(min_ndims=reinterpreted_batch_ndims))
+        tfp_hps.shapes(min_ndims=reinterpreted_batch_ndims))
   else:  # This independent adds some batch dims to its underlying distribution.
     batch_shape = tensorshape_util.concatenate(
         batch_shape,
-        draw(
-            tfp_hps.batch_shapes(
-                min_ndims=reinterpreted_batch_ndims,
-                max_ndims=reinterpreted_batch_ndims)))
+        draw(tfp_hps.shapes(
+            min_ndims=reinterpreted_batch_ndims,
+            max_ndims=reinterpreted_batch_ndims)))
   underlying = draw(
       distributions(
           batch_shape=batch_shape,
@@ -395,7 +394,7 @@ def transformed_distributions(draw,
   bijector = draw(bijector_hps.unconstrained_bijectors())
   logging.info('TD bijector: %s', bijector)
   if batch_shape is None:
-    batch_shape = draw(tfp_hps.batch_shapes())
+    batch_shape = draw(tfp_hps.shapes())
   underlying_batch_shape = batch_shape
   batch_shape_arg = None
   if draw(hps.booleans()):
@@ -464,11 +463,11 @@ def mixtures_same_family(draw,
 
   if batch_shape is None:
     # Ensure the components dist has at least one batch dim (a component dim).
-    batch_shape = draw(tfp_hps.batch_shapes(min_ndims=1, min_lastdimsize=2))
+    batch_shape = draw(tfp_hps.shapes(min_ndims=1, min_lastdimsize=2))
   else:  # This mixture adds a batch dim to its underlying components dist.
     batch_shape = tensorshape_util.concatenate(
         batch_shape,
-        draw(tfp_hps.batch_shapes(min_ndims=1, max_ndims=1, min_lastdimsize=2)))
+        draw(tfp_hps.shapes(min_ndims=1, max_ndims=1, min_lastdimsize=2)))
 
   component_dist = draw(
       distributions(
@@ -546,7 +545,7 @@ def base_distributions(draw,
     dist_name = draw(hps.one_of(map(hps.just, names)))
 
   if batch_shape is None:
-    batch_shape = draw(tfp_hps.batch_shapes())
+    batch_shape = draw(tfp_hps.shapes())
 
   params_kwargs = draw(
       broadcasting_params(

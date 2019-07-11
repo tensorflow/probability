@@ -41,7 +41,19 @@ INSTANTIABLE_BIJECTORS = None
 
 
 def instantiable_bijectors():
-  """Identifies bijectors that are trivially instantiable."""
+  """Identifies bijectors that are trivially instantiable.
+
+  Here, "trivially" means things like `Exp` for which no parameters need to be
+  generated; i.e., the only arguments to the constructor are `self`, `name`, and
+  `validate_args`.
+
+  This finds the bijectors by traversing the `tfp.bijectors` namespace.  The
+  traversal is cached so it only happens once per Python process.
+
+  Returns:
+    instantiable: A Python `dict` mapping the `str` bijector name to a singleton
+      tuple containing the bijector class object.
+  """
   global INSTANTIABLE_BIJECTORS
   if INSTANTIABLE_BIJECTORS is not None:
     return INSTANTIABLE_BIJECTORS
@@ -74,7 +86,7 @@ def instantiable_bijectors():
 
 
 class Support(object):
-  """Enumeration of supports for trivially instantiable bijectors."""
+  """Classification of bijector domains and codomains."""
   SCALAR_UNCONSTRAINED = 'SCALAR_UNCONSTRAINED'
   SCALAR_NON_NEGATIVE = 'SCALAR_NON_NEGATIVE'
   SCALAR_NON_ZERO = 'SCALAR_NON_ZERO'
@@ -92,13 +104,30 @@ class Support(object):
   OTHER = 'OTHER'
 
 
-BijectorSupport = collections.namedtuple('BijectorSupport', 'forward,inverse')
+class BijectorSupport(collections.namedtuple(
+    'BijectorSupport', ['forward', 'inverse'])):
+  """Specification of the domain and codomain of a bijector.
+
+  The `forward` slot is the support of the forward computation, i.e., the
+  domain, and the `inverse` slot is the support of the inverse computation,
+  i.e., the codomain.
+  """
+  __slots__ = ()
+
 
 BIJECTOR_SUPPORTS = None
 
 
 def bijector_supports():
-  """Returns a dict of support mappings for each instantiable bijector."""
+  """Returns a dict of supports for each instantiable bijector.
+
+  Warns if any `instantiable_bijectors` are found to have no declared supports,
+  once per Python process.
+
+  Returns:
+    supports: Python `dict` mapping `str` bijector name to the corresponding
+      `BijectorSupport` object.
+  """
   global BIJECTOR_SUPPORTS
   if BIJECTOR_SUPPORTS is not None:
     return BIJECTOR_SUPPORTS
@@ -178,7 +207,17 @@ def bijector_supports():
 
 @hps.composite
 def unconstrained_bijectors(draw):
-  """Draws bijectors which can act on [numerically] unconstrained events."""
+  """Strategy for drawing forward-unconstrained bijectors.
+
+  The bijectors emitted by this are those whose `forward` computation
+  can act on all of R^n.
+
+  Args:
+    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+
+  Returns:
+    unconstrained: A strategy for drawing such bijectors.
+  """
   bijector_names = hps.one_of(map(hps.just, instantiable_bijectors().keys()))
   bijector_name = draw(
       bijector_names.filter(lambda b: (  # pylint: disable=g-long-lambda
@@ -193,7 +232,22 @@ def unconstrained_bijectors(draw):
 
 
 def distribution_filter_for(bijector):
-  """Returns filter function f s.t. f(dist)=True => bijector can act on dist."""
+  """Returns a function checking Distribution compatibility with this bijector.
+
+  That is, `distribution_filter_for(bijector)(dist) == True` implies
+  that `bijector` can act on `dist` (i.e., they are safe to compose with
+  `TransformedDistribution`).
+
+  TODO(bjp): Make this sensitive to supports.  Currently assumes `bijector` acts
+  on an unconstrained space, and just checks compatible ranks.
+
+  Args:
+    bijector: A `Bijector` instance to check compatibility with.
+
+  Returns:
+    filter: A Python callable filtering Distributions for compatibility with
+      this bijector.
+  """
   if isinstance(bijector, tfb.CholeskyToInvCholesky):
 
     def additional_check(dist):
