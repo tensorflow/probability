@@ -126,12 +126,12 @@ class RealNVP(bijector_lib.Bijector):
        Autoregressive Flow for Density Estimation. In _Neural Information
        Processing Systems_, 2017. https://arxiv.org/abs/1705.07057
 
-  [5]: Kingma, D. P., Salimans, T., & Welling, M. Improving Variational
+  [5]: Diederik P Kingma, Tim Salimans, Max Welling. Improving Variational
        Inference with Inverse Autoregressive Flow. In _Neural Information
        Processing Systems_, 2016. https://arxiv.org/abs/1606.04934
 
-  [6]: Durkan, C., Bekasov, A., Murray, I., & Papamakarios, G. Neural
-       Spline Flows, 2019. Retrieved from http://arxiv.org/abs/1906.04032
+  [6]: Conor Durkan, Artur Bekasov, Iain Murray, George Papamakarios. Neural
+       Spline Flows, 2019. http://arxiv.org/abs/1906.04032
   """
 
   def __init__(self,
@@ -157,8 +157,9 @@ class RealNVP(bijector_lib.Bijector):
         `log_scale` is equivalent to (but more efficient than) returning zero.
       bijector_fn: Python `callable` which returns a `tfb.Bijector` which
         transforms the last `D-d` unit with the signature `(masked_units_tensor,
-        output_units, **condition_kwargs)`. The bijector must operate on scalar
-        or vector events and must not alter the rank of its imput.
+        output_units, **condition_kwargs) -> bijector`. The bijector must
+        operate on scalar or vector events and must not alter the rank of its
+        input.
       is_constant_jacobian: Python `bool`. Default: `False`. When `True` the
         implementation assumes `log_scale` does not depend on the forward domain
         (`x`) or inverse domain (`y`) values. (No validation is made;

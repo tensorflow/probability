@@ -386,6 +386,7 @@ py_library(
     name = "masked_autoregressive",
     srcs = ["masked_autoregressive.py"],
     deps = [
+        ":affine_scalar",
         ":bijector",
         # numpy dep,
         # six dep,
@@ -990,6 +991,7 @@ py_test(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
