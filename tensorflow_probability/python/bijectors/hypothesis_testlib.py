@@ -135,6 +135,9 @@ def bijector_supports():
       'AffineScalar':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
+      'BatchNormalization':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_UNCONSTRAINED),
       'CholeskyOuterProduct':
           BijectorSupport(Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE,
                           Support.MATRIX_POSITIVE_DEFINITE),

@@ -40,6 +40,7 @@ FLAGS = flags.FLAGS
 
 TF2_FRIENDLY_BIJECTORS = (
     # 'AffineScalar',  # TODO(b/136265958): Cached jacobian breaks grad to scale
+    'BatchNormalization',
     'CholeskyOuterProduct',
     'Cumsum',
     'Exp',
@@ -74,6 +75,7 @@ MUTEX_PARAMS = (
 
 NO_LDJ_GRADS_EXPECTED = {
     'AffineScalar': {'[arg]', 'shift'},
+    'BatchNormalization': {'beta'},
     'Cumsum': {'[arg]'},
     'Gumbel': {'loc'},
     'Identity': {'[arg]'},
@@ -287,7 +289,7 @@ def assert_no_none_grad(bijector, method, wrt_vars, grads):
     if 'log_det_jacobian' in method:
       if tensor_util.is_ref(var):
         # We check tensor_util.is_ref to accounts for xs/ys being in vars.
-        var_name = var.name.rstrip('_0123456789:')
+        var_name = var.name.rstrip('_0123456789:').split('/')[-1]
       else:
         var_name = '[arg]'
       to_check = bijector.bijector if is_invert(bijector) else bijector
@@ -323,7 +325,7 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
                 shp[:shp.ndims - bijector.forward_min_event_ndims])),
         shp[shp.ndims - bijector.forward_min_event_ndims:])
     xs = tf.identity(data.draw(domain_tensors(bijector, shape=shp)), name='xs')
-    wrt_vars = [xs] + list(bijector.variables)
+    wrt_vars = [xs] + list(bijector.trainable_variables)
     with tf.GradientTape() as tape:
       with tfp_hps.assert_no_excessive_var_usage(
           'method `forward` of {}'.format(bijector)):
@@ -366,7 +368,7 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
         shp[shp.ndims - bijector.inverse_min_event_ndims:])
     ys = tf.identity(
         data.draw(codomain_tensors(bijector, shape=shp)), name='ys')
-    wrt_vars = [ys] + list(bijector.variables)
+    wrt_vars = [ys] + list(bijector.trainable_variables)
     with tf.GradientTape() as tape:
       with tfp_hps.assert_no_excessive_var_usage(
           'method `inverse` of {}'.format(bijector)):

@@ -21,10 +21,11 @@ from __future__ import print_function
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python import distributions
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -241,6 +242,35 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
               batch_size=16,
               epochs=1,
               steps_per_epoch=2)
+
+  def testTheoreticalFldj(self):
+    nbatch = 5
+    channels = 10
+    x = np.random.uniform(size=[nbatch, channels]).astype(np.float32)
+
+    bijector = tfb.BatchNormalization(training=False)
+    bijector.batchnorm.build(x.shape)
+    self.evaluate([v.initializer for v in bijector.variables])
+
+    y = self.evaluate(bijector.forward(x))
+    bijector_test_util.assert_bijective_and_finite(
+        bijector,
+        x,
+        y,
+        eval_func=self.evaluate,
+        event_ndims=1,
+        inverse_event_ndims=1,
+        rtol=1e-5)
+    fldj = bijector.forward_log_det_jacobian(x, event_ndims=1)
+    # The jacobian is not yet broadcast, since it is constant.
+    fldj = fldj + tf.zeros(tf.shape(x)[:-1], dtype=x.dtype)
+    fldj_theoretical = bijector_test_util.get_fldj_theoretical(
+        bijector, x, event_ndims=1)
+    self.assertAllClose(
+        self.evaluate(fldj_theoretical),
+        self.evaluate(fldj),
+        atol=1e-5,
+        rtol=1e-5)
 
 if __name__ == "__main__":
   tf.test.main()

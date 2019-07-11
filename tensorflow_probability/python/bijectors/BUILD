@@ -763,6 +763,7 @@ py_test(
     size = "medium",
     srcs = ["batch_normalization_test.py"],
     deps = [
+        ":bijector_test_util",
         ":bijectors",
         # absl/testing:parameterized dep,
         # numpy dep,

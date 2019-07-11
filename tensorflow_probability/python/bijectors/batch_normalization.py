@@ -20,13 +20,13 @@ from __future__ import print_function
 
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 
 
 __all__ = [
-    "BatchNormalization",
+    'BatchNormalization',
 ]
 
 
@@ -54,7 +54,7 @@ def _undo_batch_normalization(x,
   Returns:
     batch_unnormalized: The de-normalized, de-scaled, de-offset `Tensor`.
   """
-  with tf.compat.v2.name_scope(name or "undo_batchnorm"):
+  with tf.name_scope(name or 'undo_batch_normalization'):
     # inv = tf.rsqrt(variance + variance_epsilon)
     # if scale is not None:
     #   inv *= scale
@@ -127,13 +127,13 @@ class BatchNormalization(bijector.Bijector):
                batchnorm_layer=None,
                training=True,
                validate_args=False,
-               name="batch_normalization"):
+               name='batch_normalization'):
     """Instantiates the `BatchNormalization` bijector.
 
     Args:
       batchnorm_layer: `tf.layers.BatchNormalization` layer object. If `None`,
-        defaults to
-        `tf.layers.BatchNormalization(gamma_constraint=tf.nn.relu(x) + 1e-6)`.
+        defaults to a `tf.keras.layers.BatchNormalization` with
+        `gamma_constraint=tf.nn.relu(x) + 1e-6)`.
         This ensures positivity of the scale variable.
 
       training: If True, updates running-average statistics during call to
@@ -174,12 +174,18 @@ class BatchNormalization(bijector.Bijector):
     if (not isinstance(layer, tf.keras.layers.BatchNormalization) and
         not isinstance(layer, tf.compat.v1.layers.BatchNormalization)):
       raise ValueError(
-          "batchnorm_layer must be an instance of BatchNormalization layer.")
+          'batchnorm_layer must be an instance of '
+          '`tf.keras.layers.BatchNormalization` or '
+          '`tf.compat.v1.layers.BatchNormalization`. Got {}'.format(
+              type(layer)))
     if layer.renorm:
-      raise ValueError("BatchNorm Bijector does not support renormalization.")
+      raise ValueError(
+          '`BatchNormalization` Bijector does not support renormalization, '
+          'but `batchnorm_layer.renorm` is `True`.')
     if layer.virtual_batch_size:
       raise ValueError(
-          "BatchNorm Bijector does not support virtual batch sizes.")
+          '`BatchNormlization` Bijector does not support virtual batch sizes, '
+          'but `batchnorm_layer.virtual_batch_size` is `True`.')
 
   def _get_broadcast_fn(self, x):
     ndims = len(x.shape)
@@ -232,22 +238,21 @@ class BatchNormalization(bijector.Bijector):
     # At training-time, ildj is computed from the mean and log-variance across
     # the current minibatch.
     # We use multiplication instead of tf.where() to get easier broadcasting.
-    use_saved_statistics = tf.cast(
-        tf.logical_or(use_saved_statistics, tf.logical_not(self._training)),
-        tf.float32)
     log_variance = tf.math.log(
-        (1 - use_saved_statistics) *
-        tf.nn.moments(x=y, axes=reduction_axes, keepdims=True)[1] +
-        use_saved_statistics * self.batchnorm.moving_variance +
+        tf.where(
+            tf.logical_or(use_saved_statistics, tf.logical_not(self._training)),
+            self.batchnorm.moving_variance,
+            tf.nn.moments(x=y, axes=reduction_axes, keepdims=True)[1]) +
         self.batchnorm.epsilon)
 
+    # TODO(b/137216713): determine whether it's unsafe for the reduce_sums below
+    # to happen across all axes.
     # `gamma` and `log Var(y)` reductions over event_dims.
     # Log(total change in area from gamma term).
-    log_total_gamma = tf.reduce_sum(
-        input_tensor=tf.math.log(self.batchnorm.gamma))
+    log_total_gamma = tf.reduce_sum(tf.math.log(self.batchnorm.gamma))
 
     # Log(total change in area from log-variance term).
-    log_total_variance = tf.reduce_sum(input_tensor=log_variance)
+    log_total_variance = tf.reduce_sum(log_variance)
     # The ildj is scalar, as it does not depend on the values of x and are
     # constant across minibatch elements.
     return log_total_gamma - 0.5 * log_total_variance
