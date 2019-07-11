@@ -117,8 +117,6 @@ class RationalQuadraticSpline(bijector.Bijector):
   ys_inv = spline_flow().inverse(ys)  # ys_inv ~= xs
   ```
 
-  For exactly two splits, `tfp.bijectors.RealNVP` can be used.
-
   For a one-at-a-time autoregressive flow as in [1], it would be profitable to
   implement a mask over `xs` to parallelize either the inverse or the forward
   pass and implement the other using a `tf.while_loop`. See

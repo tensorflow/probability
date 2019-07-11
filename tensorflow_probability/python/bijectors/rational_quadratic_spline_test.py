@@ -151,12 +151,12 @@ class RationalQuadraticSplineTest(test_case.TestCase):
         x,
         y,
         eval_func=self.evaluate,
-        event_ndims=1,
-        inverse_event_ndims=1,
+        event_ndims=0,
+        inverse_event_ndims=0,
         rtol=1e-5)
-    fldj = bijector.forward_log_det_jacobian(x, event_ndims=1)
+    fldj = bijector.forward_log_det_jacobian(x, event_ndims=0)
     fldj_theoretical = bijector_test_util.get_fldj_theoretical(
-        bijector, x, event_ndims=1)
+        bijector, x, event_ndims=0)
     self.assertAllClose(
         self.evaluate(fldj_theoretical),
         self.evaluate(fldj),
@@ -170,10 +170,10 @@ class RationalQuadraticSplineTest(test_case.TestCase):
     batch_shape = data.draw(tfp_hps.batch_shapes(min_ndims=1, max_ndims=1))
     bijector = data.draw(rq_splines(batch_shape=batch_shape, dtype=tf.float64))
     self.assertEqual(tf.float64, bijector.dtype)
-    kx, ky, kd = self.evaluate(
+    bw, bh, kd = self.evaluate(
         [bijector.bin_widths, bijector.bin_heights, bijector.knot_slopes])
-    logging.info('kx: %s\nky: %s\nkd: %s', kx, ky, kd)
-    x_shp = ((kx + ky)[..., :-1] + kd).shape[:-1]
+    logging.info('bw: %s\nbh: %s\nkd: %s', bw, bh, kd)
+    x_shp = ((bw + bh)[..., :-1] + kd).shape[:-1]
     if x_shp[-1] == 1:  # Possibly broadcast the x dim.
       dim = data.draw(hps.integers(min_value=1, max_value=7))
       x_shp = x_shp[:-1] + (dim,)
@@ -184,12 +184,12 @@ class RationalQuadraticSplineTest(test_case.TestCase):
         x,
         y,
         eval_func=self.evaluate,
-        event_ndims=1,
-        inverse_event_ndims=1,
+        event_ndims=0,
+        inverse_event_ndims=0,
         rtol=1e-5)
-    fldj = bijector.forward_log_det_jacobian(x, event_ndims=1)
+    fldj = bijector.forward_log_det_jacobian(x, event_ndims=0)
     fldj_theoretical = bijector_test_util.get_fldj_theoretical(
-        bijector, x, event_ndims=1)
+        bijector, x, event_ndims=0)
     self.assertAllClose(
         self.evaluate(fldj_theoretical),
         self.evaluate(fldj),

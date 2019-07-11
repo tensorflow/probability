@@ -147,8 +147,8 @@ def bijector_supports():
           BijectorSupport(Support.VECTOR_STRICTLY_INCREASING,
                           Support.VECTOR_UNCONSTRAINED),
       'RationalQuadraticSpline':
-          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
-                          Support.VECTOR_UNCONSTRAINED),
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED,
+                          Support.SCALAR_UNCONSTRAINED),
       'Reciprocal':
           BijectorSupport(Support.SCALAR_NON_ZERO, Support.SCALAR_NON_ZERO),
       'Sigmoid':
