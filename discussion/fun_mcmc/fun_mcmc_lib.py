@@ -72,12 +72,13 @@ __all__ = [
     'leapfrog_step',
     'make_gaussian_kinetic_energy_fn',
     'maybe_broadcast_structure',
+    'mclachlan_optimal_4th_order_step',
     'metropolis_hastings_step',
     'PotentialFn',
     'ruth4_step',
     'sign_adaptation',
+    'spliting_integrator_step',
     'State',
-    'symmetric_spliting_integrator_step',
     'trace',
     'transform_log_prob_fn',
     'transition_kernel_wrapper',
@@ -85,6 +86,7 @@ __all__ = [
 ]
 
 AnyTensor = Union[tf.Tensor, np.ndarray, np.generic]
+BooleanTensor = Union[bool, tf.Tensor, np.ndarray, np.bool_]
 IntTensor = Union[int, tf.Tensor, np.ndarray, np.integer]
 FloatTensor = Union[float, tf.Tensor, np.ndarray, np.floating]
 # TODO(b/109648354): Correctly represent the recursive nature of this type.
@@ -325,7 +327,7 @@ def transform_log_prob_fn(log_prob_fn: PotentialFn,
 
 
 IntegratorStepState = collections.namedtuple('IntegratorStepState',
-                                             'state, state_grads, momentum')
+                                             'state, state_grads,momentum')
 IntegratorStepExtras = collections.namedtuple(
     'IntegratorStepExtras', 'target_log_prob, state_extra, '
     'kinetic_energy, kinetic_energy_extra')
@@ -333,19 +335,19 @@ IntegratorStep = Callable[[IntegratorStepState],
                           Tuple[IntegratorStepState, IntegratorStepExtras]]
 
 
-def symmetric_spliting_integrator_step(
+def spliting_integrator_step(
     integrator_step_state: IntegratorStepState,
     step_size: FloatTensor,
     target_log_prob_fn: PotentialFn,
     kinetic_energy_fn: PotentialFn,
     coefficients: Sequence[FloatTensor],
+    forward: bool = True,
 ) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
   """Symmetric symplectic integrator `TransitionOperator`.
 
   This implementation is based on Hamiltonian splitting, with the splits
-  weighted by coefficients. We assume a symmetric integrator, so only the first
-  `N / 2 + 1` coefficients need be specified. We always update the momentum
-  first. See [1] for an overview of the method.
+  weighted by coefficients. We update the momentum first, if `forward` argument
+  is `True`. See [1] for an overview of the method.
 
   Args:
     integrator_step_state: IntegratorStepState.
@@ -353,7 +355,8 @@ def symmetric_spliting_integrator_step(
       state.
     target_log_prob_fn: Target log prob fn.
     kinetic_energy_fn: Kinetic energy fn.
-    coefficients: First N / 2 + 1 coefficients.
+    coefficients: Integrator coefficients.
+    forward: Whether to run the integrator in the forward direction.
 
   Returns:
     integrator_step_state: IntegratorStepState.
@@ -367,30 +370,39 @@ def symmetric_spliting_integrator_step(
   """
   if len(coefficients) < 2:
     raise ValueError('Too few coefficients. Need at least 2.')
-  coefficients = list(coefficients) + list(reversed(coefficients))[1:]
   state = integrator_step_state.state
   state_grads = integrator_step_state.state_grads
   momentum = integrator_step_state.momentum
+  # TODO(siege): Consider amortizing this across steps. The tricky bit here
+  # is that only a few integrators take these grads.
+  momentum_grads = None
   step_size = maybe_broadcast_structure(step_size, state)
 
   state = tf.nest.map_structure(tf.convert_to_tensor, state)
   momentum = tf.nest.map_structure(tf.convert_to_tensor, momentum)
   state = tf.nest.map_structure(tf.convert_to_tensor, state)
 
-  if state_grads is None:
-    _, _, state_grads = call_and_grads(target_log_prob_fn, state)
-  else:
-    state_grads = tf.nest.map_structure(tf.convert_to_tensor, state_grads)
+  idx_and_coefficients = enumerate(coefficients)
+  if not forward:
+    idx_and_coefficients = reversed(list(idx_and_coefficients))
 
-  for i, c in enumerate(coefficients):
+  for i, c in idx_and_coefficients:
     # pylint: disable=cell-var-from-loop
     if i % 2 == 0:
+      if state_grads is None:
+        _, _, state_grads = call_and_grads(target_log_prob_fn, state)
+      else:
+        state_grads = tf.nest.map_structure(tf.convert_to_tensor, state_grads)
+
       momentum = tf.nest.map_structure(lambda m, sg, s: m + c * sg * s,
                                        momentum, state_grads, step_size)
 
       kinetic_energy, kinetic_energy_extra, momentum_grads = call_and_grads(
           kinetic_energy_fn, momentum)
     else:
+      if momentum_grads is None:
+        _, _, momentum_grads = call_and_grads(kinetic_energy_fn, momentum)
+
       state = tf.nest.map_structure(lambda x, mg, s: x + c * mg * s, state,
                                     momentum_grads, step_size)
 
@@ -421,8 +433,8 @@ def leapfrog_step(
     integrator_step_state: IntegratorStepState.
     integrator_step_extras: IntegratorStepExtras.
   """
-  coefficients = [0.5, 1.]
-  return symmetric_spliting_integrator_step(
+  coefficients = [0.5, 1., 0.5]
+  return spliting_integrator_step(
       integrator_step_state,
       step_size,
       target_log_prob_fn,
@@ -458,7 +470,8 @@ def ruth4_step(
   """
   c = 2**(1. / 3)
   coefficients = (1. / (2 - c)) * np.array([0.5, 1., 0.5 - 0.5 * c, -c])
-  return symmetric_spliting_integrator_step(
+  coefficients = list(coefficients) + list(reversed(coefficients))[1:]
+  return spliting_integrator_step(
       integrator_step_state,
       step_size,
       target_log_prob_fn,
@@ -496,7 +509,8 @@ def blanes_3_stage_step(
   a1 = 0.11888010966
   b1 = 0.29619504261
   coefficients = [a1, b1, 0.5 - a1, 1. - 2. * b1]
-  return symmetric_spliting_integrator_step(
+  coefficients = coefficients + list(reversed(coefficients))[1:]
+  return spliting_integrator_step(
       integrator_step_state,
       step_size,
       target_log_prob_fn,
@@ -535,12 +549,75 @@ def blanes_4_stage_step(
   a2 = 0.268548791
   b1 = 0.191667800
   coefficients = [a1, b1, a2, 0.5 - b1, 1. - 2. * (a1 + a2)]
-  return symmetric_spliting_integrator_step(
+  coefficients = coefficients + list(reversed(coefficients))[1:]
+  return spliting_integrator_step(
       integrator_step_state,
       step_size,
       target_log_prob_fn,
       kinetic_energy_fn,
       coefficients=coefficients)
+
+
+def mclachlan_optimal_4th_order_step(
+    integrator_step_state: IntegratorStepState,
+    step_size: FloatTensor,
+    target_log_prob_fn: PotentialFn,
+    kinetic_energy_fn: PotentialFn,
+    forward: BooleanTensor,
+) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
+  """4th order integrator for Hamiltonians with a quadratic kinetic energy.
+
+  See [1] for details. Note that this integrator step is not reversible, so for
+  use in HMC you should randomly reverse the integration direction to preserve
+  detailed balance.
+
+  Args:
+    integrator_step_state: IntegratorStepState.
+    step_size: Step size, structure broadcastable to the `target_log_prob_fn`
+      state.
+    target_log_prob_fn: Target log prob fn.
+    kinetic_energy_fn: Kinetic energy fn.
+    forward: A scalar `bool` Tensor. Whether to run this integrator in the
+      forward direction. Note that this is done for the entire state, not
+      per-batch.
+
+  Returns:
+    integrator_step_state: IntegratorStepState.
+    integrator_step_extras: IntegratorStepExtras.
+
+  #### References:
+
+  [1]: McLachlan R. I., & Atela P. (1992). The accuracy of symplectic
+       integrators. Nonlinearity, 5, 541-562.
+  """
+  # N.B. a's and b's are used in the opposite sense than the Blanes integrators
+  # above.
+  a1 = 0.5153528374311229364
+  a2 = -0.085782019412973646
+  a3 = 0.4415830236164665242
+  a4 = 0.1288461583653841854
+
+  b1 = 0.1344961992774310892
+  b2 = -0.2248198030794208058
+  b3 = 0.7563200005156682911
+  b4 = 0.3340036032863214255
+  coefficients = [b1, a1, b2, a2, b3, a3, b4, a4]
+
+  def _step(direction):
+    return spliting_integrator_step(
+        integrator_step_state,
+        step_size,
+        target_log_prob_fn,
+        kinetic_energy_fn,
+        coefficients=coefficients,
+        forward=direction)
+
+  # In principle we can avoid the cond, and use `tf.where` to select between the
+  # coefficients. This would require a superfluous momentum update, but in
+  # principle is feasible. We're not doing it because it would complicate the
+  # code slightly, and there is limited motivation to do it since reversing the
+  # directions for all the chains at once is typically valid as well.
+  return tf.cond(forward, lambda: _step(True), lambda: _step(False))
 
 
 def metropolis_hastings_step(current_state: State,

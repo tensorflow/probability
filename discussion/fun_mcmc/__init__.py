@@ -39,12 +39,13 @@ from discussion.fun_mcmc.fun_mcmc_lib import IntegratorStepState
 from discussion.fun_mcmc.fun_mcmc_lib import leapfrog_step
 from discussion.fun_mcmc.fun_mcmc_lib import make_gaussian_kinetic_energy_fn
 from discussion.fun_mcmc.fun_mcmc_lib import maybe_broadcast_structure
+from discussion.fun_mcmc.fun_mcmc_lib import mclachlan_optimal_4th_order_step
 from discussion.fun_mcmc.fun_mcmc_lib import metropolis_hastings_step
 from discussion.fun_mcmc.fun_mcmc_lib import PotentialFn
 from discussion.fun_mcmc.fun_mcmc_lib import ruth4_step
 from discussion.fun_mcmc.fun_mcmc_lib import sign_adaptation
+from discussion.fun_mcmc.fun_mcmc_lib import spliting_integrator_step
 from discussion.fun_mcmc.fun_mcmc_lib import State
-from discussion.fun_mcmc.fun_mcmc_lib import symmetric_spliting_integrator_step
 from discussion.fun_mcmc.fun_mcmc_lib import trace
 from discussion.fun_mcmc.fun_mcmc_lib import transform_log_prob_fn
 from discussion.fun_mcmc.fun_mcmc_lib import transition_kernel_wrapper
@@ -72,12 +73,13 @@ __all__ = [
     'leapfrog_step',
     'make_gaussian_kinetic_energy_fn',
     'maybe_broadcast_structure',
+    'mclachlan_optimal_4th_order_step',
     'metropolis_hastings_step',
     'PotentialFn',
     'ruth4_step',
     'sign_adaptation',
+    'spliting_integrator_step',
     'State',
-    'symmetric_spliting_integrator_step',
     'trace',
     'transform_log_prob_fn',
     'transition_kernel_wrapper',
