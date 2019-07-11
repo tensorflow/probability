@@ -44,7 +44,7 @@ py_library(
         ":semilocal_linear_trend",
         ":structural_time_series",
         ":sum",
-        ":trigonometric",
+        ":smooth_seasonal",
     ],
 )
 
@@ -320,8 +320,8 @@ py_test(
 )
 
 py_library(
-    name = "trigonometric",
-    srcs = ["trigonometric.py"],
+    name = "smooth_seasonal",
+    srcs = ["smooth_seasonal.py"],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
@@ -331,9 +331,9 @@ py_library(
 )
 
 py_test(
-    name = "trigonometric_test",
+    name = "smooth_seasonal_test",
     size = "medium",
-    srcs = ["trigonometric_test.py"],
+    srcs = ["smooth_seasonal_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

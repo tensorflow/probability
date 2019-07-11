@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Trigonometric seasonal model."""
+"""Smooth Seasonal Model."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -30,8 +30,8 @@ from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 
 
-class TrigonometricStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
-  """State space model for a trigonometric seasonal effect."""
+class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
+  """State space model for a smooth seasonal effect."""
 
   def __init__(self,
                num_timesteps,
@@ -44,10 +44,10 @@ class TrigonometricStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                validate_args=False,
                allow_nan_stats=True,
                name=None):
-    """Build a trigonometric seasonal state space model."""
+    """Build a smooth seasonal state space model."""
 
     with tf.compat.v1.name_scope(
-        name, 'TrigonometricStateSpaceModel', values=[drift_scale]) as name:
+        name, 'SmoothSeasonalStateSpaceModel', values=[drift_scale]) as name:
 
       dtype = dtype_util.common_dtype(
           [period, selected_frequencies, drift_scale, initial_state_prior])
@@ -66,7 +66,7 @@ class TrigonometricStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           input=tf.constant([[1., 0.]], dtype=dtype),
           multiples=[1, num_frequencies])
 
-      transition_matrix = build_trigonometric_transition_matrix(
+      transition_matrix = build_smooth_seasonal_transition_matrix(
           period=period, selected_frequencies=selected_frequencies, dtype=dtype)
 
       self._drift_scale = drift_scale
@@ -74,7 +74,7 @@ class TrigonometricStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       self._period = period
       self._selected_frequencies = selected_frequencies
 
-      super(TrigonometricStateSpaceModel, self).__init__(
+      super(SmoothSeasonalStateSpaceModel, self).__init__(
           num_timesteps=num_timesteps,
           transition_matrix=transition_matrix,
           transition_noise=tfd.MultivariateNormalDiag(
@@ -112,8 +112,10 @@ class TrigonometricStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     return self._selected_frequencies
 
 
-def build_trigonometric_transition_matrix(period, selected_frequencies, dtype):
-  """Build the transition matrix for a TrigonometricStateSpaceModel"""
+def build_smooth_seasonal_transition_matrix(period,
+                                            selected_frequencies,
+                                            dtype):
+  """Build the transition matrix for a SmoothSeasonalStateSpaceModel"""
 
   two_pi = tf.constant(2. * np.pi, dtype=dtype)
   frequencies = two_pi * selected_frequencies / period
@@ -139,8 +141,8 @@ def build_trigonometric_transition_matrix(period, selected_frequencies, dtype):
   return transition_matrix
 
 
-class Trigonometric(StructuralTimeSeries):
-  """Formal representation of a trigonometric seasonal effects model."""
+class SmoothSeasonal(StructuralTimeSeries):
+  """Formal representation of a smooth seasonal effects model."""
 
   def __init__(self,
                period,
@@ -149,10 +151,10 @@ class Trigonometric(StructuralTimeSeries):
                initial_effect_prior=None,
                observed_time_series=None,
                name=None):
-    """Specify a trigonometric seasonal effects model."""
+    """Specify a smooth seasonal effects model."""
 
     with tf.compat.v1.name_scope(
-        name, 'Trigonometric', values=[observed_time_series]) as name:
+        name, 'SmoothSeasonal', values=[observed_time_series]) as name:
 
       _, observed_stddev, observed_initial = (
           sts_util.empirical_statistics(observed_time_series)
@@ -183,7 +185,7 @@ class Trigonometric(StructuralTimeSeries):
       self._period = period
       self._selected_frequencies = selected_frequencies
 
-      super(Trigonometric, self).__init__(
+      super(SmoothSeasonal, self).__init__(
           parameters=[
               Parameter('drift_scale', drift_scale_prior,
                         tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
@@ -216,7 +218,7 @@ class Trigonometric(StructuralTimeSeries):
     if initial_state_prior is None:
       initial_state_prior = self.initial_state_prior
 
-    return TrigonometricStateSpaceModel(
+    return SmoothSeasonalStateSpaceModel(
         num_timesteps=num_timesteps,
         period=self.period,
         selected_frequencies=self.selected_frequencies,

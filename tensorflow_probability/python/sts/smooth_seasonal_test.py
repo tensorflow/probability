@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Trigonometric State Space Model Tests."""
+"""Smooth Seasonal Model Tests."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -22,14 +22,14 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.sts import Trigonometric
-from tensorflow_probability.python.sts import TrigonometricStateSpaceModel
+from tensorflow_probability.python.sts import SmoothSeasonal
+from tensorflow_probability.python.sts import SmoothSeasonalStateSpaceModel
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
 
-class _TrigonometricStateSpaceModelTest(object):
+class _SmoothSeasonalStateSpaceModelTest(object):
 
   def test_basic_statistics_no_latent_variance_one_frequency(self):
     # fix the latent variables at the value 1 so the results are deterministic
@@ -44,7 +44,7 @@ class _TrigonometricStateSpaceModelTest(object):
     initial_state_prior = tfd.MultivariateNormalDiag(
         loc=initial_state_loc, scale_diag=initial_state_scale)
 
-    ssm = TrigonometricStateSpaceModel(
+    ssm = SmoothSeasonalStateSpaceModel(
         num_timesteps=num_timesteps,
         period=period,
         selected_frequencies=selected_frequencies,
@@ -65,7 +65,7 @@ class _TrigonometricStateSpaceModelTest(object):
     period = 12
     selected_frequencies = [1, 3]
 
-    component = Trigonometric(
+    component = SmoothSeasonal(
         period=period, selected_frequencies=selected_frequencies)
 
     ssm = component.make_state_space_model(num_timesteps, [drift_scale])
@@ -121,22 +121,22 @@ class _TrigonometricStateSpaceModelTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TrigonometricStateSpaceModelTestStaticShape32(
-    tf.test.TestCase, _TrigonometricStateSpaceModelTest):
+class SmoothSeasonalStateSpaceModelTestStaticShape32(
+    tf.test.TestCase, _SmoothSeasonalStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TrigonometricStateSpaceModelTestDynamicShape32(
-    tf.test.TestCase, _TrigonometricStateSpaceModelTest):
+class SmoothSeasonalStateSpaceModelTestDynamicShape32(
+    tf.test.TestCase, _SmoothSeasonalStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TrigonometricStateSpaceModelTestStaticShape64(
-    tf.test.TestCase, _TrigonometricStateSpaceModelTest):
+class SmoothSeasonalStateSpaceModelTestStaticShape64(
+    tf.test.TestCase, _SmoothSeasonalStateSpaceModelTest):
   dtype = np.float64
   use_static_shape = True
 
