@@ -404,7 +404,7 @@ class SmoothSeasonalTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return SmoothSeasonal(period=42,
-                          selected_frequencies=[1, 2, 4],
+                          frequency_multipliers=[1, 2, 4],
                           observed_time_series=observed_time_series)
 
 

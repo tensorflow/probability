@@ -36,7 +36,7 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
   def __init__(self,
                num_timesteps,
                period,
-               selected_frequencies,
+               frequency_multipliers,
                drift_scale,
                initial_state_prior,
                observation_noise_scale=0.,
@@ -50,7 +50,7 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         name, 'SmoothSeasonalStateSpaceModel', values=[drift_scale]) as name:
 
       dtype = dtype_util.common_dtype(
-          [period, selected_frequencies, drift_scale, initial_state_prior])
+          [period, frequency_multipliers, drift_scale, initial_state_prior])
 
       drift_scale = tf.convert_to_tensor(
           value=drift_scale, name='drift_scale', dtype=dtype)
@@ -60,19 +60,21 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           name='observation_noise_scale',
           dtype=dtype)
 
-      num_frequencies = len(selected_frequencies)
+      num_frequencies = len(frequency_multipliers)
 
       observation_matrix = tf.tile(
           input=tf.constant([[1., 0.]], dtype=dtype),
           multiples=[1, num_frequencies])
 
       transition_matrix = build_smooth_seasonal_transition_matrix(
-          period=period, selected_frequencies=selected_frequencies, dtype=dtype)
+          period=period,
+          frequency_multipliers=frequency_multipliers,
+          dtype=dtype)
 
       self._drift_scale = drift_scale
       self._observation_noise_scale = observation_noise_scale
       self._period = period
-      self._selected_frequencies = selected_frequencies
+      self._frequency_multipliers = frequency_multipliers
 
       super(SmoothSeasonalStateSpaceModel, self).__init__(
           num_timesteps=num_timesteps,
@@ -107,19 +109,19 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     return self._period
 
   @property
-  def selected_frequencies(self):
-    """Chosen frequency indices to include."""
-    return self._selected_frequencies
+  def frequency_multipliers(self):
+    """Multipliers of the fundamental frequency."""
+    return self._frequency_multipliers
 
 
 def build_smooth_seasonal_transition_matrix(period,
-                                            selected_frequencies,
+                                            frequency_multipliers,
                                             dtype):
   """Build the transition matrix for a SmoothSeasonalStateSpaceModel"""
 
   two_pi = tf.constant(2. * np.pi, dtype=dtype)
-  frequencies = two_pi * selected_frequencies / period
-  num_frequencies = len(selected_frequencies)
+  frequencies = two_pi * frequency_multipliers / period
+  num_frequencies = len(frequency_multipliers)
 
   sin_frequencies = tf.sin(frequencies)
   cos_frequencies = tf.cos(frequencies)
@@ -146,7 +148,7 @@ class SmoothSeasonal(StructuralTimeSeries):
 
   def __init__(self,
                period,
-               selected_frequencies,
+               frequency_multipliers,
                drift_scale_prior=None,
                initial_effect_prior=None,
                observed_time_series=None,
@@ -160,7 +162,7 @@ class SmoothSeasonal(StructuralTimeSeries):
           sts_util.empirical_statistics(observed_time_series)
           if observed_time_series is not None else (0., 1., 0.))
 
-      latent_size = 2 * len(selected_frequencies)
+      latent_size = 2 * len(frequency_multipliers)
 
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
@@ -183,7 +185,7 @@ class SmoothSeasonal(StructuralTimeSeries):
 
       self._initial_state_prior = initial_state_prior
       self._period = period
-      self._selected_frequencies = selected_frequencies
+      self._frequency_multipliers = frequency_multipliers
 
       super(SmoothSeasonal, self).__init__(
           parameters=[
@@ -200,9 +202,9 @@ class SmoothSeasonal(StructuralTimeSeries):
     return self._period
 
   @property
-  def selected_frequencies(self):
-    """Chosen frequency indices to include."""
-    return self._selected_frequencies
+  def frequency_multipliers(self):
+    """Multipliers of the fundamental frequency."""
+    return self._frequency_multipliers
 
   @property
   def initial_state_prior(self):
@@ -221,7 +223,7 @@ class SmoothSeasonal(StructuralTimeSeries):
     return SmoothSeasonalStateSpaceModel(
         num_timesteps=num_timesteps,
         period=self.period,
-        selected_frequencies=self.selected_frequencies,
+        frequency_multipliers=self.frequency_multipliers,
         initial_state_prior=initial_state_prior,
         initial_step=initial_step,
         **param_map)

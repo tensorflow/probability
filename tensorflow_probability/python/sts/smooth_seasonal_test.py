@@ -35,7 +35,7 @@ class _SmoothSeasonalStateSpaceModelTest(object):
     # fix the latent variables at the value 1 so the results are deterministic
     num_timesteps = 10
     period = 42
-    selected_frequencies = [3]
+    frequency_multipliers = [3]
     drift_scale = 0.
 
     initial_state_loc = self._build_placeholder(np.ones([2]))
@@ -47,7 +47,7 @@ class _SmoothSeasonalStateSpaceModelTest(object):
     ssm = SmoothSeasonalStateSpaceModel(
         num_timesteps=num_timesteps,
         period=period,
-        selected_frequencies=selected_frequencies,
+        frequency_multipliers=frequency_multipliers,
         drift_scale=drift_scale,
         initial_state_prior=initial_state_prior)
 
@@ -63,23 +63,23 @@ class _SmoothSeasonalStateSpaceModelTest(object):
     num_timesteps = 4
     drift_scale = 1.23
     period = 12
-    selected_frequencies = [1, 3]
+    frequency_multipliers = [1, 3]
 
     component = SmoothSeasonal(
-        period=period, selected_frequencies=selected_frequencies)
+        period=period, frequency_multipliers=frequency_multipliers)
 
     ssm = component.make_state_space_model(num_timesteps, [drift_scale])
 
-    lambda_0 = 2 * np.pi * selected_frequencies[0] / period
-    lambda_1 = 2 * np.pi * selected_frequencies[1] / period
+    frequency_0 = 2 * np.pi * frequency_multipliers[0] / period
+    frequency_1 = 2 * np.pi * frequency_multipliers[1] / period
 
     first_frequency_transition = np.array(
-        [[np.cos(lambda_0), np.sin(lambda_0)],
-         [-np.sin(lambda_0), np.cos(lambda_0)]])
+        [[np.cos(frequency_0), np.sin(frequency_0)],
+         [-np.sin(frequency_0), np.cos(frequency_0)]])
 
     second_frequency_transition = np.array(
-        [[np.cos(lambda_1), np.sin(lambda_1)],
-         [-np.sin(lambda_1), np.cos(lambda_1)]])
+        [[np.cos(frequency_1), np.sin(frequency_1)],
+         [-np.sin(frequency_1), np.cos(frequency_1)]])
 
     latents_transition = np.block(
         [[first_frequency_transition, np.zeros([2, 2])],
