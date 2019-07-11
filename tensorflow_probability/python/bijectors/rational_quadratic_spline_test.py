@@ -56,7 +56,7 @@ def rq_splines(draw, batch_shape=None, dtype=tf.float32):
   params = draw(
       tfp_hps.broadcasting_params(
           batch_shape,
-          params_event_ndims=dict(bin_widths=2, bin_heights=2, knot_slopes=2),
+          params_event_ndims=dict(bin_widths=1, bin_heights=1, knot_slopes=1),
           constraint_fn_for=constraints.get))
   return tfb.RationalQuadraticSpline(
       range_min=lo, validate_args=draw(hps.booleans()), **params)
