@@ -27,6 +27,9 @@ from discussion.fun_mcmc.fun_mcmc_lib import blanes_4_stage_step
 from discussion.fun_mcmc.fun_mcmc_lib import call_and_grads
 from discussion.fun_mcmc.fun_mcmc_lib import call_fn
 from discussion.fun_mcmc.fun_mcmc_lib import gaussian_momentum_sample
+from discussion.fun_mcmc.fun_mcmc_lib import gradient_descent_step
+from discussion.fun_mcmc.fun_mcmc_lib import GradientDescentExtra
+from discussion.fun_mcmc.fun_mcmc_lib import GradientDescentState
 from discussion.fun_mcmc.fun_mcmc_lib import hamiltonian_integrator
 from discussion.fun_mcmc.fun_mcmc_lib import hamiltonian_monte_carlo
 from discussion.fun_mcmc.fun_mcmc_lib import hamiltonian_monte_carlo_init
@@ -61,6 +64,9 @@ __all__ = [
     'call_and_grads',
     'call_fn',
     'gaussian_momentum_sample',
+    'gradient_descent_step',
+    'GradientDescentExtra',
+    'GradientDescentState',
     'hamiltonian_integrator',
     'hamiltonian_monte_carlo',
     'hamiltonian_monte_carlo_init',

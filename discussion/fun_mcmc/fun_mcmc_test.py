@@ -576,5 +576,20 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(2., y[-1], atol=1e-3)
     self.assertAllClose(0., loss[-1], atol=1e-3)
 
+  def testGradientDescent(self):
+    def loss_fn(x, y):
+      return tf.square(x - 1.) + tf.square(y - 2.), []
+
+    _, [(x, y), loss] = fun_mcmc.trace(
+        fun_mcmc.GradientDescentState([tf.zeros([]), tf.zeros([])]),
+        lambda gd_state: fun_mcmc.gradient_descent_step(  # pylint: disable=g-long-lambda
+            gd_state, loss_fn, learning_rate=0.01),
+        num_steps=1000,
+        trace_fn=lambda state, extra: [state.state, extra.loss])
+
+    self.assertAllClose(1., x[-1], atol=1e-3)
+    self.assertAllClose(2., y[-1], atol=1e-3)
+    self.assertAllClose(0., loss[-1], atol=1e-3)
+
 if __name__ == '__main__':
   tf.test.main()

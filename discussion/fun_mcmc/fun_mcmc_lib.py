@@ -60,6 +60,9 @@ __all__ = [
     'call_and_grads',
     'call_fn',
     'gaussian_momentum_sample',
+    'gradient_descent_step',
+    'GradientDescentExtra',
+    'GradientDescentState',
     'hamiltonian_integrator',
     'hamiltonian_monte_carlo',
     'hamiltonian_monte_carlo_init',
@@ -1105,7 +1108,7 @@ def _choose(is_accepted, accepted, rejected, name='choose'):
       rejected)
 
 AdamState = collections.namedtuple('AdamState', 'state, m, v, t')
-AdamExtra = collections.namedtuple('AdamExtra', 'loss, loss_extra')
+AdamExtra = collections.namedtuple('AdamExtra', 'loss, loss_extra, grads')
 
 
 def adam_init(state: FloatNest) -> AdamState:
@@ -1181,4 +1184,40 @@ def adam_step(adam_state: AdamState,
       v=nest.map_structure_up_to(state, lambda x: x[2], state_m_v),
       t=adam_state.t + 1)
 
-  return adam_state, AdamExtra(loss_extra=loss_extra, loss=loss)
+  return adam_state, AdamExtra(loss_extra=loss_extra, loss=loss, grads=grads)
+
+
+GradientDescentState = collections.namedtuple('GradientDescentState', 'state')
+GradientDescentExtra = collections.namedtuple('GradientDescentExtra',
+                                              'loss, loss_extra, grads')
+
+
+def gradient_descent_step(gd_state: GradientDescentState, loss_fn: PotentialFn,
+                          learning_rate: FloatNest
+                         ) -> Tuple[GradientDescentState, GradientDescentExtra]:
+  """Perform a step of regular gradient descent.
+
+  Args:
+    gd_state: Current `GradientDescentState`.
+    loss_fn: A function whose output will be minimized.
+    learning_rate: Learning rate, broadcastable with the state.
+
+  Returns:
+    gd_state: `GradientDescentState`
+    gd_extra: `GradientDescentExtra`
+  """
+
+  state = gd_state.state
+  learning_rate = maybe_broadcast_structure(learning_rate, state)
+
+  def _one_part(state, g, learning_rate):
+    return state - learning_rate * g
+
+  loss, loss_extra, grads = call_and_grads(loss_fn, state)
+
+  state = tf.nest.map_structure(_one_part, state, grads, learning_rate)
+
+  gd_state = GradientDescentState(state=state)
+
+  return gd_state, GradientDescentExtra(
+      loss_extra=loss_extra, loss=loss, grads=grads)
