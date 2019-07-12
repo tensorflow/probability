@@ -636,6 +636,9 @@ class Bijector(tf.Module):
     self._initial_parameter_control_dependencies = tuple(
         d for d in self._parameter_control_dependencies(is_init=True)
         if d is not None)
+    if self._initial_parameter_control_dependencies:
+      self._initial_parameter_control_dependencies = (
+          tf.group(*self._initial_parameter_control_dependencies),)
 
     if forward_min_event_ndims is None and inverse_min_event_ndims is None:
       raise ValueError('Must specify at least one of `forward_min_event_ndims` '
