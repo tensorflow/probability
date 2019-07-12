@@ -52,6 +52,14 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       dtype = dtype_util.common_dtype(
           [period, frequency_multipliers, drift_scale, initial_state_prior])
 
+      period = tf.convert_to_tensor(
+          value=period, name='period', dtype=dtype)
+
+      frequency_multipliers = tf.convert_to_tensor(
+          value=frequency_multipliers,
+          name='frequency_multipliers',
+          dtype=dtype)
+
       drift_scale = tf.convert_to_tensor(
           value=drift_scale, name='drift_scale', dtype=dtype)
 
@@ -60,7 +68,7 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           name='observation_noise_scale',
           dtype=dtype)
 
-      num_frequencies = len(frequency_multipliers)
+      num_frequencies = static_num_frequencies(frequency_multipliers)
 
       observation_matrix = tf.tile(
           input=tf.constant([[1., 0.]], dtype=dtype),
@@ -121,7 +129,7 @@ def build_smooth_seasonal_transition_matrix(period,
 
   two_pi = tf.constant(2. * np.pi, dtype=dtype)
   frequencies = two_pi * frequency_multipliers / period
-  num_frequencies = len(frequency_multipliers)
+  num_frequencies = static_num_frequencies(frequency_multipliers)
 
   sin_frequencies = tf.sin(frequencies)
   cos_frequencies = tf.cos(frequencies)
@@ -143,6 +151,22 @@ def build_smooth_seasonal_transition_matrix(period,
   return transition_matrix
 
 
+def static_num_frequencies(frequency_multipliers):
+  """Statically known number of frequencies. Raises if not possible"""
+
+  frequency_multipliers = tf.convert_to_tensor(
+      frequency_multipliers, name="frequency_multipliers")
+
+  num_frequencies = tf.compat.dimension_value(frequency_multipliers.shape[0])
+
+  if num_frequencies is None:
+    raise ValueError('The number of frequencies must be statically known. Saw '
+                     '`frequency_multipliers` with shape {}'.format(
+                         frequency_multipliers.shape))
+
+  return num_frequencies
+
+
 class SmoothSeasonal(StructuralTimeSeries):
   """Formal representation of a smooth seasonal effects model."""
 
@@ -150,7 +174,7 @@ class SmoothSeasonal(StructuralTimeSeries):
                period,
                frequency_multipliers,
                drift_scale_prior=None,
-               initial_effect_prior=None,
+               initial_state_prior=None,
                observed_time_series=None,
                name=None):
     """Specify a smooth seasonal effects model."""
@@ -162,7 +186,7 @@ class SmoothSeasonal(StructuralTimeSeries):
           sts_util.empirical_statistics(observed_time_series)
           if observed_time_series is not None else (0., 1., 0.))
 
-      latent_size = 2 * len(frequency_multipliers)
+      latent_size = 2 * static_num_frequencies(frequency_multipliers)
 
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
@@ -170,18 +194,12 @@ class SmoothSeasonal(StructuralTimeSeries):
         drift_scale_prior = tfd.LogNormal(
             loc=tf.math.log(.01 * observed_stddev), scale=3.)
 
-      if initial_effect_prior is None:
-        initial_effect_prior = tfd.Normal(
-            loc=observed_initial,
-            scale=tf.abs(observed_initial) + observed_stddev)
-
-      if isinstance(initial_effect_prior, tfd.Normal):
+      if initial_state_prior is None:
+        initial_state_scale = (
+            tf.abs(observed_initial) + observed_stddev)[..., tf.newaxis]
+        ones = tf.ones([latent_size], dtype=drift_scale_prior.dtype)
         initial_state_prior = tfd.MultivariateNormalDiag(
-            loc=tf.stack([initial_effect_prior.mean()] * latent_size, axis=-1),
-            scale_diag=tf.stack([initial_effect_prior.stddev()] * latent_size,
-                                axis=-1))
-      else:
-        initial_state_prior = initial_effect_prior
+            scale_diag=initial_state_scale * ones)
 
       self._initial_state_prior = initial_state_prior
       self._period = period

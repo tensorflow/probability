@@ -31,6 +31,22 @@ tfd = tfp.distributions
 
 class _SmoothSeasonalStateSpaceModelTest(object):
 
+  def test_period_and_frequency_multipliers_tensor(self):
+
+    period = tf.constant(100.)
+    frequency_multipliers = tf.constant([1., 3.])
+    drift_scale = tf.constant([2.])
+
+    component = SmoothSeasonal(
+        period=period, frequency_multipliers=frequency_multipliers)
+
+    ssm = component.make_state_space_model(
+        num_timesteps=3, param_vals=[drift_scale])
+
+    self.assertAllEqual(component.latent_size, 4)
+    self.assertAllEqual(ssm.latent_size, 4)
+
+
   def test_basic_statistics_no_latent_variance_one_frequency(self):
     # fix the latent variables at the value 1 so the results are deterministic
     num_timesteps = 10
