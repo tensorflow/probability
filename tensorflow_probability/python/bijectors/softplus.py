@@ -131,7 +131,7 @@ class Softplus(bijector.Bijector):
 
   def _forward_log_det_jacobian(self, x):
     if self.hinge_softness is not None:
-      x = x /tf.cast(self.hinge_softness, x.dtype)
+      x = x / tf.cast(self.hinge_softness, x.dtype)
     return -tf.math.softplus(-x)
 
   @property
