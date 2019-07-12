@@ -288,7 +288,8 @@ def get_fldj_theoretical(bijector,
   x_unconstrained = 1 * input_to_unconstrained.forward(x)
   # Collapse any batch dimensions (including scalar) to a single axis.
   batch_shape = x_unconstrained.shape[:-1]
-  x_unconstrained = tf.reshape(x_unconstrained, [-1, x_unconstrained.shape[-1]])
+  x_unconstrained = tf.reshape(
+      x_unconstrained, [int(np.prod(batch_shape)), x_unconstrained.shape[-1]])
 
   with tf.GradientTape(persistent=True) as tape:
     tape.watch(x_unconstrained)
@@ -300,10 +301,14 @@ def get_fldj_theoretical(bijector,
         unflattened_x_unconstrained))
     f_x_unconstrained = output_to_unconstrained.forward(f_x)
     # Flatten any batch dimensions to a single axis.
-    f_x_unconstrained = tf.reshape(f_x_unconstrained,
-                                   [-1, f_x_unconstrained.shape[-1]])
-  jacobian = tape.batch_jacobian(
-      f_x_unconstrained, x_unconstrained, experimental_use_pfor=False)
+    f_x_unconstrained = tf.reshape(
+        f_x_unconstrained,
+        [int(np.prod(batch_shape)), f_x_unconstrained.shape[-1]])
+  try:
+    jacobian = tape.batch_jacobian(f_x_unconstrained, x_unconstrained)
+  except ValueError:  # Fallback to for-loop jacobian.
+    jacobian = tape.batch_jacobian(
+        f_x_unconstrained, x_unconstrained, experimental_use_pfor=False)
   jacobian = tf.reshape(
       jacobian, tensorshape_util.concatenate(batch_shape, jacobian.shape[-2:]))
   logging.vlog(1, 'Jacobian: %s', jacobian)

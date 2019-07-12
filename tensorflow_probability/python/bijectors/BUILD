@@ -1236,12 +1236,18 @@ py_test(
 
 py_test(
     name = "transform_diagonal_test",
-    size = "small",
+    size = "medium",
     srcs = ["transform_diagonal_test.py"],
+    tags = ["hypothesis"],
     deps = [
+        ":bijector_test_util",
         ":bijectors",
+        ":hypothesis_testlib",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

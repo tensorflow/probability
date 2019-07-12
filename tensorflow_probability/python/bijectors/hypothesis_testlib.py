@@ -114,6 +114,10 @@ class BijectorSupport(collections.namedtuple(
   """
   __slots__ = ()
 
+  def invert(self):
+    """Returns the inverse of this `BijectorSupport`."""
+    return BijectorSupport(self.inverse, self.forward)
+
 
 BIJECTOR_SUPPORTS = None
 
@@ -209,26 +213,49 @@ def bijector_supports():
 
 
 @hps.composite
-def unconstrained_bijectors(draw):
+def unconstrained_bijectors(draw, max_forward_event_ndims=None,
+                            must_preserve_event_ndims=False):
   """Strategy for drawing forward-unconstrained bijectors.
 
   The bijectors emitted by this are those whose `forward` computation
-  can act on all of R^n.
+  can act on all of R^n, with n <= `max_forward_event_ndims`.
 
   Args:
-    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    draw: Strategy sampler supplied by `@hps.composite`.
+    max_forward_event_ndims: Optional python `int`, maximum acceptable bijector
+      `forward_event_ndims`.
+    must_preserve_event_ndims: Optional python `bool`, `True` if the returned
+      bijector must preserve the rank of the event.
 
   Returns:
     unconstrained: A strategy for drawing such bijectors.
   """
-  bijector_names = hps.one_of(map(hps.just, instantiable_bijectors().keys()))
-  bijector_name = draw(
-      bijector_names.filter(lambda b: (  # pylint: disable=g-long-lambda
-          b == 'Invert' or 'UNCONSTRAINED' in bijector_supports()[b].forward)))
+  if max_forward_event_ndims is None:
+    max_forward_event_ndims = float('inf')
+
+  ndims_by_prefix = dict(SCALAR=0, VECTOR=1, MATRIX=2)
+
+  def is_acceptable(support):
+    """Determines if a `BijectorSupport` object is acceptable."""
+    if 'UNCONSTRAINED' not in support.forward:
+      return False
+    forward_prefix = support.forward.split('_')[0]
+    if ndims_by_prefix[forward_prefix] > max_forward_event_ndims:
+      return False
+    if must_preserve_event_ndims:
+      inverse_prefix = support.inverse.split('_')[0]
+      if ndims_by_prefix[forward_prefix] != ndims_by_prefix[inverse_prefix]:
+        return False
+    return True
+
+  supports = bijector_supports()
+  acceptable_keys = [k for k in instantiable_bijectors().keys()
+                     if k == 'Invert' or is_acceptable(supports[k])]
+  bijector_name = draw(hps.one_of(map(hps.just, acceptable_keys)))
   if bijector_name == 'Invert':
-    underlying = draw(
-        bijector_names.filter(
-            lambda b: 'UNCONSTRAINED' in bijector_supports()[b].inverse))
+    acceptable_keys = [k for k in instantiable_bijectors().keys()
+                       if is_acceptable(supports[k].invert())]
+    underlying = draw(hps.one_of(map(hps.just, acceptable_keys)))
     underlying = instantiable_bijectors()[underlying][0](validate_args=True)
     return tfb.Invert(underlying, validate_args=True)
   return instantiable_bijectors()[bijector_name][0](validate_args=True)
