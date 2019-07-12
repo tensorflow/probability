@@ -49,3 +49,4 @@ Module = compat.v2.Module
 Variable = compat.v2.Variable
 Assert = debugging.Assert
 check_numerics = debugging.check_numerics
+enable_v2_behavior = lambda: None
