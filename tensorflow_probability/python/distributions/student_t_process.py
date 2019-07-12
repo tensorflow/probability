@@ -18,12 +18,19 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+import warnings
+
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multivariate_student_t
+from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
     'StudentTProcess',
@@ -35,8 +42,7 @@ def _add_diagonal_shift(matrix, shift):
       matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
-class StudentTProcess(
-    multivariate_student_t.MultivariateStudentTLinearOperator):
+class StudentTProcess(distribution.Distribution):
   """Marginal distribution of a Student's T process at finitely many points.
 
   A Student's T process (TP) is an indexed collection of random variables, any
@@ -184,7 +190,7 @@ class StudentTProcess(
   def __init__(self,
                df,
                kernel,
-               index_points,
+               index_points=None,
                mean_fn=None,
                jitter=1e-6,
                validate_args=False,
@@ -233,16 +239,11 @@ class StudentTProcess(
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [df, index_points, jitter], tf.float32)
-      df = tf.convert_to_tensor(df, dtype=dtype, name='df')
-      index_points = tf.convert_to_tensor(
+      df = tensor_util.convert_nonref_to_tensor(df, dtype=dtype, name='df')
+      index_points = tensor_util.convert_nonref_to_tensor(
           index_points, dtype=dtype, name='index_points')
-      jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
-
-      with tf.control_dependencies([
-          assert_util.assert_greater(
-              df, tf.cast(2., df.dtype), message='`df` must be greater than 2.')
-      ] if validate_args else []):
-        self._df = tf.identity(df)
+      jitter = tensor_util.convert_nonref_to_tensor(
+          jitter, dtype=dtype, name='jitter')
 
       self._kernel = kernel
       self._index_points = index_points
@@ -253,31 +254,105 @@ class StudentTProcess(
       else:
         if not callable(mean_fn):
           raise ValueError('`mean_fn` must be a Python callable')
+      self._df = df
       self._mean_fn = mean_fn
       self._jitter = jitter
 
       with tf.name_scope('init'):
-        kernel_matrix = _add_diagonal_shift(
-            kernel.matrix(self.index_points, self.index_points),
-            jitter)
-        self._covariance_matrix = kernel_matrix
-
-        scale = tf.linalg.LinearOperatorLowerTriangular(
-            tf.linalg.cholesky(
-                ((self.df - 2) / self.df)[..., tf.newaxis, tf.newaxis] *
-                kernel_matrix),
-            is_non_singular=True,
-            name='StudentTProcessScaleLinearOperator')
-
         super(StudentTProcess, self).__init__(
-            df=df,
-            loc=mean_fn(index_points),
-            scale=scale,
+            dtype=dtype,
+            reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats,
+            parameters=parameters,
             name=name)
-        self._parameters = parameters
-        self._graph_parents = [index_points, jitter]
+
+  def _is_univariate_marginal(self, index_points):
+    """True if the given index_points would yield a univariate marginal.
+
+    Args:
+      index_points: the set of index set locations at which to compute the
+      marginal Student T distribution. If this set is of size 1, the marginal is
+      univariate.
+
+    Returns:
+      is_univariate: Boolean indicating whether the marginal is univariate or
+      multivariate. In the case of dynamic shape in the number of index points,
+      defaults to "multivariate" since that's the best we can do.
+    """
+    num_index_points = tf.compat.dimension_value(
+        index_points.shape[-(self.kernel.feature_ndims + 1)])
+    if num_index_points is None:
+      warnings.warn(
+          'Unable to detect statically whether the number of index_points is '
+          '1. As a result, defaulting to treating the marginal Student T '
+          'Process at `index_points` as a multivariate Student T. This makes '
+          'some methods, like `cdf` unavailable.')
+    return num_index_points == 1
+
+  def _compute_covariance(self, index_points):
+    kernel_matrix = self.kernel.matrix(index_points, index_points)
+    if self._is_univariate_marginal(index_points):
+      # kernel_matrix thus has shape [..., 1, 1]; squeeze off the last dims and
+      # tack on the observation noise variance.
+      return tf.squeeze(kernel_matrix, axis=[-2, -1])
+    else:
+      return kernel_matrix
+
+  def get_marginal_distribution(self, index_points=None):
+    """Compute the marginal over function values at `index_points`.
+
+    Args:
+      index_points: `float` `Tensor` representing finite (batch of) vector(s) of
+        points in the index set over which the TP is defined. Shape has the form
+        `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
+        dimensions and must equal `kernel.feature_ndims` and `e` is the number
+        (size) of index points in each batch. Ultimately this distribution
+        corresponds to a `e`-dimensional multivariate student t. The batch shape
+        must be broadcastable with `kernel.batch_shape` and any batch dims
+        yielded by `mean_fn`.
+
+    Returns:
+      marginal: a `StudentT` or `MultivariateStudentT` distribution,
+        according to whether `index_points` consists of one or many index
+        points, respectively.
+    """
+    with self._name_and_control_scope('get_marginal_distribution'):
+      df = tf.convert_to_tensor(self.df)
+      index_points = self._get_index_points(index_points)
+      squared_scale = self._compute_covariance(index_points)
+      if self._is_univariate_marginal(index_points):
+        squared_scale = (df - 2.) / df * squared_scale
+      else:
+        squared_scale = ((df - 2.) / df)[
+            ..., tf.newaxis, tf.newaxis] * squared_scale
+      loc = self._mean_fn(index_points)
+      # If we're sure the number of index points is 1, we can just construct a
+      # scalar Normal. This has computational benefits and supports things like
+      # CDF that aren't otherwise straightforward to provide.
+      if self._is_univariate_marginal(index_points):
+        scale = tf.sqrt(squared_scale)
+        # `loc` has a trailing 1 in the shape; squeeze it.
+        loc = tf.squeeze(loc, axis=-1)
+        return student_t.StudentT(
+            df=df,
+            loc=loc,
+            scale=scale,
+            validate_args=self._validate_args,
+            allow_nan_stats=self._allow_nan_stats,
+            name='marginal_distribution')
+      else:
+        scale = tf.linalg.LinearOperatorLowerTriangular(
+            tf.linalg.cholesky(_add_diagonal_shift(squared_scale, self.jitter)),
+            is_non_singular=True,
+            name='StudentTProcessScaleLinearOperator')
+        return multivariate_student_t.MultivariateStudentTLinearOperator(
+            df=df,
+            loc=loc,
+            scale=scale,
+            validate_args=self._validate_args,
+            allow_nan_stats=self._allow_nan_stats,
+            name='marginal_distribution')
 
   @property
   def df(self):
@@ -299,5 +374,117 @@ class StudentTProcess(
   def jitter(self):
     return self._jitter
 
-  def _covariance(self):
-    return self._covariance_matrix
+  def _get_index_points(self, index_points=None):
+    """Return `index_points` if not None, else `self._index_points`.
+
+    Args:
+      index_points: if given, this is what is returned; else,
+      `self._index_points`
+
+    Returns:
+      index_points: the given arg, if not None, else the class member
+      `self._index_points`.
+
+    Rases:
+      ValueError: if `index_points` and `self._index_points` are both `None`.
+    """
+    if self._index_points is None and index_points is None:
+      raise ValueError(
+          'This StudentTProcess instance was not instantiated with a value for '
+          'index_points. One must therefore be provided when calling sample, '
+          'log_prob, and other such methods.')
+    return (index_points if index_points is not None
+            else tf.convert_to_tensor(self._index_points))
+
+  def _log_prob(self, value, index_points=None):
+    return self.get_marginal_distribution(index_points).log_prob(value)
+
+  def _batch_shape_tensor(self, index_points=None):
+    index_points = self._get_index_points(index_points)
+    return functools.reduce(tf.broadcast_dynamic_shape, [
+        tf.shape(index_points)[:-(self.kernel.feature_ndims + 1)],
+        self.kernel.batch_shape_tensor(),
+        tf.shape(self.df)
+    ])
+
+  def _batch_shape(self, index_points=None):
+    index_points = self._get_index_points(index_points)
+    return functools.reduce(
+        tf.broadcast_static_shape,
+        [index_points.shape[:-(self.kernel.feature_ndims + 1)],
+         self.kernel.batch_shape,
+         self.df.shape])
+
+  def _event_shape_tensor(self, index_points=None):
+    index_points = self._get_index_points(index_points)
+    if self._is_univariate_marginal(index_points):
+      return tf.constant([], dtype=tf.int32)
+    else:
+      # The examples index is one position to the left of the feature dims.
+      examples_index = -(self.kernel.feature_ndims + 1)
+      return tf.shape(index_points)[examples_index:examples_index + 1]
+
+  def _event_shape(self, index_points=None):
+    index_points = self._get_index_points(index_points)
+    if self._is_univariate_marginal(index_points):
+      return tf.TensorShape([])
+    else:
+      # The examples index is one position to the left of the feature dims.
+      examples_index = -(self.kernel.feature_ndims + 1)
+      shape = index_points.shape[examples_index:examples_index + 1]
+      if shape.rank is None:
+        return tf.TensorShape([None])
+      return shape
+
+  def _sample_n(self, n, seed=None, index_points=None):
+    return self.get_marginal_distribution(index_points).sample(n, seed=seed)
+
+  def _log_survival_function(self, value, index_points=None):
+    return self.get_marginal_distribution(
+        index_points).log_survival_function(value)
+
+  def _survival_function(self, value, index_points=None):
+    return self.get_marginal_distribution(index_points).survival_function(value)
+
+  def _log_cdf(self, value, index_points=None):
+    return self.get_marginal_distribution(index_points).log_cdf(value)
+
+  def _entropy(self, index_points=None):
+    return self.get_marginal_distribution(index_points).entropy()
+
+  def _mean(self, index_points=None):
+    return self.get_marginal_distribution(index_points).mean()
+
+  def _quantile(self, value, index_points=None):
+    return self.get_marginal_distribution(index_points).quantile(value)
+
+  def _stddev(self, index_points=None):
+    return tf.sqrt(self._variance(index_points=index_points))
+
+  def _variance(self, index_points=None):
+    index_points = self._get_index_points(index_points)
+
+    kernel_diag = self.kernel.apply(index_points, index_points, example_ndims=1)
+    if self._is_univariate_marginal(index_points):
+      return tf.squeeze(kernel_diag, axis=[-1])
+    return kernel_diag
+
+  def _covariance(self, index_points=None):
+    # Using the result of get_marginal_distribution would involve an extra
+    # matmul, and possibly even an unnecessary cholesky first. We can avoid that
+    # by going straight through the kernel function.
+    return self._compute_covariance(self._get_index_points(index_points))
+
+  def _mode(self, index_points=None):
+    return self.get_marginal_distribution(index_points).mode()
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_mutable(self.df):
+      assertions.append(
+          assert_util.assert_greater(
+              self.df, tf.cast(2., self.df.dtype),
+              message='`df` must be greater than 2.'))
+    return assertions

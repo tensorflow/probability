@@ -407,6 +407,7 @@ py_library(
         ":normal",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1066,9 +1067,12 @@ py_library(
     srcs = ["student_t_process.py"],
     deps = [
         ":multivariate_student_t",
+        ":student_t",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 

@@ -73,6 +73,8 @@ class _StudentTProcessTest(object):
       self.assertAllEqual(tp.event_shape, event_shape)
       self.assertAllEqual(samples.shape,
                           sample_shape + batch_shape + event_shape)
+      self.assertAllEqual(tp.mean().shape, batch_shape + event_shape)
+      self.assertAllEqual(tp.variance().shape, batch_shape + event_shape)
     else:
       self.assertAllEqual(self.evaluate(tp.batch_shape_tensor()), batch_shape)
       self.assertAllEqual(self.evaluate(tp.event_shape_tensor()), event_shape)
@@ -84,6 +86,10 @@ class _StudentTProcessTest(object):
       self.assertEqual(tensorshape_util.rank(tp.event_shape), 1)
       self.assertIsNone(
           tf.compat.dimension_value(tensorshape_util.dims(tp.event_shape)[0]))
+      self.assertAllEqual(
+          self.evaluate(tf.shape(tp.mean())), batch_shape + event_shape)
+      self.assertAllEqual(self.evaluate(
+          tf.shape(tp.variance())), batch_shape + event_shape)
 
   def testVarianceAndCovarianceMatrix(self):
     df = np.float64(4.)
@@ -106,8 +112,7 @@ class _StudentTProcessTest(object):
 
     expected_covariance = (
         _kernel_fn(np.expand_dims(index_points, 0),
-                   np.expand_dims(index_points, 1)) +
-        jitter * np.eye(10))
+                   np.expand_dims(index_points, 1)))
 
     self.assertAllClose(expected_covariance,
                         self.evaluate(tp.covariance()))
@@ -178,6 +183,55 @@ class _StudentTProcessTest(object):
       self.assertEqual(self.evaluate(tp2.df), 4.)
       self.assertAllEqual(self.evaluate(tp1.index_points), index_points_1)
       self.assertAllEqual(self.evaluate(tp2.index_points), index_points_2)
+
+  def testLateBindingIndexPoints(self):
+    amp = np.float64(.5)
+    len_scale = np.float64(.2)
+    kernel = psd_kernels.ExponentiatedQuadratic(amp, len_scale)
+    mean_fn = lambda x: x[:, 0]**2
+    jitter = np.float64(1e-4)
+
+    tp = tfd.StudentTProcess(
+        df=np.float64(3.),
+        kernel=kernel,
+        mean_fn=mean_fn,
+        jitter=jitter)
+
+    index_points = np.random.uniform(-1., 1., [10, 1]).astype(np.float64)
+
+    expected_mean = mean_fn(index_points)
+    self.assertAllClose(expected_mean,
+                        self.evaluate(tp.mean(index_points=index_points)))
+
+    def _kernel_fn(x, y):
+      return amp ** 2 * np.exp(-.5 * (np.squeeze((x - y)**2)) / (len_scale**2))
+
+    expected_covariance = _kernel_fn(np.expand_dims(index_points, -3),
+                                     np.expand_dims(index_points, -2))
+
+    self.assertAllClose(expected_covariance,
+                        self.evaluate(tp.covariance(index_points=index_points)))
+    self.assertAllClose(np.diag(expected_covariance),
+                        self.evaluate(tp.variance(index_points=index_points)))
+    self.assertAllClose(np.sqrt(np.diag(expected_covariance)),
+                        self.evaluate(tp.stddev(index_points=index_points)))
+
+    # Calling mean with no index_points should raise an Error
+    with self.assertRaises(ValueError):
+      tp.mean()
+
+  def testMarginalHasCorrectTypes(self):
+    tp = tfd.StudentTProcess(df=3., kernel=psd_kernels.ExponentiatedQuadratic())
+
+    self.assertIsInstance(
+        tp.get_marginal_distribution(
+            index_points=np.ones([1, 1], dtype=np.float32)),
+        tfd.StudentT)
+
+    self.assertIsInstance(
+        tp.get_marginal_distribution(
+            index_points=np.ones([10, 1], dtype=np.float32)),
+        tfd.MultivariateStudentTLinearOperator)
 
 
 @test_util.run_all_in_graph_and_eager_modes
