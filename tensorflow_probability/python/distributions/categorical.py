@@ -325,7 +325,7 @@ class Categorical(distribution.Distribution):
     sum_exp_x = tf.reduce_sum(tf.math.exp(x), axis=-1)
     lse_logits = m[..., 0] + tf.math.log(sum_exp_x)
     return lse_logits - tf.reduce_sum(
-        logits * tf.math.exp(x), axis=-1) / sum_exp_x
+        tf.math.multiply_no_nan(logits, tf.math.exp(x)), axis=-1) / sum_exp_x
 
   def _mode(self):
     x = self._probs if self._logits is None else self._logits
