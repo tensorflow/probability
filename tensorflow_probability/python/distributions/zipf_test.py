@@ -62,7 +62,7 @@ class ZipfTest(test_case.TestCase):
     for power in invalid_powers:
       with self.assertRaisesOpError("Condition x > y"):
         zipf = tfd.Zipf(power=power, validate_args=True)
-        self.evaluate(zipf.power)
+        self.evaluate(zipf.mean())
 
   def testNanPower(self):
     zipf = tfd.Zipf(power=np.nan, validate_args=False)

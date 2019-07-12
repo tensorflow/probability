@@ -56,9 +56,12 @@ TF2_FRIENDLY_DISTS = (
     'Dirichlet',
     'Exponential',
     'Gamma',
+    'GammaGamma',
     'GeneralizedPareto',
     'Gumbel',
+    'HalfCauchy',
     'HalfNormal',
+    'Horseshoe',
     'Laplace',
     'LogNormal',
     'Logistic',
@@ -68,7 +71,8 @@ TF2_FRIENDLY_DISTS = (
     'Pareto',
     'Poisson',
     'ProbitBernoulli',
-    'StudentT'
+    'StudentT',
+    'Zipf',
 )
 
 NO_SAMPLE_PARAM_GRADS = {
