@@ -28,7 +28,6 @@ from hypothesis.extra import numpy as hpnp
 import hypothesis.strategies as hps
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -119,8 +118,11 @@ def constrained_tensors(constraint_fn, shape):
 
   def mapper(x):
     x = constraint_fn(tf.convert_to_tensor(x))
-    if dtype_util.is_floating(x.dtype):
-      x = assert_util.assert_finite(x, message='param non-finite')
+    if dtype_util.is_floating(x.dtype) and tf.executing_eagerly():
+      # We'll skip this check in graph mode; too expensive.
+      if not np.all(np.isfinite(x.numpy())):
+        raise AssertionError('{} generated non-finite param value: {}'.format(
+            constraint_fn, x.numpy()))
     return x
 
   return hpnp.arrays(
@@ -228,9 +230,13 @@ def broadcasting_params(draw,
   for param in params_to_use:
     param_batch_shape = param_batch_shapes[param]
     param_event_rank = params_event_ndims[param]
-    param_strategy = constrained_tensors(
-        constraint_fn_for(param), (tensorshape_util.as_list(param_batch_shape) +
-                                   [event_dim] * param_event_rank))
+    param_shape = (tensorshape_util.as_list(param_batch_shape) +
+                   [event_dim] * param_event_rank)
+
+    # Reduce our risk of exceeding TF kernel broadcast limits.
+    hp.assume(len(param_shape) < 6)
+
+    param_strategy = constrained_tensors(constraint_fn_for(param), param_shape)
     params_kwargs[param] = tf.convert_to_tensor(
         draw(param_strategy), dtype_hint=tf.float32, name=param)
     if enable_vars and draw(hps.booleans()):

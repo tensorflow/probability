@@ -269,7 +269,6 @@ py_library(
     srcs = ["hypothesis_testlib.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":assert_util",
         ":tensorshape_util",
         # hypothesis dep,
         # numpy dep,

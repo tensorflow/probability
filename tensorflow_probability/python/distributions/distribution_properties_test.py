@@ -182,7 +182,7 @@ def valid_slices(draw, batch_shape):
   # 2. Decide whether or not to add an Ellipsis; if using, updating the indexing
   #    used (e.g. batch_shape[i]) to identify safe bounds.
   # 3. Choose 0 to [remaining_dims] slices to come last.
-  # 4. Decide where to insert between 0 and 4 newaxis slices.
+  # 4. Decide where to insert between 0 and 3 newaxis slices.
   batch_shape = tf.TensorShape(batch_shape).as_list()
   slices = []
   batch_rank = len(batch_shape)
@@ -220,9 +220,9 @@ def valid_slices(draw, batch_shape):
             hps.integers(min_value=0, max_value=batch_shape[i] - 1),
             arbitrary_slices))
     slices.append(slc)
-  # 4. Decide where to insert between 0 and 4 newaxis slices.
+  # 4. Decide where to insert between 0 and 3 newaxis slices.
   newaxis_positions = draw(
-      hps.lists(hps.integers(min_value=0, max_value=len(slices)), max_size=4))
+      hps.lists(hps.integers(min_value=0, max_value=len(slices)), max_size=3))
   for i in sorted(newaxis_positions, reverse=True):
     slices.insert(i, tf.newaxis)
   slices = tuple(slices)
