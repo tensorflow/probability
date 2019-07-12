@@ -40,7 +40,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
                             num_steps,
                             trace_fn=_trace_loss,
                             variational_loss_fn=_reparameterized_elbo,
-                            sample_size=10,
+                            sample_size=1,
                             trainable_variables=None,
                             seed=None,
                             name='fit_surrogate_posterior'):
@@ -108,7 +108,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
     sample_size: Python `int` number of Monte Carlo samples to use
       in estimating the variational divergence. Larger values may stabilize
       the optimization, but at higher cost per step in time and memory.
-      Default value: 10.
+      Default value: `1`.
     trainable_variables: Optional list of `tf.Variable` instances to optimize
       with respect to. If `None`, defaults to the set of all variables accessed
       during the computation of the variational bound, i.e., those defining
