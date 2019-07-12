@@ -30,6 +30,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
@@ -117,8 +118,10 @@ def constrained_tensors(constraint_fn, shape):
   float32s = hps.floats(-200, 200, allow_nan=False, allow_infinity=False)
 
   def mapper(x):
-    return assert_util.assert_finite(
-        constraint_fn(tf.convert_to_tensor(x)), message='param non-finite')
+    x = constraint_fn(tf.convert_to_tensor(x))
+    if dtype_util.is_floating(x.dtype):
+      x = assert_util.assert_finite(x, message='param non-finite')
+    return x
 
   return hpnp.arrays(
       dtype=np.float32, shape=shape, elements=float32s).map(mapper)

@@ -39,7 +39,7 @@ flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
 FLAGS = flags.FLAGS
 
 TF2_FRIENDLY_BIJECTORS = (
-    # 'AffineScalar',  # TODO(b/136265958): Cached jacobian breaks grad to scale
+    'AffineScalar',
     'BatchNormalization',
     'CholeskyOuterProduct',
     'Cumsum',
@@ -50,6 +50,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'IteratedSigmoidCentered',
     'Invert',
     'Kumaraswamy',
+    'MatvecLU',
     'NormalCDF',
     'Ordered',
     'RationalQuadraticSpline',
@@ -65,20 +66,24 @@ BIJECTOR_PARAMS_NDIMS = {
     'AffineScalar': dict(shift=0, scale=0, log_scale=0),
     'Gumbel': dict(loc=0, scale=0),
     'Kumaraswamy': dict(concentration1=0, concentration0=0),
+    'MatvecLU': dict(lower_upper=2, permutation=1),
     'SinhArcsinh': dict(skewness=0, tailweight=0),
-    'RationalQuadraticSpline': dict(bin_widths=2, bin_heights=2, knot_slopes=2),
+    'RationalQuadraticSpline': dict(bin_widths=1, bin_heights=1, knot_slopes=1),
 }
 
 MUTEX_PARAMS = (
     set(['scale', 'log_scale']),
 )
 
+FLDJ = 'forward_log_det_jacobian'
+ILDJ = 'inverse_log_det_jacobian'
+
+INVERT_LDJ = {FLDJ: ILDJ, ILDJ: FLDJ}
+
 NO_LDJ_GRADS_EXPECTED = {
-    'AffineScalar': {'[arg]', 'shift'},
-    'BatchNormalization': {'beta'},
-    'Cumsum': {'[arg]'},
-    'Gumbel': {'loc'},
-    'Identity': {'[arg]'},
+    'AffineScalar': dict(shift={FLDJ, ILDJ}),
+    'BatchNormalization': dict(beta={FLDJ, ILDJ}),
+    'Gumbel': dict(loc={ILDJ}),
 }
 
 
@@ -286,18 +291,24 @@ def codomain_tensors(draw, bijector, shape=None):
 
 def assert_no_none_grad(bijector, method, wrt_vars, grads):
   for var, grad in zip(wrt_vars, grads):
+    expect_grad = var.dtype not in (tf.int32, tf.int64)
     if 'log_det_jacobian' in method:
       if tensor_util.is_ref(var):
-        # We check tensor_util.is_ref to accounts for xs/ys being in vars.
+        # We check tensor_util.is_ref to account for xs/ys being in vars.
         var_name = var.name.rstrip('_0123456789:').split('/')[-1]
       else:
         var_name = '[arg]'
       to_check = bijector.bijector if is_invert(bijector) else bijector
-      if var_name in NO_LDJ_GRADS_EXPECTED.get(type(to_check).__name__, ()):
-        continue
-    if grad is None:
-      raise AssertionError('Missing `{}` -> {} grad for bijector {}'.format(
-          method, var, bijector))
+      to_check_method = INVERT_LDJ[method] if is_invert(bijector) else method
+      if var_name == '[arg]' and bijector.is_constant_jacobian:
+        expect_grad = False
+      exempt_var_method = NO_LDJ_GRADS_EXPECTED.get(type(to_check).__name__, {})
+      if to_check_method in exempt_var_method.get(var_name, ()):
+        expect_grad = False
+
+    if expect_grad != (grad is not None):
+      raise AssertionError('{} `{}` -> {} grad for bijector {}'.format(
+          'Missing' if expect_grad else 'Unexpected', method, var, bijector))
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -400,15 +411,31 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
     assert_no_none_grad(bijector, 'inverse_log_det_jacobian', wrt_vars, grads)
 
 
+def ensure_nonzero(x):
+  return tf.where(x < 1e-6, tf.constant(1e-3, x.dtype), x)
+
+
 CONSTRAINTS = {
-    'concentration0': tfp_hps.softplus_plus_eps(),
-    'concentration1': tfp_hps.softplus_plus_eps(),
-    'scale': tfp_hps.softplus_plus_eps(),
-    'tailweight': tfp_hps.softplus_plus_eps(),
-    'AffineScalar.scale': tfp_hps.softplus_plus_eps(),
-    'bin_widths': bijector_hps.spline_bin_size_constraint,
-    'bin_heights': bijector_hps.spline_bin_size_constraint,
-    'knot_slopes': bijector_hps.spline_slope_constraint,
+    'concentration0':
+        tfp_hps.softplus_plus_eps(),
+    'concentration1':
+        tfp_hps.softplus_plus_eps(),
+    'scale':
+        tfp_hps.softplus_plus_eps(),
+    'tailweight':
+        tfp_hps.softplus_plus_eps(),
+    'AffineScalar.scale':
+        tfp_hps.softplus_plus_eps(),
+    'bin_widths':
+        bijector_hps.spline_bin_size_constraint,
+    'bin_heights':
+        bijector_hps.spline_bin_size_constraint,
+    'knot_slopes':
+        bijector_hps.spline_slope_constraint,
+    'lower_upper':
+        lambda x: tf.linalg.set_diag(x, ensure_nonzero(tf.linalg.diag_part(x))),
+    'permutation':
+        lambda x: tf.math.top_k(x, k=x.shape[-1]).indices,
 }
 
 
