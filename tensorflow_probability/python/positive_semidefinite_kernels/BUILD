@@ -265,3 +265,48 @@ py_test(
         "//tensorflow_probability",
     ],
 )
+
+PSD_KERNEL_PROPERTIES_DEPS = [
+    # absl/flags dep,
+    # absl/logging dep,
+    # absl/testing:parameterized dep,
+    # hypothesis dep,
+    # numpy dep,
+    # six dep,
+    # tensorflow dep,
+    "//tensorflow_probability",
+    "//tensorflow_probability/python/internal:assert_util",
+    "//tensorflow_probability/python/internal:hypothesis_testlib",
+    "//tensorflow_probability/python/internal:tensor_util",
+    "//tensorflow_probability/python/internal:tensorshape_util",
+]
+
+py_test(
+    name = "psd_kernel_properties_test_eager",
+    size = "medium",
+    srcs = ["psd_kernel_properties_test.py"],
+    args = ["--tf_mode=eager"],
+    main = "psd_kernel_properties_test.py",
+    shard_count = 3,
+    tags = ["hypothesis"],
+    deps = PSD_KERNEL_PROPERTIES_DEPS,
+)
+
+py_test(
+    name = "psd_kernel_properties_test_graph",
+    size = "medium",
+    srcs = ["psd_kernel_properties_test.py"],
+    args = ["--tf_mode=graph"],
+    main = "psd_kernel_properties_test.py",
+    shard_count = 3,
+    tags = ["hypothesis"],
+    deps = PSD_KERNEL_PROPERTIES_DEPS,
+)
+
+test_suite(
+    name = "psd_kernel_properties_test",
+    tests = [
+        ":psd_kernel_properties_test_eager",
+        ":psd_kernel_properties_test_graph",
+    ],
+)

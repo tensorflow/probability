@@ -22,7 +22,9 @@ from __future__ import print_function
 import functools
 
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
@@ -30,14 +32,6 @@ __all__ = [
     'Linear',
     'Polynomial',
 ]
-
-
-def _validate_arg_if_not_none(arg, assertion, validate_args):
-  if arg is None:
-    return arg
-  with tf.control_dependencies([assertion(arg)] if validate_args else []):
-    result = tf.identity(arg)
-  return result
 
 
 def _maybe_shape_static(tensor):
@@ -49,7 +43,7 @@ def _maybe_shape_static(tensor):
 def _maybe_shape_dynamic(tensor):
   if tensor is None:
     return []
-  return tf.shape(input=tensor)
+  return tf.shape(tensor)
 
 
 class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
@@ -121,30 +115,19 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
       name: Python `str` name prefixed to Ops created by this class.
         Default Value: `'Polynomial'`
     """
-    with tf.compat.v1.name_scope(
-        name, values=[bias_variance, slope_variance, shift, exponent]):
+    with tf.name_scope(name):
       dtype = util.maybe_get_common_dtype(
           [bias_variance, slope_variance, shift, exponent])
-      if bias_variance is not None:
-        bias_variance = tf.convert_to_tensor(
-            value=bias_variance, name='bias_variance', dtype=dtype)
-      self._bias_variance = _validate_arg_if_not_none(
-          bias_variance, tf.compat.v1.assert_positive, validate_args)
-      if slope_variance is not None:
-        slope_variance = tf.convert_to_tensor(
-            value=slope_variance, name='slope_variance', dtype=dtype)
-      self._slope_variance = _validate_arg_if_not_none(
-          slope_variance, tf.compat.v1.assert_positive, validate_args)
-      if shift is not None:
-        shift = tf.convert_to_tensor(value=shift, name='shift', dtype=dtype)
-      self._shift = shift
-      if exponent is not None:
-        exponent = tf.convert_to_tensor(
-            value=exponent, name='exponent', dtype=dtype)
-      self._exponent = _validate_arg_if_not_none(
-          exponent, tf.compat.v1.assert_positive, validate_args)
-    super(Polynomial, self).__init__(
-        feature_ndims, dtype=dtype, name=name)
+      self._bias_variance = tensor_util.convert_nonref_to_tensor(
+          bias_variance, name='bias_variance', dtype=dtype)
+      self._slope_variance = tensor_util.convert_nonref_to_tensor(
+          slope_variance, name='slope_variance', dtype=dtype)
+      self._shift = tensor_util.convert_nonref_to_tensor(
+          shift, name='shift', dtype=dtype)
+      self._exponent = tensor_util.convert_nonref_to_tensor(
+          exponent, name='exponent', dtype=dtype)
+      super(Polynomial, self).__init__(
+          feature_ndims, dtype=dtype, name=name, validate_args=validate_args)
 
   @property
   def bias_variance(self):
@@ -183,26 +166,43 @@ class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
       dot_prod = util.sum_rightmost_ndims_preserving_shape(
           x1 * x2, ndims=self.feature_ndims)
     else:
+      shift = tf.convert_to_tensor(self.shift)
       dot_prod = util.sum_rightmost_ndims_preserving_shape(
-          (x1 - self.shift) * (x2 - self.shift),
+          (x1 - shift) * (x2 - shift),
           ndims=self.feature_ndims)
 
     if self.exponent is not None:
+      exponent = tf.convert_to_tensor(self.exponent)
       exponent = util.pad_shape_with_ones(
-          self.exponent, example_ndims)
+          exponent, example_ndims)
       dot_prod **= exponent
 
     if self.slope_variance is not None:
+      slope_variance = tf.convert_to_tensor(self.slope_variance)
       slope_variance = util.pad_shape_with_ones(
-          self.slope_variance, example_ndims)
+          slope_variance, example_ndims)
       dot_prod *= slope_variance ** 2.
 
     if self.bias_variance is not None:
+      bias_variance = tf.convert_to_tensor(self.bias_variance)
       bias_variance = util.pad_shape_with_ones(
-          self.bias_variance, example_ndims)
+          bias_variance, example_ndims)
       dot_prod += bias_variance ** 2.
 
     return dot_prod
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    for arg_name, arg in dict(bias_variance=self.bias_variance,
+                              slope_variance=self.slope_variance,
+                              exponent=self.exponent).items():
+      if arg is not None and is_init != tensor_util.is_ref(arg):
+        assertions.append(assert_util.assert_positive(
+            arg,
+            message='{} must be positive.'.format(arg_name)))
+    return assertions
 
 
 class Linear(Polynomial):

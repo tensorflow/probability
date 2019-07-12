@@ -21,7 +21,7 @@ from __future__ import print_function
 from absl.testing import parameterized
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability import positive_semidefinite_kernels as tfpk
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -54,12 +54,14 @@ class _MaternTestCase(parameterized.TestCase, tf.test.TestCase):
 
   def testValidateArgs(self):
     with self.assertRaises(tf.errors.InvalidArgumentError):
-      k = self._kernel_type(amplitude=-1., length_scale=-1., validate_args=True)
-      self.evaluate(k.amplitude)
+      k = self._kernel_type(amplitude=-1., length_scale=1., validate_args=True)
+      self.evaluate(k.apply([[1.]], [[1.]]))
 
     if not tf.executing_eagerly():
       with self.assertRaises(tf.errors.InvalidArgumentError):
-        self.evaluate(k.length_scale)
+        k = self._kernel_type(
+            amplitude=1., length_scale=-1., validate_args=True)
+        self.evaluate(k.apply([[1.]], [[1.]]))
 
     # But `None`'s are ok
     k = self._kernel_type(amplitude=None, length_scale=None, validate_args=True)

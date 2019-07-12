@@ -21,7 +21,7 @@ from __future__ import print_function
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors
 from tensorflow_probability.python import positive_semidefinite_kernels as tfpk
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util

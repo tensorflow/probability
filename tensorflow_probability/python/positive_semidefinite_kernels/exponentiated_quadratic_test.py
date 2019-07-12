@@ -21,7 +21,7 @@ from __future__ import print_function
 from absl.testing import parameterized
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability import positive_semidefinite_kernels as tfpk
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -92,11 +92,11 @@ class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
   def testValidateArgs(self):
     with self.assertRaises(tf.errors.InvalidArgumentError):
       k = tfpk.ExponentiatedQuadratic(-1., -1., validate_args=True)
-      self.evaluate(k.amplitude)
+      self.evaluate(k.apply([1.], [1.]))
 
     if not tf.executing_eagerly():
       with self.assertRaises(tf.errors.InvalidArgumentError):
-        self.evaluate(k.length_scale)
+        self.evaluate(k.apply([1.], [1.]))
 
     # But `None`'s are ok
     k = tfpk.ExponentiatedQuadratic(None, None, validate_args=True)
