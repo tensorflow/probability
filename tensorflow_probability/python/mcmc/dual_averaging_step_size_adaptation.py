@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import functools
 
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -67,6 +68,7 @@ def _get_differing_dims(a, b):
                      tf.shape(input=b)[: tf.rank(a)]))[:, 0]
 
 
+
 class DualAveragingStepSizeAdaptationResults(
     collections.namedtuple(
         'DualAveragingStepSizeAdaptationResults',
@@ -80,9 +82,9 @@ class DualAveragingStepSizeAdaptationResults(
     target_accept_prob: Floating point scalar `Tensor`. Target accept
       probability.
     shrinkage_target: Floating point scalar `Tensor`. Arbitrary value the
-    exploration step size is biased towards.
+      exploration step size is biased towards.
     exploration_shrinkage: Floating point scalar `Tensor`. How strongly the
-    exploration rate is biased towards the shrinkage target.
+      exploration rate is biased towards the shrinkage target.
     initial_t: Int32 scalar `Tensor`. Number of "pseudo-observations" applied
       to the initial step size. Prevents early noisy exploration.
     decay_rate: Floating point scalar `Tensor`. How much to favor recent
@@ -111,11 +113,12 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
   modifies the [stochastic convex optimization scheme of Nesterov (2009)][2].
   The modified algorithm applies extra weight to recent iterations while
   keeping the convergence guarantees of Robbins-Monro, and takes care not
-  to make the step size too small too quickly, to avoid expensive early
-  iterations. A good target acceptance probability depends on the inner
-  kernel. If this kernel is `HamiltonianMonteCarlo`, then 0.6-0.9 is a good
-  range to aim for. For `RandomWalkMetropolis` this should be closer to 0.25.
-  See the individual kernels' docstrings for guidance.
+  to make the step size too small too quickly when maintaining a constant
+  trajectory length, to avoid expensive early iterations. A good target
+  acceptance probability depends on the inner kernel. If this kernel is
+  `HamiltonianMonteCarlo`, then 0.6-0.9 is a good range to aim for. For
+  `RandomWalkMetropolis` this should be closer to 0.25. See the individual
+  kernels' docstrings for guidance.
 
   In general, adaptation prevents the chain from reaching a stationary
   distribution, so obtaining consistent samples requires `num_adaptation_steps`
@@ -292,6 +295,97 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
     """Return `dict` of ``__init__`` arguments and their values."""
     return self._parameters
 
+  def _one_step_part(
+      self,
+      *parts,
+      log_accept_prob_rank,
+      log_accept_prob,
+      target_accept_prob,
+      previous_kernel_results):
+    """Compute new step sizes for each step size part.
+
+    If step size part has smaller rank than the corresponding state part, then
+    the difference is averaged away in the log accept prob.
+
+    Example:
+
+      state_part has shape      [2, 3, 4, 5]
+      step_size_part has shape     [1, 4, 1]
+      log_accept_prob has shape [2, 3, 4]
+
+    Since step size has 1 rank fewer than the state, we reduce away the leading
+    dimension of log_accept_prob to get a Tensor with shape [3, 4]. Next,
+    since log_accept_prob must broadcast into step_size_part on the left, we
+    reduce the dimensions where their shapes differ, to get a Tensor with shape
+    [1, 4], which now is compatible with the leading dimensions of
+    step_size_part.
+
+    There is a subtlety here in that step_size_parts might be a length-1 list,
+    which means that we'll be "structure-broadcasting" it for all the state
+    parts (see logic in, e.g., hmc.py). In this case we must assume that that
+    the lone step size provided broadcasts with the event dims of each state
+    part. This means that either step size has no dimensions corresponding to
+    chain dimensions, or all states are of the same shape. For the former, we
+    want to reduce over all chain dimensions. For the later, we want to use
+    the same logic as in the non-structure-broadcasted case.
+
+    It turns out we can compute the reduction dimensions for both cases
+    uniformly by taking the rank of any state part. This obviously works in
+    the second case (where all state ranks are the same). In the first case,
+    all state parts have the rank L + D_i + B, where L is the rank of
+    log_accept_prob, D_i is the non-shared dimensions amongst all states, and
+    B are the shared dimensions of all the states, which are equal to the step
+    size. When we subtract B, we will always get a number >= L, which means
+    we'll get the full reduction we want.
+    """
+    step_size, state, error_sum, log_averaging_step, shrinkage_target = parts
+    num_reduce_dims = tf.minimum(
+        log_accept_prob_rank,
+        tf.rank(state) - tf.rank(step_size))
+    reduced_log_accept_prob = _reduce_logmeanexp(log_accept_prob,
+                                                 tf.range(num_reduce_dims))
+
+    # reduced_log_accept_prob must broadcast into step_size on the
+    # left, so we do an additional reduction over dimensions where their
+    # shapes differ.
+    reduce_indices = _get_differing_dims(reduced_log_accept_prob,
+                                         step_size)
+    reduced_log_accept_prob = _reduce_logmeanexp(
+        reduced_log_accept_prob, reduce_indices, keepdims=True)
+    new_error_sum = (error_sum +
+                     target_accept_prob -
+                     tf.math.exp(reduced_log_accept_prob))
+
+    initial_t = previous_kernel_results.initial_t
+    step = tf.cast(previous_kernel_results.step, initial_t.dtype) + 1.
+    soft_t = initial_t + step
+
+    new_log_step = (shrinkage_target - (
+        tf.reshape(new_error_sum, shrinkage_target.shape) *
+        tf.math.sqrt(step)) / (
+            soft_t * previous_kernel_results.exploration_shrinkage))
+
+    eta = tf.math.pow(step, -previous_kernel_results.decay_rate)
+    new_log_averaging_step = (eta * new_log_step +
+                              (1 - eta) * log_averaging_step)
+
+    # - If still adapting, return an exploring step size,
+    # - If just finished, return the averaging step size
+    # - Otherwise, do not update
+    new_step_size = tf.where(
+        previous_kernel_results.step < self.num_adaptation_steps,
+        tf.math.exp(new_log_step),
+        tf.where(
+            previous_kernel_results.step > self.num_adaptation_steps,
+            step_size,
+            tf.math.exp(new_log_averaging_step)))
+    new_log_averaging_step = tf.where(
+        previous_kernel_results.step > self.num_adaptation_steps,
+        log_averaging_step,
+        new_log_averaging_step)
+    new_error_sum = new_error_sum
+    return new_step_size, new_log_averaging_step, new_error_sum
+
   def one_step(self, current_state, previous_kernel_results):
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'dual_averaging_step_size_adaptation',
@@ -319,96 +413,20 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
           previous_kernel_results.log_averaging_step)
       shrinkage_target_parts = tf.nest.flatten(
           previous_kernel_results.shrinkage_target)
-      new_error_sum_parts = []
-      new_step_size_parts = []
-      new_log_averaging_step_parts = []
-      for parts in zip(
-          step_size_parts, state_parts, error_sum_parts,
-          log_averaging_step_parts, shrinkage_target_parts):
-        # Compute new step sizes for each step size part. If step size part has
-        # smaller rank than the corresponding state part, then the difference is
-        # averaged away in the log accept prob.
-        #
-        # Example:
-        #
-        # state_part has shape      [2, 3, 4, 5]
-        # step_size_part has shape     [1, 4, 1]
-        # log_accept_prob has shape [2, 3, 4]
-        #
-        # Since step size has 1 rank fewer than the state, we reduce away the
-        # leading dimension of log_accept_prob to get a Tensor with shape [3,
-        # 4]. Next, since log_accept_prob must broadcast into step_size_part on
-        # the left, we reduce the dimensions where their shapes differ, to get a
-        # Tensor with shape [1, 4], which now is compatible with the leading
-        # dimensions of step_size_part.
-        #
-        # There is a subtlety here in that step_size_parts might be a length-1
-        # list, which means that we'll be "structure-broadcasting" it for all
-        # the state parts (see logic in, e.g., hmc.py). In this case we must
-        # assume that that the lone step size provided broadcasts with the event
-        # dims of each state part. This means that either step size has no
-        # dimensions corresponding to chain dimensions, or all states are of the
-        # same shape. For the former, we want to reduce over all chain
-        # dimensions. For the later, we want to use the same logic as in the
-        # non-structure-broadcasted case.
-        #
-        # It turns out we can compute the reduction dimensions for both cases
-        # uniformly by taking the rank of any state part. This obviously works
-        # in the second case (where all state ranks are the same). In the first
-        # case, all state parts have the rank L + D_i + B, where L is the rank
-        # of log_accept_prob, D_i is the non-shared dimensions amongst all
-        # states, and B are the shared dimensions of all the states, which are
-        # equal to the step size. When we subtract B, we will always get a
-        # number >= L, which means we'll get the full reduction we want.
-        (step_size_part, state_part, error_sum_part,
-         log_averaging_step_part, shrinkage_target_part) = parts
-        num_reduce_dims = tf.minimum(
-            log_accept_prob_rank,
-            tf.rank(state_part) - tf.rank(step_size_part))
-        reduced_log_accept_prob = _reduce_logmeanexp(log_accept_prob,
-                                                     tf.range(num_reduce_dims))
 
-        # reduced_log_accept_prob must broadcast into step_size_part on the
-        # left, so we do an additional reduction over dimensions where their
-        # shapes differ.
-        reduce_indices = _get_differing_dims(reduced_log_accept_prob,
-                                             step_size_part)
-        reduced_log_accept_prob = _reduce_logmeanexp(
-            reduced_log_accept_prob, reduce_indices, keepdims=True)
-        new_error_sum = (error_sum_part +
-                         target_accept_prob -
-                         tf.math.exp(reduced_log_accept_prob))
+      # Build partial function for step size
+      step_func = functools.partial(
+          self._one_step_part, log_accept_prob_rank=log_accept_prob_rank,
+          log_accept_prob=log_accept_prob,
+          target_accept_prob=target_accept_prob,
+          previous_kernel_results=previous_kernel_results)
+      # Apply adaptation to each part of the chains
+      ret = tf.nest.map_structure(
+          step_func, step_size_parts, state_parts, error_sum_parts,
+          log_averaging_step_parts, shrinkage_target_parts)
 
-        initial_t = previous_kernel_results.initial_t
-        step = tf.cast(previous_kernel_results.step, initial_t.dtype) + 1.
-        soft_t = initial_t + step
-
-        new_log_step = (shrinkage_target_part - (
-            tf.reshape(new_error_sum, shrinkage_target_part.shape) *
-            tf.math.sqrt(step)) / (
-                soft_t * previous_kernel_results.exploration_shrinkage))
-
-        eta = tf.math.pow(step, -previous_kernel_results.decay_rate)
-        new_log_averaging_step = (eta * new_log_step +
-                                  (1 - eta) * log_averaging_step_part)
-
-        # - If still adapting, return an exploring step size,
-        # - If just finished, return the averaging step size
-        # - Otherwise, do not update
-        new_step_size_parts.append(
-            tf.where(
-                previous_kernel_results.step < self.num_adaptation_steps,
-                tf.math.exp(new_log_step),
-                tf.where(
-                    previous_kernel_results.step > self.num_adaptation_steps,
-                    step_size_part,
-                    tf.math.exp(new_log_averaging_step))))
-        new_log_averaging_step_parts.append(
-            tf.where(
-                previous_kernel_results.step > self.num_adaptation_steps,
-                log_averaging_step_part,
-                new_log_averaging_step))
-        new_error_sum_parts.append(new_error_sum)
+      (new_step_size_parts, new_log_averaging_step_parts,
+       new_error_sum_parts) = zip(*ret)
       new_step_size = tf.nest.pack_sequence_as(step_size, new_step_size_parts)
       new_error_sum = tf.nest.pack_sequence_as(error_sum_parts,
                                                new_error_sum_parts)
