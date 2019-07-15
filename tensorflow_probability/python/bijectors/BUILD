@@ -703,6 +703,20 @@ py_test(
     size = "small",
     srcs = ["bijector_test.py"],
     deps = [
+        ":bijectors",
+        # mock dep,
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_test(
+    name = "bijector_composition_test",
+    size = "small",
+    srcs = ["bijector_composition_test.py"],
+    deps = [
         # mock dep,
         # numpy dep,
         # scipy dep,

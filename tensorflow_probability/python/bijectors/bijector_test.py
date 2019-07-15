@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
 import weakref
 
 # Dependency imports
@@ -27,14 +26,10 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -224,7 +219,7 @@ class BijectorCachingTest(test_case.TestCase):
     else:
       self.assertIs(y, forward_only_bijector.forward(x))
 
-    # Now, everything should be cached if the argument is y, so these are ok.
+    # Now, everything should be cached if the argument `is y`, so these are ok.
     forward_only_bijector.inverse(y)
     forward_only_bijector.inverse_log_det_jacobian(y, event_ndims=0)
 
@@ -247,7 +242,7 @@ class BijectorCachingTest(test_case.TestCase):
     else:
       self.assertIs(x, inverse_only_bijector.inverse(y))
 
-    # Now, everything should be cached if the argument is x.
+    # Now, everything should be cached if the argument `is x`.
     inverse_only_bijector.forward(x)
     inverse_only_bijector.forward_log_det_jacobian(x, event_ndims=0)
 
@@ -335,62 +330,6 @@ class BijectorReduceEventDimsTest(test_case.TestCase):
     ildj = self.evaluate(
         bij.inverse_log_det_jacobian(x, event_ndims=event_ndims))
     self.assertAllClose(-np.log(x_), ildj)
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class BijectorCompositionTest(test_case.TestCase):
-
-  def testComposeFromChainBijector(self):
-    x = tf.constant([-5., 0., 5.])
-    sigmoid = functools.reduce(lambda chain, f: chain(f), [
-        tfb.Reciprocal(),
-        tfb.AffineScalar(shift=1.),
-        tfb.Exp(),
-        tfb.AffineScalar(scale=-1.),
-    ])
-    self.assertIsInstance(sigmoid, tfb.Chain)
-    self.assertAllClose(
-        *self.evaluate([tf.math.sigmoid(x), sigmoid.forward(x)]),
-        atol=0, rtol=1e-3)
-
-  def testComposeFromTransformedDistribution(self):
-    actual_log_normal = tfb.Exp()(tfd.TransformedDistribution(
-        distribution=tfd.Normal(0, 1),
-        bijector=tfb.AffineScalar(shift=0.5, scale=2.)))
-    expected_log_normal = tfd.LogNormal(0.5, 2.)
-    x = tf.constant([0.1, 1., 5.])
-    self.assertAllClose(
-        *self.evaluate([actual_log_normal.log_prob(x),
-                        expected_log_normal.log_prob(x)]),
-        atol=0, rtol=1e-3)
-
-  def testComposeFromTDSubclassWithAlternateCtorArgs(self):
-    # This line used to raise an exception.
-    tfb.Identity()(tfd.Chi(df=1., allow_nan_stats=True))
-
-  def testComposeFromNonTransformedDistribution(self):
-    actual_log_normal = tfb.Exp()(tfd.Normal(0.5, 2.))
-    expected_log_normal = tfd.LogNormal(0.5, 2.)
-    x = tf.constant([0.1, 1., 5.])
-    self.assertAllClose(
-        *self.evaluate([actual_log_normal.log_prob(x),
-                        expected_log_normal.log_prob(x)]),
-        atol=0, rtol=1e-3)
-
-  def testComposeFromTensor(self):
-    x = tf.constant([-5., 0., 5.])
-    self.assertAllClose(
-        *self.evaluate([tf.exp(x), tfb.Exp()(x)]),
-        atol=0, rtol=1e-3)
-
-  def testHandlesKwargs(self):
-    x = tfb.Exp()(tfd.Normal(0, 1), event_shape=[4])
-    y = tfd.Independent(tfd.LogNormal(tf.zeros(4), 1), 1)
-    z = tf.constant([[1., 2, 3, 4],
-                     [0.5, 1.5, 2., 2.5]])
-    self.assertAllClose(
-        *self.evaluate([y.log_prob(z), x.log_prob(z)]),
-        atol=0, rtol=1e-3)
 
 
 class BijectorLDJCachingTest(test_case.TestCase):
