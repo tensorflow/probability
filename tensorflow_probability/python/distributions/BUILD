@@ -2432,7 +2432,7 @@ py_test(
     srcs = ["distribution_properties_test.py"],
     args = ["--tf_mode=graph"],
     main = "distribution_properties_test.py",
-    shard_count = 6,
+    shard_count = 10,
     tags = ["hypothesis"],
     deps = [":distribution_properties_testlib"],
 )
