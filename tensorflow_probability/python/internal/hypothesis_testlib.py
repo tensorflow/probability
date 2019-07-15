@@ -99,13 +99,120 @@ def assert_no_excessive_var_usage(name, max_permissible=2):
             name, var_nusages))
 
 
+class Support(object):
+  """Classification of sample spaces and bijector domains and codomains."""
+  SCALAR_UNCONSTRAINED = 'SCALAR_UNCONSTRAINED'
+  SCALAR_NON_NEGATIVE = 'SCALAR_NON_NEGATIVE'
+  SCALAR_NON_ZERO = 'SCALAR_NON_ZERO'
+  SCALAR_POSITIVE = 'SCALAR_POSITIVE'
+  SCALAR_GT_NEG1 = 'SCALAR_GT_NEG1'
+  SCALAR_IN_NEG1_1 = 'SCALAR_IN_NEG1_1'
+  SCALAR_IN_0_1 = 'SCALAR_IN_0_1'
+  VECTOR_UNCONSTRAINED = 'VECTOR_UNCONSTRAINED'
+  VECTOR_SIZE_TRIANGULAR = 'VECTOR_SIZE_TRIANGULAR'
+  VECTOR_WITH_L1_NORM_1_SIZE_GT1 = 'VECTOR_WITH_L1_NORM_1_SIZE_GT1'
+  VECTOR_STRICTLY_INCREASING = 'VECTOR_STRICTLY_INCREASING'
+  MATRIX_LOWER_TRIL_POSITIVE_DEFINITE = 'MATRIX_LOWER_TRIL_POSITIVE_DEFINITE'
+  MATRIX_POSITIVE_DEFINITE = 'MATRIX_POSITIVE_DEFINITE'
+  CORRELATION_CHOLESKY = 'CORRELATION_CHOLESKY'
+  OTHER = 'OTHER'
+
+ALL_SUPPORTS = None
+
+
+def all_supports():
+  global ALL_SUPPORTS
+  cls = Support
+  ALL_SUPPORTS = [attr for attr in dir(cls)
+                  if not callable(getattr(cls, attr))
+                  and not attr.startswith('__')]
+all_supports()
+del all_supports
+
+
+def _scalar_constrainer(support):
+  """Helper for `constrainer` for scalar supports."""
+
+  def nonzero(x):
+    return tf.where(tf.equal(x, 0), 1e-6, x)
+
+  constrainers = {
+      Support.SCALAR_IN_0_1: tf.math.sigmoid,
+      Support.SCALAR_GT_NEG1: softplus_plus_eps(-1 + 1e-6),
+      Support.SCALAR_NON_ZERO: nonzero,
+      Support.SCALAR_IN_NEG1_1: lambda x: tf.math.tanh(x) * (1 - 1e-6),
+      Support.SCALAR_NON_NEGATIVE: tf.math.softplus,
+      Support.SCALAR_POSITIVE: softplus_plus_eps(),
+      Support.SCALAR_UNCONSTRAINED: tf.identity,
+  }
+  if support not in constrainers:
+    raise NotImplementedError(support)
+  return constrainers[support]
+
+
+def _vector_constrainer(support):
+  """Helper for `constrainer` for vector supports."""
+
+  def l1norm(x):
+    x = tf.concat([x, tf.ones_like(x[..., :1]) * 1e-6], axis=-1)
+    x = x / tf.linalg.norm(x, ord=1, axis=-1, keepdims=True)
+    return x
+
+  constrainers = {
+      Support.VECTOR_UNCONSTRAINED:
+          identity_fn,
+      Support.VECTOR_STRICTLY_INCREASING:
+          lambda x: tf.cumsum(tf.abs(x) + 1e-3, axis=-1),
+      Support.VECTOR_WITH_L1_NORM_1_SIZE_GT1:
+          l1norm,
+  }
+  if support not in constrainers:
+    raise NotImplementedError(support)
+  return constrainers[support]
+
+
+def _matrix_constrainer(support):
+  """Helper for `constrainer` for matrix supports."""
+  constrainers = {
+      Support.MATRIX_POSITIVE_DEFINITE:
+          positive_definite,
+      Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE:
+          lower_tril_positive_definite,
+  }
+  if support not in constrainers:
+    raise NotImplementedError(support)
+  return constrainers[support]
+
+
+def constrainer(support):
+  """Determines a constraining transformation into the given support."""
+  if support.startswith('SCALAR_'):
+    return _scalar_constrainer(support)
+  if support.startswith('VECTOR_'):
+    return _vector_constrainer(support)
+  if support.startswith('MATRIX_'):
+    return _matrix_constrainer(support)
+  raise NotImplementedError(support)
+
+
+def min_rank_for_support(support):
+  """Reports the minimum rank of a Tensor in the given support."""
+  if support.startswith('SCALAR_'):
+    return 0
+  if support.startswith('VECTOR_'):
+    return 1
+  if support.startswith('MATRIX_'):
+    return 2
+  raise NotImplementedError(support)
+
+
 def constrained_tensors(constraint_fn, shape):
   """Strategy for drawing a constrained Tensor.
 
   Args:
     constraint_fn: Function mapping the unconstrained space to the desired
       constrained space.
-    shape: Shape of the desired Tensors
+    shape: Shape of the desired Tensors as a Python list.
 
   Returns:
     tensors: A strategy for drawing constrained Tensors of the given shape.
@@ -130,6 +237,36 @@ def constrained_tensors(constraint_fn, shape):
 
 
 # pylint: disable=no-value-for-parameter
+
+
+@hps.composite
+def tensors_in_support(draw, support, batch_shape=None, event_dim=None):
+  """Strategy for drawing Tensors in the given support.
+
+  Supports have a notion of event shape, which is the trailing dimensions in
+  which the support region may not be axis-aligned (e.g., the event ndims of
+  `VECTOR_STRICTLY_INCREASING` is 1).  This strategy produces Tensors with at
+  least the support's event rank, and also an optional batch shape.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    support: The `Support` in which the Tensor should live.
+    batch_shape: Optional shape.  The returned Tensors will have this batch
+      shape.  Hypothesis will pick one if omitted.
+    event_dim: Optional Python int giving the size of each event dimension.
+      This is shared across all event dimensions, permitting square event
+      matrices, etc. If omitted, Hypothesis will choose one.
+
+  Returns:
+    tensors: A strategy for drawing such Tensors.
+  """
+  if event_dim is None:
+    event_dim = draw(hps.integers(min_value=2, max_value=6))
+  if batch_shape is None:
+    batch_shape = tensorshape_util.as_list(draw(shapes()))
+  shape = batch_shape + [event_dim] * min_rank_for_support(support)
+  constraint_fn = constrainer(support)
+  return draw(constrained_tensors(constraint_fn, shape))
 
 
 @hps.composite
@@ -187,7 +324,7 @@ def broadcasting_params(draw,
     params_event_ndims: Python `dict` mapping the name of each parameter to a
       Python `int` giving the event ndims for that parameter.
     event_dim: Optional Python int giving the size of each parameter's event
-      dimensions (except where overridded by any applicable constraint
+      dimensions (except where overridden by any applicable constraint
       functions).  This is shared across all parameters, permitting square event
       matrices, compatible location and scale Tensors, etc. If omitted,
       Hypothesis will choose one.
@@ -236,6 +373,9 @@ def broadcasting_params(draw,
     # Reduce our risk of exceeding TF kernel broadcast limits.
     hp.assume(len(param_shape) < 6)
 
+    # TODO(axch): Can I replace `params_event_ndims` and `constraint_fn_for`
+    # with a map from params to `Suppport`s, and use `tensors_in_support` here
+    # instead of this explicit `constrained_tensors` function?
     param_strategy = constrained_tensors(constraint_fn_for(param), param_shape)
     params_kwargs[param] = tf.convert_to_tensor(
         draw(param_strategy), dtype_hint=tf.float32, name=param)

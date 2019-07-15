@@ -171,66 +171,7 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
   return ctor(validate_args=True, **bijector_params)
 
 
-Support = bijector_hps.Support
-
-
-def scalar_constrainer(support):
-  """Helper for `constrainer` for scalar supports."""
-
-  def nonzero(x):
-    return tf.where(tf.equal(x, 0), 1e-6, x)
-
-  constrainers = {
-      Support.SCALAR_IN_0_1: tf.math.sigmoid,
-      Support.SCALAR_GT_NEG1: tfp_hps.softplus_plus_eps(-1 + 1e-6),
-      Support.SCALAR_NON_ZERO: nonzero,
-      Support.SCALAR_IN_NEG1_1: lambda x: tf.math.tanh(x) * (1 - 1e-6),
-      Support.SCALAR_NON_NEGATIVE: tf.math.softplus,
-      Support.SCALAR_POSITIVE: tfp_hps.softplus_plus_eps(),
-      Support.SCALAR_UNCONSTRAINED: tf.identity,
-  }
-  return constrainers[support]
-
-
-def vector_constrainer(support):
-  """Helper for `constrainer` for vector supports."""
-
-  def l1norm(x):
-    x = tf.concat([x, tf.ones_like(x[..., :1]) * 1e-6], axis=-1)
-    x = x / tf.linalg.norm(x, ord=1, axis=-1, keepdims=True)
-    return x
-
-  constrainers = {
-      Support.VECTOR_UNCONSTRAINED:
-          tfp_hps.identity_fn,
-      Support.VECTOR_STRICTLY_INCREASING:
-          lambda x: tf.cumsum(tf.abs(x) + 1e-3, axis=-1),
-      Support.VECTOR_WITH_L1_NORM_1_SIZE_GT1:
-          l1norm,
-  }
-  return constrainers[support]
-
-
-def matrix_constrainer(support):
-  """Helper for `constrainer` for matrix supports."""
-  constrainers = {
-      Support.MATRIX_POSITIVE_DEFINITE:
-          tfp_hps.positive_definite,
-      Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE:
-          tfp_hps.lower_tril_positive_definite,
-  }
-  return constrainers[support]
-
-
-def constrainer(support):
-  """Determines a constraining transformation into the given support."""
-  if support.startswith('SCALAR_'):
-    return scalar_constrainer(support)
-  if support.startswith('VECTOR_'):
-    return vector_constrainer(support)
-  if support.startswith('MATRIX_'):
-    return matrix_constrainer(support)
-  raise NotImplementedError(support)
+Support = tfp_hps.Support
 
 
 @hps.composite
@@ -240,7 +181,7 @@ def domain_tensors(draw, bijector, shape=None):
   If the bijector's domain is constrained, this proceeds by drawing an
   unconstrained Tensor and then transforming it to fit.  The constraints are
   declared in `bijectors.hypothesis_testlib.bijector_supports`.  The
-  transformations are defined by `constrainer`.
+  transformations are defined by `tfp_hps.constrainer`.
 
   Args:
     draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
@@ -257,7 +198,7 @@ def domain_tensors(draw, bijector, shape=None):
     shape = draw(tfp_hps.shapes())
   bijector_name = type(bijector).__name__
   support = bijector_hps.bijector_supports()[bijector_name].forward
-  constraint_fn = constrainer(support)
+  constraint_fn = tfp_hps.constrainer(support)
   return draw(tfp_hps.constrained_tensors(constraint_fn, shape))
 
 
@@ -268,7 +209,7 @@ def codomain_tensors(draw, bijector, shape=None):
   If the bijector's codomain is constrained, this proceeds by drawing an
   unconstrained Tensor and then transforming it to fit.  The constraints are
   declared in `bijectors.hypothesis_testlib.bijector_supports`.  The
-  transformations are defined by `constrainer`.
+  transformations are defined by `tfp_hps.constrainer`.
 
   Args:
     draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
@@ -285,7 +226,7 @@ def codomain_tensors(draw, bijector, shape=None):
     shape = draw(tfp_hps.shapes())
   bijector_name = type(bijector).__name__
   support = bijector_hps.bijector_supports()[bijector_name].inverse
-  constraint_fn = constrainer(support)
+  constraint_fn = tfp_hps.constrainer(support)
   return draw(tfp_hps.constrained_tensors(constraint_fn, shape))
 
 
@@ -328,6 +269,11 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
     # Forward mapping: Check differentiation through forward mapping with
     # respect to the input and parameter variables.  Also check that any
     # variables are not referenced overmuch.
+    # TODO(axch): Would be nice to get rid of all this shape inference logic and
+    # just rely on a notion of batch and event shape for bijectors, so we can
+    # pass those through `domain_tensors` and `codomain_tensors` and use
+    # `tensors_in_support`.  However, `RationalQuadraticSpline` behaves weirdly
+    # somehow and I got confused.
     shp = bijector.inverse_event_shape([event_dim] *
                                        bijector.inverse_min_event_ndims)
     shp = tensorshape_util.concatenate(

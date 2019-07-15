@@ -29,6 +29,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
 
 tfb = tfp.bijectors
@@ -85,25 +86,6 @@ def instantiable_bijectors():
   return INSTANTIABLE_BIJECTORS
 
 
-class Support(object):
-  """Classification of bijector domains and codomains."""
-  SCALAR_UNCONSTRAINED = 'SCALAR_UNCONSTRAINED'
-  SCALAR_NON_NEGATIVE = 'SCALAR_NON_NEGATIVE'
-  SCALAR_NON_ZERO = 'SCALAR_NON_ZERO'
-  SCALAR_POSITIVE = 'SCALAR_POSITIVE'
-  SCALAR_GT_NEG1 = 'SCALAR_GT_NEG1'
-  SCALAR_IN_NEG1_1 = 'SCALAR_IN_NEG1_1'
-  SCALAR_IN_0_1 = 'SCALAR_IN_0_1'
-  VECTOR_UNCONSTRAINED = 'VECTOR_UNCONSTRAINED'
-  VECTOR_SIZE_TRIANGULAR = 'VECTOR_SIZE_TRIANGULAR'
-  VECTOR_WITH_L1_NORM_1_SIZE_GT1 = 'VECTOR_WITH_L1_NORM_1_SIZE_GT1'
-  VECTOR_STRICTLY_INCREASING = 'VECTOR_STRICTLY_INCREASING'
-  MATRIX_LOWER_TRIL_POSITIVE_DEFINITE = 'MATRIX_LOWER_TRIL_POSITIVE_DEFINITE'
-  MATRIX_POSITIVE_DEFINITE = 'MATRIX_POSITIVE_DEFINITE'
-  CORRELATION_CHOLESKY = 'CORRELATION_CHOLESKY'
-  OTHER = 'OTHER'
-
-
 class BijectorSupport(collections.namedtuple(
     'BijectorSupport', ['forward', 'inverse'])):
   """Specification of the domain and codomain of a bijector.
@@ -135,6 +117,7 @@ def bijector_supports():
   global BIJECTOR_SUPPORTS
   if BIJECTOR_SUPPORTS is not None:
     return BIJECTOR_SUPPORTS
+  Support = tfp_hps.Support  # pylint: disable=invalid-name
   supports = {
       'AffineScalar':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,

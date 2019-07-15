@@ -278,6 +278,19 @@ py_library(
     ],
 )
 
+py_test(
+    name = "hypothesis_testlib_test",
+    srcs = ["hypothesis_testlib_test.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":hypothesis_testlib",
+        # absl/testing:parameterized dep,
+        # hypothesis dep,
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
 py_library(
     name = "test_util",
     testonly = 1,

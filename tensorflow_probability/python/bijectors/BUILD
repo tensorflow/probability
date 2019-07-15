@@ -140,7 +140,7 @@ py_test(
     srcs = ["bijector_properties_test.py"],
     args = ["--tf_mode=graph"],
     main = "bijector_properties_test.py",
-    shard_count = 5,
+    shard_count = 8,
     tags = ["hypothesis"],
     deps = [":bijector_properties_testlib"],
 )
