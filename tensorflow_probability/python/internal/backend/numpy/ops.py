@@ -88,6 +88,11 @@ def _control_dependencies(control_inputs):
 
 def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint: disable=unused-argument
   assert not tf.is_tensor(value), value
+  if isinstance(value, np.ndarray):
+    if dtype is not None and value.dtype != utils.numpy_dtype(dtype):
+      raise ValueError('Expected dtype {} but got {} with dtype {}.'.format(
+          utils.numpy_dtype(dtype), value, value.dtype))
+    return value
   return np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
 
 
