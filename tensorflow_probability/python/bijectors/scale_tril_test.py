@@ -22,16 +22,12 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class ScaleTriLBijectorTest(tf.test.TestCase):
   """Tests the correctness of the ScaleTriL bijector."""
-
-  def setUp(self):
-    self._rng = np.random.RandomState(42)
 
   def testComputesCorrectValues(self):
     shift = 1.61803398875
@@ -53,7 +49,7 @@ class ScaleTriLBijectorTest(tf.test.TestCase):
     # Generate random inputs from an unconstrained space, with
     # event size 6 to specify 3x3 triangular matrices.
     batch_shape = [2, 1]
-    x = np.float32(self._rng.randn(*(batch_shape + [6])))
+    x = np.random.randn(*(batch_shape + [6])).astype(np.float32)
     b = tfb.ScaleTriL(
         diag_bijector=tfb.Softplus(), diag_shift=3.14159)
     y = self.evaluate(b.forward(x))
@@ -66,5 +62,6 @@ class ScaleTriLBijectorTest(tf.test.TestCase):
     ildj = self.evaluate(b.inverse_log_det_jacobian(y, event_ndims=2))
     self.assertAllClose(fldj, -ildj, rtol=1e-4)
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
   tf.test.main()
