@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -65,6 +66,7 @@ class GumbelTest(tf.test.TestCase):
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
 
+  @tfp_test_util.numpy_disable
   def testVariableScale(self):
     x = tf.Variable(1.)
     b = tfb.Gumbel(loc=0., scale=x, validate_args=True)

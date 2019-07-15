@@ -51,14 +51,23 @@ flags.DEFINE_string('fixed_seed', None,
                      'Takes precedence over --vary-seed when both appear.'))
 
 
-def numpy_disable(test_fn):
+def numpy_disable(test_fn_or_reason, reason=None):
+  """Disable a test when using the numpy backend: `@numpy_disable('reason')`."""
 
-  def new_test(self, *args, **kwargs):
-    if not inspect.isclass(tf.Variable):
-      self.skipTest('test disabled for numpy')
-    return test_fn(self, *args, **kwargs)
+  if callable(test_fn_or_reason):
 
-  return new_test
+    def new_test(self, *args, **kwargs):
+      if not inspect.isclass(tf.Variable):
+        msg = 'test disabled for numpy'
+        if reason is not None:
+          msg += ': {}'.format(reason)
+        self.skipTest(msg)
+      return test_fn_or_reason(self, *args, **kwargs)
+
+    return new_test
+
+  else:
+    return lambda test_fn: numpy_disable(test_fn, reason=test_fn_or_reason)
 
 
 def test_seed(hardcoded_seed=None, set_eager_seed=True):

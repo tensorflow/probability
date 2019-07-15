@@ -270,6 +270,7 @@ py_library(
 py_test(
     name = "numpy_test",
     srcs = ["numpy_test.py"],
+    shard_count = 5,
     deps = [
         ":numpy",
         # absl/testing:parameterized dep,

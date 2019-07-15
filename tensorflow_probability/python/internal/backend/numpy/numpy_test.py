@@ -154,8 +154,6 @@ def psd_matrix(draw, eps=1e-2):
 # broadcast_dynamic_shape
 # broadcast_static_shape
 # broadcast_to
-# linalg.band_part
-# linalg.diag_part
 # linalg.set_diag
 # linalg.triangular_solve
 # math.accumulate_n
@@ -245,12 +243,17 @@ NUMPY_TEST_CASES = [
     TestCase('math.real',
              [single_array(dtype=np.complex, elements=complex_numbers())]),
     TestCase('linalg.cholesky', [psd_matrix()]),
-    TestCase('linalg.diag_part', []),
+    TestCase('linalg.diag_part', [single_array(min_dims=2)]),
     TestCase('identity', [single_array()]),
 
     # ArgSpec(args=['input', 'num_lower', 'num_upper', 'name'], varargs=None,
     #         keywords=None, defaults=(None,))
-    TestCase('linalg.band_part', []),
+    TestCase('linalg.band_part', [
+        hps.tuples(
+            single_array(min_dims=2, min_side=3),
+            hps.integers(min_value=-1, max_value=3),
+            hps.integers(min_value=-1, max_value=3))
+    ]),
 
     # ArgSpec(args=['input', 'shape', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -341,10 +344,10 @@ NUMPY_TEST_CASES = [
         ]),
     TestCase('math.erf', [single_array()]),
     TestCase('math.erfc', [single_array()]),
-    TestCase('math.exp', [single_array(
-        elements=floats(min_value=-1e3, max_value=1e3))]),
-    TestCase('math.expm1', [single_array(
-        elements=floats(min_value=-1e3, max_value=1e3))]),
+    TestCase('math.exp',
+             [single_array(elements=floats(min_value=-1e3, max_value=1e3))]),
+    TestCase('math.expm1',
+             [single_array(elements=floats(min_value=-1e3, max_value=1e3))]),
     TestCase('math.floor', [single_array()]),
     TestCase('math.is_finite', [single_array()]),
     TestCase('math.is_inf', [single_array()]),
@@ -401,9 +404,10 @@ NUMPY_TEST_CASES = [
     TestCase('math.multiply', [n_same_shape(n=2)]),
     TestCase('math.multiply_no_nan', [n_same_shape(n=2)]),
     TestCase('math.not_equal', [n_same_shape(n=2)]),
-    TestCase('math.pow',
-             [n_same_shape(
-                 n=2, elements=[floats(-1e3, 1e3), floats(-10., 10.)])]),
+    TestCase(
+        'math.pow',
+        [n_same_shape(n=2, elements=[floats(-1e3, 1e3),
+                                     floats(-10., 10.)])]),
     TestCase('math.squared_difference', [n_same_shape(n=2)]),
     TestCase('math.subtract', [n_same_shape(n=2)]),
     TestCase('math.truediv',

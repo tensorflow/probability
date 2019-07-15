@@ -915,6 +915,7 @@ py_test(
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1005,6 +1006,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

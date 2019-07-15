@@ -64,8 +64,12 @@ __all__ = [
 ]
 
 
-def _assert_equal(*_, **__):  # pylint: disable=unused-argument
-  pass
+def _assert_equal(x, y, message=None, summarize=None, name=None):
+  del summarize
+  del name
+  if not np.all(np.equal(x, y)):
+    raise ValueError('Expected x == y but got {} vs {} {}'.format(
+        x, y, message or ''))
 
 
 def _assert_greater(*_, **__):  # pylint: disable=unused-argument
@@ -112,16 +116,23 @@ def _assert_non_positive(*_, **__):  # pylint: disable=unused-argument
   pass
 
 
-def _assert_none_equal(*_, **__):  # pylint: disable=unused-argument
-  pass
+def _assert_none_equal(x, y, summarize=None, message=None, name=None):
+  del summarize
+  del name
+  if np.any(np.equal(x, y)):
+    raise ValueError('Expected x != y but got {} vs {} {}'.format(
+        x, y, message or ''))
 
 
 def _assert_positive(*_, **__):  # pylint: disable=unused-argument
   pass
 
 
-def _assert_rank_at_least(*_, **__):  # pylint: disable=unused-argument
-  pass
+def _assert_rank_at_least(x, rank, message=None, name=None):
+  del name
+  if len(x.shape) < rank:
+    raise ValueError('Expected rank at least {} but got shape {} {}'.format(
+        rank, x.shape, message or ''))
 
 
 def _assert_rank_in(*_, **__):  # pylint: disable=unused-argument
