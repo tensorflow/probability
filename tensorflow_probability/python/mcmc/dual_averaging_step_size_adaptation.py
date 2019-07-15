@@ -404,7 +404,6 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
       log_accept_prob = self.log_accept_prob_getter_fn(new_inner_results)
       target_accept_prob = previous_kernel_results.target_accept_prob
 
-      state_parts = tf.nest.flatten(current_state)
       step_size = self.step_size_getter_fn(new_inner_results)
       step_size_parts = tf.nest.flatten(step_size)
       log_accept_prob_rank = tf.rank(log_accept_prob)
@@ -413,25 +412,27 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
           previous_kernel_results.log_averaging_step)
       shrinkage_target_parts = tf.nest.flatten(
           previous_kernel_results.shrinkage_target)
+      current_state = tf.nest.flatten(current_state)[:len(step_size_parts)]
 
       # Build partial function for step size
       step_func = functools.partial(
-          self._one_step_part, log_accept_prob_rank=log_accept_prob_rank,
+          self._one_step_part,
+          log_accept_prob_rank=log_accept_prob_rank,
           log_accept_prob=log_accept_prob,
           target_accept_prob=target_accept_prob,
           previous_kernel_results=previous_kernel_results)
       # Apply adaptation to each part of the chains
       ret = tf.nest.map_structure(
-          step_func, step_size_parts, state_parts, error_sum_parts,
-          log_averaging_step_parts, shrinkage_target_parts)
+          step_func, step_size_parts, current_state,
+          error_sum_parts,
+          log_averaging_step_parts,
+          shrinkage_target_parts)
 
-      (new_step_size_parts, new_log_averaging_step_parts,
-       new_error_sum_parts) = zip(*ret)
-      new_step_size = tf.nest.pack_sequence_as(step_size, new_step_size_parts)
-      new_error_sum = tf.nest.pack_sequence_as(error_sum_parts,
-                                               new_error_sum_parts)
+      new_step_size, new_log_averaging_step, new_error_sum = zip(*ret)
+      new_step_size = tf.nest.pack_sequence_as(step_size, new_step_size)
+      new_error_sum = tf.nest.pack_sequence_as(error_sum_parts, new_error_sum)
       new_log_averaging_step = tf.nest.pack_sequence_as(
-          log_averaging_step_parts, new_log_averaging_step_parts)
+          log_averaging_step_parts, new_log_averaging_step)
 
       return new_state, previous_kernel_results._replace(
           inner_results=new_inner_results,

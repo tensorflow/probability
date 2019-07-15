@@ -36,6 +36,14 @@ tfd = tfp.distributions
 _INITIAL_T = 10.0
 _EXPLORATION_SHRINKAGE = 0.05
 
+# Hardcoded expected step after two steps. Calculate with
+# tf.math.exp(tf.math.log(10.) - (err - 0.75) / ((10. + 1.) * 0.05))
+_UPDATE_M05 = 9.131008  # err = -0.05
+_UPDATE_M02 = 9.642897  # err = -0.02
+_UPDATE_M01 = 9.819825  # err = -0.01
+_UPDATE_0 = 10.  # err = 0
+_UPDATE_01 = 10.183481  # err = +0.01
+
 def _set_seed(seed):
   """Helper which uses graph seed if using eager."""
   # TODO(b/68017812): Deprecate once eager correctly supports seed.
@@ -295,6 +303,7 @@ class DualAveragingStepSizeAdaptationTest(tf.test.TestCase,
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
 
 
+
 @test_util.run_all_in_graph_and_eager_modes
 class DualAveragingStepSizeAdaptationStaticBroadcastingTest(
     tf.test.TestCase,
@@ -302,45 +311,45 @@ class DualAveragingStepSizeAdaptationStaticBroadcastingTest(
   use_static_shape = True
 
   @parameterized.parameters(
-      (np.float64(1.), 9.96974283748709),
+      (np.float64(1.), _UPDATE_M01),
       ([np.float64(1.), np.ones([3, 1])], [
-          9.96974283748709,
-          np.array([[10.],
-                    [10.27648032],
-                    [9.64289579]])
+          _UPDATE_M01,
+          np.array([[_UPDATE_M02],
+                    [_UPDATE_01],
+                    [_UPDATE_M02]])
       ]),
       ([np.float64(1.), np.ones([2, 3, 1])], [
-          9.96974283748709,
-          np.array([[[9.64289579], [10.18348113], [9.64289579]],
-                    [[10.3703288], [10.3703288], [9.64289579]]])
+          _UPDATE_M01,
+          np.array([[[_UPDATE_M05], [_UPDATE_01], [_UPDATE_M02]],
+                    [[_UPDATE_01], [_UPDATE_01], [_UPDATE_M02]]])
       ]),
       ([np.float64(1.), np.ones([2, 1, 1])], [
-          9.96974283748709,
-          np.array([[[9.81982474]], [[10.12194972]]])
+          _UPDATE_M01,
+          np.array([[[_UPDATE_M02]], [[_UPDATE_0]]])
       ]),
       ([np.float64(1.), np.ones([1, 3, 1])], [
-          9.96974283748709,
-          np.array([[[10.],
-                     [10.27648032],
-                     [9.64289579]]])
+          _UPDATE_M01,
+          np.array([[[_UPDATE_M02],
+                     [_UPDATE_01],
+                     [_UPDATE_M02]]])
       ]),
       ([np.float64(1.), np.ones([1, 1, 1])], [
-          9.96974283748709,
-          np.array([[[9.96974284]]])
+          _UPDATE_M01,
+          np.array([[[_UPDATE_M01]]])
       ]),
       ([np.float64(1.), np.ones([1, 1])], [
-          9.96974283748709,
-          np.array([[9.96974284]])
+          _UPDATE_M01,
+          np.array([[_UPDATE_M01]])
       ]),
       ([np.float64(1.), np.ones([1])], [
-          9.96974283748709,
-          np.array([9.96974284])
+          _UPDATE_M01,
+          np.array([_UPDATE_M01])
       ]),
   )
   def testBroadcasting(self, old_step_size, new_step_size):
     log_accept_ratio = tf.constant(
-        [[np.log(0.73), np.log(0.76), np.log(0.73)],
-         [np.log(0.77), np.log(0.77), np.log(0.73)]],
+        np.log([[0.70, 0.76, 0.73],
+                [0.76, 0.76, 0.73]]),
         dtype=tf.float64)
     log_accept_ratio = tf.compat.v1.placeholder_with_default(
         input=log_accept_ratio,
@@ -354,6 +363,7 @@ class DualAveragingStepSizeAdaptationStaticBroadcastingTest(
         log_accept_ratio=log_accept_ratio)
     kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
         kernel,
+        target_accept_prob=0.75,
         num_adaptation_steps=1,
         validate_args=True)
 
