@@ -181,14 +181,14 @@ class _AffineScalarBijectorTest(object):
 
   def testVariableScaleAssertion(self):
     v = tf.Variable(0.)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(v.initializer)
     with self.assertRaisesOpError("Argument `scale` must be non-zero"):
       b = tfb.AffineScalar(scale=v, validate_args=True)
       _ = self.evaluate(b.forward(1.))
 
   def testModifiedVariableScaleAssertion(self):
     v = tf.Variable(1.)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(v.initializer)
     b = tfb.AffineScalar(scale=v, validate_args=True)
     with self.assertRaisesOpError("Argument `scale` must be non-zero"):
       with tf.control_dependencies([v.assign(0.)]):

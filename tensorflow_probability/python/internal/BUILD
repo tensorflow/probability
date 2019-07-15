@@ -304,6 +304,7 @@ py_library(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:seed_stream",
+        "//tensorflow_probability/python/internal/backend/numpy",
     ],
 )
 

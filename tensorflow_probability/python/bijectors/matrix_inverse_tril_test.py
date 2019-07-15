@@ -162,7 +162,7 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
     with self.assertRaisesOpError(nonsingular_error_msg):
       self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 
-  @tfp_test_util.numpy_disable('gradients')
+  @tfp_test_util.numpy_disable_gradient_test
   def testJacobian(self):
     bijector = tfb.MatrixInverseTriL()
     batch_size = 5

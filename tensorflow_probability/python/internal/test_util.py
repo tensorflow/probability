@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import inspect
 import os
 
 # Dependency imports
@@ -30,9 +29,10 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal.backend.numpy import ops
 
 __all__ = [
-    'numpy_disable',
+    'numpy_disable_gradient_test',
     'test_seed',
     'test_seed_stream',
     'DiscreteScalarDistributionTestHelpers',
@@ -51,23 +51,15 @@ flags.DEFINE_string('fixed_seed', None,
                      'Takes precedence over --vary-seed when both appear.'))
 
 
-def numpy_disable(test_fn_or_reason, reason=None):
-  """Disable a test when using the numpy backend: `@numpy_disable('reason')`."""
+def numpy_disable_gradient_test(test_fn):
+  """Disable a gradient-using test when using the numpy backend."""
 
-  if callable(test_fn_or_reason):
+  def new_test(self, *args, **kwargs):
+    if tf.Variable == ops.NumpyVariable:
+      self.skipTest('gradient-using test disabled for numpy')
+    return test_fn(self, *args, **kwargs)
 
-    def new_test(self, *args, **kwargs):
-      if not inspect.isclass(tf.Variable):
-        msg = 'test disabled for numpy'
-        if reason is not None:
-          msg += ': {}'.format(reason)
-        self.skipTest(msg)
-      return test_fn_or_reason(self, *args, **kwargs)
-
-    return new_test
-
-  else:
-    return lambda test_fn: numpy_disable(test_fn, reason=test_fn_or_reason)
+  return new_test
 
 
 def test_seed(hardcoded_seed=None, set_eager_seed=True):

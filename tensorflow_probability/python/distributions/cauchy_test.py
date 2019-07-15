@@ -199,7 +199,7 @@ class CauchyTest(test_case.TestCase):
           return getattr(tfd.Cauchy(loc=loc, scale=scale), name)(x)
         return cauchy
 
-      self.evaluate(tf1.global_variables_initializer())
+      self.evaluate([loc.initializer, scale.initializer])
       for func_name in [
           "cdf", "log_cdf", "survival_function",
           "log_survival_function", "log_prob", "prob"

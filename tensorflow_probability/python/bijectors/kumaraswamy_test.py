@@ -26,6 +26,7 @@ from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -127,6 +128,7 @@ class KumaraswamyTest(test_case.TestCase):
                           validate_args=True)
       self.evaluate(b.forward_event_shape_tensor(tf.constant([1, 2, 3])))
 
+  @tfp_test_util.numpy_disable_gradient_test
   def testGradient(self):
     x = tf.Variable(1.)
     y = tf.Variable(2.)

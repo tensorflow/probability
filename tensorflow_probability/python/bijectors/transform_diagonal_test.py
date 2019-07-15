@@ -69,7 +69,7 @@ class TransformDiagonalBijectorTest(tf.test.TestCase):
             np.array([np.diag(y_mat) for y_mat in y]),
             event_ndims=1)))
 
-  @tfp_test_util.numpy_disable
+  @tfp_test_util.numpy_disable_gradient_test
   def testTheoreticalFldjNormalCDF(self):
     # b/137367959 test failure trigger case (resolved by using
     # experimental_use_pfor=False as fallback instead of primary in
@@ -88,7 +88,7 @@ class TransformDiagonalBijectorTest(tf.test.TestCase):
         atol=1e-5,
         rtol=1e-5)
 
-  @tfp_test_util.numpy_disable
+  @tfp_test_util.numpy_disable_gradient_test
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(max_examples=5)
   def testTheoreticalFldj(self, data):

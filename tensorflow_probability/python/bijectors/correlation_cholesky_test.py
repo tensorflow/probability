@@ -23,7 +23,6 @@ import itertools
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
@@ -165,7 +164,9 @@ class CorrelationCholeskyBijectorTest(parameterized.TestCase, tf.test.TestCase):
     y = tf.Variable(y_, dtype=tf.float32)
     forward_event_ndims = tf.Variable(1, dtype=tf.int32)
     inverse_event_ndims = tf.Variable(2, dtype=tf.int32)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate([
+        v.initializer for v in (x, y, forward_event_ndims, inverse_event_ndims)
+    ])
 
     bijector = tfb.CorrelationCholesky()
     self.assertAllClose(

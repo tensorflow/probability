@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import inspect
-
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
@@ -131,9 +129,6 @@ def is_ref(x):
   # behalf and it would need a `dtype` and `shape`. (I.e., there would be some
   # work to support this.)
   return (
-      # Note: we check that tf.Variable is a class because we might be using a
-      # different backend other than TF.
-      (inspect.isclass(tf.Variable) and isinstance(x, tf.Variable))
-      or
+      isinstance(x, tf.Variable) or
       (isinstance(x, tf.Module) and hasattr(x, 'dtype') and hasattr(x, 'shape'))
   )
