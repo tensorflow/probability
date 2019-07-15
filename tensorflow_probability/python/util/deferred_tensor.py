@@ -65,9 +65,10 @@ class TensorMetaClass(type):
   """A type of class which will make objects which act like Tensors."""
 
   def __new__(mcs, name, bases, attrs):
-    attrs.update(
-        (attr, _wrap_method(tf.Tensor, attr))
-        for attr in tf.Tensor.OVERLOADABLE_OPERATORS.union({'__iter__'}))
+    operators = tf.Tensor.OVERLOADABLE_OPERATORS
+    operators.difference_update({'__eq__', '__ne__'})
+    operators.update({'__iter__'})
+    attrs.update((attr, _wrap_method(tf.Tensor, attr)) for attr in operators)
     attrs.update(
         (attr, getattr(tf.Tensor, attr))
         for attr in {'__nonzero__', '__bool__', '__array_priority__'})
