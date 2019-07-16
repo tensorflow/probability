@@ -45,20 +45,11 @@ def hypothesis_max_examples(default=None):
 
 
 def tfp_hp_settings(**kwargs):
-  """Standard TFP-wide Hypothesis settings, locally overridable."""
-  # N.B.: `hp.HealthCheck.hung_test` and `timeout=hp.unlimited` both do nothing
-  # in the latest Hypothesis release.  The intent is to use `deadline` and
-  # `max_examples` to control run times.  Explicitly turning them off here as
-  # future-proofing.  This is not a no-op because the internally-available
-  # release of Hypothesis still respects old default values for these
-  # parameters, leading to unexpected interactions with `deadline` and
-  # `max_examples`.
   kwds = dict(
       deadline=None,
       max_examples=hypothesis_max_examples(kwargs.pop('max_examples', None)),
-      suppress_health_check=[hp.HealthCheck.too_slow, hp.HealthCheck.hung_test],
-      derandomize=derandomize_hypothesis(),
-      timeout=hp.unlimited)
+      suppress_health_check=[hp.HealthCheck.too_slow],
+      derandomize=derandomize_hypothesis())
   kwds.update(kwargs)
   return hp.settings(**kwds)
 

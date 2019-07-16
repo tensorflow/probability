@@ -261,10 +261,6 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
   def testBijector(self, bijector_name, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
       return
-    if (bijector_name == 'RationalQuadraticSpline'
-        and not tf.executing_eagerly()):
-      # Graph build time is too slow; rely on Eager-only testing.
-      return
     event_dim = data.draw(hps.integers(min_value=2, max_value=6))
     bijector = data.draw(
         bijectors(bijector_name=bijector_name, event_dim=event_dim,
