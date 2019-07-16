@@ -298,10 +298,10 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
   def _one_step_part(
       self,
       *parts,
-      log_accept_prob_rank,
-      log_accept_prob,
-      target_accept_prob,
-      previous_kernel_results):
+      log_accept_prob_rank=None,
+      log_accept_prob=None,
+      target_accept_prob=None,
+      previous_kernel_results=None):
     """Compute new step sizes for each step size part.
 
     If step size part has smaller rank than the corresponding state part, then
