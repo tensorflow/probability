@@ -1747,6 +1747,7 @@ class VariationalGaussianProcess(DistributionLambda):
           tf.compat.v1.initializers.constant(-10.)),
       mean_fn=None,
       jitter=1e-6,
+      convert_to_tensor_fn=tfd.Distribution.sample,
       name=None):
     """Construct a VariationalGaussianProcess Layer.
 
@@ -1776,11 +1777,16 @@ class VariationalGaussianProcess(DistributionLambda):
         omitted, defaults to a constant function with trainable variable value.
       jitter: a small term added to the diagonal of various kernel matrices for
         numerical stability.
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
+        instance and returns a `tf.Tensor`-like object. For examples, see
+        `class` docstring.
       name: name to give to this layer and the scope of ops and variables it
         contains.
     """
+    convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
+
     super(VariationalGaussianProcess, self).__init__(
-        lambda x: VariationalGaussianProcess.new(  # pylint: disable=g-long-lambda
+        make_distribution_fn=lambda x: VariationalGaussianProcess.new(  # pylint: disable=g-long-lambda
             x,
             kernel_provider=self._kernel_provider,
             event_shape=self._event_shape,
@@ -1792,7 +1798,8 @@ class VariationalGaussianProcess(DistributionLambda):
             mean_fn=self._mean_fn,
             observation_noise_variance=tf.nn.softplus(
                 self._unconstrained_observation_noise_variance),
-            jitter=self._jitter))
+            jitter=self._jitter),
+        convert_to_tensor_fn=convert_to_tensor_fn)
 
     tmp_kernel = kernel_provider.kernel
     self._dtype = tmp_kernel.dtype.as_numpy_dtype
