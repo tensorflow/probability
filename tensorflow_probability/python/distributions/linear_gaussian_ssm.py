@@ -41,9 +41,10 @@ tfl = tf.linalg
 def _safe_concat(values, axis):
   """Concat that works even when some arguments are empty."""
   return tf.concat(
-      [t for t in values if 
-      prefer_static.cond(tf.equal(tf.size(t), 0), lambda: False, lambda: True)],
-      axis=axis)
+      [t for t in values if
+       prefer_static.cond(
+          tf.equal(tf.size(t), 0), lambda: False, lambda: True)],
+          axis=axis)
 
 
 def _check_equal_shape(name,
