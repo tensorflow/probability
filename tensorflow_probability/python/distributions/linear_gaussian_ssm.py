@@ -40,7 +40,8 @@ tfl = tf.linalg
 def _safe_concat(values, axis):
   """Concat that works even when some arguments are empty."""
   return tf.concat(
-      [t for t in values if tensorshape_util.num_elements(t.shape) != 0],
+      [t for t in values if 
+      np.array(tensorshape_util.num_elements(tf.TensorShape(t.shape))) != 0],
       axis=axis)
 
 
