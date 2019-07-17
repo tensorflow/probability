@@ -361,7 +361,7 @@ class SanityChecks(tf.test.TestCase):
     self.assertAllEqual(tensorshape_util.as_list(sample_.shape), result_shape)
     self.assertAllEqual(tensorshape_util.as_list(mean_.shape), result_shape)
     self.assertAllEqual(
-        tensorshape_util.as_list(variance_.shape), 
+        tensorshape_util.as_list(variance_.shape),
         result_shape)
 
 
