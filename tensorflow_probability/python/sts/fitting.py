@@ -20,7 +20,8 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import mcmc
@@ -64,13 +65,13 @@ def sample_uniform_initial_state(parameter,
 
 def _build_trainable_posterior(param, initial_loc_fn):
   """Built a transformed-normal variational dist over a parameter's support."""
-  loc = tf.compat.v1.get_variable(
+  loc = tf1.get_variable(
       param.name + '_loc',
       initializer=lambda: initial_loc_fn(param),
       dtype=param.prior.dtype,
       use_resource=True)
-  scale = tf.nn.softplus(
-      tf.compat.v1.get_variable(
+  scale = tf.math.softplus(
+      tf1.get_variable(
           param.name + '_scale',
           initializer=lambda: -4 * tf.ones_like(initial_loc_fn(param)),
           dtype=param.prior.dtype,
@@ -226,9 +227,7 @@ def build_factored_variational_loss(model,
 
   """
 
-  with tf.compat.v1.name_scope(
-      name, 'build_factored_variational_loss',
-      values=[observed_time_series]) as name:
+  with tf.name_scope(name or 'build_factored_variational_loss') as name:
     seed = tfd.SeedStream(
         seed, salt='StructuralTimeSeries_build_factored_variational_loss')
 
@@ -266,19 +265,18 @@ def build_factored_variational_loss(model,
 
 def _minimize_in_graph(build_loss_fn, num_steps=200, optimizer=None):
   """Run an optimizer within the graph to minimize a loss function."""
-  optimizer = tf.compat.v1.train.AdamOptimizer(
-      0.1) if optimizer is None else optimizer
+  if optimizer is None:
+    optimizer = tf1.train.AdamOptimizer(learning_rate=0.1)
 
   def train_loop_body(step):
     train_op = optimizer.minimize(
         build_loss_fn if tf.executing_eagerly() else build_loss_fn())
     return tf.tuple(tensors=[tf.add(step, 1)], control_inputs=[train_op])
 
-  minimize_op = tf.compat.v1.while_loop(
+  minimize_op = tf.while_loop(
       cond=lambda step: step < num_steps,
       body=train_loop_body,
-      loop_vars=[tf.constant(0)],
-      return_same_structure=True)[0]  # Always return a single op.
+      loop_vars=[tf.constant(0)])[0]  # Always return a single op.
   return minimize_op
 
 
@@ -474,8 +472,7 @@ def fit_with_hmc(model,
        https://arxiv.org/abs/1411.6669
 
   """
-  with tf.compat.v1.name_scope(
-      name, 'fit_with_hmc', values=[observed_time_series]) as name:
+  with tf.name_scope(name or 'fit_with_hmc') as name:
     seed = tfd.SeedStream(seed, salt='StructuralTimeSeries_fit_with_hmc')
 
     # Initialize state and step sizes from a variational posterior if not
@@ -490,8 +487,7 @@ def fit_with_hmc(model,
             model, observed_time_series,
             init_batch_shape=chain_batch_shape, seed=seed())
 
-      make_variational = tf.compat.v1.make_template('make_variational',
-                                                    make_variational)
+      make_variational = tf1.make_template('make_variational', make_variational)
       _, variational_distributions = make_variational()
       minimize_op = _minimize_in_graph(
           build_loss_fn=lambda: make_variational()[0],  # return just the loss.
