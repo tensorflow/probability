@@ -31,7 +31,7 @@ tfd = tfp.distributions
 
 class _SmoothSeasonalStateSpaceModelTest(object):
 
-  def test_period_and_frequency_multipliers_tensor(self):
+  def test_accepts_tensor_valued_period_and_frequency_multipliers(self):
 
     period = tf.constant(100.)
     frequency_multipliers = tf.constant([1., 3.])
