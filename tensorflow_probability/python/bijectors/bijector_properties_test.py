@@ -282,7 +282,8 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
                 shp[:shp.ndims - bijector.forward_min_event_ndims])),
         shp[shp.ndims - bijector.forward_min_event_ndims:])
     xs = tf.identity(data.draw(domain_tensors(bijector, shape=shp)), name='xs')
-    wrt_vars = [xs] + list(bijector.trainable_variables)
+    wrt_vars = [xs] + [v for v in bijector.trainable_variables
+                       if v.dtype.is_floating]
     with tf.GradientTape() as tape:
       with tfp_hps.assert_no_excessive_var_usage(
           'method `forward` of {}'.format(bijector)):
@@ -325,7 +326,8 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
         shp[shp.ndims - bijector.inverse_min_event_ndims:])
     ys = tf.identity(
         data.draw(codomain_tensors(bijector, shape=shp)), name='ys')
-    wrt_vars = [ys] + list(bijector.trainable_variables)
+    wrt_vars = [ys] + [v for v in bijector.trainable_variables
+                       if v.dtype.is_floating]
     with tf.GradientTape() as tape:
       with tfp_hps.assert_no_excessive_var_usage(
           'method `inverse` of {}'.format(bijector)):
