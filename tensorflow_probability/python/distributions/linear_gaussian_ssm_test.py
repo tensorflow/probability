@@ -38,7 +38,6 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import line
 
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_case as tfp_test_case
-from tensorflow_probability.python.internal import prefer_static
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
