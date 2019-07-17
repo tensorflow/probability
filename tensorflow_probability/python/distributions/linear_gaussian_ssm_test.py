@@ -38,6 +38,7 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import line
 
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_case as tfp_test_case
+from tensorflow_probability.python.internal import prefer_static
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -357,9 +358,12 @@ class SanityChecks(tf.test.TestCase):
     sample_, mean_, variance_ = self.evaluate(
         [model.sample(), model.mean(), model.variance()])
 
-    self.assertAllEqual(sample_.shape, [num_timesteps, latent_size])
-    self.assertAllEqual(mean_.shape, [num_timesteps, latent_size])
-    self.assertAllEqual(variance_.shape, [num_timesteps, latent_size])
+    result_shape = [num_timesteps, latent_size]
+    self.assertAllEqual(tensorshape_util.as_list(sample_.shape), result_shape)
+    self.assertAllEqual(tensorshape_util.as_list(mean_.shape), result_shape)
+    self.assertAllEqual(
+        tensorshape_util.as_list(variance_.shape), 
+        result_shape)
 
 
 @test_util.run_all_in_graph_and_eager_modes
