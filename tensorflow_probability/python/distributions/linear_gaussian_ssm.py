@@ -43,8 +43,8 @@ def _safe_concat(values, axis):
   return tf.concat(
       [t for t in values if
        prefer_static.cond(
-            tf.equal(tf.size(t), 0), lambda: False, lambda: True)],
-            axis=axis)
+           tf.equal(tf.size(t), 0), lambda: False, lambda: True)],
+           axis=axis)
 
 
 def _check_equal_shape(name,
