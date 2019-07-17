@@ -261,8 +261,10 @@ class RationalQuadraticSpline(bijector.Bijector):
             out_type=tf.int64) - 1)
 
     def gather_squeeze(params, indices):
-      batch_dims = indices.shape.ndims - 1
-      return tf.gather(params, indices, axis=-1, batch_dims=batch_dims)[..., 0]
+      rank = tensorshape_util.rank(indices.shape)
+      if rank is None:
+        raise ValueError('`indices` must have statically known rank.')
+      return tf.gather(params, indices, axis=-1, batch_dims=rank - 1)[..., 0]
 
     x_k = gather_squeeze(bc_kx, indices)
     x_kp1 = gather_squeeze(bc_kx, indices + 1)
