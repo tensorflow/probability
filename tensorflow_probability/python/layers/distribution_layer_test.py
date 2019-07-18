@@ -1452,6 +1452,12 @@ class VariationalGaussianProcessEndToEnd(tf.test.TestCase):
             amplitude=tf.nn.softplus(self._amplitude))
 
     num_inducing_points = 50
+
+    # Add a leading dimension for the event_shape.
+    eyes = np.expand_dims(np.eye(num_inducing_points), 0)
+    variational_inducing_observations_scale_initializer = (
+        tf.compat.v1.initializers.constant(1e-3 * eyes))
+
     model = tf.keras.Sequential([
         tf.keras.layers.InputLayer(input_shape=[1], dtype=dtype),
         tf.keras.layers.Dense(1, kernel_initializer='Ones', use_bias=False,
@@ -1463,7 +1469,9 @@ class VariationalGaussianProcessEndToEnd(tf.test.TestCase):
                 tf.compat.v1.initializers.constant(
                     np.linspace(*x_range,
                                 num=num_inducing_points,
-                                dtype=dtype)[..., np.newaxis]))),
+                                dtype=dtype)[..., np.newaxis])),
+            variational_inducing_observations_scale_initializer=(
+                variational_inducing_observations_scale_initializer)),
     ])
 
     if not tf.executing_eagerly():
