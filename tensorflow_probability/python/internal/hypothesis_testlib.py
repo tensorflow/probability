@@ -96,8 +96,8 @@ def assert_no_excessive_var_usage(name, max_permissible=2):
           print('Conversion {} of {}:\n{}'.format(i + 1, len(usages),
                                                   ''.join(usage)))
     raise AssertionError(
-        'Excessive tensor conversions detected for {}: {}'.format(
-            name, var_nusages))
+        'More than {} tensor conversions detected for {}: {}'.format(
+            max_permissible, name, var_nusages))
 
 
 class Support(object):

@@ -49,6 +49,7 @@ FLAGS = flags.FLAGS
 TF2_FRIENDLY_DISTS = (
     'Bernoulli',
     'Beta',
+    'Binomial',
     'Chi',
     'Chi2',
     'Categorical',
@@ -670,7 +671,8 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
       self.assertIs(getattr(dist, k), v)
 
     # Check that standard statistics do not read distribution parameters more
-    # than once.
+    # than twice (once in the stat itself and up to once in any validation
+    # assertions).
     for stat in data.draw(
         hps.sets(
             hps.one_of(
@@ -689,7 +691,7 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
       except NotImplementedError:
         pass
 
-    # Check that `sample` doesn't read distribution parameters more than once,
+    # Check that `sample` doesn't read distribution parameters more than twice,
     # and that it produces non-None gradients (if the distribution is fully
     # reparameterized).
     with tf.GradientTape() as tape:
