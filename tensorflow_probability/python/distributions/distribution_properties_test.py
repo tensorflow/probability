@@ -21,23 +21,21 @@ from __future__ import print_function
 import collections
 import functools
 import inspect
-import traceback
 
 from absl import flags
 from absl import logging
 from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
-from hypothesis.extra import numpy as hpnp
 import numpy as np
 import six
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
@@ -131,9 +129,9 @@ def instantiable_base_dists():
   instantiation rules hard-coded in the `distributions` strategy.
 
   Returns:
-    instantiable_base_dists: A Python dict mapping distribution name (as a
-      string) to a `DistInfo` carrying the information necessary to instantiate
-      it.
+    instantiable_base_dists: A Python dict mapping distribution name
+      (as a string) to a `DistInfo` carrying the information necessary to
+      instantiate it.
   """
   result = {}
   for (dist_name, dist_class) in six.iteritems(tfd.__dict__):
@@ -144,8 +142,8 @@ def instantiable_base_dists():
     try:
       params_event_ndims = dist_class._params_event_ndims()
     except NotImplementedError:
-      logging.warning('Unable to test tfd.%s: %s', dist_name,
-                      traceback.format_exc())
+      msg = 'Unable to test tfd.%s: _params_event_ndims not implemented'
+      logging.warning(msg, dist_name)
       continue
     result[dist_name] = DistInfo(dist_class, params_event_ndims)
 
@@ -295,6 +293,10 @@ def broadcasting_params(draw,
           mutex_params=MUTEX_PARAMS))
 
 
+def params_used(dist):
+  return [k for k, v in six.iteritems(dist.parameters) if v is not None]
+
+
 @hps.composite
 def independents(
     draw, batch_shape=None, event_dim=None,
@@ -327,6 +329,7 @@ def independents(
     depth = draw(depths())
 
   reinterpreted_batch_ndims = draw(hps.integers(min_value=0, max_value=2))
+
   if batch_shape is None:
     batch_shape = draw(
         tfp_hps.shapes(min_ndims=reinterpreted_batch_ndims))
@@ -336,15 +339,16 @@ def independents(
         draw(tfp_hps.shapes(
             min_ndims=reinterpreted_batch_ndims,
             max_ndims=reinterpreted_batch_ndims)))
+
   underlying = draw(
       distributions(
           batch_shape=batch_shape,
           event_dim=event_dim,
           enable_vars=enable_vars,
           depth=depth - 1))
-  logging.info(
-      'underlying distribution: %s; parameters used: %s', underlying,
-      [k for k, v in six.iteritems(underlying.parameters) if v is not None])
+  hp.note('Forming Independent with underlying dist {}; '
+          'parameters {}; reinterpreted_batch_ndims {}'.format(
+              underlying, params_used(underlying), reinterpreted_batch_ndims))
   result_dist = tfd.Independent(
       underlying,
       reinterpreted_batch_ndims=reinterpreted_batch_ndims,
@@ -396,7 +400,7 @@ def transformed_distributions(draw,
     depth = draw(depths())
 
   bijector = draw(bijector_hps.unconstrained_bijectors())
-  logging.info('TD bijector: %s', bijector)
+  hp.note('Drawing TransformedDistribution with bijector {}'.format(bijector))
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
   underlying_batch_shape = batch_shape
@@ -412,9 +416,9 @@ def transformed_distributions(draw,
       depth=depth - 1).filter(
           bijector_hps.distribution_filter_for(bijector))
   to_transform = draw(underlyings)
-  logging.info(
-      'TD underlying distribution: %s; parameters used: %s', to_transform,
-      [k for k, v in six.iteritems(to_transform.parameters) if v is not None])
+  hp.note('Forming TransformedDistribution with '
+          'underlying distribution {}; parameters {}'.format(
+              to_transform, params_used(to_transform)))
   # TODO(bjp): Add test coverage for `event_shape` argument of
   # `TransformedDistribution`.
   result_dist = tfd.TransformedDistribution(
@@ -473,15 +477,14 @@ def mixtures_same_family(draw,
         batch_shape,
         draw(tfp_hps.shapes(min_ndims=1, max_ndims=1, min_lastdimsize=2)))
 
-  component_dist = draw(
+  component = draw(
       distributions(
           batch_shape=batch_shape,
           event_dim=event_dim,
           enable_vars=enable_vars,
           depth=depth - 1))
-  logging.info(
-      'component distribution: %s; parameters used: %s', component_dist,
-      [k for k, v in six.iteritems(component_dist.parameters) if v is not None])
+  hp.note('Drawing MixtureSameFamily with component {}; parameters {}'.format(
+      component, params_used(component)))
   # scalar or same-shaped categorical?
   mixture_batch_shape = draw(
       hps.one_of(hps.just(batch_shape[:-1]), hps.just(tf.TensorShape([]))))
@@ -490,15 +493,15 @@ def mixtures_same_family(draw,
       batch_shape=mixture_batch_shape,
       event_dim=tensorshape_util.as_list(batch_shape)[-1],
       enable_vars=enable_vars))
-  logging.info(
-      'mixture distribution: %s; parameters used: %s', mixture_dist,
-      [k for k, v in six.iteritems(mixture_dist.parameters) if v is not None])
+  hp.note(('Forming MixtureSameFamily with '
+           'mixture distribution {}; parameters {}').format(
+               mixture_dist, params_used(mixture_dist)))
   result_dist = tfd.MixtureSameFamily(
-      components_distribution=component_dist,
+      components_distribution=component,
       mixture_distribution=mixture_dist,
       validate_args=True)
   if batch_shape[:-1] != result_dist.batch_shape:
-    msg = ('TransformedDistribution strategy generated a bad batch shape '
+    msg = ('MixtureSameFamily strategy generated a bad batch shape '
            'for {}, should have been {}.').format(result_dist, batch_shape[:-1])
     raise AssertionError(msg)
   return result_dist
@@ -546,7 +549,7 @@ def base_distributions(draw,
   """
   if dist_name is None:
     names = [k for k in INSTANTIABLE_BASE_DISTS.keys() if eligibility_filter(k)]
-    dist_name = draw(hps.one_of(map(hps.just, names)))
+    dist_name = draw(hps.one_of(map(hps.just, sorted(names))))
 
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
@@ -555,6 +558,8 @@ def base_distributions(draw,
       broadcasting_params(
           dist_name, batch_shape, event_dim=event_dim, enable_vars=enable_vars))
   params_constrained = constraint_for(dist_name)(params_kwargs)
+  hp.note('Forming dist {} with constrained parameters {}'.format(
+      dist_name, params_constrained))
   assert_shapes_unchanged(params_kwargs, params_constrained)
   params_constrained['validate_args'] = True
   dist_cls = INSTANTIABLE_BASE_DISTS[dist_name].cls
@@ -627,10 +632,6 @@ def distributions(draw,
         batch_shape, event_dim, enable_vars, depth))
 
 
-def maybe_seed(seed):
-  return tf1.set_random_seed(seed) if tf.executing_eagerly() else seed
-
-
 def get_event_dim(dist):
   for param, val in dist.parameters.items():
     if (param in dist._params_event_ndims() and val is not None and
@@ -647,9 +648,7 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
   def testDistribution(self, dist_name, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
       return
-    tf1.set_random_seed(
-        data.draw(
-            hpnp.arrays(dtype=np.int64, shape=[]).filter(lambda x: x != 0)))
+    seed = tfp_test_util.test_seed()
     dist = data.draw(distributions(dist_name=dist_name, enable_vars=True))
     batch_shape = dist.batch_shape
     batch_shape2 = data.draw(tfp_hps.broadcast_compatible_shape(batch_shape))
@@ -659,9 +658,6 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
             batch_shape=batch_shape2,
             event_dim=get_event_dim(dist),
             enable_vars=True))
-    logging.info(
-        'distribution: %s; parameters used: %s', dist,
-        [k for k, v in six.iteritems(dist.parameters) if v is not None])
     self.evaluate([var.initializer for var in dist.variables])
 
     # Check that the distribution passes Variables through to the accessor
@@ -682,7 +678,7 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
                 ])),
             min_size=3,
             max_size=3)):
-      logging.info('%s.%s', dist_name, stat)
+      hp.note('Testing excessive var usage in {}.{}'.format(dist_name, stat))
       try:
         with tfp_hps.assert_no_excessive_var_usage(
             'statistic `{}` of `{}`'.format(stat, dist)):
@@ -702,7 +698,7 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
       with tfp_hps.assert_no_excessive_var_usage(
           'method `sample` of `{}`'.format(dist),
           max_permissible=max_permissible):
-        sample = dist.sample()
+        sample = dist.sample(seed=seed)
     if dist.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
       grads = tape.gradient(sample, dist.variables)
       for grad, var in zip(grads, dist.variables):
@@ -764,7 +760,8 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
                 ])),
             min_size=3,
             max_size=3)):
-      logging.info('%s.%s', dist_name, evaluative)
+      hp.note('Testing excessive var usage in {}.{}'.format(
+          dist_name, evaluative))
       try:
         # No validation => 1 convert. But for TD we allow 2:
         # dist.log_prob(bijector.inverse(samp)) + bijector.ildj(samp)
@@ -782,13 +779,12 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
 class DistributionSlicingTest(tf.test.TestCase):
 
   def _test_slicing(self, data, dist):
+    strm = tfp_test_util.test_seed_stream()
     batch_shape = dist.batch_shape
     slices = data.draw(valid_slices(batch_shape))
     slice_str = 'dist[{}]'.format(', '.join(stringify_slices(slices)))
-    logging.info('slice used: %s', slice_str)
-    # Make sure the slice string appears in Hypothesis' attempted example log,
-    # by drawing and discarding it.
-    data.draw(hps.just(slice_str))
+    # Make sure the slice string appears in Hypothesis' attempted example log
+    hp.note('Using slice ' + slice_str)
     if not slices:  # Nothing further to check.
       return
     sliced_zeros = np.zeros(batch_shape)[slices]
@@ -799,16 +795,14 @@ class DistributionSlicingTest(tf.test.TestCase):
 
     # Check that sampling of sliced distributions executes.
     try:
-      seed = data.draw(
-          hpnp.arrays(dtype=np.int64, shape=[]).filter(lambda x: x != 0))
-      samples = self.evaluate(dist.sample(seed=maybe_seed(seed)))
+      samples = self.evaluate(dist.sample(seed=strm()))
 
       if not sliced_zeros.size:
         # TODO(b/128924708): Fix distributions that fail on degenerate empty
         #     shapes, e.g. Multinomial, DirichletMultinomial, ...
         return
 
-      sliced_samples = self.evaluate(sliced_dist.sample(seed=maybe_seed(seed)))
+      sliced_samples = self.evaluate(sliced_dist.sample(seed=strm()))
     except NotImplementedError as e:
       raise
     except tf.errors.UnimplementedError as e:
@@ -828,7 +822,7 @@ class DistributionSlicingTest(tf.test.TestCase):
                            tensorshape_util.rank(dist.event_shape))
 
     # Report sub-sliced samples (on which we compare log_prob) to hypothesis.
-    data.draw(hps.just(samples[sample_slices]))
+    hp.note('Sample(s) for testing log_prob ' + str(samples[sample_slices]))
 
     # Check that sampling a sliced distribution produces the same shape as
     # slicing the samples from the original.
@@ -870,13 +864,7 @@ class DistributionSlicingTest(tf.test.TestCase):
         rtol=0.4, atol=1e-4)
 
   def _run_test(self, data):
-    tf1.set_random_seed(
-        data.draw(
-            hpnp.arrays(dtype=np.int64, shape=[]).filter(lambda x: x != 0)))
     dist = data.draw(distributions(enable_vars=False))
-    logging.info(
-        'distribution: %s; parameters used: %s', dist,
-        [k for k, v in six.iteritems(dist.parameters) if v is not None])
 
     # Check that all distributions still register as non-iterable despite
     # defining __getitem__.  (Because __getitem__ magically makes an object
