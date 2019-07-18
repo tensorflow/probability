@@ -49,6 +49,8 @@ FLAGS = flags.FLAGS
 TF2_FRIENDLY_DISTS = (
     'Bernoulli',
     'Beta',
+    'Chi',
+    'Chi2',
     'Categorical',
     'Deterministic',
     'Dirichlet',
