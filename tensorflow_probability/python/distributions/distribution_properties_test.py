@@ -306,7 +306,7 @@ def independents(
   The underlying distribution is drawn from the `distributions` strategy.
 
   Args:
-    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     batch_shape: An optional `TensorShape`.  The batch shape of the resulting
       `Independent` distribution.  Note that the underlying distribution will in
       general have a higher-rank batch shape, to make room for reinterpreting
@@ -378,7 +378,7 @@ def transformed_distributions(draw,
   that vector bijectors are not combined with scalar distributions, etc).
 
   Args:
-    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     batch_shape: An optional `TensorShape`.  The batch shape of the resulting
       `TransformedDistribution`.  The underlying distribution will sometimes
       have the same `batch_shape`, and sometimes have scalar batch shape.
@@ -448,7 +448,7 @@ def mixtures_same_family(draw,
   `MixtureSameFamily`).
 
   Args:
-    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     batch_shape: An optional `TensorShape`.  The batch shape of the resulting
       `MixtureSameFamily` distribution.  The component distribution will have a
       batch shape of 1 rank higher (for the components being mixed).  Hypothesis
@@ -528,7 +528,7 @@ def base_distributions(draw,
   that do not accept other Distributions as arguments.
 
   Args:
-    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     dist_name: Optional Python `str`.  If given, the produced distributions
       will all have this type.
     batch_shape: An optional `TensorShape`.  The batch shape of the resulting
@@ -586,7 +586,7 @@ def distributions(draw,
   underlying distributions are drawn recursively from this strategy as well.
 
   Args:
-    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     dist_name: Optional Python `str`.  If given, the produced distributions
       will all have this type.
     batch_shape: An optional `TensorShape`.  The batch shape of the resulting

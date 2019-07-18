@@ -275,7 +275,7 @@ def shapes(draw, min_ndims=0, max_ndims=3, min_lastdimsize=1):
   """Strategy for drawing TensorShapes with some control over rank/dim sizes.
 
   Args:
-    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     min_ndims: Python `int` giving the minimum rank.
     max_ndims: Python `int` giving the maximum rank.
     min_lastdimsize: Python `int`.  The trailing dimension will always be at
@@ -319,7 +319,7 @@ def broadcasting_params(draw,
   constraint functions.
 
   Args:
-    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     batch_shape: A `TensorShape`.  The returned parameters' batch shapes will
       broadcast to this.
     params_event_ndims: Python `dict` mapping the name of each parameter to a
@@ -402,7 +402,7 @@ def broadcasting_named_shapes(draw, batch_shape, param_names):
   promise that the broadcast of the set of all shapes matches `batch_shape`.
 
   Args:
-    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     batch_shape: `tf.TensorShape`, the target (fully-defined) batch shape.
     param_names: Iterable of `str`, the parameters whose batch shapes need
       determination.
@@ -479,7 +479,7 @@ def broadcasting_shapes(draw, target_shape, n):
   that the broadcast of the set of all shapes matches `target_shape`.
 
   Args:
-    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     target_shape: The target (fully-defined) batch shape.
     n: Python `int`, the number of shapes to draw.
 

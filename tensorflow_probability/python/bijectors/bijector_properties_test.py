@@ -128,7 +128,7 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
   bijector, but not a compound like `Chain`.
 
   Args:
-    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     bijector_name: Optional Python `str`.  If given, the produced bijectors
       will all have this type.  If omitted, Hypothesis chooses one from
       the whitelist `TF2_FRIENDLY_BIJECTORS`.
@@ -184,7 +184,7 @@ def domain_tensors(draw, bijector, shape=None):
   transformations are defined by `tfp_hps.constrainer`.
 
   Args:
-    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     bijector: A `Bijector` in whose domain the Tensors will be.
     shape: An optional `TensorShape`.  The shape of the resulting
       Tensors.  Hypothesis will pick one if omitted.
@@ -212,7 +212,7 @@ def codomain_tensors(draw, bijector, shape=None):
   transformations are defined by `tfp_hps.constrainer`.
 
   Args:
-    draw: Hypothesis MacGuffin.  Supplied by `@hps.composite`.
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     bijector: A `Bijector` in whose codomain the Tensors will be.
     shape: An optional `TensorShape`.  The shape of the resulting
       Tensors.  Hypothesis will pick one if omitted.
