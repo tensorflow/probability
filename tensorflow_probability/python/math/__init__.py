@@ -23,6 +23,7 @@ from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import log_combinations
+from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
 from tensorflow_probability.python.math.generic import soft_threshold
 from tensorflow_probability.python.math.generic import softplus_inverse
@@ -75,6 +76,7 @@ _allowed_symbols = [
     'pivoted_cholesky',
     'random_rademacher',
     'random_rayleigh',
+    'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
     'secant_root',
     'soft_threshold',

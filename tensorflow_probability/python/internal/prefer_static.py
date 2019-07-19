@@ -258,6 +258,10 @@ ones = _prefer_static(
     lambda shape, dtype=tf.float32, name=None: np.ones(  # pylint: disable=g-long-lambda
         shape, _numpy_dtype(dtype)))
 
+reshape = _prefer_static(
+    tf.reshape,
+    lambda tensor, shape, name=None: np.reshape(tensor, shape))
+
 
 def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
   s = _shape(input)
