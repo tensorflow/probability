@@ -72,5 +72,28 @@ class MinimizeTests(tf.test.TestCase):
     self.assertAllClose(final_x_, 2, atol=0.1)
     self.assertEqual(final_y_, 2.)  # `y` was untrained, so should be unchanged.
 
+  def test_works_when_results_have_dynamic_shape(self):
+
+    # Create a variable (and thus loss) with dynamically-shaped result.
+    x = tf.Variable(initial_value=tf1.placeholder_with_default(
+        [5., 3.], shape=None))
+
+    num_steps = 10
+    losses, grads = tfp.math.minimize(
+        loss_fn=lambda: (x - 2.)**2,
+        num_steps=num_steps,
+        # TODO(b/137299119) Replace with TF2 optimizer.
+        optimizer=tf1.train.AdamOptimizer(0.1),
+        trace_fn=lambda loss, grads, vars: (loss, grads),
+        trainable_variables=[x])
+    with tf.control_dependencies([losses]):
+      final_x = tf.identity(x)
+
+    self.evaluate(tf1.global_variables_initializer())
+    final_x_, losses_, grads_ = self.evaluate((final_x, losses, grads))
+    self.assertAllEqual(final_x_.shape, [2])
+    self.assertAllEqual(losses_.shape, [num_steps, 2])
+    self.assertAllEqual(grads_[0].shape, [num_steps, 2])
+
 if __name__ == '__main__':
   tf.test.main()
