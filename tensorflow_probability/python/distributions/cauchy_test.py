@@ -47,7 +47,7 @@ class CauchyTest(test_case.TestCase):
 
   def _testParamShapes(self, sample_shape, expected):
     param_shapes = tfd.Cauchy.param_shapes(sample_shape)
-    loc_shape, scale_shape = param_shapes["loc"], param_shapes["scale"]
+    loc_shape, scale_shape = param_shapes['loc'], param_shapes['scale']
     self.assertAllEqual(expected, self.evaluate(loc_shape))
     self.assertAllEqual(expected, self.evaluate(scale_shape))
     loc = tf.zeros(loc_shape)
@@ -58,7 +58,7 @@ class CauchyTest(test_case.TestCase):
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.Cauchy.param_static_shapes(sample_shape)
-    loc_shape, scale_shape = param_shapes["loc"], param_shapes["scale"]
+    loc_shape, scale_shape = param_shapes['loc'], param_shapes['scale']
     self.assertEqual(expected, loc_shape)
     self.assertEqual(expected, scale_shape)
 
@@ -201,8 +201,8 @@ class CauchyTest(test_case.TestCase):
 
       self.evaluate([loc.initializer, scale.initializer])
       for func_name in [
-          "cdf", "log_cdf", "survival_function",
-          "log_survival_function", "log_prob", "prob"
+          'cdf', 'log_cdf', 'survival_function',
+          'log_survival_function', 'log_prob', 'prob'
       ]:
         print(func_name)
         value, grads = self.evaluate(tfp.math.value_and_gradient(
@@ -376,7 +376,7 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(expected_shape, sample_values.shape)
 
   def testCauchyNegativeLocFails(self):
-    with self.assertRaisesOpError("Condition x > 0 did not hold"):
+    with self.assertRaisesOpError('Condition x > 0 did not hold'):
       cauchy = tfd.Cauchy(loc=[1.], scale=[-5.], validate_args=True)
       self.evaluate(cauchy.mode())
 
@@ -397,12 +397,33 @@ class CauchyTest(test_case.TestCase):
     scale = tf1.placeholder_with_default(input=[1., 2], shape=None)
     cauchy = tfd.Cauchy(loc=loc, scale=scale)
 
-    # get_batch_shape should return an "<unknown>" tensor.
+    # get_batch_shape should return an '<unknown>' tensor.
     self.assertEqual(cauchy.batch_shape, tf.TensorShape(None))
     self.assertEqual(cauchy.event_shape, ())
     self.assertAllEqual(self.evaluate(cauchy.event_shape_tensor()), [])
     self.assertAllEqual(self.evaluate(cauchy.batch_shape_tensor()), [2])
 
+  def testAssertsPositiveScale(self):
+    loc, scale = (
+        tf.Variable([-1, 0, 1], dtype=tf.float64),
+        tf.Variable([-1, 2, 3], dtype=tf.float64)
+    )
+    with self.assertRaisesOpError('Argument `scale` must be positive.'):
+      d = tfd.Cauchy(loc, scale, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.sample())
 
-if __name__ == "__main__":
+  def testAssertsPositiveScaleAfterMutation(self):
+    loc, scale = (
+        tf.Variable([-1., 0., 1.]),
+        tf.Variable([1., 2., 3.])
+    )
+    d = tfd.Cauchy(loc, scale, validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
+    with self.assertRaisesOpError('Argument `scale` must be positive.'):
+      with tf.control_dependencies([scale.assign([1., 2., -3.])]):
+        self.evaluate(d.mean())
+
+
+if __name__ == '__main__':
   tf.test.main()

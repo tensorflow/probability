@@ -53,6 +53,7 @@ TF2_FRIENDLY_DISTS = (
     'Chi',
     'Chi2',
     'Categorical',
+    'Cauchy',
     'Deterministic',
     'Dirichlet',
     'Exponential',
