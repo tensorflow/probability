@@ -177,7 +177,7 @@ class PositiveSemidefiniteKernel(tf.Module):
 
   """
 
-  def __init__(self, feature_ndims, dtype=None, name=None):
+  def __init__(self, feature_ndims, dtype=None, name=None, validate_args=False):
     """Construct a PositiveSemidefiniteKernel (subclass) instance.
 
     Args:
@@ -186,6 +186,10 @@ class PositiveSemidefiniteKernel(tf.Module):
       dtype: `DType` on which this kernel operates.
       name: Python `str` name prefixed to Ops created by this class. Default:
         subclass name.
+      validate_args: Python `bool`, default `False`. When `True` kernel
+        parameters are checked for validity despite possibly degrading runtime
+        performance. When `False` invalid inputs may silently render incorrect
+        outputs.
 
     Raises:
       ValueError: if `feature_ndims` is not an integer greater than 0
@@ -212,6 +216,13 @@ class PositiveSemidefiniteKernel(tf.Module):
     if not name or name[-1] != '/':  # `name` is not a name scope
       name = tf.name_scope(name or type(self).__name__).name
     self._name = name
+    self._validate_args = validate_args
+    self._initial_parameter_control_dependencies = tuple(
+        d for d in self._parameter_control_dependencies(is_init=True)
+        if d is not None)
+    if self._initial_parameter_control_dependencies:
+      self._initial_parameter_control_dependencies = (
+          tf.group(*self._initial_parameter_control_dependencies),)
 
   @property
   def feature_ndims(self):
@@ -242,6 +253,11 @@ class PositiveSemidefiniteKernel(tf.Module):
   def name(self):
     """Name prepended to all ops created by this class."""
     return self._name
+
+  @property
+  def validate_args(self):
+    """Python `bool` indicating possibly expensive checks are enabled."""
+    return self._validate_args
 
   @property
   def batch_shape(self):
@@ -289,12 +305,19 @@ class PositiveSemidefiniteKernel(tf.Module):
         return self._batch_shape_tensor()
 
   @contextlib.contextmanager
-  def _name_scope(self, name=None, values=None):
+  def _name_and_control_scope(self, name=None):
     """Helper function to standardize op scope."""
     with tf.name_scope(self.name):
-      values = [] if values is None else values
-      with tf.name_scope(name) as scope:
-        yield scope
+      with tf.name_scope(name) as name_scope:
+        deps = tuple(
+            d for d in (  # pylint: disable=g-complex-comprehension
+                tuple(self._initial_parameter_control_dependencies) +
+                tuple(self._parameter_control_dependencies(is_init=False))))
+        if not deps:
+          yield name_scope
+          return
+        with tf.control_dependencies(deps) as deps_scope:
+          yield deps_scope
 
   def apply(self, x1, x2, example_ndims=0):
     """Apply the kernel function pairs of inputs.
@@ -402,9 +425,9 @@ class PositiveSemidefiniteKernel(tf.Module):
     # ==> [2, 5]
 
     """
-    with self._name_scope(self._name, values=[x1, x2]):
-      x1 = tf.convert_to_tensor(x1, name='x1')
-      x2 = tf.convert_to_tensor(x2, name='x2')
+    with self._name_and_control_scope(self._name):
+      x1 = tf.convert_to_tensor(x1, name='x1', dtype_hint=self.dtype)
+      x2 = tf.convert_to_tensor(x2, name='x2', dtype_hint=self.dtype)
 
       should_expand_dims = (example_ndims == 0)
 
@@ -625,9 +648,9 @@ class PositiveSemidefiniteKernel(tf.Module):
     parameters, to each of a batch of 10 pairs of input lists.
 
     """
-    with self._name_scope(self._name, values=[x1, x2]):
-      x1 = tf.convert_to_tensor(x1, name='x1')
-      x2 = tf.convert_to_tensor(x2, name='x2')
+    with self._name_and_control_scope(self._name):
+      x1 = tf.convert_to_tensor(x1, name='x1', dtype_hint=self.dtype)
+      x2 = tf.convert_to_tensor(x2, name='x2', dtype_hint=self.dtype)
 
       return self.tensor(x1, x2, x1_example_ndims=1, x2_example_ndims=1)
 
@@ -783,9 +806,9 @@ class PositiveSemidefiniteKernel(tf.Module):
     ```
 
     """
-    with self._name_scope(self._name, values=[x1, x2]):
-      x1 = tf.convert_to_tensor(x1, name='x1')
-      x2 = tf.convert_to_tensor(x2, name='x2')
+    with self._name_and_control_scope(self._name):
+      x1 = tf.convert_to_tensor(x1, name='x1', dtype_hint=self.dtype)
+      x2 = tf.convert_to_tensor(x2, name='x2', dtype_hint=self.dtype)
 
       x1 = util.pad_shape_with_ones(
           x1,
@@ -850,6 +873,21 @@ class PositiveSemidefiniteKernel(tf.Module):
                 batch_shape=self.batch_shape,
                 feature_ndims=self.feature_ndims,
                 dtype=None if self.dtype is None else self.dtype.name))
+
+  def _parameter_control_dependencies(self, is_init):
+    """Returns a list of ops to be executed in members with graph deps.
+
+    Typically subclasses override this function to return parameter specific
+    assertions (eg, positivity of `amplitude`, etc.).
+
+    Args:
+      is_init: Python `bool` indicating that the call site is `__init__`.
+
+    Returns:
+      dependencies: `list`-like of ops to be executed in member functions with
+        graph dependencies.
+    """
+    return ()
 
 
 def _flatten_summand_list(kernels):
@@ -949,7 +987,8 @@ class _SumKernel(PositiveSemidefiniteKernel):
         feature_ndims=kernels[0].feature_ndims,
         dtype=util.maybe_get_common_dtype(
             [None if k.dtype is None else k for k in kernels]),
-        name=name)
+        name=name,
+        validate_args=any([k.validate_args for k in kernels]))
 
   @property
   def kernels(self):
@@ -1017,7 +1056,8 @@ class _ProductKernel(PositiveSemidefiniteKernel):
         feature_ndims=kernels[0].feature_ndims,
         dtype=util.maybe_get_common_dtype(
             [None if k.dtype is None else k for k in kernels]),
-        name=name)
+        name=name,
+        validate_args=any([k.validate_args for k in kernels]))
 
   @property
   def kernels(self):

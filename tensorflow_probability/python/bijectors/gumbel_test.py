@@ -22,7 +22,6 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
@@ -69,7 +68,7 @@ class GumbelTest(tf.test.TestCase):
   def testVariableScale(self):
     x = tf.Variable(1.)
     b = tfb.Gumbel(loc=0., scale=x, validate_args=True)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(x.initializer)
     self.assertIs(x, b.scale)
     self.assertEqual((), self.evaluate(b.forward(-3.)).shape)
     with self.assertRaisesOpError("Argument `scale` must be positive."):

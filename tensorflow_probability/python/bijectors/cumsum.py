@@ -75,7 +75,7 @@ class Cumsum(bijector.Bijector):
       ValueError: if `axis` is not negative.
     """
     with tf.name_scope(name) as name:
-      self._axis = tensor_util.convert_immutable_to_tensor(
+      self._axis = tensor_util.convert_nonref_to_tensor(
           axis, dtype_hint=tf.int32, name='axis')
       super(Cumsum, self).__init__(
           is_constant_jacobian=True,
@@ -118,7 +118,7 @@ class Cumsum(bijector.Bijector):
     if not self.validate_args:
       return []
     assertions = []
-    if is_init != tensor_util.is_mutable(self.axis):
+    if is_init != tensor_util.is_ref(self.axis):
       assertions.append(assert_util.assert_negative(
           self.axis,
           message='Argument `axis` must be negative.'))

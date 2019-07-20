@@ -20,21 +20,13 @@ from __future__ import print_function
 
 import functools
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
-__all__ = [
-    "RationalQuadratic",
-]
-
-
-def _validate_arg_if_not_none(arg, assertion, validate_args):
-  if arg is None:
-    return arg
-  with tf.control_dependencies([assertion(arg)] if validate_args else []):
-    result = tf.identity(arg)
-  return result
+__all__ = ['RationalQuadratic']
 
 
 class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
@@ -87,52 +79,45 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
       scale_mixture_rate=None,
       feature_ndims=1,
       validate_args=False,
-      name="RationalQuadratic"):
+      name='RationalQuadratic'):
     """Construct a RationalQuadratic kernel instance.
 
     Args:
       amplitude: Positive floating point `Tensor` that controls the maximum
         value of the kernel. Must be broadcastable with `length_scale` and
-        `scale_mixture_rate` and inputs to `apply` and `matrix` methods.
+        `scale_mixture_rate` and inputs to `apply` and `matrix` methods. A
+        value of `None` is treated like 1.
+        Default value: None
       length_scale: Positive floating point `Tensor` that controls how sharp or
         wide the kernel shape is. This provides a characteristic "unit" of
         length against which `||x - y||` can be compared for scale. Must be
         broadcastable with `amplitude`, `scale_mixture_rate`  and inputs to
-        `apply` and `matrix` methods.
+        `apply` and `matrix` methods. A value of `None` is treated like 1.
+        Default value: None
       scale_mixture_rate: Positive floating point `Tensor` that controls how the
         ExponentiatedQuadratic kernels are mixed.  Must be broadcastable with
         `amplitude`, `length_scale` and inputs to `apply` and `matrix` methods.
+        A value of `None` is treated like 1.
+        Default value: None
       feature_ndims: Python `int` number of rightmost dims to include in the
         squared difference norm in the exponential.
       validate_args: If `True`, parameters are checked for validity despite
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.compat.v1.name_scope(
-        name, values=[amplitude, scale_mixture_rate, length_scale]) as name:
+    with tf.name_scope(name) as name:
       dtype = util.maybe_get_common_dtype(
           [amplitude, scale_mixture_rate, length_scale])
 
-      if amplitude is not None:
-        amplitude = tf.convert_to_tensor(
-            value=amplitude, name="amplitude", dtype=dtype)
-      self._amplitude = _validate_arg_if_not_none(
-          amplitude, tf.compat.v1.assert_positive, validate_args)
+      self._amplitude = tensor_util.convert_nonref_to_tensor(
+          amplitude, name='amplitude', dtype=dtype)
+      self._scale_mixture_rate = tensor_util.convert_nonref_to_tensor(
+          scale_mixture_rate, name='scale_mixture_rate', dtype=dtype)
+      self._length_scale = tensor_util.convert_nonref_to_tensor(
+          length_scale, name='length_scale', dtype=dtype)
 
-      if scale_mixture_rate is not None:
-        scale_mixture_rate = tf.convert_to_tensor(
-            value=scale_mixture_rate, name="scale_mixture_rate", dtype=dtype)
-      self._scale_mixture_rate = _validate_arg_if_not_none(
-          scale_mixture_rate, tf.compat.v1.assert_positive, validate_args)
-
-      if length_scale is not None:
-        length_scale = tf.convert_to_tensor(
-            value=length_scale, name="length_scale", dtype=dtype)
-      self._length_scale = _validate_arg_if_not_none(
-          length_scale, tf.compat.v1.assert_positive, validate_args)
-
-    super(RationalQuadratic, self).__init__(
-        feature_ndims, dtype=dtype, name=name)
+      super(RationalQuadratic, self).__init__(
+          feature_ndims, dtype=dtype, name=name, validate_args=validate_args)
 
   def _apply(self, x1, x2, example_ndims=0):
     difference = util.sum_rightmost_ndims_preserving_shape(
@@ -140,21 +125,24 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
     difference /= 2
 
     if self.length_scale is not None:
+      length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
-          self.length_scale, ndims=example_ndims)
+          length_scale, ndims=example_ndims)
       difference /= length_scale ** 2
 
-    scale_mixture_rate = 1.
-    if self.scale_mixture_rate is not None:
-      scale_mixture_rate = util.pad_shape_with_ones(
-          self.scale_mixture_rate, ndims=example_ndims)
-      difference /= scale_mixture_rate
+    if self.scale_mixture_rate is None:
+      power = 1.
+    else:
+      scale_mixture_rate = tf.convert_to_tensor(self.scale_mixture_rate)
+      power = util.pad_shape_with_ones(
+          scale_mixture_rate, ndims=example_ndims)
+      difference /= power
 
-    result = (1. + difference) ** -scale_mixture_rate
+    result = (1. + difference) ** -power
 
     if self.amplitude is not None:
-      amplitude = util.pad_shape_with_ones(
-          self.amplitude, ndims=example_ndims)
+      amplitude = tf.convert_to_tensor(self.amplitude)
+      amplitude = util.pad_shape_with_ones(amplitude, ndims=example_ndims)
       result *= amplitude ** 2
     return result
 
@@ -187,10 +175,24 @@ class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
 
   def _batch_shape_tensor(self):
     shape_list = [
-        tf.shape(input=x)
+        tf.shape(x)
         for x in [self.amplitude, self.scale_mixture_rate, self.length_scale]
         if x is not None
     ]
     if not shape_list:
       return tf.constant([], dtype=tf.int32)
     return functools.reduce(tf.broadcast_dynamic_shape, shape_list)
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    for arg_name, arg in dict(
+        amplitude=self.amplitude,
+        length_scale=self.length_scale,
+        scale_mixture_rate=self.scale_mixture_rate).items():
+      if arg is not None and is_init != tensor_util.is_ref(arg):
+        assertions.append(assert_util.assert_positive(
+            arg,
+            message='{} must be positive.'.format(arg_name)))
+    return assertions

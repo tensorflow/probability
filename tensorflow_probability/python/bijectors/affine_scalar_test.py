@@ -26,8 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -182,14 +181,14 @@ class _AffineScalarBijectorTest(object):
 
   def testVariableScaleAssertion(self):
     v = tf.Variable(0.)
-    self.evaluate(tf1.global_variables_initializer())
-    b = tfb.AffineScalar(scale=v, validate_args=True)
+    self.evaluate(v.initializer)
     with self.assertRaisesOpError("Argument `scale` must be non-zero"):
+      b = tfb.AffineScalar(scale=v, validate_args=True)
       _ = self.evaluate(b.forward(1.))
 
   def testModifiedVariableScaleAssertion(self):
     v = tf.Variable(1.)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(v.initializer)
     b = tfb.AffineScalar(scale=v, validate_args=True)
     with self.assertRaisesOpError("Argument `scale` must be non-zero"):
       with tf.control_dependencies([v.assign(0.)]):

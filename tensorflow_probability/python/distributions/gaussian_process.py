@@ -31,6 +31,8 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
+
 
 __all__ = [
     'GaussianProcess',
@@ -250,11 +252,11 @@ class GaussianProcess(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [index_points, observation_noise_variance, jitter], tf.float32)
-      if index_points is not None:
-        index_points = tf.convert_to_tensor(
-            index_points, dtype=dtype, name='index_points')
-      jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
-      observation_noise_variance = tf.convert_to_tensor(
+      index_points = tensor_util.convert_nonref_to_tensor(
+          index_points, dtype=dtype, name='index_points')
+      jitter = tensor_util.convert_nonref_to_tensor(
+          jitter, dtype=dtype, name='jitter')
+      observation_noise_variance = tensor_util.convert_nonref_to_tensor(
           observation_noise_variance,
           dtype=dtype,
           name='observation_noise_variance')
@@ -272,9 +274,6 @@ class GaussianProcess(distribution.Distribution):
       self._observation_noise_variance = observation_noise_variance
       self._jitter = jitter
 
-      graph_parents = [observation_noise_variance, jitter]
-      if index_points is not None: graph_parents.append(index_points)
-
       with tf.name_scope('init'):
         super(GaussianProcess, self).__init__(
             dtype=dtype,
@@ -282,7 +281,6 @@ class GaussianProcess(distribution.Distribution):
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats,
             parameters=parameters,
-            graph_parents=graph_parents,
             name=name)
 
   def _is_univariate_marginal(self, index_points):
@@ -422,7 +420,8 @@ class GaussianProcess(distribution.Distribution):
           'an argument and returns a `Normal` or '
           '`MultivariateNormalLinearOperator` instance, whose KL can be '
           'computed.')
-    return index_points if index_points is not None else self._index_points
+    return index_points if index_points is not None else tf.convert_to_tensor(
+        self._index_points)
 
   def _log_prob(self, value, index_points=None):
     return self.get_marginal_distribution(index_points).log_prob(value)

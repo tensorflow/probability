@@ -373,7 +373,7 @@ class MultinomialFromVariableTest(test_case.TestCase):
 
   def testGradientProbs(self):
     x = tf.Variable([0.1, 0.7, 0.2])
-    d = tfd.Multinomial(total_count=2., logits=x, validate_args=True)
+    d = tfd.Multinomial(total_count=2., probs=x, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([0, 1, 1])
     g = tape.gradient(loss, d.trainable_variables)

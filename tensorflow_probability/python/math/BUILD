@@ -38,6 +38,7 @@ py_library(
         ":gradient",
         ":interpolation",
         ":linalg",
+        ":minimize",
         ":numeric",
         ":random_ops",
         ":root_search",
@@ -80,6 +81,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -166,6 +168,7 @@ py_test(
     size = "medium",
     srcs = ["linalg_test.py"],
     shard_count = 5,
+    tags = ["hypothesis"],
     deps = [
         # absl/testing:parameterized dep,
         # hypothesis dep,
@@ -173,6 +176,29 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
+    ],
+)
+
+py_library(
+    name = "minimize",
+    srcs = [
+        "minimize.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "minimize_test",
+    size = "small",
+    srcs = ["minimize_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 

@@ -33,6 +33,8 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":csiszar_divergence",
+        ":mutual_information",
+        ":optimization",
     ],
 )
 
@@ -56,6 +58,55 @@ py_test(
     name = "csiszar_divergence_test",
     size = "medium",
     srcs = ["csiszar_divergence_test.py"],
+    shard_count = 5,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "mutual_information",
+    srcs = ["mutual_information.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "mutual_information_test",
+    size = "small",
+    srcs = ["mutual_information_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "optimization",
+    srcs = ["optimization.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:nest_util",
+        "//tensorflow_probability/python/monte_carlo",
+    ],
+)
+
+py_test(
+    name = "optimization_test",
+    size = "medium",
+    srcs = ["optimization_test.py"],
     shard_count = 5,
     deps = [
         # numpy dep,

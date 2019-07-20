@@ -187,11 +187,11 @@ class Multinomial(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs],
                                       dtype_hint=tf.float32)
-      self._total_count = tensor_util.convert_immutable_to_tensor(
+      self._total_count = tensor_util.convert_nonref_to_tensor(
           total_count, name='total_count', dtype=dtype)
-      self._probs = tensor_util.convert_immutable_to_tensor(
+      self._probs = tensor_util.convert_nonref_to_tensor(
           probs, dtype=dtype, name='probs')
-      self._logits = tensor_util.convert_immutable_to_tensor(
+      self._logits = tensor_util.convert_nonref_to_tensor(
           logits, dtype=dtype, name='logits')
       super(Multinomial, self).__init__(
           dtype=dtype,
@@ -331,7 +331,7 @@ class Multinomial(distribution.Distribution):
         is_init, self.validate_args, self._probs, self._logits)
     if not self.validate_args:
       return assertions
-    if is_init != tensor_util.is_mutable(self.total_count):
+    if is_init != tensor_util.is_ref(self.total_count):
       assertions.extend(distribution_util.assert_nonnegative_integer_form(
           self.total_count))
     return assertions

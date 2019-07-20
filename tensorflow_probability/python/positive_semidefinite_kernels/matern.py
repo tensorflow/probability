@@ -19,7 +19,9 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
@@ -30,41 +32,25 @@ __all__ = [
 ]
 
 
-def _validate_arg_if_not_none(arg, assertion, validate_args):
-  if arg is None:
-    return arg
-  with tf.control_dependencies([assertion(arg)] if validate_args else []):
-    result = tf.identity(arg)
-  return result
-
-
 class _AmplitudeLengthScaleMixin(object):
   """Shared logic for amplitude/length_scale parameterized kernels."""
 
-  def _init_params(self, amplitude, length_scale, validate_args):
+  def _init_params(self, amplitude, length_scale):
     """Shared init logic for `amplitude` and `length_scale` params.
 
     Args:
       amplitude: `Tensor` (or convertible) or `None` to convert, validate.
       length_scale: `Tensor` (or convertible) or `None` to convert, validate.
-      validate_args: If `True`, parameters are checked for validity despite
-        possibly degrading runtime performance
 
     Returns:
       dtype: The common `DType` of the parameters.
     """
     dtype = util.maybe_get_common_dtype(
         [amplitude, length_scale])
-    if amplitude is not None:
-      amplitude = tf.convert_to_tensor(
-          value=amplitude, name='amplitude', dtype=dtype)
-    self._amplitude = _validate_arg_if_not_none(
-        amplitude, tf.compat.v1.assert_positive, validate_args)
-    if length_scale is not None:
-      length_scale = tf.convert_to_tensor(
-          value=length_scale, name='length_scale', dtype=dtype)
-    self._length_scale = _validate_arg_if_not_none(
-        length_scale, tf.compat.v1.assert_positive, validate_args)
+    self._amplitude = tensor_util.convert_nonref_to_tensor(
+        amplitude, name='amplitude', dtype=dtype)
+    self._length_scale = tensor_util.convert_nonref_to_tensor(
+        length_scale, name='length_scale', dtype=dtype)
     return dtype
 
   @property
@@ -85,8 +71,21 @@ class _AmplitudeLengthScaleMixin(object):
 
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
-        [] if self.amplitude is None else tf.shape(input=self.amplitude),
-        [] if self.length_scale is None else tf.shape(input=self.length_scale))
+        [] if self.amplitude is None else tf.shape(self.amplitude),
+        [] if self.length_scale is None else tf.shape(self.length_scale))
+
+  def _parameter_control_dependencies(self, is_init):
+    """Control dependencies for parameters."""
+    if not self.validate_args:
+      return []
+    assertions = []
+    for arg_name, arg in dict(amplitude=self.amplitude,
+                              length_scale=self.length_scale).items():
+      if arg is not None and is_init != tensor_util.is_ref(arg):
+        assertions.append(assert_util.assert_positive(
+            arg,
+            message='{} must be positive.'.format(arg_name)))
+    return assertions
 
 
 class MaternOneHalf(_AmplitudeLengthScaleMixin,
@@ -132,11 +131,10 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin,
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.compat.v1.name_scope(
-        name, values=[amplitude, length_scale]) as name:
-      dtype = super(MaternOneHalf, self)._init_params(amplitude, length_scale,
-                                                      validate_args)
-    super(MaternOneHalf, self).__init__(feature_ndims, dtype=dtype, name=name)
+    with tf.name_scope(name) as name:
+      dtype = super(MaternOneHalf, self)._init_params(amplitude, length_scale)
+      super(MaternOneHalf, self).__init__(
+          feature_ndims, dtype=dtype, name=name, validate_args=validate_args)
 
   def _apply(self, x1, x2, example_ndims=0):
     # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
@@ -144,14 +142,16 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin,
         util.sum_rightmost_ndims_preserving_shape(
             tf.math.squared_difference(x1, x2), self.feature_ndims))
     if self.length_scale is not None:
+      length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
-          self.length_scale, ndims=example_ndims)
+          length_scale, ndims=example_ndims)
       norm /= length_scale
     log_result = -norm
 
     if self.amplitude is not None:
+      amplitude = tf.convert_to_tensor(self.amplitude)
       amplitude = util.pad_shape_with_ones(
-          self.amplitude, ndims=example_ndims)
+          amplitude, ndims=example_ndims)
       log_result += 2. * tf.math.log(amplitude)
     return tf.exp(log_result)
 
@@ -195,12 +195,11 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin,
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.compat.v1.name_scope(
-        name, values=[amplitude, length_scale]) as name:
+    with tf.name_scope(name) as name:
       dtype = super(MaternThreeHalves, self)._init_params(
-          amplitude, length_scale, validate_args)
-    super(MaternThreeHalves, self).__init__(
-        feature_ndims, dtype=dtype, name=name)
+          amplitude, length_scale)
+      super(MaternThreeHalves, self).__init__(
+          feature_ndims, dtype=dtype, name=name, validate_args=validate_args)
 
   def _apply(self, x1, x2, example_ndims=0):
     # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
@@ -208,14 +207,16 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin,
         util.sum_rightmost_ndims_preserving_shape(
             tf.math.squared_difference(x1, x2), self.feature_ndims))
     if self.length_scale is not None:
+      length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
-          self.length_scale, ndims=example_ndims)
+          length_scale, ndims=example_ndims)
       norm /= length_scale
     series_term = np.sqrt(3) * norm
     log_result = tf.math.log1p(series_term) - series_term
 
     if self.amplitude is not None:
-      amplitude = util.pad_shape_with_ones(self.amplitude, example_ndims)
+      amplitude = tf.convert_to_tensor(self.amplitude)
+      amplitude = util.pad_shape_with_ones(amplitude, example_ndims)
       log_result += 2. * tf.math.log(amplitude)
     return tf.exp(log_result)
 
@@ -259,12 +260,11 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin,
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-    with tf.compat.v1.name_scope(
-        name, values=[amplitude, length_scale]) as name:
+    with tf.name_scope(name) as name:
       dtype = super(MaternFiveHalves, self)._init_params(
-          amplitude, length_scale, validate_args)
-    super(MaternFiveHalves, self).__init__(
-        feature_ndims, dtype=dtype, name=name)
+          amplitude, length_scale)
+      super(MaternFiveHalves, self).__init__(
+          feature_ndims, dtype=dtype, name=name, validate_args=validate_args)
 
   def _apply(self, x1, x2, example_ndims=0):
     # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
@@ -272,13 +272,15 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin,
         util.sum_rightmost_ndims_preserving_shape(
             tf.math.squared_difference(x1, x2), self.feature_ndims))
     if self.length_scale is not None:
+      length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
-          self.length_scale, ndims=example_ndims)
+          length_scale, ndims=example_ndims)
       norm /= length_scale
     series_term = np.sqrt(5) * norm
     log_result = tf.math.log1p(series_term + series_term**2 / 3.) - series_term
 
     if self.amplitude is not None:
-      amplitude = util.pad_shape_with_ones(self.amplitude, example_ndims)
+      amplitude = tf.convert_to_tensor(self.amplitude)
+      amplitude = util.pad_shape_with_ones(amplitude, example_ndims)
       log_result += 2. * tf.math.log(amplitude)
     return tf.exp(log_result)

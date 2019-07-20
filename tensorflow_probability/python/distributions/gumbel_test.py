@@ -52,9 +52,18 @@ class _GumbelTest(object):
 
   def testInvalidScale(self):
     scale = [-.01, 0., 2.]
-    with self.assertRaisesOpError('Condition x > 0'):
+    with self.assertRaisesOpError('Argument `scale` must be positive.'):
       gumbel = tfd.Gumbel(loc=0., scale=scale, validate_args=True)
-      self.evaluate(gumbel.scale)
+      self.evaluate(gumbel.mean())
+
+    scale = tf.Variable([.01])
+    self.evaluate(scale.initializer)
+    gumbel = tfd.Gumbel(loc=0., scale=scale, validate_args=True)
+    self.assertIs(scale, gumbel.scale)
+    self.evaluate(gumbel.mean())
+    with tf.control_dependencies([scale.assign([-.01])]):
+      with self.assertRaisesOpError('Argument `scale` must be positive.'):
+        self.evaluate(gumbel.mean())
 
   def testGumbelLogPdf(self):
     batch_size = 6

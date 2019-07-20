@@ -21,7 +21,7 @@ from __future__ import print_function
 from absl.testing import parameterized
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability import positive_semidefinite_kernels as tfpk
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -127,7 +127,7 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
           length_scale=1.,
           scale_mixture_rate=1.,
           validate_args=True)
-      self.evaluate(k.amplitude)
+      self.evaluate(k.apply([1.], [1.]))
 
     with self.assertRaises(tf.errors.InvalidArgumentError):
       k = tfpk.RationalQuadratic(
@@ -135,7 +135,7 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
           length_scale=-1.,
           scale_mixture_rate=1.,
           validate_args=True)
-      self.evaluate(k.length_scale)
+      self.evaluate(k.apply([1.], [1.]))
 
     with self.assertRaises(tf.errors.InvalidArgumentError):
       k = tfpk.RationalQuadratic(
@@ -143,7 +143,7 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
           length_scale=1.,
           scale_mixture_rate=-1.,
           validate_args=True)
-      self.evaluate(k.scale_mixture_rate)
+      self.evaluate(k.apply([1.], [1.]))
 
     # But `None`'s are ok
     k = tfpk.RationalQuadratic(

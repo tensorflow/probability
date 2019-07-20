@@ -54,6 +54,7 @@ from tensorflow_probability.python.bijectors.normal_cdf import NormalCDF
 from tensorflow_probability.python.bijectors.ordered import Ordered
 from tensorflow_probability.python.bijectors.permute import Permute
 from tensorflow_probability.python.bijectors.power_transform import PowerTransform
+from tensorflow_probability.python.bijectors.rational_quadratic_spline import RationalQuadraticSpline
 from tensorflow_probability.python.bijectors.real_nvp import real_nvp_default_template
 from tensorflow_probability.python.bijectors.real_nvp import RealNVP
 from tensorflow_probability.python.bijectors.reciprocal import Reciprocal
@@ -106,6 +107,7 @@ __all__ = [
     "Ordered",
     "Permute",
     "PowerTransform",
+    "RationalQuadraticSpline",
     "RealNVP",
     "Reciprocal",
     "Reshape",

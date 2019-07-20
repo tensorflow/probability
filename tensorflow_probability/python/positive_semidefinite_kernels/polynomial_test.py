@@ -23,7 +23,7 @@ from absl.testing import parameterized
 import numpy as np
 
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability import positive_semidefinite_kernels as tfpk
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -60,24 +60,24 @@ class PolynomialTest(tf.test.TestCase, parameterized.TestCase):
       k = tfpk.Polynomial(
           bias_variance=-1.,
           validate_args=True)
-      self.evaluate(k.bias_variance)
+      self.evaluate(k.apply([1.], [1.]))
     with self.assertRaisesOpError('Condition x > 0 did not hold'):
       k = tfpk.Polynomial(
           slope_variance=-1.,
           validate_args=True)
-      self.evaluate(k.slope_variance)
+      self.evaluate(k.apply([1.], [1.]))
     with self.assertRaisesOpError('Condition x > 0 did not hold'):
       k = tfpk.Polynomial(
           exponent=-1.,
           validate_args=True)
-      self.evaluate(k.exponent)
+      self.evaluate(k.apply([1.], [1.]))
 
   def testShifttNonPositiveIsOk(self):
     # No exception expected
     k = tfpk.Polynomial(
         shift=-1.,
         validate_args=True)
-    self.evaluate(k.shift)
+    self.evaluate(k.apply([1.], [1.]))
 
   def testValidateArgsNoneIsOk(self):
     # No exception expected

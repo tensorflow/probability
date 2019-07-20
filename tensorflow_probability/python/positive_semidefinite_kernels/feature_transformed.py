@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
 
 __all__ = ['FeatureTransformed']
@@ -97,12 +98,14 @@ class FeatureTransformed(psd_kernel.PositiveSemidefiniteKernel):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-    self._kernel = kernel
-    self._transformation_fn = transformation_fn
-    super(FeatureTransformed, self).__init__(
-        feature_ndims=kernel.feature_ndims,
-        dtype=kernel.dtype,
-        name=name)
+    with tf.name_scope(name):
+      self._kernel = kernel
+      self._transformation_fn = transformation_fn
+      super(FeatureTransformed, self).__init__(
+          feature_ndims=kernel.feature_ndims,
+          dtype=kernel.dtype,
+          name=name,
+          validate_args=validate_args)
 
   def _apply(self, x1, x2, example_ndims=0):
     return self._kernel.apply(

@@ -18,7 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.positive_semidefinite_kernels import feature_transformed
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
 
@@ -62,24 +64,23 @@ class FeatureScaled(feature_transformed.FeatureTransformed):
       name: Python `str` name prefixed to Ops created by this class.
     """
 
-    with tf.compat.v1.name_scope(name):
-      scale_diag = tf.convert_to_tensor(
-          value=scale_diag, name='scale_diag')
-      with tf.control_dependencies([
-          tf.compat.v1.assert_positive(scale_diag)] if validate_args else []):
-        self._scale_diag = tf.identity(scale_diag)
+    with tf.name_scope(name):
+      self._scale_diag = tensor_util.convert_nonref_to_tensor(
+          scale_diag, name='scale_diag')
 
-    def rescale_input(x, feature_ndims, example_ndims):
-      """Computes `x / scale_diag`."""
-      scale_diag = util.pad_shape_with_ones(
-          self.scale_diag,
-          example_ndims,
-          # Start before the first feature dimension. We assume scale_diag has
-          # at least as many dimensions as feature_ndims.
-          start=-(feature_ndims + 1))
-      return x / scale_diag
+      def rescale_input(x, feature_ndims, example_ndims):
+        """Computes `x / scale_diag`."""
+        scale_diag = tf.convert_to_tensor(self.scale_diag)
+        scale_diag = util.pad_shape_with_ones(
+            scale_diag,
+            example_ndims,
+            # Start before the first feature dimension. We assume scale_diag has
+            # at least as many dimensions as feature_ndims.
+            start=-(feature_ndims + 1))
+        return x / scale_diag
 
-    super(FeatureScaled, self).__init__(kernel, transformation_fn=rescale_input)
+      super(FeatureScaled, self).__init__(
+          kernel, transformation_fn=rescale_input, validate_args=validate_args)
 
   @property
   def scale_diag(self):
@@ -93,5 +94,15 @@ class FeatureScaled(feature_transformed.FeatureTransformed):
   def _batch_shape_tensor(self):
     return tf.broadcast_dynamic_shape(
         self.kernel.batch_shape_tensor(),
-        tf.shape(input=self.scale_diag)[:-self.kernel.feature_ndims])
+        tf.shape(self.scale_diag)[:-self.kernel.feature_ndims])
 
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    scale_diag = self.scale_diag
+    if scale_diag is not None and is_init != tensor_util.is_ref(scale_diag):
+      assertions.append(assert_util.assert_positive(
+          scale_diag,
+          message='scale_diag must be positive.'))
+    return assertions

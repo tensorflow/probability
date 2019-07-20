@@ -26,7 +26,6 @@ import weakref
 # Dependency imports
 import numpy as np
 import six
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
@@ -43,12 +42,6 @@ __all__ = [
 
 
 SKIP_DTYPE_CHECKS = False
-
-
-def _get_current_graph():
-  if tf.executing_eagerly():
-    return None
-  return tf1.get_default_graph()
 
 
 class _Mapping(
@@ -634,8 +627,6 @@ class Bijector(tf.Module):
     self._graph_parents = self._no_dependency(graph_parents or [])
 
     self._is_constant_jacobian = is_constant_jacobian
-    # Keyed by the current graph.
-    self._constant_ildj = self._no_dependency({})
     self._validate_args = validate_args
     self._dtype = dtype
 
@@ -645,6 +636,9 @@ class Bijector(tf.Module):
     self._initial_parameter_control_dependencies = tuple(
         d for d in self._parameter_control_dependencies(is_init=True)
         if d is not None)
+    if self._initial_parameter_control_dependencies:
+      self._initial_parameter_control_dependencies = (
+          tf.group(*self._initial_parameter_control_dependencies),)
 
     if forward_min_event_ndims is None and inverse_min_event_ndims is None:
       raise ValueError('Must specify at least one of `forward_min_event_ndims` '
@@ -1052,10 +1046,8 @@ class Bijector(tf.Module):
         over to compute the total ildj.
       kwargs: dictionary of keyword args that will be passed to calls to
         `self.forward` or `self.inverse` (if either of those are required), and
-        to `self._compute_unreduced_nonconstant_ildj_with_caching` or
-        `self._compute_unreduced_constant_ildj_with_caching`, as appropriate (
-        those functions use the conditioning kwargs for caching and for
-        their underlying computations).
+        to `self._compute_unreduced_ildj_with_caching` (which uses the
+        conditioning kwargs for caching and for their underlying computations).
 
     Returns:
       ildj: a Tensor of ILDJ['s] at the given input (as specified by the args).
@@ -1082,19 +1074,15 @@ class Bijector(tf.Module):
       tensor_to_use = x if x is not None else self.inverse(y, **kwargs)
       min_event_ndims = self.forward_min_event_ndims
 
-    if self.is_constant_jacobian:
-      unreduced_ildj = self._compute_unreduced_constant_ildj_with_caching(
-          tensor_to_use, use_inverse_ldj_fn, kwargs)
-    else:
-      unreduced_ildj = self._compute_unreduced_nonconstant_ildj_with_caching(
-          x, y, tensor_to_use, use_inverse_ldj_fn, kwargs)
+    unreduced_ildj = self._compute_unreduced_ildj_with_caching(
+        x, y, tensor_to_use, use_inverse_ldj_fn, kwargs)
 
     return self._reduce_jacobian_det_over_event(
         tf.shape(tensor_to_use), unreduced_ildj, min_event_ndims, event_ndims)
 
-  def _compute_unreduced_nonconstant_ildj_with_caching(
+  def _compute_unreduced_ildj_with_caching(
       self, x, y, tensor_to_use, use_inverse_ldj_fn, kwargs):
-    """Helper for computing ILDJ, with caching, in the non-constant case.
+    """Helper for computing ILDJ, with caching.
 
     Does not do the 'reduce' step which is necessary in some cases; this is left
     to the caller.
@@ -1122,7 +1110,7 @@ class Bijector(tf.Module):
 
     Returns:
       ildj: the (un-reduce_sum'ed) value of the ILDJ at the specified input
-      location. Also updates the cache as needed.
+        location. Also updates the cache as needed.
     """
     mapping = self._lookup(x=x, y=y, kwargs=kwargs)
     if mapping.ildj is not None:
@@ -1135,40 +1123,6 @@ class Bijector(tf.Module):
 
     mapping = mapping.merge(x=x, y=y, ildj=ildj)
     self._cache_update(mapping)
-    return ildj
-
-  def _compute_unreduced_constant_ildj_with_caching(
-      self, tensor_to_use, use_inverse_ldj_fn, kwargs):
-    """Helper for computing ILDJ, with caching, in the constant-ILDJ case.
-
-    Does not do the 'reduce' step which is necessary in some cases; this is left
-    to the caller.
-
-    Args:
-      tensor_to_use: a `Tensor`, to pass to the chosen compute
-        function (`_inverse_log_det_jacobian` or `_forward_log_det_jacobian`).
-        Since we know the ILDJ is input-independent, the actual value is not
-        meaningful, although the shape and dtype may be.
-      use_inverse_ldj_fn: Python `bool`, if `True`, will use the
-        `_inverse_log_det_jacobian` to compute ILDJ; else, will use
-        `_forward_log_det_jacobian`.
-      kwargs: dictionary of keyword args that will be passed to calls to
-        to `_inverse_log_det_jacobian` or `_forward_log_det_jacobian`, as well
-        as for lookup/updating of the result in the cache.
-
-    Returns:
-      ildj: the (un-reduce_sum'ed) value of the ILDJ for the specified input.
-        Also updates the cache as needed.
-    """
-    current_graph = _get_current_graph()
-    if current_graph in self._constant_ildj:
-      return self._constant_ildj[current_graph]
-
-    if use_inverse_ldj_fn:
-      ildj = self._inverse_log_det_jacobian(tensor_to_use, **kwargs)
-    else:
-      ildj = -self._forward_log_det_jacobian(tensor_to_use, **kwargs)
-    self._constant_ildj[current_graph] = ildj
     return ildj
 
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):

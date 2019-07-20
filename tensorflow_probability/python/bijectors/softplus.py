@@ -126,12 +126,12 @@ class Softplus(bijector.Bijector):
     # which is the most stable for large Y > 0. For small Y, we use
     # 1 - exp{-Y} approx Y.
     if self.hinge_softness is not None:
-      y /= tf.cast(self.hinge_softness, y.dtype)
+      y = y / tf.cast(self.hinge_softness, y.dtype)
     return -tf.math.log(-tf.math.expm1(-y))
 
   def _forward_log_det_jacobian(self, x):
     if self.hinge_softness is not None:
-      x /= tf.cast(self.hinge_softness, x.dtype)
+      x = x / tf.cast(self.hinge_softness, x.dtype)
     return -tf.math.softplus(-x)
 
   @property

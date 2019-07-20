@@ -80,6 +80,7 @@ class FillTriangular(bijector.Bijector):
     super(FillTriangular, self).__init__(
         forward_min_event_ndims=1,
         inverse_min_event_ndims=2,
+        is_constant_jacobian=True,
         validate_args=validate_args,
         name=name)
 
@@ -90,10 +91,10 @@ class FillTriangular(bijector.Bijector):
     return tfp_math.fill_triangular_inverse(y, upper=self._upper)
 
   def _forward_log_det_jacobian(self, x):
-    return tf.zeros_like(x[..., 0])
+    return tf.zeros([], dtype=x.dtype)
 
   def _inverse_log_det_jacobian(self, y):
-    return tf.zeros_like(y[..., 0, 0])
+    return tf.zeros([], dtype=y.dtype)
 
   def _forward_event_shape(self, input_shape):
     batch_shape, d = input_shape[:-1], tf.compat.dimension_value(

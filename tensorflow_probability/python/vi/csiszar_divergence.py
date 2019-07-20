@@ -790,8 +790,8 @@ def symmetrized_csiszar_function(logu, csiszar_function, name=None):
 
 def monte_carlo_variational_loss(target_log_prob_fn,
                                  surrogate_posterior,
+                                 sample_size=1,
                                  discrepancy_fn=kl_reverse,
-                                 sample_size=None,
                                  use_reparametrization=None,
                                  seed=None,
                                  name=None):
@@ -831,12 +831,14 @@ def monte_carlo_variational_loss(target_log_prob_fn,
       this is to use `tfp.util.DeferredTensor` to represent any parameters
       defined as transformations of unconstrained variables, so that the
       transformations execute at runtime instead of at distribution creation.
+    sample_size: Integer scalar number of Monte Carlo samples used to
+      approximate the variational divergence. Larger values may stabilize
+      the optimization, but at higher cost per step in time and memory.
+      Default value: `1`.
     discrepancy_fn: Python `callable` representing a Csiszar `f` function in
       in log-space. That is, `discrepancy_fn(log(u)) = f(u)`, where `f` is
       convex in `u`.
       Default value: `tfp.vi.kl_reverse`.
-    sample_size: Integer scalar number of Monte Carlo samples used to
-      approximate the variational divergence.
     use_reparametrization: Python `bool`. When `None` (the default),
       automatically set to:
       `surrogate_posterior.reparameterization_type ==

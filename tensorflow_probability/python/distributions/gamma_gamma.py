@@ -30,9 +30,10 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
-    "GammaGamma",
+    'GammaGamma',
 ]
 
 
@@ -91,7 +92,7 @@ class GammaGamma(distribution.Distribution):
                mixing_rate,
                validate_args=False,
                allow_nan_stats=True,
-               name="GammaGamma"):
+               name='GammaGamma'):
     """Initializes a batch of Gamma-Gamma distributions.
 
     The parameters `concentration` and `rate` must be shaped in a way that
@@ -123,35 +124,20 @@ class GammaGamma(distribution.Distribution):
       dtype = dtype_util.common_dtype(
           [concentration, mixing_concentration, mixing_rate],
           dtype_hint=tf.float32)
-      concentration = tf.convert_to_tensor(
-          concentration, name="concentration", dtype=dtype)
-      mixing_concentration = tf.convert_to_tensor(
-          mixing_concentration, name="mixing_concentration", dtype=dtype)
-      mixing_rate = tf.convert_to_tensor(
-          mixing_rate, name="mixing_rate", dtype=dtype)
-      with tf.control_dependencies([
-          assert_util.assert_positive(concentration),
-          assert_util.assert_positive(mixing_concentration),
-          assert_util.assert_positive(mixing_rate),
-      ] if validate_args else []):
-        self._concentration = tf.identity(concentration, name="concentration")
-        self._mixing_concentration = tf.identity(
-            mixing_concentration, name="mixing_concentration")
-        self._mixing_rate = tf.identity(mixing_rate, name="mixing_rate")
+      self._concentration = tensor_util.convert_nonref_to_tensor(
+          concentration, name='concentration', dtype=dtype)
+      self._mixing_concentration = tensor_util.convert_nonref_to_tensor(
+          mixing_concentration, name='mixing_concentration', dtype=dtype)
+      self._mixing_rate = tensor_util.convert_nonref_to_tensor(
+          mixing_rate, name='mixing_rate', dtype=dtype)
 
-      dtype_util.assert_same_float_dtype(
-          [self._concentration, self._mixing_concentration, self._mixing_rate])
-
-    super(GammaGamma, self).__init__(
-        dtype=self._concentration.dtype,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        parameters=parameters,
-        graph_parents=[
-            self._concentration, self._mixing_concentration, self._mixing_rate
-        ],
-        name=name)
+      super(GammaGamma, self).__init__(
+          dtype=self._concentration.dtype,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          parameters=parameters,
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -192,35 +178,41 @@ class GammaGamma(distribution.Distribution):
       """Note: See `tf.random.gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
-    seed = seed_stream.SeedStream(seed, "gamma_gamma")
+    concentration = tf.convert_to_tensor(self.concentration)
+    mixing_concentration = tf.convert_to_tensor(self.mixing_concentration)
+    mixing_rate = tf.convert_to_tensor(self.mixing_rate)
+    seed = seed_stream.SeedStream(seed, 'gamma_gamma')
     rate = tf.random.gamma(
         shape=[n],
         # Be sure to draw enough rates for the fully-broadcasted gamma-gamma.
-        alpha=self.mixing_concentration + tf.zeros_like(self.concentration),
-        beta=self.mixing_rate,
+        alpha=mixing_concentration + tf.zeros_like(concentration),
+        beta=mixing_rate,
         dtype=self.dtype,
         seed=seed())
     return tf.random.gamma(
         shape=[],
-        alpha=self.concentration,
+        alpha=concentration,
         beta=rate,
         dtype=self.dtype,
         seed=seed())
 
   def _log_prob(self, x):
-    return self._log_unnormalized_prob(x) - self._log_normalization()
+    concentration = tf.convert_to_tensor(self.concentration)
+    mixing_concentration = tf.convert_to_tensor(self.mixing_concentration)
+    mixing_rate = tf.convert_to_tensor(self.mixing_rate)
 
-  def _log_unnormalized_prob(self, x):
+    log_normalization = (
+        tf.math.lgamma(concentration) +
+        tf.math.lgamma(mixing_concentration) -
+        tf.math.lgamma(concentration + mixing_concentration) -
+        mixing_concentration * tf.math.log(mixing_rate))
+
     x = self._maybe_assert_valid_sample(x)
-    return (tf.math.xlogy(self.concentration - 1., x) -
-            (self.concentration + self.mixing_concentration) *
-            tf.math.log(x + self.mixing_rate))
+    log_unnormalized_prob = (tf.math.xlogy(concentration - 1., x) -
+                             (concentration + mixing_concentration) *
+                             tf.math.log(x + mixing_rate))
 
-  def _log_normalization(self):
-    return (tf.math.lgamma(self.concentration) +
-            tf.math.lgamma(self.mixing_concentration) -
-            tf.math.lgamma(self.concentration + self.mixing_concentration) -
-            self.mixing_concentration * tf.math.log(self.mixing_rate))
+    return log_unnormalized_prob - log_normalization
 
   @distribution_util.AppendDocstring(
       """The mean of a Gamma-Gamma distribution is
@@ -228,20 +220,24 @@ class GammaGamma(distribution.Distribution):
       `mixing_concentration > 1`, and `NaN` otherwise. If `self.allow_nan_stats`
       is `False`, an exception will be raised rather than returning `NaN`""")
   def _mean(self):
-    mean = self.concentration * self.mixing_rate / (
-        self.mixing_concentration - 1.)
+    concentration = tf.convert_to_tensor(self.concentration)
+    mixing_concentration = tf.convert_to_tensor(self.mixing_concentration)
+    mixing_rate = tf.convert_to_tensor(self.mixing_rate)
+
+    mean = concentration * mixing_rate / (mixing_concentration - 1.)
     if self.allow_nan_stats:
       return tf.where(
-          self.mixing_concentration > 1.,
+          mixing_concentration > 1.,
           mean,
           dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
-      return distribution_util.with_dependencies([
+      with tf.control_dependencies([
           assert_util.assert_less(
               tf.ones([], self.dtype),
-              self.mixing_concentration,
-              message="mean undefined when `mixing_concentration` <= 1"),
-      ], mean)
+              mixing_concentration,
+              message='mean undefined when `mixing_concentration` <= 1'),
+      ]):
+        return tf.identity(mean)
 
   @distribution_util.AppendDocstring(
       """The variance of a Gamma-Gamma distribution is
@@ -250,26 +246,45 @@ class GammaGamma(distribution.Distribution):
       otherwise. If `self.allow_nan_stats` is `False`, an exception will be
       raised rather than returning `NaN`""")
   def _variance(self):
-    variance = (tf.square(self.concentration * self.mixing_rate /
-                          (self.mixing_concentration - 1.)) /
-                (self.mixing_concentration - 2.))
+    concentration = tf.convert_to_tensor(self.concentration)
+    mixing_concentration = tf.convert_to_tensor(self.mixing_concentration)
+    mixing_rate = tf.convert_to_tensor(self.mixing_rate)
+
+    variance = (tf.square(concentration * mixing_rate /
+                          (mixing_concentration - 1.)) /
+                (mixing_concentration - 2.))
     if self.allow_nan_stats:
       return tf.where(
-          self.mixing_concentration > 2.,
+          mixing_concentration > 2.,
           variance,
           dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
-      return distribution_util.with_dependencies([
+      with tf.control_dependencies([
           assert_util.assert_less(
               tf.ones([], self.dtype) * 2.,
-              self.mixing_concentration,
-              message="variance undefined when `mixing_concentration` <= 2"),
-      ], variance)
+              mixing_concentration,
+              message='variance undefined when `mixing_concentration` <= 2')]):
+        return tf.identity(variance)
 
   def _maybe_assert_valid_sample(self, x):
     dtype_util.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
     if not self.validate_args:
       return x
-    return distribution_util.with_dependencies([
-        assert_util.assert_positive(x),
-    ], x)
+    with tf.control_dependencies([
+        assert_util.assert_positive(x)]):
+      return tf.identity(x)
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    for param_name, param in dict(
+        concentration=self.concentration,
+        mixing_concentration=self.mixing_concentration,
+        mixing_rate=self.mixing_rate).items():
+
+      if is_init != tensor_util.is_ref(param):
+        assertions.append(assert_util.assert_positive(
+            param,
+            message='Argument `{}` must be positive.'.format(param_name)))
+    return assertions

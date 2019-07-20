@@ -40,6 +40,16 @@ def _no_compile(fn):
   return fn
 
 
+def _fwd_mclachlan_optimal_4th_order_step(*args, **kwargs):
+  return fun_mcmc.mclachlan_optimal_4th_order_step(
+      *args, forward=True, **kwargs)
+
+
+def _rev_mclachlan_optimal_4th_order_step(*args, **kwargs):
+  return fun_mcmc.mclachlan_optimal_4th_order_step(
+      *args, forward=False, **kwargs)
+
+
 class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
 
   def testTraceSingle(self):
@@ -108,22 +118,55 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
     self.assertIsInstance(transformed_init_state, list)
     self.assertAllClose([1., 1.], transformed_init_state)
     tlp, (orig_space, _) = transformed_log_prob_fn(1., 1.)
-    self.assertIsInstance(orig_space, list)
     lp = log_prob_fn(2., 3.)[0] + sum(
         b.forward_log_det_jacobian(1., event_ndims=0) for b in bijectors)
 
     self.assertAllClose([2., 3.], orig_space)
     self.assertAllClose(lp, tlp)
 
-  @parameterized.parameters(
-      fun_mcmc.leapfrog_step,
-      fun_mcmc.ruth4_step,
-      fun_mcmc.blanes_3_stage_step,
-      fun_mcmc.blanes_4_stage_step,
-  )
-  def testIntegratorStep(self, method):
+  def testTransformLogProbFnKwargs(self):
 
+    def log_prob_fn(x, y):
+      return tfd.Normal(0., 1.).log_prob(x) + tfd.Normal(1., 1.).log_prob(y), ()
+
+    bijectors = {
+        'x': tfb.AffineScalar(scale=2.),
+        'y': tfb.AffineScalar(scale=3.)
+    }
+
+    (transformed_log_prob_fn,
+     transformed_init_state) = fun_mcmc.transform_log_prob_fn(
+         log_prob_fn, bijectors, {
+             'x': 2.,
+             'y': 3.
+         })
+
+    self.assertIsInstance(transformed_init_state, dict)
+    self.assertAllClose({'x': 1., 'y': 1.}, transformed_init_state)
+
+    tlp, (orig_space, _) = transformed_log_prob_fn(x=1., y=1.)
+    lp = log_prob_fn(
+        x=2., y=3.)[0] + sum(
+            b.forward_log_det_jacobian(1., event_ndims=0)
+            for b in bijectors.values())
+
+    self.assertAllClose({'x': 2., 'y': 3.}, orig_space)
+    self.assertAllClose(lp, tlp)
+
+  # The +1's here are because we initialize the `state_grads` at 1, which
+  # require an extra call to `target_log_prob_fn` for most integrators.
+  @parameterized.parameters(
+      (fun_mcmc.leapfrog_step, 1 + 1),
+      (fun_mcmc.ruth4_step, 3 + 1),
+      (fun_mcmc.blanes_3_stage_step, 3 + 1),
+      (_fwd_mclachlan_optimal_4th_order_step, 4 + 1),
+      (_rev_mclachlan_optimal_4th_order_step, 4),
+  )
+  def testIntegratorStep(self, method, num_tlp_calls):
+
+    tlp_call_counter = [0]
     def target_log_prob_fn(q):
+      tlp_call_counter[0] += 1
       return -q**2, 1.
 
     def kinetic_energy_fn(p):
@@ -136,6 +179,7 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
         target_log_prob_fn=target_log_prob_fn,
         kinetic_energy_fn=kinetic_energy_fn)
 
+    self.assertEqual(num_tlp_calls, tlp_call_counter[0])
     self.assertEqual(1., extras.state_extra)
     self.assertEqual(2., extras.kinetic_energy_extra)
 
@@ -144,6 +188,55 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
         state.momentum)[0]
 
     self.assertAllClose(fin_hamiltonian, initial_hamiltonian, atol=0.2)
+
+  @parameterized.parameters(
+      fun_mcmc.leapfrog_step,
+      fun_mcmc.ruth4_step,
+      fun_mcmc.blanes_3_stage_step,
+  )
+  def testIntegratorStepReversible(self, method):
+    def target_log_prob_fn(q):
+      return -q**2, []
+
+    def kinetic_energy_fn(p):
+      return p**2., []
+
+    state_fwd, _ = method(
+        integrator_step_state=fun_mcmc.IntegratorStepState(
+            state=1., state_grads=None, momentum=tf.random.normal([])),
+        step_size=0.1,
+        target_log_prob_fn=target_log_prob_fn,
+        kinetic_energy_fn=kinetic_energy_fn)
+
+    state_rev, _ = method(
+        integrator_step_state=state_fwd._replace(momentum=-state_fwd.momentum),
+        step_size=0.1,
+        target_log_prob_fn=target_log_prob_fn,
+        kinetic_energy_fn=kinetic_energy_fn)
+
+    self.assertAllClose(1., state_rev.state, atol=1e-6)
+
+  def testMclachlanIntegratorStepReversible(self):
+    def target_log_prob_fn(q):
+      return -q**2, []
+
+    def kinetic_energy_fn(p):
+      return p**2., []
+
+    state_fwd, _ = _fwd_mclachlan_optimal_4th_order_step(
+        integrator_step_state=fun_mcmc.IntegratorStepState(
+            state=1., state_grads=None, momentum=tf.random.normal([])),
+        step_size=0.1,
+        target_log_prob_fn=target_log_prob_fn,
+        kinetic_energy_fn=kinetic_energy_fn)
+
+    state_rev, _ = _rev_mclachlan_optimal_4th_order_step(
+        integrator_step_state=state_fwd._replace(momentum=-state_fwd.momentum),
+        step_size=0.1,
+        target_log_prob_fn=target_log_prob_fn,
+        kinetic_energy_fn=kinetic_energy_fn)
+
+    self.assertAllClose(1., state_rev.state, atol=1e-6)
 
   def testMetropolisHastingsStep(self):
     accepted, is_accepted, _ = fun_mcmc.metropolis_hastings_step(
@@ -476,6 +569,21 @@ class FunMCMCTest(tf.test.TestCase, parameterized.TestCase):
         fun_mcmc.adam_init([tf.zeros([]), tf.zeros([])]),
         lambda adam_state: fun_mcmc.adam_step(  # pylint: disable=g-long-lambda
             adam_state, loss_fn, learning_rate=0.01),
+        num_steps=1000,
+        trace_fn=lambda state, extra: [state.state, extra.loss])
+
+    self.assertAllClose(1., x[-1], atol=1e-3)
+    self.assertAllClose(2., y[-1], atol=1e-3)
+    self.assertAllClose(0., loss[-1], atol=1e-3)
+
+  def testGradientDescent(self):
+    def loss_fn(x, y):
+      return tf.square(x - 1.) + tf.square(y - 2.), []
+
+    _, [(x, y), loss] = fun_mcmc.trace(
+        fun_mcmc.GradientDescentState([tf.zeros([]), tf.zeros([])]),
+        lambda gd_state: fun_mcmc.gradient_descent_step(  # pylint: disable=g-long-lambda
+            gd_state, loss_fn, learning_rate=0.01),
         num_steps=1000,
         trace_fn=lambda state, extra: [state.state, extra.loss])
 

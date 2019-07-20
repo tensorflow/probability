@@ -23,6 +23,7 @@ from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import log_combinations
+from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
 from tensorflow_probability.python.math.generic import soft_threshold
 from tensorflow_probability.python.math.generic import softplus_inverse
@@ -41,6 +42,7 @@ from tensorflow_probability.python.math.linalg import pinv
 from tensorflow_probability.python.math.linalg import pivoted_cholesky
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matmul
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
+from tensorflow_probability.python.math.minimize import minimize
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 from tensorflow_probability.python.math.numeric import log1psquare
 from tensorflow_probability.python.math.random_ops import random_rademacher
@@ -68,11 +70,13 @@ _allowed_symbols = [
     'lu_reconstruct',
     'lu_solve',
     'matrix_rank',
+    'minimize',
     'ode',
     'pinv',
     'pivoted_cholesky',
     'random_rademacher',
     'random_rayleigh',
+    'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
     'secant_root',
     'soft_threshold',

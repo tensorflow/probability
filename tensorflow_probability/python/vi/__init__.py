@@ -14,6 +14,7 @@
 # ============================================================================
 """Methods and objectives for variational inference."""
 
+from tensorflow_probability.python.vi import mutual_information
 from tensorflow_probability.python.vi.csiszar_divergence import amari_alpha
 from tensorflow_probability.python.vi.csiszar_divergence import arithmetic_geometric
 from tensorflow_probability.python.vi.csiszar_divergence import chi_square
@@ -34,31 +35,34 @@ from tensorflow_probability.python.vi.csiszar_divergence import symmetrized_csis
 from tensorflow_probability.python.vi.csiszar_divergence import t_power
 from tensorflow_probability.python.vi.csiszar_divergence import total_variation
 from tensorflow_probability.python.vi.csiszar_divergence import triangular
+from tensorflow_probability.python.vi.optimization import fit_surrogate_posterior
 
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 
 _allowed_symbols = [
-    "amari_alpha",
-    "arithmetic_geometric",
-    "chi_square",
-    "csiszar_vimco",
-    "csiszar_vimco_helper",
-    "dual_csiszar_function",
-    "jensen_shannon",
-    "jeffreys",
-    "kl_forward",
-    "kl_reverse",
-    "log1p_abs",
-    "modified_gan",
-    "monte_carlo_csiszar_f_divergence",
-    "monte_carlo_variational_loss",
-    "pearson",
-    "squared_hellinger",
-    "symmetrized_csiszar_function",
-    "total_variation",
-    "triangular",
-    "t_power",
+    'amari_alpha',
+    'arithmetic_geometric',
+    'chi_square',
+    'csiszar_vimco',
+    'csiszar_vimco_helper',
+    'dual_csiszar_function',
+    'fit_surrogate_posterior',
+    'jensen_shannon',
+    'jeffreys',
+    'kl_forward',
+    'kl_reverse',
+    'log1p_abs',
+    'modified_gan',
+    'monte_carlo_csiszar_f_divergence',
+    'monte_carlo_variational_loss',
+    'mutual_information',
+    'pearson',
+    'squared_hellinger',
+    'symmetrized_csiszar_function',
+    'total_variation',
+    'triangular',
+    't_power',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

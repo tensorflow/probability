@@ -20,7 +20,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
@@ -188,7 +187,7 @@ class SinhArcsinhTest(tf.test.TestCase):
   def testVariableTailweight(self):
     x = tf.Variable(1.)
     b = tfb.SinhArcsinh(tailweight=x, validate_args=True)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(x.initializer)
     self.assertIs(x, b.tailweight)
     self.assertEqual((), self.evaluate(b.forward(0.5)).shape)
     with self.assertRaisesOpError("Argument `tailweight` must be positive."):

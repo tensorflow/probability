@@ -25,7 +25,10 @@ from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 class NegativeBinomial(distribution.Distribution):
@@ -65,8 +68,7 @@ class NegativeBinomial(distribution.Distribution):
         `probs` or `logits`. Defines this as a batch of `N1 x ... x Nm`
         different Negative Binomial distributions. In practice, this represents
         the number of negative Bernoulli trials to stop at (the `total_count`
-        of failures), but this is still a valid distribution when
-        `total_count` is a non-integer.
+        of failures). Its components should be equal to integer values.
       logits: Floating-point `Tensor` with shape broadcastable to
         `[B1, ..., Bb]` where `b >= 0` indicates the number of batch dimensions.
         Each entry represents logits for the probability of success for
@@ -90,25 +92,26 @@ class NegativeBinomial(distribution.Distribution):
     """
 
     parameters = dict(locals())
+    if (probs is None) == (logits is None):
+      raise ValueError(
+          'Construct `NegativeBinomial` with `probs` or `logits` but not both.')
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs],
                                       dtype_hint=tf.float32)
-      self._logits, self._probs = distribution_util.get_logits_and_probs(
-          logits, probs, validate_args=validate_args, name=name, dtype=dtype)
-      total_count = tf.convert_to_tensor(
-          total_count, name='total_count', dtype=dtype)
-      with tf.control_dependencies(
-          [assert_util.assert_positive(total_count)] if validate_args else []):
-        self._total_count = tf.identity(total_count, name='total_count')
+      self._probs = tensor_util.convert_nonref_to_tensor(
+          probs, dtype_hint=tf.float32, name='probs')
+      self._logits = tensor_util.convert_nonref_to_tensor(
+          logits, dtype_hint=tf.float32, name='logits')
+      self._total_count = tensor_util.convert_nonref_to_tensor(
+          total_count, dtype=dtype, name='total_count')
 
-    super(NegativeBinomial, self).__init__(
-        dtype=self._probs.dtype,
-        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._total_count, self._probs, self._logits],
-        name=name)
+      super(NegativeBinomial, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -122,20 +125,27 @@ class NegativeBinomial(distribution.Distribution):
   @property
   def logits(self):
     """Input argument `logits`."""
+    if self._logits is None:
+      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
+    if self._probs is None:
+      return self._probs_deprecated_behavior()
     return self._probs
 
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.total_count), tf.shape(self.probs))
+  def _batch_shape_tensor(self, logits_or_probs=None, total_count=None):
+    if logits_or_probs is None:
+      logits_or_probs = self._logits if self._probs is None else self._logits
+    total_count = self._total_count if total_count is None else total_count
+    return prefer_static.broadcast_shape(
+        prefer_static.shape(logits_or_probs), prefer_static.shape(total_count))
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(self.total_count.shape,
-                                     self.probs.shape)
+    x = self._probs if self._logits is None else self._logits
+    return tf.broadcast_static_shape(self._total_count.shape, x.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -147,58 +157,136 @@ class NegativeBinomial(distribution.Distribution):
     # Here we use the fact that if:
     # lam ~ Gamma(concentration=total_count, rate=(1-probs)/probs)
     # then X ~ Poisson(lam) is Negative Binomially distributed.
+    logits = self._logits_parameter_no_checks()
     stream = seed_stream.SeedStream(seed, salt='NegativeBinomial')
     rate = tf.random.gamma(
         shape=[n],
         alpha=self.total_count,
-        beta=tf.exp(-self.logits),
+        beta=tf.exp(-logits),
         dtype=self.dtype,
         seed=stream())
     return tf.random.poisson(
         lam=rate, shape=[], dtype=self.dtype, seed=stream())
 
   def _cdf(self, x):
-    if self.validate_args:
-      x = distribution_util.embed_check_nonnegative_integer_form(x)
-    return tf.math.betainc(self.total_count, 1. + x, tf.sigmoid(-self.logits))
+    x = self._maybe_assert_valid_sample(x)
+    logits = self._logits_parameter_no_checks()
+    total_count = tf.convert_to_tensor(self.total_count)
+    shape = self._batch_shape_tensor(
+        logits_or_probs=logits, total_count=total_count)
+    return tf.math.betainc(
+        tf.broadcast_to(total_count, shape),
+        tf.broadcast_to(1. + x, shape),
+        tf.broadcast_to(tf.sigmoid(-logits), shape))
 
   def _log_prob(self, x):
-    return (self._log_unnormalized_prob(x)
-            - self._log_normalization(x))
+    x = self._maybe_assert_valid_sample(x)
+    total_count = tf.convert_to_tensor(self.total_count)
+    logits = self._logits_parameter_no_checks()
+    log_unnormalized_prob = (total_count * tf.math.log_sigmoid(-logits) +
+                             x * tf.math.log_sigmoid(logits))
+    log_normalization = (-tf.math.lgamma(total_count + x) +
+                         tf.math.lgamma(1. + x) +
+                         tf.math.lgamma(total_count))
+    return log_unnormalized_prob - log_normalization
 
-  def _log_unnormalized_prob(self, x):
-    if self.validate_args:
-      x = distribution_util.embed_check_nonnegative_integer_form(x)
-    return (self.total_count * tf.math.log_sigmoid(-self.logits) +
-            x * tf.math.log_sigmoid(self.logits))
-
-  def _log_normalization(self, x):
-    if self.validate_args:
-      x = distribution_util.embed_check_nonnegative_integer_form(x)
-    return (-tf.math.lgamma(self.total_count + x) + tf.math.lgamma(1. + x) +
-            tf.math.lgamma(self.total_count))
-
-  def _mean(self):
-    return self.total_count * tf.exp(self.logits)
+  def _mean(self, logits=None):
+    logits = self._logits_parameter_no_checks() if logits is None else logits
+    return self.total_count * tf.exp(logits)
 
   def _mode(self):
-    adjusted_count = tf.where(1. < self.total_count, self.total_count - 1.,
-                              tf.zeros_like(self.total_count))
-    return tf.floor(adjusted_count * tf.exp(self.logits))
+    total_count = tf.convert_to_tensor(self.total_count)
+    adjusted_count = tf.where(1. < total_count, total_count - 1.,
+                              tf.zeros_like(total_count))
+    return tf.floor(adjusted_count * tf.exp(self._logits_parameter_no_checks()))
 
   def _variance(self):
-    return self._mean() / tf.sigmoid(-self.logits)
+    logits = self._logits_parameter_no_checks()
+    return self._mean(logits=logits) / tf.sigmoid(-logits)
+
+  def _logits_parameter_no_checks(self, name=None):
+    """Logits computed from non-`None` input arg (`probs` or `logits`)."""
+    if self._logits is None:
+      probs = tf.convert_to_tensor(self._probs)
+      return tf.math.log(probs) - tf.math.log1p(-probs)
+    return tf.identity(self._logits)
 
   def logits_parameter(self, name=None):
     """Logits computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'logits_parameter'):
-      if self.logits is None:
-        return tf.math.log(self.probs) - tf.math.log1p(-self.probs)
-      return tf.identity(self.logits)
+      return self._logits_parameter_no_checks()
+
+  def _probs_parameter_no_checks(self, name=None):
+    """Probs computed from non-`None` input arg (`probs` or `logits`)."""
+    if self._logits is None:
+      return tf.identity(self._probs)
+    return tf.math.sigmoid(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'probs_parameter'):
-      if self.logits is None:
-        return tf.identity(self.probs)
-      return tf.math.sigmoid(self.logits)
+      return self._probs_parameter_no_checks()
+
+  @deprecation.deprecated(
+      '2019-10-01',
+      ('The `logits` property will return `None` when the distribution is '
+       'parameterized with `logits=None`. Use `logits_parameter()` instead.'),
+      warn_once=True)
+  def _logits_deprecated_behavior(self):
+    return self.logits_parameter()
+
+  @deprecation.deprecated(
+      '2019-10-01',
+      ('The `probs` property will return `None` when the distribution is '
+       'parameterized with `probs=None`. Use `probs_parameter()` instead.'),
+      warn_once=True)
+  def _probs_deprecated_behavior(self):
+    return self.probs_parameter()
+
+  def _parameter_control_dependencies(self, is_init):
+    return maybe_assert_negative_binomial_param_correctness(
+        is_init, self.validate_args, self._total_count, self._probs,
+        self._logits)
+
+  def _maybe_assert_valid_sample(self, x):
+    """Check counts for proper shape and values, then return tensor version."""
+    if not self.validate_args:
+      return x
+    return distribution_util.embed_check_nonnegative_integer_form(x)
+
+
+def maybe_assert_negative_binomial_param_correctness(
+    is_init, validate_args, total_count, probs, logits):
+  """Return assertions for `NegativeBinomial`-type distributions."""
+  if is_init:
+    x, name = (probs, 'probs') if logits is None else (logits, 'logits')
+    if not dtype_util.is_floating(x.dtype):
+      raise TypeError(
+          'Argument `{}` must having floating type.'.format(name))
+
+  if not validate_args:
+    return []
+
+  assertions = []
+  if is_init != tensor_util.is_ref(total_count):
+    total_count = tf.convert_to_tensor(total_count)
+    assertions.extend([
+        assert_util.assert_non_negative(
+            total_count,
+            message='`total_count` has components less than 0.'),
+        distribution_util.assert_integer_form(
+            total_count,
+            message='`total_count` has fractional components.')
+    ])
+  if probs is not None:
+    if is_init != tensor_util.is_ref(probs):
+      probs = tf.convert_to_tensor(probs)
+      one = tf.constant(1., probs.dtype)
+      assertions.extend([
+          assert_util.assert_non_negative(
+              probs, message='`probs` has components less than 0.'),
+          assert_util.assert_less_equal(
+              probs, one, message='`probs` has components greater than 1.')
+      ])
+
+  return assertions

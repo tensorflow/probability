@@ -32,6 +32,7 @@ from tensorflow_probability.python.stats.sample_stats import auto_correlation
 from tensorflow_probability.python.stats.sample_stats import cholesky_covariance
 from tensorflow_probability.python.stats.sample_stats import correlation
 from tensorflow_probability.python.stats.sample_stats import covariance
+from tensorflow_probability.python.stats.sample_stats import log_average_probs
 from tensorflow_probability.python.stats.sample_stats import stddev
 from tensorflow_probability.python.stats.sample_stats import variance
 
@@ -47,6 +48,7 @@ __all__ = [
     'covariance',
     'find_bins',
     'histogram',
+    'log_average_probs',
     'log_loomean_exp',
     'log_loosum_exp',
     'log_soomean_exp',

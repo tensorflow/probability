@@ -24,7 +24,7 @@ import operator
 
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.positive_semidefinite_kernels.internal import util as kernels_util
@@ -54,7 +54,7 @@ class TestKernel(tfpk.PositiveSemidefiniteKernel):
 
   def __init__(self, multiplier=None, feature_ndims=1):
     self._multiplier = (None if multiplier is None else
-                        tf.convert_to_tensor(value=multiplier))
+                        tf.convert_to_tensor(multiplier))
     dtype = None if multiplier is None else self._multiplier.dtype
     super(TestKernel, self).__init__(feature_ndims=feature_ndims,
                                      dtype=dtype)
@@ -68,13 +68,13 @@ class TestKernel(tfpk.PositiveSemidefiniteKernel):
 
   def _batch_shape_tensor(self):
     return (tf.TensorShape([]) if self.multiplier is None else
-            tf.shape(input=self._multiplier))
+            tf.shape(self._multiplier))
 
   def _apply(self, x1, x2, example_ndims=0):
-    x1 = tf.convert_to_tensor(value=x1)
-    x2 = tf.convert_to_tensor(value=x2)
+    x1 = tf.convert_to_tensor(x1)
+    x2 = tf.convert_to_tensor(x2)
 
-    value = tf.reduce_sum(input_tensor=x1 + x2, axis=-1)
+    value = tf.reduce_sum(x1 + x2, axis=-1)
     if self.multiplier is not None:
       multiplier = kernels_util.pad_shape_with_ones(
           self._multiplier, example_ndims)

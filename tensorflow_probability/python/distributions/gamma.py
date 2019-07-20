@@ -147,9 +147,9 @@ class Gamma(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [concentration, rate], dtype_hint=tf.float32)
-      self._concentration = tensor_util.convert_immutable_to_tensor(
+      self._concentration = tensor_util.convert_nonref_to_tensor(
           concentration, dtype=dtype, name="concentration")
-      self._rate = tensor_util.convert_immutable_to_tensor(
+      self._rate = tensor_util.convert_nonref_to_tensor(
           rate, dtype=dtype, name="rate")
 
       super(Gamma, self).__init__(
@@ -268,11 +268,11 @@ class Gamma(distribution.Distribution):
     if not self.validate_args:
       return []
     assertions = []
-    if is_init != tensor_util.is_mutable(self.concentration):
+    if is_init != tensor_util.is_ref(self.concentration):
       assertions.append(assert_util.assert_positive(
           self.concentration,
           message="Argument `concentration` must be positive."))
-    if is_init != tensor_util.is_mutable(self.rate):
+    if is_init != tensor_util.is_ref(self.rate):
       assertions.append(assert_util.assert_positive(
           self.rate,
           message="Argument `rate` must be positive."))

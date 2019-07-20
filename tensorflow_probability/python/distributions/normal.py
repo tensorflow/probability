@@ -132,9 +132,9 @@ class Normal(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], dtype_hint=tf.float32)
-      self._loc = tensor_util.convert_immutable_to_tensor(
+      self._loc = tensor_util.convert_nonref_to_tensor(
           loc, dtype=dtype, name="loc")
-      self._scale = tensor_util.convert_immutable_to_tensor(
+      self._scale = tensor_util.convert_nonref_to_tensor(
           scale, dtype=dtype, name="scale")
       super(Normal, self).__init__(
           dtype=dtype,
@@ -232,7 +232,7 @@ class Normal(distribution.Distribution):
     if not self.validate_args:
       return []
     assertions = []
-    if is_init != tensor_util.is_mutable(self.scale):
+    if is_init != tensor_util.is_ref(self.scale):
       assertions.append(assert_util.assert_positive(
           self.scale,
           message="Argument `scale` must be positive."))
@@ -256,8 +256,7 @@ def _kl_normal_normal(n_a, n_b, name=None):
     one = tf.constant(1, dtype=n_a.dtype)
     two = tf.constant(2, dtype=n_a.dtype)
     half = tf.constant(0.5, dtype=n_a.dtype)
-    s_a_squared = tf.square(n_a.scale)
-    s_b_squared = tf.square(n_b.scale)
-    ratio = s_a_squared / s_b_squared
-    return (tf.square(n_a.loc - n_b.loc) / (two * s_b_squared) + half *
-            (ratio - one - tf.math.log(ratio)))
+    n_b_scale = tf.identity(n_b.scale)
+    log_ratio_squared = 2.0 * (tf.math.log(n_a.scale) - tf.math.log(n_b_scale))
+    return (tf.square(n_a.loc - n_b.loc) / (two * tf.square(n_b_scale)) + half *
+            (tf.math.exp(log_ratio_squared) - one - log_ratio_squared))

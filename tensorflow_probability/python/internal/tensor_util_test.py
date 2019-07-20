@@ -23,15 +23,21 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+import tensorflow_probability as tfp
+
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
+
+tfd = tfp.distributions
 
 
 class FakeModule(tf.Module):
 
   def __init__(self, x, name=None):
     super(FakeModule, self).__init__(name)
-    self.x = x
+    self.x = tensor_util.convert_nonref_to_tensor(x)
 
   @property
   def dtype(self):
@@ -48,52 +54,61 @@ tf.register_tensor_conversion_function(
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ConvertImmutableToTensorTest(tf.test.TestCase):
+class ConvertNonrefToTensorTest(test_case.TestCase):
 
   def test_np_object(self):
     x = np.array(0.)
-    y = tensor_util.convert_immutable_to_tensor(x)
+    y = tensor_util.convert_nonref_to_tensor(x)
     self.assertIsInstance(y, tf.Tensor)
     self.assertEqual(x, self.evaluate(y))
 
   def test_tf_tensor(self):
     x = tf.constant(1.)
-    y = tensor_util.convert_immutable_to_tensor(x)
+    y = tensor_util.convert_nonref_to_tensor(x)
     self.assertIs(x, y)
 
   def test_tf_variable(self):
     x = tf.Variable(1., trainable=True)
-    y = tensor_util.convert_immutable_to_tensor(x)
+    y = tensor_util.convert_nonref_to_tensor(x)
     self.assertIs(x, y)
     x = tf.Variable(1., trainable=False)
-    y = tensor_util.convert_immutable_to_tensor(x)
+    y = tensor_util.convert_nonref_to_tensor(x)
     self.assertIs(x, y)
 
   def test_tf_module(self):
-    x = FakeModule(1.)
-    y = tensor_util.convert_immutable_to_tensor(x)
-    self.assertIsInstance(y, tf.Tensor)
-    self.assertEqual(1., self.evaluate(y))
+    x = FakeModule(np.array(1.))
+    y = tensor_util.convert_nonref_to_tensor(x)
+    self.assertIs(x, y)
 
     x = FakeModule(tf.Variable(2., trainable=True))
-    y = tensor_util.convert_immutable_to_tensor(x)
+    y = tensor_util.convert_nonref_to_tensor(x)
     self.assertIs(x, y)
 
     x = FakeModule(tf.Variable(2., trainable=False))
-    y = tensor_util.convert_immutable_to_tensor(x)
+    y = tensor_util.convert_nonref_to_tensor(x)
     self.assertIs(x, y)
 
+  def test_end_to_end(self):
+    x = tf.constant(-0.5)
+    d = tfd.Normal(loc=0., scale=tfp.util.DeferredTensor(tf.math.exp, x))
+    with tf.GradientTape(watch_accessed_variables=False) as tape:
+      tape.watch(x)
+      negloglik = -d.log_prob(0.)
+    g = tape.gradient(negloglik, [x])
+    self.assertAllNotNone(g)
+    self.assertEqual([1.], self.evaluate(g))
 
-class IsImmutableTest(tf.test.TestCase):
+
+class IsRefTest(test_case.TestCase):
 
   def test_various_types(self):
-    self.assertFalse(tensor_util.is_mutable(0.))
-    self.assertFalse(tensor_util.is_mutable(FakeModule(0.)))
-    self.assertFalse(tensor_util.is_mutable([tf.Variable(0.)]))  # Note!
-    self.assertFalse(tensor_util.is_mutable(np.array(0., np.float32)))
-    self.assertFalse(tensor_util.is_mutable(tf.constant(0.)))
-    self.assertTrue(tensor_util.is_mutable(FakeModule(tf.Variable(0.))))
-    self.assertTrue(tensor_util.is_mutable(tf.Variable(0.)))
+    self.assertFalse(tensor_util.is_ref(0.))
+    self.assertFalse(tensor_util.is_ref([tf.Variable(0.)]))  # Note!
+    self.assertFalse(tensor_util.is_ref(np.array(0., np.float32)))
+    self.assertFalse(tensor_util.is_ref(tf.constant(0.)))
+    self.assertTrue(tensor_util.is_ref(FakeModule(0.)))
+    self.assertTrue(tensor_util.is_ref(FakeModule(tf.Variable(0.))))
+    self.assertTrue(tensor_util.is_ref(tf.Variable(0.)))
 
 
 if __name__ == '__main__':

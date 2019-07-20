@@ -66,9 +66,9 @@ def pad_shape_with_ones(x, ndims, start=-1):
     return x
   x = tf.convert_to_tensor(value=x)
   original_shape = x.shape
-  rank = tf.rank(input=x)
-  first_shape = tf.shape(input=x)[:rank + start + 1]
-  second_shape = tf.shape(input=x)[rank + start + 1:]
+  rank = tf.rank(x)
+  first_shape = tf.shape(x)[:rank + start + 1]
+  second_shape = tf.shape(x)[rank + start + 1:]
   new_shape = distribution_util.pad(
       first_shape, axis=0, back=True, value=1, count=ndims)
   new_shape = tf.concat([new_shape, second_shape], axis=0)
@@ -101,7 +101,7 @@ def sum_rightmost_ndims_preserving_shape(x, ndims):
     axes = tf.range(x.shape.ndims - ndims, x.shape.ndims)
   else:
     axes = tf.range(tf.rank(x) - ndims, tf.rank(x))
-  return tf.reduce_sum(input_tensor=x, axis=axes)
+  return tf.reduce_sum(x, axis=axes)
 
 
 @tf.custom_gradient

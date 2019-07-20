@@ -119,9 +119,9 @@ class Logistic(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], dtype_hint=tf.float32)
-      self._loc = tensor_util.convert_immutable_to_tensor(
+      self._loc = tensor_util.convert_nonref_to_tensor(
           loc, name='loc', dtype=dtype)
-      self._scale = tensor_util.convert_immutable_to_tensor(
+      self._scale = tensor_util.convert_nonref_to_tensor(
           scale, name='scale', dtype=dtype)
       super(Logistic, self).__init__(
           dtype=self._scale.dtype,
@@ -231,7 +231,7 @@ class Logistic(distribution.Distribution):
     if not self.validate_args:
       return []
     assertions = []
-    if is_init != tensor_util.is_mutable(self._scale):
+    if is_init != tensor_util.is_ref(self._scale):
       assertions.append(assert_util.assert_positive(
           self._scale, message='Argument `scale` must be positive.'))
     return assertions

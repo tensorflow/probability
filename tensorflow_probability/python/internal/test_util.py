@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import inspect
 import os
 
 # Dependency imports
@@ -30,9 +29,10 @@ import tensorflow as tf
 
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal.backend.numpy import ops
 
 __all__ = [
-    'numpy_disable',
+    'numpy_disable_gradient_test',
     'test_seed',
     'test_seed_stream',
     'DiscreteScalarDistributionTestHelpers',
@@ -51,11 +51,12 @@ flags.DEFINE_string('fixed_seed', None,
                      'Takes precedence over --vary-seed when both appear.'))
 
 
-def numpy_disable(test_fn):
+def numpy_disable_gradient_test(test_fn):
+  """Disable a gradient-using test when using the numpy backend."""
 
   def new_test(self, *args, **kwargs):
-    if not inspect.isclass(tf.Variable):
-      self.skipTest('test disabled for numpy')
+    if tf.Variable == ops.NumpyVariable:
+      self.skipTest('gradient-using test disabled for numpy')
     return test_fn(self, *args, **kwargs)
 
   return new_test

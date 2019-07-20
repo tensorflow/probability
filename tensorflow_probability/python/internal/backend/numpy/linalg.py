@@ -71,6 +71,16 @@ __all__ = [
 ]
 
 
+def _band_part(input, num_lower, num_upper, name=None):  # pylint: disable=redefined-builtin
+  del name
+  result = input
+  if num_lower > -1:
+    result = np.triu(result, -num_lower)
+  if num_upper > -1:
+    result = np.tril(result, num_upper)
+  return result
+
+
 def _eye(num_rows, num_columns=None, batch_shape=None,
          dtype=tf.float32, name=None):  # pylint: disable=unused-argument
   dt = utils.numpy_dtype(dtype)
@@ -118,12 +128,33 @@ def _matmul(a, b,
   return np.matmul(a, b)
 
 
+def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):
+  """Scipy solve does not broadcast, so we must do so explicitly."""
+  del name
+  try:
+    bcast = np.broadcast(matrix[..., :1], rhs)
+  except ValueError as e:
+    raise ValueError('Error with inputs shaped `matrix`={}, rhs={}:\n{}'.format(
+        matrix.shape, rhs.shape, str(e)))
+  dim = matrix.shape[-1]
+  matrix = np.broadcast_to(matrix, bcast.shape[:-1] + (dim,))
+  rhs = np.broadcast_to(rhs, bcast.shape)
+  nbatch = int(np.prod(matrix.shape[:-2]))
+  flat_mat = matrix.reshape(nbatch, dim, dim)
+  flat_rhs = rhs.reshape(nbatch, dim, rhs.shape[-1])
+  result = np.empty(flat_rhs.shape)
+  if np.size(result):
+    for i, (mat, rh) in enumerate(zip(flat_mat, flat_rhs)):
+      result[i] = scipy_linalg.solve_triangular(mat, rh, lower=lower,
+                                                trans='C' if adjoint else 'N')
+  return result.reshape(*rhs.shape)
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 band_part = utils.copy_docstring(
     tf.linalg.band_part,
-    lambda input, num_lower, num_upper, name=None: (  # pylint: disable=g-long-lambda
-        np.tril(np.triu(input, -num_lower), num_upper)))
+    _band_part)
 
 cholesky = utils.copy_docstring(
     tf.linalg.cholesky,
@@ -174,7 +205,7 @@ matrix_transpose = utils.copy_docstring(
     tf.linalg.matrix_transpose,
     _matrix_transpose)
 
+
 triangular_solve = utils.copy_docstring(
     tf.linalg.triangular_solve,
-    lambda matrix, rhs, lower=True, adjoint=False, name=None: (  # pylint: disable=g-long-lambda
-        scipy_linalg.solve_triangular(matrix, rhs)))
+    _triangular_solve)

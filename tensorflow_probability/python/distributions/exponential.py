@@ -91,7 +91,7 @@ class Exponential(gamma.Gamma):
     # allow_nan_stats=True
     # through to the parent class results in unnecessary asserts.
     with tf.name_scope(name) as name:
-      self._rate = tensor_util.convert_immutable_to_tensor(
+      self._rate = tensor_util.convert_nonref_to_tensor(
           rate,
           name="rate",
           dtype=dtype_util.common_dtype([rate], dtype_hint=tf.float32))

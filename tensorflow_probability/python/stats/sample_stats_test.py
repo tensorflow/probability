@@ -545,5 +545,49 @@ class StddevTest(tf.test.TestCase):
     self.assertAllClose(np.std(x, axis=(1, -1)), stddev)
 
 
+@test_util.run_all_in_graph_and_eager_modes
+class LogAverageProbsTest(tf.test.TestCase):
+
+  def test_mathematical_correctness_bernoulli(self):
+    logits = tf.random.normal([10, 3, 4], seed=42)
+    # The "expected" calculation is numerically naive.
+    probs = tf.math.sigmoid(logits)
+    expected = tf.math.log(tf.reduce_mean(probs, axis=0))
+    actual = tfp.stats.log_average_probs(logits, validate_args=True)
+    self.assertAllClose(*self.evaluate([expected, actual]), rtol=1e-5, atol=0.)
+
+  def test_mathematical_correctness_categorical(self):
+    logits = tf.random.normal([10, 3, 4], seed=43)
+    # The "expected" calculation is numerically naive.
+    probs = tf.math.softmax(logits, axis=-1)
+    expected = tf.math.log(tf.reduce_mean(probs, axis=0))
+    actual = tfp.stats.log_average_probs(
+        logits, event_axis=-1, validate_args=True)
+    self.assertAllClose(*self.evaluate([expected, actual]), rtol=1e-5, atol=0.)
+
+  def test_bad_axis_static(self):
+    logits = tf.random.normal([10, 3, 4], seed=44)
+    with self.assertRaisesRegexp(ValueError, r'.*must be distinct.'):
+      tfp.stats.log_average_probs(
+          logits,
+          sample_axis=[0, 1, 2],
+          event_axis=-1,
+          validate_args=True)
+
+  def test_bad_axis_dynamic(self):
+    if tf.executing_eagerly():
+      return
+    logits = tf.random.normal([10, 3, 4], seed=45)
+    event_axis = tf.Variable(-1)
+    with self.assertRaisesOpError(
+        r'Arguments `sample_axis` and `event_axis` must be distinct.'):
+      self.evaluate(event_axis.initializer)
+      self.evaluate(tfp.stats.log_average_probs(
+          logits,
+          sample_axis=[0, 1, 2],
+          event_axis=event_axis,
+          validate_args=True))
+
+
 if __name__ == '__main__':
   tf.test.main()

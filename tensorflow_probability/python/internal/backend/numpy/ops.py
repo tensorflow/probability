@@ -88,6 +88,11 @@ def _control_dependencies(control_inputs):
 
 def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint: disable=unused-argument
   assert not tf.is_tensor(value), value
+  if isinstance(value, np.ndarray):
+    if dtype is not None and value.dtype != utils.numpy_dtype(dtype):
+      raise ValueError('Expected dtype {} but got {} with dtype {}.'.format(
+          utils.numpy_dtype(dtype), value, value.dtype))
+    return value
   return np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
 
 
@@ -229,11 +234,38 @@ stop_gradient = utils.copy_docstring(
 TensorShape = tf.TensorShape
 
 
-def Variable(initial_value=None, trainable=True, validate_shape=True,  # pylint: disable=unused-argument,invalid-name
-             caching_device=None, name=None, variable_def=None, dtype=None,  # pylint: disable=unused-argument
-             import_scope=None, constraint=None):  # pylint: disable=unused-argument
-  assert constraint is None
-  return np.array(initial_value, dtype=dtype or np.float32)
+class NumpyVariable(object):
+  """Stand-in for tf.Variable."""
+
+  # pylint: disable=unused-argument
+  def __init__(
+      self,
+      initial_value=None,
+      trainable=True,
+      validate_shape=True,
+      caching_device=None,
+      name=None,
+      variable_def=None,
+      dtype=None,
+      import_scope=None,
+      constraint=None):
+    assert constraint is None
+    self._value = np.array(initial_value, dtype=dtype or np.float32)
+    self.initializer = None
+    self.dtype = dtype or self._value.dtype
+
+  # pylint: enable=unused-argument
+
+  def __array__(self, dtype=None):
+    if dtype is not None:
+      return self._value.astype(dtype)
+    return self._value
+
+  def assign(self, value):
+    self._value = np.array(value, dtype=self.dtype)
+
+
+Variable = NumpyVariable
 
 
 class Module(object):

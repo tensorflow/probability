@@ -492,6 +492,9 @@ class Distribution(_BaseDistribution):
     self._initial_parameter_control_dependencies = tuple(
         d for d in self._parameter_control_dependencies(is_init=True)
         if d is not None)
+    if self._initial_parameter_control_dependencies:
+      self._initial_parameter_control_dependencies = (
+          tf.group(*self._initial_parameter_control_dependencies),)
 
   @classmethod
   def param_shapes(cls, sample_shape, name='DistributionParamShapes'):
