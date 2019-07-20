@@ -131,7 +131,7 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
   example of the difference between these two components:
 
   ```python
-  ssm = tfp.sts.SeasonalStateSpaceModel(
+  ssm = SeasonalStateSpaceModel(
       num_timesteps=100,
       num_seasons=24,
       num_steps_per_season=1,
