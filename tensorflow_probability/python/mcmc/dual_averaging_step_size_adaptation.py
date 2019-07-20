@@ -297,11 +297,16 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
 
   def _one_step_part(
       self,
-      *parts,
+      step_size,
+      state,
+      error_sum,
+      log_averaging_step,
+      shrinkage_target,
       log_accept_prob_rank=None,
       log_accept_prob=None,
       target_accept_prob=None,
-      previous_kernel_results=None):
+      previous_kernel_results=None,
+      ):
     """Compute new step sizes for each step size part.
 
     If step size part has smaller rank than the corresponding state part, then
@@ -338,7 +343,6 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
     size. When we subtract B, we will always get a number >= L, which means
     we'll get the full reduction we want.
     """
-    step_size, state, error_sum, log_averaging_step, shrinkage_target = parts
     num_reduce_dims = tf.minimum(
         log_accept_prob_rank,
         tf.rank(state) - tf.rank(step_size))
