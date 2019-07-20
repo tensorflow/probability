@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Smooth Seasonal Model."""
+"""Smooth Seasonal model."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -31,7 +31,122 @@ from tensorflow_probability.python.sts.structural_time_series import StructuralT
 
 
 class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
-  """State space model for a smooth seasonal effect."""
+  """State space model for a smooth seasonal effect.
+
+  A state space model (SSM) posits a set of latent (unobserved) variables that
+  evolve over time with dynamics specified by a probabilistic transition model
+  `p(z[t+1] | z[t])`. At each timestep, we observe a value sampled from an
+  observation model conditioned on the current state, `p(x[t] | z[t])`. The
+  special case where both the transition and observation models are Gaussians
+  with mean specified as a linear function of the inputs, is known as a linear
+  Gaussian state space model and supports tractable exact probabilistic
+  calculations; see `tfp.distributions.LinearGaussianStateSpaceModel` for
+  details.
+
+  A smooth seasonal effect model is a special case of a linear Gaussian SSM. It
+  is the sum of a set of "cyclic" components, with one component for each
+  frequency:
+
+  ```python
+  frequencies[j] = 2 * pi * frequency_multipliers[j] / period
+  ```
+
+  Each cyclic component contains two latent states which we denote `effect` and
+  `auxiliary`. The two latent states for component `j` drift over time via:
+
+  ```python
+  effect[t] = (effect[t-1] * cos(frequencies[j]) +
+               auxiliary[t-] * sin(frequencies[j]) +
+               Normal(0., drift_scale))
+
+  auxiliary[t] = (-effect[t-1] * sin(frequencies[j]) +
+                  auxiliary[t-] * cos(frequencies[j]) +
+                  Normal(0., drift_scale))
+  ```
+
+  The `auxiliary` latent state only appears as a matter of construction and thus
+  it's interpretation is not particularly important. The total smooth seasonal
+  effect is the sum of the `effect` values from each of the cyclic components.
+
+  The parameters `drift_scale` and `observation_noise_scale` are each (a batch
+  of) scalars. The batch shape of this `Distribution` is the broadcast batch
+  shape of these parameters and of the `initial_state_prior`.
+
+  #### Mathematical Details
+
+  The smooth seasonal effect model implements a
+  `tfp.distributions.LinearGaussianStateSpaceModel` with `latent_size = 2 *
+  len(frequency_multipliers)` and `observation_size = 1`. The latent state is
+  the concatenation of the cyclic latent states which themselves comprise an
+  `effect` and an `auxiliary` state. The transition matrix is a block diagonal
+  matrix where block `j` is:
+
+  ```python
+  transition_matrix[j] =  [[cos(frequencies[j]), sin(frequencies[j])],
+                           [-sin(frequencies[j]), cos(frequencies[j])]]
+  ```
+
+  The observation model picks out the cyclic `effect` values from the latent
+  state:
+
+  ```
+  observation_matrix = [[1., 0., 1., 0., ..., 1., 0.]]
+  observation_noise ~ Normal(loc=0, scale=observation_noise_scale)
+  ```
+
+  For further mathematical details please see [1].
+
+  #### Examples
+
+  A state space model with hour-of-day seasonality on hourly data. In other
+  words, each day there is a pattern which broadly repeats itself over the
+  course of the day and doesn't change too much from one hour to the next. Four
+  random samples from such a model can be obtained via:
+
+  ```python
+  from matplotlib import pylab as plt
+
+  ssm = SmoothSeasonalStateSpaceModel(
+      num_timesteps=100,
+      period=24,
+      frequency_multipliers=[1, 4],
+      drift_scale=0.1,
+      initial_state_prior=tfd.MultivariateNormalDiag(
+          scale_diag=tf.fill([4], 2.0)),
+  )
+
+  fig, axes = plt.subplots(4)
+
+  series = ssm.sample(4)
+
+  for series, ax in zip(series[..., 0], axes):
+    ax.set_xticks(tf.range(ssm.num_timesteps, delta=ssm.period))
+    ax.grid()
+    ax.plot(series)
+
+  plt.show()
+  ```
+
+  A comparison of the above with a comparable `Seasonal` component gives an
+  example of the difference between these two components:
+
+  ```python
+  ssm = tfp.sts.SeasonalStateSpaceModel(
+      num_timesteps=100,
+      num_seasons=24,
+      num_steps_per_season=1,
+      drift_scale=0.1,
+      initial_state_prior=tfd.MultivariateNormalDiag(
+          scale_diag=tf.fill([24], 2.0)),
+  )
+  ```
+
+  #### References
+
+  [1]: Harvey, A. Forecasting, Structural Time Series Models and the Kalman
+    Filter. Cambridge: Cambridge University Press, 1990.
+
+  """
 
   def __init__(self,
                num_timesteps,
@@ -44,7 +159,43 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                validate_args=False,
                allow_nan_stats=True,
                name=None):
-    """Build a smooth seasonal state space model."""
+    """Build a smooth seasonal state space model.
+
+    Args:
+      num_timesteps: Scalar `int` `Tensor` number of timesteps to model
+        with this distribution.
+      period: positive scalar `float` giving the number of timesteps required
+        for the longest cyclic effect to repeat.
+      frequency_multipliers: one-dimensional `float` `Tensor` giving the number
+        of times each cyclic component repeats per period. Two latent states are
+        required for each element. A 'full' smooth seasonal model is given by
+        `frequency_multipliers = [1, 2, ..., floor(period / 2)]` but it is often
+        reasonable to drop some of these.
+      drift_scale: Scalar (any additional dimensions are treated as batch
+        dimensions) `float` `Tensor` indicating the standard deviation of the
+        latent state transitions.
+      initial_state_prior: instance of `tfd.MultivariateNormal`
+        representing the prior distribution on latent states.  Must have
+        event shape `[num_features]`.
+      observation_noise_scale: Scalar (any additional dimensions are
+        treated as batch dimensions) `float` `Tensor` indicating the standard
+        deviation of the observation noise.
+        Default value: `0.`.
+      initial_step: scalar `int` `Tensor` specifying the starting timestep.
+        Default value: `0`.
+      validate_args: Python `bool`. Whether to validate input with asserts. If
+        `validate_args` is `False`, and the inputs are invalid, correct behavior
+        is not guaranteed.
+        Default value: `False`.
+      allow_nan_stats: Python `bool`. If `False`, raise an
+        exception if a statistic (e.g. mean/mode/etc...) is undefined for any
+        batch member. If `True`, batch members with valid parameters leading to
+        undefined statistics will return NaN for this statistic.
+        Default value: `True`.
+      name: Python `str` name prefixed to ops created by this class.
+        Default value: 'SmoothSeasonalStateSpaceModel'.
+
+    """
 
     with tf.compat.v1.name_scope(
         name, 'SmoothSeasonalStateSpaceModel', values=[drift_scale]) as name:
@@ -168,7 +319,47 @@ def static_num_frequencies(frequency_multipliers):
 
 
 class SmoothSeasonal(StructuralTimeSeries):
-  """Formal representation of a smooth seasonal effects model."""
+  """Formal representation of a smooth seasonal effect model.
+
+  The smooth seasonal model uses a set of trigonometric terms in order to
+  capture a recurring pattern whereby adjacent (in time) effects are
+  similar. The model uses `frequencies` calculated via:
+
+  ```python
+  frequencies[j] = 2 * pi * frequency_multipliers[j] / period
+  ```
+
+  and then posits two latent states for each `frequency`. The two latent states
+  associated with frequency `j` drift over time via:
+
+  ```python
+  effect[t] = (effect[t-1] * cos(frequencies[j]) +
+               auxiliary[t-] * sin(frequencies[j]) +
+               Normal(0., drift_scale))
+
+  auxiliary[t] = (-effect[t-1] * sin(frequencies[j]) +
+                  auxiliary[t-] * cos(frequencies[j]) +
+                  Normal(0., drift_scale))
+  ```
+
+  where `effect` is the smooth seasonal effect and `auxiliary` only appears as a
+  matter of construction. The interpretation of `auxiliary` is thus not
+  particularly important.
+
+  #### Examples
+
+  A smooth seasonal effect model representing day-of-week seasonality on daily
+  data:
+
+  ```python
+  component = SmoothSeasonal(
+      period=7,
+      frequency_multipliers=[1, 2, 3],
+      initial_state_prior=tfd.MultivariateNormalDiag(scale_diag=tf.ones([6])),
+  )
+  ```
+
+  """
 
   def __init__(self,
                period,
@@ -177,7 +368,36 @@ class SmoothSeasonal(StructuralTimeSeries):
                initial_state_prior=None,
                observed_time_series=None,
                name=None):
-    """Specify a smooth seasonal effects model."""
+    """Specify a smooth seasonal effects model.
+
+    Args:
+      period: positive scalar `float` giving the number of timesteps required
+        for the longest cyclic effect to repeat.
+      frequency_multipliers: one-dimensional `float` `Tensor` giving the number
+        of times each cyclic component repeats per period. Two latent states are
+        required for each element. A 'full' smooth seasonal model is given by
+        `frequency_multipliers = [1, 2, ..., floor(period / 2)]` but it is often
+        reasonable to drop some of these.
+      drift_scale_prior: optional `tfd.Distribution` instance specifying a prior
+        on the `drift_scale` parameter. If `None`, a heuristic default prior is
+        constructed based on the provided `observed_time_series`.
+        Default value: `None`.
+      initial_state_prior: instance of `tfd.MultivariateNormal` representing
+        the prior distribution on the latent states. Must have event shape
+        `[2 * len(frequency_multipliers)]`. If `None`, a heuristic default prior
+        is constructed based on the provided `observed_time_series`.
+      observed_time_series: optional `float` `Tensor` of shape
+        `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
+        supported when `T > 1`), specifying an observed time series.
+        Any priors not explicitly set will be given default values according to
+        the scale of the observed time series (or batch of time series). May
+        optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
+        a mask `Tensor` to specify timesteps with missing observations.
+        Default value: `None`.
+      name: the name of this model component.
+        Default value: 'SmoothSeasonal'.
+
+    """
 
     with tf.compat.v1.name_scope(
         name, 'SmoothSeasonal', values=[observed_time_series]) as name:
@@ -226,7 +446,7 @@ class SmoothSeasonal(StructuralTimeSeries):
 
   @property
   def initial_state_prior(self):
-    """Prior distribution on the initial latent state (cyclic effects)."""
+    """Prior distribution on the initial latent states."""
     return self._initial_state_prior
 
   def _make_state_space_model(self,
