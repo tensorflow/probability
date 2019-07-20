@@ -255,7 +255,9 @@ def assert_no_none_grad(bijector, method, wrt_vars, grads):
 @test_util.run_all_in_graph_and_eager_modes
 class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
 
-  @parameterized.parameters((bname,) for bname in TF2_FRIENDLY_BIJECTORS)
+  @parameterized.named_parameters(
+      {'testcase_name': bname, 'bijector_name': bname}
+      for bname in TF2_FRIENDLY_BIJECTORS)
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testBijector(self, bijector_name, data):

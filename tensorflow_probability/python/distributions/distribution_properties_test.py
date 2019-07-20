@@ -283,6 +283,9 @@ def broadcasting_params(draw,
                         event_dim=None,
                         enable_vars=False):
   """Strategy for drawing parameters broadcasting to `batch_shape`."""
+  if dist_name not in INSTANTIABLE_BASE_DISTS:
+    raise ValueError('Unknown Distribution name {}'.format(dist_name))
+
   params_event_ndims = INSTANTIABLE_BASE_DISTS[dist_name].params_event_ndims
 
   def _constraint(param):
@@ -556,6 +559,11 @@ def base_distributions(draw,
     names = [k for k in INSTANTIABLE_BASE_DISTS.keys() if eligibility_filter(k)]
     dist_name = draw(hps.one_of(map(hps.just, sorted(names))))
 
+  if dist_name == 'Empirical':
+    variants = [k for k in INSTANTIABLE_BASE_DISTS.keys()
+                if eligibility_filter(k) and 'Empirical' in k]
+    dist_name = draw(hps.one_of(map(hps.just, sorted(variants))))
+
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
 
@@ -612,6 +620,10 @@ def distributions(draw,
   Returns:
     dists: A strategy for drawing Distributions with the specified `batch_shape`
       (or an arbitrary one if omitted).
+
+  Raises:
+    ValueError: If it doesn't know how to instantiate a Distribution of class
+      `dist_name`.
   """
   if depth is None:
     depth = draw(depths())
@@ -623,7 +635,9 @@ def distributions(draw,
                        'TransformedDistribution']))
     dist_name = draw(hps.one_of([bases, compounds]))
 
-  if dist_name is None or dist_name in INSTANTIABLE_BASE_DISTS:
+  if (dist_name is None
+      or dist_name in INSTANTIABLE_BASE_DISTS
+      or dist_name == 'Empirical'):
     return draw(base_distributions(
         dist_name, batch_shape, event_dim, enable_vars, eligibility_filter))
   if dist_name == 'Independent':
@@ -635,6 +649,7 @@ def distributions(draw,
   if dist_name == 'TransformedDistribution':
     return draw(transformed_distributions(
         batch_shape, event_dim, enable_vars, depth))
+  raise ValueError('Unknown Distribution name {}'.format(dist_name))
 
 
 def get_event_dim(dist):
@@ -647,7 +662,9 @@ def get_event_dim(dist):
 @test_util.run_all_in_graph_and_eager_modes
 class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
 
-  @parameterized.parameters((dname,) for dname in TF2_FRIENDLY_DISTS)
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in TF2_FRIENDLY_DISTS)
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testDistribution(self, dist_name, data):
