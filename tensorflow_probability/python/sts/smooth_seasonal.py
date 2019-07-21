@@ -166,11 +166,15 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         with this distribution.
       period: positive scalar `float` `Tensor` giving the number of timesteps
         required for the longest cyclic effect to repeat.
-      frequency_multipliers: one-dimensional `float` `Tensor` giving the number
-        of times each cyclic component repeats per period. Two latent states are
-        required for each element. A 'full' smooth seasonal model is given by
-        `frequency_multipliers = [1, 2, ..., floor(period / 2)]` but it is often
-        reasonable to drop some of these.
+      frequency_multipliers: One-dimensional `float` `Tensor` listing the
+        frequencies (cyclic components) included in the model, as multipliers of
+        the base/fundamental frequency `2. * pi / period`. Each component is
+        specified by the number of times it repeats per period, and adds two
+        latent dimensions to the model. A smooth seasonal model that can
+        represent any periodic function is given by `frequency_multipliers = [1,
+        2, ..., floor(period / 2)]`. However, it is often desirable to enforce a
+        smoothness assumption (and reduce the computational burden) by dropping
+        some of the higher frequencies.
       drift_scale: Scalar (any additional dimensions are treated as batch
         dimensions) `float` `Tensor` indicating the standard deviation of the
         latent state transitions.
@@ -373,11 +377,15 @@ class SmoothSeasonal(StructuralTimeSeries):
     Args:
       period: positive scalar `float` `Tensor` giving the number of timesteps
         required for the longest cyclic effect to repeat.
-      frequency_multipliers: one-dimensional `float` `Tensor` giving the number
-        of times each cyclic component repeats per period. Two latent states are
-        required for each element. A 'full' smooth seasonal model is given by
-        `frequency_multipliers = [1, 2, ..., floor(period / 2)]` but it is often
-        reasonable to drop some of these.
+      frequency_multipliers: One-dimensional `float` `Tensor` listing the
+        frequencies (cyclic components) included in the model, as multipliers of
+        the base/fundamental frequency `2. * pi / period`. Each component is
+        specified by the number of times it repeats per period, and adds two
+        latent dimensions to the model. A smooth seasonal model that can
+        represent any periodic function is given by `frequency_multipliers = [1,
+        2, ..., floor(period / 2)]`. However, it is often desirable to enforce a
+        smoothness assumption (and reduce the computational burden) by dropping
+        some of the higher frequencies.
       drift_scale_prior: optional `tfd.Distribution` instance specifying a prior
         on the `drift_scale` parameter. If `None`, a heuristic default prior is
         constructed based on the provided `observed_time_series`.
