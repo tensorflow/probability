@@ -164,8 +164,8 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     Args:
       num_timesteps: Scalar `int` `Tensor` number of timesteps to model
         with this distribution.
-      period: positive scalar `float` giving the number of timesteps required
-        for the longest cyclic effect to repeat.
+      period: positive scalar `float` `Tensor` giving the number of timesteps
+        required for the longest cyclic effect to repeat.
       frequency_multipliers: one-dimensional `float` `Tensor` giving the number
         of times each cyclic component repeats per period. Two latent states are
         required for each element. A 'full' smooth seasonal model is given by
@@ -371,8 +371,8 @@ class SmoothSeasonal(StructuralTimeSeries):
     """Specify a smooth seasonal effects model.
 
     Args:
-      period: positive scalar `float` giving the number of timesteps required
-        for the longest cyclic effect to repeat.
+      period: positive scalar `float` `Tensor` giving the number of timesteps
+        required for the longest cyclic effect to repeat.
       frequency_multipliers: one-dimensional `float` `Tensor` giving the number
         of times each cyclic component repeats per period. Two latent states are
         required for each element. A 'full' smooth seasonal model is given by
