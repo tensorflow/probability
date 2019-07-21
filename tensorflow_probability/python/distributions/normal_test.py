@@ -39,6 +39,7 @@ class NormalTest(test_case.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
+    super(NormalTest, self).setUp()
 
   def _testParamShapes(self, sample_shape, expected):
     param_shapes = tfd.Normal.param_shapes(sample_shape)
@@ -476,6 +477,21 @@ class NormalTest(test_case.TestCase):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       with tf.control_dependencies([x.assign(-1.)]):
         self.evaluate(d.mean())
+
+  def testIncompatibleArgShapesGraph(self):
+    if tf.executing_eagerly(): return
+    scale = tf1.placeholder_with_default(tf.ones([4, 1]), shape=None)
+    with self.assertRaisesRegexp(tf.errors.OpError, r'Incompatible shapes'):
+      d = tfd.Normal(loc=tf.zeros([2, 3]), scale=scale, validate_args=True)
+      self.evaluate(d.mean())
+
+  def testIncompatibleArgShapesEager(self):
+    if not tf.executing_eagerly(): return
+    scale = tf1.placeholder_with_default(tf.ones([4, 1]), shape=None)
+    with self.assertRaisesRegexp(
+        ValueError,
+        r'Arguments `loc` and `scale` must have compatible shapes.'):
+      tfd.Normal(loc=tf.zeros([2, 3]), scale=scale, validate_args=True)
 
 
 class NormalEagerGCTest(tf.test.TestCase):

@@ -203,7 +203,7 @@ class TransformedDistributionTest(tf.test.TestCase):
         [sample, exp_normal.log_prob(sample)])
     expected_log_pdf = sample_val + stats.norm.logpdf(
         np.exp(sample_val), loc=mu, scale=sigma)
-    self.assertAllClose(expected_log_pdf, log_pdf_val, atol=0.)
+    self.assertAllClose(expected_log_pdf, log_pdf_val, atol=0., rtol=1e-5)
 
   def testShapeChangingBijector(self):
     softmax = tfb.SoftmaxCentered()
@@ -318,6 +318,7 @@ class ScalarToMultiTest(tf.test.TestCase):
                             [3, 2, 0],
                             [4, 3, 2]]],
                           dtype=np.float32)
+    super(ScalarToMultiTest, self).setUp()
 
   def _testMVN(self,
                base_distribution_class,
@@ -353,7 +354,7 @@ class ScalarToMultiTest(tf.test.TestCase):
     actual_cov = np.matmul(self._tril, np.transpose(self._tril, [0, 2, 1]))
 
     def actual_mvn_log_prob(x):
-      return np.concatenate([[
+      return np.concatenate([[  # pylint: disable=g-complex-comprehension
           stats.multivariate_normal(actual_mean[i],
                                     actual_cov[i]).logpdf(x[:, i, :])
       ] for i in range(len(actual_cov))]).T
