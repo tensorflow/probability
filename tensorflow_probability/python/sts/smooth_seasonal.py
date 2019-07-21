@@ -98,7 +98,7 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
   #### Examples
 
-  A state space model with hour-of-day seasonality on hourly data. In other
+  A state space model with smooth daily seasonality on hourly data. In other
   words, each day there is a pattern which broadly repeats itself over the
   course of the day and doesn't change too much from one hour to the next. Four
   random samples from such a model can be obtained via:
@@ -348,7 +348,7 @@ class SmoothSeasonal(StructuralTimeSeries):
 
   #### Examples
 
-  A smooth seasonal effect model representing day-of-week seasonality on daily
+  A smooth seasonal effect model representing smooth weekly seasonality on daily
   data:
 
   ```python
