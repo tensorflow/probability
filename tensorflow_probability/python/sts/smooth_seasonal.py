@@ -48,7 +48,7 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
   frequency:
 
   ```python
-  frequencies[j] = 2 * pi * frequency_multipliers[j] / period
+  frequencies[j] = 2. * pi * frequency_multipliers[j] / period
   ```
 
   Each cyclic component contains two latent states which we denote `effect` and
@@ -326,7 +326,7 @@ class SmoothSeasonal(StructuralTimeSeries):
   similar. The model uses `frequencies` calculated via:
 
   ```python
-  frequencies[j] = 2 * pi * frequency_multipliers[j] / period
+  frequencies[j] = 2. * pi * frequency_multipliers[j] / period
   ```
 
   and then posits two latent states for each `frequency`. The two latent states
