@@ -65,7 +65,7 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
   ```
 
   The `auxiliary` latent state only appears as a matter of construction and thus
-  it's interpretation is not particularly important. The total smooth seasonal
+  its interpretation is not particularly important. The total smooth seasonal
   effect is the sum of the `effect` values from each of the cyclic components.
 
   The parameters `drift_scale` and `observation_noise_scale` are each (a batch
