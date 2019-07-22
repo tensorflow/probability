@@ -45,11 +45,26 @@ def hypothesis_max_examples(default=None):
 
 
 def tfp_hp_settings(**kwargs):
+  """Default TFP-specific Hypothesis settings."""
+  # Rationales for deviating from Hypothesis default settings
+  # - Derandomize by default because flaky tests are horrible
+  # - Turn off example database because
+  #   - It makes tests flaky on our cluster even if derandomized at the current
+  #     internal Hypothesis version (3.65)
+  #   - In the future, derandomization will imply ignoring the database setting
+  #     anyway
+  #   - Having one can't make example runs any faster
+  # - No deadline because our test functions are too slow
+  # - No too_slow health check for the same reason
+  # - Fewer examples by default for the same reason
+  # - Always print `@reproduce_failure` blobs because one never doesn't want
+  #   them in the logs
   kwds = dict(
-      deadline=None,
-      max_examples=hypothesis_max_examples(kwargs.pop('max_examples', None)),
-      suppress_health_check=[hp.HealthCheck.too_slow],
       derandomize=derandomize_hypothesis(),
+      database=None,
+      deadline=None,
+      suppress_health_check=[hp.HealthCheck.too_slow],
+      max_examples=hypothesis_max_examples(kwargs.pop('max_examples', None)),
       print_blob=hp.PrintSettings.ALWAYS)
   kwds.update(kwargs)
   return hp.settings(**kwds)
