@@ -34,9 +34,9 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 
-def derandomize_hypothesis():
-  # Use --test_env=TFP_DERANDOMIZE_HYPOTHESIS=0 to get random coverage.
-  return bool(int(os.environ.get('TFP_DERANDOMIZE_HYPOTHESIS', 1)))
+def randomize_hypothesis():
+  # Use --test_env=TFP_RANDOMIZE_HYPOTHESIS=1 to get random coverage.
+  return bool(int(os.environ.get('TFP_RANDOMIZE_HYPOTHESIS', 0)))
 
 
 def hypothesis_max_examples(default=None):
@@ -60,7 +60,7 @@ def tfp_hp_settings(**kwargs):
   # - Always print `@reproduce_failure` blobs because one never doesn't want
   #   them in the logs
   kwds = dict(
-      derandomize=derandomize_hypothesis(),
+      derandomize=not randomize_hypothesis(),
       database=None,
       deadline=None,
       suppress_health_check=[hp.HealthCheck.too_slow],
