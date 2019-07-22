@@ -71,6 +71,7 @@ TF2_FRIENDLY_DISTS = (
     'Normal',
     'Multinomial',
     'NegativeBinomial',
+    'OneHotCategorical',
     'Pareto',
     'Poisson',
     'ProbitBernoulli',
