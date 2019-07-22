@@ -137,8 +137,8 @@ def _pad(  # pylint: disable=unused-argument
     tensor,
     paddings,
     mode='CONSTANT',
-    name=None,
-    constant_values=0):
+    constant_values=0,
+    name=None):
   return np.pad(
       tensor, paddings,
       mode=mode.lower(),
