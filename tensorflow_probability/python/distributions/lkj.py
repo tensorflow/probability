@@ -14,10 +14,10 @@
 # ============================================================================
 """Lewandowski-Kurowicka-Joe distribution on correlation matrices.
 
-The sampler follows the "onion" method from
+The sampler follows the 'onion' method from
 [1] Daniel Lewandowski, Dorota Kurowicka, and Harry Joe,
-"Generating random correlation matrices based on vines and extended
-onion method," Journal of Multivariate Analysis 100 (2009), pp
+'Generating random correlation matrices based on vines and extended
+onion method,' Journal of Multivariate Analysis 100 (2009), pp
 1989-2001.
 """
 
@@ -35,7 +35,9 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -135,25 +137,17 @@ class LKJ(distribution.Distribution):
     parameters = dict(locals())
     self._input_output_cholesky = input_output_cholesky
     with tf.name_scope(name):
-      concentration = tf.convert_to_tensor(
-          concentration,
-          name='concentration',
-          dtype=dtype_util.common_dtype([concentration], dtype_hint=tf.float32))
-      with tf.control_dependencies([
-          # concentration >= 1
-          # TODO(b/111451422) Generalize to concentration > 0.
-          assert_util.assert_non_negative(concentration - 1.),
-      ] if validate_args else []):
-        self._dimension = dimension
-        self._concentration = tf.identity(concentration, name='concentration')
-    super(LKJ, self).__init__(
-        dtype=self._concentration.dtype,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
-        parameters=parameters,
-        graph_parents=[self._concentration],
-        name=name)
+      dtype = dtype_util.common_dtype([concentration], tf.float32)
+      self._concentration = tensor_util.convert_nonref_to_tensor(
+          concentration, name='concentration', dtype=dtype)
+      self._dimension = dimension
+      super(LKJ, self).__init__(
+          dtype=self._concentration.dtype,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
+          parameters=parameters,
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -175,7 +169,7 @@ class LKJ(distribution.Distribution):
     return self._input_output_cholesky
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.concentration)
+    return prefer_static.shape(self.concentration)
 
   def _batch_shape(self):
     return self.concentration.shape
@@ -208,18 +202,19 @@ class LKJ(distribution.Distribution):
     # Notation below: B is the batch shape, i.e., tf.shape(concentration)
     seed = seed_stream.SeedStream(seed, 'sample_lkj')
     with tf.name_scope('sample_lkj' or name):
-      if not dtype_util.is_floating(self.concentration.dtype):
+      concentration = tf.convert_to_tensor(self.concentration)
+      if not dtype_util.is_floating(concentration.dtype):
         raise TypeError(
             'The concentration argument should have floating type, not '
-            '{}'.format(dtype_util.name(self.concentration.dtype)))
+            '{}'.format(dtype_util.name(concentration.dtype)))
 
-      concentration = _replicate(num_samples, self.concentration)
+      concentration = _replicate(num_samples, concentration)
       concentration_shape = tf.shape(concentration)
       if self.dimension <= 1:
         # For any dimension <= 1, there is only one possible correlation matrix.
         shape = tf.concat([
             concentration_shape, [self.dimension, self.dimension]], axis=0)
-        return tf.ones(shape=shape, dtype=self.concentration.dtype)
+        return tf.ones(shape=shape, dtype=concentration.dtype)
       beta_conc = concentration + (self.dimension - 2.) / 2.
       beta_dist = beta.Beta(concentration1=beta_conc, concentration0=beta_conc)
 
@@ -260,7 +255,7 @@ class LKJ(distribution.Distribution):
         # direction is u in reference [1].
         # direction shape: B + [n]
         direction = _uniform_unit_norm(
-            n, concentration_shape, self.concentration.dtype, seed)
+            n, concentration_shape, concentration.dtype, seed)
         # raw_correlation is w in reference [1].
         raw_correlation = distance * direction  # shape: B + [n]
 
@@ -363,16 +358,19 @@ class LKJ(distribution.Distribution):
     # of division, not multiplication.
     x = self._validate_dimension(x)
     x = self._validate_correlationness(x)
-    normalizer = self._log_normalization()
-    return self._log_unnorm_prob(x) - normalizer
+    concentration = tf.convert_to_tensor(self.concentration)
+    normalizer = self._log_normalization(concentration=concentration)
+    return self._log_unnorm_prob(x, concentration) - normalizer
 
-  def _log_unnorm_prob(self, x, name=None):
+  def _log_unnorm_prob(self, x, concentration, name=None):
     """Returns the unnormalized log density of an LKJ distribution.
 
     Args:
       x: `float` or `double` `Tensor` of correlation matrices.  The shape of `x`
         must be `B + [D, D]`, where `B` broadcasts with the shape of
         `concentration`.
+      concentration: `float` or `double` `Tensor`. The positive concentration
+        parameter of the LKJ distributions.
       name: Python `str` name prefixed to Ops created by this function.
 
     Returns:
@@ -404,13 +402,15 @@ class LKJ(distribution.Distribution):
             tf.math.log(tf.linalg.diag_part(x)), axis=[-1])
       else:
         _, logdet = tf.linalg.slogdet(x)
-      answer = (self.concentration - 1.) * logdet
+      answer = (concentration - 1.) * logdet
       return answer
 
-  def _log_normalization(self, name='log_normalization'):
+  def _log_normalization(self, concentration=None, name='log_normalization'):
     """Returns the log normalization of an LKJ distribution.
 
     Args:
+      concentration: `float` or `double` `Tensor`. The positive concentration
+        parameter of the LKJ distributions.
       name: Python `str` name prefixed to Ops created by this function.
 
     Returns:
@@ -420,13 +420,16 @@ class LKJ(distribution.Distribution):
     # The formula is from D. Lewandowski et al [1], p. 1999, from the
     # proof that eqs 16 and 17 are equivalent.
     with tf.name_scope(name or 'log_normalization_lkj'):
+      concentration = (
+          tf.convert_to_tensor(self.concentration
+                               if concentration is None else concentration))
       logpi = np.log(np.pi)
-      ans = tf.zeros_like(self.concentration)
+      ans = tf.zeros_like(concentration)
       for k in range(1, self.dimension):
         ans += logpi * (k / 2.)
-        ans += tf.math.lgamma(self.concentration +
+        ans += tf.math.lgamma(concentration +
                               (self.dimension - 1 - k) / 2.)
-        ans -= tf.math.lgamma(self.concentration + (self.dimension - 1) / 2.)
+        ans -= tf.math.lgamma(concentration + (self.dimension - 1) / 2.)
       return ans
 
   def _mean(self):
@@ -437,14 +440,24 @@ class LKJ(distribution.Distribution):
     # with respect to this operation (because the determinant doesn't change).
     # Ergo, the mean must be invariant under it (for any k), and hence all the
     # off-diagonal entries must be 0.
-    return self._identity()
-
-  def _identity(self):
-    batch = tf.shape(self.concentration)
+    concentration = tf.convert_to_tensor(self.concentration)
+    batch = tf.shape(concentration)
     answer = tf.eye(
         num_rows=self.dimension, batch_shape=batch,
-        dtype=self.concentration.dtype)
+        dtype=concentration.dtype)
     # set_shape only necessary because tf.eye doesn't do it itself: b/111413915
     shape = answer.shape[:-2].concatenate([self.dimension, self.dimension])
     tensorshape_util.set_shape(answer, shape)
     return answer
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_ref(self.concentration):
+      # concentration >= 1
+      # TODO(b/111451422, b/115950951) Generalize to concentration > 0.
+      assertions.append(assert_util.assert_non_negative(
+          self.concentration - 1,
+          message='Argument `concentration` must be >= 1.'))
+    return assertions
