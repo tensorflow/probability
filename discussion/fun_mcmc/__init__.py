@@ -18,6 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from discussion.fun_mcmc.backend import get_backend
+from discussion.fun_mcmc.backend import JAX
+from discussion.fun_mcmc.backend import set_backend
+from discussion.fun_mcmc.backend import TENSORFLOW
 from discussion.fun_mcmc.fun_mcmc_lib import adam_init
 from discussion.fun_mcmc.fun_mcmc_lib import adam_step
 from discussion.fun_mcmc.fun_mcmc_lib import AdamExtra
@@ -64,6 +68,7 @@ __all__ = [
     'call_and_grads',
     'call_fn',
     'gaussian_momentum_sample',
+    'get_backend',
     'gradient_descent_step',
     'GradientDescentExtra',
     'GradientDescentState',
@@ -76,6 +81,7 @@ __all__ = [
     'IntegratorState',
     'IntegratorStep',
     'IntegratorStepState',
+    'JAX',
     'leapfrog_step',
     'make_gaussian_kinetic_energy_fn',
     'maybe_broadcast_structure',
@@ -83,9 +89,11 @@ __all__ = [
     'metropolis_hastings_step',
     'PotentialFn',
     'ruth4_step',
+    'set_backend',
     'sign_adaptation',
     'spliting_integrator_step',
     'State',
+    'TENSORFLOW',
     'trace',
     'transform_log_prob_fn',
     'transition_kernel_wrapper',
