@@ -92,12 +92,6 @@ class Chi2Test(test_case.TestCase):
     self.assertEqual(chi2.entropy().shape, (3,))
     self.assertAllClose(self.evaluate(chi2.entropy()), expected_entropy)
 
-  def testChi2WithAbsDf(self):
-    df_v = np.array([-1.3, -3.2, 5], dtype=np.float64)
-    chi2 = tfd.Chi2WithAbsDf(df=df_v)
-    self.assertAllClose(
-        self.evaluate(tf.floor(tf.abs(df_v))), self.evaluate(chi2.df))
-
   def testChi2Chi2KL(self):
     a_df = np.arange(1.0, 10.0)
     b_df = np.arange(1.0, 10.0)

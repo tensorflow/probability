@@ -977,8 +977,6 @@ CONSTRAINTS = {
         tfp_hps.positive_definite,
     'df':
         tfp_hps.softplus_plus_eps(),
-    'Chi2WithAbsDf.df':
-        tfp_hps.softplus_plus_eps(1),  # does floor(abs(x)) for some reason
     'InverseGaussian.loc':
         tfp_hps.softplus_plus_eps(),
     'VonMisesFisher.mean_direction':  # max ndims is 5

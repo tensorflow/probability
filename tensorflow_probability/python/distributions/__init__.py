@@ -29,7 +29,6 @@ from tensorflow_probability.python.distributions.categorical import Categorical
 from tensorflow_probability.python.distributions.cauchy import Cauchy
 from tensorflow_probability.python.distributions.chi import Chi
 from tensorflow_probability.python.distributions.chi2 import Chi2
-from tensorflow_probability.python.distributions.chi2 import Chi2WithAbsDf  # deprecated, remove 6/5/19
 from tensorflow_probability.python.distributions.deterministic import Deterministic
 from tensorflow_probability.python.distributions.deterministic import VectorDeterministic
 from tensorflow_probability.python.distributions.dirichlet import Dirichlet
@@ -152,7 +151,6 @@ __all__ = [
     'Categorical',
     'Chi',
     'Chi2',
-    'Chi2WithAbsDf',
     'Deterministic',
     'VectorDeterministic',
     'Empirical',

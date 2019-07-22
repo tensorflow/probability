@@ -30,12 +30,9 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
-
 
 __all__ = [
     'Chi2',
-    'Chi2WithAbsDf',
 ]
 
 
@@ -192,29 +189,6 @@ class Chi2(distribution.Distribution):
       assertions.append(assert_util.assert_positive(
           self.df, message='Argument `df` must be positive.'))
     return assertions
-
-
-class Chi2WithAbsDf(Chi2):
-  """Chi2 with parameter transform `df = floor(abs(df))`."""
-
-  @deprecation.deprecated(
-      '2019-06-05',
-      'Chi2WithAbsDf is deprecated, use '
-      'Chi2(df=tf.floor(tf.abs(df))) instead.',
-      warn_once=True)
-  def __init__(self,
-               df,
-               validate_args=False,
-               allow_nan_stats=True,
-               name='Chi2WithAbsDf'):
-    parameters = dict(locals())
-    with tf.name_scope(name) as name:
-      super(Chi2WithAbsDf, self).__init__(
-          df=tf.floor(tf.abs(df, name='abs_df'), name='floor_abs_df'),
-          validate_args=validate_args,
-          allow_nan_stats=allow_nan_stats,
-          name=name)
-    self._parameters = parameters
 
 
 @kullback_leibler.RegisterKL(Chi2, Chi2)
