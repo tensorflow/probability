@@ -24,7 +24,7 @@ from tensorflow_probability.python.bijectors import bijector
 
 
 __all__ = [
-    "Inline",
+    'Inline',
 ]
 
 
@@ -35,11 +35,11 @@ class Inline(bijector.Bijector):
 
   ```python
   exp = Inline(
-    forward_fn=tf.exp,
-    inverse_fn=tf.log,
-    inverse_log_det_jacobian_fn=(
-      lambda y: -tf.reduce_sum(tf.log(y), axis=-1)),
-    name="exp")
+      forward_fn=tf.exp,
+      inverse_fn=tf.math.log,
+      inverse_log_det_jacobian_fn=lambda y: -tf.math.log(y),
+      forward_min_event_ndims=0,
+      name='exp')
   ```
 
   The above example is equivalent to the `Bijector` `Exp()`.
@@ -58,16 +58,21 @@ class Inline(bijector.Bijector):
                validate_args=False,
                forward_min_event_ndims=None,
                inverse_min_event_ndims=None,
-               name="inline"):
+               name='inline'):
     """Creates a `Bijector` from callables.
+
+    At the minimum, you must supply one of `forward_min_event_ndims` or
+    `inverse_min_event_ndims`. To be fully functional, a typical bijector will
+    also require `forward_fn`, `inverse_fn` and at least one of
+    `inverse_log_det_jacobian_fn` or `forward_log_det_jacobian_fn`.
 
     Args:
       forward_fn: Python callable implementing the forward transformation.
       inverse_fn: Python callable implementing the inverse transformation.
       inverse_log_det_jacobian_fn: Python callable implementing the
-        log o det o jacobian of the inverse transformation.
+        `log o det o jacobian` of the inverse transformation.
       forward_log_det_jacobian_fn: Python callable implementing the
-        log o det o jacobian of the forward transformation.
+        `log o det o jacobian` of the forward transformation.
       forward_event_shape_fn: Python callable implementing non-identical
         static event shape changes. Default: shape is assumed unchanged.
       forward_event_shape_tensor_fn: Python callable implementing non-identical
@@ -85,16 +90,30 @@ class Inline(bijector.Bijector):
       inverse_min_event_ndims: Python `int` indicating the minimal
         dimensionality this bijector acts on.
       name: Python `str`, name given to ops managed by this object.
+
+    Raises:
+      TypeError: If any of the non-`None` `*_fn` arguments are not callable.
     """
     with tf.name_scope(name) as name:
-      self._forward_fn = forward_fn
-      self._inverse_fn = inverse_fn
-      self._inverse_log_det_jacobian_fn = inverse_log_det_jacobian_fn
-      self._forward_log_det_jacobian_fn = forward_log_det_jacobian_fn
-      self._forward_event_shape_fn = forward_event_shape_fn
-      self._forward_event_shape_tensor_fn = forward_event_shape_tensor_fn
-      self._inverse_event_shape_fn = inverse_event_shape_fn
-      self._inverse_event_shape_tensor_fn = inverse_event_shape_tensor_fn
+      self._maybe_implement(forward_fn, '_forward', 'forward_fn')
+      self._maybe_implement(inverse_fn, '_inverse', 'inverse_fn')
+      self._maybe_implement(inverse_log_det_jacobian_fn,
+                            '_inverse_log_det_jacobian',
+                            'inverse_log_det_jacobian_fn')
+      self._maybe_implement(forward_log_det_jacobian_fn,
+                            '_forward_log_det_jacobian',
+                            'forward_log_det_jacobian_fn')
+
+      # By default assume shape doesn't change.
+      self._forward_event_shape = _maybe_impute_as_identity(
+          forward_event_shape_fn, 'forward_event_shape_fn')
+      self._forward_event_shape_tensor = _maybe_impute_as_identity(
+          forward_event_shape_tensor_fn, 'forward_event_shape_tensor_fn')
+      self._inverse_event_shape = _maybe_impute_as_identity(
+          inverse_event_shape_fn, 'inverse_event_shape_fn')
+      self._inverse_event_shape_tensor = _maybe_impute_as_identity(
+          inverse_event_shape_tensor_fn, 'inverse_event_shape_tensor_fn')
+
       super(Inline, self).__init__(
           forward_min_event_ndims=forward_min_event_ndims,
           inverse_min_event_ndims=inverse_min_event_ndims,
@@ -102,50 +121,17 @@ class Inline(bijector.Bijector):
           validate_args=validate_args,
           name=name)
 
-  def _forward_event_shape(self, input_shape):
-    if self._forward_event_shape_fn is None:
-      # By default assume shape doesn't change.
-      return input_shape
-    return self._forward_event_shape_fn(input_shape)
+  def _maybe_implement(self, fn, lhs_name, rhs_name):
+    if not fn:
+      return
+    if not callable(fn):
+      raise TypeError('`{}` is not a callable function.'.format(rhs_name))
+    setattr(self, lhs_name, fn)
 
-  def _forward_event_shape_tensor(self, input_shape):
-    if self._forward_event_shape_tensor_fn is None:
-      # By default assume shape doesn't change.
-      return input_shape
-    return self._forward_event_shape_tensor_fn(input_shape)
 
-  def _inverse_event_shape(self, output_shape):
-    if self._inverse_event_shape_fn is None:
-      # By default assume shape doesn't change.
-      return output_shape
-    return self._inverse_event_shape_fn(output_shape)
-
-  def _inverse_event_shape_tensor(self, output_shape):
-    if self._inverse_event_shape_tensor_fn is None:
-      # By default assume shape doesn't change.
-      return output_shape
-    return self._inverse_event_shape_tensor_fn(output_shape)
-
-  def _forward(self, x, **kwargs):
-    if not callable(self._forward_fn):
-      raise NotImplementedError(
-          "forward_fn is not a callable function.")
-    return self._forward_fn(x, **kwargs)
-
-  def _inverse(self, y, **kwargs):
-    if not callable(self._inverse_fn):
-      raise NotImplementedError(
-          "inverse_fn is not a callable function.")
-    return self._inverse_fn(y, **kwargs)
-
-  def _inverse_log_det_jacobian(self, y, **kwargs):
-    if not callable(self._inverse_log_det_jacobian_fn):
-      raise NotImplementedError(
-          "inverse_log_det_jacobian_fn is not a callable function.")
-    return self._inverse_log_det_jacobian_fn(y, **kwargs)
-
-  def _forward_log_det_jacobian(self, x, **kwargs):
-    if not callable(self._forward_log_det_jacobian_fn):
-      raise NotImplementedError(
-          "forward_log_det_jacobian_fn is not a callable function.")
-    return self._forward_log_det_jacobian_fn(x, **kwargs)
+def _maybe_impute_as_identity(fn, name):
+  if fn is None:
+    return lambda x: x
+  if not callable(fn):
+    raise TypeError('`{}` is not a callable function.'.format(name))
+  return fn

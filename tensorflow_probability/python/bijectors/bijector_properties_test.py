@@ -47,8 +47,9 @@ TF2_FRIENDLY_BIJECTORS = (
     'Expm1',
     'Gumbel',
     'Identity',
-    'IteratedSigmoidCentered',
+    'Inline',
     'Invert',
+    'IteratedSigmoidCentered',
     'Kumaraswamy',
     'MatvecLU',
     'NormalCDF',
@@ -163,6 +164,23 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
             event_dim=event_dim,
             enable_vars=enable_vars))
     return tfb.Invert(underlying, validate_args=True)
+  if bijector_name == 'Inline':
+    if enable_vars:
+      scale = tf.Variable(1., name='scale')
+    else:
+      scale = 2.
+    b = tfb.AffineScalar(scale=scale)
+
+    inline = tfb.Inline(
+        forward_fn=b.forward,
+        inverse_fn=b.inverse,
+        forward_log_det_jacobian_fn=lambda x: b.forward_log_det_jacobian(  # pylint: disable=g-long-lambda
+            x, event_ndims=b.forward_min_event_ndims),
+        forward_min_event_ndims=b.forward_min_event_ndims,
+        is_constant_jacobian=b.is_constant_jacobian,
+    )
+    inline.b = b
+    return inline
 
   bijector_params = draw(
       broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,

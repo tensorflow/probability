@@ -35,7 +35,10 @@ from tensorflow_probability.python.internal import tensorshape_util
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
-SPECIAL_BIJECTORS = ['Invert']
+SPECIAL_BIJECTORS = [
+    'Inline',
+    'Invert',
+]
 
 # INSTANTIABLE_BIJECTORS is a map from str->(BijectorClass,)
 INSTANTIABLE_BIJECTORS = None
@@ -153,6 +156,9 @@ def bijector_supports():
       'Gumbel':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'Identity':
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED,
+                          Support.SCALAR_UNCONSTRAINED),
+      'Inline':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
       'Invert':
