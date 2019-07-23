@@ -61,6 +61,12 @@ class MatvecLU(bijector.Bijector):
           initial_value=lower_upper,
           trainable=True,
           name='lower_upper')
+      # Initialize a non-trainable variable for the permutation indices so
+      # that its value isn't re-sampled from run-to-run.
+      permutation = tf.Variable(
+          initial_value=permutation,
+          trainable=False,
+          name='permutation')
       return lower_upper, permutation
 
   channels = 3

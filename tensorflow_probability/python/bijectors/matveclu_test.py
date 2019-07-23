@@ -43,6 +43,10 @@ def trainable_lu_factorization(
     lower_upper, permutation = tf.linalg.lu(random_orthonormal)
     lower_upper = tf.Variable(
         initial_value=lower_upper, trainable=True, name='lower_upper')
+    # Initialize a non-trainable variable for the permutation indices so
+    # that its value isn't re-sampled from run-to-run.
+    permutation = tf.Variable(
+        initial_value=permutation, trainable=False, name='permutation')
     return lower_upper, permutation
 
 
@@ -80,6 +84,20 @@ class MatvecLUTest(tf.test.TestCase):
     # this by checking that at least 50% of pixels differ by at least 10%.
     self.assertTrue(np.mean(np.abs(x_ - fwd_) > 0.1 * x_) > 0.5)
     self.assertTrue(np.mean(np.abs(x_ - rev_) > 0.1 * x_) > 0.5)
+
+  def test_trainable_lu_factorization_init(self):
+    """Initial LU factorization parameters do not change per execution."""
+    channels = 8
+    lower_upper, permutation = trainable_lu_factorization(channels, seed=42)
+    conv1x1 = tfb.MatvecLU(lower_upper, permutation, validate_args=True)
+
+    self.evaluate([v.initializer for v in conv1x1.variables])
+
+    lower_upper_1, permutation_1 = self.evaluate([lower_upper, permutation])
+    lower_upper_2, permutation_2 = self.evaluate([lower_upper, permutation])
+
+    self.assertAllEqual(lower_upper_1, lower_upper_2)
+    self.assertAllEqual(permutation_1, permutation_2)
 
   def test_invertible_from_lu(self):
     lower_upper, permutation = tf.linalg.lu(
