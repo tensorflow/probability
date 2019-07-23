@@ -56,7 +56,7 @@ class _TfDispatcher(object):
     if get_backend() == TENSORFLOW:
       import tensorflow.compat.v2 as tf_
     elif get_backend() == JAX:
-      from tensorflow_probability.opensource.discussion.fun_mcmc import tf_on_jax
+      from discussion.fun_mcmc import tf_on_jax
       tf_ = tf_on_jax.tf
     else:
       raise ValueError('Unknown backend "{}"'.format(get_backend()))
@@ -69,9 +69,9 @@ class _UtilDispatcher(object):
   def __getattr__(self, attr):
     # pylint: disable=g-import-not-at-top
     if get_backend() == TENSORFLOW:
-      from tensorflow_probability.opensource.discussion.fun_mcmc import util_tf as util_
+      from discussion.fun_mcmc import util_tf as util_
     elif get_backend() == JAX:
-      from tensorflow_probability.opensource.discussion.fun_mcmc import util_jax as util_
+      from discussion.fun_mcmc import util_jax as util_
     else:
       raise ValueError('Unknown backend "{}"'.format(get_backend()))
     return getattr(util_, attr)
