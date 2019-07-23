@@ -126,11 +126,6 @@ class OneHotCategoricalTest(test_case.TestCase):
       dist = tfd.OneHotCategorical(logits, validate_args=True)
       self.evaluate(dist.sample())
 
-  def testInvalidStaticShape(self):
-    with self.assertRaisesRegexp(
-        ValueError, '`logits` must have final dimension <= 2147483647.'):
-      tfd.OneHotCategorical(tf.zeros(1<<31), validate_args=True)
-
   def testEntropyNoBatch(self):
     logits = np.log([0.2, 0.8]) - 50.
     dist = tfd.OneHotCategorical(logits, validate_args=True)
