@@ -41,6 +41,8 @@ from tensorflow_probability.python.sts.seasonal import Seasonal
 from tensorflow_probability.python.sts.seasonal import SeasonalStateSpaceModel
 from tensorflow_probability.python.sts.semilocal_linear_trend import SemiLocalLinearTrend
 from tensorflow_probability.python.sts.semilocal_linear_trend import SemiLocalLinearTrendStateSpaceModel
+from tensorflow_probability.python.sts.smooth_seasonal import SmoothSeasonal
+from tensorflow_probability.python.sts.smooth_seasonal import SmoothSeasonalStateSpaceModel
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 from tensorflow_probability.python.sts.sum import AdditiveStateSpaceModel
 from tensorflow_probability.python.sts.sum import Sum
@@ -64,6 +66,8 @@ _allowed_symbols = [
     'SeasonalStateSpaceModel',
     'SemiLocalLinearTrend',
     'SemiLocalLinearTrendStateSpaceModel',
+    'SmoothSeasonal',
+    'SmoothSeasonalStateSpaceModel',
     'SparseLinearRegression',
     'StructuralTimeSeries',
     'Sum',
