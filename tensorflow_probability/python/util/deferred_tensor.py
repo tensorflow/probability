@@ -69,6 +69,14 @@ class TensorMetaClass(type):
     operators.difference_update({'__eq__', '__ne__'})
     operators.update({'__iter__'})
     attrs.update((attr, _wrap_method(tf.Tensor, attr)) for attr in operators)
+
+    # Support methods for __iter__ and __bool__
+    private_methods = {
+        name for name in dir(tf.Tensor) if name.startswith('_disallow')
+    }
+    attrs.update(
+        (attr, _wrap_method(tf.Tensor, attr)) for attr in private_methods)
+
     attrs.update(
         (attr, getattr(tf.Tensor, attr))
         for attr in {'__nonzero__', '__bool__', '__array_priority__'})
