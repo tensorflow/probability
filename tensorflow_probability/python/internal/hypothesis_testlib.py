@@ -44,7 +44,7 @@ def hypothesis_max_examples(default=None):
   return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', default or 20))
 
 
-def tfp_hp_settings(**kwargs):
+def tfp_hp_settings(default_max_examples=None, **kwargs):
   """Default TFP-specific Hypothesis settings."""
   # Rationales for deviating from Hypothesis default settings
   # - Derandomize by default because flaky tests are horrible
@@ -64,7 +64,7 @@ def tfp_hp_settings(**kwargs):
       database=None,
       deadline=None,
       suppress_health_check=[hp.HealthCheck.too_slow],
-      max_examples=hypothesis_max_examples(kwargs.pop('max_examples', None)),
+      max_examples=hypothesis_max_examples(default=default_max_examples),
       print_blob=hp.PrintSettings.ALWAYS)
   kwds.update(kwargs)
   return hp.settings(**kwds)

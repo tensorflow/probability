@@ -90,7 +90,7 @@ class TransformDiagonalBijectorTest(tf.test.TestCase):
 
   @tfp_test_util.numpy_disable_gradient_test
   @hp.given(hps.data())
-  @tfp_hps.tfp_hp_settings(max_examples=5)
+  @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testTheoreticalFldj(self, data):
     dim = data.draw(hps.integers(min_value=0, max_value=10))
     diag_bijector = data.draw(

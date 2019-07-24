@@ -67,7 +67,7 @@ def generalized_paretos(draw, batch_shape=None):
 class GeneralizedParetoTest(test_case.TestCase):
 
   @hp.given(generalized_paretos())
-  @tfp_hps.tfp_hp_settings(max_examples=5)
+  @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testShape(self, dist):
     # batch_shape == dist.batch_shape asserted in generalized_paretos()
     self.assertEqual(dist.batch_shape, self.evaluate(dist.batch_shape_tensor()))
@@ -75,7 +75,7 @@ class GeneralizedParetoTest(test_case.TestCase):
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(max_examples=5)
+  @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testLogPDF(self, dist):
     xs = self.evaluate(dist.sample())
 
@@ -99,7 +99,7 @@ class GeneralizedParetoTest(test_case.TestCase):
     self.assertAllClose(-np.log(scale), self.evaluate(log_pdf), rtol=1e-5)
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(max_examples=5)
+  @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testCDF(self, dist):
     xs = self.evaluate(dist.sample())
     cdf = dist.cdf(xs)
@@ -110,7 +110,7 @@ class GeneralizedParetoTest(test_case.TestCase):
     self.assertAllClose(expected_cdf, self.evaluate(cdf), rtol=5e-5)
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(max_examples=5)
+  @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testMean(self, dist):
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
     self.assertEqual(dist.batch_shape, dist.mean().shape)
@@ -121,7 +121,7 @@ class GeneralizedParetoTest(test_case.TestCase):
     self.assertAllClose(expected, actual, rtol=5e-4)
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(max_examples=5)
+  @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testVariance(self, dist):
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
     self.assertEqual(dist.batch_shape, dist.variance().shape)
@@ -135,7 +135,7 @@ class GeneralizedParetoTest(test_case.TestCase):
     self.assertAllClose(expected, actual, rtol=.01)
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(max_examples=5)
+  @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testEntropy(self, dist):
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
     self.assertEqual(dist.batch_shape, dist.entropy().shape)

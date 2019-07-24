@@ -164,7 +164,7 @@ class RationalQuadraticSplineTest(test_case.TestCase):
         rtol=1e-5)
 
   @hp.given(hps.data())
-  @tfp_hps.tfp_hp_settings(max_examples=5)
+  @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testTheoreticalFldj(self, data):
     # get_fldj_theoretical test rig requires 1-d batches.
     batch_shape = data.draw(tfp_hps.shapes(min_ndims=1, max_ndims=1))

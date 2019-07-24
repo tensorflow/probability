@@ -200,7 +200,7 @@ class KernelPropertiesTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.parameters((bname,) for bname in TF2_FRIENDLY_KERNELS)
   @hp.given(hps.data())
-  @tfp_hps.tfp_hp_settings(max_examples=10)
+  @tfp_hps.tfp_hp_settings(default_max_examples=10)
   def testKernelGradient(self, kernel_name, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
       return
