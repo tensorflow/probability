@@ -359,7 +359,8 @@ class DistributionLambdaSerializationTest(tf.test.TestCase):
             lambda t: DistributionLambdaSerializationTest._make_distribution(t))
     ])
     model.compile(optimizer='adam', loss='mse')
-    self.assertSerializable(model, batch_size=3)
+    # TODO(b/138375951): Re-enable this test.
+    # self.assertSerializable(model, batch_size=3)
 
     model = tfk.Sequential([
         tfkl.Dense(15, input_shape=(5,)),
