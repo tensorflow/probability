@@ -96,6 +96,32 @@ class _PoissonLogNormalQuadratureCompoundTest(
     self.run_test_sample_consistent_mean_variance(
         self.evaluate, pln, rtol=0.1, atol=0.01)
 
+  def testGradientThroughParams(self):
+    pln = tfd.PoissonLogNormalQuadratureCompound(
+        loc=tf.Variable([0., -0.5], shape=[2] if self.static_shape
+                        else None),
+        scale=tf.Variable([1., 0.9], shape=[2] if self.static_shape
+                          else None),
+        quadrature_size=10, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -pln.log_prob([1., 2.])
+    grad = tape.gradient(loss, pln.trainable_variables)
+    self.assertLen(grad, 2)
+    self.assertNotIn(None, grad)
+
+  def testGradientThroughNonVariableParams(self):
+    pln = tfd.PoissonLogNormalQuadratureCompound(
+        loc=tf.convert_to_tensor([0., -0.5]),
+        scale=tf.convert_to_tensor([1., 0.9]),
+        quadrature_size=10, validate_args=True)
+    with tf.GradientTape() as tape:
+      tape.watch(pln.loc)
+      tape.watch(pln.scale)
+      loss = -pln.log_prob([1., 2.])
+    grad = tape.gradient(loss, [pln.loc, pln.scale])
+    self.assertLen(grad, 2)
+    self.assertNotIn(None, grad)
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class PoissonLogNormalQuadratureCompoundStaticShapeTest(
@@ -115,5 +141,5 @@ class PoissonLogNormalQuadratureCompoundDynamicShapeTest(
     return False
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()
