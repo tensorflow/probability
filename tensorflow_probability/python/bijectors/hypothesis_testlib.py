@@ -140,14 +140,9 @@ def bijector_supports():
       'Cumsum':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
                           Support.VECTOR_UNCONSTRAINED),
-      'MatrixInverseTriL':
-          BijectorSupport(Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE,
-                          Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
-      'MatvecLU':
-          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
-                          Support.VECTOR_UNCONSTRAINED),
-      'NormalCDF':
-          BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
+      'DiscreteCosineTransform':
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED,
+                          Support.SCALAR_UNCONSTRAINED),
       'Exp':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_POSITIVE),
@@ -168,9 +163,21 @@ def bijector_supports():
                           Support.VECTOR_WITH_L1_NORM_1_SIZE_GT1),
       'Kumaraswamy':
           BijectorSupport(Support.SCALAR_IN_0_1, Support.SCALAR_IN_0_1),
+      'MatrixInverseTriL':
+          BijectorSupport(Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE,
+                          Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
+      'MatvecLU':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_UNCONSTRAINED),
+      'NormalCDF':
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'Ordered':
           BijectorSupport(Support.VECTOR_STRICTLY_INCREASING,
                           Support.VECTOR_UNCONSTRAINED),
+      'PowerTransform':
+          # The domain is dependent on the `power` parameter of PowerTransform,
+          # hence is handled in the test harness.
+          BijectorSupport(Support.OTHER, Support.SCALAR_POSITIVE),
       'RationalQuadraticSpline':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
@@ -193,6 +200,8 @@ def bijector_supports():
       'Tanh':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_IN_NEG1_1),
+      'Weibull':
+          BijectorSupport(Support.SCALAR_NON_NEGATIVE, Support.SCALAR_IN_0_1),
   }
   missing_keys = set(instantiable_bijectors().keys()) - set(supports.keys())
   if missing_keys:
@@ -317,3 +326,12 @@ def spline_slope_constraint(s, dtype=tf.float32):
   # Slice off a position since this is nknots - 2 vs nknots - 1 for bin sizes.
   min_slope = 1e-2
   return tf.math.softplus(tf.cast(s[..., :-1], dtype)) + min_slope
+
+
+def power_transform_constraint(power):
+  """Maps `s` to [-1 / power, inf)."""
+  def constrain(x):
+    if power == 0:
+      return x
+    return tf.math.softplus(x) - 1. / power
+  return constrain

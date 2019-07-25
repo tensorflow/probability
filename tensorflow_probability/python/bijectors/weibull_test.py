@@ -37,7 +37,7 @@ class WeibullBijectorTest(tf.test.TestCase):
     concentration = 0.3
     bijector = tfb.Weibull(
         scale=scale, concentration=concentration, validate_args=True)
-    self.assertStartsWith(bijector.name, "weibull")
+    self.assertStartsWith(bijector.name, 'weibull')
     x = np.array([[[0.], [1.], [14.], [20.], [100.]]], dtype=np.float32)
     # Weibull distribution
     weibull_dist = stats.frechet_r(c=concentration, scale=scale)
@@ -78,6 +78,30 @@ class WeibullBijectorTest(tf.test.TestCase):
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
 
+  def testAsserts(self):
+    with self.assertRaisesOpError('Argument `scale` must be positive.'):
+      b = tfb.Weibull(
+          concentration=1., scale=-1., validate_args=True)
+      self.evaluate(b.forward(-3.))
+    with self.assertRaisesOpError('Argument `concentration` must be positive.'):
+      b = tfb.Weibull(
+          concentration=-1., scale=1., validate_args=True)
+      self.evaluate(b.forward(-3.))
 
-if __name__ == "__main__":
+  def testVariableAsserts(self):
+    concentration = tf.Variable(1.)
+    scale = tf.Variable(1.)
+    b = tfb.Weibull(
+        concentration=concentration, scale=scale, validate_args=True)
+    self.evaluate([concentration.initializer, scale.initializer])
+    with self.assertRaisesOpError('Argument `scale` must be positive.'):
+      with tf.control_dependencies([scale.assign(-1.)]):
+        self.evaluate(b.forward(-3.))
+    with self.assertRaisesOpError('Argument `concentration` must be positive.'):
+      with tf.control_dependencies([
+          scale.assign(1.), concentration.assign(-1.)]):
+        self.evaluate(b.forward(-3.))
+
+
+if __name__ == '__main__':
   tf.test.main()

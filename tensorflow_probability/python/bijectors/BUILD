@@ -339,7 +339,6 @@ py_library(
         ":bijector",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
@@ -465,7 +464,6 @@ py_library(
         ":bijector",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -666,7 +664,7 @@ py_library(
         ":bijector",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 

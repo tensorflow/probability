@@ -43,6 +43,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'BatchNormalization',
     'CholeskyOuterProduct',
     'Cumsum',
+    'DiscreteCosineTransform',
     'Exp',
     'Expm1',
     'Gumbel',
@@ -54,6 +55,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'MatvecLU',
     'NormalCDF',
     'Ordered',
+    'PowerTransform',
     'RationalQuadraticSpline',
     'Reciprocal',
     'Sigmoid',
@@ -61,6 +63,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'Softsign',
     'Square',
     'Tanh',
+    'Weibull',
 )
 
 BIJECTOR_PARAMS_NDIMS = {
@@ -70,6 +73,7 @@ BIJECTOR_PARAMS_NDIMS = {
     'MatvecLU': dict(lower_upper=2, permutation=1),
     'SinhArcsinh': dict(skewness=0, tailweight=0),
     'RationalQuadraticSpline': dict(bin_widths=1, bin_heights=1, knot_slopes=1),
+    'Weibull': dict(concentration=0, scale=0),
 }
 
 MUTEX_PARAMS = (
@@ -181,6 +185,13 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
     )
     inline.b = b
     return inline
+  if bijector_name == 'DiscreteCosineTransform':
+    dct_type = draw(hps.integers(min_value=2, max_value=3))
+    return tfb.DiscreteCosineTransform(
+        validate_args=True, dct_type=dct_type)
+  if bijector_name == 'PowerTransform':
+    power = draw(hps.floats(min_value=0., max_value=10.))
+    return tfb.PowerTransform(validate_args=True, power=power)
 
   bijector_params = draw(
       broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,
@@ -216,7 +227,10 @@ def domain_tensors(draw, bijector, shape=None):
     shape = draw(tfp_hps.shapes())
   bijector_name = type(bijector).__name__
   support = bijector_hps.bijector_supports()[bijector_name].forward
-  constraint_fn = tfp_hps.constrainer(support)
+  if isinstance(bijector, tfb.PowerTransform):
+    constraint_fn = bijector_hps.power_transform_constraint(bijector.power)
+  else:
+    constraint_fn = tfp_hps.constrainer(support)
   return draw(tfp_hps.constrained_tensors(constraint_fn, shape))
 
 
@@ -384,6 +398,8 @@ def ensure_nonzero(x):
 
 
 CONSTRAINTS = {
+    'concentration':
+        tfp_hps.softplus_plus_eps(),
     'concentration0':
         tfp_hps.softplus_plus_eps(),
     'concentration1':

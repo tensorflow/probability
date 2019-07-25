@@ -34,7 +34,7 @@ class PowerTransformBijectorTest(tf.test.TestCase):
   def testBijector(self):
     c = 0.2
     bijector = tfb.PowerTransform(power=c, validate_args=True)
-    self.assertStartsWith(bijector.name, "power_transform")
+    self.assertStartsWith(bijector.name, 'power_transform')
     x = np.array([[[-1.], [2.], [-5. + 1e-4]]])
     y = (1. + x * c)**(1. / c)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
@@ -61,5 +61,5 @@ class PowerTransformBijectorTest(tf.test.TestCase):
         bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

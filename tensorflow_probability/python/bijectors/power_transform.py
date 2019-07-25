@@ -22,11 +22,10 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
-    "PowerTransform",
+    'PowerTransform',
 ]
 
 
@@ -43,7 +42,7 @@ class PowerTransform(bijector.Bijector):
   def __init__(self,
                power=0.,
                validate_args=False,
-               name="power_transform"):
+               name='power_transform'):
     """Instantiates the `PowerTransform` bijector.
 
     Args:
@@ -57,9 +56,9 @@ class PowerTransform(bijector.Bijector):
       ValueError: if `power < 0` or is not known statically.
     """
     with tf.name_scope(name) as name:
-      power = tf.get_static_value(tf.convert_to_tensor(power, name="power"))
+      power = tf.get_static_value(tf.convert_to_tensor(power, name='power'))
       if power is None or power < 0:
-        raise ValueError("`power` must be a non-negative TF constant.")
+        raise ValueError('`power` must be a non-negative TF constant.')
       self._power = power
       super(PowerTransform, self).__init__(
           forward_min_event_ndims=0,
@@ -72,43 +71,41 @@ class PowerTransform(bijector.Bijector):
     return self._power
 
   def _forward(self, x):
-    x = self._maybe_assert_valid_x(x)
-    if self.power == 0.:
-      return tf.exp(x)
-    # If large x accuracy is an issue, consider using:
-    # (1. + x * self.power)**(1. / self.power) when x >> 1.
-    return tf.exp(tf.math.log1p(x * self.power) / self.power)
+    with tf.control_dependencies(self._maybe_assert_valid_x(x)):
+      if self.power == 0.:
+        return tf.exp(x)
+      # If large x accuracy is an issue, consider using:
+      # (1. + x * self.power)**(1. / self.power) when x >> 1.
+      return tf.exp(tf.math.log1p(x * self.power) / self.power)
 
   def _inverse(self, y):
-    y = self._maybe_assert_valid_y(y)
-    if self.power == 0.:
-      return tf.math.log(y)
-    # If large y accuracy is an issue, consider using:
-    # (y**self.power - 1.) / self.power when y >> 1.
-    return tf.math.expm1(tf.math.log(y) * self.power) / self.power
+    with tf.control_dependencies(self._maybe_assert_valid_y(y)):
+      if self.power == 0.:
+        return tf.math.log(y)
+      # If large y accuracy is an issue, consider using:
+      # (y**self.power - 1.) / self.power when y >> 1.
+      return tf.math.expm1(tf.math.log(y) * self.power) / self.power
 
   def _inverse_log_det_jacobian(self, y):
-    y = self._maybe_assert_valid_y(y)
-    return (self.power - 1.) * tf.math.log(y)
+    with tf.control_dependencies(self._maybe_assert_valid_y(y)):
+      return (self.power - 1.) * tf.math.log(y)
 
   def _forward_log_det_jacobian(self, x):
-    x = self._maybe_assert_valid_x(x)
-    if self.power == 0.:
-      return x
-    return (1. / self.power - 1.) * tf.math.log1p(x * self.power)
+    with tf.control_dependencies(self._maybe_assert_valid_x(x)):
+      if self.power == 0.:
+        return x
+      return (1. / self.power - 1.) * tf.math.log1p(x * self.power)
 
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args or self.power == 0.:
-      return x
-    is_valid = assert_util.assert_non_negative(
+      return []
+    return [assert_util.assert_non_negative(
         1. + self.power * x,
-        message="Forward transformation input must be at least {}.".format(
-            -1. / self.power))
-    return distribution_util.with_dependencies([is_valid], x)
+        message='Forward transformation input must be at least {}.'.format(
+            -1. / self.power))]
 
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:
-      return y
-    is_valid = assert_util.assert_positive(
-        y, message="Inverse transformation input must be greater than 0.")
-    return distribution_util.with_dependencies([is_valid], y)
+      return []
+    return [assert_util.assert_positive(
+        y, message='Inverse transformation input must be greater than 0.')]
