@@ -19,8 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import contextlib
 import functools
 import inspect
+import re
 
 from absl import flags
 from absl import logging
@@ -803,6 +805,41 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
         pass
 
 
+@contextlib.contextmanager
+def no_tf_rank_errors():
+  # TODO(axch): Instead of catching and `assume`ing away rank errors, could try
+  # harder to avoid generating them in the first place.  For instance, could add
+  # a parameter to `valid_slices` that limits how much the rank may increase
+  # after the slice.  Trouble is, predicting what limits to set is difficult
+  # because rank handling is non-uniform, and actually meeting them is also
+  # non-trivial because in addition to the batch shape there is the event shape,
+  # and at least one more dimention added by `sample`, and the parameters may
+  # have larger "event" shapes than the distribution itself.
+  rank_bcast_pat = (r'Broadcast between \[([0-9]*,){8,}[0-9]*\] '
+                    r'and \[([0-9]*,){8,}[0-9]*\] is not supported yet')
+  input_dims_pat = r'Unhandled input dimensions (8|9|[1-9][0-9]+)'
+  input_rank_pat = r'inputs rank not in \[0,([6-9]|[1-9][0-9]+)\]'
+  try:
+    yield
+  except tf.errors.UnimplementedError as e:
+    # TODO(b/138385438): This really shouldn't be so complicated.
+    msg = str(e)
+    if re.search(rank_bcast_pat, msg):
+      # We asked some TF op (SelectV2?) to broadcast Tensors of rank >= 9.
+      # Let's not.
+      hp.assume(False)
+    elif re.search(input_dims_pat, msg):
+      # We asked some TF op (StridedSlice?) to operate on a Tensor of rank >= 8.
+      # Let's not.
+      hp.assume(False)
+    elif re.search(input_rank_pat, msg):
+      # We asked some TF op (PadV2?) to operate on a Tensor of rank >= 7.
+      # Let's not.
+      hp.assume(False)
+    else:
+      raise
+
+
 @test_util.run_all_in_graph_and_eager_modes
 class DistributionSlicingTest(tf.test.TestCase):
 
@@ -821,24 +858,15 @@ class DistributionSlicingTest(tf.test.TestCase):
     # Check that slicing modifies batch shape as expected.
     self.assertAllEqual(sliced_zeros.shape, sliced_dist.batch_shape)
 
+    if not sliced_zeros.size:
+      # TODO(b/128924708): Fix distributions that fail on degenerate empty
+      #     shapes, e.g. Multinomial, DirichletMultinomial, ...
+      return
+
     # Check that sampling of sliced distributions executes.
-    try:
+    with no_tf_rank_errors():
       samples = self.evaluate(dist.sample(seed=strm()))
-
-      if not sliced_zeros.size:
-        # TODO(b/128924708): Fix distributions that fail on degenerate empty
-        #     shapes, e.g. Multinomial, DirichletMultinomial, ...
-        return
-
       sliced_samples = self.evaluate(sliced_dist.sample(seed=strm()))
-    except NotImplementedError as e:
-      raise
-    except tf.errors.UnimplementedError as e:
-      if 'Unhandled input dimensions' in str(e) or 'rank not in' in str(e):
-        # Some cases can fail with 'Unhandled input dimensions \d+' or
-        # 'inputs rank not in [0,6]: \d+'
-        return
-      raise
 
     # Come up with the slices for samples (which must also include event dims).
     sample_slices = (
@@ -858,7 +886,7 @@ class DistributionSlicingTest(tf.test.TestCase):
 
     # Check that a sliced distribution can compute the log_prob of its own
     # samples (up to numerical validation errors).
-    try:
+    with no_tf_rank_errors():
       try:
         lp = self.evaluate(dist.log_prob(samples))
       except tf.errors.InvalidArgumentError:
@@ -867,12 +895,6 @@ class DistributionSlicingTest(tf.test.TestCase):
         # We only tolerate this case for the non-sliced dist.
         return
       sliced_lp = self.evaluate(sliced_dist.log_prob(samples[sample_slices]))
-    except tf.errors.UnimplementedError as e:
-      if 'Unhandled input dimensions' in str(e) or 'rank not in' in str(e):
-        # Some cases can fail with 'Unhandled input dimensions \d+' or
-        # 'inputs rank not in [0,6]: \d+'
-        return
-      raise
 
     # Check that the sliced dist's log_prob agrees with slicing the original's
     # log_prob.
