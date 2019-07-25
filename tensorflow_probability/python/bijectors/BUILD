@@ -107,6 +107,7 @@ py_library(
     srcs = ["bijector_properties_test.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":categorical_to_discrete",
         ":hypothesis_testlib",
         # absl/flags dep,
         # absl/logging dep,
@@ -227,6 +228,8 @@ py_library(
         ":bijector",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
@@ -843,6 +846,7 @@ py_test(
         ":categorical_to_discrete",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 

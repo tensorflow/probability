@@ -41,6 +41,8 @@ FLAGS = flags.FLAGS
 TF2_FRIENDLY_BIJECTORS = (
     'AffineScalar',
     'BatchNormalization',
+    # 'CategoricalToDiscrete', TODO(b/137956955): Add support
+    # for hypothesis testing
     'CholeskyOuterProduct',
     'Cumsum',
     'DiscreteCosineTransform',
