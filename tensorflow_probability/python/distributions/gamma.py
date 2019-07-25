@@ -32,7 +32,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
-    "Gamma",
+    'Gamma',
 ]
 
 
@@ -119,7 +119,7 @@ class Gamma(distribution.Distribution):
                rate,
                validate_args=False,
                allow_nan_stats=True,
-               name="Gamma"):
+               name='Gamma'):
     """Construct Gamma with `concentration` and `rate` parameters.
 
     The parameters `concentration` and `rate` must be shaped in a way that
@@ -148,9 +148,9 @@ class Gamma(distribution.Distribution):
       dtype = dtype_util.common_dtype(
           [concentration, rate], dtype_hint=tf.float32)
       self._concentration = tensor_util.convert_nonref_to_tensor(
-          concentration, dtype=dtype, name="concentration")
+          concentration, dtype=dtype, name='concentration')
       self._rate = tensor_util.convert_nonref_to_tensor(
-          rate, dtype=dtype, name="rate")
+          rate, dtype=dtype, name='rate')
 
       super(Gamma, self).__init__(
           dtype=dtype,
@@ -163,7 +163,7 @@ class Gamma(distribution.Distribution):
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("concentration", "rate"),
+        zip(('concentration', 'rate'),
             ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
@@ -252,7 +252,7 @@ class Gamma(distribution.Distribution):
     else:
       assertions = [assert_util.assert_less(
           tf.ones([], self.dtype), concentration,
-          message="Mode not defined when any concentration <= 1.")]
+          message='Mode not defined when any concentration <= 1.')]
     with tf.control_dependencies(assertions):
       return tf.where(
           concentration > 1.,
@@ -262,7 +262,7 @@ class Gamma(distribution.Distribution):
   def _maybe_assert_valid_sample(self, x):
     if not self.validate_args:
       return []
-    return [assert_util.assert_positive(x, message="Sample must be positive.")]
+    return [assert_util.assert_positive(x, message='Sample must be positive.')]
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
@@ -271,11 +271,11 @@ class Gamma(distribution.Distribution):
     if is_init != tensor_util.is_ref(self.concentration):
       assertions.append(assert_util.assert_positive(
           self.concentration,
-          message="Argument `concentration` must be positive."))
+          message='Argument `concentration` must be positive.'))
     if is_init != tensor_util.is_ref(self.rate):
       assertions.append(assert_util.assert_positive(
           self.rate,
-          message="Argument `rate` must be positive."))
+          message='Argument `rate` must be positive.'))
     return assertions
 
 
@@ -292,7 +292,7 @@ def _kl_gamma_gamma(g0, g1, name=None):
   Returns:
     kl_gamma_gamma: `Tensor`. The batchwise KL(g0 || g1).
   """
-  with tf.name_scope(name or "kl_gamma_gamma"):
+  with tf.name_scope(name or 'kl_gamma_gamma'):
     # Result from:
     #   http://www.fil.ion.ucl.ac.uk/~wpenny/publications/densities.ps
     # For derivation see:

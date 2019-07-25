@@ -60,15 +60,18 @@ TF2_FRIENDLY_DISTS = (
     'Gamma',
     'GammaGamma',
     'GeneralizedPareto',
+    'Geometric',
     'Gumbel',
     'HalfCauchy',
     'HalfNormal',
     'Horseshoe',
+    'InverseGamma',
+    'InverseGaussian',
+    'Kumaraswamy',
     'Laplace',
     'LKJ',
     'LogNormal',
     'Logistic',
-    'Kumaraswamy',
     'Normal',
     'Multinomial',
     'NegativeBinomial',
@@ -77,6 +80,8 @@ TF2_FRIENDLY_DISTS = (
     'Poisson',
     'ProbitBernoulli',
     'StudentT',
+    'Triangular',
+    'Uniform',
     'Zipf',
 )
 
@@ -915,8 +920,8 @@ class DistributionSlicingTest(tf.test.TestCase):
 # TODO(b/128518790): Eliminate / minimize the fudge factors in here.
 
 
-def sigmoid_plus_eps(eps=1e-6):
-  return lambda x: tf.sigmoid(x) * (1 - eps) + eps
+def constrain_between_eps_and_one_minus_eps(eps=1e-6):
+  return lambda x: eps + (1 - 2 * eps) * tf.sigmoid(x)
 
 
 def ensure_high_gt_low(low, high):
@@ -997,9 +1002,11 @@ CONSTRAINTS = {
     'Zipf.power':
         tfp_hps.softplus_plus_eps(1 + 1e-6),  # strictly > 1
     'Geometric.logits':  # TODO(b/128410109): re-enable down to -50
-        lambda x: tf.maximum(x, -16.),  # works around the bug
+        # Capping at 16. so that probability is less than 1, and entropy is
+        # defined.
+        lambda x: tf.minimum(tf.maximum(x, -16.), 16.),  # works around the bug
     'Geometric.probs':
-        sigmoid_plus_eps(),
+        constrain_between_eps_and_one_minus_eps(),
     'Binomial.probs':
         tf.sigmoid,
     'NegativeBinomial.probs':

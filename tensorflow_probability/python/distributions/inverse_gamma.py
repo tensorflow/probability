@@ -27,12 +27,13 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
-    "InverseGamma",
-    "InverseGammaWithSoftplusConcentrationRate",
+    'InverseGamma',
+    'InverseGammaWithSoftplusConcentrationRate',
 ]
 
 
@@ -116,16 +117,16 @@ class InverseGamma(distribution.Distribution):
   """
 
   @deprecation.deprecated_args(
-      "2019-05-08", "The `rate` parameter is deprecated. Use `scale` instead."
-      "The `rate` parameter was always interpreted as a `scale` parameter, "
-      "but erroneously misnamed.", "rate")
+      '2019-05-08', 'The `rate` parameter is deprecated. Use `scale` instead.'
+      'The `rate` parameter was always interpreted as a `scale` parameter, '
+      'but erroneously misnamed.', 'rate')
   def __init__(self,
                concentration,
                scale=None,
                validate_args=False,
                allow_nan_stats=True,
                rate=None,
-               name="InverseGamma"):
+               name='InverseGamma'):
     """Construct InverseGamma with `concentration` and `scale` parameters.
 
     The parameters `concentration` and `scale` must be shaped in a way that
@@ -155,34 +156,24 @@ class InverseGamma(distribution.Distribution):
       scale = rate
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([concentration, scale],
-                                      dtype_hint=tf.float32)
-      concentration = tf.convert_to_tensor(
-          concentration, name="concentration", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies([
-          assert_util.assert_positive(
-              concentration, message="Concentration must be positive."),
-          assert_util.assert_positive(
-              scale, message="Scale must be positive."),
-      ] if validate_args else []):
-        self._concentration = tf.identity(concentration, name="concentration")
-        self._scale = tf.identity(scale, name="scale")
-      dtype_util.assert_same_float_dtype([self._concentration, self._scale])
-
-    super(InverseGamma, self).__init__(
-        dtype=self._concentration.dtype,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        parameters=parameters,
-        graph_parents=[self._concentration, self._scale],
-        name=name)
+      dtype = dtype_util.common_dtype(
+          [concentration, scale], dtype_hint=tf.float32)
+      self._concentration = tensor_util.convert_nonref_to_tensor(
+          concentration, dtype=dtype, name='concentration')
+      self._scale = tensor_util.convert_nonref_to_tensor(
+          scale, dtype=dtype, name='scale')
+      super(InverseGamma, self).__init__(
+          dtype=self._concentration.dtype,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("concentration", "scale"),
+        zip(('concentration', 'scale'),
             ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
@@ -196,9 +187,9 @@ class InverseGamma(distribution.Distribution):
 
   @property
   @deprecation.deprecated(
-      "2019-05-08", "The `rate` parameter is deprecated. Use `scale` instead."
-      "The `rate` parameter was always interpreted as a `scale`parameter, but "
-      "erroneously misnamed.")
+      '2019-05-08', 'The `rate` parameter is deprecated. Use `scale` instead.'
+      'The `rate` parameter was always interpreted as a `scale`parameter, but '
+      'erroneously misnamed.')
   def rate(self):
     """Scale parameter."""
     return self._scale
@@ -234,26 +225,26 @@ class InverseGamma(distribution.Distribution):
         seed=seed)
 
   def _log_prob(self, x):
-    return self._log_unnormalized_prob(x) - self._log_normalization()
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
+      concentration = tf.convert_to_tensor(self.concentration)
+      scale = tf.convert_to_tensor(self.scale)
+      unnormalized_prob = -(1. + concentration) * tf.math.log(x) - scale / x
+      normalization = (
+          tf.math.lgamma(concentration) - concentration * tf.math.log(scale))
+      return unnormalized_prob - normalization
 
   def _cdf(self, x):
-    x = self._maybe_assert_valid_sample(x)
-    # Note that igammac returns the upper regularized incomplete gamma
-    # function Q(a, x), which is what we want for the CDF.
-    return tf.math.igammac(self.concentration, self.scale / x)
-
-  def _log_unnormalized_prob(self, x):
-    x = self._maybe_assert_valid_sample(x)
-    return -(1. + self.concentration) * tf.math.log(x) - self.scale / x
-
-  def _log_normalization(self):
-    return (tf.math.lgamma(self.concentration) -
-            self.concentration * tf.math.log(self.scale))
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
+      # Note that igammac returns the upper regularized incomplete gamma
+      # function Q(a, x), which is what we want for the CDF.
+      return tf.math.igammac(self.concentration, self.scale / x)
 
   def _entropy(self):
-    return (self.concentration + tf.math.log(self.scale) +
-            tf.math.lgamma(self.concentration) -
-            ((1. + self.concentration) * tf.math.digamma(self.concentration)))
+    concentration = tf.convert_to_tensor(self.concentration)
+    scale = tf.convert_to_tensor(self.scale)
+    return (concentration + tf.math.log(scale) +
+            tf.math.lgamma(concentration) -
+            ((1. + concentration) * tf.math.digamma(concentration)))
 
   @distribution_util.AppendDocstring(
       """The mean of an inverse gamma distribution is
@@ -261,40 +252,44 @@ class InverseGamma(distribution.Distribution):
       otherwise. If `self.allow_nan_stats` is `False`, an exception will be
       raised rather than returning `NaN`""")
   def _mean(self):
-    mean = self.scale / (self.concentration - 1.)
+    concentration = tf.convert_to_tensor(self.concentration)
+    scale = tf.convert_to_tensor(self.scale)
+    mean = scale / (concentration - 1.)
     if self.allow_nan_stats:
+      assertions = []
+    else:
+      assertions = [assert_util.assert_less(
+          tf.ones([], self.dtype), concentration,
+          message='mean undefined when any concentration <= 1')]
+    with tf.control_dependencies(assertions):
       return tf.where(
-          self.concentration > 1.,
+          concentration > 1.,
           mean,
           dtype_util.as_numpy_dtype(self.dtype)(np.nan))
-    else:
-      return distribution_util.with_dependencies([
-          assert_util.assert_less(
-              tf.ones([], self.dtype),
-              self.concentration,
-              message="mean undefined when any concentration <= 1"),
-      ], mean)
 
   @distribution_util.AppendDocstring(
       """Variance for inverse gamma is defined only for `concentration > 2`. If
       `self.allow_nan_stats` is `False`, an exception will be raised rather
       than returning `NaN`.""")
   def _variance(self):
+    concentration = tf.convert_to_tensor(self.concentration)
+    scale = tf.convert_to_tensor(self.scale)
     var = (
-        tf.square(self.scale) / tf.square(self.concentration - 1.) /
-        (self.concentration - 2.))
+        tf.square(scale) / tf.square(concentration - 1.) /
+        (concentration - 2.))
     if self.allow_nan_stats:
+      assertions = []
+    else:
+      assertions = [assert_util.assert_less(
+          tf.constant(2., dtype=self.dtype),
+          concentration,
+          message='variance undefined when any concentration <= 2')]
+
+    with tf.control_dependencies(assertions):
       return tf.where(
-          self.concentration > 2.,
+          concentration > 2.,
           var,
           dtype_util.as_numpy_dtype(self.dtype)(np.nan))
-    else:
-      return distribution_util.with_dependencies([
-          assert_util.assert_less(
-              tf.constant(2., dtype=self.dtype),
-              self.concentration,
-              message="variance undefined when any concentration <= 2"),
-      ], var)
 
   @distribution_util.AppendDocstring(
       """The mode of an inverse gamma distribution is `scale / (concentration +
@@ -305,38 +300,50 @@ class InverseGamma(distribution.Distribution):
   def _maybe_assert_valid_sample(self, x):
     dtype_util.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
     if not self.validate_args:
-      return x
-    return distribution_util.with_dependencies([
-        assert_util.assert_positive(x),
-    ], x)
+      return []
+    return [assert_util.assert_positive(x, message='Sample must be positive.')]
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_ref(self.concentration):
+      assertions.append(assert_util.assert_positive(
+          self.concentration,
+          message='Argument `concentration` must be positive.'))
+    if is_init != tensor_util.is_ref(self.scale):
+      assertions.append(assert_util.assert_positive(
+          self.scale,
+          message='Argument `scale` must be positive.'))
+    return assertions
 
 
 class _InverseGammaWithSoftplusConcentrationScale(InverseGamma):
   """`InverseGamma` with softplus of `concentration` and `scale`."""
 
   @deprecation.deprecated_args(
-      "2019-05-08", "The `rate` parameter is deprecated. Use `scale` instead."
-      "The `rate` parameter was always interpreted as a `scale`parameter, but "
-      "erroneously misnamed.", "rate")
+      '2019-05-08', 'The `rate` parameter is deprecated. Use `scale` instead.'
+      'The `rate` parameter was always interpreted as a `scale`parameter, but '
+      'erroneously misnamed.', 'rate')
   def __init__(self,
                concentration,
                scale=None,
                validate_args=False,
                allow_nan_stats=True,
                rate=None,
-               name="InverseGammaWithSoftplusConcentrationScale"):
+               name='InverseGammaWithSoftplusConcentrationScale'):
     if rate is not None:
       scale = rate
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration, scale])
       concentration = tf.convert_to_tensor(
-          concentration, name="softplus_concentration", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="softplus_scale", dtype=dtype)
+          concentration, name='softplus_concentration', dtype=dtype)
+      scale = tf.convert_to_tensor(scale, name='softplus_scale', dtype=dtype)
       super(_InverseGammaWithSoftplusConcentrationScale, self).__init__(
           concentration=tf.math.softplus(
-              concentration, name="softplus_concentration"),
-          scale=tf.math.softplus(scale, name="softplus_scale"),
+              concentration, name='softplus_concentration'),
+          scale=tf.math.softplus(scale, name='softplus_scale'),
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           name=name)
@@ -344,20 +351,20 @@ class _InverseGammaWithSoftplusConcentrationScale(InverseGamma):
 
 
 _rate_deprecator = deprecation.deprecated(
-    "2019-06-05",
-    "InverseGammaWithSoftplusConcentrationRate is deprecated, use "
-    "InverseGamma(concentration=tf.math.softplus(concentration), "
-    "scale=tf.math.softplus(scale)) instead.",
+    '2019-06-05',
+    'InverseGammaWithSoftplusConcentrationRate is deprecated, use '
+    'InverseGamma(concentration=tf.math.softplus(concentration), '
+    'scale=tf.math.softplus(scale)) instead.',
     warn_once=True)
 # pylint: disable=invalid-name
 InverseGammaWithSoftplusConcentrationRate = _rate_deprecator(
     _InverseGammaWithSoftplusConcentrationScale)
 
 _scale_deprecator = deprecation.deprecated(
-    "2019-06-05",
-    "InverseGammaWithSoftplusConcentrationScale is deprecated, use "
-    "InverseGamma(concentration=tf.math.softplus(concentration), "
-    "scale=tf.math.softplus(scale)) instead.",
+    '2019-06-05',
+    'InverseGammaWithSoftplusConcentrationScale is deprecated, use '
+    'InverseGamma(concentration=tf.math.softplus(concentration), '
+    'scale=tf.math.softplus(scale)) instead.',
     warn_once=True)
 InverseGammaWithSoftplusConcentrationScale = _scale_deprecator(
     _InverseGammaWithSoftplusConcentrationScale)

@@ -661,7 +661,7 @@ def assert_symmetric(matrix):
 
 
 def assert_nonnegative_integer_form(
-    x, name='embed_check_nonnegative_integer_form'):
+    x, name='assert_nonnegative_integer_form'):
   """Assert x is a non-negative tensor, and optionally of integers."""
   with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name='x')

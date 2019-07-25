@@ -133,9 +133,9 @@ class UniformTest(tf.test.TestCase):
     b_v = np.array([1.0, 2.0, 3.0], dtype=np.float32)
 
     with self.assertRaisesWithPredicateMatch(
-        tf.errors.InvalidArgumentError, "x < y"):
+        tf.errors.InvalidArgumentError, 'not defined when low >= high'):
       uniform = tfd.Uniform(low=a_v, high=b_v, validate_args=True)
-      self.evaluate(uniform.low)
+      self.evaluate(uniform.mean())
 
   def testUniformSample(self):
     a = tf.constant([3.0, 4.0])
@@ -334,5 +334,15 @@ class UniformTest(tf.test.TestCase):
     true_kl_, kl_ = self.evaluate([true_kl, kl])
     self.assertAllEqual(true_kl_, kl_)
 
-if __name__ == "__main__":
+  def testModifiedVariableAssertion(self):
+    low = tf.Variable(0.)
+    high = tf.Variable(1.)
+    self.evaluate([low.initializer, high.initializer])
+    uniform = tfd.Uniform(low=low, high=high, validate_args=True)
+    with self.assertRaisesOpError('not defined when low >= high'):
+      with tf.control_dependencies([low.assign(2.)]):
+        self.evaluate(uniform.mean())
+
+
+if __name__ == '__main__':
   tf.test.main()

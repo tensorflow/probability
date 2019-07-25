@@ -28,9 +28,10 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
-    "InverseGaussian",
+    'InverseGaussian',
 ]
 
 
@@ -78,7 +79,7 @@ class InverseGaussian(distribution.Distribution):
                concentration,
                validate_args=False,
                allow_nan_stats=True,
-               name="InverseGaussian"):
+               name='InverseGaussian'):
     """Constructs inverse Gaussian distribution with `loc` and `concentration`.
 
     Args:
@@ -103,24 +104,18 @@ class InverseGaussian(distribution.Distribution):
     with tf.name_scope(name):
       dtype = dtype_util.common_dtype([loc, concentration],
                                       dtype_hint=tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      concentration = tf.convert_to_tensor(
-          concentration, name="concentration", dtype=dtype)
-      with tf.control_dependencies([
-          assert_util.assert_positive(loc),
-          assert_util.assert_positive(concentration)
-      ] if validate_args else []):
-        self._loc = tf.identity(loc, name="loc")
-        self._concentration = tf.identity(concentration, name="concentration")
-      dtype_util.assert_same_float_dtype([self._loc, self._concentration])
-    super(InverseGaussian, self).__init__(
-        dtype=self._loc.dtype,
-        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._loc, self._concentration],
-        name=name)
+      self._concentration = tensor_util.convert_nonref_to_tensor(
+          concentration, dtype=dtype, name='concentration')
+      self._loc = tensor_util.convert_nonref_to_tensor(
+          loc, dtype=dtype, name='loc')
+
+      super(InverseGaussian, self).__init__(
+          dtype=self._loc.dtype,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -136,9 +131,11 @@ class InverseGaussian(distribution.Distribution):
     """Concentration parameter."""
     return self._concentration
 
-  def _batch_shape_tensor(self):
+  def _batch_shape_tensor(self, loc=None, concentration=None):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc), tf.shape(self.concentration))
+        tf.shape(self.loc if loc is None else loc),
+        tf.shape(
+            self.concentration if concentration is None else concentration))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -150,49 +147,41 @@ class InverseGaussian(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     # See https://en.wikipedia.org/wiki/Inverse_Gaussian_distribution or
     # https://www.jstor.org/stable/2683801
-    seed = seed_stream.SeedStream(seed, "inverse_gaussian")
-    shape = tf.concat([[n], self.batch_shape_tensor()], axis=0)
+    concentration = tf.convert_to_tensor(self.concentration)
+    loc = tf.convert_to_tensor(self.loc)
+    seed = seed_stream.SeedStream(seed, 'inverse_gaussian')
+    shape = tf.concat([[n], self._batch_shape_tensor(
+        loc=loc, concentration=concentration)], axis=0)
     sampled_chi2 = (tf.random.normal(
         shape, mean=0., stddev=1., seed=seed(), dtype=self.dtype))**2.
     sampled_uniform = tf.random.uniform(
         shape, minval=0., maxval=1., seed=seed(), dtype=self.dtype)
     sampled = (
-        self.loc + self.loc ** 2. * sampled_chi2 / (2. * self.concentration) -
-        self.loc / (2. * self.concentration) *
-        (4. * self.loc * self.concentration * sampled_chi2 +
-         (self.loc * sampled_chi2) ** 2) ** 0.5)
-    return tf.where(sampled_uniform <= self.loc / (self.loc + sampled),
-                    sampled, self.loc**2 / sampled)
+        loc + loc ** 2. * sampled_chi2 / (2. * concentration) -
+        loc / (2. * concentration) *
+        (4. * loc * concentration * sampled_chi2 +
+         (loc * sampled_chi2) ** 2) ** 0.5)
+    return tf.where(sampled_uniform <= loc / (loc + sampled),
+                    sampled, loc**2 / sampled)
 
   def _log_prob(self, x):
-    with tf.control_dependencies([
-        assert_util.assert_greater(
-            x,
-            dtype_util.as_numpy_dtype(x.dtype)(0),
-            message="x must be positive.")
-    ] if self.validate_args else []):
-
-      return (0.5 * (tf.math.log(self.concentration) - np.log(2. * np.pi) -
-                     3. * tf.math.log(x)) + (-self.concentration *
-                                             (x - self.loc)**2.) /
-              (2. * self.loc**2. * x))
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
+      concentration = tf.convert_to_tensor(self.concentration)
+      loc = tf.convert_to_tensor(self.loc)
+      return (0.5 * (tf.math.log(concentration) - np.log(2. * np.pi) -
+                     3. * tf.math.log(x)) + (-concentration * (x - loc)**2.) /
+              (2. * loc**2. * x))
 
   def _cdf(self, x):
-    with tf.control_dependencies([
-        assert_util.assert_greater(
-            x,
-            dtype_util.as_numpy_dtype(x.dtype)(0),
-            message="x must be positive.")
-    ] if self.validate_args else []):
-
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
+      concentration = tf.convert_to_tensor(self.concentration)
+      loc = tf.convert_to_tensor(self.loc)
       return (
           special_math.ndtr(
-              ((self.concentration / x) ** 0.5 *
-               (x / self.loc - 1.))) +
-          tf.exp(2. * self.concentration / self.loc) *
+              ((concentration / x) ** 0.5 * (x / loc - 1.))) +
+          tf.exp(2. * concentration / loc) *
           special_math.ndtr(
-              - (self.concentration / x) ** 0.5 *
-              (x / self.loc + 1)))
+              -(concentration / x) ** 0.5 * (x / loc + 1)))
 
   @distribution_util.AppendDocstring(
       """The mean of inverse Gaussian is the `loc` parameter.""")
@@ -204,3 +193,22 @@ class InverseGaussian(distribution.Distribution):
       """The variance of inverse Gaussian is `loc` ** 3 / `concentration`.""")
   def _variance(self):
     return self.loc ** 3 / self.concentration
+
+  def _maybe_assert_valid_sample(self, x):
+    if not self.validate_args:
+      return []
+    return [assert_util.assert_positive(x, message='Sample must be positive.')]
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_ref(self.concentration):
+      assertions.append(assert_util.assert_positive(
+          self.concentration,
+          message='Argument `concentration` must be positive.'))
+    if is_init != tensor_util.is_ref(self.loc):
+      assertions.append(assert_util.assert_positive(
+          self.loc,
+          message='Argument `loc` must be positive.'))
+    return assertions
