@@ -301,30 +301,6 @@ class InverseGammaTest(test_case.TestCase):
           concentration=alpha_v, scale=beta_v, validate_args=True)
       self.evaluate(inv_gamma.mean())
 
-  def testInverseGammaWithSoftplusConcentrationScale(self):
-    alpha = tf.constant([-0.1, -2.9], name='alpha')
-    beta = tf.constant([1.0, -4.8], name='beta')
-    inv_gamma = tfd.InverseGammaWithSoftplusConcentrationScale(
-        concentration=alpha, scale=beta, validate_args=True)
-    self.assertAllClose(
-        self.evaluate(tf.math.softplus(alpha)),
-        self.evaluate(inv_gamma.concentration))
-    self.assertAllClose(
-        self.evaluate(tf.math.softplus(beta)), self.evaluate(inv_gamma.scale))
-
-  def testRateArgBackwardsCompatiblity(self):
-    concentration = 1.
-    scale = 2.
-    inv_gamma = tfd.InverseGamma(concentration=concentration, rate=scale)
-    self.assertEqual(scale, self.evaluate(inv_gamma.scale))
-    self.assertEqual(scale, self.evaluate(inv_gamma.rate))
-
-  def testInverseGammaWithSoftplusConcentrationRate(self):
-    isp_concentration = -1.
-    isp_scale = -2.
-    tfd.InverseGammaWithSoftplusConcentrationRate(
-        concentration=isp_concentration, rate=isp_scale)
-
   def testModifiedVariableAssertion(self):
     c = tf.Variable(0.9)
     s = tf.Variable(2.)

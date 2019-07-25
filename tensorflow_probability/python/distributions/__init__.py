@@ -54,8 +54,6 @@ from tensorflow_probability.python.distributions.internal.moving_stats import as
 from tensorflow_probability.python.distributions.internal.moving_stats import assign_moving_mean_variance
 from tensorflow_probability.python.distributions.internal.moving_stats import moving_mean_variance
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGamma
-from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationRate  # deprecated, remove 6/5/19
-from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationScale  # deprecated, remove 6/5/19
 from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
 from tensorflow_probability.python.distributions.joint_distribution import JointDistribution
 from tensorflow_probability.python.distributions.joint_distribution_coroutine import JointDistributionCoroutine
@@ -75,7 +73,6 @@ from tensorflow_probability.python.distributions.mixture_same_family import Mixt
 from tensorflow_probability.python.distributions.multinomial import Multinomial
 from tensorflow_probability.python.distributions.multivariate_student_t import MultivariateStudentTLinearOperator
 from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiag
-from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiagWithSoftplusScale  # deprecated, remove 6/5/19
 from tensorflow_probability.python.distributions.mvn_diag_plus_low_rank import MultivariateNormalDiagPlusLowRank
 from tensorflow_probability.python.distributions.mvn_full_covariance import MultivariateNormalFullCovariance
 from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
@@ -171,8 +168,6 @@ __all__ = [
     'Horseshoe',
     'Independent',
     'InverseGamma',
-    'InverseGammaWithSoftplusConcentrationRate',
-    'InverseGammaWithSoftplusConcentrationScale',
     'JointDistribution',
     'JointDistributionCoroutine',
     'JointDistributionNamed',
@@ -201,7 +196,6 @@ __all__ = [
     'MultivariateNormalLinearOperator',
     'MultivariateNormalTriL',
     'MultivariateNormalDiagPlusLowRank',
-    'MultivariateNormalDiagWithSoftplusScale',
     'MultivariateStudentTLinearOperator',
     'Dirichlet',
     'DirichletMultinomial',

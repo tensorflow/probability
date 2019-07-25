@@ -159,8 +159,6 @@ def instantiable_base_dists():
       continue
     result[dist_name] = DistInfo(dist_class, params_event_ndims)
 
-  del result['InverseGamma'].params_event_ndims['rate']  # deprecated parameter
-
   # Empirical._params_event_ndims depends on `self.event_ndims`, so we have to
   # explicitly list these entries.
   result['Empirical|event_ndims=0'] = DistInfo(  #
@@ -1031,8 +1029,6 @@ CONSTRAINTS = {
         tfp_hps.positive_definite,
     'scale_diag':
         tfp_hps.softplus_plus_eps(),
-    'MultivariateNormalDiagWithSoftplusScale.scale_diag':
-        lambda x: tf.maximum(x, -87.),  # softplus(-87) ~= 1e-38
     'scale_identity_multiplier':
         tfp_hps.softplus_plus_eps(),
     'scale_tril':

@@ -181,17 +181,6 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     self.assertAllClose(
         np.array([[3., 2, 1], [4, 5, 6]]), self.evaluate(mvn.stddev()))
 
-  def testMultivariateNormalDiagWithSoftplusScale(self):
-    mu = [-1.0, 1.0]
-    diag = [-1.0, -2.0]
-    dist = tfd.MultivariateNormalDiagWithSoftplusScale(
-        mu, diag, validate_args=True)
-    samps = self.evaluate(dist.sample(1000, seed=tfp_test_util.test_seed()))
-    cov_mat = self.evaluate(tf.linalg.diag(tf.math.softplus(diag))**2)
-
-    self.assertAllClose(mu, samps.mean(axis=0), atol=0.1)
-    self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.1)
-
   def testMultivariateNormalDiagNegLogLikelihood(self):
     num_draws = 50
     dims = 3
