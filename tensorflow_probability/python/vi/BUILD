@@ -73,16 +73,22 @@ py_library(
     srcs = ["mutual_information.py"],
     srcs_version = "PY2AND3",
     deps = [
+        # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
 py_test(
     name = "mutual_information_test",
-    size = "small",
+    size = "medium",
     srcs = ["mutual_information_test.py"],
+    shard_count = 5,
     deps = [
         # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
