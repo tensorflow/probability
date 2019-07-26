@@ -1891,6 +1891,8 @@ class VariationalGaussianProcess(DistributionLambda):
       loss = vgp.variational_loss(bij.forward(y), kl_weight=kl_weight)
       return loss
     d.variational_loss = _transposed_variational_loss
+    d.surrogate_posterior_kl_divergence_prior = (
+        vgp.surrogate_posterior_kl_divergence_prior)
     return d
 
 
