@@ -297,5 +297,7 @@ py_library(
     srcs = ["v2.py"],
     deps = [
         ":ops",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )

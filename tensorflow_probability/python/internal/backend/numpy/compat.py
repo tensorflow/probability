@@ -47,10 +47,6 @@ dimension_value = utils.copy_docstring(
     _dimension_value)
 
 
-function = utils.copy_docstring(
-    tf.function,
-    lambda func=None, input_signature=None, autograph=True,  # pylint: disable=g-long-lambda
-           experimental_autograph_options=None,
-           experimental_relax_shapes=False: func)
+function = v2.function
 
 del tf, utils
