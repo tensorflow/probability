@@ -29,6 +29,11 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 tfd = tfp.distributions
 
 
+@tf.function(autograph=False)
+def _graph_mode_sample_chain(*args, **kwargs):
+  return tfp.mcmc.sample_chain(*args, trace_fn=None, **kwargs)
+
+
 @test_util.run_all_in_graph_and_eager_modes
 class LangevinTest(tf.test.TestCase):
 
@@ -37,7 +42,7 @@ class LangevinTest(tf.test.TestCase):
     dtype = np.float32
 
     target = tfd.Normal(loc=dtype(0), scale=dtype(1))
-    samples, _ = tfp.mcmc.sample_chain(
+    samples = _graph_mode_sample_chain(
         num_results=1000,
         current_state=dtype(1),
         kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
@@ -60,9 +65,16 @@ class LangevinTest(tf.test.TestCase):
 
   def testLangevin3DNormal(self):
     """Sampling from a 3-D Multivariate Normal distribution."""
-    dtype = np.float32
-    true_mean = dtype([1, 2, 7])
-    true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
+    dtype = tf.float32
+    true_mean = tf.constant([1, 2, 7], dtype=dtype)
+    true_cov = tf.constant(
+        [
+            [1, 0.25, 0.25],
+            [0.25, 1, 0.25],
+            [0.25, 0.25, 1],
+        ],
+        dtype=dtype,
+    )
     num_results = 500
     num_chains = 500
 
@@ -78,12 +90,12 @@ class LangevinTest(tf.test.TestCase):
       return target.log_prob(z)
 
     # Initial state of the chain
-    init_state = [np.ones([num_chains, 2], dtype=dtype),
-                  np.ones([num_chains, 1], dtype=dtype)]
+    init_state = [tf.ones([num_chains, 2], dtype=dtype),
+                  tf.ones([num_chains, 1], dtype=dtype)]
 
     # Run MALA with normal proposal for `num_results` iterations for
     # `num_chains` independent chains:
-    states, _ = tfp.mcmc.sample_chain(
+    states = _graph_mode_sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
@@ -108,9 +120,16 @@ class LangevinTest(tf.test.TestCase):
 
   def testLangevin3DNormalDynamicVolatility(self):
     """Sampling from a 3-D Multivariate Normal distribution."""
-    dtype = np.float32
-    true_mean = dtype([1, 2, 7])
-    true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
+    dtype = tf.float32
+    true_mean = tf.constant([1, 2, 7], dtype=dtype)
+    true_cov = tf.constant(
+        [
+            [1, 0.25, 0.25],
+            [0.25, 1, 0.25],
+            [0.25, 0.25, 1],
+        ],
+        dtype=dtype,
+    )
     num_results = 500
     num_chains = 500
 
@@ -132,12 +151,12 @@ class LangevinTest(tf.test.TestCase):
               1. / (0.5 + 0.1 * tf.abs(y))]
 
     # Initial state of the chain
-    init_state = [np.ones([num_chains, 2], dtype=dtype),
-                  np.ones([num_chains, 1], dtype=dtype)]
+    init_state = [tf.ones([num_chains, 2], dtype=dtype),
+                  tf.ones([num_chains, 1], dtype=dtype)]
 
     # Run Random Walk Metropolis with normal proposal for `num_results`
     # iterations for `num_chains` independent chains:
-    states, _ = tfp.mcmc.sample_chain(
+    states = _graph_mode_sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
