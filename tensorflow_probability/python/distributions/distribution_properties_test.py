@@ -86,6 +86,7 @@ TF2_FRIENDLY_DISTS = (
     'StudentT',
     'Triangular',
     'Uniform',
+    'VonMises',
     'Zipf',
 )
 

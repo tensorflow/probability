@@ -28,7 +28,9 @@ from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
 
 
@@ -98,7 +100,7 @@ class VonMises(distribution.Distribution):
                concentration,
                validate_args=False,
                allow_nan_stats=True,
-               name="VonMises"):
+               name='VonMises'):
     """Construct von Mises distributions with given location and concentration.
 
     The parameters `loc` and `concentration` must be shaped in a way that
@@ -127,28 +129,23 @@ class VonMises(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, concentration],
                                       dtype_hint=tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      concentration = tf.convert_to_tensor(
-          concentration, name="concentration", dtype=dtype)
-      with tf.control_dependencies([
-          assert_util.assert_non_negative(concentration)
-      ] if validate_args else []):
-        self._loc = tf.identity(loc, name="loc")
-        self._concentration = tf.identity(concentration, name="concentration")
-        dtype_util.assert_same_float_dtype([self._loc, self._concentration])
-    super(VonMises, self).__init__(
-        dtype=self._concentration.dtype,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._loc, self._concentration],
-        name=name)
+      self._loc = tensor_util.convert_nonref_to_tensor(
+          loc, name='loc', dtype=dtype)
+      self._concentration = tensor_util.convert_nonref_to_tensor(
+          concentration, name='concentration', dtype=dtype)
+      dtype_util.assert_same_float_dtype([self._loc, self._concentration])
+      super(VonMises, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("loc", "concentration"),
+        zip(('loc', 'concentration'),
             ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
@@ -165,9 +162,11 @@ class VonMises(distribution.Distribution):
     """Distribution parameter for the concentration."""
     return self._concentration
 
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc), tf.shape(self.concentration))
+  def _batch_shape_tensor(self, loc=None, concentration=None):
+    return prefer_static.broadcast_shape(
+        prefer_static.shape(self.loc if loc is None else loc),
+        prefer_static.shape(self.concentration if concentration is None
+                            else concentration))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.loc.shape, self.concentration.shape)
@@ -179,71 +178,101 @@ class VonMises(distribution.Distribution):
     return tf.TensorShape([])
 
   def _log_prob(self, x):
-    return self._log_unnormalized_prob(x) - self._log_normalization()
+    concentration = tf.convert_to_tensor(self.concentration)
+    log_normalization = np.log(2. * np.pi) + tf.math.log(
+        tf.math.bessel_i0e(concentration))
+    return (self._log_unnormalized_prob(x, loc=self.loc,
+                                        concentration=concentration) -
+            log_normalization)
 
-  def _log_unnormalized_prob(self, x):
-    z = self._z(x)
-    return self.concentration * (tf.cos(z) - 1)
-
-  def _log_normalization(self):
-    return np.log(2. * np.pi) + tf.math.log(
-        tf.math.bessel_i0e(self.concentration))
+  def _log_unnormalized_prob(self, x, loc, concentration):
+    z = self._z(x, loc=loc)
+    return concentration * (tf.cos(z) - 1)
 
   def _prob(self, x):
-    unnormalized_prob = tf.exp(self._log_unnormalized_prob(x))
-    normalization = (2. * np.pi) * tf.math.bessel_i0e(self.concentration)
+    concentration = tf.convert_to_tensor(self.concentration)
+    unnormalized_prob = tf.exp(self._log_unnormalized_prob(
+        x, loc=self.loc, concentration=concentration))
+    normalization = (2. * np.pi) * tf.math.bessel_i0e(concentration)
     return unnormalized_prob / normalization
 
   def _cdf(self, x):
-    z = self._z(x) + tf.zeros_like(self.concentration)
-    concentration = self.concentration + tf.zeros_like(z)
+    loc = tf.convert_to_tensor(self.loc)
+    concentration = tf.convert_to_tensor(self.concentration)
+    batch_shape = prefer_static.broadcast_shape(
+        self._batch_shape_tensor(loc=loc, concentration=concentration),
+        prefer_static.shape(x))
+    z = tf.broadcast_to(self._z(x, loc=loc), batch_shape)
+    concentration = tf.broadcast_to(concentration, batch_shape)
     return von_mises_cdf(z, concentration)
 
   def _entropy(self):
-    i0e = tf.math.bessel_i0e(self.concentration)
-    i1e = tf.math.bessel_i1e(self.concentration)
+    concentration = tf.convert_to_tensor(self.concentration)
+    i0e = tf.math.bessel_i0e(concentration)
+    i1e = tf.math.bessel_i1e(concentration)
     entropy = (
-        self.concentration * (1 - i1e / i0e) + tf.math.log(i0e) +
+        concentration * (1 - i1e / i0e) + tf.math.log(i0e) +
         np.log(2 * np.pi))
-    return entropy + tf.zeros_like(self.loc)
+    return tf.broadcast_to(entropy, self._batch_shape_tensor(
+        concentration=concentration))
 
   @distribution_util.AppendDocstring(
       """Note: This function computes the circular mean, defined as
       atan2(E sin(x), E cos(x)). The values are in the [-pi, pi] range.""")
   def _mean(self):
-    return self.loc + tf.zeros_like(self.concentration)
+    loc = tf.convert_to_tensor(self.loc)
+    return tf.broadcast_to(loc, self._batch_shape_tensor(loc=loc))
 
   def _mode(self):
-    return self.mean()
+    return self._mean()
 
   @distribution_util.AppendDocstring(
       """Note: This function computes the circular variance defined as
       1 - E cos(x - loc). The values are in the [0, 1] range.""")
   def _variance(self):
-    concentration = self.concentration + tf.zeros_like(self.loc)
+    concentration = tf.convert_to_tensor(self.concentration)
+    concentration = tf.broadcast_to(
+        concentration, self._batch_shape_tensor(concentration=concentration))
     return 1. - tf.math.bessel_i1e(concentration) / tf.math.bessel_i0e(
         concentration)
 
-  def _z(self, x):
+  def _z(self, x, loc):
     """Standardize input `x` to a zero-loc von Mises."""
-    with tf.name_scope("standardize"):
-      return x - self.loc
+    with tf.name_scope('standardize'):
+      return x - loc
 
   def _sample_n(self, n, seed=None):
+    loc = tf.convert_to_tensor(self.loc)
+    concentration = tf.convert_to_tensor(self.concentration)
+    concentration = tf.broadcast_to(
+        concentration, self._batch_shape_tensor(
+            loc=loc, concentration=concentration))
+
     # random_von_mises does not work for zero concentration, so round it up to
     # something very small.
     tiny = np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny
-    concentration = tf.maximum(self.concentration, tiny)
+    concentration = tf.maximum(concentration, tiny)
 
-    sample_batch_shape = tf.concat([[n], self._batch_shape_tensor()], axis=0)
+    sample_batch_shape = tf.concat([
+        [n], prefer_static.shape(concentration)], axis=0)
     samples = random_von_mises(
         sample_batch_shape, concentration, dtype=self.dtype, seed=seed)
 
     # vonMises(0, concentration) -> vonMises(loc, concentration)
-    samples += self.loc
+    samples += loc
     # Map the samples to [-pi, pi].
     samples -= 2. * np.pi * tf.round(samples / (2. * np.pi))
     return samples
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_ref(self.concentration):
+      assertions.append(assert_util.assert_non_negative(
+          self.concentration,
+          message='Argument `concentration` must be non-negative.'))
+    return assertions
 
 
 @kullback_leibler.RegisterKL(VonMises, VonMises)
@@ -259,7 +288,7 @@ def _kl_von_mises_von_mises(d1, d2, name=None):
   Returns:
     Batchwise KL(d1 || d2)
   """
-  with tf.name_scope(name or "kl_von_mises_von_mises"):
+  with tf.name_scope(name or 'kl_von_mises_von_mises'):
     # The density of von Mises is (abbreviating the concentration for conc):
     #   vonMises(x; loc, conc) = exp(conc cos(x - loc)) / (2 pi I_0 (conc) )
     # We need two properties:
@@ -295,12 +324,15 @@ def _kl_von_mises_von_mises(d1, d2, name=None):
     #     + (conc1 - conc2 cos (loc2 - loc1)) I_1^E(conc1) / I_0^E(conc1)
     # Note that this formula is numerically stable for conc1 = 0 and/or
     # conc2 = 0 because I_0 (0) = I_0^E (0) = 1.
-    i0e_concentration1 = tf.math.bessel_i0e(d1.concentration)
-    i1e_concentration1 = tf.math.bessel_i1e(d1.concentration)
-    i0e_concentration2 = tf.math.bessel_i0e(d2.concentration)
-    return ((d2.concentration - d1.concentration) +
+    concentration1 = tf.convert_to_tensor(d1.concentration)
+    concentration2 = tf.convert_to_tensor(d2.concentration)
+
+    i0e_concentration1 = tf.math.bessel_i0e(concentration1)
+    i1e_concentration1 = tf.math.bessel_i1e(concentration1)
+    i0e_concentration2 = tf.math.bessel_i0e(concentration2)
+    return ((concentration2 - concentration1) +
             tf.math.log(i0e_concentration2 / i0e_concentration1) +
-            (d1.concentration - d2.concentration * tf.cos(d1.loc - d2.loc)) *
+            (concentration1 - concentration2 * tf.cos(d1.loc - d2.loc)) *
             (i1e_concentration1 / i0e_concentration1))
 
 
@@ -401,10 +433,10 @@ def _von_mises_cdf_series(x, concentration, num_terms, dtype):
       body=loop_body,
       loop_vars=(
           num_terms,  # n
-          tf.zeros_like(x, name="rn"),
-          tf.zeros_like(x, name="drn_dconcentration"),
-          tf.zeros_like(x, name="vn"),
-          tf.zeros_like(x, name="dvn_dconcentration"),
+          tf.zeros_like(x, name='rn'),
+          tf.zeros_like(x, name='drn_dconcentration'),
+          tf.zeros_like(x, name='vn'),
+          tf.zeros_like(x, name='dvn_dconcentration'),
       ),
   )
 
@@ -474,9 +506,9 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
     [2] Michael Figurnov, Shakir Mohamed, Andriy Mnih. "Implicit
     Reparameterization Gradients", 2018.
   """
-  seed = SeedStream(seed, salt="von_mises")
+  seed = SeedStream(seed, salt='von_mises')
   concentration = tf.convert_to_tensor(
-      concentration, dtype=dtype, name="concentration")
+      concentration, dtype=dtype, name='concentration')
 
   @tf.custom_gradient
   def rejection_sample_with_gradient(concentration):
@@ -545,9 +577,9 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
         cond=lambda done, *_: ~tf.reduce_all(done),
         body=loop_body,
         loop_vars=(
-            tf.zeros(shape, dtype=tf.bool, name="done"),
-            tf.zeros(shape, dtype=dtype, name="u"),
-            tf.zeros(shape, dtype=dtype, name="w"),
+            tf.zeros(shape, dtype=tf.bool, name='done'),
+            tf.zeros(shape, dtype=dtype, name='u'),
+            tf.zeros(shape, dtype=dtype, name='w'),
         ),
         # The expected number of iterations depends on concentration.
         # It monotonically increases from one iteration for concentration = 0 to
@@ -562,7 +594,8 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
 
     def grad(dy):
       """The gradient of the von Mises samples w.r.t. concentration."""
-      broadcast_concentration = concentration + tf.zeros_like(x)
+      broadcast_concentration = tf.broadcast_to(
+          concentration, prefer_static.shape(x))
       _, dcdf_dconcentration = value_and_gradient(
           lambda conc: von_mises_cdf(x, conc), broadcast_concentration)
       inv_prob = tf.exp(-broadcast_concentration * (tf.cos(x) - 1.)) * (
