@@ -26,24 +26,18 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 tfd = tfp.distributions
 
 
-@tf.function(autograph=False)
-def graph_mode_sample_chain(*args, **kwargs):
-  return tfp.mcmc.sample_chain(*args, trace_fn=None, **kwargs)
-
-
 @test_util.run_all_in_graph_and_eager_modes
 class SliceSamplerTest(tf.test.TestCase):
 
   def testOneDimNormal(self):
     """Sampling from the Standard Normal Distribution."""
-    dtype = tf.float32
+    dtype = np.float32
 
-    target = tfd.Normal(
-        loc=tf.zeros([], dtype=dtype), scale=tf.ones([], dtype=dtype))
+    target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
-    samples = graph_mode_sample_chain(
+    samples, _ = tfp.mcmc.sample_chain(
         num_results=500,
-        current_state=tf.constant(1, dtype=dtype),
+        current_state=dtype(1),
         kernel=tfp.mcmc.SliceSampler(
             target.log_prob,
             step_size=1.0,
@@ -65,8 +59,8 @@ class SliceSamplerTest(tf.test.TestCase):
   def testTwoDimNormal(self):
     """Sampling from a 2-D Multivariate Normal distribution."""
     dtype = np.float32
-    true_mean = tf.zeros(2, dtype=dtype)
-    true_cov = tf.constant([[1, 0.5], [0.5, 1]], dtype=dtype)
+    true_mean = dtype([0, 0])
+    true_cov = dtype([[1, 0.5], [0.5, 1]])
     num_results = 200
     num_chains = 75
     # Target distribution is defined through the Cholesky decomposition.
@@ -81,12 +75,12 @@ class SliceSamplerTest(tf.test.TestCase):
       return target.log_prob(z)
 
     # Initial state of the chain
-    init_state = [tf.ones([num_chains, 1], dtype=dtype),
-                  tf.ones([num_chains, 1], dtype=dtype)]
+    init_state = [np.ones([num_chains, 1], dtype=dtype),
+                  np.ones([num_chains, 1], dtype=dtype)]
 
     # Run Slice Samper for `num_results` iterations for `num_chains`
     # independent chains:
-    x, y = graph_mode_sample_chain(
+    [x, y], _ = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.SliceSampler(
@@ -115,8 +109,8 @@ class SliceSamplerTest(tf.test.TestCase):
     if tf.executing_eagerly(): return
 
     dtype = np.float32
-    true_mean = tf.zeros(2, dtype=dtype)
-    true_cov = tf.constant([[1, 0.5], [0.5, 1]], dtype=dtype)
+    true_mean = dtype([0, 0])
+    true_cov = dtype([[1, 0.5], [0.5, 1]])
     num_results = 200
     num_chains = 75
     # Target distribution is defined through the Cholesky decomposition.
@@ -126,19 +120,20 @@ class SliceSamplerTest(tf.test.TestCase):
     # Assume that the state is passed as a list of 1-d tensors `x` and `y`.
     # Then the target log-density is defined as follows:
     def target_log_prob(x, y):
+      # Stack the input tensors together
       z = tf.stack([x, y], axis=-1) - true_mean
       return target.log_prob(z)
 
     # Initial state of the chain
-    init_state = [tf.ones([num_chains, 1], dtype=dtype),
-                  tf.ones([num_chains, 1], dtype=dtype)]
+    init_state = [np.ones([num_chains, 1], dtype=dtype),
+                  np.ones([num_chains, 1], dtype=dtype)]
     placeholder_init_state = [
         tf.compat.v1.placeholder_with_default(init_state[0], shape=[None, 1]),
         tf.compat.v1.placeholder_with_default(init_state[1], shape=[None, 1])
     ]
     # Run Slice Samper for `num_results` iterations for `num_chains`
     # independent chains:
-    x, y = graph_mode_sample_chain(
+    [x, y], _ = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=placeholder_init_state,
         kernel=tfp.mcmc.SliceSampler(
@@ -165,8 +160,8 @@ class SliceSamplerTest(tf.test.TestCase):
     """Checks that fully dynamic shape for the initial state is supported."""
     if tf.executing_eagerly(): return
     dtype = np.float32
-    true_mean = tf.zeros(2, dtype=dtype)
-    true_cov = tf.constant([[1, 0.5], [0.5, 1]], dtype=dtype)
+    true_mean = dtype([0, 0])
+    true_cov = dtype([[1, 0.5], [0.5, 1]])
     num_results = 200
     num_chains = 75
     # Target distribution is defined through the Cholesky decomposition.
@@ -181,16 +176,15 @@ class SliceSamplerTest(tf.test.TestCase):
       return target.log_prob(z)
 
     # Initial state of the chain
-    init_state = [tf.ones([num_chains, 1], dtype=dtype),
-                  tf.ones([num_chains, 1], dtype=dtype)]
+    init_state = [np.ones([num_chains, 1], dtype=dtype),
+                  np.ones([num_chains, 1], dtype=dtype)]
     placeholder_init_state = [
         tf.compat.v1.placeholder_with_default(init_state[0], shape=None),
         tf.compat.v1.placeholder_with_default(init_state[1], shape=None)
     ]
     # Run Slice Samper for `num_results` iterations for `num_chains`
     # independent chains:
-    # TODO(b/138304652): Switch to graph_mode_sample_chain.
-    x, y = tfp.mcmc.sample_chain(
+    [x, y], _ = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=placeholder_init_state,
         kernel=tfp.mcmc.SliceSampler(
@@ -200,8 +194,7 @@ class SliceSamplerTest(tf.test.TestCase):
             seed=47),
         num_burnin_steps=200,
         num_steps_between_results=1,
-        parallel_iterations=1,
-        trace_fn=None)
+        parallel_iterations=1)
 
     states = tf.stack([x, y], axis=-1)
     sample_mean = tf.reduce_mean(input_tensor=states, axis=[0, 1])
@@ -217,9 +210,9 @@ class SliceSamplerTest(tf.test.TestCase):
   def testFourDimNormal(self):
     """Sampling from a 4-D Multivariate Normal distribution."""
 
-    dtype = tf.float32
-    true_mean = tf.constant([0, 4, -8, 2], dtype=dtype)
-    true_cov = tf.eye(4, dtype=dtype)
+    dtype = np.float32
+    true_mean = dtype([0, 4, -8, 2])
+    true_cov = dtype([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
     num_results = 25
     num_chains = 500
     # Target distribution is defined through the Cholesky decomposition
@@ -227,11 +220,11 @@ class SliceSamplerTest(tf.test.TestCase):
     target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
     # Initial state of the chain
-    init_state = [tf.ones([num_chains, 4], dtype=dtype)]
+    init_state = [np.ones([num_chains, 4], dtype=dtype)]
 
     # Run Slice Samper for `num_results` iterations for `num_chains`
     # independent chains:
-    states = graph_mode_sample_chain(
+    states, _ = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.SliceSampler(
@@ -253,9 +246,9 @@ class SliceSamplerTest(tf.test.TestCase):
     [sample_mean_err, sample_cov_err] = self.evaluate([sample_mean_err,
                                                        sample_cov_err])
 
-    self.assertAllClose(tf.zeros_like(sample_mean_err), b=sample_mean_err,
+    self.assertAllClose(np.zeros_like(sample_mean_err), b=sample_mean_err,
                         atol=0.1, rtol=0.1)
-    self.assertAllClose(tf.zeros_like(sample_cov_err), b=sample_cov_err,
+    self.assertAllClose(np.zeros_like(sample_cov_err), b=sample_cov_err,
                         atol=0.1, rtol=0.1)
 
 if __name__ == '__main__':
