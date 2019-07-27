@@ -339,6 +339,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual(
         util.flatten_tree(proposed), util.flatten_tree(accepted))
 
+  @_skip_on_jax  # TODO(b/138469069): Re-enable when JAX gets fast again.
   def testBasicHMC(self):
     step_size = 0.2
     num_steps = 2000
