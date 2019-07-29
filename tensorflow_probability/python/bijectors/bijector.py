@@ -33,11 +33,9 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'Bijector',
-    'ConditionalBijector',
 ]
 
 
@@ -1425,15 +1423,3 @@ class Bijector(tf.Module):
         graph dependencies.
     """
     return ()
-
-
-class ConditionalBijector(Bijector):
-  """Conditional Bijector is a Bijector that allows intrinsic conditioning."""
-
-  @deprecation.deprecated(
-      '2019-07-01',
-      '`ConditionalBijector` is no longer required; `Bijector` '
-      'top-level functions now pass-through `**kwargs`.',
-      warn_once=True)
-  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
-    return super(ConditionalBijector, cls).__new__(cls)

@@ -33,7 +33,6 @@ from tensorflow_probability.python.distributions.deterministic import Determinis
 from tensorflow_probability.python.distributions.deterministic import VectorDeterministic
 from tensorflow_probability.python.distributions.dirichlet import Dirichlet
 from tensorflow_probability.python.distributions.dirichlet_multinomial import DirichletMultinomial
-from tensorflow_probability.python.distributions.distribution import ConditionalDistribution
 from tensorflow_probability.python.distributions.distribution import Distribution
 from tensorflow_probability.python.distributions.empirical import Empirical
 from tensorflow_probability.python.distributions.exponential import Exponential
@@ -97,7 +96,6 @@ from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.distributions.student_t import StudentT
 from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
-from tensorflow_probability.python.distributions.transformed_distribution import ConditionalTransformedDistribution
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
 from tensorflow_probability.python.distributions.triangular import Triangular
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
@@ -132,9 +130,6 @@ del _sys
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member,g-bad-import-order
 
 __all__ = [
-    'Cauchy',
-    'ConditionalDistribution',
-    'ConditionalTransformedDistribution',
     'FULLY_REPARAMETERIZED',
     'NOT_REPARAMETERIZED',
     'ReparameterizationType',
@@ -146,6 +141,7 @@ __all__ = [
     'Binomial',
     'Blockwise',
     'Categorical',
+    'Cauchy',
     'Chi',
     'Chi2',
     'Deterministic',

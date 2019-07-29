@@ -104,8 +104,6 @@ MUTEX_PARAMS = (
 )
 
 SPECIAL_DISTS = (
-    'ConditionalDistribution',
-    'ConditionalTransformedDistribution',
     'Distribution',
     'Empirical',
     'Independent',

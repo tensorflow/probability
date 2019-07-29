@@ -25,10 +25,8 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
-    "ConditionalTransformedDistribution",
     "TransformedDistribution",
 ]
 
@@ -674,16 +672,3 @@ class TransformedDistribution(distribution_lib.Distribution):
       return event_ndims_
 
     return event_ndims
-
-
-class ConditionalTransformedDistribution(TransformedDistribution):
-  """A TransformedDistribution that allows intrinsic conditioning."""
-
-  @deprecation.deprecated(
-      "2019-07-01",
-      "`ConditionalTransformedDistribution` is no longer required; "
-      "`TransformedDistribution` top-level functions now pass-through "
-      "`**kwargs`.",
-      warn_once=True)
-  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
-    return super(ConditionalTransformedDistribution, cls).__new__(cls)

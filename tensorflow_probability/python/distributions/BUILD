@@ -1463,42 +1463,6 @@ py_test(
 )
 
 py_test(
-    name = "conditional_distribution_test",
-    size = "small",
-    srcs = [
-        "conditional_distribution_test.py",
-        "distribution_test.py",
-    ],
-    tags = ["no_pip"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-    ],
-)
-
-py_test(
-    name = "conditional_transformed_distribution_test",
-    size = "medium",
-    srcs = [
-        "conditional_transformed_distribution_test.py",
-        "transformed_distribution_test.py",
-    ],
-    tags = [
-        "no_pip",
-    ],
-    deps = [
-        # numpy dep,
-        # scipy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_test(
     name = "deterministic_test",
     size = "small",
     srcs = ["deterministic_test.py"],

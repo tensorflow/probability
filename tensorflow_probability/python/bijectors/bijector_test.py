@@ -407,5 +407,65 @@ class TfModuleTest(test_case.TestCase):
     self.assertEqual((-1.,), self.evaluate(g))
 
 
+class _ConditionalBijector(tfb.Bijector):
+
+  def __init__(self):
+    super(_ConditionalBijector, self).__init__(
+        forward_min_event_ndims=0,
+        graph_parents=[],
+        is_constant_jacobian=True,
+        validate_args=False,
+        dtype=tf.float32,
+        name='test_bijector')
+
+  # These are not implemented in the base class, but we need to write a stub in
+  # order to mock them out.
+  def _inverse_log_det_jacobian(self, _, arg1, arg2):
+    pass
+
+  def _forward_log_det_jacobian(self, _, arg1, arg2):
+    pass
+
+
+# Test that ensures kwargs from public methods are passed in to
+# private methods.
+@test_util.run_all_in_graph_and_eager_modes
+class ConditionalBijectorTest(tf.test.TestCase):
+
+  def testConditionalBijector(self):
+    b = _ConditionalBijector()
+    arg1 = 'b1'
+    arg2 = 'b2'
+    retval = tf.constant(1.)
+    for name in ['forward', 'inverse']:
+      method = getattr(b, name)
+      with mock.patch.object(b, '_' + name, return_value=retval) as mock_method:
+        method(1., arg1=arg1, arg2=arg2)
+      mock_method.assert_called_once_with(mock.ANY, arg1=arg1, arg2=arg2)
+
+    for name in ['inverse_log_det_jacobian', 'forward_log_det_jacobian']:
+      method = getattr(b, name)
+      with mock.patch.object(b, '_' + name, return_value=retval) as mock_method:
+        method(1., event_ndims=0, arg1=arg1, arg2=arg2)
+      mock_method.assert_called_once_with(mock.ANY, arg1=arg1, arg2=arg2)
+
+  def testNestedCondition(self):
+    b = _ConditionalBijector()
+    arg1 = {'b1': 'c1'}
+    arg2 = {'b2': 'c2'}
+    retval = tf.constant(1.)
+    for name in ['forward', 'inverse']:
+      method = getattr(b, name)
+      with mock.patch.object(b, '_' + name, return_value=retval) as mock_method:
+        method(1., arg1=arg1, arg2=arg2)
+      mock_method.assert_called_once_with(mock.ANY, arg1=arg1, arg2=arg2)
+
+    for name in ['inverse_log_det_jacobian', 'forward_log_det_jacobian']:
+      method = getattr(b, name)
+      with mock.patch.object(b, '_' + name, return_value=retval) as mock_method:
+        method(1., event_ndims=0, arg1=arg1, arg2=arg2)
+      mock_method.assert_called_once_with(mock.ANY, arg1=arg1, arg2=arg2)
+
+
 if __name__ == '__main__':
   tf.test.main()

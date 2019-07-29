@@ -851,16 +851,6 @@ py_test(
 )
 
 py_test(
-    name = "conditional_bijector_test",
-    size = "small",
-    srcs = ["conditional_bijector_test.py"],
-    deps = [
-        ":bijectors",
-        # tensorflow dep,
-    ],
-)
-
-py_test(
     name = "matveclu_test",
     size = "small",
     srcs = ["matveclu_test.py"],
