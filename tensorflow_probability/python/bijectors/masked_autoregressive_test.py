@@ -40,10 +40,10 @@ def _masked_autoregressive_2d_template(base_template, event_shape):
 
   def wrapper(x):
     x_flat = tf.reshape(
-        x, tf.concat([tf.shape(input=x)[:-len(event_shape)], [-1]], -1))
+        x, tf.concat([tf.shape(x)[:-len(event_shape)], [-1]], -1))
     x_shift, x_log_scale = base_template(x_flat)
-    return tf.reshape(x_shift, tf.shape(input=x)), tf.reshape(
-        x_log_scale, tf.shape(input=x))
+    return tf.reshape(x_shift, tf.shape(x)), tf.reshape(
+        x_log_scale, tf.shape(x))
 
   return wrapper
 

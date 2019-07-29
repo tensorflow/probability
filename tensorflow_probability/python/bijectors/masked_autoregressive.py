@@ -307,8 +307,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
         y = self._bijector_fn(y, **kwargs).forward(x)
       return y
 
-    event_size = tf.reduce_prod(
-        input_tensor=tf.shape(input=x)[-self._event_ndims:])
+    event_size = tf.reduce_prod(tf.shape(x)[-self._event_ndims:])
     y0 = tf.zeros_like(x, name='y0')
     # call the template once to ensure creation
     if not tf.executing_eagerly():
@@ -537,7 +536,7 @@ def masked_autoregressive_default_template(hidden_layers,
             'Rightmost dimension must be known prior to graph execution.')
       input_shape = (
           np.int32(tensorshape_util.as_list(x.shape))
-          if tensorshape_util.is_fully_defined(x.shape) else tf.shape(input=x))
+          if tensorshape_util.is_fully_defined(x.shape) else tf.shape(x))
       if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
       for i, units in enumerate(hidden_layers):
@@ -922,8 +921,8 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   def call(self, x):
     """See tfkl.Layer.call."""
     with tf.name_scope(self.name or 'AutoregressiveNetwork_call'):
-      x = tf.convert_to_tensor(value=x, dtype=self.dtype, name='x')
-      input_shape = tf.shape(input=x)
+      x = tf.convert_to_tensor(x, dtype=self.dtype, name='x')
+      input_shape = tf.shape(x)
       # TODO(b/67594795): Better support for dynamic shapes.
       if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
@@ -1063,7 +1062,7 @@ def _make_masked_initializer(mask, initializer):
 def _make_masked_constraint(mask, constraint=None):
   constraint = tf.keras.constraints.get(constraint)
   def masked_constraint(x):
-    x = tf.convert_to_tensor(value=x, dtype_hint=tf.float32, name='x')
+    x = tf.convert_to_tensor(x, dtype_hint=tf.float32, name='x')
     if constraint is not None:
       x = constraint(x)
     return tf.cast(mask, x.dtype) * x
