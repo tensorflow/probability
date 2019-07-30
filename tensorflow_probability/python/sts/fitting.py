@@ -595,22 +595,25 @@ def fit_with_hmc(model,
               for p in model.parameters]
 
     # Run HMC to sample from the posterior on parameters.
-    samples, kernel_results = mcmc.sample_chain(
-        num_results=num_results,
-        current_state=initial_state,
-        num_burnin_steps=num_warmup_steps,
-        kernel=mcmc.SimpleStepSizeAdaptation(
-            inner_kernel=mcmc.TransformedTransitionKernel(
-                inner_kernel=mcmc.HamiltonianMonteCarlo(
-                    target_log_prob_fn=target_log_prob_fn,
-                    step_size=initial_step_size,
-                    num_leapfrog_steps=num_leapfrog_steps,
-                    state_gradients_are_stopped=True,
-                    seed=seed()),
-                bijector=[param.bijector for param in model.parameters]),
-            num_adaptation_steps=int(num_warmup_steps * 0.8),
-            adaptation_rate=tf.convert_to_tensor(
-                value=0.1, dtype=initial_state[0].dtype)),
-        parallel_iterations=1 if seed is not None else 10)
+    @tf.function(autograph=False)
+    def run_hmc():
+      return mcmc.sample_chain(
+          num_results=num_results,
+          current_state=initial_state,
+          num_burnin_steps=num_warmup_steps,
+          kernel=mcmc.SimpleStepSizeAdaptation(
+              inner_kernel=mcmc.TransformedTransitionKernel(
+                  inner_kernel=mcmc.HamiltonianMonteCarlo(
+                      target_log_prob_fn=target_log_prob_fn,
+                      step_size=initial_step_size,
+                      num_leapfrog_steps=num_leapfrog_steps,
+                      state_gradients_are_stopped=True,
+                      seed=seed()),
+                  bijector=[param.bijector for param in model.parameters]),
+              num_adaptation_steps=int(num_warmup_steps * 0.8),
+              adaptation_rate=tf.convert_to_tensor(
+                  value=0.1, dtype=initial_state[0].dtype)),
+          parallel_iterations=1 if seed is not None else 10)
+    samples, kernel_results = run_hmc()
 
     return samples, kernel_results
