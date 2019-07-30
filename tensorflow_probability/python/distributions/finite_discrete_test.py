@@ -63,9 +63,10 @@ class FiniteDiscreteValidateArgsTest(FiniteDiscreteTest):
       self.evaluate(dist.mean())
 
   def testSizeOfOutcomesIsZeroRaises(self):
-    # Skip this test in static mode, because creating the underlying categorical
-    # fails first.
-    if self.use_static_shape:
+    # Skip this test in dynamic mode, because the "same last dimensions" check
+    # may fail first.  Static mode is OK because the ValueError is raised in
+    # Python.
+    if not self.use_static_shape:
       return
 
     outcomes = self._build_tensor([])
