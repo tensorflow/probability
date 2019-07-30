@@ -77,7 +77,7 @@ def make_value_setter(**model_kwargs):
   ```python
   x_observed = np.array([6, 3, 1, 8, 7, 0, 6, 4, 7, 5])
   def observed_model():
-    with ed.interception(make_value_setter(x=x_observed)):
+    with ed.interception(ed.make_value_setter(x=x_observed)):
       model()
   observed_log_joint_fn = ed.make_log_joint_fn(observed_model)
 
