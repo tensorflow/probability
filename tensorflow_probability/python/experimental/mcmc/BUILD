@@ -57,6 +57,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal/auto_batching",
     ],
 )
 

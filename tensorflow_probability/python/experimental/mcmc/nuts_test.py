@@ -26,6 +26,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
+from tensorflow_probability.python.internal.auto_batching import instructions as inst
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -38,7 +39,7 @@ def run_nuts_chain(
     event_size, batch_size, num_steps,
     initial_state=None, dry_run=False, stackless=False):
   def target_log_prob_fn(event):
-    with tf.compat.v1.name_scope("nuts_test_target_log_prob", values=[event]):
+    with tf.compat.v1.name_scope('nuts_test_target_log_prob', values=[event]):
       return tfd.MultivariateNormalDiag(
           tf.zeros(event_size),
           scale_identity_multiplier=1.).log_prob(event)
@@ -81,7 +82,7 @@ def assert_univariate_target_conservation(
   num_samples = int(5e4)
   num_steps = 1
   target_d = mk_target()
-  strm = tfd.SeedStream(salt="univariate_nuts_test", seed=1)
+  strm = tfd.SeedStream(salt='univariate_nuts_test', seed=1)
   initialization = target_d.sample([num_samples], seed=strm())
   def target(*args):
     # TODO(axch): Just use target_d.log_prob directly, and accept target_d
@@ -274,6 +275,43 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
     self.evaluate(assert_univariate_target_conservation(
         self, mk_sigmoid_beta, step_size=0.02, stackless=True))
 
+  def testProgramProperties(self):
+    def target(x):
+      return x
+    operator = nuts.NoUTurnSampler(
+        target,
+        step_size=0,
+        use_auto_batching=True)
+    program = operator.autobatch_context.program_lowered('evolve_trajectory')
+    def full_var(var):
+      return program.var_alloc[var] == inst.VariableAllocation.FULL
 
-if __name__ == "__main__":
+    # Check that the number of FULL variables doesn't accidentally grow.  This
+    # is an equality rather than comparison to remind the maintainer to reduce
+    # the expected number when they implement any pass that manages to reduce
+    # the count.
+    num_full_vars = 0
+    for var in program.var_alloc:
+      if full_var(var):
+        num_full_vars += 1
+    self.assertEqual(10, num_full_vars)
+
+    # Check that the number of stack pushes doesn't accidentally grow.
+    num_full_stack_pushes = 0
+    for i in range(program.graph.exit_index()):
+      block = program.graph.block(i)
+      for op in block.instructions:
+        if hasattr(op, 'vars_out'):
+          for var in inst.pattern_traverse(op.vars_out):
+            if full_var(var):
+              if (not hasattr(op, 'skip_push_mask')
+                  or var not in op.skip_push_mask):
+                num_full_stack_pushes += 1
+      if isinstance(block.terminator, inst.PushGotoOp):
+        if full_var(inst.pc_var):
+          num_full_stack_pushes += 1
+    self.assertEqual(19, num_full_stack_pushes)
+
+
+if __name__ == '__main__':
   tf.test.main()

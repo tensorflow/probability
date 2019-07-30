@@ -170,7 +170,7 @@ class NoUTurnSampler(mcmc.TransitionKernel):
     self.value_and_gradients_fn = _embed_no_none_gradient_check(
         value_and_gradients_fn)
     max_tree_edges = max_tree_depth - 1
-    self.evolve_trajectory = _make_evolve_trajectory(
+    self.evolve_trajectory, self.autobatch_context = _make_evolve_trajectory(
         self.value_and_gradients_fn, max_tree_edges, unrolled_leapfrog_steps,
         self._seed_stream)
     self._block_code_cache = {}
@@ -525,7 +525,7 @@ def _make_evolve_trajectory(value_and_gradients_fn, max_depth,
       return (next_, next_, next_, num_states, unrolled_leapfrog_steps,
               continue_trajectory)
 
-  return evolve_trajectory
+  return evolve_trajectory, ctx
 
 
 def _embed_no_none_gradient_check(value_and_gradients_fn):

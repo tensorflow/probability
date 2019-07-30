@@ -601,15 +601,19 @@ class Context(object):
     """
     return self.module().program(main)
 
-  def program_compiled(self, main, sig, backend):
+  def program_compiled(self, main, sig=None, backend=None):
     """Constructs a compiled `instructions.Program` for this `Context`.
 
     This constructs the program with `self.program(main)`, and the performs type
-    inference, optimization, and lowering, to emit a result that can be executed
-    (or staged) by the auto-batching VM.
+    inference and optimization, to emit a result that can be executed by the
+    stackless auto-batching VM.
 
     The point of having this as a method in its own right is that it caches the
     compilation on the types of the arguments.
+
+    If either `sig` or `backend` are omitted or `None`, type inference is
+    skipped.  The result is not executable, but it can be enlightening to
+    inspect.
 
     Args:
       main: Python string name of the function that should be the entry point.
@@ -634,12 +638,15 @@ class Context(object):
         self._module = None
         module = self.module()
         prog = module.program(main)
-    typed = ab_type_inference.infer_types_from_signature(prog, sig, backend)
+    if sig is not None and backend is not None:
+      typed = ab_type_inference.infer_types_from_signature(prog, sig, backend)
+    else:
+      typed = prog
     result = allocation_strategy.optimize(typed)
     self._compile_cache = ((module, main, sig, backend), result)
     return result
 
-  def program_lowered(self, main, sig, backend):
+  def program_lowered(self, main, sig=None, backend=None):
     """Constructs a lowered `instructions.Program` for this `Context`.
 
     This constructs the program with `self.program(main)`, and the performs type
@@ -648,6 +655,10 @@ class Context(object):
 
     The point of having this as a method in its own right is that it caches the
     compilation on the types of the arguments.
+
+    If either `sig` or `backend` are omitted or `None`, type inference is
+    skipped.  The result is not executable, but it can be enlightening to
+    inspect.
 
     Args:
       main: Python string name of the function that should be the entry point.
@@ -673,7 +684,10 @@ class Context(object):
         self._compile_cache = None
         module = self.module()
         prog = module.program(main)
-    typed = ab_type_inference.infer_types_from_signature(prog, sig, backend)
+    if sig is not None and backend is not None:
+      typed = ab_type_inference.infer_types_from_signature(prog, sig, backend)
+    else:
+      typed = prog
     alloc = allocation_strategy.optimize(typed)
     lowered = lowering.lower_function_calls(alloc)
     result = stack.fuse_pop_push(lowered)
