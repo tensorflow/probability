@@ -24,6 +24,7 @@ from tensorflow_probability.python.sts.decomposition import decompose_by_compone
 from tensorflow_probability.python.sts.decomposition import decompose_forecast_by_component
 from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegression
 from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegressionStateSpaceModel
+from tensorflow_probability.python.sts.fitting import build_factored_surrogate_posterior
 from tensorflow_probability.python.sts.fitting import build_factored_variational_loss
 from tensorflow_probability.python.sts.fitting import fit_with_hmc
 from tensorflow_probability.python.sts.fitting import sample_uniform_initial_state
@@ -47,7 +48,7 @@ from tensorflow_probability.python.sts.structural_time_series import StructuralT
 from tensorflow_probability.python.sts.sum import AdditiveStateSpaceModel
 from tensorflow_probability.python.sts.sum import Sum
 
-from tensorflow.python.util.all_util import remove_undocumented
+from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'AdditiveStateSpaceModel',
@@ -71,6 +72,7 @@ _allowed_symbols = [
     'SparseLinearRegression',
     'StructuralTimeSeries',
     'Sum',
+    'build_factored_surrogate_posterior',
     'build_factored_variational_loss',
     'decompose_by_component',
     'decompose_forecast_by_component',

@@ -19,13 +19,16 @@ from __future__ import print_function
 
 import collections
 
-# Dependency imports
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import mcmc
+from tensorflow_probability.python import util as tfp_util
+from tensorflow_probability.python import vi
 from tensorflow_probability.python.sts.internal import util as sts_util
+
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 def sample_uniform_initial_state(parameter,
@@ -63,33 +66,137 @@ def sample_uniform_initial_state(parameter,
     return uniform_initializer
 
 
-def _build_trainable_posterior(param, initial_loc_fn):
+def _build_posterior_for_one_parameter(param, batch_shape, seed):
   """Built a transformed-normal variational dist over a parameter's support."""
-  loc = tf1.get_variable(
-      param.name + '_loc',
-      initializer=lambda: initial_loc_fn(param),
-      dtype=param.prior.dtype,
-      use_resource=True)
-  scale = tf.math.softplus(
-      tf1.get_variable(
-          param.name + '_scale',
-          initializer=lambda: -4 * tf.ones_like(initial_loc_fn(param)),
-          dtype=param.prior.dtype,
-          use_resource=True))
 
-  q = tfd.Normal(loc=loc, scale=scale)
+  # Build a trainable Normal distribution.
+  initial_loc = sample_uniform_initial_state(
+      param, init_sample_shape=batch_shape,
+      return_constrained=False, seed=seed)
+  loc = tf.Variable(initial_value=initial_loc,
+                    name=param.name + '_loc')
+  scale = tfp_util.DeferredTensor(
+      tf.nn.softplus, tf.Variable(
+          initial_value=tf.fill(tf.shape(initial_loc),
+                                value=tf.constant(-4, initial_loc.dtype)),
+          name=param.name + '_scale'))
+  posterior_dist = tfd.Normal(loc=loc, scale=scale)
 
   # Ensure the `event_shape` of the variational distribution matches the
   # parameter.
   if (param.prior.event_shape.ndims is None
       or param.prior.event_shape.ndims > 0):
-    q = tfd.Independent(
-        q, reinterpreted_batch_ndims=param.prior.event_shape.ndims)
+    posterior_dist = tfd.Independent(
+        posterior_dist, reinterpreted_batch_ndims=param.prior.event_shape.ndims)
 
   # Transform to constrained parameter space.
-  return tfd.TransformedDistribution(q, param.bijector)
+  posterior_dist = tfd.TransformedDistribution(
+      posterior_dist, param.bijector, name='{}_posterior'.format(param.name))
+  return posterior_dist
 
 
+def build_factored_surrogate_posterior(
+    model,
+    batch_shape=(),
+    seed=None,
+    name=None):
+  """Build a variational posterior that factors over model parameters.
+
+  The surrogate posterior consists of independent Normal distributions for
+  each parameter with trainable `loc` and `scale`, transformed using the
+  parameter's `bijector` to the appropriate support space for that parameter.
+
+  Args:
+    model: An instance of `StructuralTimeSeries` representing a
+        time-series model. This represents a joint distribution over
+        time-series and their parameters with batch shape `[b1, ..., bN]`.
+    batch_shape: Batch shape (Python `tuple`, `list`, or `int`) of initial
+      states to optimize in parallel.
+      Default value: `()`. (i.e., just run a single optimization).
+    seed: Python integer to seed the random number generator.
+    name: Python `str` name prefixed to ops created by this function.
+      Default value: `None` (i.e., 'build_factored_surrogate_posterior').
+  Returns:
+    variational_posterior: `tfd.JointDistributionNamed` defining a trainable
+        surrogate posterior over model parameters. Samples from this
+        distribution are Python `dict`s with Python `str` parameter names as
+        keys.
+
+  ### Examples
+
+  Assume we've built a structural time-series model:
+
+  ```python
+    day_of_week = tfp.sts.Seasonal(
+        num_seasons=7,
+        observed_time_series=observed_time_series,
+        name='day_of_week')
+    local_linear_trend = tfp.sts.LocalLinearTrend(
+        observed_time_series=observed_time_series,
+        name='local_linear_trend')
+    model = tfp.sts.Sum(components=[day_of_week, local_linear_trend],
+                        observed_time_series=observed_time_series)
+  ```
+
+  To fit the model to data, we define a surrogate posterior and fit it
+  by optimizing a variational bound:
+
+  ```python
+    surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
+      model=model)
+    loss_curve = tfp.vi.fit_surrogate_posterior(
+      target_log_prob_fn=model.joint_log_prob(observed_time_series),
+      surrogate_posterior=surrogate_posterior,
+      num_steps=200)
+    posterior_samples = surrogate_posterior.sample(50)
+
+    # In graph mode, we would need to write:
+    # with tf.control_dependencies([loss_curve]):
+    #   posterior_samples = surrogate_posterior.sample(50)
+  ```
+
+  For more control, we can also build and optimize a variational loss
+  manually:
+
+  ```python
+    @tf.function(autograph=False)  # Ensure the loss is computed efficiently
+    def loss_fn():
+      return tfp.vi.monte_carlo_variational_loss(
+        model.joint_log_prob(observed_time_series),
+        surrogate_posterior,
+        sample_size=10)
+
+    optimizer = tf.optimizers.Adam(learning_rate=0.1)
+    for step in range(200):
+      with tf.GradientTape() as tape:
+        loss = loss_fn()
+      grads = tape.gradient(loss, surrogate_posterior.trainable_variables)
+      optimizer.apply_gradients(
+        zip(grads, surrogate_posterior.trainable_variables))
+      if step % 20 == 0:
+        print('step {} loss {}'.format(step, loss))
+
+    posterior_samples = surrogate_posterior.sample(50)
+  ```
+
+  """
+  with tf.name_scope(name or 'build_factored_surrogate_posterior'):
+    seed = tfd.SeedStream(
+        seed, salt='StructuralTimeSeries_build_factored_surrogate_posterior')
+    variational_posterior = collections.OrderedDict()
+    for param in model.parameters:
+      variational_posterior[param.name] = _build_posterior_for_one_parameter(
+          param, batch_shape=batch_shape, seed=seed())
+    return tfd.JointDistributionNamed(variational_posterior)
+
+
+@deprecation.deprecated(
+    '2019-10-01',
+    '`tfp.sts.build_factored_variational_loss` is deprecated. Use'
+    '`tfp.sts.build_factored_surrogate_posterior` and '
+    '`tfp.vi.monte_carlo_variational_loss` (or `tfp.vi.fit_surrogate_posterior`'
+    ' to automate the optimization loop) instead.',
+    warn_once=True)
 def build_factored_variational_loss(model,
                                     observed_time_series,
                                     init_batch_shape=(),
@@ -231,17 +338,8 @@ def build_factored_variational_loss(model,
     seed = tfd.SeedStream(
         seed, salt='StructuralTimeSeries_build_factored_variational_loss')
 
-    variational_distributions = collections.OrderedDict()
-    variational_samples = []
-    for param in model.parameters:
-      def initial_loc_fn(param):
-        return sample_uniform_initial_state(
-            param, return_constrained=False,
-            init_sample_shape=init_batch_shape,
-            seed=seed())
-      q = _build_trainable_posterior(param, initial_loc_fn=initial_loc_fn)
-      variational_distributions[param.name] = q
-      variational_samples.append(q.sample(seed=seed()))
+    variational_posterior = build_factored_surrogate_posterior(
+        model, batch_shape=init_batch_shape, seed=seed())
 
     # Multiple initializations (similar to HMC chains) manifest as an extra
     # param batch dimension, so we need to add corresponding batch dimension(s)
@@ -249,35 +347,17 @@ def build_factored_variational_loss(model,
     observed_time_series = sts_util.pad_batch_dimension_for_multiple_chains(
         observed_time_series, model, chain_batch_shape=init_batch_shape)
 
-    # Construct the variational bound.
-    log_prob_fn = model.joint_log_prob(observed_time_series)
-    expected_log_joint = log_prob_fn(*variational_samples)
-    entropy = tf.reduce_sum(
-        input_tensor=[
-            -q.log_prob(sample) for (q, sample) in zip(
-                variational_distributions.values(), variational_samples)
-        ],
-        axis=0)
-    variational_loss = -(expected_log_joint + entropy)  # -ELBO
+    loss = vi.monte_carlo_variational_loss(
+        model.joint_log_prob(observed_time_series),
+        surrogate_posterior=variational_posterior,
+        sample_size=1,
+        seed=seed())
 
-  return variational_loss, variational_distributions
-
-
-def _minimize_in_graph(build_loss_fn, num_steps=200, optimizer=None):
-  """Run an optimizer within the graph to minimize a loss function."""
-  if optimizer is None:
-    optimizer = tf1.train.AdamOptimizer(learning_rate=0.1)
-
-  def train_loop_body(step):
-    train_op = optimizer.minimize(
-        build_loss_fn if tf.executing_eagerly() else build_loss_fn())
-    return tf.tuple(tensors=[tf.add(step, 1)], control_inputs=[train_op])
-
-  minimize_op = tf.while_loop(
-      cond=lambda step: step < num_steps,
-      body=train_loop_body,
-      loop_vars=[tf.constant(0)])[0]  # Always return a single op.
-  return minimize_op
+    ds, _ = variational_posterior._flat_sample_distributions()  # pylint: disable=protected-access
+    ds_dict = variational_posterior._model_unflatten(ds)  # pylint: disable=protected-access
+    variational_distributions = collections.OrderedDict([
+        (p.name, ds_dict[p.name]) for p in model.parameters])
+    return loss, variational_distributions
 
 
 def fit_with_hmc(model,
@@ -290,6 +370,7 @@ def fit_with_hmc(model,
                  chain_batch_shape=(),
                  num_variational_steps=150,
                  variational_optimizer=None,
+                 variational_sample_size=5,
                  seed=None,
                  name=None):
   """Draw posterior samples using Hamiltonian Monte Carlo (HMC).
@@ -353,6 +434,10 @@ def fit_with_hmc(model,
       the variational optimization. If `None`, defaults to
       `tf.train.AdamOptimizer(0.1)`.
       Default value: `None`.
+    variational_sample_size: Python `int` number of Monte Carlo samples to use
+      in estimating the variational divergence. Larger values may stabilize
+      the optimization, but at higher cost per step in time and memory.
+      Default value: `1`.
     seed: Python integer to seed the random number generator.
     name: Python `str` name prefixed to ops created by this function.
       Default value: `None` (i.e., 'fit_with_hmc').
@@ -475,40 +560,39 @@ def fit_with_hmc(model,
   with tf.name_scope(name or 'fit_with_hmc') as name:
     seed = tfd.SeedStream(seed, salt='StructuralTimeSeries_fit_with_hmc')
 
+    observed_time_series = sts_util.pad_batch_dimension_for_multiple_chains(
+        observed_time_series, model, chain_batch_shape=chain_batch_shape)
+    target_log_prob_fn = model.joint_log_prob(observed_time_series)
+
     # Initialize state and step sizes from a variational posterior if not
     # specified.
     if initial_step_size is None or initial_state is None:
+      variational_posterior = build_factored_surrogate_posterior(
+          model, batch_shape=chain_batch_shape, seed=seed())
 
-      # To avoid threading variational distributions through the training
-      # while loop, we build our own copy here. `make_template` ensures
-      # that our variational distributions share the optimized parameters.
-      def make_variational():
-        return build_factored_variational_loss(
-            model, observed_time_series,
-            init_batch_shape=chain_batch_shape, seed=seed())
-
-      make_variational = tf1.make_template('make_variational', make_variational)
-      _, variational_distributions = make_variational()
-      minimize_op = _minimize_in_graph(
-          build_loss_fn=lambda: make_variational()[0],  # return just the loss.
+      if variational_optimizer is None:
+        variational_optimizer = tf1.train.AdamOptimizer(
+            learning_rate=0.1)  # TODO(b/137299119) Replace with TF2 optimizer.
+      loss_curve = vi.fit_surrogate_posterior(
+          target_log_prob_fn,
+          variational_posterior,
+          sample_size=variational_sample_size,
           num_steps=num_variational_steps,
-          optimizer=variational_optimizer)
+          optimizer=variational_optimizer,
+          seed=seed())
 
-      with tf.control_dependencies([minimize_op]):
+      with tf.control_dependencies([loss_curve]):
         if initial_state is None:
-          initial_state = [tf.stop_gradient(d.sample())
-                           for d in variational_distributions.values()]
+          posterior_sample = variational_posterior.sample()
+          initial_state = [posterior_sample[p.name] for p in model.parameters]
 
         # Set step sizes using the unconstrained variational distribution.
         if initial_step_size is None:
+          q_dists_by_name = variational_posterior._model_unflatten(  # pylint: disable=protected-access
+              variational_posterior._most_recently_built_distributions)  # pylint: disable=protected-access
           initial_step_size = [
-              transformed_q.distribution.stddev()
-              for transformed_q in variational_distributions.values()]
-
-    # Multiple chains manifest as an extra param batch dimension, so we need to
-    # add a corresponding batch dimension to `observed_time_series`.
-    observed_time_series = sts_util.pad_batch_dimension_for_multiple_chains(
-        observed_time_series, model, chain_batch_shape=chain_batch_shape)
+              q_dists_by_name[p.name].distribution.stddev()
+              for p in model.parameters]
 
     # Run HMC to sample from the posterior on parameters.
     samples, kernel_results = mcmc.sample_chain(
@@ -518,8 +602,7 @@ def fit_with_hmc(model,
         kernel=mcmc.SimpleStepSizeAdaptation(
             inner_kernel=mcmc.TransformedTransitionKernel(
                 inner_kernel=mcmc.HamiltonianMonteCarlo(
-                    target_log_prob_fn=model.joint_log_prob(
-                        observed_time_series),
+                    target_log_prob_fn=target_log_prob_fn,
                     step_size=initial_step_size,
                     num_leapfrog_steps=num_leapfrog_steps,
                     state_gradients_are_stopped=True,
