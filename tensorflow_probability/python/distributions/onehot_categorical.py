@@ -148,10 +148,11 @@ class OneHotCategorical(distribution.Distribution):
   def _event_size(self, param=None):
     if param is None:
       param = self._logits if self._logits is not None else self._probs
-    # NOTE: If the last dimension of `param.shape` is statically-known, but
-    # the `param.shape` is not statically-known, then we will *not* return a
-    # statically-known event size here.  This could be fixed.
-    return prefer_static.shape(param)[-1]
+    if param.shape is not None:
+      event_size = tf.compat.dimension_value(param.shape[-1])
+      if event_size is not None:
+        return event_size
+    return tf.shape(param)[-1]
 
   @property
   def logits(self):
@@ -318,8 +319,6 @@ class OneHotCategorical(distribution.Distribution):
     return self.probs_parameter()
 
   def _parameter_control_dependencies(self, is_init):
-    if not self.validate_args:
-      return []
     assertions = []
 
     logits = self._logits
@@ -353,15 +352,17 @@ class OneHotCategorical(distribution.Distribution):
           raise ValueError(msg1)
         if event_size > tf.int32.max:
           raise ValueError(msg2)
-      else:
+      elif self.validate_args:
         param = tf.convert_to_tensor(param)
-        assertions.append([
-            assert_util.assert_greater_equal(
-                tf.shape(param)[-1], 2, message=msg1),
-        ])
+        assertions.append(assert_util.assert_greater_equal(
+            tf.shape(param)[-1], 2, message=msg1))
         # NOTE: For now, we leave out a runtime assertion that
         # `tf.shape(param)[-1] <= tf.int32.max`.  An earlier `tf.shape` call
         # will fail before we get to this point.
+
+    if not self.validate_args:
+      assert not assertions  # Should never happen.
+      return []
 
     if probs is not None:
       probs = param  # reuse tensor conversion from above

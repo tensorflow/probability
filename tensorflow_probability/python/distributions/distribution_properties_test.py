@@ -84,6 +84,7 @@ TF2_FRIENDLY_DISTS = (
     # 'PoissonLogNormalQuadratureCompound' TODO(b/137956955): Add support
     # for hypothesis testing
     'ProbitBernoulli',
+    'ExpRelaxedOneHotCategorical',
     'StudentT',
     'Triangular',
     'Uniform',

@@ -27,8 +27,11 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 class ExpRelaxedOneHotCategorical(distribution.Distribution):
@@ -159,54 +162,46 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-
       dtype = dtype_util.common_dtype([logits, probs, temperature], tf.float32)
-      self._logits, self._probs = distribution_util.get_logits_and_probs(
-          name=name,
-          logits=logits,
-          probs=probs,
+      self._temperature = tensor_util.convert_nonref_to_tensor(
+          temperature, dtype_hint=dtype, name='temperature')
+      self._logits = tensor_util.convert_nonref_to_tensor(
+          logits, dtype_hint=dtype, name='logits')
+      self._probs = tensor_util.convert_nonref_to_tensor(
+          probs, dtype_hint=dtype, name='probs')
+      if (self._probs is None) == (self._logits is None):
+        raise ValueError('Must pass `probs` or `logits`, but not both.')
+
+      super(ExpRelaxedOneHotCategorical, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
           validate_args=validate_args,
-          multidimensional=True,
-          dtype=dtype)
-
-      with tf.control_dependencies(
-          [assert_util.assert_positive(temperature)] if validate_args else []):
-        self._temperature = tf.convert_to_tensor(
-            temperature, name='temperature', dtype=dtype)
-        self._temperature_2d = tf.reshape(
-            self._temperature, [-1, 1], name='temperature_2d')
-
-      logits_shape_static = tensorshape_util.with_rank_at_least(
-          self._logits.shape, 1)
-      if tensorshape_util.rank(logits_shape_static) is not None:
-        self._batch_rank = tf.convert_to_tensor(
-            tensorshape_util.rank(logits_shape_static) - 1,
-            dtype=tf.int32,
-            name='batch_rank')
-      else:
-        with tf.name_scope('batch_rank'):
-          self._batch_rank = tf.rank(self._logits) - 1
-
-      with tf.name_scope('event_size'):
-        self._event_size = tf.shape(self._logits)[-1]
-
-    super(ExpRelaxedOneHotCategorical, self).__init__(
-        dtype=dtype,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._logits, self._probs, self._temperature],
-        name=name)
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
     return dict(temperature=0, logits=1, probs=1)
 
   @property
+  @deprecation.deprecated(
+      '2019-10-01', 'The `event_size` property is deprecated.  Use '
+      '`tf.shape(self.probs if self.logits is None else self.logits)[-1]` '
+      'instead.')
   def event_size(self):
     """Scalar `int32` tensor: the number of classes."""
-    return self._event_size
+    return self._event_size()
+
+  def _event_size(self, logits=None):
+    param = logits
+    if param is None:
+      param = self._logits if self._logits is not None else self._probs
+    if param.shape is not None:
+      event_size = tf.compat.dimension_value(param.shape[-1])
+      if event_size is not None:
+        return event_size
+    return tf.shape(param)[-1]
 
   @property
   def temperature(self):
@@ -216,29 +211,44 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
   @property
   def logits(self):
     """Input argument `logits`."""
+    if self._logits is None:
+      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
+    if self._probs is None:
+      return self._probs_deprecated_behavior()
     return self._probs
 
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.temperature),
-        tf.shape(self.logits)[:-1])
+  def _batch_shape_tensor(self, temperature=None, logits=None):
+    param = logits
+    if param is None:
+      param = self._logits if self._logits is not None else self._probs
+    if temperature is None:
+      temperature = self.temperature
+    return prefer_static.broadcast_shape(
+        prefer_static.shape(temperature), prefer_static.shape(param)[:-1])
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(self.temperature.shape,
-                                     self.logits.shape[:-1])
+    param = self._logits if self._logits is not None else self._probs
+    return tf.broadcast_static_shape(self.temperature.shape, param.shape[:-1])
 
-  def _event_shape_tensor(self):
-    return tf.shape(self.logits)[-1:]
+  def _event_shape_tensor(self, logits=None):
+    param = logits
+    if param is None:
+      param = self._logits if self._logits is not None else self._probs
+    return prefer_static.shape(param)[-1:]
 
   def _event_shape(self):
-    return tensorshape_util.with_rank_at_least(self.logits.shape, 1)[-1:]
+    param = self._logits if self._logits is not None else self._probs
+    return tensorshape_util.with_rank_at_least(param.shape, 1)[-1:]
 
   def _sample_n(self, n, seed=None):
+    temperature = tf.convert_to_tensor(self.temperature)
+    logits = self._logits_parameter_no_checks()
+
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
     # than `[0, 1)`. To do so, we use
     # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny` because it is the
@@ -247,7 +257,9 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     # reasonable property that, `x + y >= max(x, y)`. In this case, a subnormal
     # number (i.e., np.nextafter) can cause us to sample 0.
     uniform_shape = tf.concat(
-        [[n], self.batch_shape_tensor(), self.event_shape_tensor()], 0)
+        [[n],
+         self._batch_shape_tensor(temperature=temperature, logits=logits),
+         self._event_shape_tensor(logits=logits)], 0)
     uniform = tf.random.uniform(
         shape=uniform_shape,
         minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
@@ -255,25 +267,26 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         dtype=self.dtype,
         seed=seed)
     gumbel = -tf.math.log(-tf.math.log(uniform))
-    noisy_logits = (gumbel + self.logits) / self.temperature[..., tf.newaxis]
+    noisy_logits = (gumbel + logits) / temperature[..., tf.newaxis]
     return tf.math.log_softmax(noisy_logits)
 
   def _log_prob(self, x):
+    temperature = tf.convert_to_tensor(self.temperature)
+    logits = self._logits_parameter_no_checks()
+
     x = self._assert_valid_sample(x)
     # broadcast logits or x if need be.
-    logits = self.logits
     if (not tensorshape_util.is_fully_defined(x.shape) or
         not tensorshape_util.is_fully_defined(logits.shape) or
         x.shape != logits.shape):
       logits = tf.ones_like(x, dtype=logits.dtype) * logits
       x = tf.ones_like(logits, dtype=x.dtype) * x
     # compute the normalization constant
-    k = tf.cast(self.event_size, x.dtype)
+    k = tf.cast(self._event_size(logits), x.dtype)
     log_norm_const = (
-        tf.math.lgamma(k) + (k - 1.) * tf.math.log(self.temperature))
+        tf.math.lgamma(k) + (k - 1.) * tf.math.log(temperature))
     # compute the unnormalized density
-    log_softmax = tf.math.log_softmax(self.logits -
-                                      x * self.temperature[..., tf.newaxis])
+    log_softmax = tf.math.log_softmax(logits - x * temperature[..., tf.newaxis])
     log_unnorm_prob = tf.reduce_sum(log_softmax, axis=[-1], keepdims=False)
     # combine unnormalized density with normalization constant
     return log_norm_const + log_unnorm_prob
@@ -281,16 +294,22 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
   def logits_parameter(self, name=None):
     """Logits vec computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'logits_parameter'):
-      if self.logits is None:
-        return tf.math.log(self.probs)
-      return tf.identity(self.logits)
+      return self._logits_parameter_no_checks()
+
+  def _logits_parameter_no_checks(self):
+    if self._logits is None:
+      return tf.math.log(self._probs)
+    return tf.identity(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'probs_parameter'):
-      if self.logits is None:
-        return tf.identity(self.probs)
-      return tf.math.softmax(self.logits)
+      return self._probs_parameter_no_checks()
+
+  def _probs_parameter_no_checks(self):
+    if self._logits is None:
+      return tf.identity(self._probs)
+    return tf.math.softmax(self._logits)
 
   def _assert_valid_sample(self, x):
     if not self.validate_args:
@@ -300,6 +319,84 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         assert_util.assert_near(
             tf.zeros([], dtype=self.dtype), tf.reduce_logsumexp(x, axis=[-1])),
     ], x)
+
+  @deprecation.deprecated(
+      '2019-11-01',
+      ('The `logits` property will return `None` when the distribution is '
+       'parameterized with `logits=None`. Use `logits_parameter()` instead.'),
+      warn_once=True)
+  def _logits_deprecated_behavior(self):
+    return self.logits_parameter()
+
+  @deprecation.deprecated(
+      '2019-11-01',
+      ('The `probs` property will return `None` when the distribution is '
+       'parameterized with `probs=None`. Use `probs_parameter()` instead.'),
+      warn_once=True)
+  def _probs_deprecated_behavior(self):
+    return self.probs_parameter()
+
+  def _parameter_control_dependencies(self, is_init):
+    assertions = []
+
+    logits = self._logits
+    probs = self._probs
+    param, name = (probs, 'probs') if logits is None else (logits, 'logits')
+
+    # In init, we can always build shape and dtype checks because
+    # we assume shape doesn't change for Variable backed args.
+    if is_init:
+      if not dtype_util.is_floating(param.dtype):
+        raise TypeError('Argument `{}` must having floating type.'.format(name))
+
+      msg = 'Argument `{}` must have rank at least 1.'.format(name)
+      shape_static = tensorshape_util.dims(param.shape)
+      if shape_static is not None:
+        if len(shape_static) < 1:
+          raise ValueError(msg)
+      elif self.validate_args:
+        param = tf.convert_to_tensor(param)
+        assertions.append(
+            assert_util.assert_rank_at_least(param, 1, message=msg))
+
+      msg1 = 'Argument `{}` must have final dimension >= 2.'.format(name)
+      msg2 = 'Argument `{}` must have final dimension <= {}.'.format(
+          name, tf.int32.max)
+      event_size = shape_static[-1] if shape_static is not None else None
+      if event_size is not None:
+        if event_size < 2:
+          raise ValueError(msg1)
+        if event_size > tf.int32.max:
+          raise ValueError(msg2)
+      elif self.validate_args:
+        param = tf.convert_to_tensor(param)
+        assertions.append(assert_util.assert_greater_equal(
+            tf.shape(param)[-1], 2, message=msg1))
+        # NOTE: For now, we leave out a runtime assertion that
+        # `tf.shape(param)[-1] <= tf.int32.max`.  An earlier `tf.shape` call
+        # will fail before we get to this point.
+
+    if not self.validate_args:
+      assert not assertions  # Should never happen.
+      return []
+
+    if is_init != tensor_util.is_ref(self.temperature):
+      assertions.append(assert_util.assert_positive(self.temperature))
+
+    if probs is not None:
+      probs = param  # reuse tensor conversion from above
+      if is_init != tensor_util.is_ref(probs):
+        probs = tf.convert_to_tensor(probs)
+        one = tf.ones([], dtype=probs.dtype)
+        assertions.extend([
+            assert_util.assert_non_negative(probs),
+            assert_util.assert_less_equal(probs, one),
+            assert_util.assert_near(
+                tf.reduce_sum(probs, axis=-1), one,
+                message='Argument `probs` must sum to 1.'),
+        ])
+
+    return assertions
 
 
 class RelaxedOneHotCategorical(
@@ -422,6 +519,10 @@ class RelaxedOneHotCategorical(
     return self.distribution.temperature
 
   @property
+  @deprecation.deprecated(
+      '2019-10-01', 'The `event_size` property is deprecated.  Use '
+      '`tf.shape(self.probs if self.logits is None else self.logits)[-1]` '
+      'instead.')
   def event_size(self):
     """Scalar `int32` tensor: the number of classes."""
     return self.distribution.event_size
@@ -435,3 +536,11 @@ class RelaxedOneHotCategorical(
   def logits(self):
     """Input argument `logits`."""
     return self.distribution.logits
+
+  def logits_parameter(self, name=None):
+    """Logits vec computed from non-`None` input arg (`probs` or `logits`)."""
+    return self.distribution.logits_parameter(name)
+
+  def probs_parameter(self, name=None):
+    """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
+    return self.distribution.probs_parameter(name)
