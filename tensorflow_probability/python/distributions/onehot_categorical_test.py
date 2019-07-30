@@ -120,9 +120,9 @@ class OneHotCategoricalTest(test_case.TestCase):
       dist = tfd.OneHotCategorical(logits, validate_args=True)
       self.evaluate(dist.sample())
 
-    logits = tf1.placeholder_with_default([19.84], shape=None)
+    logits = tf1.placeholder_with_default([[], []], shape=None)
     with self.assertRaises(
-        ValueError, 'Argument `logits` must have final dimension >= 2.'):
+        ValueError, 'Argument `logits` must have final dimension >= 1.'):
       dist = tfd.OneHotCategorical(logits, validate_args=True)
       self.evaluate(dist.sample())
 
@@ -151,6 +151,20 @@ class OneHotCategoricalTest(test_case.TestCase):
     np_prob = self.evaluate(dist.prob(np_sample))
     expected_prob = prob[np_sample.astype(np.bool)]
     self.assertAllClose(expected_prob, np_prob.flatten())
+
+  def testEventSizeOfOne(self):
+    d = tfd.OneHotCategorical(
+        probs=tf1.placeholder_with_default([1.], shape=None),
+        validate_args=True)
+    self.assertAllEqual(np.ones((5, 3, 1), dtype=np.int32),
+                        self.evaluate(d.sample([5, 3])))
+    self.assertAllClose([0., 0., 0., 0., 0.],
+                        self.evaluate(d.log_prob(tf.ones((5, 1)))))
+    self.assertAllClose(0., self.evaluate(d.entropy()))
+    self.assertAllClose([0.], self.evaluate(d.variance()))
+    self.assertAllClose([[0.]], self.evaluate(d.covariance()))
+    self.assertAllClose([1.], self.evaluate(d.mode()))
+    self.assertAllClose([1.], self.evaluate(d.mean()))
 
   def testSample(self):
     probs = [[[0.2, 0.8], [0.4, 0.6]]]
