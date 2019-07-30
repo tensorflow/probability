@@ -28,8 +28,10 @@ from discussion.fun_mcmc.fun_mcmc_lib import AdamExtra
 from discussion.fun_mcmc.fun_mcmc_lib import AdamState
 from discussion.fun_mcmc.fun_mcmc_lib import blanes_3_stage_step
 from discussion.fun_mcmc.fun_mcmc_lib import blanes_4_stage_step
-from discussion.fun_mcmc.fun_mcmc_lib import call_and_grads
 from discussion.fun_mcmc.fun_mcmc_lib import call_fn
+from discussion.fun_mcmc.fun_mcmc_lib import call_potential_fn
+from discussion.fun_mcmc.fun_mcmc_lib import call_potential_fn_with_grads
+from discussion.fun_mcmc.fun_mcmc_lib import call_transition_operator
 from discussion.fun_mcmc.fun_mcmc_lib import gaussian_momentum_sample
 from discussion.fun_mcmc.fun_mcmc_lib import gradient_descent_step
 from discussion.fun_mcmc.fun_mcmc_lib import GradientDescentExtra
@@ -65,8 +67,10 @@ __all__ = [
     'AdamState',
     'blanes_3_stage_step',
     'blanes_4_stage_step',
-    'call_and_grads',
     'call_fn',
+    'call_potential_fn',
+    'call_potential_fn_with_grads',
+    'call_transition_operator',
     'gaussian_momentum_sample',
     'get_backend',
     'gradient_descent_step',

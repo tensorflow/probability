@@ -98,7 +98,7 @@ py_library(
 py_test(
     name = "fun_mcmc_test",
     srcs = ["fun_mcmc_test.py"],
-    shard_count = 4,
+    shard_count = 8,
     deps = [
         ":fun_mcmc",
         # absl/testing:parameterized dep,

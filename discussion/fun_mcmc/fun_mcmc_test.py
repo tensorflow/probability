@@ -126,6 +126,50 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     struct = fun_mcmc.maybe_broadcast_structure([3, 4], [1, 2])
     self.assertEqual([3, 4], struct)
 
+  def testCallPotentialFn(self):
+
+    def potential(x):
+      return x, ()
+
+    x, extra = fun_mcmc.call_potential_fn(potential, 0.)
+
+    self.assertEqual(0., x)
+    self.assertEqual((), extra)
+
+  def testCallPotentialFnMissingExtra(self):
+    def potential(x):
+      return x
+
+    with self.assertRaisesRegexp(TypeError, 'A common solution is to adjust'):
+      fun_mcmc.call_potential_fn(potential, 0.)
+
+  def testCallTransitionOperator(self):
+
+    def kernel(x, y):
+      del y
+      return [x, [1]], ()
+
+    [x, [y]], extra = fun_mcmc.call_transition_operator(kernel, [0., None])
+    self.assertEqual(0., x)
+    self.assertEqual(1, y)
+    self.assertEqual((), extra)
+
+  def testCallTransitionOperatorMissingExtra(self):
+    def potential(x):
+      return x
+
+    with self.assertRaisesRegexp(TypeError, 'A common solution is to adjust'):
+      fun_mcmc.call_transition_operator(potential, 0.)
+
+  @_skip_on_jax  # JAX backend cant' catch this error yet.
+  def testCallTransitionOperatorBadArgs(self):
+    def potential(x, y, z):
+      del z
+      return (x, y), ()
+
+    with self.assertRaisesRegexp(TypeError, 'The structure of `new_args=`'):
+      fun_mcmc.call_transition_operator(potential, (1, 2, 3))
+
   @_skip_on_jax  # No JAX bijectors.
   def testTransformLogProbFn(self):
 
@@ -633,7 +677,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
 
     state = tf.zeros([2])
     momentum = tf.ones([2])
-    target_log_prob, _, state_grads = fun_mcmc.call_and_grads(
+    target_log_prob, _, state_grads = fun_mcmc.call_potential_fn_with_grads(
         target_log_prob_fn, state)
 
     start_state = fun_mcmc.IntegratorState(

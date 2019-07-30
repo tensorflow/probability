@@ -24,6 +24,7 @@ from jax import random
 import jax.numpy as np
 
 __all__ = [
+    'assert_same_shallow_tree',
     'flatten_tree',
     'make_dynamic_array',
     'map_tree',
@@ -97,6 +98,13 @@ def map_tree_up_to(shallow, fn, tree, *rest):
     return fn(*rest)
 
   return jax.tree_util.tree_multimap(wrapper, shallow, tree, *rest)
+
+
+def assert_same_shallow_tree(shallow, tree):
+  """Asserts that `tree` has the same shallow structure as `shallow`."""
+  # Do a dummy multimap for the side-effect of verifying that the structures are
+  # the same. This doesn't catch all the errors we actually care about, sadly.
+  map_tree_up_to(shallow, lambda *args: (), tree)
 
 
 def make_dynamic_array(dtype, size, element_shape):

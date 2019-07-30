@@ -31,7 +31,8 @@ while not_done:
 ```
 
 `state` is allowed to be partially specified (i.e. have `None` elements), which
-the transition operator must impute when it returns the new state.
+the transition operator must impute when it returns the new state. See
+`call_transition_operator` for more details of the calling convention.
 """
 
 from __future__ import absolute_import
@@ -59,8 +60,10 @@ __all__ = [
     'AdamState',
     'blanes_3_stage_step',
     'blanes_4_stage_step',
-    'call_and_grads',
     'call_fn',
+    'call_potential_fn',
+    'call_potential_fn_with_grads',
+    'call_transition_operator',
     'gaussian_momentum_sample',
     'gradient_descent_step',
     'GradientDescentExtra',
@@ -134,7 +137,8 @@ def trace(
                         state)
 
   def wrapper(state):
-    state, extra = util.map_tree(tf.convert_to_tensor, call_fn(fn, state))
+    state, extra = util.map_tree(tf.convert_to_tensor,
+                                 call_transition_operator(fn, state))
     trace_element = util.map_tree(tf.convert_to_tensor, trace_fn(state, extra))
     return state, trace_element
 
@@ -199,12 +203,25 @@ def trace(
   return state, stacked_trace
 
 
-def call_fn(fn: TransitionOperator, args: Union[Tuple[Any], Mapping[Text, Any],
-                                                Any]) -> Any:
-  """Calls a transition operator with args.
+def _tree_repr(tree: Any) -> Text:
+  """Utility to get a string representation of the the structure of `tree`."""
 
-  If args is a sequence, the args are unpacked as `*args`.
-  If args is a mapping, the args are unpacked as `**args`.
+  class _LeafSentinel(object):
+
+    def __repr__(self):
+      return '.'
+
+  return str(util.map_tree(lambda _: _LeafSentinel(), tree))
+
+
+def call_fn(
+    fn: TransitionOperator,
+    args: Union[Tuple[Any], Mapping[Text, Any], Any],
+) -> Any:
+  """Calls a function with `args`.
+
+  If `args` is a sequence, `fn` is called like `fn(*args)`. If `args` is a
+  mapping, `fn` is called like `fn(**args)`. Otherwise, it is called `fn(args)`.
 
   Args:
     fn: A `TransitionOperator`.
@@ -224,7 +241,108 @@ def call_fn(fn: TransitionOperator, args: Union[Tuple[Any], Mapping[Text, Any],
     return fn(args)
 
 
-def call_and_grads(
+def call_potential_fn(
+    fn: PotentialFn,
+    args: Union[Tuple[Any], Mapping[Text, Any], Any],
+) -> Tuple['tf.Tensor', Any]:
+  """Calls a transition operator with `args`.
+
+  `fn` must fulfill the `PotentialFn` contract:
+
+  ```python
+  potential, extra = call_fn(fn, args)
+  ```
+
+  Args:
+    fn: `PotentialFn`.
+    args: Arguments to `fn`.
+
+  Returns:
+    ret: Return value of `fn`.
+
+  Raises:
+    TypeError: If `fn` doesn't fulfill the contract.
+  """
+  ret = call_fn(fn, args)
+  error_template = ('`{fn:}` must have a signature '
+                    '`fn(args) -> (tf.Tensor, extra)`'
+                    ' but when called with `args=`\n{args:}\nreturned '
+                    '`ret=`\n{ret:}\ninstead. The structure of '
+                    '`args=`\n{args_s:}\nThe structure of `ret=`\n{ret_s:}\n'
+                    'A common solution is to adjust the `return`s in `fn` to '
+                    'be `return args, ()`.')
+
+  if not isinstance(ret, collections.Sequence) or len(ret) != 2:
+    args_s = _tree_repr(args)
+    ret_s = _tree_repr(ret)
+    raise TypeError(
+        error_template.format(
+            fn=fn, args=args, ret=ret, args_s=args_s, ret_s=ret_s))
+  return ret
+
+
+def call_transition_operator(
+    fn: TransitionOperator,
+    args: Union[Tuple[Any], Mapping[Text, Any], Any],
+) -> Tuple[Any, Any]:
+  """Calls a transition operator with `args`.
+
+  `fn` must fulfill the `TransitionOperator` contract:
+
+  ```python
+  args_out, extra = call_fn(fn, args)
+  assert_same_shallow_tree(args, args_out)
+  ```
+
+  Args:
+    fn: `TransitionOperator`.
+    args: Arguments to `fn`.
+
+  Returns:
+    ret: Return value of `fn`.
+
+  Raises:
+    TypeError: If `fn` doesn't fulfill the contract.
+  """
+  ret = call_fn(fn, args)
+  error_template = ('`{fn:}` must have a signature '
+                    '`fn(args) -> (new_args, extra)`'
+                    ' but when called with `args=`\n{args:}\nreturned '
+                    '`ret=`\n{ret:}\ninstead. The structure of '
+                    '`args=`\n{args_s:}\nThe structure of `ret=`\n{ret_s:}\n'
+                    'A common solution is to adjust the `return`s in `fn` to '
+                    'be `return args, ()`.')
+
+  if not isinstance(ret, collections.Sequence) or len(ret) != 2:
+    args_s = _tree_repr(args)
+    ret_s = _tree_repr(ret)
+    raise TypeError(
+        error_template.format(
+            fn=fn, args=args, ret=ret, args_s=args_s, ret_s=ret_s))
+
+  error_template = (
+      '`{fn:}` must have a signature '
+      '`fn(args) -> (new_args, extra)`'
+      ' but when called with `args=`\n{args:}\nreturned '
+      '`new_args=`\n{new_args:}\ninstead. The structure of '
+      '`args=`\n{args_s:}\nThe structure of `new_args=`\n{new_args_s:}\n')
+  new_args, extra = ret
+  try:
+    util.assert_same_shallow_tree(args, new_args)
+  except:
+    args_s = _tree_repr(args)
+    new_args_s = _tree_repr(new_args)
+    raise TypeError(
+        error_template.format(
+            fn=fn,
+            args=args,
+            new_args=new_args,
+            args_s=args_s,
+            new_args_s=new_args_s))
+  return new_args, extra
+
+
+def call_potential_fn_with_grads(
     fn: TransitionOperator, args: Union[Tuple[Any], Mapping[Text, Any], Any]
 ) -> Tuple['tf.Tensor', TensorNest, TensorNest]:
   """Calls `fn` and returns the gradients with respect to `fn`'s first output.
@@ -240,7 +358,7 @@ def call_and_grads(
   """
 
   def wrapper(args):
-    return call_fn(fn, args)
+    return call_potential_fn(fn, args)
 
   return util.value_and_grad(wrapper, args)
 
@@ -318,7 +436,8 @@ def transform_log_prob_fn(log_prob_fn: PotentialFn,
 
     original_space_args = util.map_tree(lambda b, x: b.forward(x), bijector_,
                                         args)
-    original_space_log_prob, extra = call_fn(log_prob_fn, original_space_args)
+    original_space_log_prob, extra = call_potential_fn(log_prob_fn,
+                                                       original_space_args)
     event_ndims = util.map_tree(
         lambda x: tf.rank(x) - tf.rank(original_space_log_prob), args)
 
@@ -399,23 +518,25 @@ def spliting_integrator_step(
     # pylint: disable=cell-var-from-loop
     if i % 2 == 0:
       if state_grads is None:
-        _, _, state_grads = call_and_grads(target_log_prob_fn, state)
+        _, _, state_grads = call_potential_fn_with_grads(
+            target_log_prob_fn, state)
       else:
         state_grads = util.map_tree(tf.convert_to_tensor, state_grads)
 
       momentum = util.map_tree(lambda m, sg, s: m + c * sg * s, momentum,
                                state_grads, step_size)
 
-      kinetic_energy, kinetic_energy_extra, momentum_grads = call_and_grads(
+      kinetic_energy, kinetic_energy_extra, momentum_grads = call_potential_fn_with_grads(
           kinetic_energy_fn, momentum)
     else:
       if momentum_grads is None:
-        _, _, momentum_grads = call_and_grads(kinetic_energy_fn, momentum)
+        _, _, momentum_grads = call_potential_fn_with_grads(
+            kinetic_energy_fn, momentum)
 
       state = util.map_tree(lambda x, mg, s: x + c * mg * s, state,
                             momentum_grads, step_size)
 
-      target_log_prob, state_extra, state_grads = call_and_grads(
+      target_log_prob, state_extra, state_grads = call_potential_fn_with_grads(
           target_log_prob_fn, state)
 
   return (IntegratorStepState(state, state_grads, momentum),
@@ -657,9 +778,12 @@ def metropolis_hastings_step(
       states.
   """
   # Impute the None's in the current state.
-  current_state = util.map_tree_up_to(current_state, lambda c, p: p  # pylint: disable=g-long-lambda
-                                      if c is None else c, current_state,
-                                      proposed_state)
+  current_state = util.map_tree_up_to(
+      current_state,
+      lambda c, p: p  # pylint: disable=g-long-lambda
+      if c is None else c,
+      current_state,
+      proposed_state)
 
   current_state = util.map_tree(tf.convert_to_tensor, current_state)
   proposed_state = util.map_tree(tf.convert_to_tensor, proposed_state)
@@ -731,7 +855,8 @@ def make_gaussian_kinetic_energy_fn(
 
   Returns:
     kinetic_energy_fn: A callable that takes in the expanded state (see
-      `call_fn`) and returns the kinetic energy + dummy auxiliary output.
+      `call_potential_fn`) and returns the kinetic energy + dummy auxiliary
+      output.
   """
 
   def kinetic_energy_fn(*args, **kwargs):
@@ -770,7 +895,7 @@ def hamiltonian_monte_carlo_init(
   Returns:
     hmc_state: State of the `hamiltonian_monte_carlo` `TransitionOperator`.
   """
-  target_log_prob, state_extra, state_grads = call_and_grads(
+  target_log_prob, state_extra, state_grads = call_potential_fn_with_grads(
       target_log_prob_fn, util.map_tree(tf.convert_to_tensor, state))
   return HamiltonianMonteCarloState(state, state_grads, target_log_prob,
                                     state_extra)
@@ -960,7 +1085,8 @@ def hamiltonian_integrator(
   num_steps = tf.convert_to_tensor(num_steps)
   is_ragged = len(num_steps.shape) > 0  # pylint: disable=g-explicit-length-test
 
-  kinetic_energy, kinetic_energy_extra = call_fn(kinetic_energy_fn, momentum)
+  kinetic_energy, kinetic_energy_extra = call_potential_fn(
+      kinetic_energy_fn, momentum)
   current_energy = -target_log_prob + kinetic_energy
 
   if is_ragged:
@@ -1182,7 +1308,7 @@ def adam_step(adam_state: AdamState,
     state = state - lr_t * m_t / (tf.math.sqrt(v_t) + epsilon)
     return state, m_t, v_t
 
-  loss, loss_extra, grads = call_and_grads(loss_fn, state)
+  loss, loss_extra, grads = call_potential_fn_with_grads(loss_fn, state)
 
   state_m_v = util.map_tree(_one_part, state, grads, m, v, learning_rate,
                             beta_1, beta_2, epsilon)
@@ -1223,7 +1349,7 @@ def gradient_descent_step(
   def _one_part(state, g, learning_rate):
     return state - learning_rate * g
 
-  loss, loss_extra, grads = call_and_grads(loss_fn, state)
+  loss, loss_extra, grads = call_potential_fn_with_grads(loss_fn, state)
 
   state = util.map_tree(_one_part, state, grads, learning_rate)
 

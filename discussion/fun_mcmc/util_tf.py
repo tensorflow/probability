@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
+    'assert_same_shallow_tree',
     'flatten_tree',
     'make_dynamic_array',
     'map_tree',
@@ -54,6 +55,11 @@ def unflatten_tree(tree, xs):
 def map_tree_up_to(shallow, fn, tree, *rest):
   """`map_tree` with recursion depth defined by depth of `shallow`."""
   return nest.map_structure_up_to(shallow, fn, tree, *rest)
+
+
+def assert_same_shallow_tree(shallow, tree):
+  """Asserts that `tree` has the same shallow structure as `shallow`."""
+  nest.assert_shallow_structure(shallow, tree)
 
 
 def make_dynamic_array(dtype, size, element_shape):
