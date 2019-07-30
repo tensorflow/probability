@@ -59,6 +59,7 @@ TF2_FRIENDLY_DISTS = (
     'Deterministic',
     'Dirichlet',
     'Exponential',
+    'FiniteDiscrete',
     'Gamma',
     'GammaGamma',
     'GeneralizedPareto',
