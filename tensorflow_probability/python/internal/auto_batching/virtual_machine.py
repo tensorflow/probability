@@ -64,6 +64,7 @@ def execute(program, args, max_stack_depth, backend, block_code_cache=None):
       returned in the same order as the variables appear in
       `program.out_vars`.
   """
+  program = select_block_priority(program)
   halt_index = program.graph.exit_index()
   logging.vlog(1, 'Staging computation: %d blocks to stage', halt_index)
   valid_indices = range(halt_index)
@@ -306,3 +307,28 @@ def _check_initial_dtypes(var_defs, init_vals, backend):
         var_def_dict[varname].tensors, val, leaf_type=inst.TensorType):
       backend.assert_matching_dtype(
           tensor_type.dtype, subval, 'var name {}'.format(varname))
+
+
+def select_block_priority(program):
+  """Order `Block`s in `program` by execution priority."""
+  msg = 'TODO(axch): Implement block strategy selection for Functions.'
+  assert not program.functions, msg
+  def sync_weight(block):
+    # Sort all "trivial" blocks that don't call user-land operations ahead of
+    # all others.  This critically relies on `sorted` being stable to work
+    # correctly.
+    # TODO(b/118911579): Respect user-specified sync priority when that happens.
+    for op in block.instructions:
+      if isinstance(op, (inst.PrimOp, inst.FunctionCallOp)):
+        return 1
+    return 0
+  # Have to keep the first block because that's where control enters.
+  # This is unfortunate if that block is over-heavy.
+  # Could be fixed by
+  # - Adding a field to Program for the initial value of the program counter, or
+  # - Ensuring that the first block is an empty indirection block
+  new_blocks = ([program.graph.block(0)]
+                + sorted(program.graph.blocks[1:], key=sync_weight))
+  new_graph = inst.ControlFlowGraph(new_blocks)
+  return inst.Program(new_graph, [], program.var_defs,
+                      program.vars_in, program.vars_out, program.var_alloc)

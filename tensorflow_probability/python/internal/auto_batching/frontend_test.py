@@ -505,6 +505,32 @@ class AutoGraphFrontendTest(tf.test.TestCase):
         [1, 3, 7],
         gcd(input_a, input_b, max_stack_depth=3, backend=NP_BACKEND))
 
+  def testSyncingAsExpected(self):
+    execution_counter_box = [0]
+    def count_executions(x):
+      execution_counter_box[0] += 1
+      return x
+    # Instrumented test program
+    def fibonacci_inst(n):
+      if n <= 1:
+        return 1
+      else:
+        left = fibonacci_inst(n - 2)
+        right = fibonacci_inst(n - 1)
+        return count_executions(left + right)
+    batch_fibo = frontend.Context().batch_uncurried(
+        fibonacci_inst,
+        lambda *args: instructions.TensorType(np.int64, ()))
+    self.assertEqual(
+        [3, 21, 5, 8],
+        list(batch_fibo(np.array([3, 7, 4, 5], dtype=np.int64),
+                        max_stack_depth=15, backend=NP_BACKEND)))
+    # Expect 22 executions
+    # - 2 for type checking, plus
+    # - 20 because that's how many times 1 needs to be added to
+    #   1 to get 21.
+    self.assertEqual(22, execution_counter_box[0])
+
 
 class _TestHidingTFBatchSize(object):
 

@@ -312,6 +312,10 @@ class ControlFlowGraph(object):
     self._blocks = blocks
     self._block_map = dict([(bl, i) for i, bl in enumerate(blocks)])
 
+  @property
+  def blocks(self):
+    return self._blocks
+
   def block(self, index):
     """Returns the `Block` given by the input `index`.
 
