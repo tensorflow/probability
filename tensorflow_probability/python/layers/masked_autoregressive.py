@@ -66,6 +66,7 @@ class AutoregressiveTransform(DistributionLambda):
   ```python
   tfd = tfp.distributions
   tfpl = tfp.layers
+  tfb = tfp.bijectors
   tfk = tf.keras
 
   # Generate data -- as in Figure 1 in [Papamakarios et al. (2017)][1]).
@@ -82,7 +83,7 @@ class AutoregressiveTransform(DistributionLambda):
       #
       # For conditional density estimation, the model would take the
       # conditioning values as input.)
-      tfkl.InputLayer(input_shape=(0,), dtype=tf.float32),
+      tfk.layers.InputLayer(input_shape=(0,), dtype=tf.float32),
 
       # Given the empty input, return a standard normal distribution with
       # matching batch_shape and event_shape of [2].
