@@ -191,12 +191,22 @@ class RelaxedOneHotCategoricalTest(tf.test.TestCase):
           0.75, logits=logits, validate_args=True)
       self.evaluate(dist.sample())
 
-    logits = tf1.placeholder_with_default([19.84], shape=None)
+    logits = tf1.placeholder_with_default([[], []], shape=None)
     with self.assertRaises(
-        ValueError, 'Argument `logits` must have final dimension >= 2.'):
+        ValueError, 'Argument `logits` must have final dimension >= 1.'):
       dist = tfd.ExpRelaxedOneHotCategorical(
           12.0, logits=logits, validate_args=True)
       self.evaluate(dist.sample())
+
+  def testEventSizeOfOne(self):
+    d = tfd.ExpRelaxedOneHotCategorical(
+        0.1337,
+        logits=tf1.placeholder_with_default([0.], shape=None),
+        validate_args=True)
+    self.assertAllEqual(np.zeros((5, 3, 1), dtype=np.int32),
+                        self.evaluate(d.sample([5, 3])))
+    self.assertAllClose(np.ones(5),
+                        self.evaluate(d.prob(np.zeros((5, 1)))))
 
   def testDTypes(self):
     # check that sampling and log_prob work for a range of dtypes

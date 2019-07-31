@@ -359,19 +359,19 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         assertions.append(
             assert_util.assert_rank_at_least(param, 1, message=msg))
 
-      msg1 = 'Argument `{}` must have final dimension >= 2.'.format(name)
+      msg1 = 'Argument `{}` must have final dimension >= 1.'.format(name)
       msg2 = 'Argument `{}` must have final dimension <= {}.'.format(
           name, tf.int32.max)
       event_size = shape_static[-1] if shape_static is not None else None
       if event_size is not None:
-        if event_size < 2:
+        if event_size < 1:
           raise ValueError(msg1)
         if event_size > tf.int32.max:
           raise ValueError(msg2)
       elif self.validate_args:
         param = tf.convert_to_tensor(param)
         assertions.append(assert_util.assert_greater_equal(
-            tf.shape(param)[-1], 2, message=msg1))
+            tf.shape(param)[-1], 1, message=msg1))
         # NOTE: For now, we leave out a runtime assertion that
         # `tf.shape(param)[-1] <= tf.int32.max`.  An earlier `tf.shape` call
         # will fail before we get to this point.
