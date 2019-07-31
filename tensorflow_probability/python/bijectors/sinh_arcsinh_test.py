@@ -34,17 +34,20 @@ class SinhArcsinhTest(tf.test.TestCase):
   def testBijectorVersusNumpyRewriteOfBasicFunctions(self):
     skewness = 0.2
     tailweight = 2.0
+    multiplier = 2.0 / np.sinh(np.arcsinh(2.0) * tailweight)
     bijector = tfb.SinhArcsinh(
         skewness=skewness, tailweight=tailweight, validate_args=True)
     self.assertStartsWith(bijector.name, "sinh_arcsinh")
     x = np.array([[[-2.01], [2.], [1e-4]]]).astype(np.float32)
-    y = np.sinh((np.arcsinh(x) + skewness) * tailweight)
+    y = np.sinh((np.arcsinh(x) + skewness) * tailweight) * multiplier
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
     self.assertAllClose(
         np.sum(
-            np.log(np.cosh(np.arcsinh(y) / tailweight - skewness)) -
-            np.log(tailweight) - np.log(np.sqrt(y**2 + 1)),
+            np.log(np.cosh(
+                np.arcsinh(y / multiplier) / tailweight - skewness)) -
+            np.log(tailweight) - np.log(np.sqrt((y / multiplier)**2 + 1))
+            - np.log(multiplier),
             axis=-1),
         self.evaluate(bijector.inverse_log_det_jacobian(y, event_ndims=1)))
     self.assertAllClose(
@@ -52,22 +55,6 @@ class SinhArcsinhTest(tf.test.TestCase):
         self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)),
         rtol=1e-4,
         atol=0.)
-
-  def testLargerTailWeightPutsMoreWeightInTails(self):
-    # Will broadcast together to shape [3, 2].
-    x = [-1., 1.]
-    tailweight = [[0.5], [1.0], [2.0]]
-    bijector = tfb.SinhArcsinh(tailweight=tailweight, validate_args=True)
-    y = self.evaluate(bijector.forward(x))
-
-    # x = -1, 1 should be mapped to points symmetric about 0
-    self.assertAllClose(y[:, 0], -1. * y[:, 1])
-
-    # forward(1) should increase as tailweight increases, since higher
-    # tailweight should map 1 to a larger number.
-    forward_1 = y[:, 1]  # The positive values of y.
-    self.assertLess(forward_1[0], forward_1[1])
-    self.assertLess(forward_1[1], forward_1[2])
 
   def testSkew(self):
     # Will broadcast together to shape [3, 2].
@@ -84,6 +71,16 @@ class SinhArcsinhTest(tf.test.TestCase):
 
     # For skew > 0, |forward(-1)| < |forward(1)|
     self.assertLess(np.abs(y[2, 0]), np.abs(y[2, 1]))
+
+  def testKurtosis(self):
+    x = np.logspace(-2, 2, 1000).astype(np.float32)
+    tailweight = [[0.5], [1.0], [2.0]]
+    bijector = tfb.SinhArcsinh(tailweight=tailweight, validate_args=True)
+    y = self.evaluate(bijector.forward(x))
+    mean = np.mean(x, axis=-1)
+    stddev = np.std(x, axis=-1, ddof=0)
+    kurtosis = np.mean((y - mean) ** 4, axis=-1) / (stddev ** 4)
+    self.assertAllClose(kurtosis, np.sort(kurtosis))
 
   def testScalarCongruencySkewness1Tailweight0p5(self):
     bijector = tfb.SinhArcsinh(
@@ -138,8 +135,8 @@ class SinhArcsinhTest(tf.test.TestCase):
       ], dtype=dtype)
       # Ensure broadcasting works.
       x = np.swapaxes(x, 0, 1)
-
-      y = np.sinh((np.arcsinh(x) + skewness) * tailweight)
+      multiplier = 2. / np.sinh(np.arcsinh(2.) * tailweight)
+      y = np.sinh((np.arcsinh(x) + skewness) * tailweight) * multiplier
       bijector = tfb.SinhArcsinh(
           skewness=skewness, tailweight=tailweight, validate_args=True)
 
@@ -161,9 +158,10 @@ class SinhArcsinhTest(tf.test.TestCase):
         y_float128 = np.float128(y)
         self.assertAllClose(
             np.log(np.cosh(
-                np.arcsinh(y_float128) / tailweight - skewness) / np.sqrt(
-                    y_float128**2 + 1)) -
-            np.log(tailweight),
+                np.arcsinh(y_float128 / multiplier)
+                / tailweight - skewness) / np.sqrt(
+                    (y_float128 / multiplier)**2 + 1))
+            - np.log(tailweight) - np.log(multiplier),
             self.evaluate(
                 bijector.inverse_log_det_jacobian(y, event_ndims=0)),
             rtol=1e-4,

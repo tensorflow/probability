@@ -53,8 +53,8 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
   matrix multiplication):
 
   ```
-  Y := loc + scale @ F(Z) * (2 / F_0(2))
-  F(Z) := Sinh( (Arcsinh(Z) + skewness) * tailweight )
+  Y := loc + scale @ F(Z)
+  F(Z) := Sinh( (Arcsinh(Z) + skewness) * tailweight ) * (2 / F_0(2))
   F_0(Z) := Sinh( Arcsinh(Z) * tailweight )
   ```
 
@@ -173,7 +173,6 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
       loc = loc if loc is None else tf.convert_to_tensor(
           loc, name="loc", dtype=dtype)
       tailweight = 1. if tailweight is None else tailweight
-      has_default_skewness = skewness is None
       skewness = 0. if skewness is None else skewness
 
       # Recall, with Z a random variable,
@@ -218,18 +217,8 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
           tailweight, dtype=dtype, name="tailweight")
       f = sinh_arcsinh_bijector.SinhArcsinh(
           skewness=skewness, tailweight=tailweight)
-      if has_default_skewness:
-        f_noskew = f
-      else:
-        f_noskew = sinh_arcsinh_bijector.SinhArcsinh(
-            skewness=dtype_util.as_numpy_dtype(skewness.dtype)(0.),
-            tailweight=tailweight)
-
-      # Make the Affine bijector, Z --> loc + C * Z.
-      c = 2 * scale_diag_part / f_noskew.forward(
-          tf.convert_to_tensor(2, dtype=dtype))
       affine = affine_bijector.Affine(
-          shift=loc, scale_diag=c, validate_args=validate_args)
+          shift=loc, scale_diag=scale_diag_part, validate_args=validate_args)
 
       bijector = chain_bijector.Chain([affine, f])
 
@@ -248,12 +237,12 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
 
   @property
   def loc(self):
-    """The `loc` in `Y := loc + scale @ F(Z) * (2 / F(2))."""
+    """The `loc` in `Y := loc + scale @ F(Z)`."""
     return self._loc
 
   @property
   def scale(self):
-    """The `LinearOperator` `scale` in `Y := loc + scale @ F(Z) * (2 / F(2))."""
+    """The `LinearOperator` `scale` in `Y := loc + scale @ F(Z)`."""
     return self._scale
 
   @property

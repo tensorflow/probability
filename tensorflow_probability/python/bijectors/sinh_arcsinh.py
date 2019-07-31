@@ -58,7 +58,7 @@ def _sqrtx2p1(x):
 
 
 class SinhArcsinh(bijector.Bijector):
-  """Compute `Y = g(X) = Sinh( (Arcsinh(X) + skewness) * tailweight )`.
+  """`Y = g(X) = Sinh( (Arcsinh(X) + skewness) * tailweight ) * multiplier`.
 
   For `skewness in (-inf, inf)` and `tailweight in (0, inf)`, this
   transformation is a
@@ -84,6 +84,9 @@ class SinhArcsinh(bijector.Bijector):
       "flat" around `Y = 0`, and a very steep drop-off in the tails.
     * If `X` is a unit Normal, `tailweight > 1` leads to a distribution more
       peaked at the mode with heavier tails.
+  * The `multiplier` term is equal to 2 / F_0(2) where F_0 is
+    the bijector with `skewness = 0`. This is important
+    for CDF values of distributions.SinhArcsinh.
 
   To see the argument about the tails, note that for `|X| >> 1` and
   `|X| >> (|skewness| * tailweight)**tailweight`, we have
@@ -115,6 +118,7 @@ class SinhArcsinh(bijector.Bijector):
           skewness, dtype=dtype, name="skewness")
       self._tailweight = tensor_util.convert_nonref_to_tensor(
           tailweight, dtype=dtype, name="tailweight")
+      self._scale_number = tf.convert_to_tensor(2., dtype=dtype)
       super(SinhArcsinh, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
@@ -130,42 +134,57 @@ class SinhArcsinh(bijector.Bijector):
     """The `tailweight` in: `Y = Sinh((Arcsinh(X) + skewness) * tailweight)`."""
     return self._tailweight
 
+  def _output_multiplier(self, tailweight):
+    return self._scale_number / tf.sinh(
+        tf.asinh(self._scale_number) * tailweight)
+
   def _forward(self, x):
-    return tf.sinh((tf.asinh(x) + self.skewness) * self.tailweight)
+    tailweight = tf.convert_to_tensor(self.tailweight)
+    multiplier = self._output_multiplier(tailweight)
+    bijector_output = tf.sinh((tf.asinh(x) + self.skewness) * tailweight)
+    return bijector_output * multiplier
 
   def _inverse(self, y):
-    return tf.sinh(tf.asinh(y) / self.tailweight - self.skewness)
+    tailweight = tf.convert_to_tensor(self.tailweight)
+    multiplier = self._output_multiplier(tailweight)
+    return tf.sinh(tf.asinh(y / multiplier) / tailweight - self.skewness)
 
   def _inverse_log_det_jacobian(self, y):
-    # x = sinh(arcsinh(y) / tailweight - skewness)
+    # x = sinh(arcsinh(y / multiplier) / tailweight - skewness)
     # Using sinh' = cosh, arcsinh'(y) = 1 / sqrt(y**2 + 1),
     # dx/dy
-    # = cosh(arcsinh(y) / tailweight - skewness)
-    #     / (tailweight * sqrt(y**2 + 1))
+    # = cosh(arcsinh(y / multiplier) / tailweight - skewness)
+    #     / (tailweight * sqrt((y / multiplier)**2 + 1)) / multiplier
 
     # This is computed inside the log to avoid catastrophic cancellations
-    # from cosh((arcsinh(y) / tailweight) - skewness) and sqrt(x**2 + 1).
+    # from cosh((arcsinh(y / multiplier) / tailweight)
+    # - skewness) and sqrt(x**2 + 1).
     tailweight = tf.convert_to_tensor(self.tailweight)
+    multiplier = self._output_multiplier(tailweight)
+    y = y / multiplier
+    subtract_term = tf.math.log(multiplier)
     return (tf.math.log(
         tf.cosh(tf.asinh(y) / tailweight - self.skewness)
         # TODO(srvasude): Consider using cosh(arcsinh(x)) in cases
         # where (arcsinh(x) / tailweight) - skewness ~= arcsinh(x).
-        / _sqrtx2p1(y)) - tf.math.log(tailweight))
+        / _sqrtx2p1(y)) - tf.math.log(tailweight)) - subtract_term
 
   def _forward_log_det_jacobian(self, x):
-    # y = sinh((arcsinh(x) + skewness) * tailweight)
+    # y = sinh((arcsinh(x) + skewness) * tailweight) * multiplier
     # Using sinh' = cosh, arcsinh'(x) = 1 / sqrt(x**2 + 1),
     # dy/dx
     # = cosh((arcsinh(x) + skewness) * tailweight) * tailweight / sqrt(x**2 + 1)
+    # * multiplier
 
     # This is computed inside the log to avoid catastrophic cancellations
     # from cosh((arcsinh(x) + skewness) * tailweight) and sqrt(x**2 + 1).
     tailweight = tf.convert_to_tensor(self.tailweight)
+    add_term = tf.math.log(self._output_multiplier(tailweight))
     return (tf.math.log(
         tf.cosh((tf.asinh(x) + self.skewness) * tailweight)
         # TODO(srvasude): Consider using cosh(arcsinh(x)) in cases
         # where (arcsinh(x) + skewness) * tailweight ~= arcsinh(x).
-        / _sqrtx2p1(x)) + tf.math.log(tailweight))
+        / _sqrtx2p1(x)) + tf.math.log(tailweight) + add_term)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

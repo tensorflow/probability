@@ -25,6 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -33,9 +34,9 @@ rng = np.random.RandomState(123)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SinhArcsinhTest(tf.test.TestCase):
+class SinhArcsinhTest(test_case.TestCase):
 
-  def test_default_is_same_as_normal(self):
+  def testDefaultIsSameAsNormal(self):
     b = 10
     scale = rng.rand(b) + 0.5
     loc = rng.randn(b)
@@ -56,7 +57,7 @@ class SinhArcsinhTest(tf.test.TestCase):
     self.assertAllClose(
         norm_samps.std(axis=0), sasnorm_samps.std(axis=0), atol=0.1)
 
-  def test_broadcast_params_dynamic(self):
+  def testBroadcastParamsDynamic(self):
     loc = tf1.placeholder_with_default(input=rng.rand(5), shape=None)
     scale = tf1.placeholder_with_default(
         input=np.float64(rng.rand()), shape=None)
@@ -67,7 +68,7 @@ class SinhArcsinhTest(tf.test.TestCase):
     samp = self.evaluate(sasnorm.sample())
     self.assertAllEqual((5,), samp.shape)
 
-  def test_passing_in_laplace_plus_defaults_is_same_as_laplace(self):
+  def testPassingInLaplacePlusDefaultsIsSameAsLaplace(self):
     b = 10
     scale = rng.rand(b) + 0.5
     loc = rng.randn(b)
@@ -92,7 +93,7 @@ class SinhArcsinhTest(tf.test.TestCase):
     self.assertAllClose(
         lap_samps.std(axis=0), saslap_samps.std(axis=0), atol=0.1)
 
-  def test_tailweight_small_gives_fewer_outliers_than_normal(self):
+  def testTailweightSmallGivesFewerOutliersThanNormal(self):
     batch_size = 10
     scale = rng.rand(batch_size) + 0.5
     loc = 0.1 * rng.randn(batch_size)
@@ -128,7 +129,7 @@ class SinhArcsinhTest(tf.test.TestCase):
         np.percentile(norm_samps, 100 - q, axis=0),
         rtol=0.03)
 
-  def test_tailweight_large_gives_more_outliers_than_normal(self):
+  def testTailweightLargeGivesMoreOutliersThanNormal(self):
     batch_size = 10
     scale = rng.rand(batch_size) + 0.5
     loc = np.float64(0.)
@@ -164,7 +165,7 @@ class SinhArcsinhTest(tf.test.TestCase):
         np.percentile(norm_samps, 100 - q, axis=0),
         rtol=0.03)
 
-  def test_positive_skewness_moves_mean_to_the_right(self):
+  def testPositiveSkewnessMovesMeanToTheRight(self):
     batch_size = 10
     scale = rng.rand(batch_size) + 0.5
     loc = rng.randn(batch_size)
@@ -175,7 +176,7 @@ class SinhArcsinhTest(tf.test.TestCase):
         sasnorm.sample(10000, seed=tfp_test_util.test_seed()))
     np.testing.assert_array_less(loc, sasnorm_samps.mean(axis=0))
 
-  def test_pdf_reflected_for_negative_skewness(self):
+  def testPdfReflectedForNegativeSkewness(self):
     sas_pos_skew = tfd.SinhArcsinh(
         loc=0., scale=1., skewness=2., validate_args=True)
     sas_neg_skew = tfd.SinhArcsinh(
@@ -184,6 +185,34 @@ class SinhArcsinhTest(tf.test.TestCase):
     self.assertAllClose(*self.evaluate(
         [sas_pos_skew.prob(x), sas_neg_skew.prob(x[::-1])]))
 
+  def testVariableGradients(self):
+    b = 10
+    scale = tf.Variable(rng.rand(b) + 0.5)
+    loc = tf.Variable(rng.randn(b))
+    sasnorm = tfd.SinhArcsinh(loc=loc, scale=scale, validate_args=True)
 
-if __name__ == "__main__":
+    x = rng.randn(5, b)
+    with tf.GradientTape() as tape:
+      y = sasnorm.log_prob(x)
+    grads = tape.gradient(y, sasnorm.trainable_variables)
+    self.assertLen(grads, 2)
+    self.assertAllNotNone(grads)
+
+  def testNonVariableGradients(self):
+    b = 10
+    scale = tf.convert_to_tensor(rng.rand(b) + 0.5)
+    loc = tf.convert_to_tensor(rng.randn(b))
+    sasnorm = tfd.SinhArcsinh(loc=loc, scale=scale, validate_args=True)
+
+    x = rng.randn(5, b)
+    with tf.GradientTape() as tape:
+      tape.watch(loc)
+      tape.watch(scale)
+      y = sasnorm.log_prob(x)
+    grads = tape.gradient(y, [loc, scale])
+    self.assertLen(grads, 2)
+    self.assertAllNotNone(grads)
+
+
+if __name__ == '__main__':
   tf.test.main()
