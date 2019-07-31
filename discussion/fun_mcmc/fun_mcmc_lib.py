@@ -842,7 +842,7 @@ def gaussian_momentum_sample(state_spec: TensorSpecNest = None,
   def _one_part(dtype, shape, seed):
     return util.random_normal(shape=shape, dtype=dtype, seed=seed)
 
-  return util.map_tree(_one_part, dtypes, shapes, seeds)
+  return util.map_tree_up_to(dtypes, _one_part, dtypes, shapes, seeds)
 
 
 def make_gaussian_kinetic_energy_fn(

@@ -22,6 +22,9 @@ from __future__ import print_function
 import jax
 from jax import random
 import jax.numpy as np
+# TODO(siege): Switch to a JAX-specific nested structure API.
+import tensorflow.compat.v2 as tf
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'assert_same_shallow_tree',
@@ -38,73 +41,29 @@ __all__ = [
 ]
 
 
-# JAX has an annoying default where it entirely skips running functions on
-# `None`s in structures. We at times need to detect their presense, so we need
-# to sanitize `None`s before giving them to JAX.
-class _NoneSentinel(object):
-  pass
-
-
-_None = _NoneSentinel()  # pylint: disable=invalid-name
-
-
-def _replace_none_sentinels(a_list):
-  return [None if r is _None else r for r in a_list]
-
-
-def _replace_nones(tree):
-  if tree is None:
-    return _None
-  node_type = jax.tree_util._get_node_type(tree)  # pylint: disable=protected-access
-  if node_type:
-    children, node_spec = node_type.to_iterable(tree)
-    new_children = [_replace_nones(child) for child in children]
-    return node_type.from_iterable(node_spec, new_children)
-  else:
-    return tree
-
-
-def map_tree(fn, tree, *rest):
+def map_tree(fn, tree, *args):
   """Maps `fn` over the leaves of a nested structure."""
-  rest = (tree,) + rest
-  rest = [_replace_nones(r) for r in rest]
-
-  def _wrapper(*args):
-    return fn(*_replace_none_sentinels(args))
-
-  return jax.tree_util.tree_multimap(_wrapper, *rest)
+  return tf.nest.map_structure(fn, tree, *args)
 
 
 def flatten_tree(tree):
   """Flattens a nested structure to a list."""
-  tree = _replace_nones(tree)
-
-  ret = jax.tree_util.tree_flatten(tree)[0]
-  return _replace_none_sentinels(ret)
+  return tf.nest.flatten(tree)
 
 
 def unflatten_tree(tree, xs):
   """Inverse operation of `flatten_tree`."""
-  tree = _replace_nones(tree)
-
-  return jax.tree_util.tree_unflatten(jax.tree_util.tree_structure(tree), xs)
+  return tf.nest.pack_sequence_as(tree, xs)
 
 
 def map_tree_up_to(shallow, fn, tree, *rest):
   """`map_tree` with recursion depth defined by depth of `shallow`."""
-  shallow = _replace_nones(shallow)
-
-  def wrapper(_, *rest):
-    return fn(*rest)
-
-  return jax.tree_util.tree_multimap(wrapper, shallow, tree, *rest)
+  return nest.map_structure_up_to(shallow, fn, tree, *rest)
 
 
 def assert_same_shallow_tree(shallow, tree):
   """Asserts that `tree` has the same shallow structure as `shallow`."""
-  # Do a dummy multimap for the side-effect of verifying that the structures are
-  # the same. This doesn't catch all the errors we actually care about, sadly.
-  map_tree_up_to(shallow, lambda *args: (), tree)
+  nest.assert_shallow_structure(shallow, tree)
 
 
 def make_dynamic_array(dtype, size, element_shape):

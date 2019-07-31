@@ -45,6 +45,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # jax dep,
+        # tensorflow dep,
     ],
 )
 
