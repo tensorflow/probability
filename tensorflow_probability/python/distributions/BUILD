@@ -1602,6 +1602,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/positive_semidefinite_kernels",
     ],
 )
