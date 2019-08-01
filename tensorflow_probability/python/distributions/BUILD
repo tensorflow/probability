@@ -1595,7 +1595,7 @@ py_test(
 
 py_test(
     name = "gaussian_process_regression_model_test",
-    size = "small",
+    size = "medium",
     srcs = ["gaussian_process_regression_model_test.py"],
     deps = [
         ":distributions",
