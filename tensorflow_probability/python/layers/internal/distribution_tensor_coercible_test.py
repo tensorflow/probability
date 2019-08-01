@@ -21,6 +21,7 @@ import operator
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -210,7 +211,7 @@ class DistributionTensorConversionTest(
     self.assertAllClose([3., 2.], self.evaluate([var_plus_2, var]),
                         atol=0, rtol=1e-3)
 
-  def testWhileLoop(self):
+  def _testWhileLoop(self):
     """Shows misuse of `dtc._TensorCoercible(distribution)` in `tf.while_loop`.
 
     Since `dtc._TensorCoercible(distribution)` only creates the `Tensor` on an
@@ -244,7 +245,11 @@ class DistributionTensorConversionTest(
       # `tf.convert_to_tensor(x)` prior to the `tf.while_loop`.  Doing so will
       # cause the value of `x` to exist both outside and inside the
       # `tf.while_loop`.
-      with self.assertRaisesRegexp(ValueError, 'Cannot use.*in a while loop'):
+      if tf1.control_flow_v2_enabled():
+        error_regex = r'Tensor.*must be from the same graph as Tensor.*'
+      else:
+        error_regex = 'Cannot use.*in a while loop'
+      with self.assertRaisesRegexp(ValueError, error_regex):
         _ = x + tf.constant(3.)
       return
 
@@ -257,6 +262,13 @@ class DistributionTensorConversionTest(
         x + tf.constant(3.),
         mean_plus_numiter_times_stddev,
     ]))
+
+  def testWhileLoop(self):
+    self._testWhileLoop()
+
+  @test_util.enable_control_flow_v2
+  def testWhileLoopWithControlFlowV2(self):
+    self._testWhileLoop()
 
 
 if __name__ == '__main__':
