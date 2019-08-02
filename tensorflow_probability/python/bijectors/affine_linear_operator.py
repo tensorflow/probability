@@ -136,7 +136,7 @@ class AffineLinearOperator(bijector.Bijector):
   def _inverse(self, y):
     x = y
     if self.shift is not None:
-      x -= self.shift
+      x = x - self.shift
     if self.scale is not None:
       # Solve fails if the op is singular so we may safely skip this assertion.
       x = self.scale.solvevec(x, adjoint=self.adjoint)

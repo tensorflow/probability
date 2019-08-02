@@ -62,7 +62,7 @@ def _undo_batch_normalization(x,
     #     offset - mean * inv if offset is not None else -mean * inv)
     rescale = tf.sqrt(variance + variance_epsilon)
     if scale is not None:
-      rescale /= scale
+      rescale = rescale / scale
     batch_unnormalized = x * rescale + (
         mean - offset * rescale if offset is not None else mean)
     return batch_unnormalized
