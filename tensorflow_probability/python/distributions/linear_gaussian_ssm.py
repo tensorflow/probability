@@ -33,6 +33,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import prefer_static
 
 tfl = tf.linalg
 
@@ -40,7 +41,7 @@ tfl = tf.linalg
 def _safe_concat(values, axis):
   """Concat that works even when the second argument is empty."""
 
-  reference_shape = tensorshape_util.as_list(values[0].shape)
+  reference_shape = prefer_static.shape(values[0])
   reference_shape[axis] = -1
 
   values = [tf.reshape(x, reference_shape) for x in values]
