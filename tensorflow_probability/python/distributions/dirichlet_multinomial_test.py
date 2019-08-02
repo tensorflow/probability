@@ -451,6 +451,8 @@ class DirichletMultinomialTest(tf.test.TestCase):
         actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
 
   def testNotReparameterized(self):
+    if tf1.control_flow_v2_enabled():
+      self.skipTest("b/138796859")
     total_count = tf.constant(5.0)
     concentration = tf.constant([0.1, 0.1, 0.1])
     _, [grad_total_count, grad_concentration] = tfp.math.value_and_gradient(

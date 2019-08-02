@@ -432,6 +432,8 @@ class HMCTest(tf.test.TestCase):
 
   def testNanFromGradsDontPropagate(self):
     """Test that update with NaN gradients does not cause NaN in results."""
+    if tf.compat.v1.control_flow_v2_enabled():
+      self.skipTest('b/138796859')
     if tf.executing_eagerly(): return
     def _nan_log_prob_with_nan_gradient(x):
       return np.nan * tf.reduce_sum(input_tensor=x)
@@ -457,13 +459,13 @@ class HMCTest(tf.test.TestCase):
     self.assertAllEqual(initial_x_, updated_x_)
     self.assertEqual(acceptance_probs, 0.)
 
-    self.assertAllFinite(
-        self.evaluate(tf.gradients(ys=updated_x, xs=initial_x)[0]))
     self.assertAllEqual([True], [
         g is None for g in tf.gradients(
             ys=kernel_results.proposed_results.grads_target_log_prob,
             xs=initial_x)
     ])
+    self.assertAllFinite(
+        self.evaluate(tf.gradients(ys=updated_x, xs=initial_x)[0]))
 
     # Gradients of the acceptance probs and new log prob are not finite.
     # self.assertAllFinite(
