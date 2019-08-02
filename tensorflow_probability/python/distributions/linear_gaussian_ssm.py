@@ -41,8 +41,10 @@ tfl = tf.linalg
 def _safe_concat(values, axis):
   """Concat that works even when the second argument is empty."""
 
-  reference_shape = tensorshape_util.as_list(prefer_static.shape(values[0]))
-  reference_shape[axis] = -1
+  reference_shape = tf.Variable(
+      prefer_static.shape(values[0]), dtype=tf.int32)
+  reference_shape = tf.assign(
+      reference_shape[axis], tf.constant(-1, dtype=tf.int32))
 
   values = [tf.reshape(x, reference_shape) for x in values]
   return tf.concat(values, axis)
