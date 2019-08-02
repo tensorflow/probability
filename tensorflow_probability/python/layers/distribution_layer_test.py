@@ -850,6 +850,7 @@ class IndependentBernoulliTestStaticShape(tf.test.TestCase,
     model.compile(
         optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
         loss=lambda y, model: -model.log_prob(y),
+        experimental_run_tf_function=False,
         metrics=[])
     batch_size = 100
     model.fit(x, y,
