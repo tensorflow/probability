@@ -748,8 +748,7 @@ class VariationalGaussianProcess(
       inducing_prior = gaussian_process.GaussianProcess(
           kernel=self._kernel,
           mean_fn=self._mean_fn,
-          index_points=self._inducing_index_points,
-          observation_noise_variance=self._observation_noise_variance)
+          index_points=self._inducing_index_points)
 
       return kullback_leibler.kl_divergence(
           self._variational_inducing_observations_posterior,
