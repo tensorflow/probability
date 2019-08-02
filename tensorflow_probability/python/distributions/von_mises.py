@@ -259,9 +259,9 @@ class VonMises(distribution.Distribution):
         sample_batch_shape, concentration, dtype=self.dtype, seed=seed)
 
     # vonMises(0, concentration) -> vonMises(loc, concentration)
-    samples += loc
+    samples = samples + loc
     # Map the samples to [-pi, pi].
-    samples -= 2. * np.pi * tf.round(samples / (2. * np.pi))
+    samples = samples - 2. * np.pi * tf.round(samples / (2. * np.pi))
     return samples
 
   def _parameter_control_dependencies(self, is_init):
@@ -373,7 +373,7 @@ def von_mises_cdf(x, concentration):
 
   # Map x to [-pi, pi].
   num_periods = tf.round(x / (2. * np.pi))
-  x -= (2. * np.pi) * num_periods
+  x = x - (2. * np.pi) * num_periods
 
   # We take the hyperparameters from Table I of [1], the row for D=8
   # decimal digits of accuracy. ck is the cut-off for concentration:
@@ -394,7 +394,7 @@ def von_mises_cdf(x, concentration):
 
   use_series = concentration < ck
   cdf = tf.where(use_series, cdf_series, cdf_normal)
-  cdf += num_periods
+  cdf = cdf + num_periods
   dcdf_dconcentration = tf.where(use_series, dcdf_dconcentration_series,
                                  dcdf_dconcentration_normal)
 
@@ -424,7 +424,7 @@ def _von_mises_cdf_series(x, concentration, num_terms, dtype):
     vn = rn * multiplier
     dvn_dconcentration = (drn_dconcentration * multiplier +
                           rn * dvn_dconcentration)
-    n -= 1.
+    n = n - 1.
 
     return n, rn, drn_dconcentration, vn, dvn_dconcentration
 
@@ -447,7 +447,8 @@ def _von_mises_cdf_series(x, concentration, num_terms, dtype):
   cdf_clipped = tf.clip_by_value(cdf, 0., 1.)
   # The clipped values do not depend on concentration anymore, so set their
   # derivative to zero.
-  dcdf_dconcentration *= tf.cast((cdf >= 0.) & (cdf <= 1.), dtype)
+  dcdf_dconcentration = (
+      dcdf_dconcentration * tf.cast((cdf >= 0.) & (cdf <= 1.), dtype))
 
   return cdf_clipped, dcdf_dconcentration
 

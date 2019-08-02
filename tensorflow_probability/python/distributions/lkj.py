@@ -244,7 +244,7 @@ class LKJ(distribution.Distribution):
 
       for n in range(2, self.dimension):
         # Loop invariant: on entry, result has shape B + [n, n]
-        beta_conc -= 0.5
+        beta_conc = beta_conc - 0.5
         # norm is y in reference [1].
         norm = beta.Beta(
             concentration1=n/2.,
@@ -426,10 +426,10 @@ class LKJ(distribution.Distribution):
       logpi = np.log(np.pi)
       ans = tf.zeros_like(concentration)
       for k in range(1, self.dimension):
-        ans += logpi * (k / 2.)
-        ans += tf.math.lgamma(concentration +
-                              (self.dimension - 1 - k) / 2.)
-        ans -= tf.math.lgamma(concentration + (self.dimension - 1) / 2.)
+        ans = ans + logpi * (k / 2.)
+        ans = ans + tf.math.lgamma(concentration +
+                                   (self.dimension - 1 - k) / 2.)
+        ans = ans - tf.math.lgamma(concentration + (self.dimension - 1) / 2.)
       return ans
 
   def _mean(self):

@@ -262,7 +262,7 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
                 (num_dims + self.df) / 2.))
 
   def _log_unnormalized_prob(self, value):
-    value -= self._loc
+    value = value - self._loc
     value = self.scale.solve(value[..., tf.newaxis])
 
     num_dims = tf.cast(self.event_shape_tensor()[0], self.dtype)

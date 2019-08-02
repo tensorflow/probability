@@ -44,9 +44,9 @@ def _broadcast_event_and_samples(event, samples, event_ndims):
           tf.shape(samples)[tf.rank(samples) - event_ndims:]
       ],
       axis=0)
-  event *= tf.ones(samples_shape, dtype=event.dtype)
+  event = event * tf.ones(samples_shape, dtype=event.dtype)
   event = tf.expand_dims(event, axis=-event_ndims - 1)
-  samples *= tf.ones_like(event, dtype=samples.dtype)
+  samples = samples * tf.ones_like(event, dtype=samples.dtype)
 
   return event, samples
 

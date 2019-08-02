@@ -417,7 +417,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     log_prob = self.distribution.log_prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
       log_prob = tf.reduce_sum(log_prob, axis=self._reduce_event_indices)
-    log_prob += tf.cast(ildj, log_prob.dtype)
+    log_prob = log_prob + tf.cast(ildj, log_prob.dtype)
     if self._is_maybe_event_override and isinstance(event_ndims, int):
       tensorshape_util.set_shape(
           log_prob,
@@ -452,7 +452,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     prob = self.distribution.prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
       prob = tf.reduce_prod(prob, axis=self._reduce_event_indices)
-    prob *= tf.exp(tf.cast(ildj, prob.dtype))
+    prob = prob * tf.exp(tf.cast(ildj, prob.dtype))
     if self._is_maybe_event_override and isinstance(event_ndims, int):
       tensorshape_util.set_shape(
           prob,
@@ -566,7 +566,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     if self._is_maybe_event_override:
       # H[X] = sum_i H[X_i] if X_i are mutually independent.
       # This means that a reduce_sum is a simple rescaling.
-      entropy *= tf.cast(
+      entropy = entropy * tf.cast(
           tf.reduce_prod(self._override_event_shape),
           dtype=dtype_util.base_dtype(entropy.dtype))
     if self._is_maybe_batch_override:
@@ -592,7 +592,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     ildj = self.bijector.inverse_log_det_jacobian(
         dummy, event_ndims=event_ndims, **bijector_kwargs)
 
-    entropy -= tf.cast(ildj, entropy.dtype)
+    entropy = entropy - tf.cast(ildj, entropy.dtype)
     tensorshape_util.set_shape(entropy, self.batch_shape)
     return entropy
 

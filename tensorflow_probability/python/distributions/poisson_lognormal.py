@@ -393,7 +393,7 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
         limit=batch_size * self._quadrature_size,
         delta=self._quadrature_size,
         dtype=ids.dtype)
-    ids += offset
+    ids = ids + offset
     rate = tf.gather(tf.reshape(dist.rate, shape=[-1]), ids)
     rate = tf.reshape(
         rate, shape=concat_vectors([n], self._batch_shape_tensor(

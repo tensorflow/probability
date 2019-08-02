@@ -241,8 +241,8 @@ class Binomial(distribution.Distribution):
             tensorshape_util.is_fully_defined(probs.shape) and
             tensorshape_util.is_compatible_with(counts.shape, probs.shape)):
       # If both shapes are well defined and equal, we skip broadcasting.
-      probs += tf.zeros_like(counts)
-      counts += tf.zeros_like(probs)
+      probs = probs + tf.zeros_like(counts)
+      counts = counts + tf.zeros_like(probs)
 
     return _bdtr(k=counts, n=tf.convert_to_tensor(self.total_count), p=probs)
 
