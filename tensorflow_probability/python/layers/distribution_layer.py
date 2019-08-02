@@ -564,12 +564,14 @@ class CategoricalMixtureOfOneHotCategorical(DistributionLambda):
     """Create the distribution instance from a `params` vector."""
     with tf.compat.v1.name_scope(name, 'CategoricalMixtureOfOneHotCategorical',
                                  [params, event_size, num_components]):
+      params = tf.convert_to_tensor(value=params, name='params')
       dist = MixtureSameFamily.new(
           params,
           num_components,
           OneHotCategorical(
               event_size,
               validate_args=False,  # So we can eval on simplex interior.
+              dtype=params.dtype,
               name=name),
           validate_args=validate_args,
           name=name)
@@ -1562,10 +1564,12 @@ class MixtureNormal(DistributionLambda):
   def new(params, num_components, event_shape=(),
           validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
+    params = tf.convert_to_tensor(value=params, name='params')
     return MixtureSameFamily.new(
         params,
         num_components,
-        IndependentNormal(event_shape, validate_args=validate_args, name=name),
+        IndependentNormal(event_shape, validate_args=validate_args,
+                          dtype=params.dtype, name=name),
         validate_args=validate_args,
         name=name)
 
@@ -1685,11 +1689,13 @@ class MixtureLogistic(DistributionLambda):
   def new(params, num_components, event_shape=(),
           validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
+    params = tf.convert_to_tensor(value=params, name='params')
     return MixtureSameFamily.new(
         params,
         num_components,
         IndependentLogistic(
-            event_shape, validate_args=validate_args, name=name),
+            event_shape, validate_args=validate_args, dtype=params.dtype,
+            name=name),
         validate_args=validate_args,
         name=name)
 
@@ -1803,7 +1809,8 @@ class VariationalGaussianProcess(DistributionLambda):
             observation_noise_variance=tf.nn.softplus(
                 self._unconstrained_observation_noise_variance),
             jitter=self._jitter),
-        convert_to_tensor_fn=convert_to_tensor_fn)
+        convert_to_tensor_fn=convert_to_tensor_fn,
+        dtype=kernel_provider.dtype)
 
     tmp_kernel = kernel_provider.kernel
     self._dtype = tmp_kernel.dtype.as_numpy_dtype

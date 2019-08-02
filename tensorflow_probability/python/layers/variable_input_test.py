@@ -37,10 +37,11 @@ class VariableInputLayerTest(tf.test.TestCase):
             dtype=tf.float64,
             trainable=False),  # You'd probably never want this in IRL.
         # The Dense serves no real purpose; it will change the event_shape.
-        tf.keras.layers.Dense(5, use_bias=False),
+        tf.keras.layers.Dense(5, use_bias=False, dtype=tf.float64),
         tfp.layers.DistributionLambda(
             lambda t: tfd.Independent(tfd.Normal(loc=t[0], scale=t[1]),  # pylint: disable=g-long-lambda
-                                      reinterpreted_batch_ndims=1)),
+                                      reinterpreted_batch_ndims=1),
+            dtype=tf.float64),
 
     ])
 
@@ -77,10 +78,11 @@ class VariableInputLayerTest(tf.test.TestCase):
         trainable=False,  # You'd probably never want this in IRL.
     )(dummy_input)
     # The Dense serves no real purpose; it will change the event_shape.
-    x = tf.keras.layers.Dense(5, use_bias=False)(x)
+    x = tf.keras.layers.Dense(5, use_bias=False, dtype=tf.float64)(x)
     x = tfp.layers.DistributionLambda(
         lambda t: tfd.Independent(tfd.Normal(loc=t[0], scale=t[1]),  # pylint: disable=g-long-lambda
-                                  reinterpreted_batch_ndims=1))(x)
+                                  reinterpreted_batch_ndims=1),
+        dtype=tf.float64)(x)
     model = tf.keras.Model(dummy_input, x)
 
     # Instantiate the model (as a TFP distribution).
