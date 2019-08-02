@@ -280,8 +280,10 @@ def get_fldj_theoretical(bijector,
         event_shape_in=x.shape[tensorshape_util.rank(x.shape) - event_ndims:],
         event_shape_out=[-1])
   if output_to_unconstrained is None:
+    f_x_shape = bijector.forward_event_shape(x.shape)
     output_to_unconstrained = reshape_bijector.Reshape(
-        event_shape_in=x.shape[tensorshape_util.rank(x.shape) - event_ndims:],
+        event_shape_in=f_x_shape[tensorshape_util.rank(f_x_shape) -
+                                 inverse_event_ndims:],
         event_shape_out=[-1])
 
   x = tf.convert_to_tensor(x)

@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -134,23 +135,45 @@ class SoftmaxCentered(bijector.Bijector):
     return x
 
   def _inverse_log_det_jacobian(self, y):
-    # WLOG, consider the vector case:
-    #   x = log(y[:-1]) - log(y[-1])
-    # where,
-    #   y[-1] = 1 - sum(y[:-1]).
-    # We have:
-    #   det{ dX/dY } = det{ diag(1 ./ y[:-1]) + 1 / y[-1] }
-    #                = det{ inv{ diag(y[:-1]) - y[:-1]' y[:-1] } }   (1)
-    #                = 1 / det{ diag(y[:-1]) - y[:-1]' y[:-1] }
-    #                = 1 / { (1 + y[:-1]' inv(diag(y[:-1])) y[:-1]) *
-    #                        det(diag(y[:-1])) }                     (2)
-    #                = 1 / { y[-1] prod(y[:-1]) }
-    #                = 1 / prod(y)
+    # Let B be the forward map defined by the bijector. Consider the map
+    # F : R^n -> R^n where the image of B in R^{n+1} is restricted to the first
+    # n coordinates.
+    #
+    # Claim: det{ dF(X)/dX } = prod(Y) where Y = B(X).
+    # Proof: WLOG, in vector notation:
+    #     X = log(Y[:-1]) - log(Y[-1])
+    #   where,
+    #     Y[-1] = 1 - sum(Y[:-1]).
+    #   We have:
+    #     det{dF} = 1 / det{ dX/dF(X} }                                      (1)
+    #             = 1 / det{ diag(1 / Y[:-1]) + 1 / Y[-1] }
+    #             = 1 / det{ inv{ diag(Y[:-1]) - Y[:-1]' Y[:-1] } }
+    #             = det{ diag(Y[:-1]) - Y[:-1]' Y[:-1] }
+    #             = (1 + Y[:-1]' inv{diag(Y[:-1])} Y[:-1]) det{diag(Y[:-1])} (2)
+    #             = Y[-1] prod(Y[:-1])
+    #             = prod(Y)
+    #
+    # Let P be the image of R^n under F. Define the lift G, from P to R^{n+1},
+    # which appends the last coordinate, Y[-1] := 1 - \sum_k Y_k. G is linear,
+    # so its Jacobian is constant.
+    #
+    # The differential of G, DG, is eye(n) with a row of -1s appended to the
+    # bottom. To compute the Jacobian sqrt{det{(DG)^T(DG)}}, one can see that
+    # (DG)^T(DG) = A + eye(n), where A is the n x n matrix of 1s. This has
+    # eigenvalues (n + 1, 1,...,1), so the determinant is (n + 1). Hence, the
+    # Jacobian of G is sqrt{n + 1} everywhere.
+    #
+    # Putting it all together, the forward bijective map B can be written as
+    # B(X) = G(F(X)) and has Jacobian sqrt{n + 1} * prod(F(X)).
+    #
     # (1) - https://en.wikipedia.org/wiki/Sherman%E2%80%93Morrison_formula
     #       or by noting that det{ dX/dY } = 1 / det{ dY/dX } from Bijector
     #       docstring "Tip".
     # (2) - https://en.wikipedia.org/wiki/Matrix_determinant_lemma
-    return -tf.reduce_sum(tf.math.log(y), axis=-1)
+    n_plus_one = prefer_static.shape(y)[-1]
+    return -tf.reduce_sum(
+        tf.math.log(y), axis=-1) - 0.5 * tf.math.log(
+            tf.cast(n_plus_one, dtype=y.dtype))
 
   def _forward_log_det_jacobian(self, x):
     # This code is similar to tf.math.log_softmax but different because we have
@@ -159,9 +182,10 @@ class SoftmaxCentered(bijector.Bijector):
     # we must do:
     #   log_normalization = 1 + reduce_sum(exp(logits))
     #   -log_normalization + reduce_sum(logits - log_normalization)
+    n = prefer_static.shape(x)[-1]
     log_normalization = tf.math.softplus(
         tf.reduce_logsumexp(x, axis=-1, keepdims=True))
     return tf.squeeze(
         (-log_normalization +
          tf.reduce_sum(x - log_normalization, axis=-1, keepdims=True)),
-        axis=-1)
+        axis=-1) + 0.5 * tf.math.log(tf.cast(n + 1, dtype=x.dtype))

@@ -241,9 +241,9 @@ class TransformedDistributionTest(tf.test.TestCase):
     x = [[[-np.log(3.)], [0.]], [[np.log(3)], [np.log(5)]]]
     x = np.float32(x)
     y = self.evaluate(softmax.forward(x))
-    expected_log_pdf = (
-        np.squeeze(stats.norm(loc=0., scale=1.).logpdf(x)) - np.sum(
-            np.log(y), axis=-1))
+    expected_log_pdf = -0.5 * np.log(2) + (
+        np.squeeze(stats.norm(loc=0., scale=1.).logpdf(x)) -
+        np.sum(np.log(y), axis=-1))
     self.assertAllClose(expected_log_pdf,
                         self.evaluate(multi_logit_normal.log_prob(y)))
     self.assertAllClose(
