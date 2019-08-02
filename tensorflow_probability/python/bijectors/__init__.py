@@ -87,6 +87,7 @@ __all__ = [
     "Chain",
     "CholeskyOuterProduct",
     "CholeskyToInvCholesky",
+    "CorrelationCholesky",
     "Cumsum",
     "DiscreteCosineTransform",
     "Exp",
