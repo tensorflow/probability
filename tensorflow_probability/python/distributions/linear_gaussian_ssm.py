@@ -41,7 +41,7 @@ tfl = tf.linalg
 def _safe_concat(values, axis):
   """Concat that works even when the second argument is empty."""
 
-  reference_shape = tf.get_static_value(prefer_static.shape(values[0]))
+  reference_shape = tensorshape_util.as_list(prefer_static.shape(values[0]))
   reference_shape[axis] = -1
 
   values = [tf.reshape(x, reference_shape) for x in values]
