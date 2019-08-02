@@ -55,7 +55,7 @@ find_version_str() {
   PKG_NAME=$1
   # These are nightly builds we'd like to avoid for some reason; separated by
   # regex OR operator.
-  BAD_NIGHTLY_DATES="20190709\|20190716"
+  BAD_NIGHTLY_DATES="20190709\|20190716\|20190731\|20190802"
   # This will fail to find version 'X" and log available version strings to
   # stderr. We then sort, remove bad versions and take the last entry. This
   # allows us to avoid hardcoding the main version number, which would then need
