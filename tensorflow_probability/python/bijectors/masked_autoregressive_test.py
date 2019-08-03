@@ -413,6 +413,7 @@ class AutoregressiveNetworkTest(tf.test.TestCase):
         params=3, event_shape=4, activation=None, input_order="right-to-left",
         dtype=tf.float64, hidden_degrees="random", hidden_units=[10, 7, 10])
     self.assertEqual((4, 3), made(np.zeros(4, dtype=np.float64)).shape)
+    self.assertEqual("float64", made(np.zeros(4, dtype=np.float64)).dtype)
     self.assertEqual(5 * 10 + 11 * 7 + 8 * 10 + 11 * 12,
                      self._count_trainable_params(made))
     if not tf.executing_eagerly():

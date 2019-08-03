@@ -891,8 +891,6 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
         [self._masks[-1].shape[0], self._event_size * self._params])
 
     self._network = tf.keras.Sequential([
-        # Starting this model with an `InputLayer` ensures that Keras will build
-        # and propagate our `dtype` to each layer we add.
         tf.keras.layers.InputLayer((self._event_size,), dtype=self.dtype)
     ])
 
@@ -913,7 +911,8 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
           bias_regularizer=self._bias_regularizer,
           kernel_constraint=_make_masked_constraint(
               self._masks[k], self._kernel_constraint),
-          bias_constraint=self._bias_constraint))
+          bias_constraint=self._bias_constraint,
+          dtype=self.dtype))
 
     # Record that the layer has been built.
     super(AutoregressiveNetwork, self).build(input_shape)
