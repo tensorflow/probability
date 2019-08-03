@@ -288,10 +288,7 @@ py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -790,6 +787,32 @@ py_test(
 )
 
 py_test(
+    name = "blockwise_test",
+    size = "small",
+    srcs = ["blockwise_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # absl/testing:parameterized dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+py_test(
+    name = "categorical_to_discrete_test",
+    size = "small",
+    srcs = ["categorical_to_discrete_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":categorical_to_discrete",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_test(
     name = "chain_test",
     size = "small",
     srcs = ["chain_test.py"],
@@ -825,40 +848,28 @@ py_test(
 )
 
 py_test(
-    name = "blockwise_test",
-    size = "small",
-    srcs = ["blockwise_test.py"],
-    deps = [
-        ":bijector_test_util",
-        ":bijectors",
-        # absl/testing:parameterized dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:tensorshape_util",
-    ],
-)
-
-py_test(
-    name = "categorical_to_discrete_test",
-    size = "small",
-    srcs = ["categorical_to_discrete_test.py"],
-    deps = [
-        ":bijector_test_util",
-        ":categorical_to_discrete",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
-    ],
-)
-
-py_test(
-    name = "matveclu_test",
-    size = "small",
-    srcs = ["matveclu_test.py"],
+    name = "correlation_cholesky_test",
+    size = "medium",
+    srcs = ["correlation_cholesky_test.py"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:lkj",
+    ],
+)
+
+py_test(
+    name = "cumsum_test",
+    size = "small",
+    srcs = ["cumsum_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -976,19 +987,6 @@ py_test(
 )
 
 py_test(
-    name = "correlation_cholesky_test",
-    size = "medium",
-    srcs = ["correlation_cholesky_test.py"],
-    deps = [
-        ":bijector_test_util",
-        ":bijectors",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/distributions:lkj",
-    ],
-)
-
-py_test(
     name = "masked_autoregressive_test",
     size = "small",
     timeout = "moderate",
@@ -1015,6 +1013,18 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "matveclu_test",
+    size = "small",
+    srcs = ["matveclu_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 
@@ -1230,6 +1240,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1284,18 +1295,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # scipy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "cumsum_test",
-    size = "small",
-    srcs = ["cumsum_test.py"],
-    deps = [
-        ":bijector_test_util",
-        ":bijectors",
-        # numpy dep,
         # tensorflow dep,
     ],
 )

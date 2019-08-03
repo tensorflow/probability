@@ -116,8 +116,34 @@ single_array = functools.partial(n_same_shape, 1)
 def array_and_axis(draw, strategy=None):
   x = draw(strategy or single_array())
   rank = len(x.shape)
-  axis = draw(hps.integers(- rank, rank - 1))
+  axis = draw(hps.integers(-rank, rank - 1))
   return x, axis
+
+
+@hps.composite
+def sliceable_and_slices(draw, strategy=None):
+  x = draw(strategy or single_array())
+  starts = []
+  sizes = []
+  for dim in x.shape:
+    starts.append(draw(hps.integers(0, dim - 1)))
+    sizes.append(
+        draw(hps.one_of(hps.just(-1), hps.integers(0, dim - starts[-1]))))
+  return x, starts, sizes
+
+
+@hps.composite
+def one_hot_params(draw):
+  indices = draw(single_array(dtype=np.int32, elements=hps.integers(0, 8)))
+  depth = np.maximum(1, np.max(indices))
+  dtype = draw(hps.one_of(map(hps.just, (np.int32, np.float32, np.complex64))))
+  on_value = draw(hps.one_of(map(hps.just, (None, 1, 2))))
+  on_value = on_value if on_value is None else dtype(on_value)
+  off_value = draw(hps.one_of(map(hps.just, (None, 3, 7))))
+  off_value = off_value if off_value is None else dtype(off_value)
+  rank = indices.ndim
+  axis = draw(hps.one_of(hps.just(None), hps.integers(-1, rank - 1)))
+  return indices, depth, on_value, off_value, axis, dtype
 
 
 @hps.composite
@@ -416,6 +442,10 @@ NUMPY_TEST_CASES = [
              [n_same_shape(n=2, elements=[floats(), non_zero_floats()])]),
     TestCase('math.xlogy',
              [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
+
+    # Array ops.
+    TestCase('one_hot', [one_hot_params()]),
+    TestCase('slice', [sliceable_and_slices()]),
 ]
 
 
@@ -427,6 +457,22 @@ def _maybe_convert_to_tensors(args):
 
 
 class NumpyTest(test_case.TestCase, parameterized.TestCase):
+
+  def test_convert_to_tensor(self):
+    convert_to_tensor = numpy_backend.convert_to_tensor
+    self.assertEqual(
+        np.complex64,
+        convert_to_tensor(np.complex64(1 + 2j), dtype_hint=tf.int32).dtype)
+    self.assertEqual(
+        np.complex64,
+        convert_to_tensor(np.complex64(1 + 2j), dtype_hint=tf.float64).dtype)
+    self.assertEqual(np.float64,
+                     convert_to_tensor(1., dtype_hint=tf.int32).dtype)
+    self.assertEqual(np.int32, convert_to_tensor(1, dtype_hint=tf.int32).dtype)
+    self.assertEqual(np.int64, convert_to_tensor(1, dtype_hint=tf.int64).dtype)
+    self.assertEqual(
+        np.int32,
+        convert_to_tensor(np.int32(False), dtype_hint=tf.bool).dtype)
 
   def evaluate(self, tensors):
     if tf.executing_eagerly():
