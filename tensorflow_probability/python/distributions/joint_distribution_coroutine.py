@@ -16,7 +16,6 @@
 
 from __future__ import absolute_import
 from __future__ import division
-from __future__ import print_function
 
 import collections
 
@@ -24,6 +23,8 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 from tensorflow_probability.python.distributions import seed_stream
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -105,7 +106,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
   Each element yielded by the generator must be a `tfd.Distribution`-like
   instance.
 
-  An object is deemed "`tfd.Distribution`-like" if it has a
+  An object is deemed '`tfd.Distribution`-like' if it has a
   `sample`, `log_prob`, and distribution properties, e.g., `batch_shape`,
   `event_shape`, `dtype`.
 
@@ -151,7 +152,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
         correct behavior is not guaranteed.
         Default value: `False`.
       name: The name for ops managed by the distribution.
-        Default value: `None` (i.e., `"JointDistributionCoroutine"`).
+        Default value: `None` (i.e., `JointDistributionCoroutine`).
     """
     parameters = dict(locals())
     with tf.name_scope(name or 'JointDistributionCoroutine') as name:
@@ -167,6 +168,57 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
           graph_parents=[],
           name=name)
 
+  def _assert_compatible_shape(self, index, sample_shape, samples):
+    requested_shape, _ = self._expand_sample_shape_to_vector(
+        tf.convert_to_tensor(sample_shape, dtype=tf.int32),
+        name='requested_shape')
+    actual_shape = prefer_static.shape(samples)
+    actual_rank = prefer_static.rank_from_shape(actual_shape)
+    requested_rank = prefer_static.rank_from_shape(requested_shape)
+
+    # We test for two properties we expect of yielded distributions:
+    # (1) The rank of the tensor of generated samples must be at least
+    #     as large as the rank requested.
+    # (2) The requested shape must be a prefix of the shape of the
+    #     generated tensor of samples.
+    # We attempt to perform test (1) statically first.
+    # We don't need to do this explicitly for test (2) because
+    # `assert_equal` evaluates statically if it can.
+    static_actual_rank = tf.get_static_value(actual_rank)
+    static_requested_rank = tf.get_static_value(requested_rank)
+
+    assertion_message = ('Samples yielded by distribution #{} are not '
+                         'consistent with `sample_shape` passed to '
+                         '`JointDistributionCoroutine` '
+                         'distribution.'.format(index))
+
+    # TODO Remove this static check (b/138738650)
+    if (static_actual_rank is not None and
+        static_requested_rank is not None):
+      # We're able to statically check the rank
+      if static_actual_rank < static_requested_rank:
+        raise ValueError(assertion_message)
+      else:
+        control_dependencies = []
+    else:
+      # We're not able to statically check the rank
+      control_dependencies = [
+          assert_util.assert_greater_equal(
+              actual_rank, requested_rank,
+              message=assertion_message)
+          ]
+
+    with tf.control_dependencies(control_dependencies):
+      trimmed_actual_shape = actual_shape[:requested_rank]
+
+    control_dependencies = [
+        assert_util.assert_equal(
+            requested_shape, trimmed_actual_shape,
+            message=assertion_message)
+    ]
+
+    return control_dependencies
+
   def _flat_sample_distributions(self, sample_shape=(), seed=None, value=None):
     """Executes `model`, creating both samples and distributions."""
     ds = []
@@ -175,6 +227,9 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     gen = self._model()
     index = 0
     d = next(gen)
+    if not isinstance(d, self.Root):
+      raise ValueError('First distribution yielded by coroutine must '
+                       'be wrapped in `Root`.')
     try:
       while True:
         actual_distribution = d.distribution if isinstance(d, self.Root) else d
@@ -187,7 +242,15 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
           next_value = actual_distribution.sample(
               sample_shape=sample_shape if isinstance(d, self.Root) else (),
               seed=seed())
-        values_out.append(next_value)
+
+        if self._validate_args:
+          with tf.control_dependencies(
+              self._assert_compatible_shape(
+                  index, sample_shape, next_value)):
+            values_out.append(tf.identity(next_value))
+        else:
+          values_out.append(next_value)
+
         index += 1
         d = gen.send(next_value)
     except StopIteration:
