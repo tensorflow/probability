@@ -371,7 +371,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
       elif self.validate_args:
         param = tf.convert_to_tensor(param)
         assertions.append(assert_util.assert_greater_equal(
-            tf.shape(param)[-1], 1, message=msg1))
+            tf.shape(param)[-1:], 1, message=msg1))
         # NOTE: For now, we leave out a runtime assertion that
         # `tf.shape(param)[-1] <= tf.int32.max`.  An earlier `tf.shape` call
         # will fail before we get to this point.
