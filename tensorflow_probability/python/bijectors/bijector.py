@@ -174,7 +174,7 @@ class HashableWeakRef(weakref.ref):
   def __hash__(self):
     x = self()
     if not isinstance(x, np.ndarray):
-      return hash(x)
+      return id(x)
     if isinstance(x, np.generic):
       raise ValueError('Unable to weakref np.generic')
     # Note: The following logic can never be reached by the public API because
@@ -191,14 +191,15 @@ class HashableWeakRef(weakref.ref):
 
   def __eq__(self, other):
     x = self()
-    if isinstance(x, np.ndarray):
-      y = other()
-      return (isinstance(y, np.ndarray) and
-              x.__array_interface__ == y.__array_interface__ and
-              id(x) == id(y))
     if isinstance(x, np.generic):
       raise ValueError('Unable to weakref np.generic')
-    return super(HashableWeakRef, self).__eq__(other)
+    y = other()
+    ids_are_equal = id(x) == id(y)
+    if isinstance(x, np.ndarray):
+      return (isinstance(y, np.ndarray) and
+              x.__array_interface__ == y.__array_interface__ and
+              ids_are_equal)
+    return ids_are_equal
 
 
 @six.add_metaclass(abc.ABCMeta)

@@ -74,7 +74,8 @@ VAR_USAGES = {}
 
 
 def usage_counting_identity(var):
-  VAR_USAGES[var] = VAR_USAGES.get(var, []) + [traceback.format_stack(limit=15)]
+  VAR_USAGES[id(var)] = VAR_USAGES.get(
+      id(var), []) + [traceback.format_stack(limit=15)]
   return tf.identity(var)
 
 
