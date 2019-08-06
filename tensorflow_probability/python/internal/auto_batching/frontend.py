@@ -54,7 +54,7 @@ from tensorflow.python.autograph.pyct.common_transformers import anf
 TF_BACKEND = tf_backend.TensorFlowBackend()
 
 
-def _parse_and_analyze(f):
+def _parse_and_analyze(f, autobatch_functions):
   """Performs preliminary analyses and transformations.
 
   The goal is to massage the source program into a form on which
@@ -62,6 +62,9 @@ def _parse_and_analyze(f):
 
   Args:
     f: Function to analyze
+    autobatch_functions: List of Python `str` names of autobatched functions.
+      Arguments to these functions will be canonicalized to variable references,
+      but others will not.
 
   Returns:
     node: A Python AST node representing the function, suitable for
@@ -102,7 +105,26 @@ def _parse_and_analyze(f):
   node = return_statements.transform(node, ctx, default_to_null_return=False)
 
   # Transform into ANF
-  node = anf.transform(node, ctx)
+  # Replacing if tests and autobatched function call arguments because
+  # that's where divergence can happen.
+  # Replacing all function calls because the downstream transformation
+  # expects calls to lead directly to assignments.
+  def maybe_replace_function_argument(parent, field_name, child):
+    del field_name, child
+    if not anno.hasanno(parent.func, anno.Basic.QN):
+      return False
+    func_name = anno.getanno(parent.func, anno.Basic.QN)
+    if str(func_name) in autobatch_functions:
+      return True
+    return False
+
+  anf_config = [
+      (anf.ASTEdgePattern(gast.If, 'test', anf.ANY), anf.REPLACE),
+      (anf.ASTEdgePattern(anf.ANY, anf.ANY, gast.Call), anf.REPLACE),
+      (anf.ASTEdgePattern(gast.Call, 'args', anf.ANY),
+       maybe_replace_function_argument),
+  ]
+  node = anf.transform(node, ctx, config=anf_config)
   node = converter.standard_analysis(node, ctx, is_initial=False)
 
   return node, ctx
@@ -568,11 +590,13 @@ class Context(object):
       function_objects.append(declared)
     for function, _ in self._tagged_functions:
       name = function.__name__
-      node, ctx = _parse_and_analyze(function)
+      node, ctx = _parse_and_analyze(function, self.function_names())
+      # print(compiler.ast_to_source(node, indentation='  '))
       node = _AutoBatchingTransformer(
           self.function_names(),
           [scoped_name for scoped_name, _ in _environment(function, [name])],
           ctx).visit(node)
+      # print(compiler.ast_to_source(node, indentation='  '))
       builder_module, _, _ = compiler.ast_to_object(node)
       for scoped_name, val in _environment(function, [name]):
         builder_module.__dict__[scoped_name] = val

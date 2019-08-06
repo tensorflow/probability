@@ -531,6 +531,31 @@ class AutoGraphFrontendTest(tf.test.TestCase):
     #   1 to get 21.
     self.assertEqual(22, execution_counter_box[0])
 
+  def testCalmerAnf(self):
+    # This test has two syntactic features that used to ANF badly:
+    # - Literal True `if` argument used to not get replaced
+    # - Trying to use a reference in a function call, like `np.array(foo)`, used
+    #   to replace `np.array`, causing problems.
+    def int_type(args):
+      return args[0]
+    ctx = frontend.Context()
+    @ctx.batch(type_inference=int_type)
+    def function(x):
+      # pylint: disable=using-constant-test
+      if True:
+        return x + np.array(1)
+      else:
+        return x + np.array(1)
+
+    inputs = np.array([1, 5, 60, 3, 7], dtype=np.int32)
+    outputs = np.array([2, 6, 61, 4, 8], dtype=np.int32)
+    # pylint: disable=unexpected-keyword-arg
+    # The `max_stack_depth` and `backend` keyword arguments to `function`
+    # are introduced by the `@ctx.batch` decorator, confusing pylint.
+    self.assertAllEqual(
+        outputs,
+        function(inputs, max_stack_depth=3, backend=NP_BACKEND))
+
 
 class _TestHidingTFBatchSize(object):
 

@@ -400,8 +400,9 @@ def _make_evolve_trajectory(value_and_gradients_fn, max_depth,
       # Continue the NUTS trajectory if the tree-building did not terminate,
       # and if the reverse-most and forward-most states do not exhibit a
       # U-turn.
+      continue_trajectory_in = continue_trajectory
       continue_trajectory = _continue_test_batched(
-          continue_trajectory & (depth < max_depth), forward, reverse)
+          continue_trajectory_in & (depth < max_depth), forward, reverse)
       return evolve_trajectory(
           reverse,
           forward,
