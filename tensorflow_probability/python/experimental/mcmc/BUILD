@@ -35,6 +35,7 @@ py_library(
     srcs = [
         "__init__.py",
         "nuts.py",
+        "nuts_unrolled.py",
     ],
     srcs_version = "PY2AND3",
     deps = [
@@ -85,4 +86,43 @@ py_test(
         "requires-gpu-sm35",
     ],
     deps = [":nuts_testlib"],
+)
+
+py_library(
+    name = "nuts_unrolled_testlib",
+    srcs = ["nuts_unrolled_test.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/testing:parameterized dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:assert_util",
+    ],
+)
+
+py_test(
+    name = "nuts_unrolled_test",
+    size = "medium",
+    srcs = ["nuts_unrolled_test.py"],
+    shard_count = 7,
+    srcs_version = "PY2AND3",
+    tags = ["nozapfhahn"],
+    deps = [
+        ":nuts_unrolled_testlib",
+    ],
+)
+
+py_test(
+    name = "nuts_unrolled_test_gpu",
+    srcs = ["nuts_unrolled_test.py"],
+    main = "nuts_unrolled_test.py",
+    shard_count = 7,
+    srcs_version = "PY2AND3",
+    tags = [
+        "notap",
+        "nozapfhahn",
+        "requires-gpu-sm35",
+    ],
+    deps = [":nuts_unrolled_testlib"],
 )
