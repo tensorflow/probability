@@ -419,14 +419,18 @@ class VonMisesFisher(distribution.Distribution):
 
       def body_fn(w, should_continue):
         z = beta.sample(sample_shape=sample_batch_shape, seed=seed())
+        # set_shape needed here because of b/139013403
+        z.set_shape(w.shape)
         w = tf.where(should_continue, (1 - (1 + b) * z) / (1 - (1 - b) * z), w)
         w = tf.debugging.check_numerics(w, 'w')
+        unif = tf.random.uniform(
+            sample_batch_shape, seed=seed(), dtype=self.dtype)
+        # set_shape needed here because of b/139013403
+        unif.set_shape(w.shape)
         should_continue = tf.logical_and(
             should_continue,
             self.concentration * w + dim * tf.math.log1p(-x * w) - c <
-            tf.math.log(
-                tf.random.uniform(
-                    sample_batch_shape, seed=seed(), dtype=self.dtype)))
+            tf.math.log(unif))
         return w, should_continue
 
       w = tf.zeros(sample_batch_shape, dtype=self.dtype)
