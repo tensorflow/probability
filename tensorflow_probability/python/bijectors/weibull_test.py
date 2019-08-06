@@ -88,19 +88,33 @@ class WeibullBijectorTest(tf.test.TestCase):
           concentration=-1., scale=1., validate_args=True)
       self.evaluate(b.forward(-3.))
 
-  def testVariableAsserts(self):
+  def testVariableAssertsScale(self):
     concentration = tf.Variable(1.)
     scale = tf.Variable(1.)
     b = tfb.Weibull(
         concentration=concentration, scale=scale, validate_args=True)
+    # Use identities so that static asserts don't catch the error earlier
+    # and raise 'Forward transformation input must be at least 0'
+    minus_1 = tf.identity(tf.convert_to_tensor(-1.))
+    minus_3 = tf.identity(tf.convert_to_tensor(-3.))
     self.evaluate([concentration.initializer, scale.initializer])
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      with tf.control_dependencies([scale.assign(-1.)]):
-        self.evaluate(b.forward(-3.))
+      with tf.control_dependencies([scale.assign(minus_1)]):
+        self.evaluate(b.forward(minus_3))
+
+  def testVariableAssertsConcentration(self):
+    concentration = tf.Variable(1.)
+    scale = tf.Variable(1.)
+    b = tfb.Weibull(
+        concentration=concentration, scale=scale, validate_args=True)
+    # Use identities so that static asserts don't catch the error earlier
+    # and raise 'Forward transformation input must be at least 0'
+    minus_1 = tf.identity(tf.convert_to_tensor(-1.))
+    minus_3 = tf.identity(tf.convert_to_tensor(-3.))
+    self.evaluate([concentration.initializer, scale.initializer])
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
-      with tf.control_dependencies([
-          scale.assign(1.), concentration.assign(-1.)]):
-        self.evaluate(b.forward(-3.))
+      with tf.control_dependencies([concentration.assign(minus_1)]):
+        self.evaluate(b.forward(minus_3))
 
 
 if __name__ == '__main__':

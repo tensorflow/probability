@@ -90,8 +90,11 @@ class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
         ).shape)
 
   def testValidateArgs(self):
+    # Wrap -1 const in identity so that asserts don't fire at ExpSinSquared
+    # construction time.
+    minus_1 = tf.identity(tf.convert_to_tensor(-1.))
     with self.assertRaises(tf.errors.InvalidArgumentError):
-      k = tfpk.ExponentiatedQuadratic(-1., -1., validate_args=True)
+      k = tfpk.ExponentiatedQuadratic(minus_1, minus_1, validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
     if not tf.executing_eagerly():
