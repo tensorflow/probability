@@ -212,8 +212,10 @@ class OneHotCategorical(distribution.Distribution):
     if (not tensorshape_util.is_fully_defined(x.shape) or
         not tensorshape_util.is_fully_defined(logits.shape) or
         x.shape != logits.shape):
-      logits = tf.ones_like(x, dtype=logits.dtype) * logits
-      x = tf.ones_like(logits, dtype=x.dtype) * x
+      broadcast_shape = tf.broadcast_dynamic_shape(
+          tf.shape(logits), tf.shape(x))
+      logits = tf.broadcast_to(logits, broadcast_shape)
+      x = tf.broadcast_to(x, broadcast_shape)
 
     logits_shape = tf.shape(tf.reduce_sum(logits, axis=-1))
     logits_2d = tf.reshape(logits, [-1, event_size])

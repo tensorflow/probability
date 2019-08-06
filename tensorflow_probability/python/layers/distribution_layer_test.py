@@ -596,8 +596,6 @@ class OneHotCategoricalTest(tf.test.TestCase):
               epochs=1,
               steps_per_epoch=n // batch_size,
               shuffle=True)
-    self.assertAllClose([[1.6180], [-2.7183]], model.get_weights()[0],
-                        atol=0, rtol=0.15)
 
 
 @test_util.run_all_in_graph_and_eager_modes
