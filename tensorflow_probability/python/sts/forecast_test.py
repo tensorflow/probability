@@ -30,13 +30,14 @@ class _ForecastTest(object):
 
   def _build_model(self, observed_time_series,
                    prior_batch_shape=(),
+                   initial_effect_prior_scale=1.,
                    constant_offset=None):
     seasonal = tfp.sts.Seasonal(
         num_seasons=4,
         observed_time_series=observed_time_series,
         initial_effect_prior=tfd.Normal(
             loc=self._build_tensor(np.zeros(prior_batch_shape)),
-            scale=self._build_tensor(1.)),
+            scale=self._build_tensor(initial_effect_prior_scale)),
         constrain_mean_effect_to_zero=False,  # Simplifies analysis.
         name='seasonal')
     return tfp.sts.Sum(components=[seasonal],
@@ -249,6 +250,54 @@ class _ForecastTest(object):
         onestep_dist.stddev()))
     self.assertTrue(np.all(np.isfinite(onestep_mean_)))
     self.assertTrue(np.all(np.isfinite(onestep_stddev_)))
+
+  def test_impute_missing(self):
+    time_series_with_nans = self._build_tensor(
+        [-1., 1., np.nan, 2.4, np.nan, np.nan, 2.])
+    observed_time_series = tfp.sts.MaskedTimeSeries(
+        time_series=time_series_with_nans,
+        is_missing=tf.math.is_nan(time_series_with_nans))
+
+    # Build model with a near-uniform prior on the initial effect. In principle
+    # we should use a large scale like 1e8 here, but we use 1e2 because
+    # increasing the scale triggers numerical issues with Kalman smoothing
+    # described in b/138414045.
+    model = self._build_model(observed_time_series,
+                              initial_effect_prior_scale=1e2)
+
+    # Impute values using manually-set parameters, which will allow us to
+    # compute the expected results analytically.
+    drift_scale = 1.0
+    noise_scale = 0.1
+    parameter_samples = {'observation_noise_scale': [noise_scale],
+                         'seasonal/_drift_scale': [drift_scale]}
+    imputed_series_dist = tfp.sts.impute_missing_values(
+        model, observed_time_series, parameter_samples)
+    imputed_noisy_series_dist = tfp.sts.impute_missing_values(
+        model, observed_time_series, parameter_samples,
+        include_observation_noise=True)
+
+    # Compare imputed mean to expected mean.
+    mean_, stddev_ = self.evaluate([imputed_series_dist.mean(),
+                                    imputed_series_dist.stddev()])
+    noisy_mean_, noisy_stddev_ = self.evaluate([
+        imputed_noisy_series_dist.mean(),
+        imputed_noisy_series_dist.stddev()])
+    self.assertAllClose(mean_, [-1., 1., 2., 2.4, -1., 1., 2.], atol=1e-2)
+    self.assertAllClose(mean_, noisy_mean_, atol=1e-2)
+
+    # Compare imputed stddevs to expected stddevs.
+    drift_plus_noise_scale = np.sqrt(noise_scale**2 + drift_scale**2)
+    expected_stddev = np.array([noise_scale,
+                                noise_scale,
+                                drift_plus_noise_scale,
+                                noise_scale,
+                                drift_plus_noise_scale,
+                                drift_plus_noise_scale,
+                                noise_scale])
+    self.assertAllClose(stddev_, expected_stddev, atol=1e-2)
+    self.assertAllClose(noisy_stddev_,
+                        np.sqrt(stddev_**2 + noise_scale**2), atol=1e-2)
 
   def _build_tensor(self, ndarray, dtype=None):
     """Convert a numpy array to a TF placeholder.

@@ -29,6 +29,7 @@ from tensorflow_probability.python.sts.fitting import build_factored_variational
 from tensorflow_probability.python.sts.fitting import fit_with_hmc
 from tensorflow_probability.python.sts.fitting import sample_uniform_initial_state
 from tensorflow_probability.python.sts.forecast import forecast
+from tensorflow_probability.python.sts.forecast import impute_missing_values
 from tensorflow_probability.python.sts.forecast import one_step_predictive
 from tensorflow_probability.python.sts.internal.missing_values_util import MaskedTimeSeries
 from tensorflow_probability.python.sts.local_level import LocalLevel
@@ -78,6 +79,7 @@ _allowed_symbols = [
     'decompose_forecast_by_component',
     'fit_with_hmc',
     'forecast',
+    'impute_missing_values',
     'one_step_predictive',
     'sample_uniform_initial_state'
 ]
