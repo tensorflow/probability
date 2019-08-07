@@ -37,17 +37,19 @@ from tensorflow_probability.python.internal import prefer_static
 
 tfl = tf.linalg
 
+def _safe_concat(values):
+  """Concat that works even some arguments are empty.
 
-def _safe_concat(values, axis):
-  """Concat that works even when the second argument is empty."""
+  Arguments after the first could be empty. Always concats values
+  along axis=0
+  """
 
-  reference_shape = tf.Variable(
-      prefer_static.shape(values[0]), dtype=tf.int32)
-  reference_shape = tf.assign(
-      reference_shape[axis], tf.constant(-1, dtype=tf.int32))
+  initial_value_shape = prefer_static.shape(values[0])
+  reference_shape = prefer_static.concat(
+      [[-1], initial_value_shape[1:]], axis=0)
 
   values = [tf.reshape(x, reference_shape) for x in values]
-  return tf.concat(values, axis)
+  return tf.concat(values, axis=0)
 
 
 def _check_equal_shape(name,
@@ -672,9 +674,9 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
       # Combine the initial sampled timestep with the remaining timesteps.
       latents = _safe_concat([initial_latent[tf.newaxis, ...],
-                              latents], axis=0)
+                              latents])
       observations = _safe_concat([initial_observation[tf.newaxis, ...],
-                                   observations], axis=0)
+                                   observations])
 
       # Put dimensions back in order. The samples we've computed are
       # ordered by timestep, with shape `[num_timesteps, num_samples,
@@ -1046,10 +1048,10 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
       # Squish the initial step back on top of the other (scanned) timesteps
       latent_means = _safe_concat([initial_latent_mean[tf.newaxis, ...],
-                                   latent_means], axis=0)
+                                   latent_means])
       observation_means = _safe_concat([
           initial_observation_mean[tf.newaxis, ...],
-          observation_means], axis=0)
+          observation_means])
 
       # Put dimensions back in order. The samples we've computed have
       # shape `[num_timesteps, batch_shape, size, 1]`, where `size`
@@ -1103,9 +1105,9 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
       # Squish the initial step back on top of the other (scanned) timesteps
       latent_covs = _safe_concat([initial_latent_cov[tf.newaxis, ...],
-                                  latent_covs], axis=0)
+                                  latent_covs])
       observation_covs = _safe_concat([initial_observation_cov[tf.newaxis, ...],
-                                       observation_covs], axis=0)
+                                       observation_covs])
 
       # Put dimensions back in order. The samples we've computed have
       # shape `[num_timesteps, batch_shape, size, size]`, where `size`
