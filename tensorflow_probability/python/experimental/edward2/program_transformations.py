@@ -22,8 +22,8 @@ import inspect
 import six
 import tensorflow as tf
 
-from tensorflow_probability.python.edward2.interceptor import interceptable
-from tensorflow_probability.python.edward2.interceptor import interception
+from tensorflow_probability.python.experimental.edward2.interceptor import interceptable
+from tensorflow_probability.python.experimental.edward2.interceptor import interception
 
 __all__ = [
     "make_log_joint_fn",

@@ -31,6 +31,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":auto_batching",
+        "//tensorflow_probability/python/experimental/edward2",
         "//tensorflow_probability/python/experimental/mcmc",
         "//tensorflow_probability/python/internal/auto_batching",
     ],

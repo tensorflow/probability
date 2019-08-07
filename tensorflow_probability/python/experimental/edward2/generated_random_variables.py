@@ -23,8 +23,8 @@ import inspect
 import six
 
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.edward2.interceptor import interceptable
-from tensorflow_probability.python.edward2.random_variable import RandomVariable
+from tensorflow_probability.python.experimental.edward2.interceptor import interceptable
+from tensorflow_probability.python.experimental.edward2.random_variable import RandomVariable
 from tensorflow_probability.python.internal import docstring_util
 
 
