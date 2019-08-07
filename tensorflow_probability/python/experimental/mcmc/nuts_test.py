@@ -32,7 +32,6 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-nuts = tfp.experimental.mcmc.nuts
 
 
 def run_nuts_chain(
@@ -53,7 +52,7 @@ def run_nuts_chain(
   #     num_leapfrog_steps=3,
   #     step_size=0.3,
   #     seed=1)
-  kernel = nuts.NoUTurnSampler(
+  kernel = tfp.experimental.mcmc.NoUTurnSampler(
       target_log_prob_fn,
       step_size=[0.3],
       use_auto_batching=not dry_run,
@@ -91,7 +90,7 @@ def assert_univariate_target_conservation(
     # target_d.log_prob; that was blocked by b/122414321, but maybe tfp's port
     # of value_and_gradients_function fixed that bug.
     return mk_target().log_prob(*args)
-  operator = nuts.NoUTurnSampler(
+  operator = tfp.experimental.mcmc.NoUTurnSampler(
       target,
       step_size=step_size,
       max_tree_depth=3,
@@ -169,7 +168,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
   def testLeapfrogStepCounter(self, tree_depth, unrolled_leapfrog_steps):
     def never_u_turns_log_prob(x):
       return 1e-6 * x
-    kernel = nuts.NoUTurnSampler(
+    kernel = tfp.experimental.mcmc.NoUTurnSampler(
         never_u_turns_log_prob,
         step_size=[0.3],
         use_auto_batching=True,
@@ -222,7 +221,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
       pt1 = tf.reduce_sum(input_tensor=x, axis=[-1, -2])
       pt2 = tf.reduce_sum(input_tensor=y, axis=-1)
       return pt1 + pt2
-    kernel = nuts.NoUTurnSampler(
+    kernel = tfp.experimental.mcmc.NoUTurnSampler(
         batched_synthetic_log_prob,
         step_size=0.3,
         use_auto_batching=True,
@@ -278,7 +277,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
   def testProgramProperties(self):
     def target(x):
       return x
-    operator = nuts.NoUTurnSampler(
+    operator = tfp.experimental.mcmc.NoUTurnSampler(
         target,
         step_size=0,
         use_auto_batching=True)

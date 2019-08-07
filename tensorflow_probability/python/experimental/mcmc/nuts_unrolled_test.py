@@ -32,7 +32,6 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-nuts_lib = tfp.experimental.mcmc.nuts_unrolled
 
 
 @tf.function(autograph=False)
@@ -46,7 +45,7 @@ def run_nuts_chain(event_size, batch_size, num_steps, initial_state=None):
   if initial_state is None:
     initial_state = tf.zeros([batch_size, event_size])
 
-  kernel = nuts_lib.NoUTurnSamplerUnrolled(
+  kernel = tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
       target_log_prob_fn,
       step_size=[0.3],
       unrolled_leapfrog_steps=2,
@@ -78,7 +77,7 @@ def assert_univariate_target_conservation(test, target_d, step_size):
 
   @tf.function(autograph=False)
   def run_chain():
-    nuts = nuts_lib.NoUTurnSamplerUnrolled(
+    nuts = tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
         target_d.log_prob,
         step_size=step_size,
         max_tree_depth=3,
@@ -177,7 +176,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
           tfd.Normal(tf.range(6, dtype=tf.float32),
                      tf.constant(1.)),
           reinterpreted_batch_ndims=1).log_prob(x)
-    kernel0 = nuts_lib.NoUTurnSamplerUnrolled(
+    kernel0 = tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
         log_prob0,
         step_size=0.3,
         unrolled_leapfrog_steps=2,
@@ -203,7 +202,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
               tfd.Normal(tf.constant([[2., 3.], [4., 5.]]), tf.constant(1.)),
               reinterpreted_batch_ndims=2).log_prob(state2)
       )
-    kernel1 = nuts_lib.NoUTurnSamplerUnrolled(
+    kernel1 = tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
         log_prob1,
         step_size=0.3,
         unrolled_leapfrog_steps=2,
@@ -242,7 +241,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
               loc=tf.cast(mu, dtype=tf.float64),
               scale_tril=tf.cast(scale_tril, dtype=tf.float64)).log_prob(event)
 
-      nuts = nuts_lib.NoUTurnSamplerUnrolled(
+      nuts = tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
           target_log_prob_fn,
           step_size=[step_size],
           max_tree_depth=5)

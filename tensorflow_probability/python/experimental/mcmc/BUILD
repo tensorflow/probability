@@ -32,18 +32,24 @@ exports_files(["LICENSE"])
 
 py_library(
     name = "mcmc",
-    srcs = [
-        "__init__.py",
-        "nuts.py",
-        "nuts_unrolled.py",
+    srcs = ["__init__.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":nuts_autobatching",
+        ":nuts_unrolled",
+        # tensorflow dep,
     ],
+)
+
+py_library(
+    name = "nuts_autobatching",
+    srcs = ["nuts.py"],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
-        "//tensorflow_probability/python/internal/auto_batching",
+        "//tensorflow_probability/python/experimental:auto_batching",
         "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/mcmc",
     ],
@@ -86,6 +92,20 @@ py_test(
         "requires-gpu-sm35",
     ],
     deps = [":nuts_testlib"],
+)
+
+py_library(
+    name = "nuts_unrolled",
+    srcs = ["nuts_unrolled.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:seed_stream",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
+    ],
 )
 
 py_library(
