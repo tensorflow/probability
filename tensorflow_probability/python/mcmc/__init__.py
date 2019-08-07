@@ -20,6 +20,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.mcmc.diagnostic import effective_sample_size
 from tensorflow_probability.python.mcmc.diagnostic import potential_scale_reduction
+from tensorflow_probability.python.mcmc.dual_averaging_step_size_adaptation import DualAveragingStepSizeAdaptation
 from tensorflow_probability.python.mcmc.hmc import HamiltonianMonteCarlo
 from tensorflow_probability.python.mcmc.hmc import make_simple_step_size_update_policy
 from tensorflow_probability.python.mcmc.hmc import UncalibratedHamiltonianMonteCarlo
@@ -44,6 +45,7 @@ from tensorflow_probability.python.mcmc.transformed_kernel import TransformedTra
 
 __all__ = [
     'CheckpointableStatesAndTrace',
+    'DualAveragingStepSizeAdaptation',
     'HamiltonianMonteCarlo',
     'MetropolisAdjustedLangevinAlgorithm',
     'MetropolisHastings',

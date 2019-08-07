@@ -33,6 +33,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":diagnostic",
+        ":dual_averaging_step_size_adaptation",
         ":hmc",
         ":kernel",
         ":langevin",
@@ -67,6 +68,29 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "dual_averaging_step_size_adaptation",
+    srcs = ["dual_averaging_step_size_adaptation.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":kernel",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal",
+    ],
+)
+
+py_test(
+    name = "dual_averaging_step_size_adaptation_test",
+    srcs = ["dual_averaging_step_size_adaptation_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
