@@ -476,8 +476,8 @@ class DenseLocalReparameterization(_DenseVariational):
   import tensorflow_probability as tfp
 
   model = tf.keras.Sequential([
-      tfp.layers.DenseReparameterization(512, activation=tf.nn.relu),
-      tfp.layers.DenseReparameterization(10),
+      tfp.layers.DenseLocalReparameterization(512, activation=tf.nn.relu),
+      tfp.layers.DenseLocalReparameterization(10),
   ])
 
   logits = model(features)
