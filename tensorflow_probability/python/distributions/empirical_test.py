@@ -19,12 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -344,7 +345,7 @@ class EmpiricalVectorTest(tfp_test_util.VectorDistributionTestHelpers):
                           np.log(expected_cdf))
 
   def testPmfNoBatch(self):
-    sample = [[0, 0], [0, 1], [0, 1], [1, 2]]
+    samples = [[0, 0], [0, 1], [0, 1], [1, 2]]
     events = [
         [0, 1],
         [[0, 1], [1, 2]],
@@ -358,7 +359,7 @@ class EmpiricalVectorTest(tfp_test_util.VectorDistributionTestHelpers):
     ]
 
     for event, expected_pmf in zip(events, expected_pmfs):
-      input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
+      input_ = tf.convert_to_tensor(value=samples, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
           input=input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=1)
@@ -494,7 +495,9 @@ class EmpiricalVectorTest(tfp_test_util.VectorDistributionTestHelpers):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class EmpiricalNdTest(tfp_test_util.VectorDistributionTestHelpers):
+class EmpiricalNdTest(tfp_test_util.VectorDistributionTestHelpers,
+                      test_case.TestCase,
+                      parameterized.TestCase):
 
   def testSamples(self):
     for samples_shape in ([4, 2, 4], [4, 2, 2, 4]):
@@ -504,14 +507,18 @@ class EmpiricalNdTest(tfp_test_util.VectorDistributionTestHelpers):
       dist = tfd.Empirical(samples=input_ph, event_ndims=2)
       self.assertAllClose(input_ph, self.evaluate(dist.samples))
 
-    invalid_samples = [
-        0,
-        [0, 1],
-        [[0, 1], [1, 2]]
-    ]
-    for samples in invalid_samples:
-      with self.assertRaises(ValueError):
-        dist = tfd.Empirical(samples=samples, event_ndims=2)
+  @parameterized.named_parameters(
+      {'testcase_name': 'ZeroRank', 'samples': 0},
+      {'testcase_name': 'TooFewDims1', 'samples': [0, 1]},
+      {'testcase_name': 'TooFewDims2', 'samples': [[0, 1], [1, 2]]},
+  )
+  def testInvalidSamples(self, samples):
+    input_ph = tf1.placeholder_with_default(
+        input=samples,
+        shape=np.array(samples).shape if self.static_shape else None)
+    with self.assertRaises(Exception):
+      dist = tfd.Empirical(samples=input_ph, event_ndims=2, validate_args=True)
+      self.evaluate(dist.mean())
 
   def testShapes(self):
     for samples_shape in ([2, 2, 4], [4, 2, 2, 4]):
@@ -665,33 +672,34 @@ class EmpiricalNdTest(tfp_test_util.VectorDistributionTestHelpers):
 
 
 class EmpiricalScalarStaticShapeTest(
-    EmpiricalScalarTest, tf.test.TestCase):
+    EmpiricalScalarTest, test_case.TestCase):
   static_shape = True
 
 
 class EmpiricalScalarDynamicShapeTest(
-    EmpiricalScalarTest, tf.test.TestCase):
+    EmpiricalScalarTest, test_case.TestCase):
   static_shape = False
 
 
 class EmpiricalVectorStaticShapeTest(
-    EmpiricalVectorTest, tf.test.TestCase):
+    EmpiricalVectorTest, test_case.TestCase):
   static_shape = True
 
 
 class EmpiricalVectorDynamicShapeTest(
-    EmpiricalVectorTest, tf.test.TestCase):
+    EmpiricalVectorTest, test_case.TestCase):
   static_shape = False
 
 
 class EmpiricalNdStaticShapeTest(
-    EmpiricalNdTest, tf.test.TestCase):
+    EmpiricalNdTest):
   static_shape = True
 
 
 class EmpiricalNdDynamicShapeTest(
-    EmpiricalNdTest, tf.test.TestCase):
+    EmpiricalNdTest):
   static_shape = False
+del EmpiricalNdTest
 
 
 if __name__ == '__main__':

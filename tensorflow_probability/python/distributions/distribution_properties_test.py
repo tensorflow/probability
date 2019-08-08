@@ -58,6 +58,7 @@ TF2_FRIENDLY_DISTS = (
     'Cauchy',
     'Deterministic',
     'Dirichlet',
+    'Empirical',
     'Exponential',
     'FiniteDiscrete',
     'Gamma',
@@ -96,7 +97,7 @@ TF2_FRIENDLY_DISTS = (
 NO_SAMPLE_PARAM_GRADS = {
     'Deterministic': ('atol', 'rtol'),
 }
-NO_LOG_PROB_PARAM_GRADS = ('Deterministic',)
+NO_LOG_PROB_PARAM_GRADS = ('Deterministic', 'Empirical')
 NO_KL_PARAM_GRADS = ('Deterministic',)
 
 MUTEX_PARAMS = (

@@ -345,7 +345,7 @@ py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
-        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1522,9 +1522,11 @@ py_test(
     name = "empirical_test",
     srcs = ["empirical_test.py"],
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
