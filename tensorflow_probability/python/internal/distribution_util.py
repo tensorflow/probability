@@ -882,7 +882,7 @@ def _is_integer_like_by_dtype(dt):
 
 
 def assert_categorical_event_shape(
-    categorical_param, name='embed_check_categorical_event_shape'):
+    categorical_param, name='assert_check_categorical_event_shape'):
   """Embeds checks that categorical distributions don't have too many classes.
 
   A categorical-type distribution is one which, e.g., returns the class label
