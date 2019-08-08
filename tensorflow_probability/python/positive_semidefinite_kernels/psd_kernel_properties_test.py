@@ -162,7 +162,7 @@ def kernels(
   """
 
   if kernel_name is None:
-    kernel_name = draw(hps.one_of(map(hps.just, TF2_FRIENDLY_KERNELS)))
+    kernel_name = draw(hps.sampled_from(TF2_FRIENDLY_KERNELS))
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
   if event_dim is None:

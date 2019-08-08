@@ -154,15 +154,14 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
       (or an arbitrary one if omitted).
   """
   if bijector_name is None:
-    bijector_name = draw(hps.one_of(map(hps.just, TF2_FRIENDLY_BIJECTORS)))
+    bijector_name = draw(hps.sampled_from(TF2_FRIENDLY_BIJECTORS))
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
   if event_dim is None:
     event_dim = draw(hps.integers(min_value=2, max_value=6))
   if bijector_name == 'Invert':
     underlying_name = draw(
-        hps.one_of(map(hps.just,
-                       set(TF2_FRIENDLY_BIJECTORS) - {'Invert'})))
+        hps.sampled_from(sorted(set(TF2_FRIENDLY_BIJECTORS) - {'Invert'})))
     underlying = draw(
         bijectors(
             bijector_name=underlying_name,

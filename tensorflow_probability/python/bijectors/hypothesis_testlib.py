@@ -247,13 +247,13 @@ def unconstrained_bijectors(draw, max_forward_event_ndims=None,
     return True
 
   supports = bijector_supports()
-  acceptable_keys = [k for k in instantiable_bijectors().keys()
-                     if k == 'Invert' or is_acceptable(supports[k])]
-  bijector_name = draw(hps.one_of(map(hps.just, acceptable_keys)))
+  acceptable_keys = sorted([k for k in instantiable_bijectors().keys()
+                            if k == 'Invert' or is_acceptable(supports[k])])
+  bijector_name = draw(hps.sampled_from(acceptable_keys))
   if bijector_name == 'Invert':
     acceptable_keys = [k for k in instantiable_bijectors().keys()
                        if is_acceptable(supports[k].invert())]
-    underlying = draw(hps.one_of(map(hps.just, acceptable_keys)))
+    underlying = draw(hps.sampled_from(acceptable_keys))
     underlying = instantiable_bijectors()[underlying][0](validate_args=True)
     return tfb.Invert(underlying, validate_args=True)
   return instantiable_bijectors()[bijector_name][0](validate_args=True)

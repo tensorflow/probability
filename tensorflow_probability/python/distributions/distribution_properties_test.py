@@ -569,12 +569,12 @@ def base_distributions(draw,
   """
   if dist_name is None:
     names = [k for k in INSTANTIABLE_BASE_DISTS.keys() if eligibility_filter(k)]
-    dist_name = draw(hps.one_of(map(hps.just, sorted(names))))
+    dist_name = draw(hps.sampled_from(sorted(names)))
 
   if dist_name == 'Empirical':
     variants = [k for k in INSTANTIABLE_BASE_DISTS.keys()
                 if eligibility_filter(k) and 'Empirical' in k]
-    dist_name = draw(hps.one_of(map(hps.just, sorted(variants))))
+    dist_name = draw(hps.sampled_from(sorted(variants)))
 
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())

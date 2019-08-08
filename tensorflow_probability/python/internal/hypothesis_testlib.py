@@ -371,7 +371,7 @@ def broadcasting_params(draw,
   remaining_params = set(params_event_ndims.keys())
   params_to_use = []
   while remaining_params:
-    param = draw(hps.one_of(map(hps.just, sorted(remaining_params))))
+    param = draw(hps.sampled_from(sorted(remaining_params)))
     params_to_use.append(param)
     remaining_params.remove(param)
     for mutex_set in mutex_params:
