@@ -38,6 +38,8 @@ from tensorflow_probability.python.internal.backend import numpy as numpy_backen
 ALLOW_NAN = False
 ALLOW_INFINITY = False
 
+SKIP_JAX_DISABLED = False
+
 
 def _getattr(obj, name):
   names = name.split('.')
@@ -47,13 +49,14 @@ def _getattr(obj, name):
 class TestCase(dict):
   """`dict` object containing test strategies for a single function."""
 
-  def __init__(self, name, strategy_list):
+  def __init__(self, name, strategy_list, **kwargs):
     self.name = name
     super(TestCase, self).__init__(
         testcase_name='_' + name.replace('.', '_'),
         tensorflow_function=_getattr(tf, name),
         numpy_function=_getattr(numpy_backend, name),
-        strategy_list=strategy_list)
+        strategy_list=strategy_list,
+        **kwargs)
 
   def __repr__(self):
     return 'TestCase(\'{}\', {})'.format(self.name, self['strategy_list'])
@@ -216,9 +219,11 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['a', 'x', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
-    TestCase('math.polygamma', [
-        hps.tuples(hps.integers(0, 10).map(float), positive_floats()),
-    ]),
+    TestCase(
+        'math.polygamma', [
+            hps.tuples(hps.integers(0, 10).map(float), positive_floats()),
+        ],
+        jax_disabled=True),
 
     # ArgSpec(args=['arr', 'weights', 'minlength',
     #               'maxlength', 'dtype', 'name'],
@@ -355,10 +360,18 @@ NUMPY_TEST_CASES = [
     TestCase('math.asinh', [single_array(elements=positive_floats())]),
     TestCase('math.atan', [single_array()]),
     TestCase('math.atanh', [single_array(elements=floats(-1., 1.))]),
-    TestCase('math.bessel_i0', [single_array(elements=floats(-50., 50.))]),
-    TestCase('math.bessel_i0e', [single_array(elements=floats(-50., 50.))]),
-    TestCase('math.bessel_i1', [single_array(elements=floats(-50., 50.))]),
-    TestCase('math.bessel_i1e', [single_array(elements=floats(-50., 50.))]),
+    TestCase(
+        'math.bessel_i0', [single_array(elements=floats(-50., 50.))],
+        jax_disabled=True),
+    TestCase(
+        'math.bessel_i0e', [single_array(elements=floats(-50., 50.))],
+        jax_disabled=True),
+    TestCase(
+        'math.bessel_i1', [single_array(elements=floats(-50., 50.))],
+        jax_disabled=True),
+    TestCase(
+        'math.bessel_i1e', [single_array(elements=floats(-50., 50.))],
+        jax_disabled=True),
     TestCase('math.ceil', [single_array()]),
     TestCase('math.conj',
              [single_array(dtype=np.complex, elements=complex_numbers())]),
@@ -366,8 +379,7 @@ NUMPY_TEST_CASES = [
     TestCase('math.cosh', [single_array(elements=floats(-100., 100.))]),
     TestCase(
         'math.digamma',
-        [single_array(elements=non_zero_floats(min_value=-1e4, max_value=1e4))
-        ]),
+        [single_array(elements=non_zero_floats(-1e4, 1e4))]),
     TestCase('math.erf', [single_array()]),
     TestCase('math.erfc', [single_array()]),
     TestCase('math.exp',
@@ -486,15 +498,30 @@ class NumpyTest(test_case.TestCase, parameterized.TestCase):
         return sess.run(tensors)
 
   @parameterized.named_parameters(NUMPY_TEST_CASES)
-  def testLogEmptyTestCases(
-      self, tensorflow_function, numpy_function, strategy_list, atol=1e-6):
+  def testLogEmptyTestCases(self,
+                            tensorflow_function,
+                            numpy_function,
+                            strategy_list,
+                            atol=1e-6,
+                            rtol=1e-6,
+                            jax_disabled=False):
+    if jax_disabled and SKIP_JAX_DISABLED:
+      tf.compat.v1.logging.warning('The test for %s is disabled for JAX.',
+                                   numpy_function.__name__)
     if not strategy_list:
       tf.compat.v1.logging.warning(
           'The test for %s contains no strategies.', numpy_function.__name__)
 
   @parameterized.named_parameters(NUMPY_TEST_CASES)
-  def testConsistency(
-      self, tensorflow_function, numpy_function, strategy_list, atol=1e-6):
+  def testConsistency(self,
+                      tensorflow_function,
+                      numpy_function,
+                      strategy_list,
+                      atol=1e-6,
+                      rtol=1e-6,
+                      jax_disabled=False):
+    if jax_disabled and SKIP_JAX_DISABLED:
+      self.skipTest('Test is disabled for JAX')
     for strategy in strategy_list:
       @hp.settings(deadline=None,
                    max_examples=10,
@@ -509,7 +536,7 @@ class NumpyTest(test_case.TestCase, parameterized.TestCase):
             tf_fn(*_maybe_convert_to_tensors(args)))
         numpy_value = np_fn(*args)
         self.assertAllCloseAccordingToType(
-            tensorflow_value, numpy_value, atol=atol)
+            tensorflow_value, numpy_value, atol=atol, rtol=rtol)
 
       check_consistency(tensorflow_function, numpy_function)
 

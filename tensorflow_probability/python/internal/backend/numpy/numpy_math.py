@@ -23,7 +23,7 @@ import numpy as np
 
 import tensorflow as tf
 
-from tensorflow_probability.python.internal.backend.numpy.internal import utils
+from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
 scipy_special = utils.try_import('scipy.special')
 
@@ -441,7 +441,7 @@ less_equal = utils.copy_docstring(
 
 lgamma = utils.copy_docstring(
     tf.math.lgamma,
-    lambda x, name=None: real(scipy_special.loggamma(x)))
+    lambda x, name=None: scipy_special.gammaln(x))
 
 log = utils.copy_docstring(
     tf.math.log,

@@ -20,9 +20,9 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import v1
 from tensorflow_probability.python.internal.backend.numpy import v2
-from tensorflow_probability.python.internal.backend.numpy.internal import utils
 
 
 __all__ = [

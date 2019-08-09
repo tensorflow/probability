@@ -24,9 +24,9 @@ import numpy as np
 
 import tensorflow as tf
 
+from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import initializers
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
-from tensorflow_probability.python.internal.backend.numpy.internal import utils
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import Module
 from tensorflow_probability.python.internal.backend.numpy.ops import name_scope

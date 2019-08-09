@@ -57,10 +57,10 @@ py_library(
     name = "compat",
     srcs = ["compat.py"],
     deps = [
+        ":_utils",
         ":v1",
         ":v2",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -68,8 +68,8 @@ py_library(
     name = "control_flow",
     srcs = ["control_flow.py"],
     deps = [
+        ":_utils",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -77,10 +77,10 @@ py_library(
     name = "debugging",
     srcs = ["debugging.py"],
     deps = [
+        ":_utils",
         ":v1",
         ":v2",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -88,9 +88,9 @@ py_library(
     name = "dtype",
     srcs = ["dtype.py"],
     deps = [
+        ":_utils",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -106,9 +106,9 @@ py_library(
     name = "functional_ops",
     srcs = ["functional_ops.py"],
     deps = [
+        ":_utils",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -116,9 +116,9 @@ py_library(
     name = "initializers",
     srcs = ["initializers.py"],
     deps = [
+        ":_utils",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -126,10 +126,10 @@ py_library(
     name = "keras",
     srcs = ["keras.py"],
     deps = [
+        ":_utils",
         ":keras_layers",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -137,9 +137,9 @@ py_library(
     name = "keras_layers",
     srcs = ["keras_layers.py"],
     deps = [
+        ":_utils",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -147,11 +147,11 @@ py_library(
     name = "linalg",
     srcs = ["linalg.py"],
     deps = [
+        ":_utils",
         ":linear_operator",
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -159,10 +159,10 @@ py_library(
     name = "linear_operator",
     srcs = ["linear_operator.py"],
     deps = [
+        ":_utils",
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -170,9 +170,9 @@ py_library(
     name = "misc",
     srcs = ["misc.py"],
     deps = [
+        ":_utils",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -180,10 +180,10 @@ py_library(
     name = "nn",
     srcs = ["nn.py"],
     deps = [
+        ":_utils",
         ":numpy_math",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -191,9 +191,9 @@ py_library(
     name = "numpy_array",
     srcs = ["numpy_array.py"],
     deps = [
+        ":_utils",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -201,9 +201,9 @@ py_library(
     name = "numpy_logging",
     srcs = ["numpy_logging.py"],
     deps = [
+        ":_utils",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -211,10 +211,10 @@ py_library(
     name = "numpy_math",
     srcs = ["numpy_math.py"],
     deps = [
+        ":_utils",
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -222,9 +222,9 @@ py_library(
     name = "ops",
     srcs = ["ops.py"],
     deps = [
+        ":_utils",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -232,10 +232,10 @@ py_library(
     name = "random_generators",
     srcs = ["random_generators.py"],
     deps = [
+        ":_utils",
         ":numpy_math",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -243,9 +243,9 @@ py_library(
     name = "sets_lib",
     srcs = ["sets_lib.py"],
     deps = [
+        ":_utils",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -253,8 +253,8 @@ py_library(
     name = "sparse_lib",
     srcs = ["sparse_lib.py"],
     deps = [
+        ":_utils",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -262,8 +262,8 @@ py_library(
     name = "test_lib",
     srcs = ["test_lib.py"],
     deps = [
+        ":_utils",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -287,9 +287,9 @@ py_library(
     name = "v1",
     srcs = ["v1.py"],
     deps = [
+        ":_utils",
         ":initializers",
         ":ops",
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
     ],
 )
 
@@ -297,8 +297,16 @@ py_library(
     name = "v2",
     srcs = ["v2.py"],
     deps = [
+        ":_utils",
         ":ops",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal/backend/numpy/internal:utils",
+    ],
+)
+
+py_library(
+    name = "_utils",
+    srcs = ["_utils.py"],
+    deps = [
+        # decorator dep,
     ],
 )
