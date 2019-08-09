@@ -27,10 +27,9 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.positive_semidefinite_kernels.internal import util as kernels_util
+from tensorflow_probability.python.math.psd_kernels.internal import util as kernels_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfpk = tfp.positive_semidefinite_kernels
 
 PARAMS_0 = 2.
 PARAMS_1 = [2.]
@@ -38,13 +37,14 @@ PARAMS_2 = [1., 2.]
 PARAMS_21 = [[1.], [2.]]
 
 
-class IncompletelyDefinedKernel(tfpk.PositiveSemidefiniteKernel):
+class IncompletelyDefinedKernel(tfp.math.psd_kernels.PositiveSemidefiniteKernel
+                               ):
 
   def __init__(self):
     super(IncompletelyDefinedKernel, self).__init__(feature_ndims=1)
 
 
-class TestKernel(tfpk.PositiveSemidefiniteKernel):
+class TestKernel(tfp.math.psd_kernels.PositiveSemidefiniteKernel):
   """A PositiveSemidefiniteKernel implementation just for testing purposes.
 
   k(x, y) = m * sum(x + y)
@@ -108,24 +108,23 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
     k32_batch_unk = TestKernel(tf.compat.v1.placeholder_with_default(
         [2., 3], shape=None))
     self.assertEqual(
-        'tfp.positive_semidefinite_kernels.TestKernel('
-        '"TestKernel", feature_ndims=1, dtype=float32)',
-        str(k32_batch_unk))
+        'tfp.math.psd_kernels.TestKernel('
+        '"TestKernel", feature_ndims=1, dtype=float32)', str(k32_batch_unk))
 
   def testStr(self):
     k32_batch2 = TestKernel(tf.cast([123., 456.], dtype=tf.float32))
     k64_batch2x1 = TestKernel(tf.cast([[123.], [456.]], dtype=tf.float64))
     k_fdim3 = TestKernel(tf.cast(123., dtype=tf.float32), feature_ndims=3)
     self.assertEqual(
-        'tfp.positive_semidefinite_kernels.TestKernel('
+        'tfp.math.psd_kernels.TestKernel('
         '"TestKernel", batch_shape=(2,), feature_ndims=1, dtype=float32)',
         str(k32_batch2))
     self.assertEqual(
-        'tfp.positive_semidefinite_kernels.TestKernel('
+        'tfp.math.psd_kernels.TestKernel('
         '"TestKernel", batch_shape=(2, 1), feature_ndims=1, dtype=float64)',
         str(k64_batch2x1))
     self.assertEqual(
-        'tfp.positive_semidefinite_kernels.TestKernel('
+        'tfp.math.psd_kernels.TestKernel('
         '"TestKernel", batch_shape=(), feature_ndims=3, dtype=float32)',
         str(k_fdim3))
 
@@ -134,7 +133,7 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
     k32_batch_unk = TestKernel(tf.compat.v1.placeholder_with_default(
         [2., 3], shape=None))
     self.assertEqual(
-        '<tfp.positive_semidefinite_kernels.TestKernel '
+        '<tfp.math.psd_kernels.TestKernel '
         '\'TestKernel\' batch_shape=<unknown> feature_ndims=1 dtype=float32>',
         repr(k32_batch_unk))
 
@@ -143,15 +142,15 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
     k64_batch2x1 = TestKernel(tf.cast([[123.], [456.]], dtype=tf.float64))
     k_fdim3 = TestKernel(tf.cast(123., dtype=tf.float32), feature_ndims=3)
     self.assertEqual(
-        '<tfp.positive_semidefinite_kernels.TestKernel '
+        '<tfp.math.psd_kernels.TestKernel '
         '\'TestKernel\' batch_shape=(2,) feature_ndims=1 dtype=float32>',
         repr(k32_batch2))
     self.assertEqual(
-        '<tfp.positive_semidefinite_kernels.TestKernel '
+        '<tfp.math.psd_kernels.TestKernel '
         '\'TestKernel\' batch_shape=(2, 1) feature_ndims=1 dtype=float64>',
         repr(k64_batch2x1))
     self.assertEqual(
-        '<tfp.positive_semidefinite_kernels.TestKernel '
+        '<tfp.math.psd_kernels.TestKernel '
         '\'TestKernel\' batch_shape=() feature_ndims=3 dtype=float32>',
         repr(k_fdim3))
 
@@ -173,7 +172,8 @@ class PositiveSemidefiniteKernelTest(tf.test.TestCase, parameterized.TestCase):
       ('Zero feature_ndims', 0),
       ('Negative feature_ndims', -3))
   def testFeatureNdimsExceptions(self, feature_ndims):
-    class FeatureNdimsKernel(tfpk.PositiveSemidefiniteKernel):
+
+    class FeatureNdimsKernel(tfp.math.psd_kernels.PositiveSemidefiniteKernel):
 
       def __init__(self):
         super(FeatureNdimsKernel, self).__init__(feature_ndims)

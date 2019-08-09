@@ -22,7 +22,6 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
@@ -69,8 +68,7 @@ def pad_shape_with_ones(x, ndims, start=-1):
   rank = tf.rank(x)
   first_shape = tf.shape(x)[:rank + start + 1]
   second_shape = tf.shape(x)[rank + start + 1:]
-  new_shape = distribution_util.pad(
-      first_shape, axis=0, back=True, value=1, count=ndims)
+  new_shape = tf.pad(first_shape, paddings=[[0, ndims]], constant_values=1)
   new_shape = tf.concat([new_shape, second_shape], axis=0)
   x = tf.reshape(x, new_shape)
   if start == -1:

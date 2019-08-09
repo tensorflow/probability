@@ -19,12 +19,12 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
+from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 
 __all__ = ['FeatureTransformed']
 
 
-class FeatureTransformed(psd_kernel.PositiveSemidefiniteKernel):
+class FeatureTransformed(PositiveSemidefiniteKernel):
   """Input transformed kernel.
 
   Given a kernel `k` and function `f`, compute `k_{new}(x, y) = k(f(x), f(y))`.
@@ -36,7 +36,7 @@ class FeatureTransformed(psd_kernel.PositiveSemidefiniteKernel):
   import tensorflow as tf
   import tensorflow_probability as tfp
   from tensorflow_probability.positive_semidefinite_kernel.internal import util
-  tfpk = tfp.positive_semidefinite_kernels
+  tfpk = tfp.math.psd_kernels
 
   base_kernel = tfpk.ExponentiatedQuadratic(amplitude=2., length_scale=1.)
   ```

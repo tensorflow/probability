@@ -867,7 +867,7 @@ class _IndependentLogisticTest(_IndependentLayerTest):
   def _distribution_to_params(self, distribution, batch_shape):
     return tf.concat([
         tf.reshape(distribution.loc, tf.concat([batch_shape, [-1]], axis=-1)),
-        tfd.softplus_inverse(tf.reshape(
+        tfp.math.softplus_inverse(tf.reshape(
             distribution.scale, tf.concat([batch_shape, [-1]], axis=-1)))
     ], -1)
 

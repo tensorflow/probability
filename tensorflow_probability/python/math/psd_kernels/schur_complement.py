@@ -19,12 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.bijectors import cholesky_outer_product
-from tensorflow_probability.python.bijectors import invert
-from tensorflow_probability.python.internal import distribution_util
+
+from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
+from tensorflow_probability.python.bijectors.invert import Invert
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
-from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math.psd_kernels.internal import util
+from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 
 
 __all__ = [
@@ -45,7 +46,7 @@ def _add_diagonal_shift(matrix, shift):
       matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
-class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
+class SchurComplement(PositiveSemidefiniteKernel):
   """The SchurComplement kernel.
 
   Given a block matrix `M = [[A, B], [C, D]]`, the Schur complement of D in M is
@@ -106,7 +107,7 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
   Here's a simple example usage, with no particular motivation.
 
   ```python
-  from tensorflow_probability import positive_semidefinite_kernels as psd_kernel
+  from tensorflow_probability.math import psd_kernels as psd_kernel
 
   base_kernel = psd_kernel.ExponentiatedQuadratic(amplitude=np.float64(1.))
   # 3 points in 1-dimensional space (shape [3, 1]).
@@ -128,7 +129,7 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
 
   ```python
   from tensorflow_probability import distributions as tfd
-  from tensorflow_probability import positive_semidefinite_kernels as psd_kernel
+  from tensorflow_probability.math import psd_kernels as psd_kernel
 
   base_kernel = psd_kernel.ExponentiatedQuadratic(amplitude=np.float64(1.))
   observation_index_points = np.random.uniform(-1., 1., [50, 1])
@@ -224,15 +225,14 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
         # every time we needed the cholesky, the bijector cache wouldn't be hit.
         self._divisor_matrix = base_kernel.matrix(fixed_inputs, fixed_inputs)
         if diag_shift is not None:
-          broadcast_shape = distribution_util.get_broadcast_shape(
-              self._divisor_matrix, diag_shift[..., tf.newaxis])
+          broadcast_shape = get_broadcast_shape(self._divisor_matrix,
+                                                diag_shift[..., tf.newaxis])
           self._divisor_matrix = tf.broadcast_to(
               self._divisor_matrix, broadcast_shape)
           self._divisor_matrix = _add_diagonal_shift(
               self._divisor_matrix, diag_shift)
 
-      self._cholesky_bijector = invert.Invert(
-          cholesky_outer_product.CholeskyOuterProduct())
+      self._cholesky_bijector = Invert(CholeskyOuterProduct())
     super(SchurComplement, self).__init__(
         base_kernel.feature_ndims, dtype=dtype, name=name)
 
@@ -314,8 +314,8 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
         # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2) + [ez]
         input_tensor=k1z * kzzinv_kz2,
         axis=-1)  # we can safely always reduce just this one trailing dim,
-                  # since self.fixed_inputs is presumed to have example_ndims
-                  # exactly 1.
+    # since self.fixed_inputs is presumed to have example_ndims
+    # exactly 1.
 
     # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2)
     return k12 - k1z_kzzinv_kz2
@@ -339,3 +339,28 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
   @property
   def divisor_matrix_cholesky(self):
     return self.cholesky_bijector.forward(self.divisor_matrix)
+
+
+# Copied from ../../internal/distribution_util.py to avoid circular dependency.
+def get_broadcast_shape(*tensors):
+  """Get broadcast shape as a Python list of integers (preferred) or `Tensor`.
+
+  Args:
+    *tensors:  One or more `Tensor` objects (already converted!).
+
+  Returns:
+    broadcast shape:  Python list (if shapes determined statically), otherwise
+      an `int32` `Tensor`.
+  """
+  # Try static.
+  s_shape = tensors[0].shape
+  for t in tensors[1:]:
+    s_shape = tf.broadcast_static_shape(s_shape, t.shape)
+  if tensorshape_util.is_fully_defined(s_shape):
+    return tensorshape_util.as_list(s_shape)
+
+  # Fallback on dynamic.
+  d_shape = tf.shape(tensors[0])
+  for t in tensors[1:]:
+    d_shape = tf.broadcast_dynamic_shape(d_shape, tf.shape(t))
+  return d_shape

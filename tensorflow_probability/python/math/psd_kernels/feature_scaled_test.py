@@ -22,7 +22,8 @@ from __future__ import print_function
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import positive_semidefinite_kernels as tfpk
+
+import tensorflow_probability as tfp
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -50,10 +51,11 @@ class _FeatureScaledTest(parameterized.TestCase):
         low=1., high=10., size=[10, 2]).astype(self.dtype)
     inner_length_scale = self.dtype(1.)
     # Use 3 feature_ndims.
-    kernel = tfpk.ExponentiatedQuadratic(
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
         amplitude, inner_length_scale, feature_ndims=3)
     scale_diag = tf.ones([20, 1, 2, 1, 1, 1])
-    ard_kernel = tfpk.FeatureScaled(kernel, scale_diag=scale_diag)
+    ard_kernel = tfp.math.psd_kernels.FeatureScaled(
+        kernel, scale_diag=scale_diag)
     self.assertAllEqual([20, 10, 2], ard_kernel.batch_shape)
     self.assertAllEqual(
         [20, 10, 2], self.evaluate(ard_kernel.batch_shape_tensor()))
@@ -70,7 +72,7 @@ class _FeatureScaledTest(parameterized.TestCase):
     amplitude = np.random.uniform(
         low=1., high=10., size=[10, 2]).astype(self.dtype)
     inner_length_scale = self.dtype(1.)
-    kernel = tfpk.ExponentiatedQuadratic(
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
         amplitude, inner_length_scale, feature_ndims)
     input_shape = [dims] * feature_ndims
 
@@ -78,7 +80,8 @@ class _FeatureScaledTest(parameterized.TestCase):
     length_scale = np.random.uniform(
         2, 5, size=([3, 1, 2] + input_shape)).astype(self.dtype)
 
-    ard_kernel = tfpk.FeatureScaled(kernel, scale_diag=length_scale)
+    ard_kernel = tfp.math.psd_kernels.FeatureScaled(
+        kernel, scale_diag=length_scale)
 
     x = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
     y = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)

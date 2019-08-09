@@ -18,15 +18,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
 import functools
 
-
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
-from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
+from tensorflow_probability.python.math.psd_kernels.internal import util
+from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 
 __all__ = [
     'Linear',
@@ -46,7 +45,7 @@ def _maybe_shape_dynamic(tensor):
   return tf.shape(tensor)
 
 
-class Polynomial(psd_kernel.PositiveSemidefiniteKernel):
+class Polynomial(PositiveSemidefiniteKernel):
   """Polynomial Kernel.
 
     Is based on the dot product covariance function and can be obtained

@@ -22,7 +22,8 @@ from __future__ import print_function
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import positive_semidefinite_kernels as tfpk
+
+import tensorflow_probability as tfp
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -59,7 +60,7 @@ class _KumaraswamyTransformedTest(parameterized.TestCase):
     amplitude = np.random.uniform(
         low=1., high=10., size=[10, 2]).astype(self.dtype)
     inner_length_scale = self.dtype(1.)
-    kernel = tfpk.ExponentiatedQuadratic(
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
         amplitude, inner_length_scale, feature_ndims)
     input_shape = [dims] * feature_ndims
 
@@ -67,8 +68,8 @@ class _KumaraswamyTransformedTest(parameterized.TestCase):
     concentration1 = self.dtype(1.)
     concentration0 = self.dtype(1.)
 
-    kum_kernel = tfpk.KumaraswamyTransformed(kernel, concentration1,
-                                             concentration0)
+    kum_kernel = tfp.math.psd_kernels.KumaraswamyTransformed(
+        kernel, concentration1, concentration0)
 
     x = np.random.uniform(size=input_shape).astype(self.dtype)
     y = np.random.uniform(size=input_shape).astype(self.dtype)
@@ -99,7 +100,7 @@ class _KumaraswamyTransformedTest(parameterized.TestCase):
     amplitude = np.random.uniform(
         low=1., high=10., size=[10, 2]).astype(self.dtype)
     inner_length_scale = self.dtype(1.)
-    kernel = tfpk.ExponentiatedQuadratic(
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
         amplitude, inner_length_scale, feature_ndims)
     input_shape = [dims] * feature_ndims
 
@@ -110,8 +111,8 @@ class _KumaraswamyTransformedTest(parameterized.TestCase):
     concentration0 = np.random.uniform(
         2, 5, size=([3, 1, 2] + input_shape)).astype(self.dtype)
 
-    kum_kernel = tfpk.KumaraswamyTransformed(kernel, concentration1,
-                                             concentration0)
+    kum_kernel = tfp.math.psd_kernels.KumaraswamyTransformed(
+        kernel, concentration1, concentration0)
 
     x = np.random.uniform(size=input_shape).astype(self.dtype)
     y = np.random.uniform(size=input_shape).astype(self.dtype)

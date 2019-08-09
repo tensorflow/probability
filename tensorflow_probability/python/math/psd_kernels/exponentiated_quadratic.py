@@ -19,16 +19,17 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
-from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
+from tensorflow_probability.python.math.psd_kernels.internal import util
+from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 
 
 __all__ = ['ExponentiatedQuadratic']
 
 
-class ExponentiatedQuadratic(psd_kernel.PositiveSemidefiniteKernel):
+class ExponentiatedQuadratic(PositiveSemidefiniteKernel):
   """The ExponentiatedQuadratic kernel.
 
   Sometimes called the "squared exponential", "Gaussian" or "radial basis

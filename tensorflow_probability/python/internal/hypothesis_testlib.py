@@ -28,7 +28,8 @@ from hypothesis.extra import numpy as hpnp
 import hypothesis.strategies as hps
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.internal import distribution_util
+
+from tensorflow_probability.python.distributions.deprecated_linalg import matrix_diag_transform
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
@@ -545,4 +546,4 @@ def positive_definite(x):
 
 def lower_tril_positive_definite(x):
   return tf.linalg.band_part(
-      distribution_util.matrix_diag_transform(x, softplus_plus_eps()), -1, 0)
+      matrix_diag_transform(x, softplus_plus_eps()), -1, 0)

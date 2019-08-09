@@ -124,12 +124,12 @@ class MultivariateNormalTriL(
 
   # Instantiate a "learnable" MVN.
   dims = 4
-  with tf.variable_scope("model"):
-    mvn = tfd.MultivariateNormalTriL(
-        loc=tf.get_variable(shape=[dims], dtype=tf.float32, name="mu"),
-        scale_tril=tfd.fill_triangular(
-            tf.get_variable(shape=[dims * (dims + 1) / 2],
-                            dtype=tf.float32, name="chol_Sigma")))
+  mvn = tfd.MultivariateNormalTriL(
+      loc=tf.Variable(tf.zeros([dims], dtype=tf.float32), name="mu"),
+      scale_tril=tfp.utils.DeferredTensor(
+          tfp.bijectors.ScaleTriL().forward,
+          tf.Variable(tf.zeros([dims * (dims + 1) // 2], dtype=tf.float32),
+                      name="raw_scale_tril")))
   ```
 
   """

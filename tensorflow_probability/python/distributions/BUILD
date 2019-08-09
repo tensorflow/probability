@@ -42,6 +42,7 @@ py_library(
         ":cauchy",
         ":chi",
         ":chi2",
+        ":deprecated_linalg",
         ":deterministic",
         ":dirichlet",
         ":dirichlet_multinomial",
@@ -113,8 +114,9 @@ py_library(
         ":wishart",
         ":zipf",
         "//tensorflow_probability/python/distributions/internal:moving_stats",
-        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/math:linalg",
     ],
 )
 
@@ -264,6 +266,14 @@ py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/util",
+    ],
+)
+
+py_library(
+    name = "deprecated_linalg",
+    srcs = ["deprecated_linalg.py"],
+    deps = [
+        # tensorflow dep,
     ],
 )
 
@@ -1466,6 +1476,16 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "deprecated_linalg_test",
+    size = "small",
+    srcs = ["deprecated_linalg_test.py"],
+    deps = [
+        ":deprecated_linalg",
+        # tensorflow dep,
     ],
 )
 

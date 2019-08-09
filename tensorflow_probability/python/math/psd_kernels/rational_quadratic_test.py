@@ -23,7 +23,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability import positive_semidefinite_kernels as tfpk
+import tensorflow_probability as tfp
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -37,15 +37,15 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
 
   def testMismatchedFloatTypesAreBad(self):
     with self.assertRaises(TypeError):
-      tfpk.RationalQuadratic(np.float32(1.), np.float64(1.))
+      tfp.math.psd_kernels.RationalQuadratic(np.float32(1.), np.float64(1.))
 
   def testBatchShape(self):
     amplitude = np.random.uniform(2, 3., size=[3, 1, 2]).astype(np.float32)
     length_scale = np.random.uniform(2, 3., size=[1, 3, 1]).astype(np.float32)
     scale_mixture_rate = np.random.uniform(
         2, 3., size=[3, 1, 1]).astype(np.float32)
-    k = tfpk.RationalQuadratic(
-        amplitude, length_scale, scale_mixture_rate)
+    k = tfp.math.psd_kernels.RationalQuadratic(amplitude, length_scale,
+                                               scale_mixture_rate)
     self.assertAllEqual(tf.TensorShape([3, 3, 2]), k.batch_shape)
     self.assertAllEqual([3, 3, 2], self.evaluate(k.batch_shape_tensor()))
 
@@ -62,8 +62,9 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
     scale_mixture_rate = np.array(3., dtype=dtype)
 
     np.random.seed(42)
-    k = tfpk.RationalQuadratic(
-        amplitude, length_scale, scale_mixture_rate, feature_ndims)
+    k = tfp.math.psd_kernels.RationalQuadratic(amplitude, length_scale,
+                                               scale_mixture_rate,
+                                               feature_ndims)
     shape = [dims] * feature_ndims
     for _ in range(5):
       x = np.random.uniform(-1, 1, size=shape).astype(dtype)
@@ -79,10 +80,8 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
 
     np.random.seed(42)
 
-    k = tfpk.RationalQuadratic(
-        amplitude=amplitude,
-        length_scale=length_scale,
-        scale_mixture_rate=None)
+    k = tfp.math.psd_kernels.RationalQuadratic(
+        amplitude=amplitude, length_scale=length_scale, scale_mixture_rate=None)
     x = np.random.uniform(-1, 1, size=[5]).astype(np.float32)
     y = np.random.uniform(-1, 1, size=[5]).astype(np.float32)
     self.assertAllClose(
@@ -94,7 +93,7 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
         self.evaluate(k.apply(x, y)))
 
   def testShapesAreCorrect(self):
-    k = tfpk.RationalQuadratic(amplitude=1., length_scale=1.)
+    k = tfp.math.psd_kernels.RationalQuadratic(amplitude=1., length_scale=1.)
 
     x = np.ones([4, 3], np.float32)
     y = np.ones([5, 3], np.float32)
@@ -104,7 +103,7 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
         [2, 4, 5],
         k.matrix(tf.stack([x]*2), tf.stack([y]*2)).shape)
 
-    k = tfpk.RationalQuadratic(
+    k = tfp.math.psd_kernels.RationalQuadratic(
         amplitude=np.ones([2, 1, 1], np.float32),
         length_scale=np.ones([1, 3, 1], np.float32),
         scale_mixture_rate=np.ones([2, 1, 1, 1], np.float32))
@@ -122,7 +121,7 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
 
   def testValidateArgs(self):
     with self.assertRaises(tf.errors.InvalidArgumentError):
-      k = tfpk.RationalQuadratic(
+      k = tfp.math.psd_kernels.RationalQuadratic(
           amplitude=-1.,
           length_scale=1.,
           scale_mixture_rate=1.,
@@ -130,7 +129,7 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
       self.evaluate(k.apply([1.], [1.]))
 
     with self.assertRaises(tf.errors.InvalidArgumentError):
-      k = tfpk.RationalQuadratic(
+      k = tfp.math.psd_kernels.RationalQuadratic(
           amplitude=1.,
           length_scale=-1.,
           scale_mixture_rate=1.,
@@ -138,7 +137,7 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
       self.evaluate(k.apply([1.], [1.]))
 
     with self.assertRaises(tf.errors.InvalidArgumentError):
-      k = tfpk.RationalQuadratic(
+      k = tfp.math.psd_kernels.RationalQuadratic(
           amplitude=1.,
           length_scale=1.,
           scale_mixture_rate=-1.,
@@ -146,7 +145,7 @@ class RationalQuadraticTest(tf.test.TestCase, parameterized.TestCase):
       self.evaluate(k.apply([1.], [1.]))
 
     # But `None`'s are ok
-    k = tfpk.RationalQuadratic(
+    k = tfp.math.psd_kernels.RationalQuadratic(
         amplitude=None,
         length_scale=None,
         scale_mixture_rate=None,

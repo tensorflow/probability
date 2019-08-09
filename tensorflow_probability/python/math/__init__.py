@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.math import ode
+from tensorflow_probability.python.math import psd_kernels
 from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.generic import log_add_exp
@@ -73,6 +74,7 @@ _allowed_symbols = [
     'minimize',
     'ode',
     'pinv',
+    'psd_kernels',
     'pivoted_cholesky',
     'random_rademacher',
     'random_rayleigh',

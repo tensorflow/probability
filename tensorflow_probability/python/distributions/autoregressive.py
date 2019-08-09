@@ -77,7 +77,7 @@ class Autoregressive(distribution.Distribution):
     n = event_size * (event_size + 1) // 2
     p = tf.Variable(tfd.Normal(loc=0., scale=1.).sample(n))
     affine = tfb.Affine(
-        scale_tril=tfd.fill_triangular(0.25 * p))
+        scale_tril=tfp.math.fill_triangular(0.25 * p))
     def _fn(samples):
       scale = tf.exp(affine.forward(samples))
       return tfd.Independent(

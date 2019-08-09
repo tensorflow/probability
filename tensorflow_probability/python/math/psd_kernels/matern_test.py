@@ -23,7 +23,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability import positive_semidefinite_kernels as tfpk
+import tensorflow_probability as tfp
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -148,7 +148,7 @@ class _MaternTestCase(parameterized.TestCase, tf.test.TestCase):
 @test_util.run_all_in_graph_and_eager_modes
 class MaternOneHalfTest(_MaternTestCase):
 
-  _kernel_type = tfpk.MaternOneHalf
+  _kernel_type = tfp.math.psd_kernels.MaternOneHalf
 
   def _numpy_kernel(self, amplitude, length_scale, x, y):
     norm = np.sqrt(np.sum((x - y)**2)) / length_scale
@@ -158,7 +158,7 @@ class MaternOneHalfTest(_MaternTestCase):
 @test_util.run_all_in_graph_and_eager_modes
 class MaternThreeHalvesTest(_MaternTestCase):
 
-  _kernel_type = tfpk.MaternThreeHalves
+  _kernel_type = tfp.math.psd_kernels.MaternThreeHalves
 
   def _numpy_kernel(self, amplitude, length_scale, x, y):
     norm = np.sqrt(3. * np.sum((x - y)**2)) / length_scale
@@ -168,7 +168,7 @@ class MaternThreeHalvesTest(_MaternTestCase):
 @test_util.run_all_in_graph_and_eager_modes
 class MaternFiveHalvesTest(_MaternTestCase):
 
-  _kernel_type = tfpk.MaternFiveHalves
+  _kernel_type = tfp.math.psd_kernels.MaternFiveHalves
 
   def _numpy_kernel(self, amplitude, length_scale, x, y):
     norm = np.sqrt(5. * np.sum((x - y)**2)) / length_scale

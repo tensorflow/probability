@@ -20,15 +20,16 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
-from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
+from tensorflow_probability.python.math.psd_kernels.internal import util
+from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 
 __all__ = ['ExpSinSquared']
 
 
-class ExpSinSquared(psd_kernel.PositiveSemidefiniteKernel):
+class ExpSinSquared(PositiveSemidefiniteKernel):
   """Exponentiated Sine Squared Kernel.
 
     Also known as the "Periodic" kernel, this kernel, when

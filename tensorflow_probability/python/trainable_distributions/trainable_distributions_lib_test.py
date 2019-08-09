@@ -82,7 +82,7 @@ class TestMVNTriL(tf.test.TestCase):
         x,
         dims=mvn_size,
         loc_fn=tf.zeros_like,
-        scale_fn=lambda x: tfd.fill_triangular(tf.ones_like(x)))
+        scale_fn=lambda x: tfp.math.fill_triangular(tf.ones_like(x)))
     scale = mvn.scale.to_dense()
     expected_scale = tf.linalg.band_part(
         tf.ones(
@@ -304,7 +304,7 @@ class TestMakePositiveFunctions(tf.test.TestCase):
         x_, diag_shift=1.)
     y_ = self.evaluate(y)
     # Recall that:
-    # self.evaluate(tfd.fill_triangular(np.arange(6) - 3))
+    # self.evaluate(tfp.math.fill_triangular(np.arange(6) - 3))
     # ==> array([[ 0,  0,  0],
     #            [ 2,  1,  0],
     #            [-1, -2, -3]])

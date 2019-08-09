@@ -25,7 +25,7 @@ import operator
 import six
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
+from tensorflow_probability.python.math.psd_kernels.internal import util
 
 
 __all__ = [
@@ -137,7 +137,7 @@ class PositiveSemidefiniteKernel(tf.Module):
 
     # Suppose `SomeKernel` acts on vectors (rank-1 tensors), ie number of
     # feature dimensions is 1.
-    scalar_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=.5)
+    scalar_kernel = tfp.math.psd_kernels.SomeKernel(param=.5)
     scalar_kernel.batch_shape
     # ==> []
 
@@ -154,7 +154,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     Now we can consider a kernel with batched parameters:
 
     ```python
-    batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[.2, .5])
+    batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[.2, .5])
     batch_kernel.batch_shape
     # ==> [2]
 
@@ -371,7 +371,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     import tensorflow_probability as tfp
 
     # Suppose `SomeKernel` acts on vectors (rank-1 tensors)
-    scalar_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=.5)
+    scalar_kernel = tfp.math.psd_kernels.SomeKernel(param=.5)
     scalar_kernel.batch_shape
     # ==> []
 
@@ -391,7 +391,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     Now we can consider a kernel with batched parameters:
 
     ```python
-    batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[.2, .5])
+    batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[.2, .5])
     batch_kernel.batch_shape
     # ==> [2]
     batch_kernel.apply(x, y).shape
@@ -405,7 +405,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     broadcast with `[5]` to yield `[2, 5]`:
 
     ```python
-    batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+    batch_kernel = tfp.math.psd_kernels.SomeKernel(
         param=[[.2], [.5]])
     batch_kernel.batch_shape
     # ==> [2, 1]
@@ -418,7 +418,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     kernel batch shape to the left:
 
     ```python
-    batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[.2, .5])
+    batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[.2, .5])
     batch_kernel.batch_shape
     # ==> [2]
     batch_kernel.apply(x, y, example_ndims=1).shape
@@ -543,7 +543,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     ```python
     import tensorflow_probability as tfp
 
-    scalar_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=.5)
+    scalar_kernel = tfp.math.psd_kernels.SomeKernel(param=.5)
     scalar_kernel.batch_shape
     # ==> []
 
@@ -567,7 +567,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     Now consider a kernel with batched parameters with the same inputs
 
     ```python
-    batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[1., .5])
+    batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[1., .5])
     batch_kernel.batch_shape
     # ==> [2]
 
@@ -611,7 +611,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     x = np.ones([10, 5, 3], np.float32)
     y = np.ones([10, 4, 3], np.float32)
 
-    batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(params=[1., .5])
+    batch_kernel = tfp.math.psd_kernels.SomeKernel(params=[1., .5])
     batch_kernel.batch_shape
     # ==> [2]
     batch_kernel.matrix(x, y).shape
@@ -625,7 +625,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     x = np.ones([10, 5, 3], np.float32)
     y = np.ones([10, 4, 3], np.float32)
 
-    batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+    batch_kernel = tfp.math.psd_kernels.SomeKernel(
         params=[[1.], [.5]])
     batch_kernel.batch_shape
     # ==> [2, 1]
@@ -636,7 +636,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     x = np.ones([10, 1, 5, 3], np.float32)
     y = np.ones([10, 1, 4, 3], np.float32)
 
-    batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+    batch_kernel = tfp.math.psd_kernels.SomeKernel(
         params=[1., .5])
     batch_kernel.batch_shape
     # ==> [2]
@@ -698,7 +698,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     ```python
     import tensorflow_probability as tfp
 
-    scalar_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=.5)
+    scalar_kernel = tfp.math.psd_kernels.SomeKernel(param=.5)
     scalar_kernel.batch_shape
     # ==> []
 
@@ -728,7 +728,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     Now consider a kernel with batched parameters.
 
     ```python
-    batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[1., .5])
+    batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[1., .5])
     batch_kernel.batch_shape
     # ==> [2]
 
@@ -772,7 +772,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     x = np.ones([10, 5, 6, 3], np.float32)
     y = np.ones([10, 7, 8, 3], np.float32)
 
-    batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(params=[1., .5])
+    batch_kernel = tfp.math.psd_kernels.SomeKernel(params=[1., .5])
     batch_kernel.batch_shape
     # ==> [2]
     batch_kernel.tensor(x, y, x1_example_ndims=2, x2_example_ndims=2).shape
@@ -786,7 +786,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     x = np.ones([10, 5, 6, 3], np.float32)
     y = np.ones([10, 7, 8, 3], np.float32)
 
-    batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+    batch_kernel = tfp.math.psd_kernels.SomeKernel(
         params=[[1.], [.5]])
     batch_kernel.batch_shape
     # ==> [2, 1]
@@ -797,7 +797,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     x = np.ones([10, 1, 5, 6, 3], np.float32)
     y = np.ones([10, 1, 7, 8, 3], np.float32)
 
-    batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+    batch_kernel = tfp.math.psd_kernels.SomeKernel(
         params=[1., .5])
     batch_kernel.batch_shape
     # ==> [2]
@@ -849,7 +849,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     return self.__mul__(k)
 
   def __str__(self):
-    return ('tfp.positive_semidefinite_kernels.{type_name}('
+    return ('tfp.math.psd_kernels.{type_name}('
             '"{self_name}"'
             '{maybe_batch_shape}'
             ', feature_ndims={feature_ndims}'
@@ -857,13 +857,13 @@ class PositiveSemidefiniteKernel(tf.Module):
                 type_name=type(self).__name__,
                 self_name=self.name,
                 maybe_batch_shape=(', batch_shape={}'.format(self.batch_shape)
-                                   if self.batch_shape.ndims is not None
-                                   else ''),
+                                   if self.batch_shape.ndims is not None else
+                                   ''),
                 feature_ndims=self.feature_ndims,
                 dtype=None if self.dtype is None else self.dtype.name))
 
   def __repr__(self):
-    return ('<tfp.positive_semidefinite_kernels.{type_name} '
+    return ('<tfp.math.psd_kernels.{type_name} '
             '\'{self_name}\''
             ' batch_shape={batch_shape}'
             ' feature_ndims={feature_ndims}'

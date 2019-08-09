@@ -44,6 +44,7 @@ py_library(
         ":root_search",
         ":sparse",
         "//tensorflow_probability/python/math/ode",
+        "//tensorflow_probability/python/math/psd_kernels",
     ],
 )
 

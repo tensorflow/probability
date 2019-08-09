@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.math.gradient import value_and_gradient
-from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
+from tensorflow_probability.python.math.psd_kernels.internal import util
 
 
 class UtilTest(tf.test.TestCase):

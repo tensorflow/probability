@@ -42,7 +42,6 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )

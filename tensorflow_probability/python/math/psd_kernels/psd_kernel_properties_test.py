@@ -30,7 +30,6 @@ from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfpk = tfp.positive_semidefinite_kernels
 
 flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
                   'TF execution mode to use')
@@ -175,7 +174,7 @@ def kernels(
                           enable_vars=enable_vars))
   kernel_variable_names = [
       k for k in kernel_params if tensor_util.is_ref(kernel_params[k])]
-  ctor = getattr(tfpk, kernel_name)
+  ctor = getattr(tfp.math.psd_kernels, kernel_name)
   result_kernel = ctor(
       validate_args=True,
       feature_ndims=feature_ndims,

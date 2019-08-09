@@ -21,15 +21,16 @@ from __future__ import print_function
 import functools
 
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.positive_semidefinite_kernels import positive_semidefinite_kernel as psd_kernel
-from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
+from tensorflow_probability.python.math.psd_kernels.internal import util
+from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 
 __all__ = ['RationalQuadratic']
 
 
-class RationalQuadratic(psd_kernel.PositiveSemidefiniteKernel):
+class RationalQuadratic(PositiveSemidefiniteKernel):
   """RationalQuadratic Kernel.
 
   This kernel function has the form:

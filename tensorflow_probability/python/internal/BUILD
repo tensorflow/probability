@@ -101,7 +101,6 @@ py_library(
         ":tensorshape_util",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/math",
     ],
 )
 
@@ -273,6 +272,7 @@ py_library(
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:deprecated_linalg",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/util",
     ],

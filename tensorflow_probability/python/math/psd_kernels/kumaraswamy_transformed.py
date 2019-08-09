@@ -20,16 +20,16 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors
+from tensorflow_probability.python.bijectors.kumaraswamy import Kumaraswamy
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.positive_semidefinite_kernels import feature_transformed
-from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
+from tensorflow_probability.python.math.psd_kernels.feature_transformed import FeatureTransformed
+from tensorflow_probability.python.math.psd_kernels.internal import util
 
 __all__ = ['KumaraswamyTransformed']
 
 
-class KumaraswamyTransformed(feature_transformed.FeatureTransformed):
+class KumaraswamyTransformed(FeatureTransformed):
   """Transform inputs by Kumaraswamy bijector.
 
   Uses Kumaraswamy bijector to warp features. The purpose of this is to is turn
@@ -74,7 +74,7 @@ class KumaraswamyTransformed(feature_transformed.FeatureTransformed):
             self.concentration0,
             example_ndims,
             start=-(feature_ndims + 1))
-        bij = bijectors.Kumaraswamy(
+        bij = Kumaraswamy(
             concentration1, concentration0, validate_args=validate_args)
         # Apply the inverse as this is the Kumaraswamy CDF.
         return bij.inverse(x)

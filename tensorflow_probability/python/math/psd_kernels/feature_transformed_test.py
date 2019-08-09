@@ -22,9 +22,9 @@ from __future__ import print_function
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors
-from tensorflow_probability.python import positive_semidefinite_kernels as tfpk
-from tensorflow_probability.python.positive_semidefinite_kernels.internal import util
+
+import tensorflow_probability as tfp
+from tensorflow_probability.python.math.psd_kernels.internal import util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -56,10 +56,10 @@ class _FeatureTransformedTest(parameterized.TestCase):
   def testValuesAreCorrectIdentity(self, feature_ndims, dims):
     amplitude = self.dtype(5.)
     length_scale = self.dtype(0.2)
-    kernel = tfpk.ExponentiatedQuadratic(
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
         amplitude, length_scale, feature_ndims)
     input_shape = [dims] * feature_ndims
-    identity_transformed_kernel = tfpk.FeatureTransformed(
+    identity_transformed_kernel = tfp.math.psd_kernels.FeatureTransformed(
         kernel,
         transformation_fn=lambda x, feature_ndims, param_expansion_ndims: x)
     x = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
@@ -79,17 +79,17 @@ class _FeatureTransformedTest(parameterized.TestCase):
   def testValuesAreCorrectScalarTransform(self, feature_ndims, dims):
     amplitude = self.dtype(5.)
     length_scale = self.dtype(0.2)
-    kernel = tfpk.ExponentiatedQuadratic(
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
         amplitude, length_scale, feature_ndims)
     input_shape = [dims] * feature_ndims
 
-    bij = bijectors.AffineScalar(self.dtype(0.), self.dtype(2.))
+    bij = tfp.bijectors.AffineScalar(self.dtype(0.), self.dtype(2.))
     # Flat multiplication by 2.
     def scale_transform(x, feature_ndims, param_expansion_ndims):
       del feature_ndims, param_expansion_ndims
       return bij.forward(x)
 
-    scale_transformed_kernel = tfpk.FeatureTransformed(
+    scale_transformed_kernel = tfp.math.psd_kernels.FeatureTransformed(
         kernel, transformation_fn=scale_transform)
 
     x = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
@@ -109,19 +109,19 @@ class _FeatureTransformedTest(parameterized.TestCase):
   def testValuesAreCorrectVectorTransform(self, feature_ndims, dims):
     amplitude = self.dtype(5.)
     length_scale = self.dtype(0.2)
-    kernel = tfpk.ExponentiatedQuadratic(
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
         amplitude, length_scale, feature_ndims)
     input_shape = [dims] * feature_ndims
 
     scale_diag = np.random.uniform(-1, 1, size=(dims,)).astype(self.dtype)
-    bij = bijectors.Affine(scale_diag=scale_diag)
+    bij = tfp.bijectors.Affine(scale_diag=scale_diag)
 
     # Scaling the last dimension.
     def vector_transform(x, feature_ndims, param_expansion_ndims):
       del feature_ndims, param_expansion_ndims
       return bij.forward(x)
 
-    vector_transformed_kernel = tfpk.FeatureTransformed(
+    vector_transformed_kernel = tfp.math.psd_kernels.FeatureTransformed(
         kernel, transformation_fn=vector_transform)
 
     x = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
@@ -148,7 +148,7 @@ class _FeatureTransformedTest(parameterized.TestCase):
         low=1., high=10., size=[10, 2]).astype(self.dtype)
     length_scale = np.random.uniform(
         low=1., high=10., size=[1, 2]).astype(self.dtype)
-    kernel = tfpk.ExponentiatedQuadratic(
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
         amplitude, length_scale, feature_ndims)
     input_shape = [dims] * feature_ndims
 
@@ -164,7 +164,7 @@ class _FeatureTransformedTest(parameterized.TestCase):
           start=-2)
       return diag * x
 
-    vector_transformed_kernel = tfpk.FeatureTransformed(
+    vector_transformed_kernel = tfp.math.psd_kernels.FeatureTransformed(
         kernel, transformation_fn=vector_transform)
 
     x = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
