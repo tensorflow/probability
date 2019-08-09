@@ -73,7 +73,7 @@ class KumaraswamyTest(test_case.TestCase):
         upper_x=1.,
         eval_func=self.evaluate,
         n=int(10e3),
-        rtol=0.02)
+        rtol=0.05)
 
   def testBijectiveAndFinite(self):
     concentration1 = 1.2

@@ -670,6 +670,7 @@ py_library(
 
 py_library(
     name = "bijector_test_util",
+    testonly = 1,
     srcs = ["bijector_test_util.py"],
     deps = [
         ":reshape",
@@ -679,6 +680,7 @@ py_library(
         "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

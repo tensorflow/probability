@@ -28,6 +28,7 @@ from tensorflow_probability.python.bijectors import reshape as reshape_bijector
 from tensorflow_probability.python.distributions import uniform as uniform_distribution
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 
 def assert_finite(array):
@@ -100,10 +101,10 @@ def assert_scalar_congruency(bijector,
   # Uniform samples from the domain, range.
   uniform_x_samps = uniform_distribution.Uniform(
       low=lower_x, high=upper_x).sample(
-          n, seed=0)
+          n, seed=tfp_test_util.test_seed())
   uniform_y_samps = uniform_distribution.Uniform(
       low=lower_y, high=upper_y).sample(
-          n, seed=1)
+          n, seed=tfp_test_util.test_seed() + 1)
 
   # These compositions should be the identity.
   inverse_forward_x = bijector.inverse(bijector.forward(uniform_x_samps))
@@ -157,11 +158,12 @@ def assert_scalar_congruency(bijector,
       forward_inverse_y_v, uniform_y_samps_v, atol=1e-5, rtol=1e-3)
   # Change of measure should be correct.
   np.testing.assert_allclose(
-      upper_x - lower_x, change_measure_dy_dx_v, atol=0, rtol=rtol)
+      desired=upper_x - lower_x, actual=change_measure_dy_dx_v,
+      atol=0, rtol=rtol)
   # Inverse Jacobian should be equivalent to the reciprocal of the forward
   # Jacobian.
   np.testing.assert_allclose(
-      dy_dx_v, np.divide(1., dx_dy_v), atol=1e-5, rtol=1e-3)
+      desired=dy_dx_v, actual=np.reciprocal(dx_dy_v), atol=1e-5, rtol=1e-3)
 
 
 def assert_bijective_and_finite(bijector,

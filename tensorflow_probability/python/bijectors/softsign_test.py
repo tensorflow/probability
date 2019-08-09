@@ -88,7 +88,7 @@ class SoftsignBijectorTest(tf.test.TestCase):
   def testScalarCongruency(self):
     bijector = tfb.Softsign(validate_args=True)
     bijector_test_util.assert_scalar_congruency(
-        bijector, lower_x=-20., upper_x=20., eval_func=self.evaluate)
+        bijector, lower_x=-20., upper_x=20., eval_func=self.evaluate, rtol=.05)
 
   def testBijectiveAndFinite(self):
     bijector = tfb.Softsign(validate_args=True)

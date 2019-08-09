@@ -56,7 +56,7 @@ class GumbelTest(tf.test.TestCase):
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
         tfb.Gumbel(loc=0.3, scale=20.), lower_x=1., upper_x=100.,
-        eval_func=self.evaluate, rtol=0.02)
+        eval_func=self.evaluate, rtol=0.05)
 
   def testBijectiveAndFinite(self):
     bijector = tfb.Gumbel(loc=0., scale=3.0, validate_args=True)

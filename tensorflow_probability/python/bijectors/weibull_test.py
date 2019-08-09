@@ -67,7 +67,7 @@ class WeibullBijectorTest(tf.test.TestCase):
         lower_x=1.,
         upper_x=100.,
         eval_func=self.evaluate,
-        rtol=0.02)
+        rtol=0.05)
 
   def testBijectiveAndFinite(self):
     bijector = tfb.Weibull(scale=20., concentration=2., validate_args=True)

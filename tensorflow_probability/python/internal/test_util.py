@@ -80,7 +80,7 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
     (e.g., debugging a crash that only some seeds trigger).
 
   To those ends, this function returns 17, but respects the command line flags
-  `--fixed_seed=<seed>` and `--vary-seed` (Boolean, default False).
+  `--fixed_seed=<seed>` and `--vary_seed` (Boolean, default False).
   `--vary_seed` uses system entropy to produce unpredictable seeds.
   `--fixed_seed` takes precedence over `--vary_seed` when both are present.
 

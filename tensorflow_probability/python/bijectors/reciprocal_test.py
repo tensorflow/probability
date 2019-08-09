@@ -69,7 +69,7 @@ class ReciprocalTest(tf.test.TestCase, parameterized.TestCase):
     bijector = tfb.Reciprocal()
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=lower_x, upper_x=upper_x, eval_func=self.evaluate,
-        rtol=0.05)
+        rtol=0.2)
 
   @parameterized.named_parameters(
       dict(

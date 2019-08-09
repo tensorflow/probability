@@ -100,17 +100,17 @@ class SoftplusBijectorTest(tf.test.TestCase):
   def testScalarCongruency(self):
     bijector = tfb.Softplus()
     bijector_test_util.assert_scalar_congruency(
-        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
+        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
 
   def testScalarCongruencyWithPositiveHingeSoftness(self):
     bijector = tfb.Softplus(hinge_softness=1.3)
     bijector_test_util.assert_scalar_congruency(
-        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
+        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
 
   def testScalarCongruencyWithNegativeHingeSoftness(self):
     bijector = tfb.Softplus(hinge_softness=-1.3)
     bijector_test_util.assert_scalar_congruency(
-        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
+        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
 
   def testBijectiveAndFinite32bit(self):
     bijector = tfb.Softplus()
