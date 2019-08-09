@@ -139,5 +139,4 @@ class Exponential(gamma.Gamma):
     return -tf.math.log(sampled) / rate
 
   def _quantile(self, value):
-    value = tf.convert_to_tensor(value, dtype=self.rate.dtype)
     return -tf.math.log1p(-value) / self.rate
