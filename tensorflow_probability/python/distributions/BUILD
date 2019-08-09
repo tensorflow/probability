@@ -1806,6 +1806,7 @@ py_test(
     srcs = ["joint_distribution_sequential_test.py"],
     deps = [
         # absl/testing:parameterized dep,
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
