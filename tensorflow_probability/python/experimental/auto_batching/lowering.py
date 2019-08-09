@@ -26,8 +26,8 @@ from __future__ import print_function
 
 import collections
 
-from tensorflow_probability.python.internal.auto_batching import instructions as inst
-from tensorflow_probability.python.internal.auto_batching import liveness
+from tensorflow_probability.python.experimental.auto_batching import instructions as inst
+from tensorflow_probability.python.experimental.auto_batching import liveness
 
 __all__ = [
     'lower_function_calls'

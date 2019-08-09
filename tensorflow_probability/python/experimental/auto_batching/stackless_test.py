@@ -22,11 +22,11 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from tensorflow_probability.python.internal.auto_batching import allocation_strategy
-from tensorflow_probability.python.internal.auto_batching import numpy_backend
-from tensorflow_probability.python.internal.auto_batching import stackless
-from tensorflow_probability.python.internal.auto_batching import test_programs
-from tensorflow_probability.python.internal.auto_batching import tf_backend
+from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
+from tensorflow_probability.python.experimental.auto_batching import numpy_backend
+from tensorflow_probability.python.experimental.auto_batching import stackless
+from tensorflow_probability.python.experimental.auto_batching import test_programs
+from tensorflow_probability.python.experimental.auto_batching import tf_backend
 
 TF_BACKEND = tf_backend.TensorFlowBackend()
 NP_BACKEND = numpy_backend.NumpyBackend()

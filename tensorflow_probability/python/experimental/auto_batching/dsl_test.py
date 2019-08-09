@@ -21,14 +21,14 @@ import numpy as np
 
 import tensorflow as tf
 
-from tensorflow_probability.python.internal.auto_batching import allocation_strategy
-from tensorflow_probability.python.internal.auto_batching import dsl
-from tensorflow_probability.python.internal.auto_batching import instructions
-from tensorflow_probability.python.internal.auto_batching import lowering
-from tensorflow_probability.python.internal.auto_batching import numpy_backend
-from tensorflow_probability.python.internal.auto_batching import tf_backend
-from tensorflow_probability.python.internal.auto_batching import type_inference
-from tensorflow_probability.python.internal.auto_batching import virtual_machine as vm
+from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
+from tensorflow_probability.python.experimental.auto_batching import dsl
+from tensorflow_probability.python.experimental.auto_batching import instructions
+from tensorflow_probability.python.experimental.auto_batching import lowering
+from tensorflow_probability.python.experimental.auto_batching import numpy_backend
+from tensorflow_probability.python.experimental.auto_batching import tf_backend
+from tensorflow_probability.python.experimental.auto_batching import type_inference
+from tensorflow_probability.python.experimental.auto_batching import virtual_machine as vm
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 

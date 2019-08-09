@@ -49,7 +49,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
-        "//tensorflow_probability/python/experimental:auto_batching",
+        "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/mcmc",
     ],
@@ -64,7 +64,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
-        "//tensorflow_probability/python/internal/auto_batching",
+        "//tensorflow_probability/python/experimental/auto_batching",
     ],
 )
 

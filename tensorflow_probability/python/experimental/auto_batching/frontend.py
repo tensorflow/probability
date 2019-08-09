@@ -25,15 +25,15 @@ import six
 
 import tensorflow as tf
 
-from tensorflow_probability.python.internal.auto_batching import allocation_strategy
-from tensorflow_probability.python.internal.auto_batching import dsl
-from tensorflow_probability.python.internal.auto_batching import instructions
-from tensorflow_probability.python.internal.auto_batching import lowering
-from tensorflow_probability.python.internal.auto_batching import stack_optimization as stack
-from tensorflow_probability.python.internal.auto_batching import stackless as st
-from tensorflow_probability.python.internal.auto_batching import tf_backend
-from tensorflow_probability.python.internal.auto_batching import type_inference as ab_type_inference
-from tensorflow_probability.python.internal.auto_batching import virtual_machine as vm
+from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
+from tensorflow_probability.python.experimental.auto_batching import dsl
+from tensorflow_probability.python.experimental.auto_batching import instructions
+from tensorflow_probability.python.experimental.auto_batching import lowering
+from tensorflow_probability.python.experimental.auto_batching import stack_optimization as stack
+from tensorflow_probability.python.experimental.auto_batching import stackless as st
+from tensorflow_probability.python.experimental.auto_batching import tf_backend
+from tensorflow_probability.python.experimental.auto_batching import type_inference as ab_type_inference
+from tensorflow_probability.python.experimental.auto_batching import virtual_machine as vm
 
 # TODO(mdan): Move common converters under pyct; should have no other deps.
 # pylint:disable=g-direct-tensorflow-import

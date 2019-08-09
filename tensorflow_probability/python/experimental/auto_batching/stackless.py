@@ -29,7 +29,7 @@ import heapq
 # Dependency imports
 from absl import logging
 import six
-from tensorflow_probability.python.internal.auto_batching import instructions as inst
+from tensorflow_probability.python.experimental.auto_batching import instructions as inst
 
 
 def execute(program, backend, block_code_cache, *inputs):

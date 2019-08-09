@@ -29,8 +29,8 @@ from __future__ import print_function
 from absl import logging
 import six
 
-from tensorflow_probability.python.internal.auto_batching import instructions as inst
-from tensorflow_probability.python.internal.auto_batching import liveness
+from tensorflow_probability.python.experimental.auto_batching import instructions as inst
+from tensorflow_probability.python.experimental.auto_batching import liveness
 
 __all__ = [
     'optimize'

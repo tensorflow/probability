@@ -26,7 +26,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
-from tensorflow_probability.python.internal.auto_batching import instructions as inst
+from tensorflow_probability.python.experimental.auto_batching import instructions as inst
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 

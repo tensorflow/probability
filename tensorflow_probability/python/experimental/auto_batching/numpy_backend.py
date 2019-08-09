@@ -30,7 +30,7 @@ import collections
 # Dependency imports
 import numpy as np
 
-from tensorflow_probability.python.internal.auto_batching import instructions
+from tensorflow_probability.python.experimental.auto_batching import instructions
 
 
 __all__ = ['NumpyBackend']

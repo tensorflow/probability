@@ -19,8 +19,8 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow as tf
 
-from tensorflow_probability.python.internal.auto_batching import stack_optimization as stack
-from tensorflow_probability.python.internal.auto_batching import test_programs
+from tensorflow_probability.python.experimental.auto_batching import stack_optimization as stack
+from tensorflow_probability.python.experimental.auto_batching import test_programs
 
 
 class StackOptimizationTest(tf.test.TestCase):

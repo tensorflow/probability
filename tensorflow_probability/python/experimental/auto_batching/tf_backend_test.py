@@ -27,9 +27,9 @@ from hypothesis.extra import numpy as hpnp
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python.internal.auto_batching import backend_test_lib as backend_test
-from tensorflow_probability.python.internal.auto_batching import instructions as inst
-from tensorflow_probability.python.internal.auto_batching import tf_backend
+from tensorflow_probability.python.experimental.auto_batching import backend_test_lib as backend_test
+from tensorflow_probability.python.experimental.auto_batching import instructions as inst
+from tensorflow_probability.python.experimental.auto_batching import tf_backend
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 

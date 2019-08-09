@@ -23,7 +23,7 @@ import os
 # Dependency imports
 from absl import flags
 import tensorflow as tf
-from tensorflow_probability.python.internal.auto_batching import xla
+from tensorflow_probability.python.experimental.auto_batching import xla
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 
 flags.DEFINE_string('test_device', None,

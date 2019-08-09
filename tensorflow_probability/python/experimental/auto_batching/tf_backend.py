@@ -28,8 +28,8 @@ import contextlib
 import six
 import tensorflow as tf
 
-from tensorflow_probability.python.internal.auto_batching import instructions
-from tensorflow_probability.python.internal.auto_batching import xla
+from tensorflow_probability.python.experimental.auto_batching import instructions
+from tensorflow_probability.python.experimental.auto_batching import xla
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = ['TensorFlowBackend']
