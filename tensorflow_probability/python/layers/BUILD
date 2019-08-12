@@ -138,6 +138,7 @@ py_test(
     name = "distribution_layer_test",
     size = "large",
     srcs = ["distribution_layer_test.py"],
+    shard_count = 5,
     deps = [
         # numpy dep,
         # tensorflow dep,

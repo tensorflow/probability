@@ -80,6 +80,7 @@ class EndToEndTest(tf.test.TestCase):
         self.train_size, *self.input_shape) > 0.75).astype(np.float32)
     self.x_test = (np.random.rand(
         self.test_size, *self.input_shape) > 0.75).astype(np.float32)
+    super(EndToEndTest, self).setUp()
 
   def test_keras_sequential_api(self):
     """Test `DistributionLambda`s are composable via Keras `Sequential` API."""
