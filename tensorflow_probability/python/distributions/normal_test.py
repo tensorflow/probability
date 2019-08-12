@@ -372,6 +372,15 @@ class NormalTest(test_case.TestCase):
     self.assertAllEqual(expected_samples_shape, samples.shape)
     self.assertAllEqual(expected_samples_shape, sample_values.shape)
 
+  def testReproducibility(self):
+    dist = tfd.Normal(loc=[0.1, 0.5, 0.3], scale=[1.0, 5.0, 20.0])
+    seed = tfp_test_util.test_seed()
+    s1 = self.evaluate(dist.sample(500, seed=seed))
+    if tf.executing_eagerly():
+      tf.random.set_seed(seed)
+    s2 = self.evaluate(dist.sample(500, seed=seed))
+    self.assertAllEqual(s1, s2)
+
   def testNormalFullyReparameterized(self):
     mu = tf.constant(4.0)
     sigma = tf.constant(3.0)

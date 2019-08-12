@@ -16,6 +16,7 @@
 
 from __future__ import absolute_import
 from __future__ import division
+from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
@@ -341,7 +342,7 @@ class HiddenMarkovModel(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     with tf.control_dependencies(self._runtime_assertions):
-      seed = seed_stream.SeedStream(seed, salt="HiddenMarkovModel")
+      strm = seed_stream.SeedStream(seed, salt="HiddenMarkovModel")
 
       num_states = self._num_states
 
@@ -358,7 +359,7 @@ class HiddenMarkovModel(distribution.Distribution):
           tf.reduce_prod(self.batch_shape_tensor()) //
           tf.reduce_prod(self._initial_distribution.batch_shape_tensor()))
       init_state = self._initial_distribution.sample(n * init_repeat,
-                                                     seed=seed())
+                                                     seed=strm())
       init_state = tf.reshape(init_state, [n, batch_size])
       # init_state :: n batch_size
 
@@ -370,7 +371,7 @@ class HiddenMarkovModel(distribution.Distribution):
         """Take a single step in Markov chain."""
 
         gen = self._transition_distribution.sample(n * transition_repeat,
-                                                   seed=seed())
+                                                   seed=strm())
         # gen :: (n * transition_repeat) transition_batch
 
         new_states = tf.reshape(gen,
@@ -385,9 +386,18 @@ class HiddenMarkovModel(distribution.Distribution):
         return tf.reduce_sum(old_states_one_hot * new_states, axis=-1)
 
       def _scan_multiple_steps():
+        """Take multiple steps with tf.scan."""
         dummy_index = tf.zeros(self._num_steps - 1, dtype=tf.float32)
-        hidden_states = tf.scan(generate_step, dummy_index,
-                                initializer=init_state)
+        if seed is not None:
+          # Force parallel_iterations to 1 to ensure reproducibility
+          # b/139210489
+          hidden_states = tf.scan(generate_step, dummy_index,
+                                  initializer=init_state,
+                                  parallel_iterations=1)
+        else:
+          # Invoke default parallel_iterations behavior
+          hidden_states = tf.scan(generate_step, dummy_index,
+                                  initializer=init_state)
 
         # TODO(b/115618503): add/use prepend_initializer to tf.scan
         return tf.concat([[init_state],
@@ -411,7 +421,7 @@ class HiddenMarkovModel(distribution.Distribution):
               self._observation_distribution.batch_shape_tensor()[:-1]))
 
       possible_observations = self._observation_distribution.sample(
-          [self._num_steps, observation_repeat * n])
+          [self._num_steps, observation_repeat * n], seed=strm())
 
       inner_shape = self._observation_distribution.event_shape
 
