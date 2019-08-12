@@ -75,8 +75,8 @@ VAR_USAGES = {}
 
 
 def usage_counting_identity(var):
-  VAR_USAGES[id(var)] = VAR_USAGES.get(
-      id(var), []) + [traceback.format_stack(limit=15)]
+  key = (id(var), var.name)
+  VAR_USAGES[key] = VAR_USAGES.get(key, []) + [traceback.format_stack(limit=15)]
   return tf.identity(var)
 
 
@@ -103,12 +103,13 @@ def assert_no_excessive_var_usage(name, max_permissible=2):
   VAR_USAGES.clear()
   yield
   # TODO(jvdillon): Reduce max_permissible to 1?
-  var_nusages = {var: len(usages) for var, usages in VAR_USAGES.items()}
+  var_nusages = {var_id_and_name: len(usages) for var_id_and_name,
+                 usages in VAR_USAGES.items()}
   if any(len(usages) > max_permissible for usages in VAR_USAGES.values()):
-    for var, usages in VAR_USAGES.items():
+    for (_, var_name), usages in VAR_USAGES.items():
       if len(usages) > max_permissible:
         print('While executing {}, saw {} Tensor conversions of {}:'.format(
-            name, len(usages), var))
+            name, len(usages), var_name))
         for i, usage in enumerate(usages):
           print('Conversion {} of {}:\n{}'.format(i + 1, len(usages),
                                                   ''.join(usage)))
