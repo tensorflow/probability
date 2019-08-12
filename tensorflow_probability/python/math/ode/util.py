@@ -76,30 +76,32 @@ def get_jacobian_fn_mat(jacobian_fn, ode_fn_vec, state_shape, use_pfor):
   """
   if jacobian_fn is None:
 
-    def automatic_jacobian_fn_mat(time, state):
+    def automatic_jacobian_fn_mat(time, state_vec):
       with tf.GradientTape(
           watch_accessed_variables=False, persistent=not use_pfor) as tape:
-        tape.watch(state)
-        outputs = ode_fn_vec(time, state)
-      jacobian = tape.jacobian(outputs, state, experimental_use_pfor=use_pfor)
-      if jacobian is None:
-        return tf.zeros([tf.size(state)] * 2, dtype=state.dtype)
-      return jacobian
+        tape.watch(state_vec)
+        outputs = ode_fn_vec(time, state_vec)
+      jacobian_mat = tape.jacobian(
+          outputs, state_vec, experimental_use_pfor=use_pfor)
+      if jacobian_mat is None:
+        return tf.zeros([tf.size(state_vec)] * 2, dtype=state_vec.dtype)
+      return jacobian_mat
 
     return automatic_jacobian_fn_mat
 
   if not callable(jacobian_fn):
-    jacobian_const = tf.convert_to_tensor(jacobian_fn)
+    constant_jacobian_mat = tf.reshape(
+        tf.convert_to_tensor(jacobian_fn), [-1, tf.reduce_prod(state_shape)])
 
-    def constant_jacobian_fn_mat(_, state):
-      return tf.reshape(jacobian_const, [-1, tf.size(state)])
+    def constant_jacobian_fn_mat(*_):
+      return constant_jacobian_mat
 
     return constant_jacobian_fn_mat
 
-  def jacobian_fn_mat(time, state):
-    state = tf.reshape(state, state_shape)
-    jacobian = tf.reshape(jacobian_fn(time, state), [-1, tf.size(state)])
-    return jacobian
+  def jacobian_fn_mat(time, state_vec):
+    state = tf.reshape(state_vec, state_shape)
+    jacobian_mat = tf.reshape(jacobian_fn(time, state), [-1, tf.size(state)])
+    return jacobian_mat
 
   return jacobian_fn_mat
 
@@ -120,9 +122,8 @@ def get_ode_fn_vec(ode_fn, state_shape):
     The wrapper described above.
   """
 
-  def ode_fn_vec(time, unrolled_state):
-    return tf.reshape(
-        ode_fn(time, tf.reshape(unrolled_state, state_shape)), [-1])
+  def ode_fn_vec(time, state_vec):
+    return tf.reshape(ode_fn(time, tf.reshape(state_vec, state_shape)), [-1])
 
   return ode_fn_vec
 

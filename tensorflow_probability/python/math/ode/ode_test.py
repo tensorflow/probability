@@ -39,13 +39,13 @@ class NonStiffTest(parameterized.TestCase, tf.test.TestCase):
     initial_state = np.float64(1.)
     jacobian = np.float64([[-1.]])
     solver_instance = solver(rtol=_RTOL, atol=_ATOL)
-    result = solver_instance.solve(
+    results = solver_instance.solve(
         ode_fn,
         initial_time,
         initial_state,
         solution_times=tfp.math.ode.ChosenBySolver(1.),
         jacobian_fn=jacobian)
-    times, states = self.evaluate([result.times, result.states])
+    times, states = self.evaluate([results.times, results.states])
     states_exact = np.exp(-times) * initial_state
     self.assertAllClose(states, states_exact)
 
@@ -57,13 +57,13 @@ class NonStiffTest(parameterized.TestCase, tf.test.TestCase):
         np.diag(-np.ones([4])),
         np.concatenate([initial_state.shape, initial_state.shape]))
     solver_instance = solver(rtol=_RTOL, atol=_ATOL)
-    result = solver_instance.solve(
+    results = solver_instance.solve(
         ode_fn,
         initial_time,
         initial_state,
         solution_times=tfp.math.ode.ChosenBySolver(1.),
         jacobian_fn=jacobian)
-    times, states = self.evaluate([result.times, result.states])
+    times, states = self.evaluate([results.times, results.states])
     states_exact = np.exp(-times)[:, np.newaxis, np.newaxis] * initial_state
     self.assertAllClose(states, states_exact)
 
@@ -73,13 +73,13 @@ class NonStiffTest(parameterized.TestCase, tf.test.TestCase):
     ode_fn = lambda time, state: np.zeros_like(initial_state)
     jacobian = np.zeros((3, 3), dtype=np.float64)
     solver_instance = solver(rtol=_RTOL, atol=_ATOL)
-    result = solver_instance.solve(
+    results = solver_instance.solve(
         ode_fn,
         initial_time,
         initial_state,
         solution_times=tfp.math.ode.ChosenBySolver(1.),
         jacobian_fn=jacobian)
-    times, states = self.evaluate([result.times, result.states])
+    times, states = self.evaluate([results.times, results.states])
     states_exact = np.ones([times.size, initial_state.size]) * initial_state
     self.assertAllClose(states, states_exact)
 
@@ -90,13 +90,13 @@ class NonStiffTest(parameterized.TestCase, tf.test.TestCase):
     initial_state = np.float64([1., 2.])
     jacobian = np.diag(jacobian_diag_part)
     solver_instance = solver(rtol=_RTOL, atol=_ATOL)
-    result = solver_instance.solve(
+    results = solver_instance.solve(
         ode_fn,
         initial_time,
         initial_state,
         solution_times=tfp.math.ode.ChosenBySolver(1.),
         jacobian_fn=jacobian)
-    times, states = self.evaluate([result.times, result.states])
+    times, states = self.evaluate([results.times, results.states])
     states_exact = np.exp(jacobian_diag_part[np.newaxis, :] *
                           times[:, np.newaxis]) * initial_state
     self.assertAllClose(states, states_exact)
@@ -107,12 +107,12 @@ class NonStiffTest(parameterized.TestCase, tf.test.TestCase):
     initial_time = 0.
     initial_state = np.float64([1., 2.])
     solver_instance = solver(rtol=_RTOL, atol=_ATOL)
-    result = solver_instance.solve(
+    results = solver_instance.solve(
         ode_fn,
         initial_time,
         initial_state,
         solution_times=tfp.math.ode.ChosenBySolver(1.))
-    times, states = self.evaluate([result.times, result.states])
+    times, states = self.evaluate([results.times, results.states])
     states_exact = np.exp(jacobian_diag_part[np.newaxis, :] *
                           times[:, np.newaxis]) * initial_state
     self.assertAllClose(states, states_exact)
@@ -124,13 +124,13 @@ class NonStiffTest(parameterized.TestCase, tf.test.TestCase):
     initial_state = np.complex128([1., 2.])
     jacobian = np.diag(jacobian_diag_part)
     solver_instance = solver(rtol=_RTOL, atol=_ATOL)
-    result = solver_instance.solve(
+    results = solver_instance.solve(
         ode_fn,
         initial_time,
         initial_state,
         solution_times=tfp.math.ode.ChosenBySolver(1.),
         jacobian_fn=jacobian)
-    times, states = self.evaluate([result.times, result.states])
+    times, states = self.evaluate([results.times, results.states])
     states_exact = np.exp(jacobian_diag_part[np.newaxis, :] *
                           times[:, np.newaxis]) * initial_state
     self.assertAllClose(states, states_exact)
@@ -138,8 +138,8 @@ class NonStiffTest(parameterized.TestCase, tf.test.TestCase):
   def test_linear_dense(self, solver):
     np.random.seed(0)
     initial_time = 0.
-    initial_state = np.float64([1.] * 20)
-    num_odes = initial_state.size
+    num_odes = 20
+    initial_state = np.float64([1.] * num_odes)
     jacobian = np.random.randn(num_odes, num_odes)
 
     def ode_fn(_, state):
@@ -147,13 +147,13 @@ class NonStiffTest(parameterized.TestCase, tf.test.TestCase):
 
     final_time = 1.
     solver_instance = solver(rtol=_RTOL, atol=_ATOL)
-    result = solver_instance.solve(
+    results = solver_instance.solve(
         ode_fn,
         initial_time,
         initial_state,
         solution_times=[final_time],
         jacobian_fn=jacobian)
-    final_state = self.evaluate(result.states[-1])
+    final_state = self.evaluate(results.states[-1])
     # Exact solution is obtained by diagonalizing the Jacobian by
     # `jacobian = V diag(w) V^{-1}` and making the change of variables `Vz = y`.
     eigvals, eigvecs = np.linalg.eig(jacobian)
@@ -169,14 +169,14 @@ class NonStiffTest(parameterized.TestCase, tf.test.TestCase):
     initial_state = np.float64(0.5)
     jacobian_fn = lambda time, state: 2. * (state - time)
     solver_instance = solver(rtol=_RTOL, atol=_ATOL)
-    result = solver_instance.solve(
+    results = solver_instance.solve(
         ode_fn,
         initial_time,
         initial_state,
         solution_times=tfp.math.ode.ChosenBySolver(1.),
         jacobian_fn=jacobian_fn)
-    times, states = self.evaluate([result.times, result.states])
-    states_exact = (1. / (2. - times) + times)
+    times, states = self.evaluate([results.times, results.states])
+    states_exact = (1. / (1. / initial_state - times) + times)
     self.assertAllClose(states, states_exact)
 
 
@@ -201,14 +201,14 @@ class StiffTest(parameterized.TestCase, tf.test.TestCase):
     initial_time = 0.
     initial_state = np.float64([2., 0.])
     solver_instance = solver(rtol=1e-3, atol=1e-6)
-    result = solver_instance.solve(
+    results = solver_instance.solve(
         ode_fn,
         initial_time,
         initial_state,
         solution_times=[3000.],
         jacobian_fn=jacobian_fn)
     self.assertAllClose(
-        self.evaluate(result.states[-1, 0]), -1.5, rtol=0., atol=0.05)
+        self.evaluate(results.states[-1, 0]), -1.5, rtol=0., atol=0.05)
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -222,13 +222,14 @@ class GeneralTest(parameterized.TestCase, tf.test.TestCase):
     with self.assertRaisesRegexp(
         TypeError, ('`initial_state` must have a floating point or complex '
                     'floating point dtype')):
-      solver().solve(ode_fn, initial_time, initial_state, solution_times=[1.])
+      solver(validate_args=True).solve(
+          ode_fn, initial_time, initial_state, solution_times=[1.])
 
   def test_diagnostics(self, solver):
     ode_fn = lambda time, state: -state
     initial_time = 0.
     initial_state = np.float64(1.)
-    result = solver(validate_args=True).solve(
+    results = solver(validate_args=True).solve(
         ode_fn, initial_time, initial_state, solution_times=[1.])
     (
         num_ode_fn_evaluations,
@@ -236,10 +237,10 @@ class GeneralTest(parameterized.TestCase, tf.test.TestCase):
         num_matrix_factorizations,
         status,
     ) = self.evaluate([
-        result.diagnostics.num_ode_fn_evaluations,
-        result.diagnostics.num_jacobian_evaluations,
-        result.diagnostics.num_matrix_factorizations,
-        result.diagnostics.status,
+        results.diagnostics.num_ode_fn_evaluations,
+        results.diagnostics.num_jacobian_evaluations,
+        results.diagnostics.num_matrix_factorizations,
+        results.diagnostics.status,
     ])
     self.assertEqual(status, 0)
     self.assertGreater(num_ode_fn_evaluations, 0)
@@ -253,19 +254,19 @@ class GeneralTest(parameterized.TestCase, tf.test.TestCase):
     initial_state = np.float64([1., 2.])
     intermediate_time = 1.
     final_time = 2.
-    solver_instance = solver(rtol=_RTOL, atol=_ATOL)
-    previous_result = solver_instance.solve(
+    solver_instance = solver(rtol=_RTOL, atol=_ATOL, validate_args=True)
+    previous_results = solver_instance.solve(
         ode_fn,
         initial_time,
         initial_state,
         solution_times=tfp.math.ode.ChosenBySolver(intermediate_time))
-    result = solver_instance.solve(
+    results = solver_instance.solve(
         ode_fn,
         intermediate_time,
-        previous_result.states[-1],
+        previous_results.states[-1],
         solution_times=tfp.math.ode.ChosenBySolver(final_time),
-        previous_solver_internal_state=previous_result.solver_internal_state)
-    times, states = self.evaluate([result.times, result.states])
+        previous_solver_internal_state=previous_results.solver_internal_state)
+    times, states = self.evaluate([results.times, results.states])
     states_exact = np.exp(jacobian_diag_part[np.newaxis, :] *
                           times[:, np.newaxis]) * initial_state
     self.assertAllClose(states, states_exact)
