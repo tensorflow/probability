@@ -27,7 +27,11 @@ __all__ = [
 ]
 
 
-def value_and_gradient(f, xs, use_gradient_tape=False, name=None):
+def value_and_gradient(f,
+                       xs,
+                       output_gradients=None,
+                       use_gradient_tape=False,
+                       name=None):
   """Computes `f(*xs)` and its gradients wrt to `*xs`.
 
   Args:
@@ -37,10 +41,15 @@ def value_and_gradient(f, xs, use_gradient_tape=False, name=None):
       a single scalar. If desired, the tensors can be elementwise multiplied by
       the tensors passed as the `dy` keyword argument to the returned gradient
       function.
-    xs: Python list of parameters of f for which to differentiate. (Can also
+    xs: Python list of parameters of `f` for which to differentiate. (Can also
       be single `Tensor`.)
-    use_gradient_tape: Python `bool` indicating that `tf.GradientTape`
-      should be used regardless of `tf.executing_eagerly()` status.
+    output_gradients: A `Tensor` or list of `Tensor`s the same size as the
+      result `ys = f(*xs)` and holding the gradients computed for each `y` in
+      `ys`. This argument is forwarded to the underlying gradient implementation
+      (i.e., either the `grad_ys` argument of `tf.gradients` or the
+      `output_gradients` argument of `tf.GradientTape.gradient`).
+    use_gradient_tape: Python `bool` indicating that `tf.GradientTape` should be
+      used regardless of `tf.executing_eagerly()` status.
       Default value: `False`.
     name: Python `str` name prefixed to ops created by this function.
       Default value: `None` (i.e., `'value_and_gradient'`).
@@ -62,10 +71,10 @@ def value_and_gradient(f, xs, use_gradient_tape=False, name=None):
         for x in xs:
           tape.watch(x)
         y = f(*xs)
-      dydx = tape.gradient(y, xs)
+      dydx = tape.gradient(y, xs, output_gradients=output_gradients)
     else:
       y = f(*xs)
-      dydx = tf.gradients(ys=y, xs=xs)
+      dydx = tf.gradients(ys=y, xs=xs, grad_ys=output_gradients)
     if not is_xs_list_like:
       dydx = dydx[0]
     return y, dydx
