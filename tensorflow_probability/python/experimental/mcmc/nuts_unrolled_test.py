@@ -62,7 +62,7 @@ def run_nuts_chain(event_size, batch_size, num_steps, initial_state=None):
       kernel=kernel,
       parallel_iterations=1)
 
-  return chain_state, extra.leapfrogs_computed
+  return chain_state, extra.leapfrogs_taken
 
 
 def assert_univariate_target_conservation(test, target_d, step_size):
@@ -227,6 +227,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
       # (500, 1000, 20),
   )
   def testMultivariateNormalNdConvergence(self, nsamples, nchains, nd):
+    strm = tfd.SeedStream(1, salt='MultivariateNormalNdConvergence')
     theta0 = np.zeros((nchains, nd))
     mu = np.arange(nd)
     w = np.random.randn(nd, nd) * 0.1
@@ -244,33 +245,137 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
       nuts = tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
           target_log_prob_fn,
           step_size=[step_size],
-          max_tree_depth=5)
+          max_tree_depth=5,
+          seed=strm())
 
-      [x], kernel_results = tfp.mcmc.sample_chain(
+      def trace_fn(_, pkr):
+        return (pkr.is_accepted, pkr.leapfrogs_taken)
+
+      [x], (is_accepted, leapfrogs_taken) = tfp.mcmc.sample_chain(
           num_results=nsamples,
           num_burnin_steps=0,
           current_state=[tf.cast(state, dtype=tf.float64)],
           kernel=nuts,
+          trace_fn=trace_fn,
           parallel_iterations=1)
+
+      leapfrogs_taken_ = leapfrogs_taken[1:] - leapfrogs_taken[:-1]
 
       return (
           tf.shape(x),
           # We'll average over samples (dim=0) and chains (dim=1).
           tf.reduce_mean(x, axis=[0, 1]),
           tfp.stats.covariance(x, sample_axis=[0, 1]),
-          kernel_results.leapfrogs_computed
-      )
+          leapfrogs_taken_[is_accepted[1:]])
 
-    sample_shape, sample_mean, sample_cov, leapfrogs_computed = self.evaluate(
+    sample_shape, sample_mean, sample_cov, leapfrogs_taken = self.evaluate(
         run_nuts(mu, np.linalg.cholesky(cov), step_size, nsamples, theta0))
-    leapfrogs_computed_ = np.diff(leapfrogs_computed)
 
     self.assertAllEqual(sample_shape, [nsamples, nchains, nd])
     self.assertAllClose(mu, sample_mean, atol=0.1, rtol=0.1)
     self.assertAllClose(cov, sample_cov, atol=0.15, rtol=0.15)
     # Test early stopping in tree building
-    self.assertTrue(np.any(np.isin(np.asarray([5, 9, 11, 13]),
-                                   np.unique(leapfrogs_computed_))))
+    self.assertTrue(
+        np.any(np.isin(np.asarray([5, 9, 11, 13]), np.unique(leapfrogs_taken))))
+
+  def testSampleEndtoEnd(self):
+    """An end-to-end test of sampling using NUTS."""
+    strm = tfd.SeedStream(1, salt='EndtoEndTest')
+    predictors = tf.cast([
+        201., 244., 47., 287., 203., 58., 210., 202., 198., 158., 165., 201.,
+        157., 131., 166., 160., 186., 125., 218., 146.
+    ], tf.float32)
+    obs = tf.cast([
+        592., 401., 583., 402., 495., 173., 479., 504., 510., 416., 393., 442.,
+        317., 311., 400., 337., 423., 334., 533., 344.
+    ], tf.float32)
+    y_sigma = tf.cast([
+        61., 25., 38., 15., 21., 15., 27., 14., 30., 16., 14., 25., 52., 16.,
+        34., 31., 42., 26., 16., 22.
+    ], tf.float32)
+
+    # Robust linear regression model
+    robust_lm = tfd.JointDistributionSequential(
+        [
+            tfd.Normal(loc=0., scale=1.),  # b0
+            tfd.Normal(loc=0., scale=1.),  # b1
+            tfd.HalfNormal(5.),  # df
+            lambda df, b1, b0: tfd.Independent(  # pylint: disable=g-long-lambda
+                tfd.StudentT(  # Likelihood
+                    df=df[:, None],
+                    loc=b0[:, None] + b1[:, None] * predictors[None, :],
+                    scale=y_sigma[None, :])),
+        ],
+        validate_args=True)
+
+    log_prob = lambda b0, b1, df: robust_lm.log_prob([b0, b1, df, obs])
+    init_step_size = [1., .2, .5]
+    step_size0 = [tf.cast(x, dtype=tf.float32) for x in init_step_size]
+
+    number_of_steps, burnin, nchain = 100, 50, 50
+
+    @tf.function(autograph=False)
+    def run_chain():
+      # random initialization of the starting postion of each chain
+      b0, b1, df, _ = robust_lm.sample(nchain, seed=strm())
+
+      # bijector to map contrained parameters to real
+      unconstraining_bijectors = [
+          tfb.Identity(),
+          tfb.Identity(),
+          tfb.Exp(),
+      ]
+
+      def trace_fn(_, pkr):
+        return (pkr.inner_results.inner_results.step_size,
+                pkr.inner_results.inner_results.log_accept_ratio)
+
+      kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+          tfp.mcmc.TransformedTransitionKernel(
+              inner_kernel=tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
+                  target_log_prob_fn=log_prob,
+                  step_size=step_size0,
+                  seed=strm()),
+              bijector=unconstraining_bijectors),
+          num_adaptation_steps=burnin,
+          step_size_setter_fn=lambda pkr, new_step_size: pkr._replace(  # pylint: disable=g-long-lambda
+              inner_results=pkr.inner_results._replace(step_size=new_step_size)
+          ),
+          step_size_getter_fn=lambda pkr: pkr.inner_results.step_size,
+          log_accept_prob_getter_fn=lambda pkr: pkr.inner_results.
+          log_accept_ratio,
+      )
+
+      # Sampling from the chain and get diagnostics
+      mcmc_trace, (step_size, log_accept_ratio) = tfp.mcmc.sample_chain(
+          num_results=number_of_steps,
+          num_burnin_steps=burnin,
+          current_state=[b0, b1, df],
+          kernel=kernel,
+          trace_fn=trace_fn)
+      rhat = tfp.mcmc.potential_scale_reduction(mcmc_trace)
+      return (
+          [s[-1] for s in step_size],  # final step size
+          tf.reduce_mean(tf.exp(log_accept_ratio)),
+          [tf.reduce_mean(rhat_) for rhat_ in rhat],  # average rhat
+      )
+
+    # Sample from posterior distribution and get diagnostic
+    [
+        final_step_size, average_accept_ratio, average_rhat
+    ] = self.evaluate(run_chain())
+
+    # Check that step size adaptation reduced the initial step size
+    self.assertAllLess(
+        np.asarray(final_step_size) - np.asarray(init_step_size), 0.)
+    # Check that average acceptance ratio is close to target
+    self.assertAllClose(
+        average_accept_ratio,
+        .8 * np.ones_like(average_accept_ratio),
+        atol=0.1, rtol=0.1)
+    # Check that mcmc sample quality is acceptable with tuning
+    self.assertAllClose(
+        average_rhat, np.ones_like(average_rhat), atol=0.05, rtol=0.05)
 
 
 if __name__ == '__main__':

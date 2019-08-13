@@ -75,6 +75,10 @@ NUTSKernelResults = collections.namedtuple('NUTSKernelResults', [
     'target_log_prob',
     'grads_target_log_prob',
     'momentum_state_memory',
+    'step_size',
+    'log_accept_ratio',
+    'leapfrogs_taken',
+    # TODO(junpenglao): remove leapfrogs_computed once benchmarking is done.
     'leapfrogs_computed',
     'is_accepted',
     'reach_max_depth',
@@ -104,8 +108,11 @@ TreeDoublingStateCandidate = collections.namedtuple(
 TreeDoublingMetaState = collections.namedtuple(
     'TreeDoublingMetaState',
     [
-        'leapfrog_count',
         'candidate_state',  # A namedtuple of TreeDoublingStateCandidate
+        'is_accepted',
+        'energy_diff_sum',  # sum of the energy differences (H' - H0) within the
+                            # single subtree
+        'leapfrog_count',
         'continue_tree',
         'not_divergence',
     ])
@@ -267,19 +274,17 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
     return True
 
   def one_step(self, current_state, previous_kernel_results):
-    unwrap_state_list = False
-    if not tf.nest.is_nested(current_state):
-      unwrap_state_list = True
-      current_state = [current_state]
     with tf.name_scope(self.name + '.one_step'):
+      unwrap_state_list = not tf.nest.is_nested(current_state)
+      if unwrap_state_list:
+        current_state = [current_state]
+
       current_target_log_prob = previous_kernel_results.target_log_prob
-      init_momentum, log_slice_sample = self._start_trajectory_batched(
-          current_state, current_target_log_prob)
-      batch_size = prefer_static.size(current_target_log_prob)
-      momentum_state_memory = previous_kernel_results.momentum_state_memory
-      init_weight = tf.ones(batch_size, dtype=TREE_COUNT_DTYPE)
-      continue_tree = tf.ones(batch_size, dtype=tf.bool)
-      not_divergence = tf.ones([batch_size], dtype=tf.bool)
+      [
+          init_momentum,
+          log_slice_sample,
+          init_energy
+      ] = self._start_trajectory_batched(current_state, current_target_log_prob)
 
       def _copy(v):
         return v * prefer_static.ones(
@@ -294,24 +299,35 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           target_grad_parts=previous_kernel_results.grads_target_log_prob)
       initial_step_state = tf.nest.map_structure(_copy, initial_state)
 
+      batch_size = prefer_static.size(current_target_log_prob)
+
       candidate_state = TreeDoublingStateCandidate(
           state=current_state,
           target=current_target_log_prob,
           target_grad_parts=previous_kernel_results.grads_target_log_prob,
-          weight=init_weight)
+          weight=tf.ones(batch_size, dtype=TREE_COUNT_DTYPE))
 
       initial_step_metastate = TreeDoublingMetaState(
-          leapfrog_count=tf.zeros([], dtype=tf.int32, name='leapfrog_count'),
           candidate_state=candidate_state,
-          continue_tree=continue_tree,
-          not_divergence=not_divergence)
+          is_accepted=tf.zeros(batch_size, dtype=tf.bool),
+          energy_diff_sum=tf.zeros(
+              batch_size, dtype=current_target_log_prob.dtype),
+          leapfrog_count=tf.zeros(batch_size, dtype=tf.int32),
+          continue_tree=tf.ones(batch_size, dtype=tf.bool),
+          not_divergence=tf.ones(batch_size, dtype=tf.bool))
 
       _, _, new_step_metastate = tf.while_loop(
           cond=lambda iter_, state, metastate: (  # pylint: disable=g-long-lambda
               ((iter_ < self.max_tree_depth) &
                tf.reduce_any(metastate.continue_tree))),
-          body=lambda iter_, state, metastate: self._loop_one_step(  # pylint: disable=g-long-lambda
-              log_slice_sample, momentum_state_memory, iter_, state, metastate),
+          body=lambda iter_, state, metastate: self.loop_tree_doubling(  # pylint: disable=g-long-lambda
+              previous_kernel_results.step_size,
+              log_slice_sample,
+              init_energy,
+              previous_kernel_results.momentum_state_memory,
+              iter_,
+              state,
+              metastate),
           loop_vars=(
               tf.zeros([], dtype=tf.int32, name='iter'),
               initial_step_state,
@@ -319,28 +335,35 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           parallel_iterations=TF_WHILE_PARALLEL_ITERATIONS,
       )
 
-      candidate_state = new_step_metastate.candidate_state
-
-      # TODO(junpenglao): Validate that this is accurate within numerical error
-      is_accepted = tf.not_equal(initial_state.target, candidate_state.target)
-
-      reach_max_depth = new_step_metastate.continue_tree
-      leapfrogs_computed = (
-          previous_kernel_results.leapfrogs_computed +
-          new_step_metastate.leapfrog_count * self.unrolled_leapfrog_steps)
-
-      result_state = candidate_state.state
-      if unwrap_state_list:
-        result_state = result_state[0]
       kernel_results = NUTSKernelResults(
-          target_log_prob=candidate_state.target,
-          grads_target_log_prob=candidate_state.target_grad_parts,
-          momentum_state_memory=momentum_state_memory,
-          leapfrogs_computed=leapfrogs_computed,
-          is_accepted=is_accepted,
-          reach_max_depth=reach_max_depth,
+          target_log_prob=new_step_metastate.candidate_state.target,
+          grads_target_log_prob=(
+              new_step_metastate.candidate_state.target_grad_parts),
+          momentum_state_memory=previous_kernel_results.momentum_state_memory,
+          step_size=previous_kernel_results.step_size,
+          log_accept_ratio=tf.math.log(
+              new_step_metastate.energy_diff_sum /
+              tf.cast(new_step_metastate.leapfrog_count,
+                      dtype=new_step_metastate.energy_diff_sum.dtype)),
+          # TODO(junpenglao): return non-cumulated leapfrogs_taken once
+          # benchmarking is done.
+          leapfrogs_taken=(
+              previous_kernel_results.leapfrogs_taken +
+              new_step_metastate.leapfrog_count * self.unrolled_leapfrog_steps
+          ),
+          leapfrogs_computed=(
+              previous_kernel_results.leapfrogs_computed +
+              tf.reduce_max(new_step_metastate.leapfrog_count) *
+              self.unrolled_leapfrog_steps
+          ),
+          is_accepted=new_step_metastate.is_accepted,
+          reach_max_depth=new_step_metastate.continue_tree,
           has_divergence=~new_step_metastate.not_divergence,
       )
+
+      result_state = new_step_metastate.candidate_state.state
+      if unwrap_state_list:
+        result_state = result_state[0]
 
       return result_state, kernel_results
 
@@ -353,7 +376,6 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
       step_size = self.step_size
       if len(step_size) == 1:
         step_size = step_size * len(init_state)
-        self._step_size = step_size
       if len(step_size) != len(init_state):
         raise ValueError('Expected either one step size or {} (size of '
                          '`init_state`), but found {}'.format(
@@ -395,16 +417,20 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           target_log_prob=current_target_log_prob,
           grads_target_log_prob=current_grads_log_prob,
           momentum_state_memory=momentum_state_memory,
-          leapfrogs_computed=tf.zeros([],
-                                      dtype=tf.int32,
-                                      name='leapfrogs_computed'),
+          step_size=step_size,
+          log_accept_ratio=tf.zeros(
+              [batch_size],
+              dtype=current_target_log_prob.dtype,
+              name='log_accept_ratio'),
+          leapfrogs_taken=tf.zeros(
+              [batch_size], dtype=tf.int32, name='leapfrogs_taken'),
+          leapfrogs_computed=tf.zeros(
+              [], dtype=tf.int32, name='leapfrogs_computed'),
           is_accepted=tf.zeros([batch_size], dtype=tf.bool, name='is_accepted'),
-          reach_max_depth=tf.zeros([batch_size],
-                                   dtype=tf.bool,
-                                   name='reach_max_depth'),
-          has_divergence=tf.zeros([batch_size],
-                                  dtype=tf.bool,
-                                  name='has_divergence'),
+          reach_max_depth=tf.zeros(
+              [batch_size], dtype=tf.bool, name='reach_max_depth'),
+          has_divergence=tf.zeros(
+              [batch_size], dtype=tf.bool, name='has_divergence'),
       )
 
   def _start_trajectory_batched(self, state, target_log_prob):
@@ -426,11 +452,12 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           shape=prefer_static.shape(target_log_prob),
           dtype=target_log_prob.dtype,
           seed=seed_stream()))
-      log_slice_sample += compute_hamiltonian(target_log_prob, momentum)
-      return momentum, log_slice_sample
+      init_energy = compute_hamiltonian(target_log_prob, momentum)
+      return momentum, log_slice_sample, init_energy
 
-  def _loop_one_step(self, log_slice_sample, momentum_state_memory, iter_,
-                     initial_step_state, initial_step_metastate):
+  def loop_tree_doubling(self, step_size, log_slice_sample, init_energy,
+                         momentum_state_memory, iter_, initial_step_state,
+                         initial_step_metastate):
     """Main loop for tree doubling."""
     with tf.name_scope('loop_tree_doubling'):
       batch_size = prefer_static.size(log_slice_sample)
@@ -452,15 +479,30 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           lambda v: tf.gather_nd(v, left_right_index),
           initial_step_state)
 
+      directions_expanded = [
+          _expand_dims_under_batch_dim(direction, prefer_static.rank(state))
+          for state in tree_start_states.state
+      ]
+      integrator = leapfrog_impl.SimpleLeapfrogIntegrator(
+          self.target_log_prob_fn,
+          step_sizes=[
+              tf.where(direction, ss, -ss)
+              for direction, ss in zip(directions_expanded, step_size)
+          ],
+          num_steps=self.unrolled_leapfrog_steps)
+
       [
           candidate_tree_state,
           tree_final_states,
           final_not_divergence,
           continue_tree_final,
-          leapfrogs_computed,
+          energy_diff_tree_sum,
+          leapfrogs_taken,
       ] = self._build_sub_tree(
-          direction,
+          directions_expanded,
+          integrator,
           log_slice_sample,
+          init_energy,
           # num_steps_at_this_depth = 2**iter_ = 1 << iter_
           tf.bitwise.left_shift(1, iter_),
           tree_start_states,
@@ -533,20 +575,24 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           [m[0] for m in new_step_state.momentum],
           [s[1] for s in new_step_state.state],
           [m[1] for m in new_step_state.momentum])
-      continue_next_tree = continue_tree_final & no_u_turns_trajectory
 
       new_step_metastate = TreeDoublingMetaState(
-          leapfrog_count=(initial_step_metastate.leapfrog_count +
-                          leapfrogs_computed),
           candidate_state=new_candidate_state,
-          continue_tree=continue_next_tree,
-          not_divergence=final_not_divergence)
+          is_accepted=choose_new_state | initial_step_metastate.is_accepted,
+          energy_diff_sum=(
+              energy_diff_tree_sum + initial_step_metastate.energy_diff_sum),
+          continue_tree=continue_tree_final & no_u_turns_trajectory,
+          not_divergence=final_not_divergence,
+          leapfrog_count=(initial_step_metastate.leapfrog_count +
+                          leapfrogs_taken))
 
       return iter_ + 1, new_step_state, new_step_metastate
 
   def _build_sub_tree(self,
-                      direction,
+                      directions,
+                      integrator,
                       log_slice_sample,
+                      init_energy,
                       nsteps,
                       initial_state,
                       continue_tree,
@@ -561,25 +607,33 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           target_grad_parts=initial_state.target_grad_parts,
           # We never want to select the inital state
           weight=tf.zeros(batch_size, dtype=TREE_COUNT_DTYPE))
+      energy_diff_sum = tf.zeros([batch_size],
+                                 dtype=log_slice_sample.dtype,
+                                 name='energy_diff_sum')
       [
-          leapfrogs_computed,
+          _,
+          energy_diff_tree_sum,
+          leapfrogs_taken,
           final_state,
           candidate_tree_state,
           final_continue_tree,
           final_not_divergence,
           momentum_state_memory,
       ] = tf.while_loop(
-          cond=lambda iter_, state, state_c, continue_tree, not_divergence,  # pylint: disable=g-long-lambda
-                      momentum_state_memory: (
+          cond=lambda iter_, energy_diff_sum, leapfrogs_taken, state, state_c,  # pylint: disable=g-long-lambda
+                      continue_tree, not_divergence, momentum_state_memory: (
                           (iter_ < nsteps) & tf.reduce_any(continue_tree)),
-          body=lambda iter_, state, state_c, continue_tree, not_divergence,  # pylint: disable=g-long-lambda
-                      momentum_state_memory: (
+          body=lambda iter_, energy_diff_sum, leapfrogs_taken, state, state_c,  # pylint: disable=g-long-lambda
+                      continue_tree, not_divergence, momentum_state_memory: (
                           self._loop_build_sub_tree(
-                              direction, log_slice_sample, iter_, state,
-                              state_c, continue_tree, not_divergence,
-                              momentum_state_memory)),
+                              directions, integrator, log_slice_sample,
+                              init_energy, iter_, energy_diff_sum,
+                              leapfrogs_taken, state, state_c, continue_tree,
+                              not_divergence, momentum_state_memory)),
           loop_vars=(
               tf.zeros([], dtype=tf.int32, name='iter'),
+              energy_diff_sum,
+              tf.zeros([batch_size], dtype=tf.int32, name='leapfrogs_taken'),
               initial_state,
               initial_state_candidate,
               continue_tree,
@@ -594,27 +648,26 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
         final_state,
         final_not_divergence,
         final_continue_tree,
-        leapfrogs_computed,
+        energy_diff_tree_sum,
+        leapfrogs_taken,
     )
 
-  def _loop_build_sub_tree(self, direction, log_slice_sample, iter_,
-                           prev_tree_state, candidate_tree_state,
-                           continue_tree_previous, not_divergent_previous,
+  def _loop_build_sub_tree(self,
+                           directions,
+                           integrator,
+                           log_slice_sample,
+                           init_energy,
+                           iter_,
+                           energy_diff_sum_previous,
+                           leapfrogs_taken,
+                           prev_tree_state,
+                           candidate_tree_state,
+                           continue_tree_previous,
+                           not_divergent_previous,
                            momentum_state_memory):
     """Base case in tree doubling."""
     with tf.name_scope('loop_build_sub_tree'):
       # Take one leapfrog step in the direction v and check divergence
-      directions_expanded = [
-          _expand_dims_under_batch_dim(direction, prefer_static.rank(state))
-          for state in prev_tree_state.state
-      ]
-      integrator = leapfrog_impl.SimpleLeapfrogIntegrator(
-          self.target_log_prob_fn,
-          step_sizes=[
-              tf.where(direction, ss, -ss)
-              for direction, ss in zip(directions_expanded, self.step_size)
-          ],
-          num_steps=self.unrolled_leapfrog_steps)
       [
           next_momentum_parts,
           next_state_parts,
@@ -630,6 +683,9 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           state=next_state_parts,
           target=next_target,
           target_grad_parts=next_target_grad_parts)
+      # If the tree have not yet terminated previously, we count this leapfrog.
+      leapfrogs_taken = leapfrogs_taken + tf.cast(continue_tree_previous,
+                                                  tf.int32)
 
       # Save state and momentum at odd step, check U turn at even step.
       # Note that here we also write to a Placeholder at even step to avoid
@@ -671,11 +727,11 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
             tf.equal(iter_ % 2, 0),
             lambda: has_not_u_turn_at_even_step,
             lambda: has_not_u_turn_at_odd_step(  # pylint: disable=g-long-lambda
-                self.read_instruction, iter_ // 2, directions_expanded,
+                self.read_instruction, iter_ // 2, directions,
                 momentum_state_memory, next_momentum_parts, next_state_parts))
       else:
         f = lambda int_iter: has_not_u_turn_at_odd_step(  # pylint: disable=g-long-lambda
-            self.read_instruction, int_iter, directions_expanded,
+            self.read_instruction, int_iter, directions,
             momentum_state_memory, next_momentum_parts, next_state_parts)
         branch_excution = {
             x: functools.partial(f, x)
@@ -686,9 +742,11 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
             lambda: tf.switch_case(iter_ // 2, branch_excution))
 
       energy = compute_hamiltonian(next_target, next_momentum_parts)
-      valid_candidate = log_slice_sample <= energy
+      energy_diff = energy - init_energy
+      valid_candidate = log_slice_sample <= energy_diff
 
       # Uniform sampling on the trajectory within the subtree
+      # TODO(junpenglao): use energy_diff as weight to enable multinomial sample
       sample_weight = tf.cast(valid_candidate, TREE_COUNT_DTYPE)
       weight_sum = candidate_tree_state.weight + sample_weight
       log_accept_thresh = tf.math.log(
@@ -719,15 +777,24 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           ],
           weight=weight_sum)
 
-      not_divergent = log_slice_sample - energy < self.max_energy_diff
-      continue_tree = not_divergent & no_u_turns_within_tree
-      continue_tree_next = continue_tree_previous & continue_tree
+      not_divergent = log_slice_sample - energy_diff < self.max_energy_diff
+      continue_tree = not_divergent & continue_tree_previous
+      continue_tree_next = no_u_turns_within_tree & continue_tree
 
-      not_divergent_tokeep = tf.where(continue_tree_previous, not_divergent,
+      not_divergent_tokeep = tf.where(continue_tree_previous,
+                                      not_divergent,
                                       tf.ones([batch_size], dtype=tf.bool))
+
+      # min(1., exp(energy_diff)).
+      exp_energy_diff = tf.clip_by_value(tf.exp(energy_diff), 0., 1.)
+      energy_diff_sum = tf.where(continue_tree,
+                                 energy_diff_sum_previous + exp_energy_diff,
+                                 energy_diff_sum_previous)
 
       return (
           iter_ + 1,
+          energy_diff_sum,
+          leapfrogs_taken,
           next_tree_state,
           next_candidate_tree_state,
           continue_tree_next,
