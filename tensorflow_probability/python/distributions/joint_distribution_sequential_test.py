@@ -24,6 +24,7 @@ import collections
 from absl.testing import parameterized
 import numpy as np
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -311,6 +312,14 @@ class JointDistributionSequentialTest(
       tfd.JointDistributionSequential(collections.namedtuple('model', 'a b')(
           a=tfd.Normal(0, 1),
           b=tfd.Normal(1, 2)))
+
+  def test_simple_example_with_dynamic_shapes(self):
+    dist = tfd.JointDistributionSequential([
+        tfd.Normal(tf1.placeholder_with_default(0., shape=None),
+                   tf1.placeholder_with_default(1., shape=None)),
+        lambda a: tfd.Normal(a, 1.)], validate_args=True)
+    lp = dist.log_prob(dist.sample(5))
+    self.assertAllEqual(self.evaluate(lp).shape, [5])
 
   def test_latent_dirichlet_allocation(self):
     """Tests Latent Dirichlet Allocation joint model.
