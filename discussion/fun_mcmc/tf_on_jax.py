@@ -25,6 +25,7 @@ import types
 
 import jax
 from jax import lax
+from jax.experimental import stax
 import jax.numpy as np
 
 __all__ = [
@@ -93,7 +94,7 @@ class _TensorSpec(object):
   pass
 
 
-@_impl(name='cast')
+@_impl()
 def _cast(v, dtype):
   return np.asarray(v).astype(dtype)
 
@@ -115,7 +116,25 @@ def _function(x):
   return jax.jit(x)
 
 
+@_impl()
+def _one_hot(indices, depth):
+  indices = np.asarray(indices)
+  flat_indices = indices.reshape([-1])
+  flat_ret = np.eye(depth)[flat_indices]
+  return flat_ret.reshape(indices.shape + (depth,))
+
+
+@_impl()
+def _gather(params, indices):
+  params = np.asarray(params)
+  indices = np.asarray(indices)
+  return params[indices]
+
+
 _impl(name='add_n')(sum)
+_impl(['nn'], name='softmax')(stax.softmax)
+
+tf.newaxis = None
 
 _impl_np()(np.float32)
 _impl_np()(np.int32)

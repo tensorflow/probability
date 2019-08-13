@@ -20,7 +20,9 @@ from __future__ import division
 from __future__ import print_function
 
 import jax
+from jax import lax
 from jax import random
+from jax.experimental import stax
 import jax.numpy as np
 # TODO(siege): Switch to a JAX-specific nested structure API.
 import tensorflow.compat.v2 as tf
@@ -32,6 +34,7 @@ __all__ = [
     'make_dynamic_array',
     'map_tree',
     'map_tree_up_to',
+    'random_categorical',
     'random_normal',
     'random_uniform',
     'snapshot_dynamic_array',
@@ -101,3 +104,34 @@ def random_uniform(shape, dtype, seed):
 def random_normal(shape, dtype, seed):
   """Generates a sample from a standard normal distribution."""
   return random.normal(shape=tuple(shape), dtype=dtype, key=seed)
+
+
+def _searchsorted(a, v):
+  """Returns where `v` can be inserted so that `a` remains sorted."""
+  def cond(state):
+    low_idx, high_idx = state
+    return low_idx < high_idx
+
+  def body(state):
+    low_idx, high_idx = state
+    mid_idx = (low_idx + high_idx) // 2
+    mid_v = a[mid_idx]
+    low_idx = np.where(v > mid_v, mid_idx + 1, low_idx)
+    high_idx = np.where(v > mid_v, high_idx, mid_idx)
+    return low_idx, high_idx
+
+  low_idx, _ = lax.while_loop(cond, body, (0, a.shape[-1]))
+  return low_idx
+
+
+def random_categorical(logits, num_samples, seed):
+  """Returns a sample from a categorical distribution. `logits` must be 2D."""
+  probs = stax.softmax(logits)
+  cum_sum = np.cumsum(probs, axis=-1)
+
+  eta = random.uniform(seed, (num_samples,) + cum_sum.shape[:-1])
+  cum_sum = np.broadcast_to(cum_sum, (num_samples,) + cum_sum.shape)
+
+  flat_cum_sum = cum_sum.reshape([-1, cum_sum.shape[-1]])
+  flat_eta = eta.reshape([-1])
+  return jax.vmap(_searchsorted)(flat_cum_sum, flat_eta).reshape(eta.shape).T

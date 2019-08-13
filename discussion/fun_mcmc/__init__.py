@@ -51,6 +51,10 @@ from discussion.fun_mcmc.fun_mcmc_lib import maybe_broadcast_structure
 from discussion.fun_mcmc.fun_mcmc_lib import mclachlan_optimal_4th_order_step
 from discussion.fun_mcmc.fun_mcmc_lib import metropolis_hastings_step
 from discussion.fun_mcmc.fun_mcmc_lib import PotentialFn
+from discussion.fun_mcmc.fun_mcmc_lib import random_walk_metropolis
+from discussion.fun_mcmc.fun_mcmc_lib import random_walk_metropolis_init
+from discussion.fun_mcmc.fun_mcmc_lib import RandomWalkMetropolisExtra
+from discussion.fun_mcmc.fun_mcmc_lib import RandomWalkMetropolisState
 from discussion.fun_mcmc.fun_mcmc_lib import ruth4_step
 from discussion.fun_mcmc.fun_mcmc_lib import sign_adaptation
 from discussion.fun_mcmc.fun_mcmc_lib import spliting_integrator_step
@@ -92,6 +96,10 @@ __all__ = [
     'mclachlan_optimal_4th_order_step',
     'metropolis_hastings_step',
     'PotentialFn',
+    'random_walk_metropolis',
+    'random_walk_metropolis_init',
+    'RandomWalkMetropolisExtra',
+    'RandomWalkMetropolisState',
     'ruth4_step',
     'set_backend',
     'sign_adaptation',

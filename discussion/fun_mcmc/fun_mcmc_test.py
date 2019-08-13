@@ -741,6 +741,53 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(2., y[-1], atol=1e-3)
     self.assertAllClose(0., loss[-1], atol=1e-3)
 
+  def testRandomWalkMetropolis(self):
+    num_steps = 1000
+    state = tf.ones([16], dtype=tf.int32)
+    target_logits = tf.constant([1., 2., 3., 4.]) + 2.
+    proposal_logits = tf.constant([4., 3., 2., 1.]) + 2.
+
+    def target_log_prob_fn(x):
+      return tf.gather(target_logits, x), ()
+
+    def proposal_fn(x, seed):
+      current_logits = tf.gather(proposal_logits, x)
+      proposal = util.random_categorical(proposal_logits[tf.newaxis],
+                                         x.shape[0], seed)[0]
+      proposed_logits = tf.gather(proposal_logits, proposal)
+      return tf.cast(proposal, x.dtype), ((), proposed_logits - current_logits)
+
+    def kernel(rwm_state, seed):
+      if backend.get_backend() == backend.TENSORFLOW:
+        rwm_seed = tfp_test_util.test_seed()
+      else:
+        rwm_seed, seed = util.split_seed(seed, 2)
+      rwm_state, rwm_extra = fun_mcmc.random_walk_metropolis(
+          rwm_state,
+          target_log_prob_fn=target_log_prob_fn,
+          proposal_fn=proposal_fn,
+          seed=rwm_seed)
+      return (rwm_state, seed), rwm_extra
+
+    if backend.get_backend() == backend.TENSORFLOW:
+      seed = tfp_test_util.test_seed()
+    else:
+      seed = self._make_seed(tfp_test_util.test_seed())
+
+    # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
+    # for the jit to do anything.
+    _, chain = tf.function(lambda state, seed: fun_mcmc.trace(  # pylint: disable=g-long-lambda
+        state=(fun_mcmc.random_walk_metropolis_init(state, target_log_prob_fn),
+               seed),
+        fn=kernel,
+        num_steps=num_steps,
+        trace_fn=lambda state, extra: state[0].state))(state, seed)
+    # Discard the warmup samples.
+    chain = chain[500:]
+
+    sample_mean = tf.reduce_mean(tf.one_hot(chain, 4), axis=[0, 1])
+    self.assertAllClose(tf.nn.softmax(target_logits), sample_mean, atol=0.1)
+
 
 class FunMCMCTestJAX(FunMCMCTestTensorFlow):
 

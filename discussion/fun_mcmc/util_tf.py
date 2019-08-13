@@ -29,6 +29,7 @@ __all__ = [
     'make_dynamic_array',
     'map_tree',
     'map_tree_up_to',
+    'random_categorical',
     'random_normal',
     'random_uniform',
     'snapshot_dynamic_array',
@@ -108,3 +109,10 @@ def random_normal(shape, dtype, seed):
   """Generates a sample from a standard normal distribution."""
   # TODO(siege): Switch to stateless RNG ops.
   return tf.random.normal(shape=shape, dtype=dtype, seed=seed)
+
+
+def random_categorical(logits, num_samples, seed):
+  """Returns a sample from a categorical distribution. `logits` must be 2D."""
+  # TODO(siege): Switch to stateless RNG ops.
+  return tf.random.categorical(
+      logits=logits, num_samples=num_samples, seed=seed)

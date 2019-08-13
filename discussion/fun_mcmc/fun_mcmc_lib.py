@@ -83,6 +83,10 @@ __all__ = [
     'mclachlan_optimal_4th_order_step',
     'metropolis_hastings_step',
     'PotentialFn',
+    'random_walk_metropolis',
+    'random_walk_metropolis_init',
+    'RandomWalkMetropolisExtra',
+    'RandomWalkMetropolisState',
     'ruth4_step',
     'sign_adaptation',
     'spliting_integrator_step',
@@ -1357,3 +1361,98 @@ def gradient_descent_step(
 
   return gd_state, GradientDescentExtra(
       loss_extra=loss_extra, loss=loss, grads=grads)
+
+
+RandomWalkMetropolisState = collections.namedtuple(
+    'RandomWalkMetropolisState', 'state, target_log_prob, state_extra')
+
+
+RandomWalkMetropolisExtra = collections.namedtuple(
+    'RandomWalkMetropolisExtra',
+    'is_accepted, log_accept_ratio, proposal_extra, proposed_rwm_state')
+
+
+def random_walk_metropolis_init(
+    state: State, target_log_prob_fn: PotentialFn) -> RandomWalkMetropolisState:
+  """Initializes the `RandomWalkMetropolisState`.
+
+  Args:
+    state: State of the chain.
+    target_log_prob_fn: Target log prob fn.
+
+  Returns:
+    hmc_state: State of the `random_walk_metropolis_init` `TransitionOperator`.
+  """
+  target_log_prob, state_extra = call_potential_fn(target_log_prob_fn, state)
+  return RandomWalkMetropolisState(
+      state=state,
+      target_log_prob=target_log_prob,
+      state_extra=state_extra,
+  )
+
+
+def random_walk_metropolis(
+    rwm_state: RandomWalkMetropolisState,
+    target_log_prob_fn: PotentialFn,
+    proposal_fn: TransitionOperator,
+    log_uniform: FloatTensor = None,
+    seed=None) -> Tuple[RandomWalkMetropolisState, RandomWalkMetropolisExtra]:
+  """Random Walk Metropolis Hastings `TransitionOperator`.
+
+  The `proposal_fn` takes in the current state, and must return a proposed
+  state. It also must return a 2-tuple as its `extra` output, with the first
+  element being arbitrary (returned in `rwm_extra`), and the second element
+  being the log odds of going from the current state to the proposed state
+  instead of reverse. If the proposal is symmetric about the current state, you
+  can return `0.`.
+
+  Args:
+    rwm_state: RandomWalkMetropolisState.
+    target_log_prob_fn: Target log prob fn.
+    proposal_fn: Proposal fn.
+    log_uniform: Optional logarithm of a uniformly distributed random sample in
+      [0, 1], used for the MH accept/reject step.
+    seed: For reproducibility.
+
+  Returns:
+    rwm_state: RandomWalkMetropolisState
+    rwm_extra: RandomWalkMetropolisExtra
+  """
+  if any(e is None for e in util.flatten_tree(rwm_state)):
+    rwm_state = random_walk_metropolis_init(rwm_state.state, target_log_prob_fn)
+
+  seed, sample_seed = util.split_seed(seed, 2)
+  proposed_state, (proposal_extra,
+                   log_proposed_bias) = proposal_fn(rwm_state.state,
+                                                    sample_seed)
+
+  proposed_target_log_prob, proposed_state_extra = call_potential_fn(
+      target_log_prob_fn, proposed_state)
+
+  # TODO(siege): Is it really a "log accept ratio" if we need to clamp it to 0?
+  log_accept_ratio = (
+      proposed_target_log_prob - rwm_state.target_log_prob - log_proposed_bias)
+
+  proposed_rwm_state = RandomWalkMetropolisState(
+      state=proposed_state,
+      target_log_prob=proposed_target_log_prob,
+      state_extra=proposed_state_extra,
+  )
+
+  rwm_state, is_accepted, _ = metropolis_hastings_step(
+      rwm_state,
+      proposed_rwm_state,
+      -log_accept_ratio,
+      log_uniform=log_uniform,
+      seed=seed,
+  )
+
+  rwm_extra = RandomWalkMetropolisExtra(
+      proposal_extra=proposal_extra,
+      proposed_rwm_state=proposed_rwm_state,
+      log_accept_ratio=log_accept_ratio,
+      is_accepted=is_accepted,
+  )
+
+  rwm_state = rwm_state  # type: RandomWalkMetropolisState
+  return rwm_state, rwm_extra
