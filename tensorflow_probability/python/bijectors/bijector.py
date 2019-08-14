@@ -106,7 +106,12 @@ class _Mapping(
 
   def _merge(self, old, new, use_equals=False):
     """Helper to merge which handles merging one value."""
-    generic_to_array = lambda x: np.array(x) if isinstance(x, np.generic) else x
+    def generic_to_array(x):
+      if isinstance(x, np.generic):
+        x = np.array(x)
+      if isinstance(x, np.ndarray):
+        x.flags.writeable = False
+      return x
     if old is None:
       return generic_to_array(new)
     if new is None:
@@ -919,7 +924,7 @@ class Bijector(tf.Module):
   def _call_forward(self, x, name, **kwargs):
     """Wraps call to _forward, allowing extra shared logic."""
     with self._name_and_control_scope(name):
-      x = tf.convert_to_tensor(x, name='x')
+      x = tf.convert_to_tensor(x, dtype_hint=self.dtype, name='x')
       self._maybe_assert_dtype(x)
       if not self._is_injective:  # No caching for non-injective
         return self._forward(x, **kwargs)
@@ -961,7 +966,7 @@ class Bijector(tf.Module):
   def _call_inverse(self, y, name, **kwargs):
     """Wraps call to _inverse, allowing extra shared logic."""
     with self._name_and_control_scope(name):
-      y = tf.convert_to_tensor(y, name='y')
+      y = tf.convert_to_tensor(y, dtype_hint=self.dtype, name='y')
       self._maybe_assert_dtype(y)
       if not self._is_injective:  # No caching for non-injective
         return self._inverse(y, **kwargs)
