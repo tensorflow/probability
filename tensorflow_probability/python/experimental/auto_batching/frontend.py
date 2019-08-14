@@ -286,7 +286,12 @@ class _AutoBatchingTransformer(transformer.Base):
 
   def _primop(self, node, non_autobatch_names):
     scope = anno.getanno(node, anno.Static.SCOPE)
-    used_vars = list(scope.read - set(non_autobatch_names))
+    # We want the root names of any attribute accesses; the accesses will happen
+    # inside the expression.
+    used_vars = set().union(*[qn.support_set for qn in scope.read])
+    # Exclude names from the blacklist.
+    used_vars = list(used_vars - set(non_autobatch_names))
+    # Exclude names that will be available from the enclosing scope.
     used_vars = [v for v in used_vars if str(v) not in self.enclosing_names]
     # TODO(aqj) It should not be necessary to convert these QN objects to
     # strings, but empirically made the difference.

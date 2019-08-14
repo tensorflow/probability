@@ -556,6 +556,29 @@ class AutoGraphFrontendTest(tf.test.TestCase):
         outputs,
         function(inputs, max_stack_depth=3, backend=NP_BACKEND))
 
+  def testFieldReference(self):
+    # Test that we can extract fields from named tuples, whether those tuples
+    # were defined inside or outside the autobatched function.
+    foo_cls = collections.namedtuple('foo_cls', ['bar', 'baz'])
+    foo1 = foo_cls(5, 20)
+    def int_type(args):
+      return args[0]
+    ctx = frontend.Context()
+    @ctx.batch(type_inference=int_type)
+    def function(x):
+      y = x + foo1.bar
+      foo2 = foo_cls(y, y + 5)
+      return foo2.baz
+
+    inputs = np.array([1, 5, 60, 3, 7], dtype=np.int32)
+    outputs = np.array([11, 15, 70, 13, 17], dtype=np.int32)
+    # pylint: disable=unexpected-keyword-arg
+    # The `max_stack_depth` and `backend` keyword arguments to `function`
+    # are introduced by the `@ctx.batch` decorator, confusing pylint.
+    self.assertAllEqual(
+        outputs,
+        function(inputs, max_stack_depth=3, backend=NP_BACKEND))
+
 
 class _TestHidingTFBatchSize(object):
 
