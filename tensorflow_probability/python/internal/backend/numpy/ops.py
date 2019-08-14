@@ -36,6 +36,7 @@ __all__ = [
     'control_dependencies',
     'convert_to_tensor',
     'custom_gradient',
+    'enable_v2_behavior',
     'executing_eagerly',
     'get_static_value',
     'group',
@@ -98,11 +99,11 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
     dtype_hint = utils.numpy_dtype(dtype_hint)
     value = np.array(value)
     # Match TF behavior, which won't downcast e.g. float to int.
-    if np.issubdtype(value.dtype, np.complex):
-      if not np.issubdtype(dtype_hint, np.complex):
+    if np.issubdtype(value.dtype, np.complexfloating):
+      if not np.issubdtype(dtype_hint, np.complexfloating):
         return value
-    if np.issubdtype(value.dtype, np.float):
-      if not np.issubdtype(dtype_hint, np.float):
+    if np.issubdtype(value.dtype, np.floating):
+      if not np.issubdtype(dtype_hint, np.floating):
         return value
     if np.issubdtype(value.dtype, np.integer):
       if not np.issubdtype(dtype_hint, np.integer):
@@ -299,3 +300,6 @@ class Module(object):
 
   def variables(self):
     return []
+
+
+enable_v2_behavior = lambda: None

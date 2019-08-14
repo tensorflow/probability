@@ -349,8 +349,12 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['x', 'axis', 'exclusive', 'reverse', 'name'], varargs=None,
     #         keywords=None, defaults=(0, False, False, None))
-    TestCase('math.cumprod', [single_array()]),
-    TestCase('math.cumsum', [single_array()]),
+    TestCase('math.cumprod', [
+        hps.tuples(array_and_axis(), hps.booleans(), hps.booleans()).map(
+            lambda x: x[0] + (x[1], x[2]))]),
+    TestCase('math.cumsum', [
+        hps.tuples(array_and_axis(), hps.booleans(), hps.booleans()).map(
+            lambda x: x[0] + (x[1], x[2]))]),
 
     # ArgSpec(args=['x', 'name'], varargs=None, keywords=None, defaults=(None,))
     TestCase('math.abs', [single_array()]),

@@ -18,12 +18,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 import numpy as np
 
 import tensorflow as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy.numpy_array import _reverse
 
 scipy_special = utils.try_import('scipy.special')
 
@@ -162,6 +165,31 @@ def _astuple(x):
 def _bincount(arr, weights=None, minlength=None, maxlength=None,  # pylint: disable=unused-argument
               dtype=tf.int32, name=None):  # pylint: disable=unused-argument
   return np.bincount(arr, weights, minlength).astype(utils.numpy_dtype(dtype))
+
+
+def _cumop(op, x, axis=0, exclusive=False, reverse=False, initial_value=None):
+  """Shared impl of cumsum/cumprod."""
+  axis = _astuple(axis)
+  result = op(_reverse(x, axis) if reverse else x, axis)
+  if reverse:
+    result = _reverse(result, axis)
+  if exclusive:
+    paddings = [[0, 0]] * result.ndim
+    if isinstance(axis, int):
+      axis = (axis,)
+    for ax in axis:
+      paddings[ax] = [0, 1] if reverse else [1, 0]
+    result = np.pad(result, paddings, mode='constant',
+                    constant_values=initial_value)
+    slices = [slice(None)] * result.ndim
+    for ax in axis:
+      slices[ax] = slice(1, None) if reverse else slice(None, -1)
+    result = result[slices]
+  return result
+
+
+_cumprod = functools.partial(_cumop, np.cumprod, initial_value=1.)
+_cumsum = functools.partial(_cumop, np.cumsum, initial_value=0.)
 
 
 def _lbeta(x, name=None):  # pylint: disable=unused-argument
@@ -322,13 +350,11 @@ count_nonzero = utils.copy_docstring(
 
 cumprod = utils.copy_docstring(
     tf.math.cumprod,
-    lambda x, axis=0, exclusive=False, reverse=False, name=None: (  # pylint: disable=g-long-lambda
-        np.cumprod(x, _astuple(axis))))
+    _cumprod)
 
 cumsum = utils.copy_docstring(
     tf.math.cumsum,
-    lambda x, axis=0, exclusive=False, reverse=False, name=None: (  # pylint: disable=g-long-lambda
-        np.cumsum(x, _astuple(axis))))
+    _cumsum)
 
 digamma = utils.copy_docstring(
     tf.math.digamma,

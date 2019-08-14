@@ -26,6 +26,7 @@ from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -107,6 +108,7 @@ class _IteratedSigmoidCenteredBijectorTest(object):
     bijector_test_util.assert_bijective_and_finite(
         iterated_sigmoid, x, y, eval_func=self.evaluate, event_ndims=1)
 
+  @tfp_test_util.numpy_disable_gradient_test
   def testJacobianConsistent(self):
     with tf.GradientTape(persistent=True) as g:
       x = tf.constant((60 * np.random.rand(10) - 30).reshape(5, 2))
