@@ -22,6 +22,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 
@@ -174,6 +175,8 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
       design_matrix = tf.convert_to_tensor(
           value=design_matrix, name='design_matrix', dtype=dtype)
+      design_matrix_with_time_in_first_dim = distribution_util.move_dimension(
+          design_matrix, -2, 0)
 
       drift_scale = tf.convert_to_tensor(
           value=drift_scale, name='drift_scale', dtype=dtype)
@@ -187,7 +190,8 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
       def observation_matrix_fn(t):
         observation_matrix = tf.linalg.LinearOperatorFullMatrix(
-            design_matrix[..., t, tf.newaxis, :], name='observation_matrix')
+            tf.gather(design_matrix_with_time_in_first_dim,
+                      t)[..., tf.newaxis, :], name='observation_matrix')
         return observation_matrix
 
       self._drift_scale = drift_scale
