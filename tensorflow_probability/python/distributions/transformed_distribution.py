@@ -255,7 +255,7 @@ class TransformedDistribution(distribution_lib.Distribution):
           self._needs_rotation, override_event_ndims, 0)
       # We'll be reducing the head dims (if at all), i.e., this will be []
       # if we don't need to reduce.
-      self._reduce_event_indices = tf.range(
+      self._reduce_event_indices = prefer_static.range(
           self._rotate_ndims - override_event_ndims, self._rotate_ndims)
 
     self._distribution = distribution
