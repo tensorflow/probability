@@ -103,6 +103,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:seed_stream",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/mcmc:kernel",
         "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
     ],

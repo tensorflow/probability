@@ -377,6 +377,35 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllClose(
         average_rhat, np.ones_like(average_rhat), atol=0.05, rtol=0.05)
 
+  def testDivergence(self):
+    """Neals funnel with large step size."""
+    strm = tfd.SeedStream(1, salt='DivergenceTest')
+    neals_funnel = tfd.JointDistributionSequential(
+        [
+            tfd.Normal(loc=0., scale=3.),  # b0
+            lambda y: tfd.Sample(tfd.Normal(loc=0., scale=tf.exp(y/2)), 9),
+        ],
+        validate_args=True
+    )
+
+    @tf.function(autograph=False)
+    def run_chain():
+      nchains = 5
+      init_states = neals_funnel.sample(nchains, seed=strm())
+      _, has_divergence = tfp.mcmc.sample_chain(
+          num_results=100,
+          kernel=tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
+              target_log_prob_fn=lambda *args: neals_funnel.log_prob(args),
+              step_size=[1., 1.],
+              seed=strm()),
+          current_state=init_states,
+          trace_fn=lambda _, pkr: pkr.has_divergence)
+      return tf.reduce_sum(tf.cast(has_divergence, dtype=tf.int32))
+
+    divergence_count = self.evaluate(run_chain())
+
+    # Test that we observe a fair among of divergence.
+    self.assertAllGreater(divergence_count, 100)
 
 if __name__ == '__main__':
   tf.test.main()
