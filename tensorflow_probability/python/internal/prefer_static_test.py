@@ -217,7 +217,7 @@ class CaseTest(test_case.TestCase):
   def test_true(self):
     x = tf.constant(0)
     conditions = [(True, lambda: tf.constant(1)),
-                  (x == 0, raise_exception)]
+                  (tf.equal(x, 1), raise_exception)]
     y = prefer_static.case(conditions, default=raise_exception,
                            exclusive=False)
     z = prefer_static.case(conditions, default=raise_exception,

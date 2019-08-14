@@ -310,7 +310,8 @@ def get_fldj_theoretical(bijector,
         [int(np.prod(batch_shape)), f_x_unconstrained.shape[-1]])
   try:
     jacobian = tape.batch_jacobian(f_x_unconstrained, x_unconstrained)
-  except ValueError:  # Fallback to for-loop jacobian.
+  except (ValueError, TypeError):  # Fallback to for-loop jacobian.
+    # TODO(b/139374388): Remove TypeError above.
     jacobian = tape.batch_jacobian(
         f_x_unconstrained, x_unconstrained, experimental_use_pfor=False)
   jacobian = tf.reshape(
@@ -324,4 +325,5 @@ def get_fldj_theoretical(bijector,
       x, event_ndims=event_ndims)
   output_correction = output_to_unconstrained.forward_log_det_jacobian(
       f_x, event_ndims=inverse_event_ndims)
-  return log_det_jacobian + input_correction - output_correction
+  return (log_det_jacobian + tf.cast(input_correction, log_det_jacobian.dtype) -
+          tf.cast(output_correction, log_det_jacobian.dtype))

@@ -201,13 +201,13 @@ def _interpret(program, mask, backend, block_code_cache, *inputs):
       else:  # This split is not a FunctionCallOp.
         block_code_key = (id(program.graph), program_counter, split_idx)
         if block_code_key not in block_code_cache:
-          logging.info('Fill block cache for block %s', block_code_key)
+          logging.vlog(1, 'Fill block cache for block %s', block_code_key)
           varnames = inst.extract_referenced_variables(split)
           code = backend.wrap_straightline_callable(
               functools.partial(_run_straightline, split, environment.backend))
           block_code_cache[block_code_key] = (varnames, code)
         else:
-          logging.info('Use cached code for block %s', block_code_key)
+          logging.vlog(1, 'Use cached code for block %s', block_code_key)
         varnames, code = block_code_cache[block_code_key]
         filtered_env = dict({  # Only pass variables relevant to these ops
             k: v for k, v in six.iteritems(environment.env_dict)

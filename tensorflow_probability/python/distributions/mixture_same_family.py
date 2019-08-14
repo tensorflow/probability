@@ -451,10 +451,18 @@ class MixtureSameFamily(distribution.Distribution):
     # transform_2d: [S*prod(B), prod(E)]
     # jacobian: [S*prod(B), prod(E), prod(E)]
     x_2d = tf.reshape(x, x_2d_shape)
-    with tf.GradientTape() as tape:
-      tape.watch(x_2d)
-      transform_2d = reshaped_distributional_transform(x_2d)
-    jacobian = tape.batch_jacobian(transform_2d, x_2d)
+    try:
+      with tf.GradientTape() as tape:
+        tape.watch(x_2d)
+        transform_2d = reshaped_distributional_transform(x_2d)
+      jacobian = tape.batch_jacobian(transform_2d, x_2d)
+    except TypeError:
+      # TODO(b/139374388): Remove exception workaround.
+      with tf.GradientTape(persistent=True) as tape:
+        tape.watch(x_2d)
+        transform_2d = reshaped_distributional_transform(x_2d)
+      jacobian = tape.batch_jacobian(transform_2d, x_2d,
+                                     experimental_use_pfor=False)
 
     # We only provide the first derivative; the second derivative computed by
     # autodiff would be incorrect, so we raise an error if it is requested.

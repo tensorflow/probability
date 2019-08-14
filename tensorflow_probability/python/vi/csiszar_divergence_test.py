@@ -820,7 +820,8 @@ class CsiszarVIMCOTest(test_case.TestCase):
 
     grad_vimco = tape.gradient(vimco, s)
     grad_mean_f_log_sum_u = tape.gradient(f_log_sum_u, s) / num_batch_draws
-    jacobian_logqx = tape.jacobian(q_log_prob_x, s)
+    jacobian_logqx = tape.jacobian(q_log_prob_x, s, experimental_use_pfor=False)
+    # TODO(b/139374388): Remove experimental_use_pfor above.
 
     [
         logu_,

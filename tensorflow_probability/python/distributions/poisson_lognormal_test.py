@@ -107,7 +107,7 @@ class _PoissonLogNormalQuadratureCompoundTest(
       loss = -pln.log_prob([1., 2.])
     grad = tape.gradient(loss, pln.trainable_variables)
     self.assertLen(grad, 2)
-    self.assertNotIn(None, grad)
+    self.assertFalse(any([g is None for g in grad]))
 
   def testGradientThroughNonVariableParams(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
@@ -120,7 +120,7 @@ class _PoissonLogNormalQuadratureCompoundTest(
       loss = -pln.log_prob([1., 2.])
     grad = tape.gradient(loss, [pln.loc, pln.scale])
     self.assertLen(grad, 2)
-    self.assertNotIn(None, grad)
+    self.assertFalse(any([g is None for g in grad]))
 
 
 @test_util.run_all_in_graph_and_eager_modes

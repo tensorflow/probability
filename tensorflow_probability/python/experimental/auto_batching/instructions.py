@@ -843,7 +843,7 @@ class TemporaryVariable(collections.namedtuple('TemporaryVariable', ['value'])):
     # that `value` is either a Tensor or an empty tuple, and Tensors
     # (reasonably) do not permit implicit bool comparisons.
     # pylint: disable=g-explicit-bool-comparison
-    return self.value == ()
+    return isinstance(self.value, tuple) and self.value == ()
 
   def update(self, value, mask):
     del mask

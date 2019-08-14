@@ -369,8 +369,9 @@ class JointDistributionSequentialTest(
     self.assertEqual(docs_shape, log_probs.shape)
 
     # Verify we correctly track trainable variables.
-    self.assertAllEqual((alpha.pretransformed_input, beta),
-                        lda.trainable_variables)
+    self.assertLen(lda.trainable_variables, 2)
+    self.assertIs(alpha.pretransformed_input, lda.trainable_variables[0])
+    self.assertIs(beta, lda.trainable_variables[1])
 
     # Ensure we can compute gradients.
     with tf.GradientTape() as tape:

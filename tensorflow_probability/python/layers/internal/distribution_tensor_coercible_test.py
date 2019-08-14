@@ -79,7 +79,7 @@ class DistributionTensorConversionTest(
                              tfd.Distribution.mean)
     y = tf.convert_to_tensor(x)
     y1 = x._value()
-    self.assertEqual(hash(y), hash(y1))
+    self.assertIs(y, y1)
     self.assertEqual([1.5, 1.5], self.evaluate([y, y1]))
 
   def testConvertFromExplicit(self):
@@ -87,7 +87,7 @@ class DistributionTensorConversionTest(
                              lambda self: 42.)
     y = tf.convert_to_tensor(x)
     y1 = x._value()
-    self.assertEqual(hash(y), hash(y1))
+    self.assertIs(y, y1)
     self.assertEqual([42., 42.], self.evaluate([y, y1]))
 
   def testReproducible(self):

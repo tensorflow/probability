@@ -80,11 +80,7 @@ def _numpy_dtype(dtype):
 
 def _get_static_predicate(pred):
   """Helper function for statically evaluating predicates in `cond`."""
-  if pred in {0, 1}:  # Accept 1/0 as valid boolean values
-    pred_value = bool(pred)
-  elif isinstance(pred, bool):
-    pred_value = pred
-  elif isinstance(pred, tf.Tensor):
+  if isinstance(pred, tf.Tensor):
     pred_value = tf.get_static_value(pred)
 
     # TODO(jamieas): remove the dependency on `pywrap_tensorflow`.
@@ -94,6 +90,10 @@ def _get_static_predicate(pred):
                                                         pred._as_tf_output())
     # pylint: enable=protected-access
 
+  elif pred in (0, 1):  # Accept 1/0 as valid boolean values
+    pred_value = bool(pred)
+  elif isinstance(pred, bool):
+    pred_value = pred
   else:
     raise TypeError('`pred` must be a Tensor, or a Python bool, or 1 or 0. '
                     'Found instead: {}'.format(pred))
