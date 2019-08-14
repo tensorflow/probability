@@ -32,6 +32,7 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":calibration",
         ":leave_one_out",
         ":quantiles",
         ":sample_stats",
@@ -110,6 +111,31 @@ py_test(
     size = "medium",
     srcs = ["quantiles_test.py"],
     deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "calibration",
+    srcs = ["calibration.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+py_test(
+    name = "calibration_test",
+    size = "small",
+    srcs = ["calibration_test.py"],
+    deps = [
+        # absl/logging dep,
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

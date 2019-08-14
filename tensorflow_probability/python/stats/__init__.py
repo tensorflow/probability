@@ -19,6 +19,9 @@ from __future__ import print_function
 
 # pylint: disable=unused-import,line-too-long,g-importing-member
 
+from tensorflow_probability.python.stats.calibration import brier_decomposition
+from tensorflow_probability.python.stats.calibration import brier_score
+from tensorflow_probability.python.stats.calibration import expected_calibration_error
 from tensorflow_probability.python.stats.leave_one_out import log_loomean_exp
 from tensorflow_probability.python.stats.leave_one_out import log_loosum_exp
 from tensorflow_probability.python.stats.leave_one_out import log_soomean_exp
@@ -42,10 +45,13 @@ from tensorflow.python.util.all_util import remove_undocumented  # pylint: disab
 
 __all__ = [
     'auto_correlation',
+    'brier_decomposition',
+    'brier_score',
     'cholesky_covariance',
     'correlation',
     'count_integers',
     'covariance',
+    'expected_calibration_error',
     'find_bins',
     'histogram',
     'log_average_probs',
