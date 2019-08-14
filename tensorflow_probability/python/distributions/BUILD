@@ -2443,22 +2443,22 @@ py_library(
 
 py_test(
     name = "distribution_properties_test_eager",
-    size = "medium",
+    size = "large",
     srcs = ["distribution_properties_test.py"],
     args = ["--tf_mode=eager"],
     main = "distribution_properties_test.py",
-    shard_count = 3,
+    shard_count = 10,
     tags = ["hypothesis"],
     deps = [":distribution_properties_testlib"],
 )
 
 py_test(
     name = "distribution_properties_test_graph",
-    size = "medium",
+    size = "large",
     srcs = ["distribution_properties_test.py"],
     args = ["--tf_mode=graph"],
     main = "distribution_properties_test.py",
-    shard_count = 8,
+    shard_count = 10,
     tags = ["hypothesis"],
     deps = [":distribution_properties_testlib"],
 )

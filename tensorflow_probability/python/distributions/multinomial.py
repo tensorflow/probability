@@ -396,9 +396,18 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
       x = tf.reduce_sum(x, axis=-2)  # [num_samples, num_classes]
       return tf.cast(x, dtype=dtype)
 
-    x = tf.map_fn(
-        _sample_one_batch_member, [flat_logits, flat_num_trials],
-        dtype=dtype)  # [B1B2...Bm, num_samples, num_classes]
+    if seed is not None:
+      # Force parallel_iterations to 1 to ensure reproducibility
+      # b/139210489
+      x = tf.map_fn(
+          _sample_one_batch_member, [flat_logits, flat_num_trials],
+          dtype=dtype,  # [B1B2...Bm, num_samples, num_classes]
+          parallel_iterations=1)
+    else:
+      # Invoke default parallel_iterations behavior
+      x = tf.map_fn(
+          _sample_one_batch_member, [flat_logits, flat_num_trials],
+          dtype=dtype)  # [B1B2...Bm, num_samples, num_classes]
 
     # reshape the results to proper shape
     x = tf.transpose(a=x, perm=[1, 0, 2])

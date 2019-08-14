@@ -182,6 +182,11 @@ def instantiable_base_dists():
 INSTANTIABLE_BASE_DISTS = instantiable_base_dists()
 del instantiable_base_dists
 
+INSTANTIABLE_META_DISTS = (
+    'Independent',
+    'MixtureSameFamily',
+    'TransformedDistribution',
+)
 
 # pylint is unable to handle @hps.composite (e.g. complains "No value for
 # argument 'batch_shape' in function call"), so disable this lint for the file.
@@ -843,6 +848,26 @@ def no_tf_rank_errors():
       hp.assume(False)
     else:
       raise
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class ReproducibilityTest(parameterized.TestCase, tf.test.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(INSTANTIABLE_BASE_DISTS.keys()) +
+                          list(INSTANTIABLE_META_DISTS)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistribution(self, dist_name, data):
+    if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'): return
+    dist = data.draw(distributions(dist_name=dist_name, enable_vars=False))
+    seed = tfp_test_util.test_seed()
+    s1 = self.evaluate(dist.sample(50, seed=seed))
+    if tf.executing_eagerly():
+      tf.random.set_seed(seed)
+    s2 = self.evaluate(dist.sample(50, seed=seed))
+    self.assertAllEqual(s1, s2)
 
 
 @test_util.run_all_in_graph_and_eager_modes

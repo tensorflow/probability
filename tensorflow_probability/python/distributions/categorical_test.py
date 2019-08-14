@@ -103,16 +103,6 @@ class CategoricalTest(test_case.TestCase, parameterized.TestCase):
       self.assertEqual(dist.dtype, dtype)
       self.assertEqual(dist.dtype, dist.sample(5).dtype)
 
-  def testReproducibility(self):
-    probs = tf.constant([0.6, 0.4], dtype=tf.float32)
-    dist = tfd.Categorical(probs=probs)
-    seed = tfp_test_util.test_seed()
-    s1 = self.evaluate(dist.sample(500, seed=seed))
-    if tf.executing_eagerly():
-      tf.random.set_seed(seed)
-    s2 = self.evaluate(dist.sample(500, seed=seed))
-    self.assertAllEqual(s1, s2)
-
   def testUnknownShape(self):
     logits = lambda l: tf1.placeholder_with_default(  # pylint: disable=g-long-lambda
         np.float32(l), shape=None)
