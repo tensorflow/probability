@@ -29,14 +29,12 @@ from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 __all__ = [
     'as_dtype',
     'bool',
-    'complex',
     'complex128',
     'complex64',
     'double',
     'float16',
     'float32',
     'float64',
-    'half',
     'int16',
     'int32',
     'int64',
@@ -66,8 +64,6 @@ as_dtype = utils.copy_docstring(
 
 bool = np.bool  # pylint: disable=redefined-builtin
 
-complex = np.complex  # pylint: disable=redefined-builtin
-
 complex128 = np.complex128
 
 complex64 = np.complex64
@@ -80,8 +76,6 @@ float32 = np.float32
 
 float64 = np.float64
 
-half = np.half
-
 int16 = np.int16
 
 int32 = np.int32
@@ -90,7 +84,8 @@ int64 = np.int64
 
 int8 = np.int8
 
-string = np.str
+# Handle version drift between internal/external/jax numpy.
+string = getattr(np, 'str', getattr(np, 'string', None))
 
 uint16 = np.uint16
 

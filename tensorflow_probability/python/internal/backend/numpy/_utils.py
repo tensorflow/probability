@@ -76,7 +76,7 @@ def common_dtype(args_list, dtype_hint=None):
 
 def is_complex(dtype):
   """Returns whether this is a complex floating point type."""
-  return np.issubdtype(np.dtype(dtype), np.complex)
+  return np.issubdtype(np.dtype(dtype), np.complexfloating)
 
 
 class _FakeModule(types.ModuleType):
