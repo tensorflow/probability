@@ -502,20 +502,27 @@ class DenseVariational(test_case.TestCase):
       self.assertLess(np.sum(np.isclose(outputs_one_, outputs_two_)), out_size)
 
   def testDenseLayersInSequential(self):
-    batch_size, in_size, out_size = 2, 3, 4
-    inputs = tf.random.uniform([batch_size, in_size])
-    net = tf.keras.Sequential([
+    data_size, batch_size, in_size, out_size = 10, 2, 3, 4
+    x = np.random.uniform(-1., 1., size=(data_size, in_size)).astype(np.float32)
+    y = np.random.uniform(
+        -1., 1., size=(data_size, out_size)).astype(np.float32)
+
+    model = tf.keras.Sequential([
         tfp.layers.DenseReparameterization(6, activation=tf.nn.relu),
         tfp.layers.DenseFlipout(6, activation=tf.nn.relu),
         tfp.layers.DenseLocalReparameterization(out_size)
     ])
-    outputs = net(inputs)
 
-    with self.cached_session() as sess:
-      sess.run(tf.compat.v1.global_variables_initializer())
-      outputs_ = sess.run(outputs)
+    # TODO(b/139314757): The call to `model.fit` will fail if the model is
+    # compiled with the default `experimental_run_tf_function=True`.  Remove
+    # `experimental_run_tf_function=False` once this bug is fixed.
+    model.compile(
+        loss='mse', optimizer='adam', experimental_run_tf_function=False)
+    model.fit(x, y, batch_size=batch_size, epochs=3)
 
-    self.assertAllEqual(outputs_.shape, [batch_size, out_size])
+    batch_input = tf.random.uniform([batch_size, in_size])
+    batch_output = self.evaluate(model(batch_input))
+    self.assertAllEqual(batch_output.shape, [batch_size, out_size])
 
   def testGradients(self):
     net = tf.keras.Sequential([
