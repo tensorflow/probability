@@ -360,7 +360,7 @@ def _replace_event_shape_in_tensorshape(
     mask = event_shape_in_ >= 0
     explicit_input_event_shape_ = input_event_shape_[mask]
     explicit_event_shape_in_ = event_shape_in_[mask]
-    if not all(explicit_input_event_shape_ == explicit_event_shape_in_):
+    if not np.all(explicit_input_event_shape_ == explicit_event_shape_in_):
       raise ValueError(
           'Input `event_shape` does not match `event_shape_in`. '
           '({} vs {}).'.format(input_event_shape_, event_shape_in_))

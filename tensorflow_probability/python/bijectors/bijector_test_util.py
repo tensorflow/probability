@@ -99,12 +99,11 @@ def assert_scalar_congruency(bijector,
     lower_y, upper_y = upper_y, lower_y
 
   # Uniform samples from the domain, range.
+  seed_stream = tfp_test_util.test_seed_stream(salt='assert_scalar_congruency')
   uniform_x_samps = uniform_distribution.Uniform(
-      low=lower_x, high=upper_x).sample(
-          n, seed=tfp_test_util.test_seed())
+      low=lower_x, high=upper_x).sample(n, seed=seed_stream())
   uniform_y_samps = uniform_distribution.Uniform(
-      low=lower_y, high=upper_y).sample(
-          n, seed=tfp_test_util.test_seed() + 1)
+      low=lower_y, high=upper_y).sample(n, seed=seed_stream())
 
   # These compositions should be the identity.
   inverse_forward_x = bijector.inverse(bijector.forward(uniform_x_samps))

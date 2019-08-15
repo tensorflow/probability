@@ -49,7 +49,8 @@ class SinhArcsinhTest(tf.test.TestCase):
             np.log(tailweight) - np.log(np.sqrt((y / multiplier)**2 + 1))
             - np.log(multiplier),
             axis=-1),
-        self.evaluate(bijector.inverse_log_det_jacobian(y, event_ndims=1)))
+        self.evaluate(bijector.inverse_log_det_jacobian(y, event_ndims=1)),
+        rtol=2e-6)
     self.assertAllClose(
         self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=1)),
         self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)),

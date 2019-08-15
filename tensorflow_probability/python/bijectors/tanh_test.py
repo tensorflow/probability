@@ -52,7 +52,7 @@ class TanhBijectorTest(tf.test.TestCase):
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.Tanh(), lower_x=-9., upper_x=9., eval_func=self.evaluate,
+        tfb.Tanh(), lower_x=-8., upper_x=8., eval_func=self.evaluate,
         n=int(10e4), rtol=.5)
 
   def testBijectiveAndFinite(self):

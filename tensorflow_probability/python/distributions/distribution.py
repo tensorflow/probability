@@ -815,8 +815,7 @@ class Distribution(_BaseDistribution):
   def _call_sample_n(self, sample_shape, seed, name, **kwargs):
     """Wrapper around _sample_n."""
     with self._name_and_control_scope(name):
-      sample_shape = tf.convert_to_tensor(
-          sample_shape, dtype=tf.int32, name='sample_shape')
+      sample_shape = tf.cast(sample_shape, tf.int32, name='sample_shape')
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, 'sample_shape')
       samples = self._sample_n(n, seed, **kwargs)
