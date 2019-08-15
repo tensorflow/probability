@@ -111,7 +111,9 @@ class EndToEndTest(tf.test.TestCase):
 
     vae_model = tfk.Model(
         inputs=encoder_model.inputs,
-        outputs=decoder_model(encoder_model.outputs[0]))
+        # TODO(b/139437503): remove training=False once cl/263432058 hits
+        # nightly.
+        outputs=decoder_model(encoder_model.outputs[0], training=False))
 
     # Attach prior weights to model.
     self.assertLen(vae_model.trainable_weights, 4)
