@@ -33,7 +33,6 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import functools
 import numpy as np
 
 import tensorflow.compat.v2 as tf
@@ -57,12 +56,6 @@ TREE_COUNT_DTYPE = tf.int32           # Default: tf.int32
 # TensorArray, I think it'd be interesting to see if there's any performance
 # difference between the two.
 USE_TENSORARRAY = False               # Default: False
-
-# Currently, in XLA `tf.where(bool_tensor)` (and implementation rely on this)
-# does not work due to dynamic shape. We bypassed the limitation by using
-# `tf.switch_case`, which scale exponentially with the number of tree_depth. An
-# implementation using `tf.ragged.constant` scale much better in non-XLA.
-USE_RAGGED_TENSOR = False             # Default: False
 
 # Whether to use slice sampling (original NUTS implementation) or multinomial
 # sampling from the tree trajectory.
@@ -90,6 +83,13 @@ NUTSKernelResults = collections.namedtuple('NUTSKernelResults', [
 MomentumStateSwap = collections.namedtuple('MomentumStateSwap', [
     'momentum_swap',
     'state_swap',
+])
+
+OneStepMetaInfo = collections.namedtuple('OneStepMetaInfo', [
+    'log_slice_sample',
+    'init_energy',
+    'write_instruction',
+    'read_instruction',
 ])
 
 TreeDoublingState = collections.namedtuple('TreeDoublingState', [
@@ -152,7 +152,7 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
   def __init__(self,
                target_log_prob_fn,
                step_size,
-               max_tree_depth=6,
+               max_tree_depth=10,
                max_energy_diff=1000.,
                unrolled_leapfrog_steps=1,
                seed=None,
@@ -175,7 +175,7 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
       max_tree_depth: Maximum depth of the tree implicitly built by NUTS. The
         maximum number of leapfrog steps is bounded by `2**max_tree_depth` i.e.
         the number of nodes in a binary tree `max_tree_depth` nodes deep. The
-        default setting of 6 takes up to 64 leapfrog steps.
+        default setting of 10 takes up to 1024 leapfrog steps.
       max_energy_diff: Scaler threshold of energy differences at each leapfrog,
         divergence samples are defined as leapfrog steps that exceed this
         threshold. Default to 1000.
@@ -199,18 +199,15 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
       instruction_array = build_tree_uturn_instruction(
           max_tree_depth, init_memory=-1)
       [
-          write_instruction,
-          read_instruction
+          write_instruction_numpy,
+          read_instruction_numpy
       ] = generate_efficient_write_read_instruction(instruction_array)
-      if USE_RAGGED_TENSOR:
-        self._write_instruction = tf.constant(write_instruction)
-        self._read_instruction = tf.ragged.constant(read_instruction)
-      else:
-        f = lambda int_iter: write_instruction[int_iter]
-        self._write_instruction = {
-            x: functools.partial(f, x) for x in range(len(write_instruction))
-        }
-        self._read_instruction = read_instruction
+
+      # TensorArray version of the read/write instruction need to be created
+      # within the function call to be compatible with XLA. Here we store the
+      # numpy version of the instruction and convert it to TensorArray later.
+      self._write_instruction = write_instruction_numpy
+      self._read_instruction = read_instruction_numpy
 
       # Process all other arguments.
       self._target_log_prob_fn = target_log_prob_fn
@@ -322,15 +319,32 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           continue_tree=tf.ones(batch_size, dtype=tf.bool),
           not_divergence=tf.ones(batch_size, dtype=tf.bool))
 
+      # Convert the write/read instruction into TensorArray so that it is
+      # compatible with XLA.
+      write_instruction = tf.TensorArray(
+          TREE_COUNT_DTYPE,
+          size=2**(self.max_tree_depth - 1),
+          clear_after_read=False).unstack(self._write_instruction)
+      read_instruction = tf.TensorArray(
+          tf.int32,
+          size=2**(self.max_tree_depth-1),
+          clear_after_read=False).unstack(self._read_instruction)
+
+      current_step_meta_info = OneStepMetaInfo(
+          log_slice_sample=log_slice_sample,
+          init_energy=init_energy,
+          write_instruction=write_instruction,
+          read_instruction=read_instruction
+          )
+
       _, _, new_step_metastate = tf.while_loop(
           cond=lambda iter_, state, metastate: (  # pylint: disable=g-long-lambda
               ((iter_ < self.max_tree_depth) &
                tf.reduce_any(metastate.continue_tree))),
           body=lambda iter_, state, metastate: self.loop_tree_doubling(  # pylint: disable=g-long-lambda
               previous_kernel_results.step_size,
-              log_slice_sample,
-              init_energy,
               previous_kernel_results.momentum_state_memory,
+              current_step_meta_info,
               iter_,
               state,
               metastate),
@@ -458,12 +472,12 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           seed=seed_stream()))
       return momentum, init_energy, log_slice_sample
 
-  def loop_tree_doubling(self, step_size, log_slice_sample, init_energy,
-                         momentum_state_memory, iter_, initial_step_state,
+  def loop_tree_doubling(self, step_size, momentum_state_memory,
+                         current_step_meta_info, iter_, initial_step_state,
                          initial_step_metastate):
     """Main loop for tree doubling."""
     with tf.name_scope('loop_tree_doubling'):
-      batch_size = prefer_static.size(init_energy)
+      batch_size = prefer_static.size(current_step_meta_info.init_energy)
       direction = tf.cast(
           tf.random.uniform(
               shape=[batch_size],
@@ -504,8 +518,7 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
       ] = self._build_sub_tree(
           directions_expanded,
           integrator,
-          log_slice_sample,
-          init_energy,
+          current_step_meta_info,
           # num_steps_at_this_depth = 2**iter_ = 1 << iter_
           tf.bitwise.left_shift(1, iter_),
           tree_start_states,
@@ -599,8 +612,7 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
   def _build_sub_tree(self,
                       directions,
                       integrator,
-                      log_slice_sample,
-                      init_energy,
+                      current_step_meta_info,
                       nsteps,
                       initial_state,
                       continue_tree,
@@ -608,11 +620,13 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
                       momentum_state_memory,
                       name=None):
     with tf.name_scope('build_sub_tree'):
-      batch_size = prefer_static.size(init_energy)
+      batch_size = prefer_static.size(current_step_meta_info.init_energy)
       # We never want to select the inital state
       if MULTINOMIAL_SAMPLE:
-        init_weight = tf.fill([batch_size],
-                              tf.constant(-np.inf, dtype=init_energy.dtype))
+        init_weight = tf.fill(
+            [batch_size],
+            tf.constant(-np.inf,
+                        dtype=current_step_meta_info.init_energy.dtype))
       else:
         init_weight = tf.zeros(batch_size, dtype=TREE_COUNT_DTYPE)
       initial_state_candidate = TreeDoublingStateCandidate(
@@ -621,7 +635,7 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           target_grad_parts=initial_state.target_grad_parts,
           weight=init_weight)
       energy_diff_sum = tf.zeros([batch_size],
-                                 dtype=init_energy.dtype,
+                                 dtype=current_step_meta_info.init_energy.dtype,
                                  name='energy_diff_sum')
       [
           _,
@@ -639,10 +653,10 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           body=lambda iter_, energy_diff_sum, leapfrogs_taken, state, state_c,  # pylint: disable=g-long-lambda
                       continue_tree, not_divergence, momentum_state_memory: (
                           self._loop_build_sub_tree(
-                              directions, integrator, log_slice_sample,
-                              init_energy, iter_, energy_diff_sum,
-                              leapfrogs_taken, state, state_c, continue_tree,
-                              not_divergence, momentum_state_memory)),
+                              directions, integrator, current_step_meta_info,
+                              iter_, energy_diff_sum, leapfrogs_taken, state,
+                              state_c, continue_tree, not_divergence,
+                              momentum_state_memory)),
           loop_vars=(
               tf.zeros([], dtype=tf.int32, name='iter'),
               energy_diff_sum,
@@ -668,8 +682,7 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
   def _loop_build_sub_tree(self,
                            directions,
                            integrator,
-                           log_slice_sample,
-                           init_energy,
+                           current_step_meta_info,
                            iter_,
                            energy_diff_sum_previous,
                            leapfrogs_taken,
@@ -700,17 +713,16 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
       leapfrogs_taken = tf.where(
           continue_tree_previous, leapfrogs_taken + 1, leapfrogs_taken)
 
-      # Save state and momentum at odd step, check U turn at even step.
-      # Note that here we also write to a Placeholder at even step to avoid
-      # using tf.cond
-      index = iter_ // 2
-      if USE_RAGGED_TENSOR:
-        write_index_ = self.write_instruction[index]
-      else:
-        write_index_ = tf.switch_case(index, self.write_instruction)
+      write_instruction = current_step_meta_info.write_instruction
+      read_instruction = current_step_meta_info.read_instruction
+      init_energy = current_step_meta_info.init_energy
 
+      # Save state and momentum at odd step, check U turn at even step.
+      # Note that here we also write to a Placeholder at even step
       write_index = tf.where(
-          tf.equal(iter_ % 2, 0), write_index_, self.max_tree_depth)
+          tf.equal(iter_ % 2, 0),
+          write_instruction.gather([iter_ // 2]),
+          self.max_tree_depth)
 
       if USE_TENSORARRAY:
         momentum_state_memory = MomentumStateSwap(
@@ -723,36 +735,26 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
       else:
         momentum_state_memory = MomentumStateSwap(
             momentum_swap=[
-                tf.tensor_scatter_nd_update(old, [[write_index]], [new])
+                tf.tensor_scatter_nd_update(old, [write_index], [new])
                 for old, new in zip(momentum_state_memory.momentum_swap,
                                     next_momentum_parts)
             ],
             state_swap=[
-                tf.tensor_scatter_nd_update(old, [[write_index]], [new])
+                tf.tensor_scatter_nd_update(old, [write_index], [new])
                 for old, new in zip(momentum_state_memory.state_swap,
                                     next_state_parts)
             ])
       batch_size = prefer_static.size(next_target)
       has_not_u_turn_at_even_step = tf.ones([batch_size], dtype=tf.bool)
 
-      if USE_RAGGED_TENSOR:
-        no_u_turns_within_tree = tf.cond(
-            tf.equal(iter_ % 2, 0),
-            lambda: has_not_u_turn_at_even_step,
-            lambda: has_not_u_turn_at_odd_step(  # pylint: disable=g-long-lambda
-                self.read_instruction, iter_ // 2, directions,
-                momentum_state_memory, next_momentum_parts, next_state_parts))
-      else:
-        f = lambda int_iter: has_not_u_turn_at_odd_step(  # pylint: disable=g-long-lambda
-            self.read_instruction, int_iter, directions,
-            momentum_state_memory, next_momentum_parts, next_state_parts)
-        branch_excution = {
-            x: functools.partial(f, x)
-            for x in range(len(self.read_instruction))
-        }
-        no_u_turns_within_tree = tf.cond(
-            tf.equal(iter_ % 2, 0), lambda: has_not_u_turn_at_even_step,
-            lambda: tf.switch_case(iter_ // 2, branch_excution))
+      read_index = read_instruction.gather([iter_ // 2])[0]
+      no_u_turns_within_tree = tf.cond(
+          tf.equal(iter_ % 2, 0),
+          lambda: has_not_u_turn_at_even_step,
+          lambda: has_not_u_turn_at_odd_step(  # pylint: disable=g-long-lambda
+              read_index, directions, momentum_state_memory,
+              next_momentum_parts, next_state_parts,
+              has_not_u_turn_at_even_step))
 
       energy = compute_hamiltonian(next_target, next_momentum_parts)
       energy = tf.where(tf.math.is_nan(energy),
@@ -765,6 +767,7 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
         weight_sum = log_add_exp(candidate_tree_state.weight, energy_diff)
         log_accept_thresh = energy_diff - weight_sum
       else:
+        log_slice_sample = current_step_meta_info.log_slice_sample
         not_divergent = log_slice_sample - energy_diff < self.max_energy_diff
         # Uniform sampling on the trajectory within the subtree across valid
         # samples.
@@ -826,36 +829,43 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
       )
 
 
-def has_not_u_turn_at_odd_step(instruction, iter_, direction,
-                               momentum_state_memory, momentum_right,
-                               state_right):
+def has_not_u_turn_at_odd_step(read_indexes, direction, momentum_state_memory,
+                               momentum_right, state_right,
+                               no_u_turns_within_tree):
   """Check u turn for early stopping."""
-  # Note that here iter_ is actually iter_ // 2
-  left_current_index = instruction[iter_]
-  if USE_TENSORARRAY:
-    momentum_left = [
-        x.gather(left_current_index)
-        for x in momentum_state_memory.momentum_swap
-    ]
-    state_left = [
-        x.gather(left_current_index) for x in momentum_state_memory.state_swap
-    ]
-  else:
-    momentum_left = [
-        tf.gather(x, left_current_index, axis=0)
-        for x in momentum_state_memory.momentum_swap
-    ]
-    state_left = [
-        tf.gather(x, left_current_index, axis=0)
-        for x in momentum_state_memory.state_swap
-    ]
 
-  no_u_turns_within_tree_ = has_not_u_turn(
-      state_left,
-      [tf.where(d, m, -m) for d, m in zip(direction, momentum_left)],
-      state_right,
-      [tf.where(d, m, -m) for d, m in zip(direction, momentum_right)])
-  no_u_turns_within_tree = tf.reduce_all(no_u_turns_within_tree_, axis=0)
+  def _get_left_state_and_check_u_turn(left_current_index, no_u_turns_last):
+    """Check U turn on a single index."""
+    if USE_TENSORARRAY:
+      momentum_left = [
+          x.gather(left_current_index)
+          for x in momentum_state_memory.momentum_swap
+      ]
+      state_left = [
+          x.gather(left_current_index)
+          for x in momentum_state_memory.state_swap
+      ]
+    else:
+      momentum_left = [
+          tf.gather(x, left_current_index, axis=0)
+          for x in momentum_state_memory.momentum_swap
+      ]
+      state_left = [
+          tf.gather(x, left_current_index, axis=0)
+          for x in momentum_state_memory.state_swap
+      ]
+
+    no_u_turns_current = has_not_u_turn(
+        state_left,
+        [tf.where(d, m, -m) for d, m in zip(direction, momentum_left)],
+        state_right,
+        [tf.where(d, m, -m) for d, m in zip(direction, momentum_right)])
+    return left_current_index + 1, no_u_turns_current & no_u_turns_last
+
+  _, no_u_turns_within_tree = tf.while_loop(
+      cond=lambda i, no_u_turn: i < tf.gather(read_indexes, 1),
+      body=_get_left_state_and_check_u_turn,
+      loop_vars=(tf.gather(read_indexes, 0), no_u_turns_within_tree))
   return no_u_turns_within_tree
 
 
@@ -938,9 +948,9 @@ def generate_efficient_write_read_instruction(instruction_array):
   for i in range(nsteps_within_tree):
     temp_instruction = instruction_mat2[:, i]
     if np.sum(temp_instruction == 1) > 0:
-      r = np.where(temp_instruction[temp_instruction >= 0] == 1)[0]
-      read_instruction.append(r.astype(np.int32))
-  return write_instruction, read_instruction
+      r = np.where(temp_instruction[temp_instruction >= 0] == 1)[0][0]
+      read_instruction.append([r, r + np.sum(temp_instruction == 1)])
+  return write_instruction, np.asarray(read_instruction)
 
 
 def compute_hamiltonian(target_log_prob, momentum_parts):

@@ -318,10 +318,7 @@ A: There are a few differences:
   2. the check u-turn is done quite differently: numpyro compute the checkpoint
   for checking u-turn at [each leaf](https://github.com/pyro-ppl/numpyro/blob/0c9696b147098730ba1a487afdc5de51a9c675c9/numpyro/hmc_util.py#L571-L583)
   at runtime, and we pre-run the recursive to build the instruction table and do
-  indexing at run time. numpyro's implementation is using another while_loop to
-  compute the checkpoint and check u turn, and we just do a one pass (reading
-  from memory) which should be more efficient in higher order leaf number (e.g.,
-  leapfrog number 64 at depth 5).
+  indexing at run time.
 
 
 ### References:
