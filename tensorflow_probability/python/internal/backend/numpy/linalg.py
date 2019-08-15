@@ -81,25 +81,51 @@ def _band_part(input, num_lower, num_upper, name=None):  # pylint: disable=redef
   return result
 
 
+def _cholesky_solve(chol, rhs, name=None):
+  """Scipy cho_solve does not broadcast, so we must do so explicitly."""
+  del name
+  try:
+    bcast = np.broadcast(chol[..., :1], rhs)
+  except ValueError as e:
+    raise ValueError('Error with inputs shaped `chol`={}, rhs={}:\n{}'.format(
+        chol.shape, rhs.shape, str(e)))
+  dim = chol.shape[-1]
+  chol = np.broadcast_to(chol, bcast.shape[:-1] + (dim,))
+  rhs = np.broadcast_to(rhs, bcast.shape)
+  nbatch = int(np.prod(chol.shape[:-2]))
+  flat_chol = chol.reshape(nbatch, dim, dim)
+  flat_rhs = rhs.reshape(nbatch, dim, rhs.shape[-1])
+  result = np.empty_like(flat_rhs)
+  if np.size(result):
+    for i, (ch, rh) in enumerate(zip(flat_chol, flat_rhs)):
+      result[i] = scipy_linalg.cho_solve((ch, True), rh)
+  return result.reshape(*rhs.shape)
+
+
+def _diag(diagonal, name=None):
+  del name
+  nbatch = int(np.prod(diagonal.shape[:-1]))
+  flat_diag = np.reshape(diagonal, [nbatch, diagonal.shape[-1]])
+  result = np.empty(flat_diag.shape + (flat_diag.shape[-1],),
+                    dtype=flat_diag.dtype)
+  for i in range(nbatch):
+    result[i] = np.diag(flat_diag[i])
+  return result.reshape(*(diagonal.shape + (diagonal.shape[-1],)))
+
+
 def _eye(num_rows, num_columns=None, batch_shape=None,
          dtype=tf.float32, name=None):  # pylint: disable=unused-argument
   dt = utils.numpy_dtype(dtype)
   x = np.eye(num_rows, num_columns).astype(dt)
   if batch_shape is not None:
-    x = x * np.ones(np.concatenate([batch_shape, [1, 1]], axis=0)).astype(dt)
+    x = x * np.ones(tuple(batch_shape) + (1, 1)).astype(dt)
   return x
 
 
-def _fill_diagonal(input, diagonal, name=None):  # pylint: disable=unused-argument,redefined-builtin
-  x = np.array(input).copy()
-  if np.isscalar(diagonal):
-    np.fill_diagonal(x, diagonal)
-    return x
-  else:
-    diag_inds = np.diag_indices(x.shape[-1])
-    # TODO(iansf): This won't work for jax.
-    x[(slice(None, None, 1),) * len(x.shape[:-2]) + diag_inds] = diagonal
-    return x
+def _set_diag(input, diagonal, name=None):  # pylint: disable=unused-argument,redefined-builtin
+  return np.where(np.eye(diagonal.shape[-1], dtype=np.bool),
+                  diagonal[..., np.newaxis, :],
+                  input)
 
 
 def _matrix_transpose(a, name='matrix_transpose', conjugate=False):  # pylint: disable=unused-argument
@@ -144,6 +170,7 @@ def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):
   flat_rhs = rhs.reshape(nbatch, dim, rhs.shape[-1])
   result = np.empty(flat_rhs.shape)
   if np.size(result):
+    # ValueError: On entry to STRTRS parameter number 7 had an illegal value.
     for i, (mat, rh) in enumerate(zip(flat_mat, flat_rhs)):
       result[i] = scipy_linalg.solve_triangular(mat, rh, lower=lower,
                                                 trans='C' if adjoint else 'N')
@@ -162,7 +189,7 @@ cholesky = utils.copy_docstring(
 
 cholesky_solve = utils.copy_docstring(
     tf.linalg.cholesky_solve,
-    lambda chol, rhs, name=None: scipy_linalg.cho_solve((chol, True), rhs))
+    _cholesky_solve)
 
 det = utils.copy_docstring(
     tf.linalg.det,
@@ -170,7 +197,7 @@ det = utils.copy_docstring(
 
 diag = utils.copy_docstring(
     tf.linalg.diag,
-    lambda diagonal, name=None: np.diag(diagonal))
+    _diag)
 
 diag_part = utils.copy_docstring(
     tf.linalg.diag_part,
@@ -188,13 +215,14 @@ norm = utils.copy_docstring(
     tf.norm,
     lambda tensor, ord='euclidean', axis=None, keepdims=None, name=None,  # pylint: disable=g-long-lambda
            keep_dims=None: np.linalg.norm(
-               tensor, ord=2 if ord == 'euclidean' else ord,
-               axis=axis, keepdims=keep_dims)
+               np.reshape(tensor, [-1]) if axis is None else tensor,
+               ord=2 if ord == 'euclidean' else ord,
+               axis=-1 if axis is None else axis, keepdims=bool(keepdims))
 )
 
 set_diag = utils.copy_docstring(
     tf.linalg.set_diag,
-    _fill_diagonal)
+    _set_diag)
 
 # TODO(b/136555907): Add unit-test.
 slogdet = utils.copy_docstring(
