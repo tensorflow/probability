@@ -89,6 +89,16 @@ def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
   return rng.normal(loc=mean, scale=stddev, size=shape).astype(dtype)
 
 
+def _normal_jax(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
+                name=None):  # pylint: disable=unused-argument
+  dtype = utils.common_dtype([mean, stddev], dtype_hint=dtype)
+  shape = _shape([mean, stddev], shape)
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  if seed is None:
+    raise ValueError('Must provide PRNGKey to sample in JAX.')
+  return jaxrand.normal(key=seed, shape=shape, dtype=dtype) * stddev + mean
+
+
 def _poisson(shape, lam, dtype=tf.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
@@ -104,6 +114,18 @@ def _uniform(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
   maxval = 1 if maxval is None else maxval
   shape = _shape([minval, maxval], shape)
   return rng.uniform(low=minval, high=maxval, size=shape).astype(dtype)
+
+
+def _uniform_jax(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
+                 name=None):  # pylint: disable=unused-argument
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  if seed is None:
+    raise ValueError('Must provide PRNGKey to sample in JAX.')
+  dtype = utils.common_dtype([minval, maxval], dtype_hint=dtype)
+  maxval = 1 if maxval is None else maxval
+  shape = _shape([], shape)
+  return jaxrand.uniform(key=seed, shape=shape, dtype=dtype, minval=minval,
+                         maxval=maxval)
 
 
 # --- Begin Public Functions --------------------------------------------------
