@@ -27,10 +27,11 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-ed = tfp.edward2
-
 
 class DtypeUtilTest(tf.test.TestCase):
+
+  def testIsInteger(self):
+    self.assertFalse(dtype_util.is_integer(np.float64))
 
   def testNoModifyArgsList(self):
     x = tf.ones(3, tf.float32)
@@ -46,6 +47,7 @@ class DtypeUtilTest(tf.test.TestCase):
 
   def testCommonDtypeFromEdRV(self):
     # As in tensorflow_probability github issue #221
+    ed = tfp.edward2
     x = ed.Dirichlet(np.ones(3, dtype='float64'))
     self.assertEqual(
         tf.float64, dtype_util.common_dtype([x], dtype_hint=tf.float32))

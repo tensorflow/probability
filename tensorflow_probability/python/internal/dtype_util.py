@@ -114,7 +114,7 @@ def is_floating(dtype):
 def is_integer(dtype):
   """Returns whether this is a (non-quantized) integer type."""
   dtype = tf.as_dtype(dtype)
-  if hasattr(dtype, 'is_integer'):
+  if hasattr(dtype, 'is_integer') and not callable(dtype.is_integer):
     return dtype.is_integer
   return np.issubdtype(np.dtype(dtype), np.integer)
 
