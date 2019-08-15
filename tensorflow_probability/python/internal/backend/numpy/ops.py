@@ -66,10 +66,10 @@ class _NullContext(object):
 
 
 def _broadcast_static_shape(shape_x, shape_y):
-  shape_x = tf.TensorShape(shape_x)
-  shape_y = tf.TensorShape(shape_y)
+  shape_x = TensorShape(shape_x)
+  shape_y = TensorShape(shape_y)
   shape_xy = tf.broadcast_static_shape(shape_x, shape_y)
-  return np.array(shape_xy, dtype=np.int32)
+  return np.array(shape_xy.as_list(), dtype=np.int32)
 
 
 def _constant(value, dtype=None, shape=None, name='Const'):  # pylint: disable=unused-argument
@@ -95,19 +95,22 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
       raise ValueError('Expected dtype {} but got {} with dtype {}.'.format(
           utils.numpy_dtype(dtype), value, value.dtype))
     return value
+  if isinstance(value, TensorShape):
+    value = [int(d) for d in value.as_list()]
   if dtype is None and dtype_hint is not None:
     dtype_hint = utils.numpy_dtype(dtype_hint)
     value = np.array(value)
-    # Match TF behavior, which won't downcast e.g. float to int.
-    if np.issubdtype(value.dtype, np.complexfloating):
-      if not np.issubdtype(dtype_hint, np.complexfloating):
-        return value
-    if np.issubdtype(value.dtype, np.floating):
-      if not np.issubdtype(dtype_hint, np.floating):
-        return value
-    if np.issubdtype(value.dtype, np.integer):
-      if not np.issubdtype(dtype_hint, np.integer):
-        return value
+    if np.size(value):
+      # Match TF behavior, which won't downcast e.g. float to int.
+      if np.issubdtype(value.dtype, np.complexfloating):
+        if not np.issubdtype(dtype_hint, np.complexfloating):
+          return value
+      if np.issubdtype(value.dtype, np.floating):
+        if not np.issubdtype(dtype_hint, np.floating):
+          return value
+      if np.issubdtype(value.dtype, np.integer):
+        if not np.issubdtype(dtype_hint, np.integer):
+          return value
     return value.astype(dtype_hint)
   return np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
 
@@ -295,9 +298,11 @@ class Module(object):
   def _no_dependency(self, x):
     return x
 
+  @property
   def trainable_variables(self):
     return []
 
+  @property
   def variables(self):
     return []
 
