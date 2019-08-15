@@ -126,6 +126,8 @@ class _Mapping(
       return self._deep_tuple(tuple(sorted(x.items())))
     elif isinstance(x, (list, tuple)):
       return tuple(map(self._deep_tuple, x))
+    elif isinstance(x, tf.Tensor):
+      return x.experimental_ref()
 
     return x
 
