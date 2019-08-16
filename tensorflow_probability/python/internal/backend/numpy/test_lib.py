@@ -23,7 +23,7 @@ import re
 
 # Dependency imports
 from absl import logging
-import numpy as np
+import numpy as onp  # Avoid JAX rewrite.
 
 import tensorflow.compat.v2 as tf
 
@@ -47,9 +47,7 @@ class TestCase(tf.test.TestCase):
     return x
 
   def _GetNdArray(self, a):
-    if isinstance(a, (np.generic, np.ndarray)):
-      return a
-    return np.array(a)
+    return onp.array(a)
 
   @contextlib.contextmanager
   def assertRaisesOpError(self, msg):
