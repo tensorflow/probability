@@ -170,7 +170,7 @@ class NoUTurnSampler(mcmc.TransitionKernel):
     self.value_and_gradients_fn = _embed_no_none_gradient_check(
         value_and_gradients_fn)
     max_tree_edges = max_tree_depth - 1
-    self.evolve_trajectory, self.autobatch_context = _make_evolve_trajectory(
+    self.many_steps, self.autobatch_context = _make_evolve_trajectory(
         self.value_and_gradients_fn, max_tree_edges, unrolled_leapfrog_steps,
         self._seed_stream)
     self._block_code_cache = {}
@@ -183,7 +183,7 @@ class NoUTurnSampler(mcmc.TransitionKernel):
   def is_calibrated(self):
     return True
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, num_steps=1):
     """Runs one iteration of the No U-Turn Sampler.
 
     Args:
@@ -193,10 +193,15 @@ class NoUTurnSampler(mcmc.TransitionKernel):
       previous_kernel_results: `collections.namedtuple` containing `Tensor`s
         representing values from previous calls to this function (or from the
         `bootstrap_results` function.)
+      num_steps: Python `int` giving the number of NUTS trajectories to run as
+        "one" step.  Setting this higher than 1 may be favorable for performance
+        by giving the autobatching system the opportunity to batch gradients
+        across consecutive trajectories.  The intermediate samples are thinned:
+        only the last sample from the run (in each batch member) is returned.
 
     Returns:
       next_state: `Tensor` or Python list of `Tensor`s representing the state(s)
-        of the Markov chain(s) after taking exactly one step. Has same type and
+        of the Markov chain(s) after taking `num_steps` steps. Has same type and
         shape as `current_state`.
       kernel_results: `collections.namedtuple` of internal calculations used to
         advance the chain.
@@ -230,38 +235,28 @@ class NoUTurnSampler(mcmc.TransitionKernel):
                            "`current_state`), but found {}".format(
                                len(current_state), len(step_size)))
 
-        current_momentum, log_slice_sample = _start_trajectory_batched(
-            current_state, current_target_log_prob, seed=self._seed_stream())
-
-        current = Point(
-            current_state, current_target_log_prob,
-            current_grads_log_prob, current_momentum)
-
       # The `dry_run` and `max_stack_depth` arguments are added by the
       # @ctx.batch decorator, confusing pylint.
       # pylint: disable=unexpected-keyword-arg
-      next_, new_leapfrogs = self.evolve_trajectory(
-          current,
-          current,
-          current,
-          step_size,
-          log_slice_sample,
-          tf.constant([0], dtype=tf.int64),  # depth
-          tf.constant([1], dtype=tf.int64),  # num_states
-          tf.zeros_like(leapfrogs_taken),  # leapfrogs
-          tf.constant([True]),
-          dry_run=not self.use_auto_batching,
-          stackless=self.stackless,
-          backend=(ab.TensorFlowBackend()
-                   if self.backend is None else self.backend),
-          max_stack_depth=self.max_tree_depth + 3,
-          block_code_cache=self._block_code_cache)
+      ((next_state, next_target_log_prob, next_grads_target_log_prob),
+       new_leapfrogs) = self.many_steps(
+           tf.constant([num_steps], dtype=tf.int64),  # num_steps
+           current_state,
+           current_target_log_prob,
+           current_grads_log_prob,
+           step_size,
+           tf.zeros_like(leapfrogs_taken),  # leapfrogs
+           dry_run=not self.use_auto_batching,
+           stackless=self.stackless,
+           backend=(ab.TensorFlowBackend()
+                    if self.backend is None else self.backend),
+           max_stack_depth=self.max_tree_depth + 4,
+           block_code_cache=self._block_code_cache)
 
-      result_state = next_.state
       if unwrap_state_list:
-        result_state = result_state[0]
-      return result_state, NUTSKernelResults(
-          next_.target_log_prob, next_.grads_target_log_prob,
+        next_state = next_state[0]
+      return next_state, NUTSKernelResults(
+          next_target_log_prob, next_grads_target_log_prob,
           leapfrogs_taken + new_leapfrogs,
           leapfrogs_computed + tf.math.reduce_max(input_tensor=new_leapfrogs))
 
@@ -311,6 +306,48 @@ def _make_evolve_trajectory(value_and_gradients_fn, max_depth,
     evolve_trajectory: Function for running the trajectory evolution.
   """
   ctx = ab.Context()
+
+  def many_steps_type(args):
+    _, state_type, prob_type, grad_type, _, leapfrogs_type = args
+    return (state_type, prob_type, grad_type), leapfrogs_type
+
+  @ctx.batch(type_inference=many_steps_type)
+  def many_steps(
+      num_steps,
+      current_state,
+      current_target_log_prob,
+      current_grads_log_prob,
+      step_size,
+      leapfrogs):
+    """Runs `evolve_trajectory` the requested number of times sequentially."""
+    current_momentum, log_slice_sample = _start_trajectory_batched(
+        current_state, current_target_log_prob, seed_stream)
+
+    current = Point(
+        current_state, current_target_log_prob,
+        current_grads_log_prob, current_momentum)
+
+    if truthy(num_steps > 0):
+      next_, new_leapfrogs = evolve_trajectory(
+          current,
+          current,
+          current,
+          step_size,
+          log_slice_sample,
+          tf.constant([0], dtype=tf.int64),  # depth
+          tf.constant([1], dtype=tf.int64),  # num_states
+          tf.constant([0], dtype=tf.int64),  # leapfrogs_taken
+          True)  # continue_trajectory
+      return many_steps(
+          num_steps - 1,
+          next_.state,
+          next_.target_log_prob,
+          next_.grads_target_log_prob,
+          step_size,
+          leapfrogs + new_leapfrogs)
+    else:
+      return ((current.state, current.target_log_prob,
+               current.grads_target_log_prob), leapfrogs)
 
   def evolve_trajectory_type(args):
     point_type, _, _, _, _, _, _, leapfrogs_type, _ = args
@@ -526,7 +563,7 @@ def _make_evolve_trajectory(value_and_gradients_fn, max_depth,
       return (next_, next_, next_, num_states, unrolled_leapfrog_steps,
               continue_trajectory)
 
-  return evolve_trajectory, ctx
+  return many_steps, ctx
 
 
 def _embed_no_none_gradient_check(value_and_gradients_fn):
@@ -542,10 +579,10 @@ def _embed_no_none_gradient_check(value_and_gradients_fn):
   return func_wrapped
 
 
-def _start_trajectory_batched(current_state, current_target_log_prob, seed):
+def _start_trajectory_batched(
+    current_state, current_target_log_prob, seed_stream):
   """Computations needed to start a trajectory."""
   with tf.compat.v1.name_scope("start_trajectory_batched"):
-    seed_stream = distributions.SeedStream(seed, "start_trajectory_batched")
     batch_size = tf.shape(input=current_state[0])[0]
     current_momentum = []
     for state_tensor in current_state:

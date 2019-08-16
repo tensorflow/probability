@@ -309,7 +309,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
       if isinstance(block.terminator, inst.PushGotoOp):
         if full_var(inst.pc_var):
           num_full_stack_pushes += 1
-    self.assertEqual(19, num_full_stack_pushes)
+    self.assertEqual(20, num_full_stack_pushes)
 
 
 if __name__ == '__main__':
