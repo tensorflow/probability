@@ -58,6 +58,7 @@ TF2_FRIENDLY_DISTS = (
     'Cauchy',
     'Deterministic',
     'Dirichlet',
+    'DirichletMultinomial',
     'Empirical',
     'Exponential',
     'FiniteDiscrete',
