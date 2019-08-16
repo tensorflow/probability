@@ -22,6 +22,7 @@ import os
 
 # Dependency imports
 from absl import flags
+from absl import logging
 import numpy as np
 import six
 
@@ -49,6 +50,9 @@ flags.DEFINE_bool('vary_seed', False,
 flags.DEFINE_string('fixed_seed', None,
                     ('PRNG seed to initialize every test with.  '
                      'Takes precedence over --vary-seed when both appear.'))
+
+
+JAX_MODE = False
 
 
 def numpy_disable_gradient_test(test_fn):
@@ -110,15 +114,24 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
       answer = int(entropy.encode('hex'), 16)
     else:
       answer = int.from_bytes(entropy, 'big')
-    tf.compat.v1.logging.warning('Using seed {}'.format(answer))
+    logging.warning('Using seed %s', answer)
   elif hardcoded_seed is not None:
     answer = hardcoded_seed
   else:
     answer = 17
+  return (_wrap_seed_jax if JAX_MODE else _wrap_seed)(answer, set_eager_seed)
+
+
+def _wrap_seed(seed, set_eager_seed):
   # TODO(b/68017812): Remove this clause once eager correctly supports seeding.
   if tf.executing_eagerly() and set_eager_seed:
-    tf.compat.v1.set_random_seed(answer)
-  return answer
+    tf.compat.v1.set_random_seed(seed)
+  return seed
+
+
+def _wrap_seed_jax(seed, _):
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  return jaxrand.PRNGKey(seed % (2**64 - 1))
 
 
 def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
@@ -157,7 +170,7 @@ def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
     strm: A SeedStream instance seeded with 17, unless otherwise specified by
       arguments or command line flags.
   """
-  return seed_stream.SeedStream(salt, test_seed(hardcoded_seed))
+  return seed_stream.SeedStream(test_seed(hardcoded_seed), salt=salt)
 
 
 class DiscreteScalarDistributionTestHelpers(object):
