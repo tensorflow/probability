@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy.linalg import norm
 
 
@@ -207,7 +208,8 @@ def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-buil
 
 concat = utils.copy_docstring(
     tf.concat,
-    lambda values, axis, name='concat': np.concatenate(values, axis))
+    lambda values, axis, name='concat': (  # pylint: disable=g-long-lambda
+        np.concatenate([ops.convert_to_tensor(v) for v in values], axis)))
 
 expand_dims = utils.copy_docstring(
     tf.expand_dims,

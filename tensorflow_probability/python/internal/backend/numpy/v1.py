@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import initializers
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.ops import convert_to_tensor
 from tensorflow_probability.python.internal.backend.numpy.ops import Module
 from tensorflow_probability.python.internal.backend.numpy.ops import name_scope
 from tensorflow_probability.python.internal.backend.numpy.ops import Variable
@@ -67,6 +68,8 @@ __all__ = [
 def _assert_equal(x, y, message=None, summarize=None, name=None):
   del summarize
   del name
+  x = convert_to_tensor(x)
+  y = convert_to_tensor(y)
   if not np.all(np.equal(x, y)):
     raise ValueError('Expected x == y but got {} vs {} {}'.format(
         x, y, message or ''))
@@ -119,6 +122,8 @@ def _assert_non_positive(*_, **__):  # pylint: disable=unused-argument
 def _assert_none_equal(x, y, summarize=None, message=None, name=None):
   del summarize
   del name
+  x = convert_to_tensor(x)
+  y = convert_to_tensor(y)
   if np.any(np.equal(x, y)):
     raise ValueError('Expected x != y but got {} vs {} {}'.format(
         x, y, message or ''))
