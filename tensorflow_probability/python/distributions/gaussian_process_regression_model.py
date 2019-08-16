@@ -22,6 +22,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import positive_semidefinite_kernels as tfpk
+from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -521,8 +522,8 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
         conditional_kernel = tfpk.SchurComplement(
             base_kernel=kernel,
             fixed_inputs=observation_index_points,
-            diag_shift=jitter + observation_noise_variance[..., tf.newaxis])
-
+            diag_shift=tfp_util.DeferredTensor(
+                lambda x: jitter + x, observation_noise_variance))
         # Special logic for mean_fn only; SchurComplement already handles the
         # case of empty observations (ie, falls back to base_kernel).
         if _is_empty_observation_data(
@@ -540,7 +541,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
             k_x_obs_linop = tf.linalg.LinearOperatorFullMatrix(
                 kernel.matrix(x, observation_index_points))
             chol_linop = tf.linalg.LinearOperatorLowerTriangular(
-                conditional_kernel.divisor_matrix_cholesky)
+                conditional_kernel.divisor_matrix_cholesky())
 
             diff = observations - mean_fn(observation_index_points)
             return mean_fn(x) + k_x_obs_linop.matvec(

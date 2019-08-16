@@ -70,7 +70,7 @@ def common_dtype(args_list, dtype_hint=None):
   """Returns explict dtype from `args_list` if there is one."""
   dtype = None
   for a in tf.nest.flatten(args_list):
-    if hasattr(a, 'dtype'):
+    if hasattr(a, 'dtype') and a.dtype:
       dt = as_numpy_dtype(a.dtype)
     else:
       continue

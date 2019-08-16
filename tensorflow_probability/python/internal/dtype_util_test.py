@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 # Dependency imports
 
 import numpy as np
@@ -39,6 +41,21 @@ class DtypeUtilTest(tf.test.TestCase):
     lst = [x, y]
     self.assertEqual(tf.float32, dtype_util.common_dtype(lst))
     self.assertLen(lst, 2)
+
+  def testCommonDtypeAcceptsNone(self):
+    self.assertEqual(
+        tf.float16, dtype_util.common_dtype(
+            [None], dtype_hint=tf.float16))
+
+    x = tf.ones(3, tf.float16)
+    self.assertEqual(
+        tf.float16, dtype_util.common_dtype(
+            [x, None], dtype_hint=tf.float32))
+
+    fake_tensor = collections.namedtuple('fake_tensor', ['dtype'])
+    self.assertEqual(
+        tf.float16, dtype_util.common_dtype(
+            [fake_tensor(dtype=None), None, x], dtype_hint=tf.float32))
 
   def testCommonDtypeFromLinop(self):
     x = tf.linalg.LinearOperatorDiag(tf.ones(3, tf.float16))
