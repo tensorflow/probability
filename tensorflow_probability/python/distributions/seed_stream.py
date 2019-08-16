@@ -211,7 +211,10 @@ class SeedStream(object):
     import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
     return jaxrand.fold_in(
         self._seed,
-        int(hashlib.sha512(composite).hexdigest(), 16) & (2**64 - 1))
+        # More than 32 bits (as the docstring dictates) yields the exception:
+        # TypeError: shift_right_logical requires arguments to have the same
+        #   dtypes, got uint64, int64.
+        int(hashlib.sha512(composite).hexdigest(), 16) & (2**32 - 1))
 
   @property
   def original_seed(self):
