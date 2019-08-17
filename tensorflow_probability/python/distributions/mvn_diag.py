@@ -24,7 +24,7 @@ from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
-    "MultivariateNormalDiag",
+    'MultivariateNormalDiag',
 ]
 
 
@@ -33,7 +33,7 @@ class MultivariateNormalDiag(
   """The multivariate normal distribution on `R^k`.
 
   The Multivariate Normal distribution is defined over `R^k` and parameterized
-  by a (batch of) length-`k` `loc` vector (aka "mu") and a (batch of) `k x k`
+  by a (batch of) length-`k` `loc` vector (aka 'mu') and a (batch of) `k x k`
   `scale` matrix; `covariance = scale @ scale.T` where `@` denotes
   matrix-multiplication.
 
@@ -138,7 +138,7 @@ class MultivariateNormalDiag(
                scale_identity_multiplier=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="MultivariateNormalDiag"):
+               name='MultivariateNormalDiag'):
     """Construct Multivariate Normal distribution on `R^k`.
 
     The `batch_shape` is the broadcast shape between `loc` and `scale`
@@ -183,7 +183,7 @@ class MultivariateNormalDiag(
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`,
-        statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+        statistics (e.g., mean, mode, variance) use the value '`NaN`' to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -193,23 +193,22 @@ class MultivariateNormalDiag(
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      with tf.name_scope("init"):
-        # No need to validate_args while making diag_scale.  The returned
-        # LinearOperatorDiag has an assert_non_singular method that is called by
-        # the Bijector.
-        scale = distribution_util.make_diag_scale(
-            loc=loc,
-            scale_diag=scale_diag,
-            scale_identity_multiplier=scale_identity_multiplier,
-            validate_args=False,
-            assert_positive=False)
-    super(MultivariateNormalDiag, self).__init__(
-        loc=loc,
-        scale=scale,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        name=name)
-    self._parameters = parameters
+      # No need to validate_args while making diag_scale.  The returned
+      # LinearOperatorDiag has an assert_non_singular method that is called by
+      # the Bijector.
+      scale = distribution_util.make_diag_scale(
+          loc=loc,
+          scale_diag=scale_diag,
+          scale_identity_multiplier=scale_identity_multiplier,
+          validate_args=False,
+          assert_positive=False)
+      super(MultivariateNormalDiag, self).__init__(
+          loc=loc,
+          scale=scale,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          name=name)
+      self._parameters = parameters
 
   @classmethod
   def _params_event_ndims(cls):

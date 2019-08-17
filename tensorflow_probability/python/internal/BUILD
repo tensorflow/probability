@@ -98,6 +98,7 @@ py_library(
         ":dtype_util",
         ":prefer_static",
         ":reparameterization",
+        ":tensor_util",
         ":tensorshape_util",
         # numpy dep,
         # tensorflow dep,

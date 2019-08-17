@@ -22,10 +22,11 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
-    "MultivariateNormalTriL",
+    'MultivariateNormalTriL',
 ]
 
 
@@ -139,7 +140,7 @@ class MultivariateNormalTriL(
                scale_tril=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="MultivariateNormalTriL"):
+               name='MultivariateNormalTriL'):
     """Construct Multivariate Normal distribution on `R^k`.
 
     The `batch_shape` is the broadcast shape between `loc` and `scale`
@@ -180,42 +181,36 @@ class MultivariateNormalTriL(
       ValueError: if neither `loc` nor `scale_tril` are specified.
     """
     parameters = dict(locals())
-
-    def _convert_to_tensor(x, name, dtype):
-      return None if x is None else tf.convert_to_tensor(
-          x, name=name, dtype=dtype)
-
     if loc is None and scale_tril is None:
-      raise ValueError("Must specify one or both of `loc`, `scale_tril`.")
+      raise ValueError('Must specify one or both of `loc`, `scale_tril`.')
     with tf.name_scope(name) as name:
-      with tf.name_scope("init"):
-        dtype = dtype_util.common_dtype([loc, scale_tril], tf.float32)
-        loc = _convert_to_tensor(loc, name="loc", dtype=dtype)
-        scale_tril = _convert_to_tensor(
-            scale_tril, name="scale_tril", dtype=dtype)
-        if scale_tril is None:
-          scale = tf.linalg.LinearOperatorIdentity(
-              num_rows=distribution_util.dimension_size(loc, -1),
-              dtype=loc.dtype,
-              is_self_adjoint=True,
-              is_positive_definite=True,
-              assert_proper_shapes=validate_args)
-        else:
-          # No need to validate that scale_tril is non-singular.
-          # LinearOperatorLowerTriangular has an assert_non_singular
-          # method that is called by the Bijector.
-          scale = tf.linalg.LinearOperatorLowerTriangular(
-              scale_tril,
-              is_non_singular=True,
-              is_self_adjoint=False,
-              is_positive_definite=False)
-    super(MultivariateNormalTriL, self).__init__(
-        loc=loc,
-        scale=scale,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        name=name)
-    self._parameters = parameters
+      dtype = dtype_util.common_dtype([loc, scale_tril], tf.float32)
+      loc = tensor_util.convert_nonref_to_tensor(loc, name='loc', dtype=dtype)
+      scale_tril = tensor_util.convert_nonref_to_tensor(
+          scale_tril, name='scale_tril', dtype=dtype)
+      if scale_tril is None:
+        scale = tf.linalg.LinearOperatorIdentity(
+            num_rows=distribution_util.dimension_size(loc, -1),
+            dtype=loc.dtype,
+            is_self_adjoint=True,
+            is_positive_definite=True,
+            assert_proper_shapes=validate_args)
+      else:
+        # No need to validate that scale_tril is non-singular.
+        # LinearOperatorLowerTriangular has an assert_non_singular
+        # method that is called by the Bijector.
+        scale = tf.linalg.LinearOperatorLowerTriangular(
+            scale_tril,
+            is_non_singular=True,
+            is_self_adjoint=False,
+            is_positive_definite=False)
+      super(MultivariateNormalTriL, self).__init__(
+          loc=loc,
+          scale=scale,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          name=name)
+      self._parameters = parameters
 
   @classmethod
   def _params_event_ndims(cls):

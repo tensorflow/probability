@@ -548,6 +548,37 @@ class MultivariateNormalTriLSlicingTest(tf.test.TestCase,
     self.assertAllEqual((4, 2, 3, 1), mvn2.batch_shape)
     self.assertAllEqual((2,), mvn2.event_shape)
 
+  def testVariableLocation(self):
+    loc = tf.Variable([1., 1.])
+    scale = tf.eye(2)
+    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
+    self.evaluate(loc.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, loc))
+
+  def testVariableScale(self):
+    loc = tf.constant([1., 1.])
+    scale = tf.Variable([[1., 0.], [0., 1.]])
+    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
+    self.evaluate(scale.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, scale))
+
+  def testVariableScaleAssertions(self):
+    # We test that changing the scale to be non-invertible raises an exception
+    # when validate_args is True. This is really just testing the underlying
+    # LinearOperator instance, but we include it to demonstrate that it works as
+    # expected.
+    loc = tf.constant([1., 1.])
+    scale = tf.Variable(np.eye(2, dtype=np.float32))
+    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
+    self.evaluate(scale.initializer)
+    with self.assertRaises(Exception):
+      with tf.control_dependencies([scale.assign([[1., 0.], [1., 0.]])]):
+        self.evaluate(d.sample())
+
 
 if __name__ == "__main__":
   tf.test.main()

@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -233,9 +234,10 @@ def make_diag_scale(loc=None,
       dtype = dtype_util.common_dtype(
           [loc, scale_diag, scale_identity_multiplier],
           dtype_hint=tf.float32)
-    loc = _convert_to_tensor(loc, name='loc', dtype=dtype)
-    scale_diag = _convert_to_tensor(scale_diag, name='scale_diag', dtype=dtype)
-    scale_identity_multiplier = _convert_to_tensor(
+    loc = tensor_util.convert_nonref_to_tensor(loc, name='loc', dtype=dtype)
+    scale_diag = tensor_util.convert_nonref_to_tensor(
+        scale_diag, name='scale_diag', dtype=dtype)
+    scale_identity_multiplier = tensor_util.convert_nonref_to_tensor(
         scale_identity_multiplier,
         name='scale_identity_multiplier',
         dtype=dtype)
