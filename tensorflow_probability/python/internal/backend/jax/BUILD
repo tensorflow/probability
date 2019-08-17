@@ -91,6 +91,7 @@ py_test(
     shard_count = 5,
     tags = [
         "no-oss-ci",
+        "notap",
         "tfp_jax",
     ],
     deps = [
@@ -101,7 +102,6 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
-        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

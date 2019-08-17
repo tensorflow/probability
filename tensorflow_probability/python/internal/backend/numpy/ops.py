@@ -20,8 +20,9 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+import six
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow.python.ops.unconnected_gradients import UnconnectedGradients  # pylint: disable=g-direct-tensorflow-import
@@ -47,6 +48,7 @@ __all__ = [
     'stop_gradient',
     'GradientTape',
     'Module',
+    'Tensor',
     'TensorShape',
     'Variable',
     # 'gradients',
@@ -91,9 +93,12 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
   """Emulates tf.convert_to_tensor."""
   assert not tf.is_tensor(value), value
   if isinstance(value, np.ndarray):
-    if dtype is not None and value.dtype != utils.numpy_dtype(dtype):
-      raise ValueError('Expected dtype {} but got {} with dtype {}.'.format(
-          utils.numpy_dtype(dtype), value, value.dtype))
+    if dtype is not None:
+      dtype = utils.numpy_dtype(dtype)
+      if np.result_type(value, dtype) != dtype:
+        raise ValueError('Expected dtype {} but got {} with dtype {}.'.format(
+            dtype, value, value.dtype))
+      return value.astype(dtype)
     return value
   if isinstance(value, TensorShape):
     value = [int(d) for d in value.as_list()]
@@ -198,7 +203,7 @@ identity = utils.copy_docstring(
 
 is_tensor = utils.copy_docstring(
     tf.is_tensor,
-    lambda x: isinstance(x, (np.ndarray, np.generic)))
+    lambda x: isinstance(x, Tensor))
 
 
 class name_scope(object):  # pylint: disable=invalid-name
@@ -285,6 +290,17 @@ class NumpyVariable(object):
 
 
 Variable = NumpyVariable
+
+
+class _TensorMeta(type(np.ndarray)):
+
+  @classmethod
+  def __instancecheck__(cls, instance):
+    return isinstance(instance, (np.ndarray, np.generic))
+
+
+class Tensor(six.with_metaclass(_TensorMeta)):
+  pass
 
 
 class Module(object):

@@ -19,8 +19,6 @@ from __future__ import division
 # [internal] enable type annotations
 from __future__ import print_function
 
-import re
-
 from absl import app
 
 
@@ -35,10 +33,17 @@ def main(argv):
   contents = contents.replace("scipy.linalg", "jax.scipy.linalg")
   contents = contents.replace("scipy.special", "jax.scipy.special")
   contents = contents.replace(
-      "SKIP_JAX_DISABLED = False",
-      "SKIP_JAX_DISABLED = True\n"
+      "MODE_JAX = False",
+      "MODE_JAX = True\n"
       "from jax.config import config; config.update('jax_enable_x64', True)")
-  contents = re.sub("^import numpy", "import jax.numpy", contents)
+  contents = contents.replace("\nimport numpy as np",
+                              "\nimport numpy as onp\nimport jax.numpy as np")
+  contents = contents.replace("np.bool", "onp.bool")
+  contents = contents.replace("np.dtype", "onp.dtype")
+  contents = contents.replace("np.generic", "onp.generic")
+  contents = contents.replace("np.broadcast", "onp.broadcast")
+  contents = contents.replace("JAX_MODE = False", "JAX_MODE = True")
+
   print(contents)
 
 

@@ -133,9 +133,7 @@ def _matrix_transpose(a, name='matrix_transpose', conjugate=False):  # pylint: d
   if a.ndim < 2:
     raise ValueError(
         'Input must have rank at least `2`; found {}.'.format(a.ndim))
-  perm = np.concatenate([np.arange(a.ndim - 2), [a.ndim - 1, a.ndim - 2]],
-                        axis=0)
-  x = np.transpose(a, perm)
+  x = np.swapaxes(a, -2, -1)
   return np.conjugate(x) if conjugate else x
 
 

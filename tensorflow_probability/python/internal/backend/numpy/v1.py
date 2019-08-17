@@ -256,7 +256,7 @@ global_variables_initializer = utils.copy_docstring(
 
 set_random_seed = utils.copy_docstring(
     tf.compat.v1.set_random_seed,
-    lambda seed: np.random.seed(seed % (2 ** 32 - 1)))
+    lambda seed: np.random.seed(seed % (2**32 - 1)))
 
 
 class Session(object):

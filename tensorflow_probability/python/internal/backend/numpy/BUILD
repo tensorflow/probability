@@ -192,6 +192,7 @@ py_library(
     srcs = ["numpy_array.py"],
     deps = [
         ":_utils",
+        ":ops",
         # numpy dep,
         # tensorflow dep,
     ],
@@ -279,7 +280,6 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
-        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

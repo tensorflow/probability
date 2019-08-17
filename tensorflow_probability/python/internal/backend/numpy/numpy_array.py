@@ -109,7 +109,7 @@ def _one_hot(  # pylint: disable=unused-argument
     off_value = 0
 
   zeros = np.zeros_like(indices)  # pylint: disable=redefined-outer-name
-  zeros = np.tile(zeros[..., None], [1] * indices.ndim + [depth])
+  zeros = np.tile(zeros[..., None], [1] * indices.ndim + [int(depth)])
 
   cond = np.abs(np.arange(depth, dtype=np.float32) - indices[..., None]) < 0.1
 

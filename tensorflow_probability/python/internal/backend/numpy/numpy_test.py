@@ -28,8 +28,9 @@ from absl.testing import parameterized
 import hypothesis as hp
 import hypothesis.extra.numpy as hnp
 import hypothesis.strategies as hps
-import numpy as np
-import tensorflow as tf
+import numpy as np  # Rewritten by script to import jax.numpy
+import numpy as onp  # pylint: disable=reimported
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal.backend import numpy as numpy_backend
@@ -38,7 +39,12 @@ from tensorflow_probability.python.internal.backend import numpy as numpy_backen
 ALLOW_NAN = False
 ALLOW_INFINITY = False
 
-SKIP_JAX_DISABLED = False
+MODE_JAX = False
+
+
+def _add_jax_prng_key_as_seed():
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  return dict(seed=jaxrand.PRNGKey(123))
 
 
 def _getattr(obj, name):
@@ -89,35 +95,40 @@ def non_zero_floats(draw, *args, **kwargs):
 positive_floats = functools.partial(floats, min_value=1e-6)
 
 
+def shapes(min_dims=0, max_dims=4, min_side=1, max_side=5):
+  strategy = hnp.array_shapes(max(1, min_dims), max_dims, min_side, max_side)
+  if min_dims < 1:
+    strategy = hps.one_of(hps.just(()), strategy)
+  return strategy
+
+
 @hps.composite
-def n_same_shape(draw,
-                 n,
-                 min_dims=1,
-                 max_dims=4,
-                 min_side=1,
-                 max_side=5,
-                 dtype=None,
-                 elements=None):
+def n_same_shape(draw, n, shape=shapes(), dtype=None, elements=None,
+                 as_tuple=True):
   if elements is None:
     elements = floats()
   if dtype is None:
-    dtype = np.float
-  shape = draw(hnp.array_shapes(min_dims, max_dims, min_side, max_side))
+    dtype = np.float64
+  shape = draw(shape)
 
+  ensure_array = lambda x: onp.array(x, dtype=dtype)
   if isinstance(elements, (list, tuple)):
-    return tuple([draw(hnp.arrays(dtype, shape, elements=e)) for e in elements])
-  array_strategy = hnp.arrays(dtype, shape, elements=elements)
-  if n == 1:
+    return tuple([
+        draw(hnp.arrays(dtype, shape, elements=e).map(ensure_array))
+        for e in elements
+    ])
+  array_strategy = hnp.arrays(dtype, shape, elements=elements).map(ensure_array)
+  if n == 1 and not as_tuple:
     return draw(array_strategy)
-  return tuple([draw(array_strategy) for _ in range(n)])
+  return draw(hps.tuples(*([array_strategy] * n)))
 
 
-single_array = functools.partial(n_same_shape, 1)
+single_array = functools.partial(n_same_shape, n=1, as_tuple=False)
 
 
 @hps.composite
 def array_and_axis(draw, strategy=None):
-  x = draw(strategy or single_array())
+  x = draw(strategy or single_array(shape=shapes(min_dims=1)))
   rank = len(x.shape)
   axis = draw(hps.integers(-rank, rank - 1))
   return x, axis
@@ -125,7 +136,7 @@ def array_and_axis(draw, strategy=None):
 
 @hps.composite
 def sliceable_and_slices(draw, strategy=None):
-  x = draw(strategy or single_array())
+  x = draw(strategy or single_array(shape=shapes(min_dims=1)))
   starts = []
   sizes = []
   for dim in x.shape:
@@ -138,7 +149,7 @@ def sliceable_and_slices(draw, strategy=None):
 @hps.composite
 def one_hot_params(draw):
   indices = draw(single_array(dtype=np.int32, elements=hps.integers(0, 8)))
-  depth = np.maximum(1, np.max(indices))
+  depth = np.maximum(1, np.max(indices)).astype(np.int32)
   dtype = draw(hps.sampled_from((np.int32, np.float32, np.complex64)))
   on_value = draw(hps.sampled_from((None, 1, 2)))
   on_value = on_value if on_value is None else dtype(on_value)
@@ -152,18 +163,20 @@ def one_hot_params(draw):
 @hps.composite
 def array_and_diagonal(draw):
   side = draw(hps.integers(1, 10))
-  shape = draw(hnp.array_shapes(
-      min_dims=2, min_side=side, max_side=side))
-  array = draw(hnp.arrays(np.float, shape, elements=floats()))
-  diag = draw(hnp.arrays(np.float, shape[:-1], elements=floats()))
+  shape = draw(shapes(min_dims=2, min_side=side, max_side=side))
+  array = draw(hnp.arrays(np.float64, shape, elements=floats()))
+  diag = draw(hnp.arrays(np.float64, shape[:-1], elements=floats()))
   return array, diag
 
 
 @hps.composite
-def matmul_compatible_pair(
-    draw, dtype=np.float, x_strategy=None, elements=None):
+def matmul_compatible_pair(draw,
+                           dtype=np.float64,
+                           x_strategy=None,
+                           elements=None):
   elements = elements or floats()
-  x_strategy = x_strategy or single_array(2, 5, dtype=dtype, elements=elements)
+  x_strategy = x_strategy or single_array(
+      shape=shapes(min_dims=2, max_dims=5), dtype=dtype, elements=elements)
   x = draw(x_strategy)
   x_shape = x.shape
   y_shape = x_shape[:-2] + x_shape[-1:] + (draw(hps.integers(1, 10)),)
@@ -174,17 +187,39 @@ def matmul_compatible_pair(
 
 @hps.composite
 def psd_matrix(draw, eps=1e-2):
-  x = draw(single_array(
-      min_dims=2, max_dims=2, elements=floats(min_value=-1e3, max_value=1e3)))
-  return x.dot(x.T) + eps * np.eye(x.shape[0])
+  x = draw(
+      single_array(
+          shape=shapes(min_dims=2),
+          elements=floats(min_value=-1e3, max_value=1e3)))
+  y = np.swapaxes(x, -1, -2)
+  if x.shape[-1] < x.shape[-2]:  # Ensure resultant matrix not rank-deficient.
+    x, y = y, x
+  psd = np.matmul(x, y)
+  return psd + eps * np.eye(psd.shape[-1])
+
+
+def gamma_params():
+  def dict_to_params(d):
+    return (d['shape'],  # sample shape
+            d['params'][0].astype(d['dtype'].as_numpy_dtype),  # alpha
+            (d['params'][1].astype(d['dtype'].as_numpy_dtype)  # beta (or None)
+             if d['include_beta'] else None),
+            d['dtype'])  # dtype
+  return hps.fixed_dictionaries(
+      dict(shape=shapes(),
+           # hps.composite confuses pylint w/ the draw parameter...
+           # pylint: disable=no-value-for-parameter
+           params=n_same_shape(n=2, elements=positive_floats()),
+           # pylint: enable=no-value-for-parameter
+           include_beta=hps.booleans(),
+           dtype=hps.sampled_from([tf.float32, tf.float64]))
+      ).map(dict_to_params)  # dtype
 
 
 # __Currently untested:__
 # broadcast_dynamic_shape
 # broadcast_static_shape
 # broadcast_to
-# linalg.set_diag
-# linalg.triangular_solve
 # math.accumulate_n
 # math.betainc
 # math.bincount
@@ -194,11 +229,8 @@ def psd_matrix(draw, eps=1e-2):
 # math.polyval
 # math.zeta
 # random.categorical
-# random.gamma
-# random.normal
 # random.poisson
 # random.set_seed
-# random.uniform
 
 
 # TODO(jamieas): add tests for these functions.
@@ -213,9 +245,11 @@ NUMPY_TEST_CASES = [
     #         keywords=None,
     #         defaults=(False, False, False, False, False, False, None))
     TestCase('linalg.matmul', [matmul_compatible_pair()]),
+    TestCase('linalg.det', [psd_matrix()]),
 
     # ArgSpec(args=['a', 'name', 'conjugate'], varargs=None, keywords=None)
-    TestCase('linalg.matrix_transpose', [single_array(min_dims=2)]),
+    TestCase('linalg.matrix_transpose',
+             [single_array(shape=shapes(min_dims=2))]),
 
     # ArgSpec(args=['a', 'x', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -244,7 +278,7 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['diagonal', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
-    TestCase('linalg.diag', [single_array(max_dims=1)]),
+    TestCase('linalg.diag', [single_array(shape=shapes(min_dims=1))]),
 
     # ArgSpec(args=['features', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -261,27 +295,25 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['input', 'diagonal', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
-    # TODO(jamieas): test this with `array_and_diagonal()` once `set_diag` is
-    # correctly implemented.
-    TestCase('linalg.set_diag', []),
+    TestCase('linalg.set_diag', [array_and_diagonal()]),
 
     # ArgSpec(args=['input', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
     TestCase('math.angle',
-             [single_array(dtype=np.complex, elements=complex_numbers())]),
+             [single_array(dtype=np.complex64, elements=complex_numbers())]),
     TestCase('math.imag',
-             [single_array(dtype=np.complex, elements=complex_numbers())]),
+             [single_array(dtype=np.complex64, elements=complex_numbers())]),
     TestCase('math.real',
-             [single_array(dtype=np.complex, elements=complex_numbers())]),
+             [single_array(dtype=np.complex64, elements=complex_numbers())]),
     TestCase('linalg.cholesky', [psd_matrix()]),
-    TestCase('linalg.diag_part', [single_array(min_dims=2)]),
+    TestCase('linalg.diag_part', [single_array(shape=shapes(min_dims=2))]),
     TestCase('identity', [single_array()]),
 
     # ArgSpec(args=['input', 'num_lower', 'num_upper', 'name'], varargs=None,
     #         keywords=None, defaults=(None,))
     TestCase('linalg.band_part', [
         hps.tuples(
-            single_array(min_dims=2, min_side=3),
+            single_array(shape=shapes(min_dims=2, min_side=3)),
             hps.integers(min_value=-1, max_value=3),
             hps.integers(min_value=-1, max_value=3))
     ]),
@@ -292,24 +324,34 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['input_tensor', 'axis', 'keepdims', 'name'], varargs=None,
     #         keywords=None, defaults=(None, False, None))
-    TestCase(
-        'math.reduce_all',
-        [array_and_axis(single_array(dtype=np.bool, elements=hps.booleans()))]),
-    TestCase(
-        'math.reduce_any',
-        [array_and_axis(single_array(dtype=np.bool, elements=hps.booleans()))]),
-    TestCase('math.reduce_logsumexp', [array_and_axis(single_array())]),
-    TestCase('math.reduce_max', [array_and_axis(single_array())]),
-    TestCase('math.reduce_mean', [array_and_axis(single_array())]),
-    TestCase('math.reduce_min', [array_and_axis(single_array())]),
-    TestCase('math.reduce_prod', [array_and_axis(single_array())]),
-    TestCase('math.reduce_std', [array_and_axis(single_array())]),
-    TestCase('math.reduce_sum', [array_and_axis(single_array())]),
-    TestCase('math.reduce_variance', [array_and_axis(single_array())]),
+    TestCase('math.reduce_all', [
+        array_and_axis(
+            single_array(
+                shape=shapes(min_dims=1),
+                dtype=np.bool,
+                elements=hps.booleans()))
+    ]),
+    TestCase('math.reduce_any', [
+        array_and_axis(
+            single_array(
+                shape=shapes(min_dims=1),
+                dtype=np.bool,
+                elements=hps.booleans()))
+    ]),
+    TestCase('math.reduce_logsumexp', [array_and_axis()]),
+    TestCase('math.reduce_max', [array_and_axis()]),
+    TestCase('math.reduce_mean', [array_and_axis()]),
+    TestCase('math.reduce_min', [array_and_axis()]),
+    TestCase('math.reduce_prod', [array_and_axis()]),
+    TestCase('math.reduce_std', [array_and_axis()]),
+    TestCase('math.reduce_sum', [array_and_axis()]),
+    TestCase('math.reduce_variance', [array_and_axis()]),
 
     # ArgSpec(args=['inputs', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
-    TestCase('math.add_n', [hps.tuples(n_same_shape(n=5))]),
+    TestCase('math.add_n',
+             [hps.integers(1, 5).flatmap(
+                 lambda n: hps.tuples(n_same_shape(n=n)))]),
 
     # ArgSpec(args=['inputs', 'shape', 'tensor_dtype', 'name'], varargs=None,
     #         keywords=None, defaults=(None, None, None))
@@ -319,6 +361,7 @@ NUMPY_TEST_CASES = [
     #         defaults=(None, None))
     TestCase('math.log_softmax', [
         single_array(
+            shape=shapes(min_dims=1),
             elements=floats(
                 min_value=-1e6,
                 max_value=1e6,
@@ -327,6 +370,7 @@ NUMPY_TEST_CASES = [
     ]),
     TestCase('math.softmax', [
         single_array(
+            shape=shapes(min_dims=1),
             elements=floats(
                 min_value=-1e6,
                 max_value=1e6,
@@ -336,7 +380,9 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['matrix', 'rhs', 'lower', 'adjoint', 'name'], varargs=None,
     # keywords=None, defaults=(True, False, None))
-    TestCase('linalg.triangular_solve', []),
+    TestCase('linalg.triangular_solve',
+             [matmul_compatible_pair(
+                 x_strategy=psd_matrix().map(np.linalg.cholesky))]),
 
     # ArgSpec(args=['shape_x', 'shape_y'], varargs=None, keywords=None,
     #         defaults=None)
@@ -350,11 +396,13 @@ NUMPY_TEST_CASES = [
     # ArgSpec(args=['x', 'axis', 'exclusive', 'reverse', 'name'], varargs=None,
     #         keywords=None, defaults=(0, False, False, None))
     TestCase('math.cumprod', [
-        hps.tuples(array_and_axis(), hps.booleans(), hps.booleans()).map(
-            lambda x: x[0] + (x[1], x[2]))]),
+        hps.tuples(array_and_axis(), hps.booleans(),
+                   hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
+    ]),
     TestCase('math.cumsum', [
-        hps.tuples(array_and_axis(), hps.booleans(), hps.booleans()).map(
-            lambda x: x[0] + (x[1], x[2]))]),
+        hps.tuples(array_and_axis(), hps.booleans(),
+                   hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
+    ]),
 
     # ArgSpec(args=['x', 'name'], varargs=None, keywords=None, defaults=(None,))
     TestCase('math.abs', [single_array()]),
@@ -378,12 +426,11 @@ NUMPY_TEST_CASES = [
         jax_disabled=True),
     TestCase('math.ceil', [single_array()]),
     TestCase('math.conj',
-             [single_array(dtype=np.complex, elements=complex_numbers())]),
+             [single_array(dtype=np.complex64, elements=complex_numbers())]),
     TestCase('math.cos', [single_array()]),
     TestCase('math.cosh', [single_array(elements=floats(-100., 100.))]),
-    TestCase(
-        'math.digamma',
-        [single_array(elements=non_zero_floats(-1e4, 1e4))]),
+    TestCase('math.digamma',
+             [single_array(elements=non_zero_floats(-1e4, 1e4))]),
     TestCase('math.erf', [single_array()]),
     TestCase('math.erfc', [single_array()]),
     TestCase('math.exp',
@@ -459,6 +506,16 @@ NUMPY_TEST_CASES = [
     TestCase('math.xlogy',
              [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
 
+    TestCase('random.gamma', [gamma_params()],
+             jax_kwargs=_add_jax_prng_key_as_seed,
+             assert_shape_only=True),
+    TestCase('random.normal', [hps.tuples(shapes())],
+             jax_kwargs=_add_jax_prng_key_as_seed,
+             assert_shape_only=True),
+    TestCase('random.uniform', [hps.tuples(shapes())],
+             jax_kwargs=_add_jax_prng_key_as_seed,
+             assert_shape_only=True),
+
     # Array ops.
     TestCase('one_hot', [one_hot_params()]),
     TestCase('slice', [sliceable_and_slices()]),
@@ -466,10 +523,10 @@ NUMPY_TEST_CASES = [
 
 
 def _maybe_convert_to_tensors(args):
-  return tuple([tf.convert_to_tensor(value=arg)  # pylint: disable=g-complex-comprehension
-                if isinstance(arg, np.ndarray)
-                else arg
-                for arg in args])
+  # Ensures we go from JAX np -> original np -> tf.Tensor. (no-op for non-JAX.)
+  convert = lambda a: tf.convert_to_tensor(onp.array(a))
+  return tuple(
+      convert(arg) if isinstance(arg, np.ndarray) else arg for arg in args)
 
 
 class NumpyTest(test_case.TestCase, parameterized.TestCase):
@@ -506,15 +563,16 @@ class NumpyTest(test_case.TestCase, parameterized.TestCase):
                             tensorflow_function,
                             numpy_function,
                             strategy_list,
-                            atol=1e-6,
-                            rtol=1e-6,
-                            jax_disabled=False):
-    if jax_disabled and SKIP_JAX_DISABLED:
+                            jax_disabled=False,
+                            **_):
+    if jax_disabled and MODE_JAX:
       tf.compat.v1.logging.warning('The test for %s is disabled for JAX.',
                                    numpy_function.__name__)
-    if not strategy_list:
+    elif not strategy_list:
       tf.compat.v1.logging.warning(
           'The test for %s contains no strategies.', numpy_function.__name__)
+    else:
+      self.skipTest('Has coverage.')
 
   @parameterized.named_parameters(NUMPY_TEST_CASES)
   def testConsistency(self,
@@ -523,14 +581,17 @@ class NumpyTest(test_case.TestCase, parameterized.TestCase):
                       strategy_list,
                       atol=1e-6,
                       rtol=1e-6,
-                      jax_disabled=False):
-    if jax_disabled and SKIP_JAX_DISABLED:
+                      jax_disabled=False,
+                      assert_shape_only=False,
+                      jax_kwargs=lambda: {}):
+    if jax_disabled and MODE_JAX:
       self.skipTest('Test is disabled for JAX')
     for strategy in strategy_list:
       @hp.settings(deadline=None,
                    max_examples=10,
                    database=None,
-                   derandomize=True)
+                   derandomize=True,
+                   suppress_health_check=(hp.HealthCheck.too_slow,))
       @hp.given(strategy)
       def check_consistency(tf_fn, np_fn, args):
         # If `args` is a single item, put it in a tuple
@@ -538,9 +599,18 @@ class NumpyTest(test_case.TestCase, parameterized.TestCase):
           args = (args,)
         tensorflow_value = self.evaluate(
             tf_fn(*_maybe_convert_to_tensors(args)))
-        numpy_value = np_fn(*args)
-        self.assertAllCloseAccordingToType(
-            tensorflow_value, numpy_value, atol=atol, rtol=rtol)
+        kwargs = jax_kwargs() if MODE_JAX else {}
+        numpy_value = np_fn(*args, **kwargs)
+        if assert_shape_only:
+
+          def assert_same_shape(x, y):
+            self.assertAllEqual(x.shape, y.shape)
+
+          tf.nest.map_structure(assert_same_shape, tensorflow_value,
+                                numpy_value)
+        else:
+          self.assertAllCloseAccordingToType(
+              tensorflow_value, numpy_value, atol=atol, rtol=rtol)
 
       check_consistency(tensorflow_function, numpy_function)
 

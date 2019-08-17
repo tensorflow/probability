@@ -51,6 +51,9 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+
+
 def _shape(args, size):
   try:
     size = tuple(size)
@@ -79,6 +82,16 @@ def _gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None,
   scale = 1. if beta is None else (1. / beta)
   shape = _shape([alpha, scale], shape)
   return rng.gamma(shape=alpha, scale=scale, size=shape).astype(dtype)
+
+
+def _gamma_jax(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):  # pylint: disable=unused-argument
+  dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
+  shape = _shape([alpha, beta], shape)
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  if seed is None:
+    raise ValueError('Must provide PRNGKey to sample in JAX.')
+  samps = jaxrand.gamma(key=seed, a=alpha, shape=shape, dtype=dtype)
+  return samps if beta is None else samps * beta
 
 
 def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
@@ -135,18 +148,15 @@ categorical = utils.copy_docstring(
     tf.random.categorical,
     _categorical)
 
-gamma = utils.copy_docstring(
-    tf.random.gamma,
-    _gamma)
+gamma = utils.copy_docstring(tf.random.gamma,
+                             _gamma_jax if JAX_MODE else _gamma)
 
-normal = utils.copy_docstring(
-    tf.random.normal,
-    _normal)
+normal = utils.copy_docstring(tf.random.normal,
+                              _normal_jax if JAX_MODE else _normal)
 
 poisson = utils.copy_docstring(
     tf.random.poisson,
     _poisson)
 
-uniform = utils.copy_docstring(
-    tf.random.uniform,
-    _uniform)
+uniform = utils.copy_docstring(tf.random.uniform,
+                               _uniform_jax if JAX_MODE else _uniform)

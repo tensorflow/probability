@@ -202,7 +202,7 @@ def _max_mask_non_finite(x, axis=-1, keepdims=False, mask=0):
   m = np.max(x, axis=_astuple(axis), keepdims=keepdims)
   needs_masking = ~np.isfinite(m)
   if needs_masking.ndim > 0:
-    m[needs_masking] = mask
+    m = np.where(needs_masking, mask, m)
   elif needs_masking:
     m = mask
   return m
@@ -211,8 +211,8 @@ def _max_mask_non_finite(x, axis=-1, keepdims=False, mask=0):
 def _softmax(logits, axis=None, name=None):  # pylint: disable=unused-argument
   axis = -1 if axis is None else axis
   y = logits - _max_mask_non_finite(logits, axis=axis, keepdims=True)
-  np.exp(y, out=y)
-  y /= np.sum(y, axis=_astuple(axis), keepdims=True)
+  y = np.exp(y)
+  y = y / np.sum(y, axis=_astuple(axis), keepdims=True)
   return y
 
 
@@ -346,7 +346,7 @@ cosh = utils.copy_docstring(
 count_nonzero = utils.copy_docstring(
     tf.math.count_nonzero,
     lambda input, axis=None, keepdims=None, dtype=tf.int64, name=None: (  # pylint: disable=g-long-lambda
-        np.cast[utils.numpy_dtype(dtype)](np.count_nonzero(input, axis))))
+        utils.numpy_dtype(dtype)(np.count_nonzero(input, axis))))
 
 cumprod = utils.copy_docstring(
     tf.math.cumprod,
@@ -610,7 +610,8 @@ reduce_variance = utils.copy_docstring(
 
 rint = utils.copy_docstring(
     tf.math.rint,
-    lambda x, name=None: np.rint(x))
+    # JAX doesn't have rint, but round/around are ~the same with decimals=0.
+    lambda x, name=None: np.around(x))
 
 round = utils.copy_docstring(  # pylint: disable=redefined-builtin
     tf.math.round,
@@ -646,7 +647,7 @@ rsqrt = utils.copy_docstring(
 
 sigmoid = utils.copy_docstring(
     tf.math.sigmoid,
-    lambda x, name=None: 1. / (1. + np.exp(-x)))
+    lambda x, name=None: scipy_special.expit(x))
 
 sign = utils.copy_docstring(
     tf.math.sign,

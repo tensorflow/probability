@@ -24,6 +24,7 @@ from tensorflow_probability.python import distributions as tfd
 
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -80,9 +81,11 @@ class InvertBijectorTest(tf.test.TestCase):
         tfd.TransformedDistribution(
             distribution=tfd.Gamma(concentration=1., rate=2.),
             bijector=tfb.Invert(tfb.Exp())))
-    self.assertAllEqual([],
-                        self.evaluate(
-                            tf.shape(exp_gamma_distribution.sample())))
+    self.assertAllEqual(
+        [],
+        self.evaluate(
+            tf.shape(
+                exp_gamma_distribution.sample(seed=tfp_test_util.test_seed()))))
 
 
 if __name__ == "__main__":

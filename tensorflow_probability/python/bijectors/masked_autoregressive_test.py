@@ -234,7 +234,7 @@ class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
         num_samples=int(1e6),
         radius=1.,
         center=0.,
-        rtol=0.025)
+        rtol=0.03)
 
   def testVectorBijectorRaises(self):
     with self.assertRaisesRegexp(
