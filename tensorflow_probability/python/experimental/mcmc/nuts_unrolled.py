@@ -163,9 +163,6 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
       target_log_prob_fn: Python callable which takes an argument like
         `current_state` (or `*current_state` if it's a list) and returns its
         (possibly unnormalized) log-density under the target distribution.
-        Currnently only support target_log_prob_fn that takes only 1 arg (ie the
-        state or free parameters of your model), with the the input being a 2d
-        tensor with shape being batch_size * state_part_size.
       step_size: `Tensor` or Python `list` of `Tensor`s representing the step
         size for the leapfrog integrator. Must broadcast with the shape of
         `current_state`. Larger step sizes lead to faster progress, but
@@ -298,11 +295,10 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           target_grad_parts=previous_kernel_results.grads_target_log_prob)
       initial_step_state = tf.nest.map_structure(_copy, initial_state)
 
-      batch_size = prefer_static.size(current_target_log_prob)
       if MULTINOMIAL_SAMPLE:
-        init_weight = tf.zeros(batch_size, dtype=init_energy.dtype)
+        init_weight = tf.zeros_like(init_energy)
       else:
-        init_weight = tf.ones(batch_size, dtype=TREE_COUNT_DTYPE)
+        init_weight = tf.ones_like(init_energy, dtype=TREE_COUNT_DTYPE)
 
       candidate_state = TreeDoublingStateCandidate(
           state=current_state,
@@ -312,12 +308,11 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
 
       initial_step_metastate = TreeDoublingMetaState(
           candidate_state=candidate_state,
-          is_accepted=tf.zeros(batch_size, dtype=tf.bool),
-          energy_diff_sum=tf.zeros(
-              batch_size, dtype=current_target_log_prob.dtype),
-          leapfrog_count=tf.zeros(batch_size, dtype=TREE_COUNT_DTYPE),
-          continue_tree=tf.ones(batch_size, dtype=tf.bool),
-          not_divergence=tf.ones(batch_size, dtype=tf.bool))
+          is_accepted=tf.zeros_like(init_energy, dtype=tf.bool),
+          energy_diff_sum=tf.zeros_like(init_energy),
+          leapfrog_count=tf.zeros_like(init_energy, dtype=TREE_COUNT_DTYPE),
+          continue_tree=tf.ones_like(init_energy, dtype=tf.bool),
+          not_divergence=tf.ones_like(init_energy, dtype=tf.bool))
 
       # Convert the write/read instruction into TensorArray so that it is
       # compatible with XLA.
@@ -426,24 +421,26 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           current_grads_log_prob,
       ] = leapfrog_impl.process_args(self.target_log_prob_fn, dummy_momentum,
                                      init_state)
-      batch_size = prefer_static.size(current_target_log_prob)
 
       return NUTSKernelResults(
           target_log_prob=current_target_log_prob,
           grads_target_log_prob=current_grads_log_prob,
           momentum_state_memory=momentum_state_memory,
           step_size=step_size,
-          log_accept_ratio=tf.zeros(
-              [batch_size],
-              dtype=current_target_log_prob.dtype,
-              name='log_accept_ratio'),
-          leapfrogs_taken=tf.zeros(
-              [batch_size], dtype=TREE_COUNT_DTYPE, name='leapfrogs_taken'),
-          is_accepted=tf.zeros([batch_size], dtype=tf.bool, name='is_accepted'),
-          reach_max_depth=tf.zeros(
-              [batch_size], dtype=tf.bool, name='reach_max_depth'),
-          has_divergence=tf.zeros(
-              [batch_size], dtype=tf.bool, name='has_divergence'),
+          log_accept_ratio=tf.zeros_like(current_target_log_prob,
+                                         name='log_accept_ratio'),
+          leapfrogs_taken=tf.zeros_like(current_target_log_prob,
+                                        dtype=TREE_COUNT_DTYPE,
+                                        name='leapfrogs_taken'),
+          is_accepted=tf.zeros_like(current_target_log_prob,
+                                    dtype=tf.bool,
+                                    name='is_accepted'),
+          reach_max_depth=tf.zeros_like(current_target_log_prob,
+                                        dtype=tf.bool,
+                                        name='reach_max_depth'),
+          has_divergence=tf.zeros_like(current_target_log_prob,
+                                       dtype=tf.bool,
+                                       name='has_divergence'),
       )
 
   def _start_trajectory_batched(self, state, target_log_prob):
@@ -477,34 +474,33 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
                          initial_step_metastate):
     """Main loop for tree doubling."""
     with tf.name_scope('loop_tree_doubling'):
-      batch_size = prefer_static.size(current_step_meta_info.init_energy)
+      batch_shape = prefer_static.shape(current_step_meta_info.init_energy)
       direction = tf.cast(
           tf.random.uniform(
-              shape=[batch_size],
+              shape=batch_shape,
               minval=0,
               maxval=2,
               dtype=tf.int32,
               seed=self._seed_stream()),
           dtype=tf.bool)
 
-      left_right_index = tf.concat([
-          tf.cast(direction, tf.int32)[..., tf.newaxis],
-          tf.range(batch_size, dtype=tf.int32)[..., tf.newaxis]
-      ], axis=1)
       tree_start_states = tf.nest.map_structure(
-          # Alternatively: `lambda v: tf.where(direction, v[1], v[0])`
-          lambda v: tf.gather_nd(v, left_right_index),
+          lambda v: tf.where(  # pylint: disable=g-long-lambda
+              _rightmost_expand_to_rank(direction, prefer_static.rank(v[1])),
+              v[1], v[0]),
           initial_step_state)
 
       directions_expanded = [
-          _expand_dims_under_batch_dim(direction, prefer_static.rank(state))
+          _rightmost_expand_to_rank(
+              direction, prefer_static.rank(state))
           for state in tree_start_states.state
       ]
+
       integrator = leapfrog_impl.SimpleLeapfrogIntegrator(
           self.target_log_prob_fn,
           step_sizes=[
-              tf.where(direction, ss, -ss)
-              for direction, ss in zip(directions_expanded, step_size)
+              tf.where(d, ss, -ss)
+              for d, ss in zip(directions_expanded, step_size)
           ],
           num_steps=self.unrolled_leapfrog_steps)
 
@@ -541,7 +537,7 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           tf.zeros([], log_accept_thresh.dtype),
           log_accept_thresh)
       u = tf.math.log1p(-tf.random.uniform(
-          shape=[batch_size],
+          shape=batch_shape,
           dtype=log_accept_thresh.dtype,
           seed=self._seed_stream()))
       is_sample_accepted = u <= log_accept_thresh
@@ -551,51 +547,51 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
       new_candidate_state = TreeDoublingStateCandidate(
           state=[
               tf.where(  # pylint: disable=g-complex-comprehension
-                  _expand_dims_under_batch_dim(
+                  _rightmost_expand_to_rank(
                       choose_new_state, prefer_static.rank(s0)), s0, s1)
               for s0, s1 in zip(candidate_tree_state.state,
                                 last_candidate_state.state)
           ],
-          target=tf.where(choose_new_state,
-                          candidate_tree_state.target,
-                          last_candidate_state.target),
+          target=tf.where(
+              _rightmost_expand_to_rank(
+                  choose_new_state,
+                  prefer_static.rank(candidate_tree_state.target)),
+              candidate_tree_state.target, last_candidate_state.target),
           target_grad_parts=[
               tf.where(  # pylint: disable=g-complex-comprehension
-                  _expand_dims_under_batch_dim(
+                  _rightmost_expand_to_rank(
                       choose_new_state, prefer_static.rank(grad0)),
                   grad0, grad1)
               for grad0, grad1 in zip(candidate_tree_state.target_grad_parts,
                                       last_candidate_state.target_grad_parts)
           ],
           weight=weight_sum)
+
       # Update left right information of the trajectory, and check trajectory
       # level U turn
+      tree_otherend_states = tf.nest.map_structure(
+          lambda v: tf.where(  # pylint: disable=g-long-lambda
+              _rightmost_expand_to_rank(direction, prefer_static.rank(v[1])),
+              v[0], v[1]), initial_step_state)
 
-      # Alternative approach
-      # left_right_mask = tf.transpose(
-      #     tf.tile(tf.one_hot(tf.cast(direction, tf.int32), 2),
-      #            [1, initial_step_metastate.candidate_state[0].shape[-1], 1]),
-      #     [2, 0, 1])
-
-      # trajactory_state_left_right = tf.where(
-      #     tf.equal(left_right_mask, 0.),
-      #     trajactory_state_left_right,
-      #     tf.tile(tree_final_states[1][0][tf.newaxis, ...], [2, 1, 1]))
       new_step_state = tf.nest.pack_sequence_as(initial_step_state, [
-          # Alternative approach:
-          # tf.where(tf.equal(left_right_mask, 0.),
-          #          v,
-          #          tf.tile(r[tf.newaxis],
-          #                  tf.concat([[2], tf.ones_like(tf.shape(r))], 0)))
-          tf.tensor_scatter_nd_update(v, left_right_index, r)
-          for v, r in zip(tf.nest.flatten(initial_step_state),
-                          tf.nest.flatten(tree_final_states))
+          tf.stack([  # pylint: disable=g-complex-comprehension
+              tf.where(
+                  _rightmost_expand_to_rank(direction, prefer_static.rank(l)),
+                  r, l),
+              tf.where(
+                  _rightmost_expand_to_rank(direction, prefer_static.rank(l)),
+                  l, r),
+          ], axis=0)
+          for l, r in zip(tf.nest.flatten(tree_final_states),
+                          tf.nest.flatten(tree_otherend_states))
       ])
       no_u_turns_trajectory = has_not_u_turn(
           [s[0] for s in new_step_state.state],
           [m[0] for m in new_step_state.momentum],
           [s[1] for s in new_step_state.state],
-          [m[1] for m in new_step_state.momentum])
+          [m[1] for m in new_step_state.momentum],
+          log_prob_rank=len(batch_shape))
 
       new_step_metastate = TreeDoublingMetaState(
           candidate_state=new_candidate_state,
@@ -620,23 +616,22 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
                       momentum_state_memory,
                       name=None):
     with tf.name_scope('build_sub_tree'):
-      batch_size = prefer_static.size(current_step_meta_info.init_energy)
+      batch_shape = prefer_static.shape(current_step_meta_info.init_energy)
       # We never want to select the inital state
       if MULTINOMIAL_SAMPLE:
         init_weight = tf.fill(
-            [batch_size],
+            batch_shape,
             tf.constant(-np.inf,
                         dtype=current_step_meta_info.init_energy.dtype))
       else:
-        init_weight = tf.zeros(batch_size, dtype=TREE_COUNT_DTYPE)
+        init_weight = tf.zeros(batch_shape, dtype=TREE_COUNT_DTYPE)
       initial_state_candidate = TreeDoublingStateCandidate(
           state=initial_state.state,
           target=initial_state.target,
           target_grad_parts=initial_state.target_grad_parts,
           weight=init_weight)
-      energy_diff_sum = tf.zeros([batch_size],
-                                 dtype=current_step_meta_info.init_energy.dtype,
-                                 name='energy_diff_sum')
+      energy_diff_sum = tf.zeros_like(current_step_meta_info.init_energy,
+                                      name='energy_diff_sum')
       [
           _,
           energy_diff_tree_sum,
@@ -660,7 +655,7 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           loop_vars=(
               tf.zeros([], dtype=tf.int32, name='iter'),
               energy_diff_sum,
-              tf.zeros([batch_size], dtype=TREE_COUNT_DTYPE),
+              tf.zeros(batch_shape, dtype=TREE_COUNT_DTYPE),
               initial_state,
               initial_state_candidate,
               continue_tree,
@@ -744,8 +739,8 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
                 for old, new in zip(momentum_state_memory.state_swap,
                                     next_state_parts)
             ])
-      batch_size = prefer_static.size(next_target)
-      has_not_u_turn_at_even_step = tf.ones([batch_size], dtype=tf.bool)
+      batch_shape = prefer_static.shape(next_target)
+      has_not_u_turn_at_even_step = tf.ones(batch_shape, dtype=tf.bool)
 
       read_index = read_instruction.gather([iter_ // 2])[0]
       no_u_turns_within_tree = tf.cond(
@@ -754,7 +749,8 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           lambda: has_not_u_turn_at_odd_step(  # pylint: disable=g-long-lambda
               read_index, directions, momentum_state_memory,
               next_momentum_parts, next_state_parts,
-              has_not_u_turn_at_even_step))
+              has_not_u_turn_at_even_step,
+              log_prob_rank=prefer_static.rank(next_target)))
 
       energy = compute_hamiltonian(next_target, next_momentum_parts)
       energy = tf.where(tf.math.is_nan(energy),
@@ -780,7 +776,7 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
             -tf.math.log(tf.cast(weight_sum, dtype=tf.float32)),
             tf.constant(-np.inf, dtype=tf.float32))
       u = tf.math.log1p(-tf.random.uniform(
-          shape=[batch_size],
+          shape=batch_shape,
           dtype=log_accept_thresh.dtype,
           seed=self._seed_stream()))
       is_sample_accepted = u <= log_accept_thresh
@@ -788,16 +784,19 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
       next_candidate_tree_state = TreeDoublingStateCandidate(
           state=[
               tf.where(  # pylint: disable=g-complex-comprehension
-                  _expand_dims_under_batch_dim(is_sample_accepted,
-                                               prefer_static.rank(s0)), s0, s1)
+                  _rightmost_expand_to_rank(is_sample_accepted,
+                                            prefer_static.rank(s0)),
+                  s0, s1)
               for s0, s1 in zip(next_state_parts, candidate_tree_state.state)
           ],
-          target=tf.where(is_sample_accepted, next_target,
-                          candidate_tree_state.target),
+          target=tf.where(
+              _rightmost_expand_to_rank(is_sample_accepted,
+                                        prefer_static.rank(next_target)),
+              next_target, candidate_tree_state.target),
           target_grad_parts=[
               tf.where(  # pylint: disable=g-complex-comprehension
-                  _expand_dims_under_batch_dim(is_sample_accepted,
-                                               prefer_static.rank(grad0)),
+                  _rightmost_expand_to_rank(is_sample_accepted,
+                                            prefer_static.rank(grad0)),
                   grad0, grad1)
               for grad0, grad1 in zip(next_target_grad_parts,
                                       candidate_tree_state.target_grad_parts)
@@ -809,7 +808,7 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
 
       not_divergent_tokeep = tf.where(continue_tree_previous,
                                       not_divergent,
-                                      tf.ones([batch_size], dtype=tf.bool))
+                                      tf.ones(batch_shape, dtype=tf.bool))
 
       # min(1., exp(energy_diff)).
       exp_energy_diff = tf.clip_by_value(tf.exp(energy_diff), 0., 1.)
@@ -831,7 +830,7 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
 
 def has_not_u_turn_at_odd_step(read_indexes, direction, momentum_state_memory,
                                momentum_right, state_right,
-                               no_u_turns_within_tree):
+                               no_u_turns_within_tree, log_prob_rank):
   """Check u turn for early stopping."""
 
   def _get_left_state_and_check_u_turn(left_current_index, no_u_turns_last):
@@ -859,45 +858,48 @@ def has_not_u_turn_at_odd_step(read_indexes, direction, momentum_state_memory,
         state_left,
         [tf.where(d, m, -m) for d, m in zip(direction, momentum_left)],
         state_right,
-        [tf.where(d, m, -m) for d, m in zip(direction, momentum_right)])
+        [tf.where(d, m, -m) for d, m in zip(direction, momentum_right)],
+        log_prob_rank)
     return left_current_index + 1, no_u_turns_current & no_u_turns_last
 
   _, no_u_turns_within_tree = tf.while_loop(
       cond=lambda i, no_u_turn: i < tf.gather(read_indexes, 1),
       body=_get_left_state_and_check_u_turn,
-      loop_vars=(tf.gather(read_indexes, 0), no_u_turns_within_tree))
+      loop_vars=(tf.gather(read_indexes, 0), no_u_turns_within_tree),
+      parallel_iterations=TF_WHILE_PARALLEL_ITERATIONS)
   return no_u_turns_within_tree
 
 
-def _batchwise_reduce_sum(x, rank_diff):
-  with tf.name_scope('batchwise_reduce_sum'):
-    return tf.reduce_sum(
-        x, axis=prefer_static.range(1 + rank_diff, prefer_static.rank(x)))
-
-
-def has_not_u_turn(state_left, momentum_left, state_right, momentum_right):
+def has_not_u_turn(state_left,
+                   momentum_left,
+                   state_right,
+                   momentum_right,
+                   log_prob_rank):
   """If two given states and momentum do not exhibit a U-turn pattern."""
   with tf.name_scope('has_not_u_turn'):
     batch_dot_product_left = sum([
-        _batchwise_reduce_sum((s1 - s2) * m,
-                              prefer_static.rank(s2) - prefer_static.rank(s1))
+        tf.reduce_sum(  # pylint: disable=g-complex-comprehension
+            (s1 - s2) * m,
+            axis=tf.range(log_prob_rank, prefer_static.rank(m)))
         for s1, s2, m in zip(state_right, state_left, momentum_left)
     ])
     batch_dot_product_right = sum([
-        _batchwise_reduce_sum((s1 - s2) * m,
-                              prefer_static.rank(s2) - prefer_static.rank(s1))
+        tf.reduce_sum(  # pylint: disable=g-complex-comprehension
+            (s1 - s2) * m,
+            axis=tf.range(log_prob_rank, prefer_static.rank(m)))
         for s1, s2, m in zip(state_right, state_left, momentum_right)
     ])
     return (batch_dot_product_left >= 0) & (batch_dot_product_right >= 0)
 
 
-def _expand_dims_under_batch_dim(tensor, new_rank):
-  """Adds size-1 dimensions below the first until `tensor` has `new_rank`."""
-  ones = prefer_static.ones([new_rank - prefer_static.rank(tensor)],
-                            dtype=tf.int32)
-  shape = prefer_static.shape(tensor)
-  new_shape = prefer_static.concat([shape[:1], ones, shape[1:]], axis=0)
-  return tf.reshape(tensor, new_shape)
+def _rightmost_expand_to_rank(tensor, new_rank):
+  """Expands `tensor`'s rank by `new_rank - tensor.rank` rightmost dims."""
+  return tf.reshape(
+      tensor,
+      shape=prefer_static.pad(
+          prefer_static.shape(tensor),
+          paddings=[[0, max(0, new_rank - prefer_static.rank(tensor))]],
+          constant_values=1))
 
 
 def build_tree_uturn_instruction(max_depth, init_memory=0):

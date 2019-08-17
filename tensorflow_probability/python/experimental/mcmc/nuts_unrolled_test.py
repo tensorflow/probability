@@ -166,34 +166,39 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
   def testMultivariateNormalNd(self, event_size, batch_size):
     self.evaluate(assert_mvn_target_conservation(event_size, batch_size))
 
-  def testLatentsOfMixedRank(self):
-    batch_size = 10
-    num_steps = 100
+  @parameterized.parameters(
+      ([], 100),      # test scalar case
+      ([1], 100),     # test size 1 case
+      ([5], 100),
+      ([2, 5], 100),  # test rank 2 case
+  )
+  def testLatentsOfMixedRank(self, batch_shape, num_steps):
+    strm = tfd.SeedStream(5, salt='LatentsOfMixedRankTest')
 
-    init0 = [tf.ones([batch_size, 6])]
+    init0 = [tf.ones(batch_shape + [6])]
+    init1 = [tf.ones(batch_shape + []),
+             tf.ones(batch_shape + [1]),
+             tf.ones(batch_shape + [2, 2])]
+
     def log_prob0(x):
-      return tfd.Independent(
+      return tf.squeeze(tfd.Independent(
           tfd.Normal(tf.range(6, dtype=tf.float32),
                      tf.constant(1.)),
-          reinterpreted_batch_ndims=1).log_prob(x)
+          reinterpreted_batch_ndims=1).log_prob(x))
     kernel0 = tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
         log_prob0,
         step_size=0.3,
-        unrolled_leapfrog_steps=2,
-        max_tree_depth=4,
-        seed=1)
-    results0, _ = tfp.mcmc.sample_chain(
+        seed=strm())
+    [results0] = tfp.mcmc.sample_chain(
         num_results=num_steps,
-        num_burnin_steps=0,
+        num_burnin_steps=10,
         current_state=init0,
         kernel=kernel0,
+        trace_fn=None,
         parallel_iterations=1)
 
-    init1 = [tf.ones([batch_size,]),
-             tf.ones([batch_size, 1]),
-             tf.ones([batch_size, 2, 2])]
     def log_prob1(state0, state1, state2):
-      return (
+      return tf.squeeze(
           tfd.Normal(tf.constant(0.), tf.constant(1.)).log_prob(state0)
           + tfd.Independent(
               tfd.Normal(tf.constant([1.]), tf.constant(1.)),
@@ -205,22 +210,19 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
     kernel1 = tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
         log_prob1,
         step_size=0.3,
-        unrolled_leapfrog_steps=2,
-        max_tree_depth=4,
-        seed=1)
-    results1, extra1 = tfp.mcmc.sample_chain(
+        seed=strm())
+    results1_ = tfp.mcmc.sample_chain(
         num_results=num_steps,
-        num_burnin_steps=0,
+        num_burnin_steps=10,
         current_state=init1,
         kernel=kernel1,
+        trace_fn=None,
         parallel_iterations=1)
-    self.evaluate([results1, extra1])
-    self.assertAllClose(
-        tf.reduce_mean(results0[0], axis=[0, 1]),
-        tf.squeeze(tf.concat(
-            [tf.reshape(tf.reduce_mean(x, axis=[0, 1]), [-1, 1])
-             for x in results1], axis=0)),
-        atol=0.1, rtol=0.1)
+    results1 = tf.concat(
+        [tf.reshape(x, [num_steps] + batch_shape + [-1]) for x in results1_],
+        axis=-1)
+    self.evaluate(
+        st.assert_true_cdf_equal_by_dkwm_two_sample(results0, results1))
 
   @parameterized.parameters(
       (1000, 5, 3),
