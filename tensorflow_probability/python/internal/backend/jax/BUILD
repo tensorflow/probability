@@ -90,7 +90,6 @@ py_test(
     main = "numpy_test.py",
     shard_count = 5,
     tags = [
-        "no-oss-ci",
         "notap",
         "tfp_jax",
     ],

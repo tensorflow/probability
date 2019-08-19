@@ -110,7 +110,7 @@ echo "${shard_tests}" \
     --copt=-O3 \
     --copt=-march=native \
     --notest_keep_going \
-    --test_tag_filters=-gpu,-requires-gpu-sm35,-no-oss-ci \
+    --test_tag_filters=-gpu,-requires-gpu-sm35,-no-oss-ci,-tfp_jax \
     --test_timeout 300,450,1200,3600 \
     --action_env=PATH \
     --action_env=LD_LIBRARY_PATH \
