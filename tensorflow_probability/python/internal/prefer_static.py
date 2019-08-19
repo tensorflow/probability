@@ -143,7 +143,7 @@ def broadcast_shape(x_shape, y_shape):
     return tf.broadcast_dynamic_shape(x_shape, y_shape)
 
   return tf.broadcast_static_shape(
-      tf.TensorShape(x_shape), tf.TensorShape(y_shape))
+      tf.TensorShape(x_shape_static), tf.TensorShape(y_shape_static))
 
 
 def cond(pred, true_fn=None, false_fn=None, name=None):

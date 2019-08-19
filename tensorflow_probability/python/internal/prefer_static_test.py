@@ -370,5 +370,28 @@ class NonNegativeAxisTest(test_case.TestCase):
     self.assertAllEqual([0, 2], self.evaluate(positive_axis))
 
 
+@test_util.run_all_in_graph_and_eager_modes
+class BroadcastShapeTest(test_case.TestCase):
+
+  def test_static(self):
+    self.assertAllEqual(
+        (3, 4, 2, 5),
+        prefer_static.broadcast_shape((4, 1, 1), (3, 1, 2, 5)))
+
+    self.assertAllEqual((3, 4, 2, 5), prefer_static.broadcast_shape(
+        tf.convert_to_tensor((4, 1, 1)), tf.convert_to_tensor((3, 1, 2, 5))))
+
+  def test_dynamic(self):
+    if tf.executing_eagerly():
+      return
+
+    shape = prefer_static.broadcast_shape(
+        tf.convert_to_tensor([3, 2, 1]),
+        tf.shape(tf1.placeholder_with_default(np.zeros((1, 5)),
+                                              shape=(None, 5))))
+    self.assertIsNone(tf.get_static_value(shape))
+    self.assertAllEqual([3, 2, 5], self.evaluate(shape))
+
+
 if __name__ == '__main__':
   tf.test.main()
