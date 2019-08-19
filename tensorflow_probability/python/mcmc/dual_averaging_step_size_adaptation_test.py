@@ -181,16 +181,17 @@ class DualAveragingStepSizeAdaptationTest(tf.test.TestCase,
     kernel = FakeMHKernel(
         FakeSteppedKernel(step_size=0.1),
         # Just over the target_accept_prob.
-        log_accept_ratio=tf.stack(tf.math.log(0.76)))
+        log_accept_ratio=tf.math.log(0.76))
     kernel = FakeWrapperKernel(kernel)
     kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         validate_args=True)
 
-    kernel_results = kernel.bootstrap_results(0.)
+    init_state = tf.convert_to_tensor(value=0.)
+    kernel_results = kernel.bootstrap_results(init_state)
     for _ in range(2):
-      _, kernel_results = kernel.one_step(0., kernel_results)
+      _, kernel_results = kernel.one_step(init_state, kernel_results)
 
     step_size = self.evaluate(
         kernel_results.inner_results.inner_results.accepted_results.step_size)
@@ -277,16 +278,20 @@ class DualAveragingStepSizeAdaptationTest(tf.test.TestCase,
 
   def testExample(self):
     tf.compat.v1.random.set_random_seed(tfp_test_util.test_seed())
-    target_log_prob_fn = tfd.Normal(loc=0., scale=1.).log_prob
+    target_dist = tfd.JointDistributionSequential([
+        tfd.Normal(0., 1.5),
+        tfd.Independent(
+            tfd.Normal(tf.zeros([2, 5], dtype=tf.float32), 5.),
+            reinterpreted_batch_ndims=2),
+    ])
     num_burnin_steps = 500
     num_results = 500
     num_chains = 64
-    step_size = 0.1
 
     kernel = tfp.mcmc.HamiltonianMonteCarlo(
-        target_log_prob_fn=target_log_prob_fn,
+        target_log_prob_fn=lambda *args: target_dist.log_prob(args),
         num_leapfrog_steps=2,
-        step_size=step_size,
+        step_size=target_dist.stddev(),
         seed=_set_seed(tfp_test_util.test_seed()))
     kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
         inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8))
@@ -294,7 +299,7 @@ class DualAveragingStepSizeAdaptationTest(tf.test.TestCase,
     _, log_accept_ratio = tfp.mcmc.sample_chain(
         num_results=num_results,
         num_burnin_steps=num_burnin_steps,
-        current_state=tf.zeros(num_chains),
+        current_state=target_dist.sample(num_chains),
         kernel=kernel,
         trace_fn=lambda _, pkr: pkr.inner_results.log_accept_ratio)
 
@@ -372,7 +377,7 @@ class DualAveragingStepSizeAdaptationStaticBroadcastingTest(
       _, kernel_results = kernel.one_step(state, kernel_results)
 
     step_size = self.evaluate(
-        kernel_results.inner_results.accepted_results.step_size,)
+        kernel_results.inner_results.accepted_results.step_size)
 
     self.assertAllClose(new_step_size, step_size)
 
