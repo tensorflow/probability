@@ -200,6 +200,60 @@ class FitTestFast(tf.test.TestCase):
     self.assertAllClose(
         model_coefficients_true_, model_coefficients_, atol=0.03, rtol=0.15)
 
+  def testRegularizationWithPenaltyFactor(self):
+    n = int(1e4)
+    [
+        model_matrix,
+        response,
+        _,  # model_coefficients_true
+        _,  # linear_response_true
+    ] = self.make_dataset(
+        n=n, d=2, link='linear')
+    # Really strong regularization should bring all regularized coefficients to
+    # approximately 0.
+    l2_regularizer = np.array(1e9 * n, model_matrix.dtype.as_numpy_dtype)
+
+    model_coefficients_uniform_penalty, _, is_converged_uniform_penalty, _ = (
+        tfp.glm.fit(
+            model_matrix,
+            response,
+            tfp.glm.Normal(),
+            l2_regularizer=l2_regularizer,
+            fast_unsafe_numerics=self.fast,
+            maximum_iterations=10))
+
+    model_coefficients_penalty_factor, _, is_converged_penalty_factor, _ = (
+        tfp.glm.fit(
+            model_matrix,
+            response,
+            tfp.glm.Normal(),
+            l2_regularizer=l2_regularizer,
+            # only penalize (apply regularization to) second coefficient
+            l2_regularization_penalty_factor=[0.0, 1.0],
+            fast_unsafe_numerics=self.fast,
+            maximum_iterations=10))
+
+    [
+        model_coefficients_uniform_penalty_, is_converged_uniform_penalty_,
+        model_coefficients_penalty_factor_, is_converged_penalty_factor_
+    ] = self.evaluate([
+        model_coefficients_uniform_penalty, is_converged_uniform_penalty,
+        model_coefficients_penalty_factor, is_converged_penalty_factor
+    ])
+
+    self.assertTrue(is_converged_uniform_penalty_)
+    self.assertTrue(is_converged_penalty_factor_)
+    # When regularization is applied to all coefficients, they should all be
+    # close to 0.
+    self.assertAllClose([0., 0.],
+                        model_coefficients_uniform_penalty_,
+                        rtol=1e-6,
+                        atol=1e-6)
+    # When regularization is applied only to second coefficient, only it should
+    # be close to 0.
+    self.assertGreater(np.abs(model_coefficients_penalty_factor_[0]), 1e-6)
+    self.assertNear(0., model_coefficients_penalty_factor_[1], err=1e-6)
+
 
 class FitTestSlow(FitTestFast):
 
