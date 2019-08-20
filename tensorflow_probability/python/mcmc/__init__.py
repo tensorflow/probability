@@ -28,6 +28,7 @@ from tensorflow_probability.python.mcmc.kernel import TransitionKernel
 from tensorflow_probability.python.mcmc.langevin import MetropolisAdjustedLangevinAlgorithm
 from tensorflow_probability.python.mcmc.langevin import UncalibratedLangevin
 from tensorflow_probability.python.mcmc.metropolis_hastings import MetropolisHastings
+from tensorflow_probability.python.mcmc.nuts import NoUTurnSampler
 from tensorflow_probability.python.mcmc.random_walk_metropolis import random_walk_normal_fn
 from tensorflow_probability.python.mcmc.random_walk_metropolis import random_walk_uniform_fn
 from tensorflow_probability.python.mcmc.random_walk_metropolis import RandomWalkMetropolis
@@ -49,6 +50,7 @@ __all__ = [
     'HamiltonianMonteCarlo',
     'MetropolisAdjustedLangevinAlgorithm',
     'MetropolisHastings',
+    'NoUTurnSampler',
     'RandomWalkMetropolis',
     'ReplicaExchangeMC',
     'SimpleStepSizeAdaptation',

@@ -14,11 +14,12 @@
 # ============================================================================
 """No U-Turn Sampler.
 
-The implementation closely follows [1; Algorithm 3].
-The path length is set adaptively; the step size is fixed.
+The implementation closely follows [1; Algorithm 3], with Multinomial sampling
+on the tree instead of slice sampling.
 
-Achieves batch execution across chains by unrolling the tree doubling into a TF
-while loop.
+Achieves batch execution across chains by precomputing the recursive tree
+doubling data access patterns and then executes this "unrolled" data pattern via
+a `tf.while_loop`.
 
 #### References
 
@@ -50,13 +51,6 @@ TF_WHILE_PARALLEL_ITERATIONS = 10     # Default: 10
 
 TREE_COUNT_DTYPE = tf.int32           # Default: tf.int32
 
-# TesnorArray now works under XLA thanks to cl/259630499.  However, at the time
-# this cl was being written I rewrote things to not use TensorArray's as a
-# contingency plan. Although NUTS successfully compiles whether or not we use
-# TensorArray, I think it'd be interesting to see if there's any performance
-# difference between the two.
-USE_TENSORARRAY = False               # Default: False
-
 # Whether to use slice sampling (original NUTS implementation) or multinomial
 # sampling from the tree trajectory.
 MULTINOMIAL_SAMPLE = True             # Default: True
@@ -65,7 +59,7 @@ MULTINOMIAL_SAMPLE = True             # Default: True
 ##############################################################
 
 __all__ = [
-    'NoUTurnSamplerUnrolled',
+    'NoUTurnSampler',
 ]
 
 NUTSKernelResults = collections.namedtuple('NUTSKernelResults', [
@@ -120,7 +114,7 @@ TreeDoublingMetaState = collections.namedtuple(
     ])
 
 
-class NoUTurnSamplerUnrolled(TransitionKernel):
+class NoUTurnSampler(TransitionKernel):
   """Runs one step of the No U-Turn Sampler.
 
   The No U-Turn Sampler (NUTS) is an adaptive variant of the Hamiltonian Monte
@@ -183,7 +177,7 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'nuts_kernel').
     """
-    with tf.name_scope(name or 'NoUTurnSamplerUnrolled') as name:
+    with tf.name_scope(name or 'NoUTurnSampler') as name:
       # Process `max_tree_depth` argument.
       max_tree_depth = tf.get_static_value(max_tree_depth)
       if max_tree_depth is None or max_tree_depth < 1:
@@ -395,20 +389,11 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
 
       def _init(shape_and_dtype):
         """Allocate TensorArray for storing state and momentum."""
-        if USE_TENSORARRAY:
-          return [  # pylint: disable=g-complex-comprehension
-              tf.TensorArray(
-                  dtype=d,
-                  size=self.max_tree_depth + 1,
-                  element_shape=s,
-                  clear_after_read=False) for (s, d) in shape_and_dtype
-          ]
-        else:
-          return [  # pylint: disable=g-complex-comprehension
-              tf.zeros(
-                  tf.TensorShape([self.max_tree_depth + 1]).concatenate(s),
-                  dtype=d) for (s, d) in shape_and_dtype
-          ]
+        return [  # pylint: disable=g-complex-comprehension
+            tf.zeros(
+                tf.TensorShape([self.max_tree_depth + 1]).concatenate(s),
+                dtype=d) for (s, d) in shape_and_dtype
+        ]
 
       get_shapes_and_dtypes = lambda x: [(x_.shape, x_.dtype) for x_ in x]
       momentum_state_memory = MomentumStateSwap(
@@ -719,26 +704,17 @@ class NoUTurnSamplerUnrolled(TransitionKernel):
           write_instruction.gather([iter_ // 2]),
           self.max_tree_depth)
 
-      if USE_TENSORARRAY:
-        momentum_state_memory = MomentumStateSwap(
-            momentum_swap=[
-                old.write(write_index, new) for old, new in
-                zip(momentum_state_memory.momentum_swap, next_momentum_parts)],
-            state_swap=[
-                old.write(write_index, new) for old, new in
-                zip(momentum_state_memory.state_swap, next_state_parts)])
-      else:
-        momentum_state_memory = MomentumStateSwap(
-            momentum_swap=[
-                tf.tensor_scatter_nd_update(old, [write_index], [new])
-                for old, new in zip(momentum_state_memory.momentum_swap,
-                                    next_momentum_parts)
-            ],
-            state_swap=[
-                tf.tensor_scatter_nd_update(old, [write_index], [new])
-                for old, new in zip(momentum_state_memory.state_swap,
-                                    next_state_parts)
-            ])
+      momentum_state_memory = MomentumStateSwap(
+          momentum_swap=[
+              tf.tensor_scatter_nd_update(old, [write_index], [new])
+              for old, new in zip(momentum_state_memory.momentum_swap,
+                                  next_momentum_parts)
+          ],
+          state_swap=[
+              tf.tensor_scatter_nd_update(old, [write_index], [new])
+              for old, new in zip(momentum_state_memory.state_swap,
+                                  next_state_parts)
+          ])
       batch_shape = prefer_static.shape(next_target)
       has_not_u_turn_at_even_step = tf.ones(batch_shape, dtype=tf.bool)
 
@@ -835,24 +811,14 @@ def has_not_u_turn_at_odd_step(read_indexes, direction, momentum_state_memory,
 
   def _get_left_state_and_check_u_turn(left_current_index, no_u_turns_last):
     """Check U turn on a single index."""
-    if USE_TENSORARRAY:
-      momentum_left = [
-          x.gather(left_current_index)
-          for x in momentum_state_memory.momentum_swap
-      ]
-      state_left = [
-          x.gather(left_current_index)
-          for x in momentum_state_memory.state_swap
-      ]
-    else:
-      momentum_left = [
-          tf.gather(x, left_current_index, axis=0)
-          for x in momentum_state_memory.momentum_swap
-      ]
-      state_left = [
-          tf.gather(x, left_current_index, axis=0)
-          for x in momentum_state_memory.state_swap
-      ]
+    momentum_left = [
+        tf.gather(x, left_current_index, axis=0)
+        for x in momentum_state_memory.momentum_swap
+    ]
+    state_left = [
+        tf.gather(x, left_current_index, axis=0)
+        for x in momentum_state_memory.state_swap
+    ]
 
     no_u_turns_current = has_not_u_turn(
         state_left,

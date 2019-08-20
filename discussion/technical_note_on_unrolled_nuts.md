@@ -314,11 +314,13 @@ A: There are a few differences:
   version take batching as top priority so that the resulting algorithm is
   compatible with other `tfp.mcmc.*` kernels. This different approach to
   batching makes the two implementations looks/feels quite different when you
-  look at the source code.
+  look at the source code. More importantly, a batch-first implementation
+  enables the unique opportunity of cross chain step size adaptation and
+  diagnostics, which would be extremely difficult if not impossible using `pfor`.
   2. the check u-turn is done quite differently: numpyro compute the checkpoint
   for checking u-turn at [each leaf](https://github.com/pyro-ppl/numpyro/blob/0c9696b147098730ba1a487afdc5de51a9c675c9/numpyro/hmc_util.py#L571-L583)
-  at runtime, and we pre-run the recursive to build the instruction table and do
-  indexing at run time.
+  at runtime, whereas we pre-run the recursive to build the instruction table
+  and indexing to get the current check point at run time.
 
 
 ### References:

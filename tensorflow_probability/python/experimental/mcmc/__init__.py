@@ -19,13 +19,11 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.experimental.mcmc.nuts import NoUTurnSampler
-from tensorflow_probability.python.experimental.mcmc.nuts_unrolled import NoUTurnSamplerUnrolled
 
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'NoUTurnSampler',
-    'NoUTurnSamplerUnrolled',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

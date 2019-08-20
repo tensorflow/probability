@@ -37,7 +37,7 @@ tfd = tfp.distributions
 @tf.function(autograph=False)
 def run_nuts_chain(event_size, batch_size, num_steps, initial_state=None):
   def target_log_prob_fn(event):
-    with tf.name_scope('nuts_test_target_log_pro'):
+    with tf.name_scope('nuts_test_target_log_prob'):
       return tfd.MultivariateNormalDiag(
           tf.zeros(event_size),
           scale_identity_multiplier=1.).log_prob(event)
@@ -45,14 +45,14 @@ def run_nuts_chain(event_size, batch_size, num_steps, initial_state=None):
   if initial_state is None:
     initial_state = tf.zeros([batch_size, event_size])
 
-  kernel = tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
+  kernel = tfp.mcmc.NoUTurnSampler(
       target_log_prob_fn,
       step_size=[0.3],
       unrolled_leapfrog_steps=2,
       max_tree_depth=4,
       seed=1)
 
-  chain_state, extra = tfp.mcmc.sample_chain(
+  chain_state, leapfrogs_taken = tfp.mcmc.sample_chain(
       num_results=num_steps,
       num_burnin_steps=0,
       # Intentionally pass a list argument to test that singleton lists are
@@ -60,9 +60,10 @@ def run_nuts_chain(event_size, batch_size, num_steps, initial_state=None):
       # uses an unwrapped singleton).
       current_state=[initial_state],
       kernel=kernel,
+      trace_fn=lambda _, pkr: pkr.leapfrogs_taken,
       parallel_iterations=1)
 
-  return chain_state, extra.leapfrogs_taken
+  return chain_state, leapfrogs_taken
 
 
 def assert_univariate_target_conservation(test, target_d, step_size):
@@ -77,7 +78,7 @@ def assert_univariate_target_conservation(test, target_d, step_size):
 
   @tf.function(autograph=False)
   def run_chain():
-    nuts = tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
+    nuts = tfp.mcmc.NoUTurnSampler(
         target_d.log_prob,
         step_size=step_size,
         max_tree_depth=3,
@@ -185,7 +186,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
           tfd.Normal(tf.range(6, dtype=tf.float32),
                      tf.constant(1.)),
           reinterpreted_batch_ndims=1).log_prob(x))
-    kernel0 = tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
+    kernel0 = tfp.mcmc.NoUTurnSampler(
         log_prob0,
         step_size=0.3,
         seed=strm())
@@ -207,7 +208,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
               tfd.Normal(tf.constant([[2., 3.], [4., 5.]]), tf.constant(1.)),
               reinterpreted_batch_ndims=2).log_prob(state2)
       )
-    kernel1 = tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
+    kernel1 = tfp.mcmc.NoUTurnSampler(
         log_prob1,
         step_size=0.3,
         seed=strm())
@@ -244,7 +245,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
               loc=tf.cast(mu, dtype=tf.float64),
               scale_tril=tf.cast(scale_tril, dtype=tf.float64)).log_prob(event)
 
-      nuts = tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
+      nuts = tfp.mcmc.NoUTurnSampler(
           target_log_prob_fn,
           step_size=[step_size],
           max_tree_depth=5,
@@ -334,7 +335,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
 
       kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
           tfp.mcmc.TransformedTransitionKernel(
-              inner_kernel=tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
+              inner_kernel=tfp.mcmc.NoUTurnSampler(
                   target_log_prob_fn=log_prob,
                   step_size=step_size0,
                   seed=strm()),
@@ -396,7 +397,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
       init_states = neals_funnel.sample(nchains, seed=strm())
       _, has_divergence = tfp.mcmc.sample_chain(
           num_results=100,
-          kernel=tfp.experimental.mcmc.NoUTurnSamplerUnrolled(
+          kernel=tfp.mcmc.NoUTurnSampler(
               target_log_prob_fn=lambda *args: neals_funnel.log_prob(args),
               step_size=[1., 1.],
               seed=strm()),

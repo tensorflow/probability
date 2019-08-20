@@ -36,7 +36,6 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":nuts_autobatching",
-        ":nuts_unrolled",
         # tensorflow dep,
     ],
 )
@@ -92,59 +91,4 @@ py_test(
         "requires-gpu-sm35",
     ],
     deps = [":nuts_testlib"],
-)
-
-py_library(
-    name = "nuts_unrolled",
-    srcs = ["nuts_unrolled.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/distributions:seed_stream",
-        "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/math:generic",
-        "//tensorflow_probability/python/mcmc:kernel",
-        "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
-    ],
-)
-
-py_library(
-    name = "nuts_unrolled_testlib",
-    srcs = ["nuts_unrolled_test.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # absl/testing:parameterized dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/distributions/internal:statistical_testing",
-        "//tensorflow_probability/python/internal:assert_util",
-    ],
-)
-
-py_test(
-    name = "nuts_unrolled_test",
-    size = "large",
-    srcs = ["nuts_unrolled_test.py"],
-    shard_count = 7,
-    srcs_version = "PY2AND3",
-    tags = ["nozapfhahn"],
-    deps = [
-        ":nuts_unrolled_testlib",
-    ],
-)
-
-py_test(
-    name = "nuts_unrolled_test_gpu",
-    size = "large",
-    srcs = ["nuts_unrolled_test.py"],
-    main = "nuts_unrolled_test.py",
-    shard_count = 7,
-    srcs_version = "PY2AND3",
-    tags = [
-        "notap",
-        "nozapfhahn",
-        "requires-gpu-sm35",
-    ],
-    deps = [":nuts_unrolled_testlib"],
 )

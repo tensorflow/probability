@@ -38,6 +38,7 @@ py_library(
         ":kernel",
         ":langevin",
         ":metropolis_hastings",
+        ":nuts",
         ":random_walk_metropolis",
         ":replica_exchange_mc",
         ":sample",
@@ -120,6 +121,62 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
     ],
+)
+
+py_library(
+    name = "nuts",
+    srcs = ["nuts.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":kernel",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:seed_stream",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
+    ],
+)
+
+py_library(
+    name = "nuts_testlib",
+    srcs = ["nuts_test.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:assert_util",
+    ],
+)
+
+py_test(
+    name = "nuts_test",
+    size = "large",
+    srcs = ["nuts_test.py"],
+    shard_count = 7,
+    srcs_version = "PY2AND3",
+    tags = ["nozapfhahn"],
+    deps = [
+        ":nuts_testlib",
+    ],
+)
+
+py_test(
+    name = "nuts_test_gpu",
+    size = "large",
+    srcs = ["nuts_test.py"],
+    main = "nuts_test.py",
+    shard_count = 7,
+    srcs_version = "PY2AND3",
+    tags = [
+        "notap",
+        "nozapfhahn",
+        "requires-gpu-sm35",
+    ],
+    deps = [":nuts_testlib"],
 )
 
 py_library(
