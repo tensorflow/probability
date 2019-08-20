@@ -46,7 +46,7 @@ def _to_ndarray(x):
 
 
 def _adjoint(x):
-  return np.conj(np.transpose(x, axes=[-1, -2]))
+  return np.conj(np.swapaxes(x, -1, -2))
 
 
 def _matmul_with_broadcast(a,
