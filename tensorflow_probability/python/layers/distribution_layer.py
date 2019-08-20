@@ -1806,7 +1806,7 @@ class VariationalGaussianProcess(DistributionLambda):
             variational_inducing_observations_scale=(
                 self._variational_inducing_observations_scale),
             mean_fn=self._mean_fn,
-            observation_noise_variance=tf.nn.softplus(
+            observation_noise_variance=(
                 self._unconstrained_observation_noise_variance),
             jitter=self._jitter),
         convert_to_tensor_fn=convert_to_tensor_fn,
@@ -1841,10 +1841,18 @@ class VariationalGaussianProcess(DistributionLambda):
           name='mean')
       self._mean_fn = lambda x: self.mean
 
-    self._unconstrained_observation_noise_variance = self.add_variable(
-        initializer=self._unconstrained_observation_noise_variance_initializer,
-        dtype=self._dtype,
-        name='observation_noise_variance')
+    # This matches the default value of observation_noise_variance in the
+    # VariationalGaussianProcess distribution itself. As that logic changes
+    # (see b/136668249) we'll need to keep this in sync.
+    self._unconstrained_observation_noise_variance = 0.
+    if self._unconstrained_observation_noise_variance_initializer is not None:
+      unconstrained_observation_noise_variance = self.add_variable(
+          initializer=(
+              self._unconstrained_observation_noise_variance_initializer),
+          dtype=self._dtype,
+          name='observation_noise_variance')
+      self._unconstrained_observation_noise_variance = tf.nn.softplus(
+          unconstrained_observation_noise_variance)
 
     self._inducing_index_points = self.add_variable(
         name='inducing_index_points',
