@@ -107,6 +107,7 @@ fi
 #     See https://github.com/bazelbuild/bazel/issues/6648 and b/121259040.
 echo "${shard_tests}" \
   | xargs bazel test \
+    --compilation_mode=opt \
     --copt=-O3 \
     --copt=-march=native \
     --notest_keep_going \
