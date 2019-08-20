@@ -167,6 +167,7 @@ class BDF(base.Solver):
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'bdf').
     """
+    super(BDF, self).__init__(use_pfor_to_compute_jacobian, validate_args, name)
     # The default values of `rtol` and `atol` match `scipy.integrate.solve_ivp`.
     self._rtol = rtol
     self._atol = atol
@@ -181,22 +182,19 @@ class BDF(base.Solver):
     self._newton_step_size_factor = newton_step_size_factor
     self._bdf_coefficients = bdf_coefficients
     self._evaluate_jacobian_lazily = evaluate_jacobian_lazily
-    self._use_pfor_to_compute_jacobian = use_pfor_to_compute_jacobian
-    self._validate_args = validate_args
-    self._name = name
 
-  def solve(self,
-            ode_fn,
-            initial_time,
-            initial_state,
-            solution_times,
-            jacobian_fn=None,
-            jacobian_sparsity=None,
-            batch_ndims=None,
-            previous_solver_internal_state=None):
-    """See `tfp.math.ode.Solver.solve`."""
-
-    # The `solve` function is comprised of the following sequential stages:
+  def _solve(
+      self,
+      ode_fn,
+      initial_time,
+      initial_state,
+      solution_times,
+      jacobian_fn=None,
+      jacobian_sparsity=None,
+      batch_ndims=None,
+      previous_solver_internal_state=None,
+  ):
+    # This function is comprised of the following sequential stages:
     # (1) Make static assertions.
     # (2) Initialize variables.
     # (3) Make non-static assertions.
@@ -504,7 +502,7 @@ class BDF(base.Solver):
       return accepted, diagnostics, iterand, solver_internal_state
 
     # (1) Make static assertions.
-    # TODO(parsiad): Support specifying Jacobian sparsity patterns.
+    # TODO(b/138304296): Support specifying Jacobian sparsity patterns.
     if jacobian_sparsity is not None:
       raise NotImplementedError('The BDF solver does not support specifying '
                                 'Jacobian sparsity patterns.')
@@ -520,7 +518,6 @@ class BDF(base.Solver):
       state_shape = tf.shape(initial_state)
       state_dtype = initial_state.dtype
       util.error_if_not_real_or_complex(initial_state, 'initial_state')
-      # TODO(parsiad): Support complex automatic Jacobians.
       if jacobian_fn is None and state_dtype.is_complex:
         raise NotImplementedError('The BDF solver does not support automatic '
                                   'Jacobian computations for complex dtypes.')
@@ -531,13 +528,15 @@ class BDF(base.Solver):
       # `real_dtype` is the floating point `dtype` associated with
       # `initial_state.dtype` (recall that the latter can be complex).
       real_dtype = tf.abs(initial_state).dtype
-      initial_time = tf.convert_to_tensor(initial_time, dtype=real_dtype)
+      # Use tf.cast instead of tf.convert_to_tensor for differentiable
+      # parameters because the tf.custom_gradient decorator converts raw floats
+      # into tf.float32, which cannot be converted to tf.float64.
+      initial_time = tf.cast(initial_time, real_dtype)
       num_solution_times = 0
       if solution_times_chosen_by_solver:
-        final_time = solution_times.final_time
-        final_time = tf.convert_to_tensor(final_time, dtype=real_dtype)
+        final_time = tf.cast(solution_times.final_time, real_dtype)
       else:
-        solution_times = tf.convert_to_tensor(solution_times, dtype=real_dtype)
+        solution_times = tf.cast(solution_times, real_dtype)
         num_solution_times = tf.size(solution_times)
         solution_time_array = tf.TensorArray(
             solution_times.dtype, size=num_solution_times,

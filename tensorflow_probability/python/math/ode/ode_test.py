@@ -211,6 +211,60 @@ class StiffTest(parameterized.TestCase, tf.test.TestCase):
         self.evaluate(results.states[-1, 0]), -1.5, rtol=0., atol=0.05)
 
 
+@parameterized.named_parameters([('bdf', tfp.math.ode.BDF)])
+class GradientTest(parameterized.TestCase, tf.test.TestCase):
+
+  def test_linear_dense(self, solver):
+    initial_time = 0.
+    jacobian = -np.float64([[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]])
+    num_odes = jacobian.shape[0]
+    initial_state_value = np.float64([1.] * num_odes)
+    initial_state = tf.constant(initial_state_value, dtype=tf.float64)
+
+    def ode_fn(_, state):
+      return tf.squeeze(tf.matmul(jacobian, state[:, tf.newaxis]))
+
+    intermediate_time = 1.
+    final_time = 2.
+    solver_instance = solver(rtol=_RTOL, atol=_ATOL)
+    with tf.GradientTape() as tape:
+      tape.watch(initial_state)
+      results = solver_instance.solve(
+          ode_fn,
+          initial_time,
+          initial_state,
+          solution_times=[intermediate_time, final_time])
+      intermediate_state = results.states[0]
+    grad = self.evaluate(tape.gradient(intermediate_state, initial_state))
+    matrix_exponential_of_jacobian = np.float64(
+        [[+2.3703878775011322, +0.2645063729368097, -0.8413751316275110],
+         [-0.0900545996427410, +0.7326649140674798, -0.4446155722222950],
+         [-1.5504970767866180, -0.7991765448018465, +0.9521439871829201]])
+    grad_exact = np.dot(np.ones([num_odes]), matrix_exponential_of_jacobian)
+    self.assertAllClose(grad, grad_exact)
+
+  def test_riccati(self, solver):
+    ode_fn = lambda time, state: (state - time)**2 + 1.
+    initial_time = 0.
+    initial_state_value = 0.5
+    initial_state = tf.constant(initial_state_value, dtype=tf.float64)
+    final_time = 1.
+    jacobian_fn = lambda time, state: 2. * (state - time)
+    solver_instance = solver(rtol=_RTOL, atol=_ATOL)
+    with tf.GradientTape() as tape:
+      tape.watch(initial_state)
+      results = solver_instance.solve(
+          ode_fn,
+          initial_time,
+          initial_state,
+          solution_times=[final_time],
+          jacobian_fn=jacobian_fn)
+      final_state = results.states[-1]
+    grad = self.evaluate(tape.gradient(final_state, initial_state))
+    grad_exact = 1. / (1. - initial_state_value * final_time)**2
+    self.assertAllClose(grad, grad_exact, rtol=1e-3, atol=1e-3)
+
+
 @test_util.run_all_in_graph_and_eager_modes
 @parameterized.named_parameters([('bdf', tfp.math.ode.BDF)])
 class GeneralTest(parameterized.TestCase, tf.test.TestCase):

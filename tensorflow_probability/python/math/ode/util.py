@@ -20,6 +20,8 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.math.gradient import value_and_gradient
+
 
 def assert_increasing(tensor, identifier):
   """Assert if a `Tensor` is strictly increasing."""
@@ -67,7 +69,7 @@ def get_jacobian_fn_mat(jacobian_fn, ode_fn_vec, state_shape, use_pfor):
 
   Args:
     jacobian_fn: User-specified `jacobian_fn` passed to `solve`.
-    ode_fn_vec: User-specified `ode_fn` passed to `solve`.
+    ode_fn_vec: Result of `get_ode_fn_vec`.
     state_shape: The shape of the second argument and output of `ode_fn`.
     use_pfor: User-specified `use_pfor` passed to `solve`.
 
@@ -75,19 +77,7 @@ def get_jacobian_fn_mat(jacobian_fn, ode_fn_vec, state_shape, use_pfor):
     The wrapper described above.
   """
   if jacobian_fn is None:
-
-    def automatic_jacobian_fn_mat(time, state_vec):
-      with tf.GradientTape(
-          watch_accessed_variables=False, persistent=not use_pfor) as tape:
-        tape.watch(state_vec)
-        outputs = ode_fn_vec(time, state_vec)
-      jacobian_mat = tape.jacobian(
-          outputs, state_vec, experimental_use_pfor=use_pfor)
-      if jacobian_mat is None:
-        return tf.zeros([tf.size(state_vec)] * 2, dtype=state_vec.dtype)
-      return jacobian_mat
-
-    return automatic_jacobian_fn_mat
+    return _AutomaticJacobian(ode_fn_vec, use_pfor)
 
   if not callable(jacobian_fn):
     constant_jacobian_mat = tf.reshape(
@@ -157,3 +147,67 @@ def next_step_size(step_size, order, error_ratio, safety_factor,
   factor = error_ratio**(-1. / (order_cast + 1.))
   return step_size * tf.clip_by_value(
       safety_factor * factor, min_step_size_factor, max_step_size_factor)
+
+
+def stop_gradient_of_real_or_complex_entries(nested):
+  """Calls `tf.stop_gradient` on real or complex elements of a nested structure.
+
+  Args:
+    nested: The nested structure. May contain `Tensor`s with different `dtype`s.
+
+  Returns:
+    The resulting nested structure.
+  """
+  return tf.nest.pack_sequence_as(nested, [
+      tf.stop_gradient(tensor)
+      if tensor.dtype.is_floating or tensor.dtype.is_complex else tensor
+      for tensor in tf.nest.flatten(nested)
+  ])
+
+
+def right_mult_by_jacobian_mat(jacobian_fn_mat, ode_fn_vec, time, state_vec,
+                               vec):
+  """Right multiplies a vector by the Jacobian.
+
+  The Jacobian is constructed by calling `jacobian_fn_mat(time, state_vec)` if
+  doing so does not require automatic differentiation. Otherwise, chain rule
+  automatic differentiation is applied to `ode_fn_vec` to obtain the Jacobian.
+
+  Args:
+    jacobian_fn_mat: Result of `get_jacobian_fn_mat`.
+    ode_fn_vec: Result of `get_ode_fn_vec`.
+    time: Scalar float `Tensor` time at which to evalute the Jacobian.
+    state_vec: `Tensor` state at which to evaluate the Jacobian.
+    vec: `Tensor` with shape is compatible with the Jacobian.
+
+  Returns:
+    `Tensor` representing the dot product.
+  """
+  if isinstance(jacobian_fn_mat, _AutomaticJacobian):
+    # Compute the dot product by using chain rule automatic differentiation.
+    _, dot_product = value_and_gradient(
+        lambda x: ode_fn_vec(time, x), state_vec, output_gradients=vec)
+  else:
+    # Compute the dot product by explicitly constructing the Jacobian matrix.
+    jacobian_mat = jacobian_fn_mat(time, state_vec)
+    dot_product = tf.reshape(tf.matmul(vec[tf.newaxis, :], jacobian_mat), [-1])
+  return dot_product
+
+
+class _AutomaticJacobian(object):
+  """Callable that returns a Jacobian computed by automatic differentiation."""
+
+  def __init__(self, ode_fn_vec, use_pfor):
+    self._ode_fn_vec = ode_fn_vec
+    self._use_pfor = use_pfor
+
+  def __call__(self, time, state_vec):
+    with tf.GradientTape(
+        watch_accessed_variables=False, persistent=not self._use_pfor) as tape:
+      tape.watch(state_vec)
+      outputs = self._ode_fn_vec(time, state_vec)
+    jacobian_mat = tape.jacobian(
+        outputs, state_vec, experimental_use_pfor=self._use_pfor)
+    if jacobian_mat is None:
+      return tf.zeros([tf.size(state_vec)] * 2, dtype=state_vec.dtype)
+    return jacobian_mat
