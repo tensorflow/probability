@@ -112,13 +112,9 @@ def _cholesky_solve(chol, rhs, name=None):
 
 def _diag(diagonal, name=None):
   del name
-  nbatch = int(np.prod(diagonal.shape[:-1]))
-  flat_diag = np.reshape(diagonal, [nbatch, diagonal.shape[-1]])
-  result = np.empty(flat_diag.shape + (flat_diag.shape[-1],),
-                    dtype=flat_diag.dtype)
-  for i in range(nbatch):
-    result[i] = np.diag(flat_diag[i])
-  return result.reshape(*(diagonal.shape + (diagonal.shape[-1],)))
+  return _set_diag(
+      np.zeros(diagonal.shape + (diagonal.shape[-1],), dtype=diagonal.dtype),
+      diagonal)
 
 
 def _eye(num_rows, num_columns=None, batch_shape=None,

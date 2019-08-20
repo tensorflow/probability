@@ -89,10 +89,7 @@ py_test(
     srcs = ["numpy_test.py"],
     main = "numpy_test.py",
     shard_count = 5,
-    tags = [
-        "notap",
-        "tfp_jax",
-    ],
+    tags = ["tfp_jax"],
     deps = [
         ":jax",
         ":jax_testlib",

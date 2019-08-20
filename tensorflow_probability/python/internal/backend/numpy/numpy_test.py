@@ -127,8 +127,9 @@ single_arrays = functools.partial(n_same_shape, n=1, as_tuple=False)
 
 
 @hps.composite
-def array_and_axis(draw, strategy=None):
-  x = draw(strategy or single_arrays(shape=shapes(min_dims=1)))
+def array_axis_tuples(draw, strategy=None, elements=None):
+  x = draw(strategy or single_arrays(shape=shapes(min_dims=1),
+                                     elements=elements))
   rank = len(x.shape)
   axis = draw(hps.integers(-rank, rank - 1))
   return x, axis
@@ -178,10 +179,9 @@ def matmul_compatible_pairs(draw,
   x_strategy = x_strategy or single_arrays(
       shape=shapes(min_dims=2, max_dims=5), dtype=dtype, elements=elements)
   x = draw(x_strategy)
-  x_shape = x.shape
+  x_shape = tuple(map(int, x.shape))
   y_shape = x_shape[:-2] + x_shape[-1:] + (draw(hps.integers(1, 10)),)
-  y = draw(
-      hnp.arrays(dtype, y_shape, elements=elements))
+  y = draw(hnp.arrays(dtype, y_shape, elements=elements))
   return x, y
 
 
@@ -256,7 +256,8 @@ NUMPY_TEST_CASES = [
     #         keywords=None,
     #         defaults=(False, False, False, False, False, False, None))
     TestCase('linalg.matmul', [matmul_compatible_pairs()]),
-    TestCase('linalg.det', [nonsingular_matrices()]),
+    TestCase('linalg.det', [nonsingular_matrices()],
+             jax_disabled=True),  # https://github.com/google/jax/issues/1213
 
     # ArgSpec(args=['a', 'name', 'conjugate'], varargs=None, keywords=None)
     TestCase('linalg.matrix_transpose',
@@ -302,8 +303,8 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['input', 'axis', 'output_type', 'name'], varargs=None,
     #         keywords=None, defaults=(None, tf.int64, None))
-    TestCase('math.argmax', [array_and_axis()]),
-    TestCase('math.argmin', [array_and_axis()]),
+    TestCase('math.argmax', [array_axis_tuples()]),
+    TestCase('math.argmin', [array_axis_tuples()]),
 
     # ArgSpec(args=['input', 'diagonal', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -337,27 +338,29 @@ NUMPY_TEST_CASES = [
     # ArgSpec(args=['input_tensor', 'axis', 'keepdims', 'name'], varargs=None,
     #         keywords=None, defaults=(None, False, None))
     TestCase('math.reduce_all', [
-        array_and_axis(
+        array_axis_tuples(
             single_arrays(
                 shape=shapes(min_dims=1),
                 dtype=np.bool,
                 elements=hps.booleans()))
     ]),
     TestCase('math.reduce_any', [
-        array_and_axis(
+        array_axis_tuples(
             single_arrays(
                 shape=shapes(min_dims=1),
                 dtype=np.bool,
                 elements=hps.booleans()))
     ]),
-    TestCase('math.reduce_logsumexp', [array_and_axis()]),
-    TestCase('math.reduce_max', [array_and_axis()]),
-    TestCase('math.reduce_mean', [array_and_axis()]),
-    TestCase('math.reduce_min', [array_and_axis()]),
-    TestCase('math.reduce_prod', [array_and_axis()]),
-    TestCase('math.reduce_std', [array_and_axis()]),
-    TestCase('math.reduce_sum', [array_and_axis()]),
-    TestCase('math.reduce_variance', [array_and_axis()]),
+    TestCase('math.reduce_logsumexp', [array_axis_tuples()]),
+    TestCase('math.reduce_max', [array_axis_tuples()]),
+    TestCase('math.reduce_mean', [array_axis_tuples()]),
+    TestCase('math.reduce_min', [array_axis_tuples()]),
+    TestCase('math.reduce_prod', [array_axis_tuples()]),
+    TestCase('math.reduce_std',
+             [array_axis_tuples(elements=floats(-1e6, 1e6))]),
+    TestCase('math.reduce_sum', [array_axis_tuples()]),
+    TestCase('math.reduce_variance',
+             [array_axis_tuples(elements=floats(-1e6, 1e6))]),
 
     # ArgSpec(args=['inputs', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -409,16 +412,17 @@ NUMPY_TEST_CASES = [
     # ArgSpec(args=['x', 'axis', 'exclusive', 'reverse', 'name'], varargs=None,
     #         keywords=None, defaults=(0, False, False, None))
     TestCase('math.cumprod', [
-        hps.tuples(array_and_axis(), hps.booleans(),
+        hps.tuples(array_axis_tuples(), hps.booleans(),
                    hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
     ]),
     TestCase('math.cumsum', [
-        hps.tuples(array_and_axis(), hps.booleans(),
+        hps.tuples(array_axis_tuples(), hps.booleans(),
                    hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
     ]),
 
     # args=['input', 'name']
-    TestCase('linalg.slogdet', [nonsingular_matrices()]),
+    TestCase('linalg.slogdet', [nonsingular_matrices()],
+             jax_disabled=True),  # https://github.com/google/jax/issues/1213
     # ArgSpec(args=['x', 'name'], varargs=None, keywords=None, defaults=(None,))
     TestCase('math.abs', [single_arrays()]),
     TestCase('math.acos', [single_arrays(elements=floats(-1., 1.))]),
