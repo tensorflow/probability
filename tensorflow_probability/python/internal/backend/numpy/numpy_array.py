@@ -178,16 +178,16 @@ def _slice(input_, begin, size, name=None):  # pylint: disable=unused-argument,r
 
 def _split(value, num_or_size_splits, axis=0, num=None, name='split'):  # pylint: disable=unused-argument
   """Map tf.split -> np.split."""
-  indices_or_sections = num_or_size_splits
-  if np.array(indices_or_sections).ndim == 1:
+  indices_or_sections = np.array(num_or_size_splits)
+  if indices_or_sections.ndim == 1:
     if any(idx == -1 for idx in indices_or_sections):
       # Numpy parameterizes by split indices and returns nsplits+1 arrays.
       total_splits = sum(idx for idx in indices_or_sections if idx != -1)
-      remainder = max(0, np.array(value).shape[axis] - total_splits)
+      remainder = int(max(0, np.array(value).shape[axis] - total_splits))
       indices_or_sections = [
           idx if idx != -1 else remainder for idx in indices_or_sections
       ]
-    indices_or_sections = np.cumsum(indices_or_sections)[:-1]
+    indices_or_sections = np.cumsum(np.array(indices_or_sections))[:-1]
   return np.split(value, indices_or_sections, axis)
 
 

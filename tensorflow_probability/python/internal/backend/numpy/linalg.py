@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 # Dependency imports
 import numpy as np
 
@@ -71,6 +72,9 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+
+
 def _band_part(input, num_lower, num_upper, name=None):  # pylint: disable=redefined-builtin
   del name
   result = input
@@ -84,6 +88,10 @@ def _band_part(input, num_lower, num_upper, name=None):  # pylint: disable=redef
 def _cholesky_solve(chol, rhs, name=None):
   """Scipy cho_solve does not broadcast, so we must do so explicitly."""
   del name
+  if JAX_MODE:  # But JAX uses XLA, which can do a batched solve.
+    chol = chol + np.zeros(rhs.shape[:-2] + (1, 1), dtype=chol.dtype)
+    rhs = rhs + np.zeros(chol.shape[:-2] + (1, 1), dtype=rhs.dtype)
+    return scipy_linalg.cho_solve((chol, True), rhs)
   try:
     bcast = np.broadcast(chol[..., :1], rhs)
   except ValueError as e:
@@ -155,6 +163,11 @@ def _matmul(a, b,
 def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):
   """Scipy solve does not broadcast, so we must do so explicitly."""
   del name
+  if JAX_MODE:  # But JAX uses XLA, which can do a batched solve.
+    matrix = matrix + np.zeros(rhs.shape[:-2] + (1, 1), dtype=matrix.dtype)
+    rhs = rhs + np.zeros(matrix.shape[:-2] + (1, 1), dtype=rhs.dtype)
+    return scipy_linalg.solve_triangular(matrix, rhs, lower=lower,
+                                         trans='C' if adjoint else 'N')
   try:
     bcast = np.broadcast(matrix[..., :1], rhs)
   except ValueError as e:
@@ -222,10 +235,13 @@ set_diag = utils.copy_docstring(
     tf.linalg.set_diag,
     _set_diag)
 
-# TODO(b/136555907): Add unit-test.
+
+SLogDet = collections.namedtuple('slogdet', 'sign,log_abs_determinant')
+
+
 slogdet = utils.copy_docstring(
     tf.linalg.slogdet,
-    np.linalg.slogdet)
+    lambda input, name=None: SLogDet(*np.linalg.slogdet(input)))
 
 matrix_transpose = utils.copy_docstring(
     tf.linalg.matrix_transpose,

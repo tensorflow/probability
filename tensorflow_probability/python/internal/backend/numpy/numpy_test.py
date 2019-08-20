@@ -123,12 +123,12 @@ def n_same_shape(draw, n, shape=shapes(), dtype=None, elements=None,
   return draw(hps.tuples(*([array_strategy] * n)))
 
 
-single_array = functools.partial(n_same_shape, n=1, as_tuple=False)
+single_arrays = functools.partial(n_same_shape, n=1, as_tuple=False)
 
 
 @hps.composite
 def array_and_axis(draw, strategy=None):
-  x = draw(strategy or single_array(shape=shapes(min_dims=1)))
+  x = draw(strategy or single_arrays(shape=shapes(min_dims=1)))
   rank = len(x.shape)
   axis = draw(hps.integers(-rank, rank - 1))
   return x, axis
@@ -136,7 +136,7 @@ def array_and_axis(draw, strategy=None):
 
 @hps.composite
 def sliceable_and_slices(draw, strategy=None):
-  x = draw(strategy or single_array(shape=shapes(min_dims=1)))
+  x = draw(strategy or single_arrays(shape=shapes(min_dims=1)))
   starts = []
   sizes = []
   for dim in x.shape:
@@ -148,7 +148,7 @@ def sliceable_and_slices(draw, strategy=None):
 
 @hps.composite
 def one_hot_params(draw):
-  indices = draw(single_array(dtype=np.int32, elements=hps.integers(0, 8)))
+  indices = draw(single_arrays(dtype=np.int32, elements=hps.integers(0, 8)))
   depth = np.maximum(1, np.max(indices)).astype(np.int32)
   dtype = draw(hps.sampled_from((np.int32, np.float32, np.complex64)))
   on_value = draw(hps.sampled_from((None, 1, 2)))
@@ -170,12 +170,12 @@ def array_and_diagonal(draw):
 
 
 @hps.composite
-def matmul_compatible_pair(draw,
-                           dtype=np.float64,
-                           x_strategy=None,
-                           elements=None):
+def matmul_compatible_pairs(draw,
+                            dtype=np.float64,
+                            x_strategy=None,
+                            elements=None):
   elements = elements or floats()
-  x_strategy = x_strategy or single_array(
+  x_strategy = x_strategy or single_arrays(
       shape=shapes(min_dims=2, max_dims=5), dtype=dtype, elements=elements)
   x = draw(x_strategy)
   x_shape = x.shape
@@ -186,9 +186,9 @@ def matmul_compatible_pair(draw,
 
 
 @hps.composite
-def psd_matrix(draw, eps=1e-2):
+def psd_matrices(draw, eps=1e-2):
   x = draw(
-      single_array(
+      single_arrays(
           shape=shapes(min_dims=2),
           elements=floats(min_value=-1e3, max_value=1e3)))
   y = np.swapaxes(x, -1, -2)
@@ -196,6 +196,17 @@ def psd_matrix(draw, eps=1e-2):
     x, y = y, x
   psd = np.matmul(x, y)
   return psd + eps * np.eye(psd.shape[-1])
+
+
+@hps.composite
+def nonsingular_matrices(draw):
+  mat = draw(psd_matrices())  # pylint: disable=no-value-for-parameter
+  signs = draw(
+      hnp.arrays(
+          mat.dtype,
+          mat.shape[:-2] + (1, 1),
+          elements=hps.sampled_from([-1., 1.])))
+  return mat * signs
 
 
 def gamma_params():
@@ -244,12 +255,12 @@ NUMPY_TEST_CASES = [
     #         varargs=None,
     #         keywords=None,
     #         defaults=(False, False, False, False, False, False, None))
-    TestCase('linalg.matmul', [matmul_compatible_pair()]),
-    TestCase('linalg.det', [psd_matrix()]),
+    TestCase('linalg.matmul', [matmul_compatible_pairs()]),
+    TestCase('linalg.det', [nonsingular_matrices()]),
 
     # ArgSpec(args=['a', 'name', 'conjugate'], varargs=None, keywords=None)
     TestCase('linalg.matrix_transpose',
-             [single_array(shape=shapes(min_dims=2))]),
+             [single_arrays(shape=shapes(min_dims=2))]),
 
     # ArgSpec(args=['a', 'x', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -269,7 +280,8 @@ NUMPY_TEST_CASES = [
     # ArgSpec(args=['chol', 'rhs', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
     TestCase('linalg.cholesky_solve', [
-        matmul_compatible_pair(x_strategy=psd_matrix().map(np.linalg.cholesky))
+        matmul_compatible_pairs(
+            x_strategy=psd_matrices().map(np.linalg.cholesky))
     ]),
 
     # ArgSpec(args=['coeffs', 'x', 'name'], varargs=None, keywords=None,
@@ -278,15 +290,15 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['diagonal', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
-    TestCase('linalg.diag', [single_array(shape=shapes(min_dims=1))]),
+    TestCase('linalg.diag', [single_arrays(shape=shapes(min_dims=1))]),
 
     # ArgSpec(args=['features', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
-    TestCase('math.softsign', [single_array()]),
+    TestCase('math.softsign', [single_arrays()]),
 
     # ArgSpec(args=['input', 'axis', 'keepdims', 'dtype', 'name'], varargs=None,
     #         keywords=None, defaults=(None, None, tf.int64, None))
-    TestCase('math.count_nonzero', [single_array()]),
+    TestCase('math.count_nonzero', [single_arrays()]),
 
     # ArgSpec(args=['input', 'axis', 'output_type', 'name'], varargs=None,
     #         keywords=None, defaults=(None, tf.int64, None))
@@ -300,20 +312,20 @@ NUMPY_TEST_CASES = [
     # ArgSpec(args=['input', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
     TestCase('math.angle',
-             [single_array(dtype=np.complex64, elements=complex_numbers())]),
+             [single_arrays(dtype=np.complex64, elements=complex_numbers())]),
     TestCase('math.imag',
-             [single_array(dtype=np.complex64, elements=complex_numbers())]),
+             [single_arrays(dtype=np.complex64, elements=complex_numbers())]),
     TestCase('math.real',
-             [single_array(dtype=np.complex64, elements=complex_numbers())]),
-    TestCase('linalg.cholesky', [psd_matrix()]),
-    TestCase('linalg.diag_part', [single_array(shape=shapes(min_dims=2))]),
-    TestCase('identity', [single_array()]),
+             [single_arrays(dtype=np.complex64, elements=complex_numbers())]),
+    TestCase('linalg.cholesky', [psd_matrices()]),
+    TestCase('linalg.diag_part', [single_arrays(shape=shapes(min_dims=2))]),
+    TestCase('identity', [single_arrays()]),
 
     # ArgSpec(args=['input', 'num_lower', 'num_upper', 'name'], varargs=None,
     #         keywords=None, defaults=(None,))
     TestCase('linalg.band_part', [
         hps.tuples(
-            single_array(shape=shapes(min_dims=2, min_side=3)),
+            single_arrays(shape=shapes(min_dims=2, min_side=3)),
             hps.integers(min_value=-1, max_value=3),
             hps.integers(min_value=-1, max_value=3))
     ]),
@@ -326,14 +338,14 @@ NUMPY_TEST_CASES = [
     #         keywords=None, defaults=(None, False, None))
     TestCase('math.reduce_all', [
         array_and_axis(
-            single_array(
+            single_arrays(
                 shape=shapes(min_dims=1),
                 dtype=np.bool,
                 elements=hps.booleans()))
     ]),
     TestCase('math.reduce_any', [
         array_and_axis(
-            single_array(
+            single_arrays(
                 shape=shapes(min_dims=1),
                 dtype=np.bool,
                 elements=hps.booleans()))
@@ -349,9 +361,9 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['inputs', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
-    TestCase('math.add_n',
-             [hps.integers(1, 5).flatmap(
-                 lambda n: hps.tuples(n_same_shape(n=n)))]),
+    TestCase(
+        'math.add_n',
+        [hps.integers(1, 5).flatmap(lambda n: hps.tuples(n_same_shape(n=n)))]),
 
     # ArgSpec(args=['inputs', 'shape', 'tensor_dtype', 'name'], varargs=None,
     #         keywords=None, defaults=(None, None, None))
@@ -360,7 +372,7 @@ NUMPY_TEST_CASES = [
     # ArgSpec(args=['logits', 'axis', 'name'], varargs=None, keywords=None,
     #         defaults=(None, None))
     TestCase('math.log_softmax', [
-        single_array(
+        single_arrays(
             shape=shapes(min_dims=1),
             elements=floats(
                 min_value=-1e6,
@@ -369,7 +381,7 @@ NUMPY_TEST_CASES = [
                 allow_infinity=False))
     ]),
     TestCase('math.softmax', [
-        single_array(
+        single_arrays(
             shape=shapes(min_dims=1),
             elements=floats(
                 min_value=-1e6,
@@ -380,9 +392,10 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['matrix', 'rhs', 'lower', 'adjoint', 'name'], varargs=None,
     # keywords=None, defaults=(True, False, None))
-    TestCase('linalg.triangular_solve',
-             [matmul_compatible_pair(
-                 x_strategy=psd_matrix().map(np.linalg.cholesky))]),
+    TestCase('linalg.triangular_solve', [
+        matmul_compatible_pairs(
+            x_strategy=psd_matrices().map(np.linalg.cholesky))
+    ]),
 
     # ArgSpec(args=['shape_x', 'shape_y'], varargs=None, keywords=None,
     #         defaults=None)
@@ -391,7 +404,7 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['value', 'dtype', 'dtype_hint', 'name'], varargs=None,
     #         keywords=None, defaults=(None, None, None))
-    TestCase('convert_to_tensor', [single_array()]),
+    TestCase('convert_to_tensor', [single_arrays()]),
 
     # ArgSpec(args=['x', 'axis', 'exclusive', 'reverse', 'name'], varargs=None,
     #         keywords=None, defaults=(0, False, False, None))
@@ -404,65 +417,67 @@ NUMPY_TEST_CASES = [
                    hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
     ]),
 
+    # args=['input', 'name']
+    TestCase('linalg.slogdet', [nonsingular_matrices()]),
     # ArgSpec(args=['x', 'name'], varargs=None, keywords=None, defaults=(None,))
-    TestCase('math.abs', [single_array()]),
-    TestCase('math.acos', [single_array(elements=floats(-1., 1.))]),
-    TestCase('math.acosh', [single_array(elements=positive_floats())]),
-    TestCase('math.asin', [single_array(elements=floats(-1., 1.))]),
-    TestCase('math.asinh', [single_array(elements=positive_floats())]),
-    TestCase('math.atan', [single_array()]),
-    TestCase('math.atanh', [single_array(elements=floats(-1., 1.))]),
+    TestCase('math.abs', [single_arrays()]),
+    TestCase('math.acos', [single_arrays(elements=floats(-1., 1.))]),
+    TestCase('math.acosh', [single_arrays(elements=positive_floats())]),
+    TestCase('math.asin', [single_arrays(elements=floats(-1., 1.))]),
+    TestCase('math.asinh', [single_arrays(elements=positive_floats())]),
+    TestCase('math.atan', [single_arrays()]),
+    TestCase('math.atanh', [single_arrays(elements=floats(-1., 1.))]),
     TestCase(
-        'math.bessel_i0', [single_array(elements=floats(-50., 50.))],
+        'math.bessel_i0', [single_arrays(elements=floats(-50., 50.))],
         jax_disabled=True),
     TestCase(
-        'math.bessel_i0e', [single_array(elements=floats(-50., 50.))],
+        'math.bessel_i0e', [single_arrays(elements=floats(-50., 50.))],
         jax_disabled=True),
     TestCase(
-        'math.bessel_i1', [single_array(elements=floats(-50., 50.))],
+        'math.bessel_i1', [single_arrays(elements=floats(-50., 50.))],
         jax_disabled=True),
     TestCase(
-        'math.bessel_i1e', [single_array(elements=floats(-50., 50.))],
+        'math.bessel_i1e', [single_arrays(elements=floats(-50., 50.))],
         jax_disabled=True),
-    TestCase('math.ceil', [single_array()]),
+    TestCase('math.ceil', [single_arrays()]),
     TestCase('math.conj',
-             [single_array(dtype=np.complex64, elements=complex_numbers())]),
-    TestCase('math.cos', [single_array()]),
-    TestCase('math.cosh', [single_array(elements=floats(-100., 100.))]),
+             [single_arrays(dtype=np.complex64, elements=complex_numbers())]),
+    TestCase('math.cos', [single_arrays()]),
+    TestCase('math.cosh', [single_arrays(elements=floats(-100., 100.))]),
     TestCase('math.digamma',
-             [single_array(elements=non_zero_floats(-1e4, 1e4))]),
-    TestCase('math.erf', [single_array()]),
-    TestCase('math.erfc', [single_array()]),
+             [single_arrays(elements=non_zero_floats(-1e4, 1e4))]),
+    TestCase('math.erf', [single_arrays()]),
+    TestCase('math.erfc', [single_arrays()]),
     TestCase('math.exp',
-             [single_array(elements=floats(min_value=-1e3, max_value=1e3))]),
+             [single_arrays(elements=floats(min_value=-1e3, max_value=1e3))]),
     TestCase('math.expm1',
-             [single_array(elements=floats(min_value=-1e3, max_value=1e3))]),
-    TestCase('math.floor', [single_array()]),
-    TestCase('math.is_finite', [single_array()]),
-    TestCase('math.is_inf', [single_array()]),
-    TestCase('math.is_nan', [single_array()]),
-    TestCase('math.lgamma', [single_array(elements=positive_floats())]),
-    TestCase('math.log', [single_array(elements=positive_floats())]),
+             [single_arrays(elements=floats(min_value=-1e3, max_value=1e3))]),
+    TestCase('math.floor', [single_arrays()]),
+    TestCase('math.is_finite', [single_arrays()]),
+    TestCase('math.is_inf', [single_arrays()]),
+    TestCase('math.is_nan', [single_arrays()]),
+    TestCase('math.lgamma', [single_arrays(elements=positive_floats())]),
+    TestCase('math.log', [single_arrays(elements=positive_floats())]),
     TestCase('math.log1p',
-             [single_array(elements=positive_floats().map(lambda x: x - 1.))]),
+             [single_arrays(elements=positive_floats().map(lambda x: x - 1.))]),
     TestCase('math.log_sigmoid',
-             [single_array(elements=floats(min_value=-100.))]),
+             [single_arrays(elements=floats(min_value=-100.))]),
     TestCase('math.logical_not',
-             [single_array(dtype=np.bool, elements=hps.booleans())]),
-    TestCase('math.negative', [single_array()]),
-    TestCase('math.reciprocal', [single_array()]),
-    TestCase('math.rint', [single_array()]),
-    TestCase('math.round', [single_array()]),
-    TestCase('math.rsqrt', [single_array(elements=positive_floats())]),
-    TestCase('math.sigmoid', [single_array()]),
-    TestCase('math.sign', [single_array()]),
-    TestCase('math.sin', [single_array()]),
-    TestCase('math.sinh', [single_array(elements=floats(-100., 100.))]),
-    TestCase('math.softplus', [single_array()]),
-    TestCase('math.sqrt', [single_array(elements=positive_floats())]),
-    TestCase('math.square', [single_array()]),
-    TestCase('math.tan', [single_array()]),
-    TestCase('math.tanh', [single_array()]),
+             [single_arrays(dtype=np.bool, elements=hps.booleans())]),
+    TestCase('math.negative', [single_arrays()]),
+    TestCase('math.reciprocal', [single_arrays()]),
+    TestCase('math.rint', [single_arrays()]),
+    TestCase('math.round', [single_arrays()]),
+    TestCase('math.rsqrt', [single_arrays(elements=positive_floats())]),
+    TestCase('math.sigmoid', [single_arrays()]),
+    TestCase('math.sign', [single_arrays()]),
+    TestCase('math.sin', [single_arrays()]),
+    TestCase('math.sinh', [single_arrays(elements=floats(-100., 100.))]),
+    TestCase('math.softplus', [single_arrays()]),
+    TestCase('math.sqrt', [single_arrays(elements=positive_floats())]),
+    TestCase('math.square', [single_arrays()]),
+    TestCase('math.tan', [single_arrays()]),
+    TestCase('math.tanh', [single_arrays()]),
 
     # ArgSpec(args=['x', 'q', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -505,16 +520,18 @@ NUMPY_TEST_CASES = [
              [n_same_shape(n=2, elements=[floats(), non_zero_floats()])]),
     TestCase('math.xlogy',
              [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
-
-    TestCase('random.gamma', [gamma_params()],
-             jax_kwargs=_add_jax_prng_key_as_seed,
-             assert_shape_only=True),
-    TestCase('random.normal', [hps.tuples(shapes())],
-             jax_kwargs=_add_jax_prng_key_as_seed,
-             assert_shape_only=True),
-    TestCase('random.uniform', [hps.tuples(shapes())],
-             jax_kwargs=_add_jax_prng_key_as_seed,
-             assert_shape_only=True),
+    TestCase(
+        'random.gamma', [gamma_params()],
+        jax_kwargs=_add_jax_prng_key_as_seed,
+        assert_shape_only=True),
+    TestCase(
+        'random.normal', [hps.tuples(shapes())],
+        jax_kwargs=_add_jax_prng_key_as_seed,
+        assert_shape_only=True),
+    TestCase(
+        'random.uniform', [hps.tuples(shapes())],
+        jax_kwargs=_add_jax_prng_key_as_seed,
+        assert_shape_only=True),
 
     # Array ops.
     TestCase('one_hot', [one_hot_params()]),
