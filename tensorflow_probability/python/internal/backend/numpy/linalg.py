@@ -40,8 +40,10 @@ __all__ = [
     'diag_part',
     'eye',
     'matmul',
+    'matrix_rank',
     'matrix_transpose',
     'norm',
+    'pinv',
     'set_diag',
     'slogdet',
     'triangular_solve',
@@ -218,6 +220,10 @@ matmul = utils.copy_docstring(
     tf.linalg.matmul,
     _matmul)
 
+matrix_rank = utils.copy_docstring(
+    tf.linalg.matrix_rank,
+    lambda input, name=None: np.linalg.matrix_rank(input))
+
 norm = utils.copy_docstring(
     tf.norm,
     lambda tensor, ord='euclidean', axis=None, keepdims=None, name=None,  # pylint: disable=g-long-lambda
@@ -227,13 +233,14 @@ norm = utils.copy_docstring(
                axis=-1 if axis is None else axis, keepdims=bool(keepdims))
 )
 
+pinv = utils.copy_docstring(
+    tf.linalg.pinv, lambda input, name=None: np.linalg.pinv(input))
+
 set_diag = utils.copy_docstring(
     tf.linalg.set_diag,
     _set_diag)
 
-
 SLogDet = collections.namedtuple('slogdet', 'sign,log_abs_determinant')
-
 
 slogdet = utils.copy_docstring(
     tf.linalg.slogdet,
@@ -242,7 +249,6 @@ slogdet = utils.copy_docstring(
 matrix_transpose = utils.copy_docstring(
     tf.linalg.matrix_transpose,
     _matrix_transpose)
-
 
 triangular_solve = utils.copy_docstring(
     tf.linalg.triangular_solve,
