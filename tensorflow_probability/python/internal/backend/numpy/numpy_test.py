@@ -1,18 +1,18 @@
 # Copyright 2018 The TensorFlow Probability Authors.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Apache License, Version 2.0 (the 'License');
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
+# distributed under the License is distributed on an 'AS IS' BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for internal.backend.numpy.internal.numpy."""
+"""Tests for internal.backend.numpy."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -100,6 +100,14 @@ def shapes(min_dims=0, max_dims=4, min_side=1, max_side=5):
   if min_dims < 1:
     strategy = hps.one_of(hps.just(()), strategy)
   return strategy
+
+
+def fft_shapes(fft_dim):
+  return hps.tuples(
+      shapes(max_dims=2),  # batch portion
+      hps.lists(min_size=fft_dim, max_size=fft_dim,
+                elements=hps.sampled_from([2, 4, 8, 16, 32]))).map(
+                    lambda t: t[0] + tuple(t[1]))
 
 
 @hps.composite
@@ -249,6 +257,41 @@ def gamma_params():
 
 NUMPY_TEST_CASES = [
 
+    TestCase('signal.fft',
+             [single_arrays(shape=fft_shapes(fft_dim=1),
+                            dtype=np.complex64,
+                            elements=complex_numbers(max_magnitude=1e3))],
+             atol=1e-4, rtol=1e-4),
+    TestCase('signal.fft2d',
+             [single_arrays(shape=fft_shapes(fft_dim=2),
+                            dtype=np.complex64,
+                            elements=complex_numbers(max_magnitude=1e3))],
+             atol=1e-4, rtol=1e-4),
+    TestCase('signal.fft3d',
+             [single_arrays(shape=fft_shapes(fft_dim=3),
+                            dtype=np.complex64,
+                            elements=complex_numbers(max_magnitude=1e3))],
+             atol=1e-3, rtol=1e-3),
+
+    TestCase('signal.ifft',
+             [single_arrays(shape=fft_shapes(fft_dim=1),
+                            dtype=np.complex64,
+                            elements=complex_numbers(max_magnitude=1e3))],
+             jax_disabled='https://github.com/google/jax/issues/1010',
+             atol=1e-4, rtol=1e-4),
+    TestCase('signal.ifft2d',
+             [single_arrays(shape=fft_shapes(fft_dim=2),
+                            dtype=np.complex64,
+                            elements=complex_numbers(max_magnitude=1e3))],
+             jax_disabled='https://github.com/google/jax/issues/1010',
+             atol=1e-4, rtol=1e-4),
+    TestCase('signal.ifft3d',
+             [single_arrays(shape=fft_shapes(fft_dim=3),
+                            dtype=np.complex64,
+                            elements=complex_numbers(max_magnitude=1e3))],
+             jax_disabled='https://github.com/google/jax/issues/1010',
+             atol=1e-4, rtol=1e-4),
+
     # ArgSpec(args=['a', 'b', 'transpose_a', 'transpose_b', 'adjoint_a',
     #               'adjoint_b', 'a_is_sparse', 'b_is_sparse', 'name'],
     #         varargs=None,
@@ -256,7 +299,7 @@ NUMPY_TEST_CASES = [
     #         defaults=(False, False, False, False, False, False, None))
     TestCase('linalg.matmul', [matmul_compatible_pairs()]),
     TestCase('linalg.det', [nonsingular_matrices()],
-             jax_disabled=True),  # https://github.com/google/jax/issues/1213
+             jax_disabled='https://github.com/google/jax/issues/1213'),
 
     # ArgSpec(args=['a', 'name', 'conjugate'], varargs=None, keywords=None)
     TestCase('linalg.matrix_transpose',
@@ -419,9 +462,16 @@ NUMPY_TEST_CASES = [
                    hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
     ]),
 
+]
+
+NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
+
     # args=['input', 'name']
+    TestCase('linalg.adjoint',
+             [single_arrays(shape=shapes(min_dims=2),
+                            dtype=np.complex64, elements=complex_numbers())]),
     TestCase('linalg.slogdet', [nonsingular_matrices()],
-             jax_disabled=True),  # https://github.com/google/jax/issues/1213
+             jax_disabled='https://github.com/google/jax/issues/1213'),
     # ArgSpec(args=['x', 'name'], varargs=None, keywords=None, defaults=(None,))
     TestCase('math.abs', [single_arrays()]),
     TestCase('math.acos', [single_arrays(elements=floats(-1., 1.))]),
@@ -435,13 +485,13 @@ NUMPY_TEST_CASES = [
         jax_disabled=True),
     TestCase(
         'math.bessel_i0e', [single_arrays(elements=floats(-50., 50.))],
-        jax_disabled=True),
+        jax_disabled='https://github.com/google/jax/issues/1220'),
     TestCase(
         'math.bessel_i1', [single_arrays(elements=floats(-50., 50.))],
         jax_disabled=True),
     TestCase(
         'math.bessel_i1e', [single_arrays(elements=floats(-50., 50.))],
-        jax_disabled=True),
+        jax_disabled='https://github.com/google/jax/issues/1220'),
     TestCase('math.ceil', [single_arrays()]),
     TestCase('math.conj',
              [single_arrays(dtype=np.complex64, elements=complex_numbers())]),

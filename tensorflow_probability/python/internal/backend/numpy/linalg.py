@@ -32,6 +32,7 @@ scipy_linalg = utils.try_import('scipy.linalg')
 
 
 __all__ = [
+    'adjoint',
     'band_part',
     'cholesky',
     'cholesky_solve',
@@ -47,7 +48,6 @@ __all__ = [
     'set_diag',
     'slogdet',
     'triangular_solve',
-    # 'adjoint',
     # 'cross',
     # 'eigh',
     # 'eigvalsh',
@@ -140,7 +140,7 @@ def _matrix_transpose(a, name='matrix_transpose', conjugate=False):  # pylint: d
     raise ValueError(
         'Input must have rank at least `2`; found {}.'.format(a.ndim))
   x = np.swapaxes(a, -2, -1)
-  return np.conjugate(x) if conjugate else x
+  return np.conj(x) if conjugate else x
 
 
 def _matmul(a, b,
@@ -158,7 +158,7 @@ def _matmul(a, b,
   return np.matmul(a, b)
 
 
-def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):
+def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):  # pylint: disable=redefined-outer-name
   """Scipy solve does not broadcast, so we must do so explicitly."""
   del name
   if JAX_MODE:  # But JAX uses XLA, which can do a batched solve.
@@ -187,6 +187,10 @@ def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):
 
 
 # --- Begin Public Functions --------------------------------------------------
+
+adjoint = utils.copy_docstring(
+    tf.linalg.adjoint,
+    lambda matrix, name=None: _matrix_transpose(matrix, conjugate=True))
 
 band_part = utils.copy_docstring(
     tf.linalg.band_part,

@@ -44,6 +44,7 @@ py_library(
         ":numpy_array",
         ":numpy_logging",
         ":numpy_math",
+        ":numpy_signal",
         ":ops",
         ":random_generators",
         ":sets_lib",
@@ -215,6 +216,16 @@ py_library(
         ":_utils",
         # numpy dep,
         # scipy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "numpy_signal",
+    srcs = ["numpy_signal.py"],
+    deps = [
+        ":_utils",
+        # numpy dep,
         # tensorflow dep,
     ],
 )

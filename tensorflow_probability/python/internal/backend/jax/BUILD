@@ -42,6 +42,7 @@ FILENAMES = [
     "numpy_array",
     "numpy_logging",
     "numpy_math",
+    "numpy_signal",
     "numpy_test",
     "ops",
     "random_generators",
