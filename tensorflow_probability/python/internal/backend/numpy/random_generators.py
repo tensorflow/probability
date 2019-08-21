@@ -71,8 +71,22 @@ def _categorical(logits, num_samples, dtype=None, seed=None, name=None):  # pyli
   dtype = utils.numpy_dtype(dtype or np.int64)
   if not hasattr(logits, 'shape'):
     logits = np.array(logits, np.float32)
+  probs = _softmax(logits)
   n = logits.shape[-1]
-  return rng.choice(n, p=_softmax(logits), size=num_samples).astype(dtype)
+  return np.apply_along_axis(lambda p: rng.choice(n, p=p, size=num_samples), 1,
+                             probs)
+
+
+def _categorical_jax(logits, num_samples, dtype=None, seed=None, name=None):  # pylint: disable=unused-argument
+  dtype = utils.numpy_dtype(dtype or np.int64)
+  if not hasattr(logits, 'shape') or not hasattr(logits, 'dtype'):
+    logits = np.array(logits, np.float32)
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  if seed is None:
+    raise ValueError('Must provide PRNGKey to sample in JAX.')
+  z = jaxrand.gumbel(
+      key=seed, shape=logits.shape + (num_samples,), dtype=logits.dtype)
+  return np.argmax(np.expand_dims(logits, -1) + z, axis=-2).astype(dtype)
 
 
 def _gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None,
@@ -145,8 +159,7 @@ def _uniform_jax(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
 
 
 categorical = utils.copy_docstring(
-    tf.random.categorical,
-    _categorical)
+    tf.random.categorical, _categorical_jax if JAX_MODE else _categorical)
 
 gamma = utils.copy_docstring(tf.random.gamma,
                              _gamma_jax if JAX_MODE else _gamma)

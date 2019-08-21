@@ -239,7 +239,6 @@ def gamma_params():
 # math.lbeta
 # math.polyval
 # math.zeta
-# random.categorical
 # random.poisson
 # random.set_seed
 
@@ -524,6 +523,16 @@ NUMPY_TEST_CASES = [
              [n_same_shape(n=2, elements=[floats(), non_zero_floats()])]),
     TestCase('math.xlogy',
              [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
+    TestCase(
+        'random.categorical', [
+            hps.tuples(
+                single_arrays(
+                    shape=shapes(min_dims=2, max_dims=2),
+                    elements=floats(min_value=-1e3, max_value=1e3)),
+                hps.integers(0, 10))
+        ],
+        jax_kwargs=_add_jax_prng_key_as_seed,
+        assert_shape_only=True),
     TestCase(
         'random.gamma', [gamma_params()],
         jax_kwargs=_add_jax_prng_key_as_seed,
