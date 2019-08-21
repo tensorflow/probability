@@ -67,6 +67,9 @@ _DISTRIBUTION_PUBLIC_METHOD_WRAPPERS = [
 _ALWAYS_COPY_PUBLIC_METHOD_WRAPPERS = ['kl_divergence', 'cross_entropy']
 
 
+JAX_MODE = False  # Overwritten by rewrite script.
+
+
 @six.add_metaclass(abc.ABCMeta)
 class _BaseDistribution(tf.Module):
   """Abstract base class needed for resolving subclass hierarchy."""
@@ -815,6 +818,8 @@ class Distribution(_BaseDistribution):
   def _call_sample_n(self, sample_shape, seed, name, **kwargs):
     """Wrapper around _sample_n."""
     with self._name_and_control_scope(name):
+      if JAX_MODE and seed is None:
+        raise ValueError('Must provide JAX PRNGKey as `dist.sample(seed=.)`')
       sample_shape = tf.cast(sample_shape, tf.int32, name='sample_shape')
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, 'sample_shape')
