@@ -15,7 +15,8 @@
 """No U-Turn Sampler.
 
 The implementation closely follows [1; Algorithm 3], with Multinomial sampling
-on the tree instead of slice sampling.
+on the tree (instead of slice sampling) and a generalized No-U-Turn termination
+criterion [2; Appendix A].
 
 Achieves batch execution across chains by precomputing the recursive tree
 doubling data access patterns and then executes this "unrolled" data pattern via
@@ -27,6 +28,9 @@ a `tf.while_loop`.
      Setting Path Lengths in Hamiltonian Monte Carlo.
      In _Journal of Machine Learning Research_, 15(1):1593-1623, 2014.
      http://jmlr.org/papers/volume15/hoffman14a/hoffman14a.pdf
+
+[2]: Michael Betancourt. A Conceptual Introduction to Hamiltonian Monte Carlo.
+     _arXiv preprint arXiv:1701.02434_, 2018. https://arxiv.org/abs/1701.02434
 """
 
 from __future__ import absolute_import
@@ -51,9 +55,13 @@ TF_WHILE_PARALLEL_ITERATIONS = 10     # Default: 10
 
 TREE_COUNT_DTYPE = tf.int32           # Default: tf.int32
 
-# Whether to use slice sampling (original NUTS implementation) or multinomial
-# sampling from the tree trajectory.
+# Whether to use slice sampling (original NUTS implementation in [1]) or
+# multinomial sampling (implementation in [2]) from the tree trajectory.
 MULTINOMIAL_SAMPLE = True             # Default: True
+
+# Whether to use U turn criteria in [1] or generalized U turn criteria in [2]
+# to check the tree trajectory.
+GENERALIZED_UTURN = True              # Default: True
 ##############################################################
 ### END STATIC CONFIGURATION #################################
 ##############################################################
@@ -72,6 +80,7 @@ NUTSKernelResults = collections.namedtuple('NUTSKernelResults', [
     'is_accepted',
     'reach_max_depth',
     'has_divergence',
+    'energy',
 ])
 
 MomentumStateSwap = collections.namedtuple('MomentumStateSwap', [
@@ -98,6 +107,7 @@ TreeDoublingStateCandidate = collections.namedtuple(
         'state',
         'target',
         'target_grad_parts',
+        'energy',
         'weight',
     ])
 
@@ -298,6 +308,7 @@ class NoUTurnSampler(TransitionKernel):
           state=current_state,
           target=current_target_log_prob,
           target_grad_parts=previous_kernel_results.grads_target_log_prob,
+          energy=init_energy,
           weight=init_weight)
 
       initial_step_metastate = TreeDoublingMetaState(
@@ -363,6 +374,7 @@ class NoUTurnSampler(TransitionKernel):
           is_accepted=new_step_metastate.is_accepted,
           reach_max_depth=new_step_metastate.continue_tree,
           has_divergence=~new_step_metastate.not_divergence,
+          energy=new_step_metastate.candidate_state.energy
       )
 
       result_state = new_step_metastate.candidate_state.state
@@ -426,6 +438,7 @@ class NoUTurnSampler(TransitionKernel):
           has_divergence=tf.zeros_like(current_target_log_prob,
                                        dtype=tf.bool,
                                        name='has_divergence'),
+          energy=compute_hamiltonian(current_target_log_prob, dummy_momentum)
       )
 
   def _start_trajectory_batched(self, state, target_log_prob):
@@ -495,7 +508,8 @@ class NoUTurnSampler(TransitionKernel):
           final_not_divergence,
           continue_tree_final,
           energy_diff_tree_sum,
-          leapfrogs_taken,
+          momentum_tree_cumsum,
+          leapfrogs_taken
       ] = self._build_sub_tree(
           directions_expanded,
           integrator,
@@ -550,6 +564,11 @@ class NoUTurnSampler(TransitionKernel):
               for grad0, grad1 in zip(candidate_tree_state.target_grad_parts,
                                       last_candidate_state.target_grad_parts)
           ],
+          energy=tf.where(
+              _rightmost_expand_to_rank(
+                  choose_new_state,
+                  prefer_static.rank(candidate_tree_state.target)),
+              candidate_tree_state.energy, last_candidate_state.energy),
           weight=weight_sum)
 
       # Update left right information of the trajectory, and check trajectory
@@ -571,10 +590,15 @@ class NoUTurnSampler(TransitionKernel):
           for l, r in zip(tf.nest.flatten(tree_final_states),
                           tf.nest.flatten(tree_otherend_states))
       ])
+
+      if GENERALIZED_UTURN:
+        state_diff = momentum_tree_cumsum
+      else:
+        state_diff = [s[1] - s[0] for s in new_step_state.state]
+
       no_u_turns_trajectory = has_not_u_turn(
-          [s[0] for s in new_step_state.state],
+          state_diff,
           [m[0] for m in new_step_state.momentum],
-          [s[1] for s in new_step_state.state],
           [m[1] for m in new_step_state.momentum],
           log_prob_rank=len(batch_shape))
 
@@ -610,16 +634,20 @@ class NoUTurnSampler(TransitionKernel):
                         dtype=current_step_meta_info.init_energy.dtype))
       else:
         init_weight = tf.zeros(batch_shape, dtype=TREE_COUNT_DTYPE)
+
+      init_momentum_cumsum = [tf.zeros_like(x) for x in initial_state.momentum]
       initial_state_candidate = TreeDoublingStateCandidate(
           state=initial_state.state,
           target=initial_state.target,
           target_grad_parts=initial_state.target_grad_parts,
+          energy=initial_state.target,
           weight=init_weight)
       energy_diff_sum = tf.zeros_like(current_step_meta_info.init_energy,
                                       name='energy_diff_sum')
       [
           _,
           energy_diff_tree_sum,
+          momentum_tree_cumsum,
           leapfrogs_taken,
           final_state,
           candidate_tree_state,
@@ -627,19 +655,22 @@ class NoUTurnSampler(TransitionKernel):
           final_not_divergence,
           momentum_state_memory,
       ] = tf.while_loop(
-          cond=lambda iter_, energy_diff_sum, leapfrogs_taken, state, state_c,  # pylint: disable=g-long-lambda
-                      continue_tree, not_divergence, momentum_state_memory: (
+          cond=lambda iter_, energy_diff_sum, init_momentum_cumsum,  # pylint: disable=g-long-lambda
+                      leapfrogs_taken, state, state_c, continue_tree,
+                      not_divergence, momentum_state_memory: (
                           (iter_ < nsteps) & tf.reduce_any(continue_tree)),
-          body=lambda iter_, energy_diff_sum, leapfrogs_taken, state, state_c,  # pylint: disable=g-long-lambda
-                      continue_tree, not_divergence, momentum_state_memory: (
+          body=lambda iter_, energy_diff_sum, init_momentum_cumsum,  # pylint: disable=g-long-lambda
+                      leapfrogs_taken, state, state_c, continue_tree,
+                      not_divergence, momentum_state_memory: (
                           self._loop_build_sub_tree(
                               directions, integrator, current_step_meta_info,
-                              iter_, energy_diff_sum, leapfrogs_taken, state,
-                              state_c, continue_tree, not_divergence,
-                              momentum_state_memory)),
+                              iter_, energy_diff_sum, init_momentum_cumsum,
+                              leapfrogs_taken, state, state_c, continue_tree,
+                              not_divergence, momentum_state_memory)),
           loop_vars=(
               tf.zeros([], dtype=tf.int32, name='iter'),
               energy_diff_sum,
+              init_momentum_cumsum,
               tf.zeros(batch_shape, dtype=TREE_COUNT_DTYPE),
               initial_state,
               initial_state_candidate,
@@ -656,6 +687,7 @@ class NoUTurnSampler(TransitionKernel):
         final_not_divergence,
         final_continue_tree,
         energy_diff_tree_sum,
+        momentum_tree_cumsum,
         leapfrogs_taken,
     )
 
@@ -665,6 +697,7 @@ class NoUTurnSampler(TransitionKernel):
                            current_step_meta_info,
                            iter_,
                            energy_diff_sum_previous,
+                           momentum_cumsum_previous,
                            leapfrogs_taken,
                            prev_tree_state,
                            candidate_tree_state,
@@ -689,6 +722,8 @@ class NoUTurnSampler(TransitionKernel):
           state=next_state_parts,
           target=next_target,
           target_grad_parts=next_target_grad_parts)
+      momentum_cumsum = [p0 + p1 for p0, p1 in zip(momentum_cumsum_previous,
+                                                   next_momentum_parts)]
       # If the tree have not yet terminated previously, we count this leapfrog.
       leapfrogs_taken = tf.where(
           continue_tree_previous, leapfrogs_taken + 1, leapfrogs_taken)
@@ -704,6 +739,11 @@ class NoUTurnSampler(TransitionKernel):
           write_instruction.gather([iter_ // 2]),
           self.max_tree_depth)
 
+      if GENERALIZED_UTURN:
+        state_to_write = momentum_cumsum
+      else:
+        state_to_write = next_state_parts
+
       momentum_state_memory = MomentumStateSwap(
           momentum_swap=[
               tf.tensor_scatter_nd_update(old, [write_index], [new])
@@ -713,7 +753,7 @@ class NoUTurnSampler(TransitionKernel):
           state_swap=[
               tf.tensor_scatter_nd_update(old, [write_index], [new])
               for old, new in zip(momentum_state_memory.state_swap,
-                                  next_state_parts)
+                                  state_to_write)
           ])
       batch_shape = prefer_static.shape(next_target)
       has_not_u_turn_at_even_step = tf.ones(batch_shape, dtype=tf.bool)
@@ -724,15 +764,15 @@ class NoUTurnSampler(TransitionKernel):
           lambda: has_not_u_turn_at_even_step,
           lambda: has_not_u_turn_at_odd_step(  # pylint: disable=g-long-lambda
               read_index, directions, momentum_state_memory,
-              next_momentum_parts, next_state_parts,
+              next_momentum_parts, state_to_write,
               has_not_u_turn_at_even_step,
               log_prob_rank=prefer_static.rank(next_target)))
 
       energy = compute_hamiltonian(next_target, next_momentum_parts)
-      energy = tf.where(tf.math.is_nan(energy),
-                        tf.constant(-np.inf, dtype=energy.dtype),
-                        energy)
-      energy_diff = energy - init_energy
+      current_energy = tf.where(tf.math.is_nan(energy),
+                                tf.constant(-np.inf, dtype=energy.dtype),
+                                energy)
+      energy_diff = current_energy - init_energy
 
       if MULTINOMIAL_SAMPLE:
         not_divergent = -energy_diff < self.max_energy_diff
@@ -777,6 +817,10 @@ class NoUTurnSampler(TransitionKernel):
               for grad0, grad1 in zip(next_target_grad_parts,
                                       candidate_tree_state.target_grad_parts)
           ],
+          energy=tf.where(
+              _rightmost_expand_to_rank(is_sample_accepted,
+                                        prefer_static.rank(next_target)),
+              current_energy, init_energy),
           weight=weight_sum)
 
       continue_tree = not_divergent & continue_tree_previous
@@ -795,6 +839,7 @@ class NoUTurnSampler(TransitionKernel):
       return (
           iter_ + 1,
           energy_diff_sum,
+          momentum_cumsum,
           leapfrogs_taken,
           next_tree_state,
           next_candidate_tree_state,
@@ -819,12 +864,14 @@ def has_not_u_turn_at_odd_step(read_indexes, direction, momentum_state_memory,
         tf.gather(x, left_current_index, axis=0)
         for x in momentum_state_memory.state_swap
     ]
+    state_diff = [s1 - s2 for s1, s2 in zip(state_right, state_left)]
+    if not GENERALIZED_UTURN:
+      state_diff = [tf.where(d, m, -m) for d, m in zip(direction, state_diff)]
 
     no_u_turns_current = has_not_u_turn(
-        state_left,
-        [tf.where(d, m, -m) for d, m in zip(direction, momentum_left)],
-        state_right,
-        [tf.where(d, m, -m) for d, m in zip(direction, momentum_right)],
+        state_diff,
+        momentum_left,
+        momentum_right,
         log_prob_rank)
     return left_current_index + 1, no_u_turns_current & no_u_turns_last
 
@@ -836,24 +883,23 @@ def has_not_u_turn_at_odd_step(read_indexes, direction, momentum_state_memory,
   return no_u_turns_within_tree
 
 
-def has_not_u_turn(state_left,
+def has_not_u_turn(state_diff,
                    momentum_left,
-                   state_right,
                    momentum_right,
                    log_prob_rank):
-  """If two given states and momentum do not exhibit a U-turn pattern."""
+  """If the trajectory does not exhibit a U-turn pattern."""
   with tf.name_scope('has_not_u_turn'):
     batch_dot_product_left = sum([
         tf.reduce_sum(  # pylint: disable=g-complex-comprehension
-            (s1 - s2) * m,
+            s_diff * m,
             axis=tf.range(log_prob_rank, prefer_static.rank(m)))
-        for s1, s2, m in zip(state_right, state_left, momentum_left)
+        for s_diff, m in zip(state_diff, momentum_left)
     ])
     batch_dot_product_right = sum([
         tf.reduce_sum(  # pylint: disable=g-complex-comprehension
-            (s1 - s2) * m,
+            s_diff * m,
             axis=tf.range(log_prob_rank, prefer_static.rank(m)))
-        for s1, s2, m in zip(state_right, state_left, momentum_right)
+        for s_diff, m in zip(state_diff, momentum_right)
     ])
     return (batch_dot_product_left >= 0) & (batch_dot_product_right >= 0)
 

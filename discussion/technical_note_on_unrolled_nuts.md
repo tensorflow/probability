@@ -28,7 +28,7 @@ The NUTS recursion is a pre-order tree traversal. In the original algorithm 3,
 this traversal terminates when the trajectory makes a U turn or there is
 divergent sample (during leapfrog integration). We observed that:
 1. Typical implementations of NUTS cap the the recursion
-   (by default we cap `max_tree_depth` to 6).
+   (by default we cap `max_tree_depth` to 10).
 2. The NUTS computation is dominated by gradient evals in the leapfrog
    calculation.
 3. The remain computation is in U-turn checking and slice sampling which notably
@@ -302,6 +302,8 @@ step 1(0): x0        ==> U([x_,x0], [0,1]) ==> x1 --> MH([x',x1], 1/1) --> x'
 ```
 
 which means that for the purpose of slice sampling, it could be memory-less.
+This is also valid for multinominal sampling as we accumulating the weight the
+same way.
 
 ## FAQ
 
