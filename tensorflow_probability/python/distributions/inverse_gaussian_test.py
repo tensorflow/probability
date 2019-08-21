@@ -73,7 +73,7 @@ class _InverseGaussianTest(object):
     concentration_v = 1.
 
     for loc_v in invalid_locs:
-      with self.assertRaisesOpError('Condition x > 0'):
+      with self.assertRaisesOpError('`loc` must be positive'):
         inverse_gaussian = tfd.InverseGaussian(
             self.make_tensor(loc_v),
             self.make_tensor(concentration_v),
@@ -85,7 +85,7 @@ class _InverseGaussianTest(object):
     invalid_concentrations = [-.01, 0., -2.]
 
     for concentration_v in invalid_concentrations:
-      with self.assertRaisesOpError('Condition x > 0'):
+      with self.assertRaisesOpError('`concentration` must be positive'):
         inverse_gaussian = tfd.InverseGaussian(
             self.make_tensor(loc_v),
             self.make_tensor(concentration_v),

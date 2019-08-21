@@ -47,7 +47,6 @@ __all__ = [
     'assert_non_positive',
     'assert_none_equal',
     'assert_positive',
-    'assert_positive',
     'assert_rank',
     'assert_rank_at_least',
     'assert_rank_in',
@@ -65,7 +64,8 @@ __all__ = [
 ]
 
 
-def _assert_equal(x, y, message=None, summarize=None, name=None):
+def _assert_equal(x, y, data=None, summarize=None, message=None, name=None):
+  del data
   del summarize
   del name
   x = convert_to_tensor(x)
@@ -129,8 +129,13 @@ def _assert_none_equal(x, y, summarize=None, message=None, name=None):
         x, y, message or ''))
 
 
-def _assert_positive(*_, **__):  # pylint: disable=unused-argument
-  pass
+def _assert_positive(x, data=None, summarize=None, message=None, name=None):
+  del data
+  del summarize
+  del name
+  x = convert_to_tensor(x)
+  if np.any(x <= 0):
+    raise ValueError('Expected x > 0 but got {} {}'.format(x, message or ''))
 
 
 def _assert_rank_at_least(x, rank, message=None, name=None):

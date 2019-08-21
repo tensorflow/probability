@@ -41,7 +41,7 @@ class GammaGammaTest(tf.test.TestCase):
     self.assertEqual(gg.event_shape, tf.TensorShape([]))
 
   def testGammaGammaInvalidArgs(self):
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('`concentration` must be positive'):
       gg = tfd.GammaGamma(
           concentration=-1.,
           mixing_concentration=2.,
@@ -49,7 +49,7 @@ class GammaGammaTest(tf.test.TestCase):
           validate_args=True)
       self.evaluate(gg.mean())
 
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('`mixing_concentration` must be positive'):
       gg = tfd.GammaGamma(
           concentration=1.,
           mixing_concentration=-2.,
@@ -57,7 +57,7 @@ class GammaGammaTest(tf.test.TestCase):
           validate_args=True)
       self.evaluate(gg.mean())
 
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('`mixing_rate` must be positive'):
       gg = tfd.GammaGamma(
           concentration=1.,
           mixing_concentration=2.,
