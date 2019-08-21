@@ -130,7 +130,7 @@ class AffineLinearOperator(bijector.Bijector):
                                    if self.validate_args else []):
         y = self.scale.matvec(y, adjoint=self.adjoint)
     if self.shift is not None:
-      y += self.shift
+      y = y + self.shift
     return y
 
   def _inverse(self, y):
