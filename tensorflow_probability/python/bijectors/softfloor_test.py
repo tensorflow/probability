@@ -27,6 +27,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.math import value_and_gradient
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -121,10 +122,7 @@ class _SoftFloorBijectorBase(object):
   def testBijectorForwardGradient(self):
     x_np = np.array([0.1, 2.23, 4.1], dtype=self.dtype)
     x = tf.constant(x_np)
-    with tf.GradientTape() as tape:
-      tape.watch(x)
-      value = tfb.Softfloor(self.dtype(1.2)).forward(x)
-    grad = tape.gradient(value, x)
+    grad = value_and_gradient(tfb.Softfloor(self.dtype(1.2)).forward, x)[1]
     self.assertAllClose(_softfloor_grad_np(x_np, 1.2), grad)
 
 

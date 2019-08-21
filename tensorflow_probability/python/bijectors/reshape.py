@@ -269,7 +269,8 @@ def _replace_event_shape_in_shape_tensor(
       (is_validated or not validate_args)):
     with tf.control_dependencies(validation_dependencies):
       output_shape = tf.convert_to_tensor(
-          output_tensorshape, name='output_shape', dtype_hint=tf.int32)
+          tensorshape_util.as_list(output_tensorshape), name='output_shape',
+          dtype_hint=tf.int32)
     return output_shape, output_tensorshape
 
   with tf.control_dependencies(validation_dependencies):

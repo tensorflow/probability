@@ -29,6 +29,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.distributions import lkj
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -181,7 +182,7 @@ class CorrelationCholeskyBijectorTest(parameterized.TestCase, tf.test.TestCase):
     self.assertAllClose(np.log(2), ildj)
 
   @parameterized.parameters(itertools.product([2, 3, 4, 5, 6, 7], [1., 2., 3.]))
-  def testWithLKJSamples(self, dimension, concentration):
+  def testBijectiveWithLKJSamples(self, dimension, concentration):
     bijector = tfb.CorrelationCholesky()
     lkj_dist = lkj.LKJ(
         dimension=dimension,
@@ -199,6 +200,18 @@ class CorrelationCholeskyBijectorTest(parameterized.TestCase, tf.test.TestCase):
         event_ndims=1,
         inverse_event_ndims=2,
         rtol=1e-5)
+
+  @parameterized.parameters(itertools.product([2, 3, 4, 5, 6, 7], [1., 2., 3.]))
+  @tfp_test_util.numpy_disable_gradient_test
+  def testJacobianWithLKJSamples(self, dimension, concentration):
+    bijector = tfb.CorrelationCholesky()
+    lkj_dist = lkj.LKJ(
+        dimension=dimension,
+        concentration=np.float64(concentration),
+        input_output_cholesky=True)
+    batch_size = 10
+    y = self.evaluate(lkj_dist.sample([batch_size]))
+    x = self.evaluate(bijector.inverse(y))
 
     fldj = bijector.forward_log_det_jacobian(x, event_ndims=1)
     fldj_theoretical = bijector_test_util.get_fldj_theoretical(

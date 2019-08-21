@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 from absl import logging
 import numpy as np
@@ -29,6 +31,10 @@ from tensorflow_probability.python.distributions import uniform as uniform_distr
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.math.gradient import batch_jacobian
+
+
+JAX_MODE = False
 
 
 def assert_finite(array):
@@ -294,24 +300,26 @@ def get_fldj_theoretical(bijector,
   x_unconstrained = tf.reshape(
       x_unconstrained, [int(np.prod(batch_shape)), x_unconstrained.shape[-1]])
 
-  with tf.GradientTape(persistent=True) as tape:
-    tape.watch(x_unconstrained)
+  def f(x_unconstrained, batch_shape=batch_shape):
     # Unflatten any batch dimensions now under the tape.
     unflattened_x_unconstrained = tf.reshape(
         x_unconstrained,
         tensorshape_util.concatenate(batch_shape, x_unconstrained.shape[-1:]))
     f_x = bijector.forward(input_to_unconstrained.inverse(
         unflattened_x_unconstrained))
-    f_x_unconstrained = output_to_unconstrained.forward(f_x)
+    return f_x
+
+  def f_unconstrained(x_unconstrained, batch_shape=batch_shape):
+    f_x_unconstrained = output_to_unconstrained.forward(
+        f(x_unconstrained, batch_shape=batch_shape))
     # Flatten any batch dimensions to a single axis.
-    f_x_unconstrained = tf.reshape(
+    return tf.reshape(
         f_x_unconstrained,
         [int(np.prod(batch_shape)), f_x_unconstrained.shape[-1]])
-  try:
-    jacobian = tape.batch_jacobian(f_x_unconstrained, x_unconstrained)
-  except ValueError:  # Fallback to for-loop jacobian.
-    jacobian = tape.batch_jacobian(
-        f_x_unconstrained, x_unconstrained, experimental_use_pfor=False)
+
+  if JAX_MODE:
+    f_unconstrained = functools.partial(f_unconstrained, batch_shape=[])
+  jacobian = batch_jacobian(f_unconstrained, x_unconstrained)
   jacobian = tf.reshape(
       jacobian, tensorshape_util.concatenate(batch_shape, jacobian.shape[-2:]))
   logging.vlog(1, 'Jacobian: %s', jacobian)
@@ -322,6 +330,6 @@ def get_fldj_theoretical(bijector,
   input_correction = input_to_unconstrained.forward_log_det_jacobian(
       x, event_ndims=event_ndims)
   output_correction = output_to_unconstrained.forward_log_det_jacobian(
-      f_x, event_ndims=inverse_event_ndims)
+      f(x_unconstrained), event_ndims=inverse_event_ndims)
   return (log_det_jacobian + tf.cast(input_correction, log_det_jacobian.dtype) -
           tf.cast(output_correction, log_det_jacobian.dtype))

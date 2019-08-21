@@ -34,6 +34,8 @@ from tensorflow_probability.python.internal.backend.numpy import ops
 
 __all__ = [
     'numpy_disable_gradient_test',
+    'jax_disable_variable_test',
+    'jax_disable_test_missing_functionality',
     'test_seed',
     'test_seed_stream',
     'DiscreteScalarDistributionTestHelpers',
@@ -58,12 +60,45 @@ JAX_MODE = False
 def numpy_disable_gradient_test(test_fn):
   """Disable a gradient-using test when using the numpy backend."""
 
+  if JAX_MODE:
+    return test_fn
+
   def new_test(self, *args, **kwargs):
     if tf.Variable == ops.NumpyVariable:
       self.skipTest('gradient-using test disabled for numpy')
     return test_fn(self, *args, **kwargs)
 
   return new_test
+
+
+def jax_disable_variable_test(test_fn):
+  """Disable a Variable-using test when using the JAX backend."""
+
+  if not JAX_MODE:
+    return test_fn
+
+  def new_test(self, *args, **kwargs):
+    self.skipTest('tf.Variable-using test disabled for JAX')
+    return test_fn(self, *args, **kwargs)
+
+  return new_test
+
+
+def jax_disable_test_missing_functionality(issue_link):
+  """Disable a test for unimplemented JAX functionality."""
+
+  def f(test_fn):
+    if not JAX_MODE:
+      return test_fn
+
+    def new_test(self, *args, **kwargs):
+      self.skipTest(
+          'Test disabled for JAX missing functionality: {}'.format(issue_link))
+      return test_fn(self, *args, **kwargs)
+
+    return new_test
+
+  return f
 
 
 def test_seed(hardcoded_seed=None, set_eager_seed=True):
@@ -131,7 +166,7 @@ def _wrap_seed(seed, set_eager_seed):
 
 def _wrap_seed_jax(seed, _):
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
-  return jaxrand.PRNGKey(seed % (2**64 - 1))
+  return jaxrand.PRNGKey(seed % (2**32 - 1))
 
 
 def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):

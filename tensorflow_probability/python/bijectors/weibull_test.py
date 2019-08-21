@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -88,6 +89,7 @@ class WeibullBijectorTest(tf.test.TestCase):
           concentration=-1., scale=1., validate_args=True)
       self.evaluate(b.forward(-3.))
 
+  @tfp_test_util.jax_disable_variable_test
   def testVariableAssertsScale(self):
     concentration = tf.Variable(1.)
     scale = tf.Variable(1.)
@@ -102,6 +104,7 @@ class WeibullBijectorTest(tf.test.TestCase):
       with tf.control_dependencies([scale.assign(minus_1)]):
         self.evaluate(b.forward(minus_3))
 
+  @tfp_test_util.jax_disable_variable_test
   def testVariableAssertsConcentration(self):
     concentration = tf.Variable(1.)
     scale = tf.Variable(1.)

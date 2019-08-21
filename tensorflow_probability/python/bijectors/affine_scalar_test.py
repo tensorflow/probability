@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -165,6 +166,7 @@ class _AffineScalarBijectorTest(object):
         upper_x=self.dtype(2.),
         eval_func=self.evaluate)
 
+  @tfp_test_util.jax_disable_variable_test
   def testVariableGradients(self):
     b = tfb.AffineScalar(
         shift=tf.Variable(1.),

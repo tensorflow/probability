@@ -90,6 +90,7 @@ class KumaraswamyTest(test_case.TestCase):
         bijector, x, y, eval_func=self.evaluate, event_ndims=0,
         rtol=1e-3)
 
+  @tfp_test_util.jax_disable_variable_test
   def testVariableConcentration1(self):
     x = tf.Variable(1.)
     b = tfb.Kumaraswamy(concentration0=1., concentration1=x, validate_args=True)
@@ -101,6 +102,7 @@ class KumaraswamyTest(test_case.TestCase):
       with tf.control_dependencies([x.assign(-1.)]):
         self.assertEqual((), self.evaluate(b.forward(1.)).shape)
 
+  @tfp_test_util.jax_disable_variable_test
   def testVariableConcentration0(self):
     x = tf.Variable(1.)
     b = tfb.Kumaraswamy(concentration0=x, concentration1=1., validate_args=True)
@@ -129,6 +131,7 @@ class KumaraswamyTest(test_case.TestCase):
       self.evaluate(b.forward_event_shape_tensor(tf.constant([1, 2, 3])))
 
   @tfp_test_util.numpy_disable_gradient_test
+  @tfp_test_util.jax_disable_variable_test
   def testGradient(self):
     x = tf.Variable(1.)
     y = tf.Variable(2.)
