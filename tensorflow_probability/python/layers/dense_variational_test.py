@@ -513,11 +513,7 @@ class DenseVariational(test_case.TestCase):
         tfp.layers.DenseLocalReparameterization(out_size)
     ])
 
-    # TODO(b/139314757): The call to `model.fit` will fail if the model is
-    # compiled with the default `experimental_run_tf_function=True`.  Remove
-    # `experimental_run_tf_function=False` once this bug is fixed.
-    model.compile(
-        loss='mse', optimizer='adam', experimental_run_tf_function=False)
+    model.compile(loss='mse', optimizer='adam')
     model.fit(x, y, batch_size=batch_size, epochs=3)
 
     batch_input = tf.random.uniform([batch_size, in_size])
