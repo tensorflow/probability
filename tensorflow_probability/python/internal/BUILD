@@ -179,6 +179,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -337,12 +338,13 @@ class SizeTest(test_case.TestCase):
   def test_static(self):
     self.assertAllEqual(
         3 * 4 * 5,
-        prefer_static.size(tf.random.normal([3, 4, 5])))
+        prefer_static.size(
+            tf.random.normal([3, 4, 5], seed=tfp_test_util.test_seed())))
 
   def test_dynamic(self):
     if tf.executing_eagerly(): return
     x = tf1.placeholder_with_default(
-        tf.random.normal([3, 4, 5]), shape=None)
+        tf.random.normal([3, 4, 5], seed=tfp_test_util.test_seed()), shape=None)
     self.assertAllEqual(
         3 * 4 * 5,
         self.evaluate(prefer_static.size(x)))
@@ -363,6 +365,7 @@ class NonNegativeAxisTest(test_case.TestCase):
     positive_axis = prefer_static.non_negative_axis(axis=[0, -2], rank=4)
     self.assertAllEqual([0, 2], positive_axis)
 
+  @tfp_test_util.jax_disable_variable_test
   def test_dynamic_vector_index(self):
     axis = tf.Variable([0, -2])
     positive_axis = prefer_static.non_negative_axis(axis=axis, rank=4)
