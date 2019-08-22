@@ -40,6 +40,7 @@ __all__ = [
     'diag',
     'diag_part',
     'eye',
+    'lu',
     'matmul',
     'matrix_rank',
     'matrix_transpose',
@@ -59,7 +60,6 @@ __all__ = [
     # 'logdet',
     # 'logm',
     # 'lstsq',
-    # 'lu',
     # 'matvec',
     # 'norm',
     # 'qr',
@@ -128,10 +128,47 @@ def _eye(num_rows, num_columns=None, batch_shape=None,
   return x
 
 
-def _set_diag(input, diagonal, name=None):  # pylint: disable=unused-argument,redefined-builtin
-  return np.where(np.eye(diagonal.shape[-1], dtype=np.bool),
-                  diagonal[..., np.newaxis, :],
-                  input)
+def _lu_pivot_to_permutation(swaps, m):
+  """Converts the pivot (row swaps) returned by LU to a permutation.
+
+  Args:
+    swaps: an array of shape (k,) of row swaps to perform
+    m: the size of the output permutation. m should be >= k.
+  Returns:
+    An int32 array of shape (m,).
+  """
+  assert len(swaps.shape) >= 1
+
+  permutation = np.arange(m, dtype=np.int32)
+  for i in range(swaps.shape[-1]):
+    j = swaps[i]
+    permutation[i], permutation[j] = permutation[j], permutation[i]
+  return permutation
+
+
+Lu = collections.namedtuple('Lu', 'lu,p')
+
+
+def _lu(input, output_idx_type=tf.int32, name=None):  # pylint: disable=redefined-builtin
+  """Returns Lu(lu, p), as TF does."""
+  del name
+  if JAX_MODE:  # But JAX uses XLA, which can do a batched factorization.
+    lu_out, pivots = scipy_linalg.lu_factor(input)
+    from jax import lax_linalg  # pylint: disable=g-import-not-at-top
+    return Lu(lu_out,
+              lax_linalg.lu_pivots_to_permutation(pivots, lu_out.shape[-1]))
+  # Scipy can't batch, so we must do so manually.
+  nbatch = int(np.prod(input.shape[:-2]))
+  dim = input.shape[-1]
+  flat_mat = input.reshape(nbatch, dim, dim)
+  flat_lu = np.empty((nbatch, dim, dim), dtype=input.dtype)
+  flat_piv = np.empty((nbatch, dim), dtype=utils.numpy_dtype(output_idx_type))
+  if np.size(flat_lu):  # Avoid non-empty batches of empty matrices.
+    for i, mat in enumerate(flat_mat):
+      lu_out, pivots = scipy_linalg.lu_factor(mat)
+      flat_lu[i] = lu_out
+      flat_piv[i] = _lu_pivot_to_permutation(pivots, flat_lu.shape[-1])
+  return Lu(flat_lu.reshape(*input.shape), flat_piv.reshape(*input.shape[:-1]))
 
 
 def _matrix_transpose(a, name='matrix_transpose', conjugate=False):  # pylint: disable=unused-argument
@@ -156,6 +193,12 @@ def _matmul(a, b,
   if transpose_b or adjoint_b:
     b = _matrix_transpose(b, conjugate=adjoint_b)
   return np.matmul(a, b)
+
+
+def _set_diag(input, diagonal, name=None):  # pylint: disable=unused-argument,redefined-builtin
+  return np.where(np.eye(diagonal.shape[-1], dtype=np.bool),
+                  diagonal[..., np.newaxis, :],
+                  input)
 
 
 def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):  # pylint: disable=redefined-outer-name
@@ -220,6 +263,10 @@ eye = utils.copy_docstring(
     tf.eye,
     _eye)
 
+lu = utils.copy_docstring(
+    tf.linalg.lu,
+    _lu)
+
 matmul = utils.copy_docstring(
     tf.linalg.matmul,
     _matmul)
@@ -244,7 +291,8 @@ set_diag = utils.copy_docstring(
     tf.linalg.set_diag,
     _set_diag)
 
-SLogDet = collections.namedtuple('slogdet', 'sign,log_abs_determinant')
+SLogDet = collections.namedtuple('LogMatrixDeterminant',
+                                 'sign,log_abs_determinant')
 
 slogdet = utils.copy_docstring(
     tf.linalg.slogdet,

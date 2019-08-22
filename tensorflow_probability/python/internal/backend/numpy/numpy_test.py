@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
-# import logging
 
 # Dependency imports
 
@@ -30,6 +29,7 @@ import hypothesis.extra.numpy as hnp
 import hypothesis.strategies as hps
 import numpy as np  # Rewritten by script to import jax.numpy
 import numpy as onp  # pylint: disable=reimported
+import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import test_case
@@ -212,7 +212,7 @@ def nonsingular_matrices(draw):
   signs = draw(
       hnp.arrays(
           mat.dtype,
-          mat.shape[:-2] + (1, 1),
+          tuple(int(dim) for dim in mat.shape[:-2]) + (1, 1),
           elements=hps.sampled_from([-1., 1.])))
   return mat * signs
 
@@ -361,6 +361,7 @@ NUMPY_TEST_CASES = [
     TestCase('math.real',
              [single_arrays(dtype=np.complex64, elements=complex_numbers())]),
     TestCase('linalg.cholesky', [psd_matrices()]),
+    TestCase('linalg.lu', [nonsingular_matrices()]),
     TestCase('linalg.diag_part', [single_arrays(shape=shapes(min_dims=2))]),
     TestCase('identity', [single_arrays()]),
 
@@ -689,8 +690,11 @@ class NumpyTest(test_case.TestCase, parameterized.TestCase):
           tf.nest.map_structure(assert_same_shape, tensorflow_value,
                                 numpy_value)
         else:
-          self.assertAllCloseAccordingToType(
-              tensorflow_value, numpy_value, atol=atol, rtol=rtol)
+          for i, (tf_val, np_val) in enumerate(six.moves.zip_longest(
+              tf.nest.flatten(tensorflow_value), tf.nest.flatten(numpy_value))):
+            self.assertAllCloseAccordingToType(
+                tf_val, np_val, atol=atol, rtol=rtol,
+                msg='output {}'.format(i))
 
       check_consistency(tensorflow_function, numpy_function)
 
