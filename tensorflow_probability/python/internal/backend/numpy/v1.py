@@ -21,6 +21,7 @@ from __future__ import print_function
 import contextlib
 # Dependency imports
 import numpy as np
+import six
 
 import tensorflow as tf
 
@@ -31,6 +32,7 @@ from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  
 from tensorflow_probability.python.internal.backend.numpy.ops import convert_to_tensor
 from tensorflow_probability.python.internal.backend.numpy.ops import Module
 from tensorflow_probability.python.internal.backend.numpy.ops import name_scope
+from tensorflow_probability.python.internal.backend.numpy.ops import Tensor
 from tensorflow_probability.python.internal.backend.numpy.ops import Variable
 
 
@@ -47,6 +49,7 @@ __all__ = [
     'assert_non_positive',
     'assert_none_equal',
     'assert_positive',
+    'assert_proper_iterable',
     'assert_rank',
     'assert_rank_at_least',
     'assert_rank_in',
@@ -135,7 +138,20 @@ def _assert_positive(x, data=None, summarize=None, message=None, name=None):
   del name
   x = convert_to_tensor(x)
   if np.any(x <= 0):
-    raise ValueError('Expected x > 0 but got {} {}'.format(x, message or ''))
+    raise ValueError('Condition x > 0 did not hold; got {} {}'.format(
+        x, message or ''))
+
+
+def _assert_proper_iterable(values):
+  unintentional_iterables = (Tensor, np.ndarray, bytes, six.text_type)
+  if isinstance(values, unintentional_iterables):
+    raise TypeError(
+        'Expected argument "values" to be a "proper" iterable.  Found: %s' %
+        type(values))
+
+  if not hasattr(values, '__iter__'):
+    raise TypeError(
+        'Expected argument "values" to be iterable.  Found: %s' % type(values))
 
 
 def _assert_rank_at_least(x, rank, message=None, name=None):
@@ -234,6 +250,10 @@ assert_none_equal = utils.copy_docstring(
 assert_positive = utils.copy_docstring(
     tf.compat.v1.assert_positive,
     _assert_positive)
+
+assert_proper_iterable = utils.copy_docstring(
+    tf.compat.v1.assert_proper_iterable,
+    _assert_proper_iterable)
 
 assert_rank_at_least = utils.copy_docstring(
     tf.compat.v1.assert_rank_at_least,

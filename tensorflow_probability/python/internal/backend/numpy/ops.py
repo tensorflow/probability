@@ -18,10 +18,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 import numpy as np
 import six
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
@@ -37,6 +40,7 @@ __all__ = [
     'control_dependencies',
     'convert_to_tensor',
     'custom_gradient',
+    'dimension_value',
     'enable_v2_behavior',
     'executing_eagerly',
     'get_static_value',
@@ -67,10 +71,12 @@ class _NullContext(object):
     return False  # False values do not suppress exceptions.
 
 
-def _broadcast_static_shape(shape_x, shape_y):
+def _broadcast_static_shape(shape_x, shape_y, as_tensorshape=False):
   shape_x = TensorShape(shape_x)
   shape_y = TensorShape(shape_y)
   shape_xy = tf.broadcast_static_shape(shape_x, shape_y)
+  if as_tensorshape:
+    return shape_xy
   return np.array(shape_xy.as_list(), dtype=np.int32)
 
 
@@ -95,9 +101,9 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
   if isinstance(value, np.ndarray):
     if dtype is not None:
       dtype = utils.numpy_dtype(dtype)
-      if np.result_type(value, dtype) != dtype:
-        raise ValueError('Expected dtype {} but got {} with dtype {}.'.format(
-            dtype, value, value.dtype))
+      # if np.result_type(value, dtype) != dtype:
+      #   raise ValueError('Expected dtype {} but got {} with dtype {}.'.format(
+      #       dtype, value, value.dtype))
       return value.astype(dtype)
     return value
   if isinstance(value, TensorShape):
@@ -120,7 +126,17 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
   return np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
 
 
+def _dimension_value(dimension):
+  if dimension is None:
+    return None
+  return int(dimension)
+
+
 # --- Begin Public Functions --------------------------------------------------
+
+dimension_value = utils.copy_docstring(
+    tf.compat.dimension_value,
+    _dimension_value)
 
 
 class GradientTape(object):
@@ -155,6 +171,10 @@ broadcast_dynamic_shape = utils.copy_docstring(
 broadcast_static_shape = utils.copy_docstring(
     tf.broadcast_static_shape,
     _broadcast_static_shape)
+
+broadcast_static_shape_as_tensorshape = utils.copy_docstring(
+    tf.broadcast_static_shape,
+    functools.partial(_broadcast_static_shape, as_tensorshape=True))
 
 broadcast_to = utils.copy_docstring(
     tf.broadcast_to,
@@ -256,6 +276,13 @@ stop_gradient = utils.copy_docstring(
     lambda input, name=None: np.array(input))
 
 TensorShape = tf.TensorShape
+Dimension = tf1.Dimension
+
+
+def dimension_at_index(shape, index):
+  if isinstance(shape, TensorShape):
+    return shape.dims[index]
+  return Dimension(int(shape[index]))
 
 
 class NumpyVariable(object):
@@ -284,6 +311,10 @@ class NumpyVariable(object):
     if dtype is not None:
       return self._value.astype(dtype)
     return self._value
+
+  @property
+  def shape(self):
+    return self._value.shape
 
   def assign(self, value):
     self._value = np.array(value, dtype=self.dtype)

@@ -25,7 +25,7 @@ import tensorflow as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import ops
-from tensorflow_probability.python.internal.backend.numpy.linalg import norm
+from tensorflow_probability.python.internal.backend.numpy.linalg_impl import norm
 
 
 __all__ = [

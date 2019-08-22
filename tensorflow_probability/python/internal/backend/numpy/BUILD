@@ -146,21 +146,13 @@ py_library(
 
 py_library(
     name = "linalg",
-    srcs = ["linalg.py"],
+    srcs = [
+        "linalg.py",
+        "linalg_impl.py",
+    ],
     deps = [
         ":_utils",
         ":linear_operator",
-        # numpy dep,
-        # scipy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_library(
-    name = "linear_operator",
-    srcs = ["linear_operator.py"],
-    deps = [
-        ":_utils",
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
@@ -319,5 +311,61 @@ py_library(
     srcs = ["_utils.py"],
     deps = [
         # decorator dep,
+    ],
+)
+
+py_binary(
+    name = "gen_linear_operators",
+    srcs = ["gen_linear_operators.py"],
+    python_version = "PY3",
+    deps = [
+        # absl:app dep,
+        # tensorflow dep,
+    ],
+)
+
+LINOP_FILES = [
+    "adjoint_registrations",
+    "cholesky_registrations",
+    "inverse_registrations",
+    "linear_operator_addition",
+    "linear_operator_adjoint",
+    "linear_operator_algebra",
+    "linear_operator_block_diag",
+    "linear_operator_circulant",
+    "linear_operator_composition",
+    "linear_operator_diag",
+    "linear_operator_full_matrix",
+    "linear_operator_householder",
+    "linear_operator_identity",
+    "linear_operator_inversion",
+    "linear_operator_kronecker",
+    "linear_operator_lower_triangular",
+    "linear_operator_low_rank_update",
+    "linear_operator",
+    "linear_operator_toeplitz",
+    "linear_operator_util",
+    "linear_operator_zeros",
+    "matmul_registrations",
+    "registrations_util",
+    "solve_registrations",
+]
+
+[genrule(
+    name = "rewrite_{}".format(filename),
+    srcs = [],
+    outs = ["{}.py".format(filename)],
+    cmd = "$(location :gen_linear_operators) --module_name={} > $@".format(filename),
+    tools = [":gen_linear_operators"],
+) for filename in LINOP_FILES]
+
+py_library(
+    name = "linear_operator",
+    srcs = [":{}.py".format(filename) for filename in LINOP_FILES],
+    deps = [
+        ":_utils",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
     ],
 )

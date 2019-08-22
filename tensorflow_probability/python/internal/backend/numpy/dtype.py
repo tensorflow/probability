@@ -62,6 +62,8 @@ as_dtype = utils.copy_docstring(
     lambda type_value: np.dtype(  # pylint: disable=g-long-lambda
         type_value.name if hasattr(type_value, 'name') else type_value).type)
 
+real_dtype = lambda dtype: np.real(np.zeros((0,), dtype=as_dtype(dtype))).dtype
+
 bool = np.bool  # pylint: disable=redefined-builtin
 
 complex128 = np.complex128
