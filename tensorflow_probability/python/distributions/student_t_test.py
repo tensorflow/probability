@@ -449,7 +449,7 @@ class StudentTTest(test_case.TestCase):
     self.assertNear(1., total, err=err)
 
   def testNegativeDofFails(self):
-    with self.assertRaisesOpError(r'Condition x > 0 did not hold'):
+    with self.assertRaisesOpError(r'`df` must be positive'):
       student = tfd.StudentT(
           df=[2, -5.], loc=0., scale=1., validate_args=True, name='S')
       self.evaluate(student.mean())

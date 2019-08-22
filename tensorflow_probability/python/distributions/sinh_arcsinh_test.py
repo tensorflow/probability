@@ -185,6 +185,7 @@ class SinhArcsinhTest(test_case.TestCase):
     self.assertAllClose(*self.evaluate(
         [sas_pos_skew.prob(x), sas_neg_skew.prob(x[::-1])]))
 
+  @tfp_test_util.numpy_disable_gradient_test
   def testVariableGradients(self):
     b = 10
     scale = tf.Variable(rng.rand(b) + 0.5)

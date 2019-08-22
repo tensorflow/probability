@@ -23,6 +23,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow.python.ops import gen_array_ops  # pylint: disable=g-direct-tensorflow-import
@@ -156,7 +157,7 @@ class Empirical(distribution.Distribution):
       # Note: this tf.rank call affects the graph, but is ok in `__init__`
       # because we don't expect shapes (or ranks) to be runtime-variable, nor
       # ever need to differentiate with respect to them.
-      samples_rank = self.samples.shape.rank or tf.rank(self.samples)
+      samples_rank = prefer_static.rank(self.samples)
       self._samples_axis = samples_rank - self._event_ndims - 1
 
       super(Empirical, self).__init__(

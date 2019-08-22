@@ -27,6 +27,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -189,6 +190,7 @@ class CauchyTest(test_case.TestCase):
     expected_cdf = sp_stats.cauchy(loc, scale).logcdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0, rtol=1e-5)
 
+  @tfp_test_util.numpy_disable_gradient_test
   def testFiniteGradientAtDifficultPoints(self):
     for dtype in [np.float32, np.float64]:
       loc = tf.Variable(dtype(0.0))
@@ -375,8 +377,8 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(expected_shape, samples.shape)
     self.assertAllEqual(expected_shape, sample_values.shape)
 
-  def testCauchyNegativeLocFails(self):
-    with self.assertRaisesOpError('Condition x > 0 did not hold'):
+  def testCauchyNegativeScaleFails(self):
+    with self.assertRaisesOpError('`scale` must be positive.'):
       cauchy = tfd.Cauchy(loc=[1.], scale=[-5.], validate_args=True)
       self.evaluate(cauchy.mode())
 

@@ -84,7 +84,7 @@ class GeometricTest(tf.test.TestCase):
         input=[2.5, 3.2, 4.3, 5.1, 6., 7.], shape=[6])
     geom = tfd.Geometric(probs=probs, validate_args=True)
 
-    with self.assertRaisesOpError('Condition x == y'):
+    with self.assertRaisesOpError('cannot contain fractional components'):
       self.evaluate(geom.log_prob(x))
 
     with self.assertRaisesOpError('Condition x >= 0'):
