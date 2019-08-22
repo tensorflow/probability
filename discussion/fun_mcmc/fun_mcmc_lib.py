@@ -82,6 +82,7 @@ __all__ = [
     'maybe_broadcast_structure',
     'mclachlan_optimal_4th_order_step',
     'metropolis_hastings_step',
+    'MetropolisHastingsExtra',
     'PotentialFn',
     'random_walk_metropolis',
     'random_walk_metropolis_init',
@@ -754,12 +755,16 @@ def mclachlan_optimal_4th_order_step(
   return tf.cond(forward, lambda: _step(True), lambda: _step(False))
 
 
+MetropolisHastingsExtra = collections.namedtuple('MetropolisHastingsExtra',
+                                                 'is_accepted, log_uniform')
+
+
 def metropolis_hastings_step(
     current_state: State,
     proposed_state: State,
     energy_change: FloatTensor,
     log_uniform: FloatTensor = None,
-    seed=None) -> Tuple[State, 'tf.Tensor', 'tf.Tensor']:
+    seed=None) -> Tuple[State, MetropolisHastingsExtra]:
   """Metropolis-Hastings step.
 
   This probabilistically chooses between `current_state` and `proposed_state`
@@ -777,9 +782,7 @@ def metropolis_hastings_step(
 
   Returns:
     new_state: The chosen state.
-    is_accepted: Whether the proposed state was accepted.
-    log_uniform: The random number that was used to select between the two
-      states.
+    mh_extra: MetropolisHastingsExtra.
   """
   # Impute the None's in the current state.
   current_state = util.map_tree_up_to(
@@ -805,7 +808,8 @@ def metropolis_hastings_step(
 
   next_state = _choose(
       is_accepted, proposed_state, current_state, name='choose_next_state')
-  return next_state, is_accepted, log_uniform
+  return next_state, MetropolisHastingsExtra(
+      is_accepted=is_accepted, log_uniform=log_uniform)
 
 
 MomentumSampleFn = Callable[[Any], State]
@@ -1027,7 +1031,7 @@ def hamiltonian_monte_carlo(
       target_log_prob=integrator_state.target_log_prob,
       state_extra=integrator_state.state_extra)
 
-  hmc_state, is_accepted, _ = metropolis_hastings_step(
+  hmc_state, mh_extra = metropolis_hastings_step(
       hmc_state,
       proposed_state,
       integrator_extra.energy_change,
@@ -1036,7 +1040,7 @@ def hamiltonian_monte_carlo(
 
   hmc_state = hmc_state  # type: HamiltonianMonteCarloState
   return hmc_state, HamiltonianMonteCarloExtra(
-      is_accepted=is_accepted,
+      is_accepted=mh_extra.is_accepted,
       proposed_hmc_state=proposed_state,
       log_accept_ratio=-integrator_extra.energy_change,
       integrator_state=integrator_state,
@@ -1439,7 +1443,7 @@ def random_walk_metropolis(
       state_extra=proposed_state_extra,
   )
 
-  rwm_state, is_accepted, _ = metropolis_hastings_step(
+  rwm_state, mh_extra = metropolis_hastings_step(
       rwm_state,
       proposed_rwm_state,
       -log_accept_ratio,
@@ -1451,7 +1455,7 @@ def random_walk_metropolis(
       proposal_extra=proposal_extra,
       proposed_rwm_state=proposed_rwm_state,
       log_accept_ratio=log_accept_ratio,
-      is_accepted=is_accepted,
+      is_accepted=mh_extra.is_accepted,
   )
 
   rwm_state = rwm_state  # type: RandomWalkMetropolisState

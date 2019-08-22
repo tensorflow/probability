@@ -50,6 +50,7 @@ from discussion.fun_mcmc.fun_mcmc_lib import make_gaussian_kinetic_energy_fn
 from discussion.fun_mcmc.fun_mcmc_lib import maybe_broadcast_structure
 from discussion.fun_mcmc.fun_mcmc_lib import mclachlan_optimal_4th_order_step
 from discussion.fun_mcmc.fun_mcmc_lib import metropolis_hastings_step
+from discussion.fun_mcmc.fun_mcmc_lib import MetropolisHastingsExtra
 from discussion.fun_mcmc.fun_mcmc_lib import PotentialFn
 from discussion.fun_mcmc.fun_mcmc_lib import random_walk_metropolis
 from discussion.fun_mcmc.fun_mcmc_lib import random_walk_metropolis_init
@@ -95,6 +96,7 @@ __all__ = [
     'maybe_broadcast_structure',
     'mclachlan_optimal_4th_order_step',
     'metropolis_hastings_step',
+    'MetropolisHastingsExtra',
     'PotentialFn',
     'random_walk_metropolis',
     'random_walk_metropolis_init',

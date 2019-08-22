@@ -319,49 +319,49 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
   def testMetropolisHastingsStep(self):
     seed = self._make_seed(tfp_test_util.test_seed())
 
-    accepted, is_accepted, _ = fun_mcmc.metropolis_hastings_step(
+    accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
         current_state=0., proposed_state=1., energy_change=-np.inf,
         seed=seed)
     self.assertAllEqual(1., accepted)
-    self.assertAllEqual(True, is_accepted)
+    self.assertAllEqual(True, mh_extra.is_accepted)
 
-    accepted, is_accepted, _ = fun_mcmc.metropolis_hastings_step(
+    accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
         current_state=0., proposed_state=1., energy_change=np.inf,
         seed=seed)
     self.assertAllEqual(0., accepted)
-    self.assertAllEqual(False, is_accepted)
+    self.assertAllEqual(False, mh_extra.is_accepted)
 
-    accepted, is_accepted, _ = fun_mcmc.metropolis_hastings_step(
+    accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
         current_state=0., proposed_state=1., energy_change=np.nan,
         seed=seed)
     self.assertAllEqual(0., accepted)
-    self.assertAllEqual(False, is_accepted)
+    self.assertAllEqual(False, mh_extra.is_accepted)
 
-    accepted, is_accepted, _ = fun_mcmc.metropolis_hastings_step(
+    accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
         current_state=None, proposed_state=1., energy_change=np.nan,
         seed=seed)
     self.assertAllEqual(1., accepted)
-    self.assertAllEqual(False, is_accepted)
+    self.assertAllEqual(False, mh_extra.is_accepted)
 
-    accepted, is_accepted, _ = fun_mcmc.metropolis_hastings_step(
+    accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
         current_state=None,
         proposed_state=1.,
         log_uniform=-10.,
         energy_change=-np.log(0.5),
         seed=seed)
     self.assertAllEqual(1., accepted)
-    self.assertAllEqual(True, is_accepted)
+    self.assertAllEqual(True, mh_extra.is_accepted)
 
-    accepted, is_accepted, _ = fun_mcmc.metropolis_hastings_step(
+    accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
         current_state=None,
         proposed_state=1.,
         log_uniform=0.,
         energy_change=-np.log(0.5),
         seed=seed)
     self.assertAllEqual(1., accepted)
-    self.assertAllEqual(False, is_accepted)
+    self.assertAllEqual(False, mh_extra.is_accepted)
 
-    accepted, _, _ = fun_mcmc.metropolis_hastings_step(
+    accepted, _ = fun_mcmc.metropolis_hastings_step(
         current_state=tf.zeros(1000),
         proposed_state=tf.ones(1000),
         energy_change=-tf.math.log(0.5 * tf.ones(1000)),
@@ -374,12 +374,12 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     current = struct_type([1, 2], (3, [4, [0, 0]]))
     proposed = struct_type([5, 6], (7, [8, [0, 0]]))
 
-    accepted, is_accepted, _ = fun_mcmc.metropolis_hastings_step(
+    accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
         current_state=current,
         proposed_state=proposed,
         energy_change=-np.inf,
         seed=self._make_seed(tfp_test_util.test_seed()))
-    self.assertAllEqual(True, is_accepted)
+    self.assertAllEqual(True, mh_extra.is_accepted)
     self.assertAllEqual(
         util.flatten_tree(proposed), util.flatten_tree(accepted))
 
