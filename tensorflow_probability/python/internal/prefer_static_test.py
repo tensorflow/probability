@@ -396,5 +396,21 @@ class BroadcastShapeTest(test_case.TestCase):
     self.assertAllEqual([3, 2, 5], self.evaluate(shape))
 
 
+@test_util.run_all_in_graph_and_eager_modes
+class PadTest(test_case.TestCase):
+
+  def test_num_paddings_dynamic(self):
+    n = tf1.placeholder_with_default(2, shape=None)
+    x = prefer_static.pad([2, 3], paddings=[[0, n]], constant_values=1)
+    if not prefer_static.is_numpy(x):
+      x = self.evaluate(x)
+    self.assertAllEqual([2, 3, 1, 1], x)
+
+  def test_num_paddings_static(self):
+    n = 2
+    x = prefer_static.pad([2, 3], paddings=[[0, n]], constant_values=1)
+    self.assertAllEqual([2, 3, 1, 1], x)
+
+
 if __name__ == '__main__':
   tf.test.main()

@@ -268,12 +268,11 @@ ones = _prefer_static(
     lambda shape, dtype=tf.float32, name=None: np.ones(  # pylint: disable=g-long-lambda
         shape, _numpy_dtype(dtype)))
 
-
-# TODO(jvdillon): Add unit-test.
-def _pad(tensor, paddings, mode='CONSTANT', constant_values=0, name=None):  # pylint: disable=unused-argument
-  return np.pad(tensor, paddings, mode=mode.lower(),
-                constant_values=constant_values)
-pad = _copy_docstring(tf.pad, _pad)
+pad = _prefer_static(
+    tf.pad,
+    lambda tensor, paddings, mode='CONSTANT', constant_values=0, name=None: (  # pylint: disable=g-long-lambda
+        np.pad(tensor, paddings, mode=mode.lower(),
+               constant_values=constant_values)))
 
 reshape = _prefer_static(
     tf.reshape,
