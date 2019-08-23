@@ -109,6 +109,7 @@ class NoUTurnSampler(mcmc.TransitionKernel):
                step_size,
                max_tree_depth=10,
                unrolled_leapfrog_steps=1,
+               num_trajectories_per_step=1,
                use_auto_batching=True,
                stackless=False,
                backend=None,
@@ -139,6 +140,12 @@ class NoUTurnSampler(mcmc.TransitionKernel):
         trajectory length implied by max_tree_depth. Defaults to 1. This
         parameter can be useful for amortizing the auto-batching control flow
         overhead.
+      num_trajectories_per_step: Python `int` giving the number of NUTS
+        trajectories to run as "one" step.  Setting this higher than 1 may be
+        favorable for performance by giving the autobatching system the
+        opportunity to batch gradients across consecutive trajectories.  The
+        intermediate samples are thinned: only the last sample from the run (in
+        each batch member) is returned.
       use_auto_batching: Boolean.  If `False`, do not invoke the auto-batching
         system; operate on batch size 1 only.
       stackless: Boolean.  If `True`, invoke the stackless version of
@@ -158,6 +165,7 @@ class NoUTurnSampler(mcmc.TransitionKernel):
           "max_tree_depth must be >= 1 but was {}".format(max_tree_depth))
     self.max_tree_depth = max_tree_depth
     self.unrolled_leapfrog_steps = unrolled_leapfrog_steps
+    self.num_trajectories_per_step = num_trajectories_per_step
     self.use_auto_batching = use_auto_batching
     self.stackless = stackless
     self.backend = backend
@@ -183,7 +191,7 @@ class NoUTurnSampler(mcmc.TransitionKernel):
   def is_calibrated(self):
     return True
 
-  def one_step(self, current_state, previous_kernel_results, num_steps=1):
+  def one_step(self, current_state, previous_kernel_results):
     """Runs one iteration of the No U-Turn Sampler.
 
     Args:
@@ -193,16 +201,11 @@ class NoUTurnSampler(mcmc.TransitionKernel):
       previous_kernel_results: `collections.namedtuple` containing `Tensor`s
         representing values from previous calls to this function (or from the
         `bootstrap_results` function.)
-      num_steps: Python `int` giving the number of NUTS trajectories to run as
-        "one" step.  Setting this higher than 1 may be favorable for performance
-        by giving the autobatching system the opportunity to batch gradients
-        across consecutive trajectories.  The intermediate samples are thinned:
-        only the last sample from the run (in each batch member) is returned.
 
     Returns:
       next_state: `Tensor` or Python list of `Tensor`s representing the state(s)
-        of the Markov chain(s) after taking `num_steps` steps. Has same type and
-        shape as `current_state`.
+        of the Markov chain(s) after taking `self.num_trajectories_per_step`
+        steps. Has same type and shape as `current_state`.
       kernel_results: `collections.namedtuple` of internal calculations used to
         advance the chain.
     """
@@ -235,12 +238,13 @@ class NoUTurnSampler(mcmc.TransitionKernel):
                            "`current_state`), but found {}".format(
                                len(current_state), len(step_size)))
 
+      num_steps = tf.constant([self.num_trajectories_per_step], dtype=tf.int64)
       # The `dry_run` and `max_stack_depth` arguments are added by the
       # @ctx.batch decorator, confusing pylint.
       # pylint: disable=unexpected-keyword-arg
       ((next_state, next_target_log_prob, next_grads_target_log_prob),
        new_leapfrogs) = self.many_steps(
-           tf.constant([num_steps], dtype=tf.int64),  # num_steps
+           num_steps,
            current_state,
            current_target_log_prob,
            current_grads_log_prob,

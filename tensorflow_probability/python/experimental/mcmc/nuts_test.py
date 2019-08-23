@@ -22,11 +22,13 @@ import itertools
 
 # Dependency imports
 from absl.testing import parameterized
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -273,6 +275,89 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
       return tfb.Sigmoid()(beta)
     self.evaluate(assert_univariate_target_conservation(
         self, mk_sigmoid_beta, step_size=0.02, stackless=True))
+
+  def _correlated_mvn_nuts(self, dim, step_size, num_steps):
+    # The correlated MVN example is taken from the NUTS paper
+    # https://arxiv.org/pdf/1111.4246.pdf.
+    # This implementation in terms of MVNCholPrecisionTril follows
+    # tfp/examples/jupyter_notebooks/Bayesian_Gaussian_Mixture_Model.ipynb
+
+    class MVNCholPrecisionTriL(tfd.TransformedDistribution):
+      """MVN from loc and (Cholesky) precision matrix."""
+
+      def __init__(self, loc, chol_precision_tril, name=None):
+        super(MVNCholPrecisionTriL, self).__init__(
+            distribution=tfd.Independent(tfd.Normal(tf.zeros_like(loc),
+                                                    scale=tf.ones_like(loc)),
+                                         reinterpreted_batch_ndims=1),
+            bijector=tfb.Chain([
+                tfb.Affine(shift=loc),
+                tfb.Invert(tfb.Affine(scale_tril=chol_precision_tril,
+                                      adjoint=True)),
+            ]),
+            name=name)
+
+    strm = tfp_test_util.test_seed_stream()
+    wishart = tfd.Wishart(dim, scale=tf.eye(dim), input_output_cholesky=True)
+    chol_precision = wishart.sample(seed=strm())
+    mvn = MVNCholPrecisionTriL(
+        loc=tf.zeros(dim), chol_precision_tril=chol_precision)
+    kernel = tfp.experimental.mcmc.NoUTurnSampler(
+        mvn.log_prob,
+        step_size=[step_size],
+        num_trajectories_per_step=num_steps,
+        use_auto_batching=True,
+        stackless=False,
+        max_tree_depth=7,
+        seed=strm())
+    return kernel
+
+  def testCorrelatedMVNOneStep(self):
+    # Assert that we get a diversity of leapfrogs taken after one step
+    kernel = self._correlated_mvn_nuts(dim=10, step_size=0.1, num_steps=1)
+    _, extra_ = tfp.mcmc.sample_chain(
+        num_results=1,
+        num_burnin_steps=0,
+        current_state=[tf.zeros([30, 10])],
+        kernel=kernel,
+        parallel_iterations=1)
+    extra = self.evaluate(extra_)
+    self.assertLess(extra.leapfrogs_taken.min(), 25)
+    self.assertGreater(extra.leapfrogs_taken.max(), 40)
+    # Also sanity-check that leapfrogs_computed is computed consistently
+    for t, c in zip(extra.leapfrogs_taken[-1], extra.leapfrogs_computed[-1]):
+      self.assertLessEqual(t, c)
+
+  def testCorrelatedMVNChain(self):
+    # Assert that naive sample_chain gets bad batch utilization.
+    kernel = self._correlated_mvn_nuts(dim=10, step_size=0.4, num_steps=1)
+    _, extra_ = tfp.mcmc.sample_chain(
+        num_results=1,
+        num_burnin_steps=10,
+        current_state=[tf.zeros([20, 10])],
+        kernel=kernel,
+        parallel_iterations=1)
+    extra = self.evaluate(extra_)
+    utilization = extra.leapfrogs_taken[-1] / extra.leapfrogs_computed[-1]
+    # Average utilization is bad
+    self.assertAllLess(np.mean(utilization), 0.65)
+    # Even best-member utilization isn't 100%
+    self.assertAllLess(utilization, 0.9)
+
+  def testCorrelatedMVNManySteps(self):
+    # Assert that thinning inside the autobatched nuts gives better optimal
+    # utilization, in the sense that the number of leapfrogs computed is forced
+    # by the length of some batch member's computation.
+    kernel = self._correlated_mvn_nuts(dim=10, step_size=0.4, num_steps=10)
+    _, extra_ = tfp.mcmc.sample_chain(
+        num_results=1,
+        num_burnin_steps=0,
+        current_state=[tf.zeros([20, 10])],
+        kernel=kernel,
+        parallel_iterations=1)
+    extra = self.evaluate(extra_)
+    for c in extra.leapfrogs_computed[-1]:
+      self.assertEqual(c, extra.leapfrogs_taken.max())
 
   def testProgramProperties(self):
     def target(x):

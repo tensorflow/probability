@@ -56,6 +56,7 @@ py_library(
 
 py_library(
     name = "nuts_testlib",
+    testonly = 1,
     srcs = ["nuts_test.py"],
     srcs_version = "PY2AND3",
     deps = [
@@ -64,6 +65,7 @@ py_library(
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/experimental/auto_batching",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
