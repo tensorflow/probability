@@ -47,10 +47,10 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/mcmc",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 

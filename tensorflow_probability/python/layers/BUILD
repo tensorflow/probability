@@ -52,9 +52,9 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions:seed_stream",
         "//tensorflow_probability/python/internal:docstring_util",
         "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -79,9 +79,9 @@ py_library(
     deps = [
         ":util",
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions:seed_stream",
         "//tensorflow_probability/python/internal:docstring_util",
         "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -106,7 +106,7 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:kullback_leibler",
-        "//tensorflow_probability/python/distributions:seed_stream",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 

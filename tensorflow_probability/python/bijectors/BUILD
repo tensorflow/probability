@@ -707,8 +707,8 @@ py_test(
         ":bijectors",
         # mock dep,
         # numpy dep,
-        # scipy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:test_case",
     ],
 )

@@ -27,12 +27,12 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import normal
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 tfl = tf.linalg
 
@@ -611,7 +611,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """Draw a joint sample from the prior over latents and observations."""
 
     with tf.name_scope("sample_n_joint"):
-      stream = seed_stream.SeedStream(
+      stream = SeedStream(
           seed, salt="LinearGaussianStateSpaceModel_sample_n_joint")
 
       sample_and_batch_shape = distribution_util.prefer_static_value(

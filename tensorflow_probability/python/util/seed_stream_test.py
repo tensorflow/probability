@@ -1,6 +1,6 @@
 # Copyright 2018 The TensorFlow Probability Authors.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Apache License, Version 2.0 (the 'License');
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
@@ -21,7 +21,6 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -35,44 +34,44 @@ class SeedStreamTest(tf.test.TestCase):
     # The probability of repetitions in a short stream from a correct
     # PRNG is negligible; this test catches bugs that prevent state
     # updates.
-    strm = tfd.SeedStream(seed=4, salt="salt")
+    strm = tfp.util.SeedStream(seed=4, salt='salt')
     output = [strm() for _ in range(50)]
     self.assertEqual(sorted(output), sorted(list(set(output))))
 
   def testReproducibility(self):
-    strm1 = tfd.SeedStream(seed=4, salt="salt")
-    strm2 = tfd.SeedStream(seed=4, salt="salt")
-    strm3 = tfd.SeedStream(seed=4, salt="salt")
+    strm1 = tfp.util.SeedStream(seed=4, salt='salt')
+    strm2 = tfp.util.SeedStream(seed=4, salt='salt')
+    strm3 = tfp.util.SeedStream(seed=4, salt='salt')
     outputs = [strm1() for _ in range(50)]
     self.assertEqual(outputs, [strm2() for _ in range(50)])
     self.assertEqual(outputs, [strm3() for _ in range(50)])
 
   def testSeededDistinctness(self):
-    strm1 = tfd.SeedStream(seed=4, salt="salt")
-    strm2 = tfd.SeedStream(seed=5, salt="salt")
+    strm1 = tfp.util.SeedStream(seed=4, salt='salt')
+    strm2 = tfp.util.SeedStream(seed=5, salt='salt')
     self.assertAllUnique(
         [strm1() for _ in range(50)] + [strm2() for _ in range(50)])
 
   def testSaltedDistinctness(self):
-    strm1 = tfd.SeedStream(seed=4, salt="salt")
-    strm2 = tfd.SeedStream(seed=4, salt="another salt")
+    strm1 = tfp.util.SeedStream(seed=4, salt='salt')
+    strm2 = tfp.util.SeedStream(seed=4, salt='another salt')
     self.assertAllUnique(
         [strm1() for _ in range(50)] + [strm2() for _ in range(50)])
 
   def testNestingRobustness(self):
     # SeedStreams started from generated seeds should not collide with
     # the master or with each other, even if the salts are the same.
-    strm1 = tfd.SeedStream(seed=4, salt="salt")
-    strm2 = tfd.SeedStream(strm1(), salt="salt")
-    strm3 = tfd.SeedStream(strm1(), salt="salt")
+    strm1 = tfp.util.SeedStream(seed=4, salt='salt')
+    strm2 = tfp.util.SeedStream(strm1(), salt='salt')
+    strm3 = tfp.util.SeedStream(strm1(), salt='salt')
     outputs = [strm1() for _ in range(50)]
     self.assertAllUnique(
         outputs + [strm2() for _ in range(50)] + [strm3() for _ in range(50)])
 
   def testInitFromOtherSeedStream(self):
-    strm1 = tfd.SeedStream(seed=4, salt="salt")
-    strm2 = tfd.SeedStream(strm1, salt="salt")
-    strm3 = tfd.SeedStream(strm1, salt="another salt")
+    strm1 = tfp.util.SeedStream(seed=4, salt='salt')
+    strm2 = tfp.util.SeedStream(strm1, salt='salt')
+    strm3 = tfp.util.SeedStream(strm1, salt='another salt')
     out1 = [strm1() for _ in range(50)]
     out2 = [strm2() for _ in range(50)]
     out3 = [strm3() for _ in range(50)]
@@ -80,5 +79,5 @@ class SeedStreamTest(tf.test.TestCase):
     self.assertAllUnique(out1 + out3)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

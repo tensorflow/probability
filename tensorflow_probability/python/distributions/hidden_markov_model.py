@@ -22,12 +22,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -339,7 +339,7 @@ class HiddenMarkovModel(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     with tf.control_dependencies(self._runtime_assertions):
-      strm = seed_stream.SeedStream(seed, salt="HiddenMarkovModel")
+      strm = SeedStream(seed, salt="HiddenMarkovModel")
 
       num_states = self._num_states
 

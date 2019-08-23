@@ -24,8 +24,8 @@ from absl.testing import flagsaver
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 FLAGS = flags.FLAGS
@@ -45,12 +45,10 @@ def _maybe_jax(x):
 class SeedSettingTest(tf.test.TestCase):
 
   def testTypeCorrectness(self):
-    assert isinstance(tfp_test_util.test_seed_stream(),
-                      seed_stream.SeedStream)
-    assert isinstance(tfp_test_util.test_seed_stream(hardcoded_seed=7),
-                      seed_stream.SeedStream)
-    assert isinstance(tfp_test_util.test_seed_stream(salt='foo'),
-                      seed_stream.SeedStream)
+    assert isinstance(tfp_test_util.test_seed_stream(), SeedStream)
+    assert isinstance(
+        tfp_test_util.test_seed_stream(hardcoded_seed=7), SeedStream)
+    assert isinstance(tfp_test_util.test_seed_stream(salt='foo'), SeedStream)
 
   @flagsaver.flagsaver(vary_seed=False)
   def testSameness(self):

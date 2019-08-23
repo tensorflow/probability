@@ -49,7 +49,7 @@ TAP_WHITELIST = ["{}_test".format(f) for f in (
 DEPS = {
     "distribution_util": [":prefer_static"],
     "test_util": [
-        "//tensorflow_probability/python/experimental/substrates/jax/distributions:seed_stream",
+        "//tensorflow_probability/python/experimental/substrates/jax/util:seed_stream",
     ],
     "prefer_static_test": [":test_util"],
     "test_util_test": [":test_util"],

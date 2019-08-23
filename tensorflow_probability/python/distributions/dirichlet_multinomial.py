@@ -23,13 +23,13 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multinomial
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -273,7 +273,7 @@ class DirichletMultinomial(distribution.Distribution):
     return tensorshape_util.with_rank_at_least(self.concentration.shape, 1)[-1:]
 
   def _sample_n(self, n, seed=None):
-    seed = seed_stream.SeedStream(seed, 'dirichlet_multinomial')
+    seed = SeedStream(seed, 'dirichlet_multinomial')
 
     concentration = tf.convert_to_tensor(self._concentration)
     total_count = tf.convert_to_tensor(self._total_count)

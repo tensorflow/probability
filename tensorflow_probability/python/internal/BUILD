@@ -305,8 +305,8 @@ py_library(
         # numpy dep,
         # six dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions:seed_stream",
         "//tensorflow_probability/python/internal/backend/numpy",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -319,6 +319,6 @@ py_test(
         # absl/flags dep,
         # absl/testing:flagsaver dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions:seed_stream",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )

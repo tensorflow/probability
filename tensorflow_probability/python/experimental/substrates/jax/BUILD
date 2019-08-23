@@ -33,6 +33,7 @@ py_library(
         "//tensorflow_probability/python/experimental/substrates/jax/bijectors",
         "//tensorflow_probability/python/experimental/substrates/jax/distributions",
         "//tensorflow_probability/python/experimental/substrates/jax/internal",
+        "//tensorflow_probability/python/experimental/substrates/jax/util",
         "//tensorflow_probability/python/internal/backend",
     ],
 )

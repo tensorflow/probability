@@ -21,10 +21,10 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
-from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -32,6 +32,7 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 class VonMises(distribution.Distribution):

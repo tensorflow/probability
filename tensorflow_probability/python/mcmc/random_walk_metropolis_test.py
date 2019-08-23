@@ -103,7 +103,8 @@ class RWMTest(tf.test.TestCase):
     def cauchy_new_state_fn(scale, dtype):
       cauchy = tfd.Cauchy(loc=dtype(0), scale=dtype(scale))
       def _fn(state_parts, seed):
-        seed_stream = tfd.SeedStream(seed, salt='RandomWalkCauchyIncrement')
+        seed_stream = tfp.util.SeedStream(
+            seed, salt='RandomWalkCauchyIncrement')
         next_state_parts = [
             state + cauchy.sample(
                 sample_shape=state.shape, seed=seed_stream())

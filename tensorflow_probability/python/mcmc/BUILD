@@ -105,7 +105,10 @@ py_library(
         ":metropolis_hastings",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/mcmc/internal",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
+        "//tensorflow_probability/python/mcmc/internal:util",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -131,10 +134,10 @@ py_library(
         ":kernel",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions:seed_stream",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -186,8 +189,11 @@ py_library(
     deps = [
         ":kernel",
         ":metropolis_hastings",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/math:diag_jacobian",
-        "//tensorflow_probability/python/mcmc/internal",
+        "//tensorflow_probability/python/mcmc/internal:util",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -218,9 +224,9 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":kernel",
-        # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/mcmc/internal",
+        "//tensorflow_probability/python/mcmc/internal:util",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -243,7 +249,8 @@ py_library(
         ":kernel",
         ":metropolis_hastings",
         # tensorflow dep,
-        "//tensorflow_probability/python/mcmc/internal",
+        "//tensorflow_probability/python/mcmc/internal:util",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -264,9 +271,9 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":kernel",
-        # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/mcmc/internal",
+        "//tensorflow_probability/python/mcmc/internal:util",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -358,7 +365,10 @@ py_library(
     deps = [
         ":kernel",
         # tensorflow dep,
-        "//tensorflow_probability/python/mcmc/internal",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/mcmc/internal:slice_sampler_utils",
+        "//tensorflow_probability/python/mcmc/internal:util",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 

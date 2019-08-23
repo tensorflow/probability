@@ -129,10 +129,10 @@ import functools
 import itertools
 
 import tensorflow as tf
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
     'assert_true_cdf_equal_by_dkwm',
@@ -1579,7 +1579,7 @@ def assert_multivariate_true_cdf_equal_on_projections_two_sample(
   # Notate the shape of samples2 as [n2] + batch_shape + event_shape.
   args_list = (
       [samples1, samples2, num_projections, event_ndims, false_fail_rate])
-  strm = seed_stream.SeedStream(salt='random projections', seed=seed)
+  strm = SeedStream(salt='random projections', seed=seed)
   with tf.compat.v1.name_scope(
       name,
       'assert_multivariate_true_cdf_equal_on_projections_two_sample',

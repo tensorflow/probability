@@ -101,8 +101,13 @@ TAP_BLACKLIST = ["{}_test".format(f) for f in (
 ] + FILENAMES + TEST_FILENAMES]
 
 DEPS = {
-    "correlation_cholesky_test": ["//tensorflow_probability/python/experimental/substrates/numpy/distributions:lkj"],
+    "correlation_cholesky_test": [
+        "//tensorflow_probability/python/experimental/substrates/numpy/distributions:lkj",
+    ],
+    # Most bijectors tests import only what they use; these are exceptions.
+    "hypothesis_testlib": ["//tensorflow_probability"],
     "invert_test": ["//tensorflow_probability/python/experimental/substrates/numpy"],
+    "ordered_test": ["//tensorflow_probability"],
     "transpose_test": ["//tensorflow_probability/python/experimental/substrates/numpy"],
 }
 

@@ -26,12 +26,12 @@ from tensorflow_probability.python import math
 from tensorflow_probability.python.distributions import chi2 as chi2_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
     'MultivariateStudentTLinearOperator',
@@ -238,7 +238,7 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     # Like with the univariate Student's t, sampling can be implemented as a
     # ratio of samples from a multivariate gaussian with the appropriate
     # covariance matrix and a sample from the chi-squared distribution.
-    seed = seed_stream.SeedStream(seed, salt='multivariate t')
+    seed = SeedStream(seed, salt='multivariate t')
 
     loc = tf.broadcast_to(self.loc, self._sample_shape())
     mvn = mvn_linear_operator.MultivariateNormalLinearOperator(

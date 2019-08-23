@@ -90,7 +90,8 @@ class SampleAnnealedImportanceTest(tf.test.TestCase):
           step_size=0.5,
           num_leapfrog_steps=2,
           seed=_maybe_seed(make_kernel.seed()))
-    make_kernel.seed = tfp.distributions.SeedStream('make_kernel', 45)
+
+    make_kernel.seed = tfp.util.SeedStream('make_kernel', 45)
 
     _, ais_weights, _ = tfp.mcmc.sample_annealed_importance_chain(
         num_steps=num_steps,

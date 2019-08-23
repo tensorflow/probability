@@ -39,15 +39,15 @@ TF_REPLACEMENTS = {
         'from tensorflow_probability.python.internal.backend.numpy.compat '
         'import v2',
     'import tensorflow_probability as tfp':
-        'import tensorflow_probability.python.experimental.substrates.numpy '
-        'as tfp',
+        'import tensorflow_probability as tfp; '
+        'tfp = tfp.experimental.substrates.numpy',
 }
 
 DISABLED_BIJECTORS = ('masked_autoregressive', 'matveclu', 'real_nvp')
 DISABLED_DISTS = ('joint_distribution', 'gaussian_process',
                   'internal.moving_stats', 'student_t_process',
                   'variational_gaussian_process', 'von_mises')
-LIBS = ('bijectors', 'distributions', 'math', 'stats')
+LIBS = ('bijectors', 'distributions', 'math', 'stats', 'util.seed_stream')
 INTERNALS = ('assert_util', 'distribution_util', 'dtype_util',
              'hypothesis_testlib', 'prefer_static', 'special_math',
              'tensor_util', 'test_case', 'test_util')

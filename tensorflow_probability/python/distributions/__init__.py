@@ -92,7 +92,6 @@ from tensorflow_probability.python.distributions.relaxed_bernoulli import Relaxe
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import ExpRelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import RelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.sample import Sample
-from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.distributions.student_t import StudentT
 from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
@@ -121,6 +120,7 @@ from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
 from tensorflow_probability.python.math.generic import softplus_inverse as _softplus_inverse
 from tensorflow_probability.python.math.linalg import fill_triangular as _fill_triangular
 from tensorflow_probability.python.math.linalg import fill_triangular_inverse as _fill_triangular_inverse
+from tensorflow_probability.python.util.seed_stream import SeedStream as _SeedStream
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -136,6 +136,14 @@ fill_triangular_inverse = _deprecated(_fill_triangular_inverse)
 softplus_inverse = _deprecated(_softplus_inverse)
 
 reduce_weighted_logsumexp = _deprecated(_reduce_weighted_logsumexp)
+
+
+class SeedStream(_SeedStream):
+
+  __init__ = deprecation.deprecated(
+      '2019-10-01', 'SeedStream has moved to `tfp.util.SeedStream`.')(
+          _SeedStream.__init__)
+
 
 del deprecation, _deprecated
 

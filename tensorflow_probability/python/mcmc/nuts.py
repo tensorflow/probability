@@ -42,11 +42,11 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
 from tensorflow_probability.python.mcmc.kernel import TransitionKernel
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 ##############################################################
 ### BEGIN STATIC CONFIGURATION ###############################

@@ -46,10 +46,10 @@ import functools
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python import distributions
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python import mcmc
 from tensorflow_probability.python.experimental import auto_batching as ab
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 # TODO(axch): Sensibly support field references from auto-batched code
@@ -169,7 +169,7 @@ class NoUTurnSampler(mcmc.TransitionKernel):
     self.use_auto_batching = use_auto_batching
     self.stackless = stackless
     self.backend = backend
-    self._seed_stream = distributions.SeedStream(seed, "nuts_one_step")
+    self._seed_stream = SeedStream(seed, "nuts_one_step")
     self.name = "nuts_kernel" if name is None else name
     # TODO(b/125544625): Identify why we need `use_gradient_tape=True`, i.e.,
     # what's different between `tape.gradient` and `tf.gradient`.

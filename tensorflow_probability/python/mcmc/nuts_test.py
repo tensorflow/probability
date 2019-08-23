@@ -74,7 +74,7 @@ def assert_univariate_target_conservation(test, target_d, step_size):
   # the sample count.
   num_samples = int(5e4)
   num_steps = 1
-  strm = tfd.SeedStream(salt='univariate_nuts_test', seed=1)
+  strm = tfp.util.SeedStream(salt='univariate_nuts_test', seed=1)
   initialization = target_d.sample([num_samples], seed=strm())
 
   @tf.function(autograph=False)
@@ -175,7 +175,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
       ([2, 5], 100),  # test rank 2 case
   )
   def testLatentsOfMixedRank(self, batch_shape, num_steps):
-    strm = tfd.SeedStream(5, salt='LatentsOfMixedRankTest')
+    strm = tfp.util.SeedStream(5, salt='LatentsOfMixedRankTest')
 
     init0 = [tf.ones(batch_shape + [6])]
     init1 = [tf.ones(batch_shape + []),
@@ -231,7 +231,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
       # (500, 1000, 20),
   )
   def testMultivariateNormalNdConvergence(self, nsamples, nchains, nd):
-    strm = tfd.SeedStream(1, salt='MultivariateNormalNdConvergence')
+    strm = tfp.util.SeedStream(1, salt='MultivariateNormalNdConvergence')
     theta0 = np.zeros((nchains, nd))
     mu = np.arange(nd)
     w = np.random.randn(nd, nd) * 0.1
@@ -332,7 +332,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
 
   def testSampleEndtoEnd(self):
     """An end-to-end test of sampling using NUTS."""
-    strm = tfd.SeedStream(1, salt='EndtoEndTest')
+    strm = tfp.util.SeedStream(1, salt='EndtoEndTest')
     predictors = tf.cast([
         201., 244., 47., 287., 203., 58., 210., 202., 198., 158., 165., 201.,
         157., 131., 166., 160., 186., 125., 218., 146.

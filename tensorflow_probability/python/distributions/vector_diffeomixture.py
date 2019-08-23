@@ -27,12 +27,12 @@ from tensorflow_probability.python.bijectors import softmax_centered as softmax_
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import normal
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.ops.linalg import linear_operator_addition as linop_add_lib  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -530,7 +530,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
     return self._event_shape_
 
   def _sample_n(self, n, seed=None):
-    stream = seed_stream.SeedStream(seed, salt="VectorDiffeomixture")
+    stream = SeedStream(seed, salt="VectorDiffeomixture")
     x = self.distribution.sample(
         sample_shape=concat_vectors(
             [n],

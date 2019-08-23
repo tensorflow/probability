@@ -23,13 +23,12 @@ import collections
 
 import tensorflow as tf
 
-from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.math import diag_jacobian
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
-
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -427,8 +426,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
         `current_state`.
       TypeError: if `volatility_fn` is not callable.
     """
-    self._seed_stream = distributions.SeedStream(
-        seed, salt='UncalibratedLangevin')
+    self._seed_stream = SeedStream(seed, salt='UncalibratedLangevin')
     # Default value of `volatility_fn` is the identity function.
     if volatility_fn is None:
       volatility_fn = lambda *args: 1.

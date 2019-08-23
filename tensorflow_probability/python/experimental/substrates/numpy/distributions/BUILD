@@ -91,7 +91,6 @@ FILENAMES = [
     "relaxed_bernoulli",
     "relaxed_onehot_categorical",
     "sample",
-    "seed_stream",
     "sinh_arcsinh",
     # "student_t_process",
     "student_t",
@@ -126,7 +125,6 @@ TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     "lognormal",
     "kumaraswamy",
     "sample",
-    "seed_stream",
     "sinh_arcsinh",
     "vector_student_t",
     "transformed_distribution",
@@ -185,5 +183,7 @@ DEPS = {
 py_library(
     name = "distributions",
     srcs = ["__init__.py"],
-    deps = [":{}".format(filename) for filename in FILENAMES],
+    deps = [":{}".format(filename) for filename in FILENAMES] + [
+        "//tensorflow_probability/python/experimental/substrates/numpy/util:seed_stream",
+    ],
 )

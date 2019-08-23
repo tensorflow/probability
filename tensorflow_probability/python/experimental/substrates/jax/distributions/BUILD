@@ -91,7 +91,6 @@ FILENAMES = [
     "relaxed_bernoulli",
     "relaxed_onehot_categorical",
     "sample",
-    "seed_stream",
     "sinh_arcsinh",
     # "student_t_process",
     "student_t",
@@ -179,5 +178,7 @@ DEPS = {
 py_library(
     name = "distributions",
     srcs = ["__init__.py"],
-    deps = [":{}".format(filename) for filename in FILENAMES],
+    deps = [":{}".format(filename) for filename in FILENAMES] + [
+        "//tensorflow_probability/python/experimental/substrates/jax/util:seed_stream",
+    ],
 )

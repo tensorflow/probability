@@ -162,7 +162,7 @@ class HaltonSequenceTest(tf.test.TestCase):
     dim = 20
     num_results = 2000
     replica = 5
-    seed = tfd.seed_stream.SeedStream(121117, "randomized_qmc_basic")
+    seed = tfp.util.SeedStream(121117, "randomized_qmc_basic")
 
     values = []
     for _ in range(replica):
@@ -199,8 +199,8 @@ class HaltonSequenceTest(tf.test.TestCase):
     num_results_lo, num_results_hi = 1000, 10000
     replica = 10
     true_mean = m / 12.
-    seed_lo = tfd.seed_stream.SeedStream(1925, "partial_sum_func_qmc_lo")
-    seed_hi = tfd.seed_stream.SeedStream(898128, "partial_sum_func_qmc_hi")
+    seed_lo = tfp.util.SeedStream(1925, "partial_sum_func_qmc_lo")
+    seed_hi = tfp.util.SeedStream(898128, "partial_sum_func_qmc_hi")
 
     def func_estimate(x):
       return tf.reduce_mean(

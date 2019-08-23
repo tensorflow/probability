@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""TFP for Numpy."""
+"""JAX util."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_probability.python.experimental.substrates.numpy import bijectors
-from tensorflow_probability.python.experimental.substrates.numpy import distributions
-from tensorflow_probability.python.experimental.substrates.numpy import internal
-from tensorflow_probability.python.experimental.substrates.numpy import util
+# pylint: disable=unused-import
 
-from tensorflow_probability.python.internal.backend import numpy as tf2numpy
+from tensorflow_probability.python.experimental.substrates.jax.util.seed_stream import SeedStream

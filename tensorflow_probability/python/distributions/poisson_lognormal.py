@@ -27,7 +27,6 @@ from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import poisson
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -35,6 +34,7 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -368,8 +368,7 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
     # already specify a probs vector for each batch coordinate.
     # We only support this kind of reduced broadcasting, i.e., there is exactly
     # one probs vector for all batch dims or one for each.
-    stream = seed_stream.SeedStream(
-        seed, salt='PoissonLogNormalQuadratureCompound')
+    stream = SeedStream(seed, salt='PoissonLogNormalQuadratureCompound')
     ids = mixture_dist.sample(
         sample_shape=concat_vectors(
             [n],

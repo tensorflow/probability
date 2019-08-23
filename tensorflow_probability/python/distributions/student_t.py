@@ -23,13 +23,13 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -244,7 +244,7 @@ class StudentT(distribution.Distribution):
     scale = tf.convert_to_tensor(self.scale)
     batch_shape = self._batch_shape_tensor(df=df, loc=loc, scale=scale)
     shape = tf.concat([[n], batch_shape], 0)
-    seed = seed_stream.SeedStream(seed, 'student_t')
+    seed = SeedStream(seed, 'student_t')
 
     normal_sample = tf.random.normal(shape, dtype=self.dtype, seed=seed())
     df = df * tf.ones(batch_shape, dtype=self.dtype)

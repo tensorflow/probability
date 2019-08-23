@@ -24,11 +24,11 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 class Triangular(distribution.Distribution):
@@ -189,7 +189,7 @@ class Triangular(distribution.Distribution):
     high = tf.convert_to_tensor(self.high)
     peak = tf.convert_to_tensor(self.peak)
 
-    stream = seed_stream.SeedStream(seed, salt='triangular')
+    stream = SeedStream(seed, salt='triangular')
     shape = tf.concat([[n], self._batch_shape_tensor(
         low=low, high=high, peak=peak)], axis=0)
     samples = tf.random.uniform(shape=shape, dtype=self.dtype, seed=stream())

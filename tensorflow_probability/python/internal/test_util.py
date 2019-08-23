@@ -28,9 +28,9 @@ import six
 
 import tensorflow as tf
 
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal.backend.numpy import ops
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
     'numpy_disable_gradient_test',
@@ -205,7 +205,7 @@ def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
     strm: A SeedStream instance seeded with 17, unless otherwise specified by
       arguments or command line flags.
   """
-  return seed_stream.SeedStream(test_seed(hardcoded_seed), salt=salt)
+  return SeedStream(test_seed(hardcoded_seed), salt=salt)
 
 
 class DiscreteScalarDistributionTestHelpers(object):

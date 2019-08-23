@@ -21,8 +21,8 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 class Autoregressive(distribution.Distribution):
@@ -197,7 +197,7 @@ class Autoregressive(distribution.Distribution):
     return self.distribution0.event_shape_tensor()
 
   def _sample_n(self, n, seed=None):
-    seed = seed_stream.SeedStream(seed, salt="Autoregressive")()
+    seed = SeedStream(seed, salt="Autoregressive")()
     samples = self.distribution0.sample(n, seed=seed)
     for _ in range(self._num_steps):
       # pylint: disable=not-callable

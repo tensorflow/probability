@@ -49,7 +49,7 @@ DEPS = {
     "distribution_util": [":prefer_static"],
     "prefer_static_test": [":test_util"],
     "test_util": [
-        "//tensorflow_probability/python/experimental/substrates/numpy/distributions:seed_stream",
+        "//tensorflow_probability/python/experimental/substrates/numpy/util:seed_stream",
     ],
     "test_util_test": [
         ":test_util",

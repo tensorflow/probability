@@ -83,7 +83,7 @@ def assert_univariate_target_conservation(
   num_samples = int(5e4)
   num_steps = 1
   target_d = mk_target()
-  strm = tfd.SeedStream(salt='univariate_nuts_test', seed=1)
+  strm = tfp.util.SeedStream(salt='univariate_nuts_test', seed=1)
   initialization = target_d.sample([num_samples], seed=strm())
   def target(*args):
     # TODO(axch): Just use target_d.log_prob directly, and accept target_d

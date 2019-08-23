@@ -22,9 +22,9 @@ import collections
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -222,7 +222,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     """Executes `model`, creating both samples and distributions."""
     ds = []
     values_out = []
-    seed = seed_stream.SeedStream('JointDistributionCoroutine', seed)
+    seed = SeedStream('JointDistributionCoroutine', seed)
     gen = self._model()
     index = 0
     d = next(gen)

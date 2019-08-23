@@ -32,13 +32,13 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import normal
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -201,7 +201,7 @@ class LKJ(distribution.Distribution):
       raise ValueError(
           'Cannot sample negative-dimension correlation matrices.')
     # Notation below: B is the batch shape, i.e., tf.shape(concentration)
-    seed = seed_stream.SeedStream(seed, 'sample_lkj')
+    seed = SeedStream(seed, 'sample_lkj')
     with tf.name_scope('sample_lkj' or name):
       concentration = tf.convert_to_tensor(self.concentration)
       if not dtype_util.is_floating(concentration.dtype):

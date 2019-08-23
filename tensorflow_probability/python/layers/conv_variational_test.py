@@ -454,7 +454,7 @@ class ConvVariational(object):
         channels = input_shape[-1]
       rank = len(inputs.shape) - 2
 
-      seed_stream = tfd.SeedStream(layer.seed, salt='ConvFlipout')
+      seed_stream = tfp.util.SeedStream(layer.seed, salt='ConvFlipout')
 
       sign_input = tf.random.uniform(
           tf.concat([batch_shape, tf.expand_dims(channels, 0)], 0),

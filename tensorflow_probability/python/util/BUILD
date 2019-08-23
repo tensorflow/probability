@@ -33,6 +33,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":deferred_tensor",
+        ":seed_stream",
     ],
 )
 
@@ -55,6 +56,21 @@ py_test(
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "seed_stream",
+    srcs = ["seed_stream.py"],
+)
+
+py_test(
+    name = "seed_stream_test",
+    size = "small",
+    srcs = ["seed_stream_test.py"],
+    deps = [
         # tensorflow dep,
         "//tensorflow_probability",
     ],

@@ -21,13 +21,14 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = ['VonMisesFisher']
@@ -350,7 +351,7 @@ class VonMisesFisher(distribution.Distribution):
 
   def _sample_3d(self, n, seed=None):
     """Specialized inversion sampler for 3D."""
-    seed = seed_stream.SeedStream(seed, salt='von_mises_fisher_3d')
+    seed = SeedStream(seed, salt='von_mises_fisher_3d')
     u_shape = tf.concat([[n], self._batch_shape_tensor()], axis=0)
     z = tf.random.uniform(u_shape, seed=seed(), dtype=self.dtype)
     # TODO(bjp): Higher-order odd dim analytic CDFs are available in [1], could
@@ -373,7 +374,7 @@ class VonMisesFisher(distribution.Distribution):
     return u[..., tf.newaxis]
 
   def _sample_n(self, n, seed=None):
-    seed = seed_stream.SeedStream(seed, salt='vom_mises_fisher')
+    seed = SeedStream(seed, salt='vom_mises_fisher')
     # The sampling strategy relies on the fact that vMF variates are symmetric
     # about the mean direction. Accordingly, if we have a sampling strategy for
     # the away-from-mean angle, then we can uniformly sample the remaining

@@ -21,14 +21,15 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
     'InverseGaussian',
@@ -149,7 +150,7 @@ class InverseGaussian(distribution.Distribution):
     # https://www.jstor.org/stable/2683801
     concentration = tf.convert_to_tensor(self.concentration)
     loc = tf.convert_to_tensor(self.loc)
-    seed = seed_stream.SeedStream(seed, 'inverse_gaussian')
+    seed = SeedStream(seed, 'inverse_gaussian')
     shape = tf.concat([[n], self._batch_shape_tensor(
         loc=loc, concentration=concentration)], axis=0)
     sampled_chi2 = (tf.random.normal(
