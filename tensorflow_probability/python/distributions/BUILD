@@ -197,11 +197,12 @@ py_library(
     srcs = ["blockwise.py"],
     deps = [
         ":distribution",
+        ":joint_distribution_sequential",
         ":kullback_leibler",
-        ":seed_stream",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
@@ -1425,6 +1426,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
