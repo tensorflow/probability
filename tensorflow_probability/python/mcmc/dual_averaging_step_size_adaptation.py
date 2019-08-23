@@ -410,7 +410,7 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
         prefer_static.rank(new_error_sum), 0)
     new_error_sum_extend = tf.reshape(
         new_error_sum,
-        shape=tf.pad(
+        shape=prefer_static.pad(
             prefer_static.shape(new_error_sum),
             paddings=[[0, num_ones_to_pad]],
             constant_values=1))

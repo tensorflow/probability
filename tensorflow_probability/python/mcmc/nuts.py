@@ -402,12 +402,13 @@ class NoUTurnSampler(TransitionKernel):
       def _init(shape_and_dtype):
         """Allocate TensorArray for storing state and momentum."""
         return [  # pylint: disable=g-complex-comprehension
-            tf.zeros(
-                tf.TensorShape([self.max_tree_depth + 1]).concatenate(s),
+            prefer_static.zeros(
+                prefer_static.concat([[self.max_tree_depth + 1], s], axis=0),
                 dtype=d) for (s, d) in shape_and_dtype
         ]
 
-      get_shapes_and_dtypes = lambda x: [(x_.shape, x_.dtype) for x_ in x]
+      get_shapes_and_dtypes = lambda x: [(prefer_static.shape(x_), x_.dtype)  # pylint: disable=g-long-lambda
+                                         for x_ in x]
       momentum_state_memory = MomentumStateSwap(
           momentum_swap=_init(get_shapes_and_dtypes(dummy_momentum)),
           state_swap=_init(get_shapes_and_dtypes(init_state)))
@@ -600,7 +601,7 @@ class NoUTurnSampler(TransitionKernel):
           state_diff,
           [m[0] for m in new_step_state.momentum],
           [m[1] for m in new_step_state.momentum],
-          log_prob_rank=len(batch_shape))
+          log_prob_rank=prefer_static.rank_from_shape(batch_shape))
 
       new_step_metastate = TreeDoublingMetaState(
           candidate_state=new_candidate_state,
@@ -910,7 +911,9 @@ def _rightmost_expand_to_rank(tensor, new_rank):
       tensor,
       shape=prefer_static.pad(
           prefer_static.shape(tensor),
-          paddings=[[0, max(0, new_rank - prefer_static.rank(tensor))]],
+          paddings=[[0,
+                     prefer_static.maximum(
+                         new_rank - prefer_static.rank(tensor), 0)]],
           constant_values=1))
 
 
