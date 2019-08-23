@@ -30,7 +30,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
-    "FillTriangular",
+    'FillTriangular',
 ]
 
 
@@ -66,7 +66,7 @@ class FillTriangular(bijector.Bijector):
   def __init__(self,
                upper=False,
                validate_args=False,
-               name="fill_triangular"):
+               name='fill_triangular'):
     """Instantiates the `FillTriangular` bijector.
 
     Args:
@@ -112,7 +112,7 @@ class FillTriangular(bijector.Bijector):
     if n1 is None or n2 is None:
       m = None
     elif n1 != n2:
-      raise ValueError("Matrix must be square. (saw [{}, {}])".format(n1, n2))
+      raise ValueError('Matrix must be square. (saw [{}, {}])'.format(n1, n2))
     else:
       m = n1 * (n1 + 1) / 2
     return tensorshape_util.concatenate(batch_shape, [m])
@@ -126,7 +126,7 @@ class FillTriangular(bijector.Bijector):
     batch_shape, n = output_shape_tensor[:-2], output_shape_tensor[-1]
     if self.validate_args:
       is_square_matrix = assert_util.assert_equal(
-          n, output_shape_tensor[-2], message="Matrix must be square.")
+          n, output_shape_tensor[-2], message='Matrix must be square.')
       with tf.control_dependencies([is_square_matrix]):
         n = tf.identity(n)
     d = tf.cast(n * (n + 1) / 2, output_shape_tensor.dtype)
@@ -138,17 +138,18 @@ def vector_size_to_square_matrix_size(d, validate_args, name=None):
   if isinstance(d, (float, int, np.generic, np.ndarray)):
     n = (-1 + np.sqrt(1 + 8 * d)) / 2.
     if float(int(n)) != n:
-      raise ValueError("Vector length is not a triangular number.")
+      raise ValueError('Vector length {} is not a triangular number.'.format(d))
     return int(n)
   else:
-    with tf.name_scope(name or "vector_size_to_square_matrix_size") as name:
+    with tf.name_scope(name or 'vector_size_to_square_matrix_size') as name:
       n = (-1. + tf.sqrt(1 + 8. * tf.cast(d, dtype=tf.float32))) / 2.
       if validate_args:
         with tf.control_dependencies([
             assert_util.assert_equal(
                 tf.cast(tf.cast(n, dtype=tf.int32), dtype=tf.float32),
                 n,
-                message="Vector length is not a triangular number")
+                data=[d],
+                message='Vector length is not a triangular number')
         ]):
           n = tf.identity(n)
       return tf.cast(n, d.dtype)

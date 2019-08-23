@@ -48,6 +48,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'DiscreteCosineTransform',
     'Exp',
     'Expm1',
+    'FillTriangular',
     'Gumbel',
     'Identity',
     'Inline',
@@ -62,6 +63,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'Reciprocal',
     'Sigmoid',
     'SinhArcsinh',
+    'Softplus',
     'Softsign',
     'Square',
     'Tanh',
@@ -74,6 +76,7 @@ BIJECTOR_PARAMS_NDIMS = {
     'Kumaraswamy': dict(concentration1=0, concentration0=0),
     'MatvecLU': dict(lower_upper=2, permutation=1),
     'SinhArcsinh': dict(skewness=0, tailweight=0),
+    'Softplus': dict(hinge_softness=0),
     'RationalQuadraticSpline': dict(bin_widths=1, bin_heights=1, knot_slopes=1),
     'Weibull': dict(concentration=0, scale=0),
 }
@@ -204,6 +207,26 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
 Support = tfp_hps.Support
 
 
+def constrain_forward_shape(bijector, shape):
+  """Constrain the shape so it is compatible with bijector.forward."""
+  if is_invert(bijector):
+    return constrain_inverse_shape(bijector.bijector, shape=shape)
+
+  support = bijector_hps.bijector_supports()[
+      type(bijector).__name__].forward
+  if support == tfp_hps.Support.VECTOR_SIZE_TRIANGULAR:
+    # Need to constrain the shape.
+    shape[-1] = int(shape[-1] * (shape[-1] + 1) / 2)
+  return shape
+
+
+def constrain_inverse_shape(bijector, shape):
+  """Constrain the shape so it is compatible with bijector.inverse."""
+  if is_invert(bijector):
+    return constrain_forward_shape(bijector.bijector, shape=shape)
+  return shape
+
+
 @hps.composite
 def domain_tensors(draw, bijector, shape=None):
   """Strategy for drawing Tensors in the domain of a bijector.
@@ -309,8 +332,10 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
     # pass those through `domain_tensors` and `codomain_tensors` and use
     # `tensors_in_support`.  However, `RationalQuadraticSpline` behaves weirdly
     # somehow and I got confused.
-    shp = bijector.inverse_event_shape([event_dim] *
-                                       bijector.inverse_min_event_ndims)
+    codomain_event_shape = [event_dim] * bijector.inverse_min_event_ndims
+    codomain_event_shape = constrain_inverse_shape(
+        bijector, codomain_event_shape)
+    shp = bijector.inverse_event_shape(codomain_event_shape)
     shp = tensorshape_util.concatenate(
         data.draw(
             tfp_hps.broadcast_compatible_shape(
@@ -334,7 +359,7 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
     event_ndims = data.draw(
         hps.integers(
             min_value=bijector.forward_min_event_ndims,
-            max_value=bijector.forward_event_shape(xs.shape).ndims))
+            max_value=xs.shape.ndims))
     with tf.GradientTape() as tape:
       max_permitted = 2 if hasattr(bijector, '_forward_log_det_jacobian') else 4
       if is_invert(bijector):
@@ -352,8 +377,9 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
     # Inverse mapping: Check differentiation through inverse mapping with
     # respect to the codomain "input" and parameter variables.  Also check that
     # any variables are not referenced overmuch.
-    shp = bijector.forward_event_shape([event_dim] *
-                                       bijector.forward_min_event_ndims)
+    domain_event_shape = [event_dim] * bijector.forward_min_event_ndims
+    domain_event_shape = constrain_forward_shape(bijector, domain_event_shape)
+    shp = bijector.forward_event_shape(domain_event_shape)
     shp = tensorshape_util.concatenate(
         data.draw(
             tfp_hps.broadcast_compatible_shape(
@@ -378,7 +404,7 @@ class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
     event_ndims = data.draw(
         hps.integers(
             min_value=bijector.inverse_min_event_ndims,
-            max_value=bijector.inverse_event_shape(ys.shape).ndims))
+            max_value=ys.shape.ndims))
     with tf.GradientTape() as tape:
       max_permitted = 2 if hasattr(bijector, '_inverse_log_det_jacobian') else 4
       if is_invert(bijector):
@@ -404,6 +430,8 @@ CONSTRAINTS = {
     'concentration0':
         tfp_hps.softplus_plus_eps(),
     'concentration1':
+        tfp_hps.softplus_plus_eps(),
+    'hinge_softness':
         tfp_hps.softplus_plus_eps(),
     'scale':
         tfp_hps.softplus_plus_eps(),

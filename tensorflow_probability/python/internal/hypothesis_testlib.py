@@ -131,6 +131,7 @@ class Support(object):
   VECTOR_SIZE_TRIANGULAR = 'VECTOR_SIZE_TRIANGULAR'
   VECTOR_WITH_L1_NORM_1_SIZE_GT1 = 'VECTOR_WITH_L1_NORM_1_SIZE_GT1'
   VECTOR_STRICTLY_INCREASING = 'VECTOR_STRICTLY_INCREASING'
+  MATRIX_LOWER_TRIL = 'MATRIX_LOWER_TRIL'
   MATRIX_LOWER_TRIL_POSITIVE_DEFINITE = 'MATRIX_LOWER_TRIL_POSITIVE_DEFINITE'
   MATRIX_POSITIVE_DEFINITE = 'MATRIX_POSITIVE_DEFINITE'
   CORRELATION_CHOLESKY = 'CORRELATION_CHOLESKY'
@@ -184,6 +185,8 @@ def _vector_constrainer(support):
           lambda x: tf.cumsum(tf.abs(x) + 1e-3, axis=-1),
       Support.VECTOR_WITH_L1_NORM_1_SIZE_GT1:
           l1norm,
+      Support.VECTOR_SIZE_TRIANGULAR:
+          identity_fn,
   }
   if support not in constrainers:
     raise NotImplementedError(support)
@@ -197,6 +200,8 @@ def _matrix_constrainer(support):
           positive_definite,
       Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE:
           lower_tril_positive_definite,
+      Support.MATRIX_LOWER_TRIL:
+          lower_tril,
   }
   if support not in constrainers:
     raise NotImplementedError(support)
@@ -548,3 +553,7 @@ def positive_definite(x):
 def lower_tril_positive_definite(x):
   return tf.linalg.band_part(
       matrix_diag_transform(x, softplus_plus_eps()), -1, 0)
+
+
+def lower_tril(x):
+  return tf.linalg.band_part(x, -1, 0)

@@ -25,10 +25,11 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
-    "Softplus",
+    'Softplus',
 ]
 
 
@@ -77,26 +78,16 @@ class Softplus(bijector.Bijector):
 
   @distribution_util.AppendDocstring(
       kwargs_dict={
-          "hinge_softness": (
-              "Nonzero floating point `Tensor`.  Controls the softness of what "
-              "would otherwise be a kink at the origin.  Default is 1.0")})
+          'hinge_softness': (
+              'Nonzero floating point `Tensor`.  Controls the softness of what '
+              'would otherwise be a kink at the origin.  Default is 1.0')})
   def __init__(self,
                hinge_softness=None,
                validate_args=False,
-               name="softplus"):
+               name='softplus'):
     with tf.name_scope(name) as name:
-      if hinge_softness is None:
-        self._hinge_softness = None
-      else:
-        self._hinge_softness = tf.convert_to_tensor(
-            hinge_softness, name="hinge_softness")
-        if validate_args:
-          nonzero_check = assert_util.assert_none_equal(
-              dtype_util.as_numpy_dtype(self._hinge_softness.dtype)(0),
-              self.hinge_softness,
-              message="hinge_softness must be non-zero")
-          self._hinge_softness = distribution_util.with_dependencies(
-              [nonzero_check], self.hinge_softness)
+      self._hinge_softness = tensor_util.convert_nonref_to_tensor(
+          hinge_softness, name='hinge_softness')
       super(Softplus, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
@@ -137,3 +128,15 @@ class Softplus(bijector.Bijector):
   @property
   def hinge_softness(self):
     return self._hinge_softness
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if (self.hinge_softness is not None and
+        is_init != tensor_util.is_ref(self.hinge_softness)):
+      assertions.append(assert_util.assert_none_equal(
+          dtype_util.as_numpy_dtype(self._hinge_softness.dtype)(0),
+          self.hinge_softness,
+          message='Argument `hinge_softness` must be non-zero.'))
+    return assertions

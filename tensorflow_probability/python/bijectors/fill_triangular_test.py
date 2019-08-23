@@ -84,19 +84,19 @@ class FillTriangularBijectorTest(tf.test.TestCase):
     b = tfb.FillTriangular(validate_args=True)
 
     x_shape_bad = tf.TensorShape([5, 4, 7])
-    with self.assertRaisesRegexp(ValueError, "is not a triangular number"):
+    with self.assertRaisesRegexp(ValueError, 'is not a triangular number'):
       b.forward_event_shape(x_shape_bad)
-    with self.assertRaisesOpError("is not a triangular number"):
+    with self.assertRaisesOpError('is not a triangular number'):
       self.evaluate(
           b.forward_event_shape_tensor(tensorshape_util.as_list(x_shape_bad)))
 
     y_shape_bad = tf.TensorShape([5, 4, 3, 2])
-    with self.assertRaisesRegexp(ValueError, "Matrix must be square"):
+    with self.assertRaisesRegexp(ValueError, 'Matrix must be square'):
       b.inverse_event_shape(y_shape_bad)
-    with self.assertRaisesOpError("Matrix must be square"):
+    with self.assertRaisesOpError('Matrix must be square'):
       self.evaluate(
           b.inverse_event_shape_tensor(tensorshape_util.as_list(y_shape_bad)))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

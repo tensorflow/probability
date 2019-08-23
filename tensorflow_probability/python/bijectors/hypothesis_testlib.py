@@ -148,6 +148,9 @@ def bijector_supports():
                           Support.SCALAR_POSITIVE),
       'Expm1':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_GT_NEG1),
+      'FillTriangular':
+          BijectorSupport(
+              Support.VECTOR_SIZE_TRIANGULAR, Support.MATRIX_LOWER_TRIL),
       'Gumbel':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'Identity':
@@ -188,6 +191,9 @@ def bijector_supports():
       'SinhArcsinh':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
+      'Softplus':
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED,
+                          Support.SCALAR_POSITIVE),
       'Softsign':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_IN_NEG1_1),
