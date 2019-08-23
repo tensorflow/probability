@@ -94,7 +94,7 @@ py_library(
     name = "jax",
     srcs = [":{}.py".format(f) for f in FILENAMES if "_test" not in f],
     deps = [
-        # jax dep,
+        # The JAX dependency is a weak dependency, opt-in by user.
     ],
 )
 
@@ -104,7 +104,6 @@ py_library(
     srcs = [":{}.py".format(f) for f in FILENAMES if "_test" in f],
     deps = [
         ":jax",
-        # jax dep,
     ],
 )
 
@@ -121,6 +120,7 @@ py_test(
         ":jax_testlib",
         # absl/testing:parameterized dep,
         # hypothesis dep,
+        # jax dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",

@@ -22,6 +22,7 @@ import functools
 
 # Dependency imports
 
+from absl import logging
 from absl.testing import parameterized
 
 import hypothesis as hp
@@ -30,6 +31,7 @@ import hypothesis.strategies as hps
 import numpy as np  # Rewritten by script to import jax.numpy
 import numpy as onp  # pylint: disable=reimported
 import six
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import test_case
@@ -632,7 +634,7 @@ class NumpyTest(test_case.TestCase, parameterized.TestCase):
     if tf.executing_eagerly():
       return self._eval_helper(tensors)
     else:
-      sess = tf.compat.v1.get_default_session()
+      sess = tf1.get_default_session()
       if sess is None:
         with self.session() as sess:
           return sess.run(tensors)
@@ -647,10 +649,10 @@ class NumpyTest(test_case.TestCase, parameterized.TestCase):
                             jax_disabled=False,
                             **_):
     if jax_disabled and MODE_JAX:
-      tf.compat.v1.logging.warning('The test for %s is disabled for JAX.',
-                                   numpy_function.__name__)
+      logging.warning('The test for %s is disabled for JAX.',
+                      numpy_function.__name__)
     elif not strategy_list:
-      tf.compat.v1.logging.warning(
+      logging.warning(
           'The test for %s contains no strategies.', numpy_function.__name__)
     else:
       self.skipTest('Has coverage.')

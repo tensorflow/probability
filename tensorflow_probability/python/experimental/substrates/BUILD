@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2019 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,13 +26,11 @@ licenses(["notice"])  # Apache 2.0
 exports_files(["LICENSE"])
 
 py_library(
-    name = "experimental",
+    name = "substrates",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
-        "//tensorflow_probability/python/experimental/auto_batching",
-        "//tensorflow_probability/python/experimental/edward2",
-        "//tensorflow_probability/python/experimental/mcmc",
-        "//tensorflow_probability/python/experimental/substrates",
+        "//tensorflow_probability/python/experimental/substrates/jax",
+        "//tensorflow_probability/python/experimental/substrates/numpy",
     ],
 )

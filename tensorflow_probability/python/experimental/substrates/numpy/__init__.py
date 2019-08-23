@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2019 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,24 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Description:
-#   Various backend alternatives to TF.
+"""TFP for Numpy."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
-licenses(["notice"])  # Apache 2.0
+from tensorflow_probability.python.experimental.substrates.numpy import bijectors
+from tensorflow_probability.python.experimental.substrates.numpy import distributions
+from tensorflow_probability.python.experimental.substrates.numpy import internal
 
-package(
-    default_visibility = [
-        "//tensorflow_probability:__subpackages__",
-    ],
-)
-
-exports_files(["LICENSE"])
-
-py_library(
-    name = "backend",
-    srcs = ["__init__.py"],
-    deps = [
-        "//tensorflow_probability/python/internal/backend/jax",
-        "//tensorflow_probability/python/internal/backend/numpy",
-    ],
-)
+from tensorflow_probability.python.internal.backend import numpy as tf2numpy

@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2019 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Description:
-#   API-unstable code that is part of the TFP package.
+# TFP with a numpy backend.
+
+# [internal] load python3.bzl
+
+licenses(["notice"])  # Apache 2.0
 
 package(
     default_visibility = [
@@ -21,18 +24,33 @@ package(
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
-
 exports_files(["LICENSE"])
 
 py_library(
-    name = "experimental",
+    name = "numpy",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
     deps = [
-        "//tensorflow_probability/python/experimental/auto_batching",
-        "//tensorflow_probability/python/experimental/edward2",
-        "//tensorflow_probability/python/experimental/mcmc",
-        "//tensorflow_probability/python/experimental/substrates",
+        "//tensorflow_probability/python/experimental/substrates/numpy/bijectors",
+        "//tensorflow_probability/python/experimental/substrates/numpy/distributions",
+        "//tensorflow_probability/python/experimental/substrates/numpy/internal",
+        "//tensorflow_probability/python/internal/backend",
+    ],
+)
+
+py_binary(
+    name = "rewrite",
+    srcs = ["rewrite.py"],
+    python_version = "PY3",
+    deps = [
+        # absl:app dep,
+    ],
+)
+
+py_test(
+    name = "numpy_integration_test",
+    srcs = ["numpy_integration_test.py"],
+    tags = ["tfp_numpy"],
+    deps = [
+        "//tensorflow_probability",
     ],
 )

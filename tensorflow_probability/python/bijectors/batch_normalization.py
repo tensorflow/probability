@@ -20,6 +20,7 @@ from __future__ import print_function
 
 
 # Dependency imports
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
@@ -172,7 +173,7 @@ class BatchNormalization(bijector.Bijector):
       if `batchnorm_layer.virtual_batch_size` is specified.
     """
     if (not isinstance(layer, tf.keras.layers.BatchNormalization) and
-        not isinstance(layer, tf.compat.v1.layers.BatchNormalization)):
+        not isinstance(layer, tf1.layers.BatchNormalization)):
       raise ValueError(
           'batchnorm_layer must be an instance of '
           '`tf.keras.layers.BatchNormalization` or '

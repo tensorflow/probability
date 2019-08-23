@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
@@ -64,7 +65,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
       training: Boolean of whether bijector runs in training or inference mode.
     """
     x_ = np.arange(5 * 4 * 2).astype(np.float32).reshape(input_shape)
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         x_, input_shape if 0 in event_dims else (None,) + input_shape[1:])
     # When training, memorize the exact mean of the last
     # minibatch that it normalized (instead of moving average assignment).
@@ -83,7 +84,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
       # Use identity to invalidate cache.
       ildj = batch_norm.inverse_log_det_jacobian(
           tf.identity(denorm_x), event_ndims=len(event_dims))
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     # Update variables.
     norm_x_ = self.evaluate(norm_x)
     [
@@ -140,15 +141,15 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
 
   @parameterized.named_parameters(
       ("2d_event_ndims_v1",
-       (10, 4), [-1], False, tf.compat.v1.layers.BatchNormalization),
+       (10, 4), [-1], False, tf1.layers.BatchNormalization),
       ("1d_event_ndims_v1",
-       2, [-1], False, tf.compat.v1.layers.BatchNormalization),
+       2, [-1], False, tf1.layers.BatchNormalization),
       ("2d_event_ndims_keras",
        (10, 4), [-1], False, tf.keras.layers.BatchNormalization),
       ("1d_event_ndims_keras",
        2, [-1], False, tf.keras.layers.BatchNormalization))
   def testLogProb(self, event_shape, event_dims, training, layer_cls):
-    training = tf.compat.v1.placeholder_with_default(training, (), "training")
+    training = tf1.placeholder_with_default(training, (), "training")
     layer = layer_cls(axis=event_dims, epsilon=0.)
     batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
                                         training=training)
@@ -169,18 +170,18 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
     # to the identity transformation.
     base_log_prob = base_dist.log_prob(samples)
     dist_log_prob = dist.log_prob(samples)
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     base_log_prob_, dist_log_prob_ = self.evaluate(
         [base_log_prob, dist_log_prob])
     self.assertAllClose(base_log_prob_, dist_log_prob_)
 
   @parameterized.named_parameters(
-      ("v1", tf.compat.v1.layers.BatchNormalization),
+      ("v1", tf1.layers.BatchNormalization),
       ("keras", tf.keras.layers.BatchNormalization))
   def testMutuallyConsistent(self, layer_cls):
     # BatchNorm bijector is only mutually consistent when training=False.
     dims = 4
-    training = tf.compat.v1.placeholder_with_default(False, (), "training")
+    training = tf1.placeholder_with_default(False, (), "training")
     layer = layer_cls(epsilon=0.)
     batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
                                         training=training)
@@ -198,12 +199,12 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
         rtol=0.02)
 
   @parameterized.named_parameters(
-      ("v1", tf.compat.v1.layers.BatchNormalization),
+      ("v1", tf1.layers.BatchNormalization),
       ("keras", tf.keras.layers.BatchNormalization))
   def testInvertMutuallyConsistent(self, layer_cls):
     # BatchNorm bijector is only mutually consistent when training=False.
     dims = 4
-    training = tf.compat.v1.placeholder_with_default(False, (), "training")
+    training = tf1.placeholder_with_default(False, (), "training")
     layer = layer_cls(epsilon=0.)
     batch_norm = tfb.Invert(
         tfb.BatchNormalization(batchnorm_layer=layer, training=training))
@@ -222,7 +223,7 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
 
   def testWithKeras(self):
     # NOTE: Keras throws an error below if we use
-    # tf.compat.v1.layers.BatchNormalization() here.
+    # tf1.layers.BatchNormalization() here.
     layer = None
 
     dist = distributions.TransformedDistribution(
