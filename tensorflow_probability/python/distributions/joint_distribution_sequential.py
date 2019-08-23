@@ -206,7 +206,6 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
           validate_args=validate_args,
           allow_nan_stats=False,
           parameters=parameters,
-          graph_parents=[],
           name=name)
       # Check valid structure.
       self._model_unflatten(self._model_flatten(model))

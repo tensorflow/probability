@@ -648,13 +648,6 @@ class VariationalGaussianProcess(
             allow_nan_stats=allow_nan_stats,
             name=name)
         self._parameters = parameters
-        self._graph_parents = [
-            index_points,
-            inducing_index_points,
-            variational_inducing_observations_loc,
-            variational_inducing_observations_scale,
-            observation_noise_variance,
-            jitter]
 
   def _compute_posterior_predictive_params(self):
     ktt = _add_diagonal_shift(

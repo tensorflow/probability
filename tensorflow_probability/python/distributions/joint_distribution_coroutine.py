@@ -165,7 +165,6 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
           validate_args=validate_args,
           allow_nan_stats=False,
           parameters=parameters,
-          graph_parents=[],
           name=name)
 
   def _assert_compatible_shape(self, index, sample_shape, samples):

@@ -165,7 +165,6 @@ class Transpose(bijector.Bijector):
       self._rightmost_transposed_ndims = rightmost_transposed_ndims
       super(Transpose, self).__init__(
           forward_min_event_ndims=rightmost_transposed_ndims_,
-          graph_parents=[perm, rightmost_transposed_ndims],
           is_constant_jacobian=True,
           validate_args=validate_args,
           name=name)

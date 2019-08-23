@@ -175,11 +175,11 @@ class _VectorStudentT(transformed_distribution.TransformedDistribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    graph_parents = [df, loc, scale_identity_multiplier, scale_diag,
-                     scale_tril, scale_perturb_factor, scale_perturb_diag]
+    args = [df, loc, scale_identity_multiplier, scale_diag,
+            scale_tril, scale_perturb_factor, scale_perturb_diag]
     with tf.name_scope(name) as name:
       with tf.name_scope("init"):
-        dtype = dtype_util.common_dtype(graph_parents, tf.float32)
+        dtype = dtype_util.common_dtype(args, tf.float32)
         df = tf.convert_to_tensor(df, name="df", dtype=dtype)
         # The shape of the _VectorStudentT distribution is governed by the
         # relationship between df.batch_shape and affine.batch_shape. In

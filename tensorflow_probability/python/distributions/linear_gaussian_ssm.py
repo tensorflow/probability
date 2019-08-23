@@ -462,7 +462,6 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          graph_parents=[],
           name=name)
 
   def backward_smoothing_pass(self,

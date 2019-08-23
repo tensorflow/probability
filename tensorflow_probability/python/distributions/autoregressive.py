@@ -166,7 +166,6 @@ class Autoregressive(distribution.Distribution):
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
-        graph_parents=self._distribution0._graph_parents,  # pylint: disable=protected-access
         name=name)
 
   @property

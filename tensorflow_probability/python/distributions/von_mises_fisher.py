@@ -213,7 +213,6 @@ class VonMisesFisher(distribution.Distribution):
           allow_nan_stats=allow_nan_stats,
           reparameterization_type=reparameterization_type,
           parameters=parameters,
-          graph_parents=[self._mean_direction, self._concentration],
           name=name)
 
   @classmethod

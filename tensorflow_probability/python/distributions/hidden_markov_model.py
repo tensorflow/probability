@@ -292,9 +292,6 @@ class HiddenMarkovModel(distribution.Distribution):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          graph_parents=(self._initial_distribution._graph_parents +
-                         self._transition_distribution._graph_parents +
-                         self._observation_distribution._graph_parents),
           name=name)
       # pylint: enable=protected-access
 

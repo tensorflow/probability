@@ -142,7 +142,6 @@ class Sample(distribution_lib.Distribution):
           validate_args=validate_args,
           allow_nan_stats=self._distribution.allow_nan_stats,
           parameters=parameters,
-          graph_parents=([sample_shape] + distribution._graph_parents),  # pylint: disable=protected-access
           name=name)
 
   @property

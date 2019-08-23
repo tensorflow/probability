@@ -193,11 +193,6 @@ class Mixture(distribution.Distribution):
       if use_static_graph and static_num_components is None:
         raise ValueError("Number of categories must be known statically when "
                          "`static_sample=True`.")
-    # We let the Mixture distribution access _graph_parents since its arguably
-    # more like a baseclass.
-    graph_parents = self._cat._graph_parents  # pylint: disable=protected-access
-    for c in self._components:
-      graph_parents += c._graph_parents  # pylint: disable=protected-access
 
     super(Mixture, self).__init__(
         dtype=dtype,
@@ -205,7 +200,6 @@ class Mixture(distribution.Distribution):
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
-        graph_parents=graph_parents,
         name=name)
 
   @property

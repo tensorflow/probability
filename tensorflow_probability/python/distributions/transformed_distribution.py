@@ -266,10 +266,6 @@ class TransformedDistribution(distribution_lib.Distribution):
         validate_args=validate_args,
         allow_nan_stats=self._distribution.allow_nan_stats,
         parameters=parameters,
-        # We let TransformedDistribution access _graph_parents since this class
-        # is more like a baseclass than derived.
-        graph_parents=(distribution._graph_parents +  # pylint: disable=protected-access
-                       bijector.graph_parents),
         name=name)
 
   @property

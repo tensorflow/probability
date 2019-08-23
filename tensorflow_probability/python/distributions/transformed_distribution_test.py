@@ -70,7 +70,6 @@ class _ChooseLocation(tfp.bijectors.Bijector):
     with tf.name_scope(name) as name:
       self._loc = tf.convert_to_tensor(loc, name='loc')
       super(_ChooseLocation, self).__init__(
-          graph_parents=[self._loc],
           is_constant_jacobian=True,
           validate_args=False,
           forward_min_event_ndims=0,

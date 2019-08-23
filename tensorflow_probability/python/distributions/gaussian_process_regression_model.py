@@ -547,14 +547,6 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
             return mean_fn(x) + k_x_obs_linop.matvec(
                 chol_linop.solvevec(chol_linop.solvevec(diff), adjoint=True))
 
-        graph_parents = [observation_noise_variance, jitter]
-        def _maybe_append(x):
-          if x is not None:
-            graph_parents.append(x)
-        _maybe_append(index_points)
-        _maybe_append(observation_index_points)
-        _maybe_append(observations)
-
         super(GaussianProcessRegressionModel, self).__init__(
             kernel=conditional_kernel,
             mean_fn=conditional_mean_fn,
@@ -568,7 +560,6 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats, name=name)
         self._parameters = parameters
-        self._graph_parents = graph_parents
 
   @property
   def observation_index_points(self):

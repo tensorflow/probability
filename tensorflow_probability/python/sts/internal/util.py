@@ -18,7 +18,8 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
@@ -143,9 +144,7 @@ def factored_joint_mvn(distributions):
       an independent sample from each input distributions.
   """
 
-  graph_parents = [tensor for distribution in distributions
-                   for tensor in distribution._graph_parents]  # pylint: disable=protected-access
-  with tf.compat.v1.name_scope('factored_joint_mvn', values=graph_parents):
+  with tf.name_scope('factored_joint_mvn'):
 
     # We explicitly broadcast the `locs` so that we can concatenate them.
     # We don't have direct numerical access to the `scales`, which are arbitrary
@@ -183,9 +182,7 @@ def sum_mvns(distributions):
       input covariances.
   """
 
-  graph_parents = [tensor for distribution in distributions
-                   for tensor in distribution._graph_parents]  # pylint: disable=protected-access
-  with tf.compat.v1.name_scope('sum_mvns', values=graph_parents):
+  with tf.name_scope('sum_mvns'):
     if all([isinstance(mvn, tfd.MultivariateNormalDiag)
             for mvn in distributions]):
       return tfd.MultivariateNormalDiag(
@@ -216,8 +213,7 @@ def empirical_statistics(observed_time_series):
       (subtracting the mean).
   """
 
-  with tf.compat.v1.name_scope(
-      'empirical_statistics', values=[observed_time_series]):
+  with tf.name_scope('empirical_statistics'):
 
     [
         observed_time_series,
@@ -240,7 +236,7 @@ def empirical_statistics(observed_time_series):
             missing_values_util.initial_value_of_masked_time_series(
                 squeezed_series, broadcast_mask=broadcast_mask))
       except NotImplementedError:
-        tf.compat.v1.logging.warn(
+        tf1.logging.warn(
             'Cannot compute initial values for a masked time series'
             'with dynamic shape; using the mean instead. This will'
             'affect heuristic priors and may change the results of'
@@ -276,8 +272,7 @@ def _maybe_expand_trailing_dim(observed_time_series_tensor):
     expanded_time_series: `Tensor` of shape `batch_shape + [num_timesteps, 1]`.
   """
 
-  with tf.compat.v1.name_scope(
-      'maybe_expand_trailing_dim', values=[observed_time_series_tensor]):
+  with tf.name_scope('maybe_expand_trailing_dim'):
     if (observed_time_series_tensor.shape.ndims is not None and
         tf.compat.dimension_value(
             observed_time_series_tensor.shape[-1]) is not None):
@@ -308,7 +303,7 @@ def canonicalize_observed_time_series_with_mask(
       `Tensor`.
   """
 
-  with tf.compat.v1.name_scope('canonicalize_observed_time_series_with_mask'):
+  with tf.name_scope('canonicalize_observed_time_series_with_mask'):
     if hasattr(maybe_masked_observed_time_series, 'is_missing'):
       observed_time_series = (
           maybe_masked_observed_time_series.time_series)
@@ -357,8 +352,7 @@ def mix_over_posterior_draws(means, variances):
   # TODO(b/120245392): enhance `MixtureSameFamily` to reduce along an
   # arbitrary axis, and eliminate `move_dimension` calls here.
 
-  with tf.compat.v1.name_scope(
-      'mix_over_posterior_draws', values=[means, variances]):
+  with tf.name_scope('mix_over_posterior_draws'):
     num_posterior_draws = dist_util.prefer_static_value(
         tf.shape(input=means))[0]
 

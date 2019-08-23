@@ -98,7 +98,6 @@ class Blockwise(distribution.Distribution):
           allow_nan_stats=allow_nan_stats,
           reparameterization_type=reparameterization_type,
           parameters=parameters,
-          graph_parents=_model_flatten(d._graph_parents for d in distributions),  # pylint: disable=protected-access
           name=name)
 
   @property

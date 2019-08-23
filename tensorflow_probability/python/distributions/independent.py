@@ -136,9 +136,6 @@ class Independent(distribution_lib.Distribution):
           validate_args=validate_args,
           allow_nan_stats=self._distribution.allow_nan_stats,
           parameters=parameters,
-          graph_parents=(
-              [reinterpreted_batch_ndims] +
-              distribution._graph_parents),  # pylint: disable=protected-access
           name=name)
       self._runtime_assertions = self._make_runtime_assertions(
           distribution, reinterpreted_batch_ndims, validate_args)

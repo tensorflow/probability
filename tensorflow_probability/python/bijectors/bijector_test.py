@@ -51,7 +51,6 @@ class BaseBijectorTest(test_case.TestCase):
         super(_BareBonesBijector, self).__init__(forward_min_event_ndims=0)
 
     bij = _BareBonesBijector()
-    self.assertEqual([], bij.graph_parents)
     self.assertEqual(False, bij.is_constant_jacobian)
     self.assertEqual(False, bij.validate_args)
     self.assertEqual(None, bij.dtype)
@@ -412,7 +411,6 @@ class _ConditionalBijector(tfb.Bijector):
   def __init__(self):
     super(_ConditionalBijector, self).__init__(
         forward_min_event_ndims=0,
-        graph_parents=[],
         is_constant_jacobian=True,
         validate_args=False,
         dtype=tf.float32,

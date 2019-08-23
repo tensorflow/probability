@@ -255,9 +255,6 @@ class MixtureSameFamily(distribution.Distribution):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          graph_parents=(
-              self._mixture_distribution._graph_parents  # pylint: disable=protected-access
-              + self._components_distribution._graph_parents),  # pylint: disable=protected-access
           name=name)
 
   @property

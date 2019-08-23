@@ -490,10 +490,6 @@ class VectorDiffeomixture(distribution_lib.Distribution):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          graph_parents=(
-              distribution._graph_parents  # pylint: disable=protected-access
-              + [loc_ for loc_ in loc if loc_ is not None] +
-              [p for scale_ in scale for p in scale_.graph_parents]),  # pylint: disable=g-complex-comprehension
           name=name)
 
   @property
