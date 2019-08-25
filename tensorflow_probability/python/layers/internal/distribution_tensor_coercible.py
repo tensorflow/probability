@@ -54,7 +54,8 @@ class _TensorCoercible(tfd.Distribution):
     distcls = distribution.__class__
     self_class = _TensorCoercible.registered_class_list.get(distcls)
     if not self_class:
-      self_class = _TensorCoercible.registered_class_list[distcls] = type(distcls.__name__, (cls, distcls), {})
+      self_class = type(distcls.__name__, (cls, distcls), {})
+      _TensorCoercible.registered_class_list[distcls] = self_class
     self.__class__ = self_class
     self._concrete_value = None  # pylint: disable=protected-access
     self._convert_to_tensor_fn = convert_to_tensor_fn  # pylint: disable=protected-access
