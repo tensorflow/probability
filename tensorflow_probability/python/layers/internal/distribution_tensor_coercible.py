@@ -57,14 +57,13 @@ class _TensorCoercible(tfd.Distribution):
       self_class = type(distcls.__name__, (cls, distcls), {})
       _TensorCoercible.registered_class_list[distcls] = self_class
     self.__class__ = self_class
-    self._concrete_value = None  # pylint: disable=protected-access
-    self._convert_to_tensor_fn = convert_to_tensor_fn  # pylint: disable=protected-access
     return self
 
   def __init__(self,
                distribution,
                convert_to_tensor_fn=tfd.Distribution.sample):
-    pass
+    self._concrete_value = None  # pylint: disable=protected-access
+    self._convert_to_tensor_fn = convert_to_tensor_fn  # pylint: disable=protected-access
 
   @property
   def shape(self):
