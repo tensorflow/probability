@@ -41,6 +41,7 @@ class _DistributionAndTensorCoercibleMeta(type(tfd.Distribution),
 class _TensorCoercible(tfd.Distribution):
   """Docstring."""
 
+  registered_class_list = {}
   def __new__(cls, distribution, convert_to_tensor_fn=tfd.Distribution.sample):
     if isinstance(distribution, cls):
       return distribution
@@ -51,7 +52,10 @@ class _TensorCoercible(tfd.Distribution):
                           distribution, type(distribution)))
     self = copy.copy(distribution)
     distcls = distribution.__class__
-    self.__class__ = type(distcls.__name__, (cls, distcls), {})
+    self_class = _TensorCoercible.registered_class_list.get(distcls)
+    if not self_class:
+      self_class = _TensorCoercible.registered_class_list[distcls] = type(distcls.__name__, (cls, distcls), {})
+    self.__class__ = self_class
     self._concrete_value = None  # pylint: disable=protected-access
     self._convert_to_tensor_fn = convert_to_tensor_fn  # pylint: disable=protected-access
     return self
