@@ -527,7 +527,7 @@ def fit_with_hmc(model,
 
   ```python
   transformed_hmc_kernel = mcmc.TransformedTransitionKernel(
-      inner_kernel=mcmc.SimpleStepSizeAdaptation(
+      inner_kernel=mcmc.DualAveragingStepSizeAdaptation(
           inner_kernel=mcmc.HamiltonianMonteCarlo(
               target_log_prob_fn=model.joint_log_prob(observed_time_series),
               step_size=step_size,
@@ -601,7 +601,7 @@ def fit_with_hmc(model,
           num_results=num_results,
           current_state=initial_state,
           num_burnin_steps=num_warmup_steps,
-          kernel=mcmc.SimpleStepSizeAdaptation(
+          kernel=mcmc.DualAveragingStepSizeAdaptation(
               inner_kernel=mcmc.TransformedTransitionKernel(
                   inner_kernel=mcmc.HamiltonianMonteCarlo(
                       target_log_prob_fn=target_log_prob_fn,
@@ -610,9 +610,7 @@ def fit_with_hmc(model,
                       state_gradients_are_stopped=True,
                       seed=seed()),
                   bijector=[param.bijector for param in model.parameters]),
-              num_adaptation_steps=int(num_warmup_steps * 0.8),
-              adaptation_rate=tf.convert_to_tensor(
-                  value=0.1, dtype=initial_state[0].dtype)),
+              num_adaptation_steps=int(num_warmup_steps * 0.8)),
           parallel_iterations=1 if seed is not None else 10)
     samples, kernel_results = run_hmc()
 
