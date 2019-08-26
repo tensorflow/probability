@@ -16,6 +16,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import gc
 import operator
 
 # Dependency imports
@@ -269,6 +270,28 @@ class DistributionTensorConversionTest(
   @test_util.enable_control_flow_v2
   def testWhileLoopWithControlFlowV2(self):
     self._testWhileLoop()
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class MemoryLeakTest(tf.test.TestCase):
+
+  def testTypeObjectLeakage(self):
+    if not tf.executing_eagerly():
+      self.skipTest('only relevant to eager')
+
+    layer = tfp.layers.DistributionLambda(tfp.distributions.Categorical)
+    x = tf.constant([-.23, 1.23, 1.42])
+    dist = layer(x)
+    gc.collect()
+    before_objs = len(gc.get_objects())
+    for _ in range(int(1e2)):
+      dist = layer(x)
+    gc.collect()
+    after_objs = len(gc.get_objects())
+    del dist
+
+    # This was 43150(py2)/43750(py3) before PR#532.
+    self.assertEqual(after_objs - before_objs, 0)
 
 
 if __name__ == '__main__':

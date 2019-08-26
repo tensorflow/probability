@@ -93,9 +93,7 @@ FILENAMES = [
 py_library(
     name = "jax",
     srcs = [":{}.py".format(f) for f in FILENAMES if "_test" not in f],
-    deps = [
-        # The JAX dependency is a weak dependency, opt-in by user.
-    ],
+    deps = [],  # The JAX dependency is a weak dependency, opt-in by user.
 )
 
 py_library(
