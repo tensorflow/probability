@@ -323,11 +323,11 @@ class NoUTurnSampler(TransitionKernel):
       # compatible with XLA.
       write_instruction = tf.TensorArray(
           TREE_COUNT_DTYPE,
-          size=2**(self.max_tree_depth - 1),
+          size=len(self._write_instruction),
           clear_after_read=False).unstack(self._write_instruction)
       read_instruction = tf.TensorArray(
           tf.int32,
-          size=2**(self.max_tree_depth-1),
+          size=len(self._read_instruction),
           clear_after_read=False).unstack(self._read_instruction)
 
       current_step_meta_info = OneStepMetaInfo(
@@ -403,7 +403,8 @@ class NoUTurnSampler(TransitionKernel):
         """Allocate TensorArray for storing state and momentum."""
         return [  # pylint: disable=g-complex-comprehension
             prefer_static.zeros(
-                prefer_static.concat([[self.max_tree_depth + 1], s], axis=0),
+                prefer_static.concat([[max(self._write_instruction) + 1], s],
+                                     axis=0),
                 dtype=d) for (s, d) in shape_and_dtype
         ]
 
@@ -733,12 +734,8 @@ class NoUTurnSampler(TransitionKernel):
       read_instruction = current_step_meta_info.read_instruction
       init_energy = current_step_meta_info.init_energy
 
-      # Save state and momentum at odd step, check U turn at even step.
-      # Note that here we also write to a Placeholder at even step
-      write_index = tf.where(
-          tf.equal(iter_ % 2, 0),
-          write_instruction.gather([iter_ // 2]),
-          self.max_tree_depth)
+      # Get index to write state into memory swap
+      write_index = write_instruction.gather([iter_])
 
       if GENERALIZED_UTURN:
         state_to_write = momentum_cumsum
@@ -757,17 +754,13 @@ class NoUTurnSampler(TransitionKernel):
                                   state_to_write)
           ])
       batch_shape = prefer_static.shape(next_target)
-      has_not_u_turn_at_even_step = tf.ones(batch_shape, dtype=tf.bool)
+      has_not_u_turn_init = tf.ones(batch_shape, dtype=tf.bool)
 
-      read_index = read_instruction.gather([iter_ // 2])[0]
-      no_u_turns_within_tree = tf.cond(
-          tf.equal(iter_ % 2, 0),
-          lambda: has_not_u_turn_at_even_step,
-          lambda: has_not_u_turn_at_odd_step(  # pylint: disable=g-long-lambda
-              read_index, directions, momentum_state_memory,
-              next_momentum_parts, state_to_write,
-              has_not_u_turn_at_even_step,
-              log_prob_rank=prefer_static.rank(next_target)))
+      read_index = read_instruction.gather([iter_])[0]
+      no_u_turns_within_tree = has_not_u_turn_at_all_index(  # pylint: disable=g-long-lambda
+          read_index, directions, momentum_state_memory, next_momentum_parts,
+          state_to_write, has_not_u_turn_init,
+          log_prob_rank=prefer_static.rank(next_target))
 
       energy = compute_hamiltonian(next_target, next_momentum_parts)
       current_energy = tf.where(tf.math.is_nan(energy),
@@ -850,9 +843,9 @@ class NoUTurnSampler(TransitionKernel):
       )
 
 
-def has_not_u_turn_at_odd_step(read_indexes, direction, momentum_state_memory,
-                               momentum_right, state_right,
-                               no_u_turns_within_tree, log_prob_rank):
+def has_not_u_turn_at_all_index(read_indexes, direction, momentum_state_memory,
+                                momentum_right, state_right,
+                                no_u_turns_within_tree, log_prob_rank):
   """Check u turn for early stopping."""
 
   def _get_left_state_and_check_u_turn(left_current_index, no_u_turns_last):
@@ -932,7 +925,7 @@ def build_tree_uturn_instruction(max_depth, init_memory=0):
 
   instruction = []
   _, _ = _buildtree(init_memory, max_depth)
-  return np.array(instruction, dtype=np.int32)
+  return np.unique(np.array(instruction, dtype=np.int32), axis=0)
 
 
 def generate_efficient_write_read_instruction(instruction_array):
@@ -941,32 +934,42 @@ def generate_efficient_write_read_instruction(instruction_array):
   instruction_mat = np.zeros((nsteps_within_tree, nsteps_within_tree))
   for previous_step, current_step in instruction_array:
     instruction_mat[previous_step, current_step] = 1
-  instruction_mat_cumsum = np.cumsum(instruction_mat, axis=1)
-  max_to_retain = instruction_mat_cumsum[:, -1][..., np.newaxis]
 
   # Generate a sparse matrix that represents the memory footprint:
   #   -1 : no need to save to memory (these are odd steps)
   #    1 : needed for check u turn (either already in memory or will be saved)
   #    0 : still in memory but not needed for check u turn
-  instruction_mat2 = np.zeros(instruction_mat.shape)
-  instruction_mat2[instruction_mat == 0] = -1
-  instruction_mat2[(instruction_mat_cumsum < max_to_retain)
-                   & (instruction_mat_cumsum > 0)] = 0
-  instruction_mat2[instruction_mat == 1] = 1
-  np.fill_diagonal(instruction_mat2, (max_to_retain > 0) - 1)
-  # plt.imshow(instruction_mat2, interpolation='None')
+  for i in range(nsteps_within_tree):
+    temp = instruction_mat[i]
+    endpoint = np.where(temp == 1)[0]
+    if endpoint.size > 0:
+      temp[:i] = -1
+      temp[endpoint[-1]+1:] = -1
+      instruction_mat[i] = temp
+    else:
+      instruction_mat[i] = -1
 
-  # Note that we only write at even step. Oberserved that this is actually
-  # squence A000120 (https://oeis.org/A000120)
-  write_instruction = np.sum(
-      instruction_mat2 > -1, axis=0)[range(0, nsteps_within_tree, 2)] - 1
-  # Note that we only read at odd step.
+  # In the classical U-turn check, the writing is only at odd step and the
+  # instruction follows squence A000120 (https://oeis.org/A000120)
+  to_write_temp = np.sum(instruction_mat > -1, axis=0)
+  to_read_temp = np.sum(instruction_mat == 1, axis=0)
+
+  write_instruction = to_write_temp - 1
+  write_instruction[to_write_temp == to_read_temp] = max(to_write_temp)
+
   read_instruction = []
   for i in range(nsteps_within_tree):
-    temp_instruction = instruction_mat2[:, i]
+    temp_instruction = instruction_mat[:, i]
     if np.sum(temp_instruction == 1) > 0:
       r = np.where(temp_instruction[temp_instruction >= 0] == 1)[0][0]
       read_instruction.append([r, r + np.sum(temp_instruction == 1)])
+    else:
+      # If there is no instruction to do U turn check (e.g., odd step in the
+      # original U turn check scheme), we append a pair of 0s as instruction.
+      # In the inner most while loop of build tree, we loop through the read
+      # instruction to check U turn - looping from 0 to 0 works with the
+      # existing code while no computation happens.
+      read_instruction.append([0, 0])
   return write_instruction, np.asarray(read_instruction)
 
 
