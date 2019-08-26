@@ -18,9 +18,9 @@
 For user guides, see:
 
 + [Overview](
-   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/README.md)
+   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/README.md)
 + [Upgrading from Edward to Edward2](
-   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/Upgrading_From_Edward_To_Edward2.md)
+   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/Upgrading_From_Edward_To_Edward2.md)
 
 """
 
@@ -29,16 +29,16 @@ from __future__ import division
 from __future__ import print_function
 
 # pylint: disable=wildcard-import
-from tensorflow_probability.python.edward2.generated_random_variables import *
-from tensorflow_probability.python.edward2.generated_random_variables import as_random_variable
-from tensorflow_probability.python.edward2.generated_random_variables import rv_dict
-from tensorflow_probability.python.edward2.interceptor import get_next_interceptor
-from tensorflow_probability.python.edward2.interceptor import interceptable
-from tensorflow_probability.python.edward2.interceptor import interception
-from tensorflow_probability.python.edward2.interceptor import tape
-from tensorflow_probability.python.edward2.program_transformations import make_log_joint_fn
-from tensorflow_probability.python.edward2.program_transformations import make_value_setter
-from tensorflow_probability.python.edward2.random_variable import RandomVariable
+from tensorflow_probability.python.experimental.edward2.generated_random_variables import *
+from tensorflow_probability.python.experimental.edward2.generated_random_variables import as_random_variable
+from tensorflow_probability.python.experimental.edward2.generated_random_variables import rv_dict
+from tensorflow_probability.python.experimental.edward2.interceptor import get_next_interceptor
+from tensorflow_probability.python.experimental.edward2.interceptor import interceptable
+from tensorflow_probability.python.experimental.edward2.interceptor import interception
+from tensorflow_probability.python.experimental.edward2.interceptor import tape
+from tensorflow_probability.python.experimental.edward2.program_transformations import make_log_joint_fn
+from tensorflow_probability.python.experimental.edward2.program_transformations import make_value_setter
+from tensorflow_probability.python.experimental.edward2.random_variable import RandomVariable
 # pylint: enable=wildcard-import
 
 from tensorflow.python.util.all_util import remove_undocumented

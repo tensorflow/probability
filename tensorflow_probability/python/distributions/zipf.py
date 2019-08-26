@@ -22,15 +22,16 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
-    "Zipf",
+    'Zipf',
 ]
 
 
@@ -63,7 +64,7 @@ class Zipf(distribution.Distribution):
                sample_maximum_iterations=100,
                validate_args=False,
                allow_nan_stats=False,
-               name="Zipf"):
+               name='Zipf'):
     """Initialize a batch of Zipf distributions.
 
     Args:
@@ -101,32 +102,24 @@ class Zipf(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      power = tf.convert_to_tensor(
+      self._power = tensor_util.convert_nonref_to_tensor(
           power,
-          name="power",
+          name='power',
           dtype=dtype_util.common_dtype([power], dtype_hint=tf.float32))
-      if (not dtype_util.is_floating(power.dtype) or
-          dtype_util.base_equal(power.dtype, tf.float16)):
+      if (not dtype_util.is_floating(self._power.dtype) or
+          dtype_util.base_equal(self._power.dtype, tf.float16)):
         raise TypeError(
-            "power.dtype ({}) is not a supported `float` type.".format(
-                dtype_util.name(power.dtype)))
-      runtime_assertions = []
-      if validate_args:
-        runtime_assertions.append(assert_util.assert_greater(
-            power, np.ones([], power.dtype.as_numpy_dtype)))
-      with tf.control_dependencies(runtime_assertions):
-        self._power = tf.identity(power, name="power")
-
-    self._interpolate_nondiscrete = interpolate_nondiscrete
-    self._sample_maximum_iterations = sample_maximum_iterations
-    super(Zipf, self).__init__(
-        dtype=dtype,
-        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._power],
-        name=name)
+            'power.dtype ({}) is not a supported `float` type.'.format(
+                dtype_util.name(self._power.dtype)))
+      self._interpolate_nondiscrete = interpolate_nondiscrete
+      self._sample_maximum_iterations = sample_maximum_iterations
+      super(Zipf, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -159,7 +152,7 @@ class Zipf(distribution.Distribution):
   def _event_shape(self):
     return tf.TensorShape([])
 
-  def _log_prob(self, x):
+  def _log_prob(self, x, power=None):
     # The log probability at positive integer points x is log(x^(-power) / Z)
     # where Z is the normalization constant. For x < 1 and non-integer points,
     # the log-probability is -inf.
@@ -171,11 +164,19 @@ class Zipf(distribution.Distribution):
     # If interpolate_nondiscrete is False and validate_args is True, we check
     # that the sample point x is in the support. That is, x is equivalent to a
     # positive integer.
-    x = tf.cast(x, self.power.dtype)
+    power = power if power is not None else tf.convert_to_tensor(self.power)
+    x = tf.cast(x, power.dtype)
     if self.validate_args and not self.interpolate_nondiscrete:
       x = distribution_util.embed_check_integer_casting_closed(
           x, target_dtype=self.dtype, assert_positive=True)
-    return self._log_unnormalized_prob(x) - self._log_normalization()
+    log_normalization = tf.math.log(tf.math.zeta(power, 1.))
+
+    safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 1.)
+    y = -power * tf.math.log(safe_x)
+    log_unnormalized_prob = tf.where(
+        tf.equal(x, safe_x), y, dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
+
+    return log_unnormalized_prob - log_normalization
 
   def _cdf(self, x):
     # CDF(x) at positive integer x is the probability that the Zipf variable is
@@ -186,21 +187,13 @@ class Zipf(distribution.Distribution):
 
     # If interpolate_nondiscrete is True, we return a continuous relaxation
     # which agrees with the CDF at integer points.
-    x = tf.cast(x, self.power.dtype)
+    power = tf.convert_to_tensor(self.power)
+    x = tf.cast(x, power.dtype)
     safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 0.)
 
     cdf = 1. - (
-        tf.math.zeta(self.power, safe_x + 1.) / tf.math.zeta(self.power, 1.))
+        tf.math.zeta(power, safe_x + 1.) / tf.math.zeta(power, 1.))
     return tf.where(x < 1., tf.zeros_like(cdf), cdf)
-
-  def _log_normalization(self):
-    return tf.math.log(tf.math.zeta(self.power, 1.))
-
-  def _log_unnormalized_prob(self, x):
-    safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 1.)
-    y = -self.power * tf.math.log(safe_x)
-    return tf.where(
-        tf.equal(x, safe_x), y, dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
 
   @distribution_util.AppendDocstring(
       """Note: Zipf has an infinite mean when `power` <= 2.""")
@@ -229,13 +222,14 @@ class Zipf(distribution.Distribution):
            Computer Simulation (TOMACS), v.6 n.3, p.169-184, July 1996.
       """)
   def _sample_n(self, n, seed=None):
-    shape = tf.concat([[n], self.batch_shape_tensor()], axis=0)
+    power = tf.convert_to_tensor(self.power)
+    shape = tf.concat([[n], tf.shape(power)], axis=0)
 
     has_seed = seed is not None
-    seed = SeedStream(seed, salt="zipf")
+    seed = SeedStream(seed, salt='zipf')
 
-    minval_u = self._hat_integral(0.5) + 1.
-    maxval_u = self._hat_integral(tf.int64.max - 0.5)
+    minval_u = self._hat_integral(0.5, power=power) + 1.
+    maxval_u = self._hat_integral(tf.int64.max - 0.5, power=power)
 
     def loop_body(should_continue, k):
       """Resample the non-accepted points."""
@@ -245,11 +239,11 @@ class Zipf(distribution.Distribution):
           shape,
           minval=minval_u,
           maxval=maxval_u,
-          dtype=self.power.dtype,
+          dtype=power.dtype,
           seed=seed())
 
       # Sample the point X from the continuous density h(x) \propto x^(-power).
-      x = self._hat_integral_inverse(u)
+      x = self._hat_integral_inverse(u, power=power)
 
       # Rejection-inversion requires a `hat` function, h(x) such that
       # \int_{k - .5}^{k + .5} h(x) dx >= pmf(k + 1) for points k in the
@@ -268,7 +262,8 @@ class Zipf(distribution.Distribution):
       # Update the non-accepted points.
       # Since X \in (K - .5, K + .5), the sample K is chosen as floor(X + 0.5).
       k = tf.where(should_continue, tf.floor(x + 0.5), k)
-      accept = (u <= self._hat_integral(k + .5) + tf.exp(self._log_prob(k + 1)))
+      accept = (u <= self._hat_integral(k + .5, power=power) + tf.exp(
+          self._log_prob(k + 1, power=power)))
 
       return [should_continue & (~accept), k]
 
@@ -277,7 +272,7 @@ class Zipf(distribution.Distribution):
         body=loop_body,
         loop_vars=[
             tf.ones(shape, dtype=tf.bool),  # should_continue
-            tf.zeros(shape, dtype=self.power.dtype),  # k
+            tf.zeros(shape, dtype=power.dtype),  # k
         ],
         parallel_iterations=1 if has_seed else 10,
         maximum_iterations=self.sample_maximum_iterations,
@@ -297,7 +292,7 @@ class Zipf(distribution.Distribution):
 
     return samples
 
-  def _hat_integral(self, x):
+  def _hat_integral(self, x, power):
     """Integral of the `hat` function, used for sampling.
 
     We choose a `hat` function, h(x) = x^(-power), which is a continuous
@@ -307,16 +302,27 @@ class Zipf(distribution.Distribution):
 
     Arguments:
       x: A Tensor of points x at which to evaluate H(x).
+      power: Power that parameterized hat function.
 
     Returns:
       A Tensor containing evaluation H(x) at x.
     """
-    x = tf.cast(x, self.power.dtype)
-    t = self.power - 1.
+    x = tf.cast(x, power.dtype)
+    t = power - 1.
     return tf.exp((-t) * tf.math.log1p(x) - tf.math.log(t))
 
-  def _hat_integral_inverse(self, x):
+  def _hat_integral_inverse(self, x, power):
     """Inverse function of _hat_integral."""
-    x = tf.cast(x, self.power.dtype)
-    t = self.power - 1.
+    x = tf.cast(x, power.dtype)
+    t = power - 1.
     return tf.math.expm1(-(tf.math.log(t) + tf.math.log(x)) / t)
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_ref(self.power):
+      assertions.append(assert_util.assert_greater(
+          self.power, np.ones([], self.power.dtype.as_numpy_dtype),
+          message='`power` must be greater than 1.'))
+    return assertions

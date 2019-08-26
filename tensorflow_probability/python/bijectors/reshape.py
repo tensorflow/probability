@@ -204,10 +204,10 @@ class Reshape(bijector.Bijector):
     return x
 
   def _inverse_log_det_jacobian(self, y):
-    return tf.constant(0., dtype=y.dtype)
+    return tf.zeros([], dtype=y.dtype)
 
   def _forward_log_det_jacobian(self, x):
-    return tf.constant(0., dtype=x.dtype)
+    return tf.zeros([], dtype=x.dtype)
 
   def _forward_event_shape(self, input_shape):
     return _replace_event_shape_in_tensorshape(
@@ -269,7 +269,8 @@ def _replace_event_shape_in_shape_tensor(
       (is_validated or not validate_args)):
     with tf.control_dependencies(validation_dependencies):
       output_shape = tf.convert_to_tensor(
-          output_tensorshape, name='output_shape', dtype_hint=tf.int32)
+          tensorshape_util.as_list(output_tensorshape), name='output_shape',
+          dtype_hint=tf.int32)
     return output_shape, output_tensorshape
 
   with tf.control_dependencies(validation_dependencies):
@@ -360,7 +361,7 @@ def _replace_event_shape_in_tensorshape(
     mask = event_shape_in_ >= 0
     explicit_input_event_shape_ = input_event_shape_[mask]
     explicit_event_shape_in_ = event_shape_in_[mask]
-    if not all(explicit_input_event_shape_ == explicit_event_shape_in_):
+    if not np.all(explicit_input_event_shape_ == explicit_event_shape_in_):
       raise ValueError(
           'Input `event_shape` does not match `event_shape_in`. '
           '({} vs {}).'.format(input_event_shape_, event_shape_in_))

@@ -53,7 +53,8 @@ class SigmoidBijectorTest(tf.test.TestCase):
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.Sigmoid(), lower_x=-7., upper_x=7., eval_func=self.evaluate)
+        tfb.Sigmoid(), lower_x=-7., upper_x=7., eval_func=self.evaluate,
+        rtol=.1)
 
   def testBijectiveAndFinite(self):
     x = np.linspace(-100., 100., 100).astype(np.float32)

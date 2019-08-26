@@ -23,10 +23,10 @@ import collections
 
 import tensorflow as tf
 
-from tensorflow_probability.python import distributions
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -94,7 +94,7 @@ def random_walk_normal_fn(scale=1., name=None):
         scales *= len(state_parts)
       if len(state_parts) != len(scales):
         raise ValueError('`scale` must broadcast with `state_parts`.')
-      seed_stream = distributions.SeedStream(seed, salt='RandomWalkNormalFn')
+      seed_stream = SeedStream(seed, salt='RandomWalkNormalFn')
       next_state_parts = [
           tf.random.normal(
               mean=state_part,
@@ -156,7 +156,7 @@ def random_walk_uniform_fn(scale=1., name=None):
         scales *= len(state_parts)
       if len(state_parts) != len(scales):
         raise ValueError('`scale` must broadcast with `state_parts`.')
-      seed_stream = distributions.SeedStream(seed, salt='RandomWalkUniformFn')
+      seed_stream = SeedStream(seed, salt='RandomWalkUniformFn')
       next_state_parts = [
           tf.random.uniform(
               minval=state_part - scale_part,
@@ -315,7 +315,7 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
     cauchy = tfd.Cauchy(loc=dtype(0), scale=dtype(scale))
     def _fn(state_parts, seed):
       next_state_parts = []
-      seed_stream  = tfd.SeedStream(seed, salt='RandomCauchy')
+      seed_stream  = tfp.util.SeedStream(seed, salt='RandomCauchy')
       for sp in state_parts:
         next_state_parts.append(sp + cauchy.sample(
           sample_shape=sp.shape, seed=seed_stream()))
@@ -466,8 +466,7 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
       new_state_fn = random_walk_normal_fn()
 
     self._target_log_prob_fn = target_log_prob_fn
-    self._seed_stream = distributions.SeedStream(
-        seed, salt='RandomWalkMetropolis')
+    self._seed_stream = SeedStream(seed, salt='RandomWalkMetropolis')
     self._name = name
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,

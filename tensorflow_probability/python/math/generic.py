@@ -25,11 +25,13 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 
 
 __all__ = [
     'log_add_exp',
     'log_combinations',
+    'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
     'soft_threshold',
     'softplus_inverse',
@@ -69,6 +71,41 @@ def log_combinations(n, counts, name='log_combinations'):
     counts_factorial = tf.math.lgamma(counts + 1)
     redundant_permutations = tf.reduce_sum(counts_factorial, axis=-1)
     return total_permutations - redundant_permutations
+
+
+def reduce_logmeanexp(input_tensor, axis=None, keepdims=False, name=None):
+  """Computes `log(mean(exp(input_tensor)))`.
+
+  Reduces `input_tensor` along the dimensions given in `axis`.  Unless
+  `keepdims` is true, the rank of the tensor is reduced by 1 for each entry in
+  `axis`. If `keepdims` is true, the reduced dimensions are retained with length
+  1.
+
+  If `axis` has no entries, all dimensions are reduced, and a tensor with a
+  single element is returned.
+
+  This function is more numerically stable than `log(reduce_mean(exp(input)))`.
+  It avoids overflows caused by taking the exp of large inputs and underflows
+  caused by taking the log of small inputs.
+
+  Args:
+    input_tensor: The tensor to reduce. Should have numeric type.
+    axis: The dimensions to reduce. If `None` (the default), reduces all
+      dimensions. Must be in the range `[-rank(input_tensor),
+      rank(input_tensor))`.
+    keepdims:  Boolean.  Whether to keep the axis as singleton dimensions.
+      Default value: `False` (i.e., squeeze the reduced dimensions).
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'reduce_logmeanexp'`).
+
+  Returns:
+    log_mean_exp: The reduced tensor.
+  """
+  with tf.name_scope(name or 'reduce_logmeanexp'):
+    lse = tf.reduce_logsumexp(input_tensor, axis=axis, keepdims=keepdims)
+    n = prefer_static.size(input_tensor) // prefer_static.size(lse)
+    log_n = tf.math.log(tf.cast(n, lse.dtype))
+    return lse - log_n
 
 
 def reduce_weighted_logsumexp(logx,

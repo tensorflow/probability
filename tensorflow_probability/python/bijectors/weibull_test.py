@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -37,7 +38,7 @@ class WeibullBijectorTest(tf.test.TestCase):
     concentration = 0.3
     bijector = tfb.Weibull(
         scale=scale, concentration=concentration, validate_args=True)
-    self.assertStartsWith(bijector.name, "weibull")
+    self.assertStartsWith(bijector.name, 'weibull')
     x = np.array([[[0.], [1.], [14.], [20.], [100.]]], dtype=np.float32)
     # Weibull distribution
     weibull_dist = stats.frechet_r(c=concentration, scale=scale)
@@ -67,7 +68,7 @@ class WeibullBijectorTest(tf.test.TestCase):
         lower_x=1.,
         upper_x=100.,
         eval_func=self.evaluate,
-        rtol=0.02)
+        rtol=0.05)
 
   def testBijectiveAndFinite(self):
     bijector = tfb.Weibull(scale=20., concentration=2., validate_args=True)
@@ -78,6 +79,46 @@ class WeibullBijectorTest(tf.test.TestCase):
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
 
+  def testAsserts(self):
+    with self.assertRaisesOpError('Argument `scale` must be positive.'):
+      b = tfb.Weibull(
+          concentration=1., scale=-1., validate_args=True)
+      self.evaluate(b.forward(-3.))
+    with self.assertRaisesOpError('Argument `concentration` must be positive.'):
+      b = tfb.Weibull(
+          concentration=-1., scale=1., validate_args=True)
+      self.evaluate(b.forward(-3.))
 
-if __name__ == "__main__":
+  @tfp_test_util.jax_disable_variable_test
+  def testVariableAssertsScale(self):
+    concentration = tf.Variable(1.)
+    scale = tf.Variable(1.)
+    b = tfb.Weibull(
+        concentration=concentration, scale=scale, validate_args=True)
+    # Use identities so that static asserts don't catch the error earlier
+    # and raise 'Forward transformation input must be at least 0'
+    minus_1 = tf.identity(tf.convert_to_tensor(-1.))
+    minus_3 = tf.identity(tf.convert_to_tensor(-3.))
+    self.evaluate([concentration.initializer, scale.initializer])
+    with self.assertRaisesOpError('Argument `scale` must be positive.'):
+      with tf.control_dependencies([scale.assign(minus_1)]):
+        self.evaluate(b.forward(minus_3))
+
+  @tfp_test_util.jax_disable_variable_test
+  def testVariableAssertsConcentration(self):
+    concentration = tf.Variable(1.)
+    scale = tf.Variable(1.)
+    b = tfb.Weibull(
+        concentration=concentration, scale=scale, validate_args=True)
+    # Use identities so that static asserts don't catch the error earlier
+    # and raise 'Forward transformation input must be at least 0'
+    minus_1 = tf.identity(tf.convert_to_tensor(-1.))
+    minus_3 = tf.identity(tf.convert_to_tensor(-3.))
+    self.evaluate([concentration.initializer, scale.initializer])
+    with self.assertRaisesOpError('Argument `concentration` must be positive.'):
+      with tf.control_dependencies([concentration.assign(minus_1)]):
+        self.evaluate(b.forward(minus_3))
+
+
+if __name__ == '__main__':
   tf.test.main()

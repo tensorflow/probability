@@ -27,7 +27,7 @@ from tensorflow_probability.python.bijectors import fill_triangular
 from tensorflow_probability.python.internal import prefer_static
 
 __all__ = [
-    "CorrelationCholesky",
+    'CorrelationCholesky',
 ]
 
 
@@ -97,7 +97,7 @@ class CorrelationCholesky(bijector.Bijector):
 
   """
 
-  def __init__(self, validate_args=False, name="correlation_cholesky"):
+  def __init__(self, validate_args=False, name='correlation_cholesky'):
     with tf.name_scope(name) as name:
       super(CorrelationCholesky, self).__init__(
           validate_args=validate_args,
@@ -136,7 +136,7 @@ class CorrelationCholesky(bijector.Bijector):
     return fill_triangular.FillTriangular().inverse_event_shape_tensor(y_shape)
 
   def _forward(self, x):
-    x = tf.convert_to_tensor(x, name="x")
+    x = tf.convert_to_tensor(x, name='x')
     batch_shape = prefer_static.shape(x)[:-1]
 
     # Pad zeros on the top row and right column.

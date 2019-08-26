@@ -23,7 +23,7 @@ import numpy as np
 
 import tensorflow as tf
 
-
+# Note: These assertions raise tf.errors.InvalidArgumentError when they fail.
 assert_equal = tf.compat.v1.assert_equal
 assert_greater = tf.compat.v1.assert_greater
 assert_less = tf.compat.v1.assert_less

@@ -25,6 +25,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 
 
 class Uniform(distribution.Distribution):
@@ -75,7 +76,7 @@ class Uniform(distribution.Distribution):
                high=1.,
                validate_args=False,
                allow_nan_stats=True,
-               name="Uniform"):
+               name='Uniform'):
     """Initialize a batch of Uniform distributions.
 
     Args:
@@ -99,29 +100,22 @@ class Uniform(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([low, high], tf.float32)
-      low = tf.convert_to_tensor(low, name="low", dtype=dtype)
-      high = tf.convert_to_tensor(high, name="high", dtype=dtype)
-      with tf.control_dependencies([  # pylint: disable=g-long-ternary
-          assert_util.assert_less(
-              low, high, message="uniform not defined when low >= high.")
-      ] if validate_args else []):
-        self._low = tf.identity(low)
-        self._high = tf.identity(high)
-        dtype_util.assert_same_float_dtype([self._low, self._high])
-    super(Uniform, self).__init__(
-        dtype=self._low.dtype,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._low,
-                       self._high],
-        name=name)
+      self._low = tensor_util.convert_nonref_to_tensor(
+          low, name='low', dtype=dtype)
+      self._high = tensor_util.convert_nonref_to_tensor(
+          high, name='high', dtype=dtype)
+      super(Uniform, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("low", "high"),
+        zip(('low', 'high'),
             ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
@@ -138,13 +132,20 @@ class Uniform(distribution.Distribution):
     """Upper boundary of the output interval."""
     return self._high
 
-  def range(self, name="range"):
+  def range(self, name='range'):
     """`high - low`."""
     with self._name_and_control_scope(name):
-      return self.high - self.low
+      return self._range()
 
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(tf.shape(self.low), tf.shape(self.high))
+  def _range(self, low=None, high=None):
+    low = self.low if low is None else low
+    high = self.high if high is None else high
+    return high - low
+
+  def _batch_shape_tensor(self, low=None, high=None):
+    return tf.broadcast_dynamic_shape(
+        tf.shape(self.low if low is None else low),
+        tf.shape(self.high if high is None else high))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -158,28 +159,35 @@ class Uniform(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    shape = tf.concat([[n], self.batch_shape_tensor()], 0)
+    low = tf.convert_to_tensor(self.low)
+    high = tf.convert_to_tensor(self.high)
+    shape = tf.concat([[n], self._batch_shape_tensor(
+        low=low, high=high)], 0)
     samples = tf.random.uniform(shape=shape, dtype=self.dtype, seed=seed)
-    return self.low + self.range() * samples
+    return low + self._range(low=low, high=high) * samples
 
   def _prob(self, x):
+    low = tf.convert_to_tensor(self.low)
+    high = tf.convert_to_tensor(self.high)
     return tf.where(
         tf.math.is_nan(x),
         x,
         tf.where(
             # This > is only sound for continuous uniform
-            (x < self.low) | (x > self.high),
+            (x < low) | (x > high),
             tf.zeros_like(x),
-            tf.ones_like(x) / self.range()))
+            tf.ones_like(x) / self._range(low=low, high=high)))
 
   def _cdf(self, x):
+    low = tf.convert_to_tensor(self.low)
+    high = tf.convert_to_tensor(self.high)
     broadcast_shape = tf.broadcast_dynamic_shape(
-        tf.shape(x), self.batch_shape_tensor())
+        tf.shape(x), self._batch_shape_tensor(low=low, high=high))
     zeros = tf.zeros(broadcast_shape, dtype=self.dtype)
     ones = tf.ones(broadcast_shape, dtype=self.dtype)
-    result_if_not_big = tf.where(x < self.low, zeros,
-                                 (x - self.low) / self.range())
-    return tf.where(x >= self.high, ones, result_if_not_big)
+    result_if_not_big = tf.where(x < low, zeros,
+                                 (x - low) / self._range(low=low, high=high))
+    return tf.where(x >= high, ones, result_if_not_big)
 
   def _quantile(self, value):
     return (1. - value) * self.low + value * self.high
@@ -195,6 +203,17 @@ class Uniform(distribution.Distribution):
 
   def _stddev(self):
     return self.range() / np.sqrt(12.)
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if (is_init != tensor_util.is_ref(self.low) and
+        is_init != tensor_util.is_ref(self.high)):
+      assertions.append(assert_util.assert_less(
+          self.low, self.high,
+          message='uniform not defined when low >= high.'))
+    return assertions
 
 
 @kullback_leibler.RegisterKL(Uniform, Uniform)
@@ -213,13 +232,17 @@ def _kl_uniform_uniform(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name or "kl_uniform_uniform"):
+  with tf.name_scope(name or 'kl_uniform_uniform'):
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 60
     # Watch out for the change in conventions--they use 'a' and 'b' to refer to
     # lower and upper bounds respectively there.
     dtype = dtype_util.common_dtype(
         [a.low, a.high, b.low, b.high], tf.float32)
-    return tf.where((b.low <= a.low) & (a.high <= b.high),
-                    tf.math.log(b.high - b.low) - tf.math.log(a.high - a.low),
+    a_low = tf.convert_to_tensor(a.low)
+    b_low = tf.convert_to_tensor(b.low)
+    a_high = tf.convert_to_tensor(a.high)
+    b_high = tf.convert_to_tensor(b.high)
+    return tf.where((b_low <= a_low) & (a_high <= b_high),
+                    tf.math.log(b_high - b_low) - tf.math.log(a_high - a_low),
                     dtype_util.as_numpy_dtype(dtype)(np.inf))

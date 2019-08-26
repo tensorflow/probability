@@ -23,6 +23,7 @@ import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 
@@ -40,7 +41,7 @@ def _zero_dimensional_mvndiag(dtype):
 def _observe_timeseries_fn(timeseries):
   """Build an observation_noise_fn that observes a Tensor timeseries."""
   def observation_noise_fn(t):
-    current_slice = timeseries[..., t, :]
+    current_slice = tf.gather(timeseries, t)
     return tfd.MultivariateNormalDiag(
         loc=current_slice,
         scale_diag=tf.zeros_like(current_slice))
@@ -233,6 +234,9 @@ class LinearRegression(StructuralTimeSeries):
 
     weights = param_map['weights']  # shape: [B, num_features]
     predicted_timeseries = self.design_matrix.matmul(weights[..., tf.newaxis])
+    # Move timestep to the first dim (before any batch dimensions).
+    predicted_timeseries = distribution_util.move_dimension(
+        predicted_timeseries, -2, 0)
 
     dtype = self.design_matrix.dtype
 
@@ -493,6 +497,9 @@ class SparseLinearRegression(StructuralTimeSeries):
 
     weights = self.params_to_weights(**param_map)
     predicted_timeseries = self.design_matrix.matmul(weights[..., tf.newaxis])
+    # Move timestep to the first dim (before any batch dimensions).
+    predicted_timeseries = distribution_util.move_dimension(
+        predicted_timeseries, -2, 0)
 
     dtype = self.design_matrix.dtype
 

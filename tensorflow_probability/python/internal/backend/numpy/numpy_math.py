@@ -18,12 +18,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 import numpy as np
 
 import tensorflow as tf
 
-from tensorflow_probability.python.internal.backend.numpy.internal import utils
+from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy.numpy_array import _reverse
 
 scipy_special = utils.try_import('scipy.special')
 
@@ -164,6 +167,31 @@ def _bincount(arr, weights=None, minlength=None, maxlength=None,  # pylint: disa
   return np.bincount(arr, weights, minlength).astype(utils.numpy_dtype(dtype))
 
 
+def _cumop(op, x, axis=0, exclusive=False, reverse=False, initial_value=None):
+  """Shared impl of cumsum/cumprod."""
+  axis = _astuple(axis)
+  result = op(_reverse(x, axis) if reverse else x, axis)
+  if reverse:
+    result = _reverse(result, axis)
+  if exclusive:
+    paddings = [[0, 0]] * result.ndim
+    if isinstance(axis, int):
+      axis = (axis,)
+    for ax in axis:
+      paddings[ax] = [0, 1] if reverse else [1, 0]
+    result = np.pad(result, paddings, mode='constant',
+                    constant_values=initial_value)
+    slices = [slice(None)] * result.ndim
+    for ax in axis:
+      slices[ax] = slice(1, None) if reverse else slice(None, -1)
+    result = result[slices]
+  return result
+
+
+_cumprod = functools.partial(_cumop, np.cumprod, initial_value=1.)
+_cumsum = functools.partial(_cumop, np.cumsum, initial_value=0.)
+
+
 def _lbeta(x, name=None):  # pylint: disable=unused-argument
   x = np.array(x)
   return scipy_special.betaln(x[..., 0], x[..., 1])
@@ -174,7 +202,7 @@ def _max_mask_non_finite(x, axis=-1, keepdims=False, mask=0):
   m = np.max(x, axis=_astuple(axis), keepdims=keepdims)
   needs_masking = ~np.isfinite(m)
   if needs_masking.ndim > 0:
-    m[needs_masking] = mask
+    m = np.where(needs_masking, mask, m)
   elif needs_masking:
     m = mask
   return m
@@ -183,8 +211,8 @@ def _max_mask_non_finite(x, axis=-1, keepdims=False, mask=0):
 def _softmax(logits, axis=None, name=None):  # pylint: disable=unused-argument
   axis = -1 if axis is None else axis
   y = logits - _max_mask_non_finite(logits, axis=axis, keepdims=True)
-  np.exp(y, out=y)
-  y /= np.sum(y, axis=_astuple(axis), keepdims=True)
+  y = np.exp(y)
+  y = y / np.sum(y, axis=_astuple(axis), keepdims=True)
   return y
 
 
@@ -318,17 +346,15 @@ cosh = utils.copy_docstring(
 count_nonzero = utils.copy_docstring(
     tf.math.count_nonzero,
     lambda input, axis=None, keepdims=None, dtype=tf.int64, name=None: (  # pylint: disable=g-long-lambda
-        np.cast[utils.numpy_dtype(dtype)](np.count_nonzero(input, axis))))
+        utils.numpy_dtype(dtype)(np.count_nonzero(input, axis))))
 
 cumprod = utils.copy_docstring(
     tf.math.cumprod,
-    lambda x, axis=0, exclusive=False, reverse=False, name=None: (  # pylint: disable=g-long-lambda
-        np.cumprod(x, _astuple(axis))))
+    _cumprod)
 
 cumsum = utils.copy_docstring(
     tf.math.cumsum,
-    lambda x, axis=0, exclusive=False, reverse=False, name=None: (  # pylint: disable=g-long-lambda
-        np.cumsum(x, _astuple(axis))))
+    _cumsum)
 
 digamma = utils.copy_docstring(
     tf.math.digamma,
@@ -441,7 +467,7 @@ less_equal = utils.copy_docstring(
 
 lgamma = utils.copy_docstring(
     tf.math.lgamma,
-    lambda x, name=None: real(scipy_special.loggamma(x)))
+    lambda x, name=None: scipy_special.gammaln(x))
 
 log = utils.copy_docstring(
     tf.math.log,
@@ -584,7 +610,8 @@ reduce_variance = utils.copy_docstring(
 
 rint = utils.copy_docstring(
     tf.math.rint,
-    lambda x, name=None: np.rint(x))
+    # JAX doesn't have rint, but round/around are ~the same with decimals=0.
+    lambda x, name=None: np.around(x))
 
 round = utils.copy_docstring(  # pylint: disable=redefined-builtin
     tf.math.round,
@@ -620,7 +647,7 @@ rsqrt = utils.copy_docstring(
 
 sigmoid = utils.copy_docstring(
     tf.math.sigmoid,
-    lambda x, name=None: 1. / (1. + np.exp(-x)))
+    lambda x, name=None: scipy_special.expit(x))
 
 sign = utils.copy_docstring(
     tf.math.sign,

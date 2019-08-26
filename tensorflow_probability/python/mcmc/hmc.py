@@ -24,12 +24,12 @@ import collections
 import numpy as np
 import tensorflow as tf
 
-from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -618,7 +618,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       raise NotImplementedError('Specifying a `seed` when running eagerly is '
                                 'not currently supported. To run in Eager '
                                 'mode with a seed, use `tf.set_random_seed`.')
-    self._seed_stream = distributions.SeedStream(seed, 'hmc_one_step')
+    self._seed_stream = SeedStream(seed, 'hmc_one_step')
     if not store_parameters_in_results:
       mcmc_util.warn_if_parameters_are_not_simple_tensors(
           dict(step_size=step_size, num_leapfrog_steps=num_leapfrog_steps))

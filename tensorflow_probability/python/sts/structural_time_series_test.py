@@ -22,6 +22,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow_probability.python.sts import Autoregressive
 from tensorflow_probability.python.sts import DynamicLinearRegression
@@ -30,6 +31,7 @@ from tensorflow_probability.python.sts import LocalLevel
 from tensorflow_probability.python.sts import LocalLinearTrend
 from tensorflow_probability.python.sts import Seasonal
 from tensorflow_probability.python.sts import SemiLocalLinearTrend
+from tensorflow_probability.python.sts import SmoothSeasonal
 from tensorflow_probability.python.sts import SparseLinearRegression
 from tensorflow_probability.python.sts import Sum
 from tensorflow_probability.python.sts.internal import util as sts_util
@@ -128,13 +130,11 @@ class StructuralTimeSeriesTestsStaticShape64(
 
 class _StsTestHarness(object):
 
-  def setUp(self):
-    np.random.seed(142)
-
   def test_state_space_model(self):
+    seed = tfp_test_util.test_seed_stream()
     model = self._build_sts()
 
-    dummy_param_vals = [p.prior.sample() for p in model.parameters]
+    dummy_param_vals = [p.prior.sample(seed=seed()) for p in model.parameters]
     initial_state_prior = tfd.MultivariateNormalDiag(
         loc=-2. + tf.zeros([model.latent_size]),
         scale_diag=3. * tf.ones([model.latent_size]))
@@ -155,8 +155,8 @@ class _StsTestHarness(object):
     self.assertEqual(ssm.latent_size, model.latent_size)
 
   def test_log_joint(self):
+    seed = tfp_test_util.test_seed_stream()
     model = self._build_sts()
-
     num_timesteps = 5
 
     # simple case: single observation, and all params unbatched
@@ -164,7 +164,7 @@ class _StsTestHarness(object):
         observed_time_series=np.float32(
             np.random.standard_normal([num_timesteps, 1])))
     lp = self.evaluate(
-        log_joint_fn(*[p.prior.sample() for p in model.parameters]))
+        log_joint_fn(*[p.prior.sample(seed=seed()) for p in model.parameters]))
     self.assertEqual(tf.TensorShape([]), lp.shape)
 
     # more complex case: y has sample and batch shapes, some parameters
@@ -182,7 +182,7 @@ class _StsTestHarness(object):
     # batch shape.
     batch_shaped_parameters_ = self.evaluate([
         p.prior.sample(sample_shape=full_batch_shape if (i % 2 == 0)
-                       else partial_batch_shape)
+                       else partial_batch_shape, seed=seed())
         for (i, p) in enumerate(model.parameters)])
 
     lp = self.evaluate(log_joint_fn(*batch_shaped_parameters_))
@@ -199,6 +199,8 @@ class _StsTestHarness(object):
     # Test that this component accepts MaskedTimeSeries inputs. In most
     # cases, it is sufficient that the component accesses only
     # `empirical_statistics(observed_time_series)`.
+    # TODO(b/139483802): De-flake this test when run with --vary_seed.
+    seed = tfp_test_util.test_seed_stream(hardcoded_seed=123)
     observed_time_series = np.array(
         [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
     observation_mask = np.array(
@@ -211,7 +213,7 @@ class _StsTestHarness(object):
     log_joint_fn = model.joint_log_prob(
         observed_time_series=masked_time_series)
     lp = self.evaluate(
-        log_joint_fn(*[p.prior.sample() for p in model.parameters]))
+        log_joint_fn(*[p.prior.sample(seed=seed()) for p in model.parameters]))
 
     self.assertEqual(tf.TensorShape([]), lp.shape)
     self.assertTrue(np.isfinite(lp))
@@ -219,7 +221,8 @@ class _StsTestHarness(object):
   def test_prior_sample(self):
     model = self._build_sts()
     ys, param_samples = model.prior_sample(
-        num_timesteps=5, params_sample_shape=[2], trajectories_sample_shape=[3])
+        num_timesteps=5, params_sample_shape=[2], trajectories_sample_shape=[3],
+        seed=tfp_test_util.test_seed())
 
     self.assertAllEqual(ys.shape, [3, 2, 5, 1])
     for sampled, param in zip(param_samples, model.parameters):
@@ -228,6 +231,7 @@ class _StsTestHarness(object):
       ] + param.prior.batch_shape.as_list() + param.prior.event_shape.as_list())
 
   def test_default_priors_follow_batch_shapes(self):
+    seed = tfp_test_util.test_seed_stream()
     num_timesteps = 3
     time_series_sample_shape = [4, 2]
     observation_shape_full = time_series_sample_shape + [num_timesteps]
@@ -245,7 +249,7 @@ class _StsTestHarness(object):
     # The initial state prior should also have the appropriate batch shape.
     # To test this, we build the ssm and test that it has a consistent
     # broadcast batch shape.
-    param_samples = [p.prior.sample() for p in model.parameters]
+    param_samples = [p.prior.sample(seed=seed()) for p in model.parameters]
     ssm = model.make_state_space_model(
         num_timesteps=num_timesteps, param_vals=param_samples)
     self.assertEqual(ssm.batch_shape, time_series_sample_shape)
@@ -316,6 +320,15 @@ class SemiLocalLinearTrendTest(tf.test.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return SemiLocalLinearTrend(observed_time_series=observed_time_series)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class SmoothSeasonalTest(tf.test.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    return SmoothSeasonal(period=42,
+                          frequency_multipliers=[1, 2, 4],
+                          observed_time_series=observed_time_series)
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -396,6 +409,7 @@ class DynamicLinearRegressionTest(tf.test.TestCase, _StsTestHarness):
         design_matrix=np.random.randn(
             max_timesteps, num_features).astype(np.float32),
         observed_time_series=observed_time_series)
+
 
 if __name__ == '__main__':
   tf.test.main()

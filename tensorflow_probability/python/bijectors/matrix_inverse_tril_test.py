@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -44,7 +44,7 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
 
   def testComputesCorrectValues(self):
     inv = tfb.MatrixInverseTriL(validate_args=True)
-    self.assertStartsWith(inv.name, "matrix_inverse_tril")
+    self.assertStartsWith(inv.name, 'matrix_inverse_tril')
     x_ = np.array([[0.7, 0., 0.],
                    [0.1, -1., 0.],
                    [0.3, 0.25, 0.5]], dtype=np.float32)
@@ -105,7 +105,7 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
   def testErrorOnInputRankTooLow(self):
     inv = tfb.MatrixInverseTriL(validate_args=True)
     x_ = np.array([0.1], dtype=np.float32)
-    rank_error_msg = "must have rank at least 2"
+    rank_error_msg = 'must have rank at least 2'
     with self.assertRaisesWithPredicateMatch(ValueError, rank_error_msg):
       self.evaluate(inv.forward(x_))
     with self.assertRaisesWithPredicateMatch(ValueError, rank_error_msg):
@@ -120,7 +120,7 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
   ##   inv = tfb.MatrixInverseTriL(validate_args=True)
   ##   x_ = np.array([[1., 2., 3.],
   ##                  [4., 5., 6.]], dtype=np.float32)
-  ##   square_error_msg = "must be a square matrix"
+  ##   square_error_msg = 'must be a square matrix'
   ##   with self.assertRaisesWithPredicateMatch(tf.errors.InvalidArgumentError,
   ##                                            square_error_msg):
   ##     self.evaluate(inv.forward(x_))
@@ -138,25 +138,21 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
     inv = tfb.MatrixInverseTriL(validate_args=True)
     x_ = np.array([[1., 2.],
                    [3., 4.]], dtype=np.float32)
-    triangular_error_msg = "must be lower triangular"
-    with self.assertRaisesWithPredicateMatch(tf.errors.InvalidArgumentError,
-                                             triangular_error_msg):
+    triangular_error_msg = 'must be lower triangular'
+    with self.assertRaisesOpError(triangular_error_msg):
       self.evaluate(inv.forward(x_))
-    with self.assertRaisesWithPredicateMatch(tf.errors.InvalidArgumentError,
-                                             triangular_error_msg):
+    with self.assertRaisesOpError(triangular_error_msg):
       self.evaluate(inv.inverse(x_))
-    with self.assertRaisesWithPredicateMatch(tf.errors.InvalidArgumentError,
-                                             triangular_error_msg):
+    with self.assertRaisesOpError(triangular_error_msg):
       self.evaluate(inv.forward_log_det_jacobian(x_, event_ndims=2))
-    with self.assertRaisesWithPredicateMatch(tf.errors.InvalidArgumentError,
-                                             triangular_error_msg):
+    with self.assertRaisesOpError(triangular_error_msg):
       self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 
   def testErrorOnInputSingular(self):
     inv = tfb.MatrixInverseTriL(validate_args=True)
     x_ = np.array([[1., 0.],
                    [0., 0.]], dtype=np.float32)
-    nonsingular_error_msg = "must have all diagonal entries nonzero"
+    nonsingular_error_msg = 'must have all diagonal entries nonzero'
     with self.assertRaisesOpError(nonsingular_error_msg):
       self.evaluate(inv.forward(x_))
     with self.assertRaisesOpError(nonsingular_error_msg):
@@ -166,6 +162,7 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
     with self.assertRaisesOpError(nonsingular_error_msg):
       self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 
+  @tfp_test_util.numpy_disable_gradient_test
   def testJacobian(self):
     bijector = tfb.MatrixInverseTriL()
     batch_size = 5
@@ -182,5 +179,5 @@ class MatrixInverseTriLBijectorTest(tf.test.TestCase):
       self.assertAllClose(fldj_, fldj_theoretical_)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

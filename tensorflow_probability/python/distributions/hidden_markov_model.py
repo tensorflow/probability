@@ -16,17 +16,18 @@
 
 from __future__ import absolute_import
 from __future__ import division
+from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -291,9 +292,6 @@ class HiddenMarkovModel(distribution.Distribution):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          graph_parents=(self._initial_distribution._graph_parents +
-                         self._transition_distribution._graph_parents +
-                         self._observation_distribution._graph_parents),
           name=name)
       # pylint: enable=protected-access
 
@@ -341,7 +339,7 @@ class HiddenMarkovModel(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     with tf.control_dependencies(self._runtime_assertions):
-      seed = seed_stream.SeedStream(seed, salt="HiddenMarkovModel")
+      strm = SeedStream(seed, salt="HiddenMarkovModel")
 
       num_states = self._num_states
 
@@ -358,7 +356,7 @@ class HiddenMarkovModel(distribution.Distribution):
           tf.reduce_prod(self.batch_shape_tensor()) //
           tf.reduce_prod(self._initial_distribution.batch_shape_tensor()))
       init_state = self._initial_distribution.sample(n * init_repeat,
-                                                     seed=seed())
+                                                     seed=strm())
       init_state = tf.reshape(init_state, [n, batch_size])
       # init_state :: n batch_size
 
@@ -370,7 +368,7 @@ class HiddenMarkovModel(distribution.Distribution):
         """Take a single step in Markov chain."""
 
         gen = self._transition_distribution.sample(n * transition_repeat,
-                                                   seed=seed())
+                                                   seed=strm())
         # gen :: (n * transition_repeat) transition_batch
 
         new_states = tf.reshape(gen,
@@ -385,9 +383,18 @@ class HiddenMarkovModel(distribution.Distribution):
         return tf.reduce_sum(old_states_one_hot * new_states, axis=-1)
 
       def _scan_multiple_steps():
+        """Take multiple steps with tf.scan."""
         dummy_index = tf.zeros(self._num_steps - 1, dtype=tf.float32)
-        hidden_states = tf.scan(generate_step, dummy_index,
-                                initializer=init_state)
+        if seed is not None:
+          # Force parallel_iterations to 1 to ensure reproducibility
+          # b/139210489
+          hidden_states = tf.scan(generate_step, dummy_index,
+                                  initializer=init_state,
+                                  parallel_iterations=1)
+        else:
+          # Invoke default parallel_iterations behavior
+          hidden_states = tf.scan(generate_step, dummy_index,
+                                  initializer=init_state)
 
         # TODO(b/115618503): add/use prepend_initializer to tf.scan
         return tf.concat([[init_state],
@@ -411,7 +418,7 @@ class HiddenMarkovModel(distribution.Distribution):
               self._observation_distribution.batch_shape_tensor()[:-1]))
 
       possible_observations = self._observation_distribution.sample(
-          [self._num_steps, observation_repeat * n])
+          [self._num_steps, observation_repeat * n], seed=strm())
 
       inner_shape = self._observation_distribution.event_shape
 

@@ -26,7 +26,6 @@ import weakref
 # Dependency imports
 import numpy as np
 import six
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
@@ -34,21 +33,13 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'Bijector',
-    'ConditionalBijector',
 ]
 
 
 SKIP_DTYPE_CHECKS = False
-
-
-def _get_current_graph():
-  if tf.executing_eagerly():
-    return None
-  return tf1.get_default_graph()
 
 
 class _Mapping(
@@ -115,7 +106,12 @@ class _Mapping(
 
   def _merge(self, old, new, use_equals=False):
     """Helper to merge which handles merging one value."""
-    generic_to_array = lambda x: np.array(x) if isinstance(x, np.generic) else x
+    def generic_to_array(x):
+      if isinstance(x, np.generic):
+        x = np.array(x)
+      if isinstance(x, np.ndarray):
+        x.flags.writeable = False
+      return x
     if old is None:
       return generic_to_array(new)
     if new is None:
@@ -130,6 +126,8 @@ class _Mapping(
       return self._deep_tuple(tuple(sorted(x.items())))
     elif isinstance(x, (list, tuple)):
       return tuple(map(self._deep_tuple, x))
+    elif isinstance(x, tf.Tensor):
+      return x.experimental_ref()
 
     return x
 
@@ -183,7 +181,7 @@ class HashableWeakRef(weakref.ref):
   def __hash__(self):
     x = self()
     if not isinstance(x, np.ndarray):
-      return hash(x)
+      return id(x)
     if isinstance(x, np.generic):
       raise ValueError('Unable to weakref np.generic')
     # Note: The following logic can never be reached by the public API because
@@ -200,14 +198,15 @@ class HashableWeakRef(weakref.ref):
 
   def __eq__(self, other):
     x = self()
-    if isinstance(x, np.ndarray):
-      y = other()
-      return (isinstance(y, np.ndarray) and
-              x.__array_interface__ == y.__array_interface__ and
-              id(x) == id(y))
     if isinstance(x, np.generic):
       raise ValueError('Unable to weakref np.generic')
-    return super(HashableWeakRef, self).__eq__(other)
+    y = other()
+    ids_are_equal = id(x) == id(y)
+    if isinstance(x, np.ndarray):
+      return (isinstance(y, np.ndarray) and
+              x.__array_interface__ == y.__array_interface__ and
+              ids_are_equal)
+    return ids_are_equal
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -634,8 +633,6 @@ class Bijector(tf.Module):
     self._graph_parents = self._no_dependency(graph_parents or [])
 
     self._is_constant_jacobian = is_constant_jacobian
-    # Keyed by the current graph.
-    self._constant_ildj = self._no_dependency({})
     self._validate_args = validate_args
     self._dtype = dtype
 
@@ -645,6 +642,9 @@ class Bijector(tf.Module):
     self._initial_parameter_control_dependencies = tuple(
         d for d in self._parameter_control_dependencies(is_init=True)
         if d is not None)
+    if self._initial_parameter_control_dependencies:
+      self._initial_parameter_control_dependencies = (
+          tf.group(*self._initial_parameter_control_dependencies),)
 
     if forward_min_event_ndims is None and inverse_min_event_ndims is None:
       raise ValueError('Must specify at least one of `forward_min_event_ndims` '
@@ -926,7 +926,7 @@ class Bijector(tf.Module):
   def _call_forward(self, x, name, **kwargs):
     """Wraps call to _forward, allowing extra shared logic."""
     with self._name_and_control_scope(name):
-      x = tf.convert_to_tensor(x, name='x')
+      x = tf.convert_to_tensor(x, dtype_hint=self.dtype, name='x')
       self._maybe_assert_dtype(x)
       if not self._is_injective:  # No caching for non-injective
         return self._forward(x, **kwargs)
@@ -968,7 +968,7 @@ class Bijector(tf.Module):
   def _call_inverse(self, y, name, **kwargs):
     """Wraps call to _inverse, allowing extra shared logic."""
     with self._name_and_control_scope(name):
-      y = tf.convert_to_tensor(y, name='y')
+      y = tf.convert_to_tensor(y, dtype_hint=self.dtype, name='y')
       self._maybe_assert_dtype(y)
       if not self._is_injective:  # No caching for non-injective
         return self._inverse(y, **kwargs)
@@ -1052,10 +1052,8 @@ class Bijector(tf.Module):
         over to compute the total ildj.
       kwargs: dictionary of keyword args that will be passed to calls to
         `self.forward` or `self.inverse` (if either of those are required), and
-        to `self._compute_unreduced_nonconstant_ildj_with_caching` or
-        `self._compute_unreduced_constant_ildj_with_caching`, as appropriate (
-        those functions use the conditioning kwargs for caching and for
-        their underlying computations).
+        to `self._compute_unreduced_ildj_with_caching` (which uses the
+        conditioning kwargs for caching and for their underlying computations).
 
     Returns:
       ildj: a Tensor of ILDJ['s] at the given input (as specified by the args).
@@ -1082,19 +1080,15 @@ class Bijector(tf.Module):
       tensor_to_use = x if x is not None else self.inverse(y, **kwargs)
       min_event_ndims = self.forward_min_event_ndims
 
-    if self.is_constant_jacobian:
-      unreduced_ildj = self._compute_unreduced_constant_ildj_with_caching(
-          tensor_to_use, use_inverse_ldj_fn, kwargs)
-    else:
-      unreduced_ildj = self._compute_unreduced_nonconstant_ildj_with_caching(
-          x, y, tensor_to_use, use_inverse_ldj_fn, kwargs)
+    unreduced_ildj = self._compute_unreduced_ildj_with_caching(
+        x, y, tensor_to_use, use_inverse_ldj_fn, kwargs)
 
     return self._reduce_jacobian_det_over_event(
         tf.shape(tensor_to_use), unreduced_ildj, min_event_ndims, event_ndims)
 
-  def _compute_unreduced_nonconstant_ildj_with_caching(
+  def _compute_unreduced_ildj_with_caching(
       self, x, y, tensor_to_use, use_inverse_ldj_fn, kwargs):
-    """Helper for computing ILDJ, with caching, in the non-constant case.
+    """Helper for computing ILDJ, with caching.
 
     Does not do the 'reduce' step which is necessary in some cases; this is left
     to the caller.
@@ -1122,7 +1116,7 @@ class Bijector(tf.Module):
 
     Returns:
       ildj: the (un-reduce_sum'ed) value of the ILDJ at the specified input
-      location. Also updates the cache as needed.
+        location. Also updates the cache as needed.
     """
     mapping = self._lookup(x=x, y=y, kwargs=kwargs)
     if mapping.ildj is not None:
@@ -1135,40 +1129,6 @@ class Bijector(tf.Module):
 
     mapping = mapping.merge(x=x, y=y, ildj=ildj)
     self._cache_update(mapping)
-    return ildj
-
-  def _compute_unreduced_constant_ildj_with_caching(
-      self, tensor_to_use, use_inverse_ldj_fn, kwargs):
-    """Helper for computing ILDJ, with caching, in the constant-ILDJ case.
-
-    Does not do the 'reduce' step which is necessary in some cases; this is left
-    to the caller.
-
-    Args:
-      tensor_to_use: a `Tensor`, to pass to the chosen compute
-        function (`_inverse_log_det_jacobian` or `_forward_log_det_jacobian`).
-        Since we know the ILDJ is input-independent, the actual value is not
-        meaningful, although the shape and dtype may be.
-      use_inverse_ldj_fn: Python `bool`, if `True`, will use the
-        `_inverse_log_det_jacobian` to compute ILDJ; else, will use
-        `_forward_log_det_jacobian`.
-      kwargs: dictionary of keyword args that will be passed to calls to
-        to `_inverse_log_det_jacobian` or `_forward_log_det_jacobian`, as well
-        as for lookup/updating of the result in the cache.
-
-    Returns:
-      ildj: the (un-reduce_sum'ed) value of the ILDJ for the specified input.
-        Also updates the cache as needed.
-    """
-    current_graph = _get_current_graph()
-    if current_graph in self._constant_ildj:
-      return self._constant_ildj[current_graph]
-
-    if use_inverse_ldj_fn:
-      ildj = self._inverse_log_det_jacobian(tensor_to_use, **kwargs)
-    else:
-      ildj = -self._forward_log_det_jacobian(tensor_to_use, **kwargs)
-    self._constant_ildj[current_graph] = ildj
     return ildj
 
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):
@@ -1471,15 +1431,3 @@ class Bijector(tf.Module):
         graph dependencies.
     """
     return ()
-
-
-class ConditionalBijector(Bijector):
-  """Conditional Bijector is a Bijector that allows intrinsic conditioning."""
-
-  @deprecation.deprecated(
-      '2019-07-01',
-      '`ConditionalBijector` is no longer required; `Bijector` '
-      'top-level functions now pass-through `**kwargs`.',
-      warn_once=True)
-  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
-    return super(ConditionalBijector, cls).__new__(cls)

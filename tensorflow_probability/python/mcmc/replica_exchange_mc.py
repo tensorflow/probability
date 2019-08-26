@@ -22,9 +22,9 @@ import collections
 
 import tensorflow as tf
 
-from tensorflow_probability.python import distributions
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
     'ReplicaExchangeMC',
@@ -78,7 +78,7 @@ def default_exchange_proposed_fn(prob_exchange):
 
   def default_exchange_proposed_fn_(num_replica, seed=None):
     """Default function for `exchange_proposed_fn` of `kernel`."""
-    seed_stream = distributions.SeedStream(seed, 'default_exchange_proposed_fn')
+    seed_stream = SeedStream(seed, 'default_exchange_proposed_fn')
 
     zero_start = tf.random.uniform([], seed=seed_stream()) > 0.5
     if num_replica % 2 == 0:
@@ -263,7 +263,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
     inverse_temperatures.shape.assert_is_fully_defined()
     inverse_temperatures.shape.assert_has_rank(1)
 
-    self._seed_stream = distributions.SeedStream(seed, salt=name)
+    self._seed_stream = SeedStream(seed, salt=name)
     self._seeded_mcmc = seed is not None
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,

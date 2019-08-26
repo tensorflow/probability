@@ -80,12 +80,8 @@ def _numpy_dtype(dtype):
 
 def _get_static_predicate(pred):
   """Helper function for statically evaluating predicates in `cond`."""
-  if pred in {0, 1}:  # Accept 1/0 as valid boolean values
-    pred_value = bool(pred)
-  elif isinstance(pred, bool):
-    pred_value = pred
-  elif isinstance(pred, tf.Tensor):
-    pred_value = tf.get_static_value(pred)
+  if tf.is_tensor(pred):
+    pred_value = tf.get_static_value(tf.convert_to_tensor(pred))
 
     # TODO(jamieas): remove the dependency on `pywrap_tensorflow`.
     # pylint: disable=protected-access
@@ -93,7 +89,12 @@ def _get_static_predicate(pred):
       pred_value = c_api.TF_TryEvaluateConstant_wrapper(pred.graph._c_graph,
                                                         pred._as_tf_output())
     # pylint: enable=protected-access
+    if pred_value in (0, 1, True, False):
+      pred_value = bool(pred_value)
 
+  elif pred in (0, 1, True, False):  # Accept 1/0 as valid boolean values
+    # This branch also casts np.array(False), tf.EagerTensor(True), etc.
+    pred_value = bool(pred)
   else:
     raise TypeError('`pred` must be a Tensor, or a Python bool, or 1 or 0. '
                     'Found instead: {}'.format(pred))
@@ -142,7 +143,7 @@ def broadcast_shape(x_shape, y_shape):
     return tf.broadcast_dynamic_shape(x_shape, y_shape)
 
   return tf.broadcast_static_shape(
-      tf.TensorShape(x_shape), tf.TensorShape(y_shape))
+      tf.TensorShape(x_shape_static), tf.TensorShape(y_shape_static))
 
 
 def cond(pred, true_fn=None, false_fn=None, name=None):
@@ -203,6 +204,15 @@ def case(pred_fn_pairs, default=None, exclusive=False, name='smart_case'):
     TypeError: If `fns[i]` is not callable for any i, or `default` is not
                callable.
   """
+  if isinstance(pred_fn_pairs, (list, tuple)):
+    # We don't expect much usage of the `dict` option, esp. with unhashable
+    # Tensors, but could always add another branch for that if it comes up.
+    def maybe_static(pred):
+      p = _get_static_predicate(pred)
+      if p is None:
+        return pred
+      return p
+    pred_fn_pairs = [(maybe_static(pred), fn) for pred, fn in pred_fn_pairs]
   return control_flow_ops._case_helper(  # pylint: disable=protected-access
       cond, pred_fn_pairs, default, exclusive, name, allow_python_preds=True)
 
@@ -257,6 +267,16 @@ ones = _prefer_static(
     tf.ones,
     lambda shape, dtype=tf.float32, name=None: np.ones(  # pylint: disable=g-long-lambda
         shape, _numpy_dtype(dtype)))
+
+pad = _prefer_static(
+    tf.pad,
+    lambda tensor, paddings, mode='CONSTANT', constant_values=0, name=None: (  # pylint: disable=g-long-lambda
+        np.pad(tensor, paddings, mode=mode.lower(),
+               constant_values=constant_values)))
+
+reshape = _prefer_static(
+    tf.reshape,
+    lambda tensor, shape, name=None: np.reshape(tensor, shape))
 
 
 def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin

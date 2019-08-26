@@ -25,10 +25,8 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
-    "ConditionalTransformedDistribution",
     "TransformedDistribution",
 ]
 
@@ -257,7 +255,7 @@ class TransformedDistribution(distribution_lib.Distribution):
           self._needs_rotation, override_event_ndims, 0)
       # We'll be reducing the head dims (if at all), i.e., this will be []
       # if we don't need to reduce.
-      self._reduce_event_indices = tf.range(
+      self._reduce_event_indices = prefer_static.range(
           self._rotate_ndims - override_event_ndims, self._rotate_ndims)
 
     self._distribution = distribution
@@ -268,10 +266,6 @@ class TransformedDistribution(distribution_lib.Distribution):
         validate_args=validate_args,
         allow_nan_stats=self._distribution.allow_nan_stats,
         parameters=parameters,
-        # We let TransformedDistribution access _graph_parents since this class
-        # is more like a baseclass than derived.
-        graph_parents=(distribution._graph_parents +  # pylint: disable=protected-access
-                       bijector.graph_parents),
         name=name)
 
   @property
@@ -419,7 +413,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     log_prob = self.distribution.log_prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
       log_prob = tf.reduce_sum(log_prob, axis=self._reduce_event_indices)
-    log_prob += tf.cast(ildj, log_prob.dtype)
+    log_prob = log_prob + tf.cast(ildj, log_prob.dtype)
     if self._is_maybe_event_override and isinstance(event_ndims, int):
       tensorshape_util.set_shape(
           log_prob,
@@ -454,7 +448,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     prob = self.distribution.prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
       prob = tf.reduce_prod(prob, axis=self._reduce_event_indices)
-    prob *= tf.exp(tf.cast(ildj, prob.dtype))
+    prob = prob * tf.exp(tf.cast(ildj, prob.dtype))
     if self._is_maybe_event_override and isinstance(event_ndims, int):
       tensorshape_util.set_shape(
           prob,
@@ -568,7 +562,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     if self._is_maybe_event_override:
       # H[X] = sum_i H[X_i] if X_i are mutually independent.
       # This means that a reduce_sum is a simple rescaling.
-      entropy *= tf.cast(
+      entropy = entropy * tf.cast(
           tf.reduce_prod(self._override_event_shape),
           dtype=dtype_util.base_dtype(entropy.dtype))
     if self._is_maybe_batch_override:
@@ -594,7 +588,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     ildj = self.bijector.inverse_log_det_jacobian(
         dummy, event_ndims=event_ndims, **bijector_kwargs)
 
-    entropy -= tf.cast(ildj, entropy.dtype)
+    entropy = entropy - tf.cast(ildj, entropy.dtype)
     tensorshape_util.set_shape(entropy, self.batch_shape)
     return entropy
 
@@ -674,16 +668,3 @@ class TransformedDistribution(distribution_lib.Distribution):
       return event_ndims_
 
     return event_ndims
-
-
-class ConditionalTransformedDistribution(TransformedDistribution):
-  """A TransformedDistribution that allows intrinsic conditioning."""
-
-  @deprecation.deprecated(
-      "2019-07-01",
-      "`ConditionalTransformedDistribution` is no longer required; "
-      "`TransformedDistribution` top-level functions now pass-through "
-      "`**kwargs`.",
-      warn_once=True)
-  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
-    return super(ConditionalTransformedDistribution, cls).__new__(cls)

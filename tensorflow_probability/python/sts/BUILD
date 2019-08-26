@@ -42,6 +42,7 @@ py_library(
         ":regression",
         ":seasonal",
         ":semilocal_linear_trend",
+        ":smooth_seasonal",
         ":structural_time_series",
         ":sum",
     ],
@@ -274,6 +275,28 @@ py_test(
 )
 
 py_library(
+    name = "smooth_seasonal",
+    srcs = ["smooth_seasonal.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "smooth_seasonal_test",
+    size = "medium",
+    srcs = ["smooth_seasonal_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_library(
     name = "structural_time_series",
     srcs = ["structural_time_series.py"],
     srcs_version = "PY2AND3",
@@ -292,6 +315,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

@@ -40,10 +40,58 @@ py_library(
 
 # pytype
 py_library(
+    name = "util_jax",
+    srcs = ["util_jax.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # jax dep,
+        # jax:stax dep,
+        # tensorflow dep,
+    ],
+)
+
+# pytype
+py_library(
+    name = "tf_on_jax",
+    srcs = ["tf_on_jax.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # jax dep,
+        # jax:stax dep,
+    ],
+)
+
+# pytype
+py_library(
+    name = "util_tf",
+    srcs = ["util_tf.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+# pytype
+py_library(
+    name = "backend",
+    srcs = ["backend.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # TODO(siege): Add a target that doesn't link everything.
+        ":tf_on_jax",
+        ":util_tf",
+        ":util_jax",
+    ],
+)
+
+# pytype
+py_library(
     name = "fun_mcmc_lib",
     srcs = ["fun_mcmc_lib.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":backend",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -53,9 +101,11 @@ py_library(
 py_test(
     name = "fun_mcmc_test",
     srcs = ["fun_mcmc_test.py"],
+    shard_count = 8,
     deps = [
         ":fun_mcmc",
         # absl/testing:parameterized dep,
+        # jax dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

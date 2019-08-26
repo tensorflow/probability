@@ -295,6 +295,66 @@ class JointDistributionCoroutineTest(test_case.TestCase):
 
     self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
 
+  def test_detect_missing_root(self):
+    if not tf.executing_eagerly(): return
+    # The joint distribution specified below is intended to
+    # correspond to this graphical model
+    #
+    #       +-----------+
+    #       |           |
+    #  (a)--+--(b)->(c) |
+    #       |           |
+    #       +---------2-+
+
+    def dist():
+      a = yield tfd.Bernoulli(probs=0.5, dtype=tf.float32)  # Missing root
+      b = yield tfd.Sample(tfd.Bernoulli(probs=0.25 + 0.5*a,
+                                         dtype=tf.float32), 2)
+      yield tfd.Independent(tfd.Normal(loc=a, scale=1. + b), 1)
+
+    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+
+    with self.assertRaisesRegexp(
+        Exception,
+        'must be wrapped in `Root`'):
+      self.evaluate(joint.sample())
+
+  def test_check_sample_rank(self):
+    def dist():
+      g = yield Root(tfd.Gamma(2, 2))
+      # The following line lacks a `Root` so that if a shape [3, 5]
+      # sample is requested the distribution below will produce
+      # samples that have too low a rank to be consistent with
+      # the shape.
+      df = yield tfd.Exponential(1.)
+      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
+      yield tfd.Independent(tfd.StudentT(tf.expand_dims(df, -1), loc, 1), 1)
+
+    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+
+    with self.assertRaisesRegexp(
+        Exception,
+        'are not consistent with `sample_shape`'):
+      self.evaluate(joint.sample([3, 5]))
+
+  def test_check_sample_shape(self):
+    def dist():
+      g = yield Root(tfd.Gamma(2, 2))
+      # The following line lacks a `Root` so that if a shape [3, 5]
+      # sample is requested the following line will yield samples
+      # with an appropriate rank but whose shape starts with [2, 2]
+      # rather than [3, 5].
+      df = yield tfd.Exponential([[1., 2.], [3., 4.]])
+      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
+      yield tfd.Independent(tfd.StudentT(tf.expand_dims(df, -1), loc, 1), 1)
+
+    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+
+    with self.assertRaisesRegexp(
+        Exception,
+        'are not consistent with `sample_shape`'):
+      self.evaluate(joint.sample([3, 5]))
+
   def test_log_prob_multiple_samples(self):
     # The joint distribution specified below corresponds to this
     # graphical model
@@ -551,8 +611,9 @@ class JointDistributionCoroutineTest(test_case.TestCase):
     self.assertEqual(docs_shape, log_probs.shape)
 
     # Verify we correctly track trainable variables.
-    self.assertAllEqual((alpha.pretransformed_input, beta),
-                        lda.trainable_variables)
+    self.assertLen(lda.trainable_variables, 2)
+    self.assertIs(alpha.pretransformed_input, lda.trainable_variables[0])
+    self.assertIs(beta, lda.trainable_variables[1])
 
     # Ensure we can compute gradients.
     with tf.GradientTape() as tape:

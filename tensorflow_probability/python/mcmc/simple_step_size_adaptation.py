@@ -49,6 +49,7 @@ def _hmc_like_log_accept_prob_getter_fn(kernel_results):
 def _reduce_logmeanexp(value, dims, keepdims=False):
   # This is intentionally numerically imprecise for simplicity. For the purposes
   # of computing the mean acceptance probability this is more than sufficient.
+  # TODO(b/139011227): Use tfp.math.general.reduce_logmeanexp
   return tf.math.log(
       tf.reduce_mean(input_tensor=tf.exp(value), axis=dims, keepdims=keepdims))
 

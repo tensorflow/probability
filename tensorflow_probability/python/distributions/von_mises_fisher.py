@@ -21,13 +21,14 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = ['VonMisesFisher']
@@ -213,7 +214,6 @@ class VonMisesFisher(distribution.Distribution):
           allow_nan_stats=allow_nan_stats,
           reparameterization_type=reparameterization_type,
           parameters=parameters,
-          graph_parents=[self._mean_direction, self._concentration],
           name=name)
 
   @classmethod
@@ -351,7 +351,7 @@ class VonMisesFisher(distribution.Distribution):
 
   def _sample_3d(self, n, seed=None):
     """Specialized inversion sampler for 3D."""
-    seed = seed_stream.SeedStream(seed, salt='von_mises_fisher_3d')
+    seed = SeedStream(seed, salt='von_mises_fisher_3d')
     u_shape = tf.concat([[n], self._batch_shape_tensor()], axis=0)
     z = tf.random.uniform(u_shape, seed=seed(), dtype=self.dtype)
     # TODO(bjp): Higher-order odd dim analytic CDFs are available in [1], could
@@ -374,7 +374,7 @@ class VonMisesFisher(distribution.Distribution):
     return u[..., tf.newaxis]
 
   def _sample_n(self, n, seed=None):
-    seed = seed_stream.SeedStream(seed, salt='vom_mises_fisher')
+    seed = SeedStream(seed, salt='vom_mises_fisher')
     # The sampling strategy relies on the fact that vMF variates are symmetric
     # about the mean direction. Accordingly, if we have a sampling strategy for
     # the away-from-mean angle, then we can uniformly sample the remaining
@@ -419,14 +419,18 @@ class VonMisesFisher(distribution.Distribution):
 
       def body_fn(w, should_continue):
         z = beta.sample(sample_shape=sample_batch_shape, seed=seed())
+        # set_shape needed here because of b/139013403
+        z.set_shape(w.shape)
         w = tf.where(should_continue, (1 - (1 + b) * z) / (1 - (1 - b) * z), w)
         w = tf.debugging.check_numerics(w, 'w')
+        unif = tf.random.uniform(
+            sample_batch_shape, seed=seed(), dtype=self.dtype)
+        # set_shape needed here because of b/139013403
+        unif.set_shape(w.shape)
         should_continue = tf.logical_and(
             should_continue,
             self.concentration * w + dim * tf.math.log1p(-x * w) - c <
-            tf.math.log(
-                tf.random.uniform(
-                    sample_batch_shape, seed=seed(), dtype=self.dtype)))
+            tf.math.log(unif))
         return w, should_continue
 
       w = tf.zeros(sample_batch_shape, dtype=self.dtype)

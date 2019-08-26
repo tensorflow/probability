@@ -26,9 +26,10 @@ package(
 exports_files(["LICENSE"])
 
 py_library(
-    name = "numpy",
+    name = "backend",
     srcs = ["__init__.py"],
     deps = [
+        "//tensorflow_probability/python/internal/backend/jax",
         "//tensorflow_probability/python/internal/backend/numpy",
     ],
 )

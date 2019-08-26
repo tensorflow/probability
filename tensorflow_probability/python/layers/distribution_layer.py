@@ -564,12 +564,14 @@ class CategoricalMixtureOfOneHotCategorical(DistributionLambda):
     """Create the distribution instance from a `params` vector."""
     with tf.compat.v1.name_scope(name, 'CategoricalMixtureOfOneHotCategorical',
                                  [params, event_size, num_components]):
+      params = tf.convert_to_tensor(value=params, name='params')
       dist = MixtureSameFamily.new(
           params,
           num_components,
           OneHotCategorical(
               event_size,
               validate_args=False,  # So we can eval on simplex interior.
+              dtype=params.dtype,
               name=name),
           validate_args=validate_args,
           name=name)
@@ -1562,10 +1564,12 @@ class MixtureNormal(DistributionLambda):
   def new(params, num_components, event_shape=(),
           validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
+    params = tf.convert_to_tensor(value=params, name='params')
     return MixtureSameFamily.new(
         params,
         num_components,
-        IndependentNormal(event_shape, validate_args=validate_args, name=name),
+        IndependentNormal(event_shape, validate_args=validate_args,
+                          dtype=params.dtype, name=name),
         validate_args=validate_args,
         name=name)
 
@@ -1685,11 +1689,13 @@ class MixtureLogistic(DistributionLambda):
   def new(params, num_components, event_shape=(),
           validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
+    params = tf.convert_to_tensor(value=params, name='params')
     return MixtureSameFamily.new(
         params,
         num_components,
         IndependentLogistic(
-            event_shape, validate_args=validate_args, name=name),
+            event_shape, validate_args=validate_args, dtype=params.dtype,
+            name=name),
         validate_args=validate_args,
         name=name)
 
@@ -1745,8 +1751,10 @@ class VariationalGaussianProcess(DistributionLambda):
       inducing_index_points_initializer=None,
       unconstrained_observation_noise_variance_initializer=(
           tf.compat.v1.initializers.constant(-10.)),
+      variational_inducing_observations_scale_initializer=None,
       mean_fn=None,
       jitter=1e-6,
+      convert_to_tensor_fn=tfd.Distribution.sample,
       name=None):
     """Construct a VariationalGaussianProcess Layer.
 
@@ -1771,16 +1779,24 @@ class VariationalGaussianProcess(DistributionLambda):
         `tf.keras.initializer.Initializer` used to initialize the unconstrained
         observation noise variable. The observation noise variance is computed
         from this variable via the `tf.nn.softplus` function.
+      variational_inducing_observations_scale_initializer: a
+        `tf.keras.initializer.Initializer` used to initialize the variational
+        inducing observations scale.
       mean_fn: a callable that maps layer inputs to mean function values. Passed
         to the mean_fn parameter of VariationalGaussianProcess distribution. If
         omitted, defaults to a constant function with trainable variable value.
       jitter: a small term added to the diagonal of various kernel matrices for
         numerical stability.
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
+        instance and returns a `tf.Tensor`-like object. For examples, see
+        `class` docstring.
       name: name to give to this layer and the scope of ops and variables it
         contains.
     """
+    convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
+
     super(VariationalGaussianProcess, self).__init__(
-        lambda x: VariationalGaussianProcess.new(  # pylint: disable=g-long-lambda
+        make_distribution_fn=lambda x: VariationalGaussianProcess.new(  # pylint: disable=g-long-lambda
             x,
             kernel_provider=self._kernel_provider,
             event_shape=self._event_shape,
@@ -1790,9 +1806,11 @@ class VariationalGaussianProcess(DistributionLambda):
             variational_inducing_observations_scale=(
                 self._variational_inducing_observations_scale),
             mean_fn=self._mean_fn,
-            observation_noise_variance=tf.nn.softplus(
+            observation_noise_variance=(
                 self._unconstrained_observation_noise_variance),
-            jitter=self._jitter))
+            jitter=self._jitter),
+        convert_to_tensor_fn=convert_to_tensor_fn,
+        dtype=kernel_provider.dtype)
 
     tmp_kernel = kernel_provider.kernel
     self._dtype = tmp_kernel.dtype.as_numpy_dtype
@@ -1804,6 +1822,8 @@ class VariationalGaussianProcess(DistributionLambda):
     self._inducing_index_points_initializer = inducing_index_points_initializer
     self._unconstrained_observation_noise_variance_initializer = (
         unconstrained_observation_noise_variance_initializer)
+    self._variational_inducing_observations_scale_initializer = (
+        variational_inducing_observations_scale_initializer)
     self._kernel_provider = kernel_provider
 
   def build(self, input_shape):
@@ -1821,10 +1841,18 @@ class VariationalGaussianProcess(DistributionLambda):
           name='mean')
       self._mean_fn = lambda x: self.mean
 
-    self._unconstrained_observation_noise_variance = self.add_variable(
-        initializer=self._unconstrained_observation_noise_variance_initializer,
-        dtype=self._dtype,
-        name='observation_noise_variance')
+    # This matches the default value of observation_noise_variance in the
+    # VariationalGaussianProcess distribution itself. As that logic changes
+    # (see b/136668249) we'll need to keep this in sync.
+    self._unconstrained_observation_noise_variance = 0.
+    if self._unconstrained_observation_noise_variance_initializer is not None:
+      unconstrained_observation_noise_variance = self.add_variable(
+          initializer=(
+              self._unconstrained_observation_noise_variance_initializer),
+          dtype=self._dtype,
+          name='observation_noise_variance')
+      self._unconstrained_observation_noise_variance = tf.nn.softplus(
+          unconstrained_observation_noise_variance)
 
     self._inducing_index_points = self.add_variable(
         name='inducing_index_points',
@@ -1838,13 +1866,16 @@ class VariationalGaussianProcess(DistributionLambda):
         initializer=tf.compat.v1.initializers.zeros(),
         dtype=self._dtype)
 
-    eyes = (np.ones(self._event_shape.as_list() + [1, 1]) *
-            np.eye(self._num_inducing_points, dtype=self._dtype))
+    if self._variational_inducing_observations_scale_initializer is None:
+      eyes = (np.ones(self._event_shape.as_list() + [1, 1]) *
+              np.eye(self._num_inducing_points, dtype=self._dtype))
+      self._variational_inducing_observations_scale_initializer = (
+          tf.compat.v1.initializers.constant(1e-5 * eyes))
     self._variational_inducing_observations_scale = self.add_variable(
         name='variational_inducing_observations_scale',
         shape=(self._event_shape.as_list() +
                [self._num_inducing_points, self._num_inducing_points]),
-        initializer=tf.compat.v1.initializers.constant(1e-5 * eyes))
+        initializer=self._variational_inducing_observations_scale_initializer)
 
   @staticmethod
   def new(x,
@@ -1875,6 +1906,8 @@ class VariationalGaussianProcess(DistributionLambda):
       loss = vgp.variational_loss(bij.forward(y), kl_weight=kl_weight)
       return loss
     d.variational_loss = _transposed_variational_loss
+    d.surrogate_posterior_kl_divergence_prior = (
+        vgp.surrogate_posterior_kl_divergence_prior)
     return d
 
 

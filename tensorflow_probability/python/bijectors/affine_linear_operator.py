@@ -92,7 +92,7 @@ class AffineLinearOperator(bijector.Bijector):
     """
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([shift, scale], dtype_hint=tf.float32)
-      self._shift = tensor_util.convert_immutable_to_tensor(
+      self._shift = tensor_util.convert_nonref_to_tensor(
           shift, dtype=dtype, name='shift')
       if scale is not None:
         if not isinstance(scale, tf.linalg.LinearOperator):
@@ -130,13 +130,13 @@ class AffineLinearOperator(bijector.Bijector):
                                    if self.validate_args else []):
         y = self.scale.matvec(y, adjoint=self.adjoint)
     if self.shift is not None:
-      y += self.shift
+      y = y + self.shift
     return y
 
   def _inverse(self, y):
     x = y
     if self.shift is not None:
-      x -= self.shift
+      x = x - self.shift
     if self.scale is not None:
       # Solve fails if the op is singular so we may safely skip this assertion.
       x = self.scale.solvevec(x, adjoint=self.adjoint)

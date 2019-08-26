@@ -39,7 +39,7 @@ class BDF(base.Solver):
   variable step size, variable order (VSVO) BDF integrator with order varying
   between 1 and 5.
 
-  ### Algorithm details
+  #### Algorithm details
 
   Each step involves solving the following nonlinear equation by Newton's
   method:
@@ -167,6 +167,7 @@ class BDF(base.Solver):
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'bdf').
     """
+    super(BDF, self).__init__(use_pfor_to_compute_jacobian, validate_args, name)
     # The default values of `rtol` and `atol` match `scipy.integrate.solve_ivp`.
     self._rtol = rtol
     self._atol = atol
@@ -181,22 +182,19 @@ class BDF(base.Solver):
     self._newton_step_size_factor = newton_step_size_factor
     self._bdf_coefficients = bdf_coefficients
     self._evaluate_jacobian_lazily = evaluate_jacobian_lazily
-    self._use_pfor_to_compute_jacobian = use_pfor_to_compute_jacobian
-    self._validate_args = validate_args
-    self._name = name
 
-  def solve(self,
-            ode_fn,
-            initial_time,
-            initial_state,
-            solution_times,
-            jacobian_fn=None,
-            jacobian_sparsity=None,
-            batch_ndims=None,
-            previous_solver_internal_state=None):
-    """See `tfp.math.ode.Solver.solve`."""
-
-    # The `solve` function is comprised of the following sequential stages:
+  def _solve(
+      self,
+      ode_fn,
+      initial_time,
+      initial_state,
+      solution_times,
+      jacobian_fn=None,
+      jacobian_sparsity=None,
+      batch_ndims=None,
+      previous_solver_internal_state=None,
+  ):
+    # This function is comprised of the following sequential stages:
     # (1) Make static assertions.
     # (2) Initialize variables.
     # (3) Make non-static assertions.
@@ -244,12 +242,11 @@ class BDF(base.Solver):
       if not self._validate_args:
         return []
       assert_ops = []
-      if ((not initial_state_missing) and
-          (previous_solver_internal_state is not None)):
+      if previous_solver_internal_state is not None:
         assert_initial_state_matches_previous_solver_internal_state = (
-            tf.assert_near(
+            tf1.assert_near(
                 tf.norm(
-                    original_initial_state -
+                    initial_state_vec -
                     previous_solver_internal_state.backward_differences[0],
                     np.inf),
                 0.,
@@ -289,28 +286,28 @@ class BDF(base.Solver):
       return assert_ops
 
     def advance_to_solution_time(n, diagnostics, iterand, solver_internal_state,
-                                 states_array, times_array):
+                                 state_vec_array, time_array):
       """Takes multiple steps to advance time to `solution_times[n]`."""
 
       def step_cond(next_time, diagnostics, iterand, *_):
         return (iterand.time < next_time) & (tf.equal(diagnostics.status, 0))
 
-      solution_times_n = solution_times_array.read(n)
+      nth_solution_time = solution_time_array.read(n)
       [
-          _, diagnostics, iterand, solver_internal_state, states_array,
-          times_array
+          _, diagnostics, iterand, solver_internal_state, state_vec_array,
+          time_array
       ] = tf.while_loop(step_cond, step, [
-          solution_times_n, diagnostics, iterand, solver_internal_state,
-          states_array, times_array
+          nth_solution_time, diagnostics, iterand, solver_internal_state,
+          state_vec_array, time_array
       ])
-      states_array = states_array.write(
+      state_vec_array = state_vec_array.write(
           n, solver_internal_state.backward_differences[0])
-      times_array = times_array.write(n, solution_times_n)
-      return (n + 1, diagnostics, iterand, solver_internal_state, states_array,
-              times_array)
+      time_array = time_array.write(n, nth_solution_time)
+      return (n + 1, diagnostics, iterand, solver_internal_state,
+              state_vec_array, time_array)
 
     def step(next_time, diagnostics, iterand, solver_internal_state,
-             states_array, times_array):
+             state_vec_array, time_array):
       """Takes a single step."""
       distance_to_next_time = next_time - iterand.time
       overstepped = iterand.new_step_size > distance_to_next_time
@@ -323,7 +320,7 @@ class BDF(base.Solver):
         diagnostics = diagnostics._replace(
             num_jacobian_evaluations=diagnostics.num_jacobian_evaluations + 1)
         iterand = iterand._replace(
-            jacobian=jacobian_fn_mat(
+            jacobian_mat=jacobian_fn_mat(
                 iterand.time, solver_internal_state.backward_differences[0]),
             jacobian_is_up_to_date=True)
 
@@ -335,12 +332,13 @@ class BDF(base.Solver):
           [False, diagnostics, iterand, solver_internal_state])
 
       if solution_times_chosen_by_solver:
-        states_array = states_array.write(
-            states_array.size(), solver_internal_state.backward_differences[0])
-        times_array = times_array.write(times_array.size(), iterand.time)
+        state_vec_array = state_vec_array.write(
+            state_vec_array.size(),
+            solver_internal_state.backward_differences[0])
+        time_array = time_array.write(time_array.size(), iterand.time)
 
       return (next_time, diagnostics, iterand, solver_internal_state,
-              states_array, times_array)
+              state_vec_array, time_array)
 
     def maybe_step(accepted, diagnostics, iterand, solver_internal_state):
       """Takes a single step only if the outcome has a low enough error."""
@@ -349,11 +347,11 @@ class BDF(base.Solver):
           num_ode_fn_evaluations, status
       ] = diagnostics
       [
-          jacobian, jacobian_is_up_to_date, new_step_size, num_steps,
+          jacobian_mat, jacobian_is_up_to_date, new_step_size, num_steps,
           num_steps_same_size, should_update_jacobian, should_update_step_size,
           time, unitary, upper
       ] = iterand
-      backward_differences, order, state_shape, step_size = solver_internal_state
+      [backward_differences, order, step_size] = solver_internal_state
 
       if max_num_steps is not None:
         status = tf1.where(tf.equal(num_steps, max_num_steps), -1, 0)
@@ -369,17 +367,17 @@ class BDF(base.Solver):
                                       num_steps_same_size)
 
       def update_factorization():
-        return bdf_util.newton_qr(jacobian,
+        return bdf_util.newton_qr(jacobian_mat,
                                   newton_coefficients_array.read(order),
                                   step_size)
 
       if self._evaluate_jacobian_lazily:
 
         def update_jacobian_and_factorization():
-          new_jacobian = jacobian_fn_mat(time, backward_differences[0])
+          new_jacobian_mat = jacobian_fn_mat(time, backward_differences[0])
           new_unitary, new_upper = update_factorization()
           return [
-              new_jacobian, True, num_jacobian_evaluations + 1, new_unitary,
+              new_jacobian_mat, True, num_jacobian_evaluations + 1, new_unitary,
               new_upper
           ]
 
@@ -388,13 +386,13 @@ class BDF(base.Solver):
               should_update_factorization,
               update_factorization, lambda: [unitary, upper])
           return [
-              jacobian, jacobian_is_up_to_date, num_jacobian_evaluations,
+              jacobian_mat, jacobian_is_up_to_date, num_jacobian_evaluations,
               new_unitary, new_upper
           ]
 
         [
-            jacobian, jacobian_is_up_to_date, num_jacobian_evaluations, unitary,
-            upper
+            jacobian_mat, jacobian_is_up_to_date, num_jacobian_evaluations,
+            unitary, upper
         ] = tf.cond(should_update_jacobian, update_jacobian_and_factorization,
                     maybe_update_factorization)
       else:
@@ -405,7 +403,7 @@ class BDF(base.Solver):
       newton_tol = newton_tol_factor * tf.norm(tol)
 
       [
-          newton_converged, next_backward_difference, next_state,
+          newton_converged, next_backward_difference, next_state_vec,
           newton_num_iters
       ] = bdf_util.newton(backward_differences, max_num_newton_iters,
                           newton_coefficients_array.read(order), ode_fn_vec,
@@ -449,7 +447,7 @@ class BDF(base.Solver):
           accepted,
           bdf_util.update_backward_differences(backward_differences,
                                                next_backward_difference,
-                                               next_state, order),
+                                               next_state_vec, order),
           backward_differences)
       jacobian_is_up_to_date = jacobian_is_up_to_date & tf.logical_not(accepted)
       num_steps_same_size = tf1.where(accepted, num_steps_same_size + 1,
@@ -495,17 +493,16 @@ class BDF(base.Solver):
       diagnostics = _BDFDiagnostics(num_jacobian_evaluations,
                                     num_matrix_factorizations,
                                     num_ode_fn_evaluations, status)
-      iterand = _BDFIterand(jacobian, jacobian_is_up_to_date, new_step_size,
+      iterand = _BDFIterand(jacobian_mat, jacobian_is_up_to_date, new_step_size,
                             num_steps, num_steps_same_size,
                             should_update_jacobian, should_update_step_size,
                             time, unitary, upper)
       solver_internal_state = _BDFSolverInternalState(backward_differences,
-                                                      order, state_shape,
-                                                      step_size)
+                                                      order, step_size)
       return accepted, diagnostics, iterand, solver_internal_state
 
     # (1) Make static assertions.
-    # TODO(parsiad): Support specifying Jacobian sparsity patterns.
+    # TODO(b/138304296): Support specifying Jacobian sparsity patterns.
     if jacobian_sparsity is not None:
       raise NotImplementedError('The BDF solver does not support specifying '
                                 'Jacobian sparsity patterns.')
@@ -513,51 +510,42 @@ class BDF(base.Solver):
       raise NotImplementedError('The BDF solver does not support batching.')
     solution_times_chosen_by_solver = (
         isinstance(solution_times, base.ChosenBySolver))
-    initial_state_missing = initial_state is None
-    if initial_state_missing and previous_solver_internal_state is None:
-      raise ValueError(
-          'At least one of `initial_state` or `previous_solver_internal_state` '
-          'must be specified')
 
     with tf.name_scope(self._name):
 
       # (2) Initialize variables.
-      original_initial_state = initial_state
-      if previous_solver_internal_state is None:
-        initial_state = tf.convert_to_tensor(initial_state)
-        original_state_shape = tf.shape(initial_state)
-      else:
-        initial_state = previous_solver_internal_state.backward_differences[0]
-        original_state_shape = previous_solver_internal_state.state_shape
+      initial_state = tf.convert_to_tensor(initial_state)
+      state_shape = tf.shape(initial_state)
       state_dtype = initial_state.dtype
       util.error_if_not_real_or_complex(initial_state, 'initial_state')
-      # TODO(parsiad): Support complex automatic Jacobians.
       if jacobian_fn is None and state_dtype.is_complex:
         raise NotImplementedError('The BDF solver does not support automatic '
                                   'Jacobian computations for complex dtypes.')
       num_odes = tf.size(initial_state)
-      original_state_tensor_shape = initial_state.get_shape()
-      initial_state = tf.reshape(initial_state, [-1])
-      ode_fn_vec = util.get_ode_fn_vec(ode_fn, original_state_shape)
+      state_tensor_shape = initial_state.get_shape()
+      initial_state_vec = tf.reshape(initial_state, [-1])
+      ode_fn_vec = util.get_ode_fn_vec(ode_fn, state_shape)
       # `real_dtype` is the floating point `dtype` associated with
       # `initial_state.dtype` (recall that the latter can be complex).
       real_dtype = tf.abs(initial_state).dtype
-      initial_time = tf.convert_to_tensor(initial_time, dtype=real_dtype)
+      # Use tf.cast instead of tf.convert_to_tensor for differentiable
+      # parameters because the tf.custom_gradient decorator converts raw floats
+      # into tf.float32, which cannot be converted to tf.float64.
+      initial_time = tf.cast(initial_time, real_dtype)
       num_solution_times = 0
       if solution_times_chosen_by_solver:
-        final_time = solution_times.final_time
-        final_time = tf.convert_to_tensor(final_time, dtype=real_dtype)
+        final_time = tf.cast(solution_times.final_time, real_dtype)
       else:
-        solution_times = tf.convert_to_tensor(solution_times, dtype=real_dtype)
+        solution_times = tf.cast(solution_times, real_dtype)
         num_solution_times = tf.size(solution_times)
-        solution_times_array = tf.TensorArray(
+        solution_time_array = tf.TensorArray(
             solution_times.dtype, size=num_solution_times,
             element_shape=[]).unstack(solution_times)
         util.error_if_not_vector(solution_times, 'solution_times')
       jacobian_fn_mat = util.get_jacobian_fn_mat(
           jacobian_fn,
           ode_fn_vec,
-          original_state_shape,
+          state_shape,
           use_pfor=self._use_pfor_to_compute_jacobian)
       rtol = tf.convert_to_tensor(self._rtol, dtype=real_dtype)
       atol = tf.convert_to_tensor(self._atol, dtype=real_dtype)
@@ -617,8 +605,8 @@ class BDF(base.Solver):
       first_step_size = self._first_step_size
       if first_step_size is None:
         first_step_size = bdf_util.first_step_size(
-            atol, error_coefficients_array.read(1), initial_state, initial_time,
-            ode_fn_vec, rtol, safety_factor)
+            atol, error_coefficients_array.read(1), initial_state_vec,
+            initial_time, ode_fn_vec, rtol, safety_factor)
       elif previous_solver_internal_state is not None:
         tf.logging.warn('`first_step_size` is ignored since'
                         '`previous_solver_internal_state` was specified.')
@@ -628,9 +616,10 @@ class BDF(base.Solver):
       solver_internal_state = previous_solver_internal_state
       if solver_internal_state is None:
         first_order_backward_difference = ode_fn_vec(
-            initial_time, initial_state) * tf.cast(first_step_size, state_dtype)
+            initial_time, initial_state_vec) * tf.cast(first_step_size,
+                                                       state_dtype)
         backward_differences = tf.concat([
-            tf.reshape(initial_state, [1, -1]),
+            initial_state_vec[tf.newaxis, :],
             first_order_backward_difference[tf.newaxis, :],
             tf.zeros(
                 tf.stack([bdf_util.MAX_ORDER + 1, num_odes]),
@@ -639,14 +628,13 @@ class BDF(base.Solver):
         solver_internal_state = _BDFSolverInternalState(
             backward_differences=backward_differences,
             order=1,
-            state_shape=original_state_shape,
             step_size=first_step_size)
-      states_array = tf.TensorArray(
+      state_vec_array = tf.TensorArray(
           state_dtype,
           size=num_solution_times,
           dynamic_size=solution_times_chosen_by_solver,
-          element_shape=initial_state.get_shape())
-      times_array = tf.TensorArray(
+          element_shape=initial_state_vec.get_shape())
+      time_array = tf.TensorArray(
           real_dtype,
           size=num_solution_times,
           dynamic_size=solution_times_chosen_by_solver,
@@ -657,7 +645,7 @@ class BDF(base.Solver):
           num_ode_fn_evaluations=0,
           status=0)
       iterand = _BDFIterand(
-          jacobian=tf.zeros([num_odes, num_odes], dtype=state_dtype),
+          jacobian_mat=tf.zeros([num_odes, num_odes], dtype=state_dtype),
           jacobian_is_up_to_date=False,
           new_step_size=solver_internal_state.step_size,
           num_steps=0,
@@ -679,11 +667,11 @@ class BDF(base.Solver):
                 tf.equal(diagnostics.status, 0))
 
           [
-              _, diagnostics, iterand, solver_internal_state, states_array,
-              times_array
+              _, diagnostics, iterand, solver_internal_state, state_vec_array,
+              time_array
           ] = tf.while_loop(step_cond, step, [
               final_time, diagnostics, iterand, solver_internal_state,
-              states_array, times_array
+              state_vec_array, time_array
           ])
 
         else:
@@ -692,22 +680,22 @@ class BDF(base.Solver):
             return (n < num_solution_times) & (tf.equal(diagnostics.status, 0))
 
           [
-              _, diagnostics, iterand, solver_internal_state, states_array,
-              times_array
+              _, diagnostics, iterand, solver_internal_state, state_vec_array,
+              time_array
           ] = tf.while_loop(advance_to_solution_time_cond,
                             advance_to_solution_time, [
                                 0, diagnostics, iterand, solver_internal_state,
-                                states_array, times_array
+                                state_vec_array, time_array
                             ])
 
         # (6) Return `Results` object.
-        states = tf.reshape(states_array.stack(),
-                            tf.concat([[-1], original_state_shape], 0))
-        times = times_array.stack()
+        states = tf.reshape(state_vec_array.stack(),
+                            tf.concat([[-1], state_shape], 0))
+        times = time_array.stack()
         if not solution_times_chosen_by_solver:
           times.set_shape(solution_times.get_shape())
-          states.set_shape(solution_times.get_shape().concatenate(
-              original_state_tensor_shape))
+          states.set_shape(
+              solution_times.get_shape().concatenate(state_tensor_shape))
         return base.Results(
             times=times,
             states=states,
@@ -727,7 +715,7 @@ class _BDFDiagnostics(
 
 
 _BDFIterand = collections.namedtuple('_BDFIterand', [
-    'jacobian',
+    'jacobian_mat',
     'jacobian_is_up_to_date',
     'new_step_size',
     'num_steps',
@@ -744,7 +732,6 @@ class _BDFSolverInternalState(
     collections.namedtuple('_BDFSolverInternalState', [
         'backward_differences',
         'order',
-        'state_shape',
         'step_size',
     ])):
   """Returned by the solver to warm start future invocations.
@@ -756,8 +743,6 @@ class _BDFSolverInternalState(
       contains `BDF(0, y) = y`, the state.
     order: Scalar integer `Tensor` containing the order used by the solver upon
       termination.
-    state_shape: 1-D integer `Tensor` representing the shape of the initial
-    state as specified by the user.
     step_size: Scalar float `Tensor` containing the step size used by the solver
       upon termination.
   """

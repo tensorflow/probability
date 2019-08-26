@@ -20,10 +20,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
-from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
     'Cumsum',
@@ -75,8 +72,13 @@ class Cumsum(bijector.Bijector):
       ValueError: if `axis` is not negative.
     """
     with tf.name_scope(name) as name:
-      self._axis = tensor_util.convert_immutable_to_tensor(
-          axis, dtype_hint=tf.int32, name='axis')
+      if not isinstance(axis, int):
+        raise TypeError(
+            'Argument `axis` is not an `int` type; got {}'.format(axis))
+      if axis >= 0:
+        raise ValueError(
+            'Argument `axis` must be negative; got {}'.format(axis))
+      self._axis = axis
       super(Cumsum, self).__init__(
           is_constant_jacobian=True,
           # Positive because we verify `axis < 0`.
@@ -111,15 +113,3 @@ class Cumsum(bijector.Bijector):
 
   def _forward_log_det_jacobian(self, x):
     return tf.constant(0., x.dtype)
-
-  def _parameter_control_dependencies(self, is_init):
-    if is_init and not dtype_util.is_integer(self.axis.dtype):
-      raise TypeError('Argument `axis` is not an `int` type.')
-    if not self.validate_args:
-      return []
-    assertions = []
-    if is_init != tensor_util.is_mutable(self.axis):
-      assertions.append(assert_util.assert_negative(
-          self.axis,
-          message='Argument `axis` must be negative.'))
-    return assertions

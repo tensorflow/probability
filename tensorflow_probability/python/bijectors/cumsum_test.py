@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -33,10 +34,11 @@ class _CumsumBijectorTest(tf.test.TestCase):
   """Tests correctness of the cumsum bijector."""
 
   def testInvalidAxis(self):
-    with self.assertRaisesOpError('Argument `axis` must be negative.'):
-      self.evaluate(tfb.Cumsum(axis=0, validate_args=True).forward([0., 1.]))
-    with self.assertRaisesRegexp(
-        TypeError, r'Argument `axis` is not an `int` type\..*'):
+    with self.assertRaisesRegexp(ValueError,
+                                 r'Argument `axis` must be negative.*'):
+      tfb.Cumsum(axis=0, validate_args=True)
+    with self.assertRaisesRegexp(TypeError,
+                                 r'Argument `axis` is not an `int` type\.*'):
       tfb.Cumsum(axis=-1., validate_args=True)
 
   def testBijector(self):
@@ -51,6 +53,7 @@ class _CumsumBijectorTest(tf.test.TestCase):
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=1)
 
+  @tfp_test_util.numpy_disable_gradient_test
   def testJacobian(self):
     self._checkEqualTheoreticalFldj(np.expand_dims(np.arange(5.), -1))
     self._checkEqualTheoreticalFldj(np.reshape([np.arange(5.)] * 2, [5, 2]))

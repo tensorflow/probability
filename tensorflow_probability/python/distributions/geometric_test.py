@@ -49,14 +49,14 @@ class GeometricTest(tf.test.TestCase):
 
   def testInvalidP(self):
     invalid_ps = [-.01, -0.01, -2.]
-    with self.assertRaisesOpError("Condition x >= 0"):
+    with self.assertRaisesOpError('must be positive'):
       geom = tfd.Geometric(probs=invalid_ps, validate_args=True)
-      self.evaluate(geom.probs)
+      self.evaluate(geom.mean())
 
     invalid_ps = [1.1, 3., 5.]
-    with self.assertRaisesOpError("Condition x <= y"):
+    with self.assertRaisesOpError('must be less than or equal to 1'):
       geom = tfd.Geometric(probs=invalid_ps, validate_args=True)
-      self.evaluate(geom.probs)
+      self.evaluate(geom.mean())
 
   def testGeomLogPmf(self):
     batch_size = 6
@@ -84,10 +84,10 @@ class GeometricTest(tf.test.TestCase):
         input=[2.5, 3.2, 4.3, 5.1, 6., 7.], shape=[6])
     geom = tfd.Geometric(probs=probs, validate_args=True)
 
-    with self.assertRaisesOpError("Condition x == y"):
+    with self.assertRaisesOpError('cannot contain fractional components'):
       self.evaluate(geom.log_prob(x))
 
-    with self.assertRaisesOpError("Condition x >= 0"):
+    with self.assertRaisesOpError('Condition x >= 0'):
       self.evaluate(geom.log_prob([-1.]))
 
     geom = tfd.Geometric(probs=probs)
@@ -262,7 +262,7 @@ class GeometricTest(tf.test.TestCase):
     self.assertEqual([], geom.variance().shape)
     self.assertAllClose(expected_variance, self.evaluate(geom.variance()))
 
-    with self.assertRaisesOpError("Entropy is undefined"):
+    with self.assertRaisesOpError('Entropy is undefined'):
       self.evaluate(geom.entropy())
 
   def testParamTensorFromLogits(self):
@@ -287,5 +287,14 @@ class GeometricTest(tf.test.TestCase):
         *self.evaluate([d.prob(0.), d.probs_parameter()]),
         atol=0, rtol=1e-4)
 
-if __name__ == "__main__":
+  def testModifiedVariableProbAssertion(self):
+    v = tf.Variable(0.9)
+    self.evaluate(v.initializer)
+    d = tfd.Geometric(probs=v, validate_args=True)
+    with self.assertRaisesOpError('must be less than or equal to 1'):
+      with tf.control_dependencies([v.assign(1.2)]):
+        self.evaluate(d.mean())
+
+
+if __name__ == '__main__':
   tf.test.main()

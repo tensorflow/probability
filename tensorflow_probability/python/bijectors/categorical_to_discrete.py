@@ -26,6 +26,8 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
@@ -39,7 +41,7 @@ class CategoricalToDiscrete(bijector.Bijector):
   Example Usage:
 
   ```python
-  bijector = CategoricalToDiscrete(values=[0.01, 0.1, 1., 10.])
+  bijector = CategoricalToDiscrete(map_values=[0.01, 0.1, 1., 10.])
   bijector.forward([1, 3, 2, 1, 0]) = [1., 10., 1., 0.1, 0.01]
   bijector.inverse([1., 10., 1., 0.1, 0.01]) = [1, 3, 2, 1, 0]
   ```
@@ -60,24 +62,21 @@ class CategoricalToDiscrete(bijector.Bijector):
       name: Python `str` name given to ops managed by this object.
     """
     with tf.name_scope(name):
-      map_values = tf.convert_to_tensor(map_values, name='map_values')
-      assertions = _maybe_check_valid_map_values(map_values, validate_args)
-      if assertions:
-        with tf.control_dependencies(assertions):
-          map_values = tf.identity(map_values)
-      self._map_values = map_values
+      dtype = dtype_util.common_dtype([map_values], tf.float32)
+      self._map_values = tensor_util.convert_nonref_to_tensor(
+          map_values, name='map_values', dtype=dtype)
       super(CategoricalToDiscrete, self).__init__(
-          graph_parents=[map_values],
           forward_min_event_ndims=0,
           is_constant_jacobian=True,
           validate_args=validate_args,
           name=name)
 
   def _forward(self, x):
+    map_values = tf.convert_to_tensor(self.map_values)
     if self.validate_args:
       with tf.control_dependencies([
           assert_util.assert_equal(
-              (0 <= x) & (x < tf.size(self.map_values)),
+              (0 <= x) & (x < tf.size(map_values)),
               True,
               message='indices out of bound')
       ]):
@@ -85,16 +84,17 @@ class CategoricalToDiscrete(bijector.Bijector):
     # If we want batch dims in self.map_values, we can (after broadcasting),
     # use:
     # tf.gather(self.map_values, x, batch_dims=-1, axis=-1)
-    return tf.gather(self.map_values, indices=x)
+    return tf.gather(map_values, indices=x)
 
   def _inverse(self, y):
+    map_values = tf.convert_to_tensor(self.map_values)
     flat_y = tf.reshape(y, shape=[-1])
-    # Search for the indices of self.map_values that are closest to flat_y.
-    # Since self.map_values is strictly increasing, the closest is either the
+    # Search for the indices of map_values that are closest to flat_y.
+    # Since map_values is strictly increasing, the closest is either the
     # first one that is strictly greater than flat_y, or the one before it.
     upper_candidates = tf.minimum(
-        tf.size(self.map_values) - 1,
-        tf.searchsorted(self.map_values, values=flat_y, side='right'))
+        tf.size(map_values) - 1,
+        tf.searchsorted(map_values, values=flat_y, side='right'))
     lower_candidates = tf.maximum(0, upper_candidates - 1)
     candidates = tf.stack([lower_candidates, upper_candidates], axis=-1)
     lower_cand_diff = tf.abs(flat_y - self._forward(lower_candidates))
@@ -121,6 +121,9 @@ class CategoricalToDiscrete(bijector.Bijector):
   @property
   def map_values(self):
     return self._map_values
+
+  def _parameter_control_dependencies(self, is_init):
+    return _maybe_check_valid_map_values(self.map_values, self.validate_args)
 
 
 def _maybe_check_valid_map_values(map_values, validate_args):

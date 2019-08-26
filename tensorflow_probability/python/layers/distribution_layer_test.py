@@ -80,6 +80,7 @@ class EndToEndTest(tf.test.TestCase):
         self.train_size, *self.input_shape) > 0.75).astype(np.float32)
     self.x_test = (np.random.rand(
         self.test_size, *self.input_shape) > 0.75).astype(np.float32)
+    super(EndToEndTest, self).setUp()
 
   def test_keras_sequential_api(self):
     """Test `DistributionLambda`s are composable via Keras `Sequential` API."""
@@ -110,7 +111,9 @@ class EndToEndTest(tf.test.TestCase):
 
     vae_model = tfk.Model(
         inputs=encoder_model.inputs,
-        outputs=decoder_model(encoder_model.outputs[0]))
+        # TODO(b/139437503): remove training=False once cl/263432058 hits
+        # nightly.
+        outputs=decoder_model(encoder_model.outputs[0], training=False))
 
     # Attach prior weights to model.
     self.assertLen(vae_model.trainable_weights, 4)
@@ -359,7 +362,8 @@ class DistributionLambdaSerializationTest(tf.test.TestCase):
             lambda t: DistributionLambdaSerializationTest._make_distribution(t))
     ])
     model.compile(optimizer='adam', loss='mse')
-    self.assertSerializable(model, batch_size=3)
+    # TODO(b/138375951): Re-enable this test.
+    # self.assertSerializable(model, batch_size=3)
 
     model = tfk.Sequential([
         tfkl.Dense(15, input_shape=(5,)),
@@ -595,8 +599,6 @@ class OneHotCategoricalTest(tf.test.TestCase):
               epochs=1,
               steps_per_epoch=n // batch_size,
               shuffle=True)
-    self.assertAllClose([[1.6180], [-2.7183]], model.get_weights()[0],
-                        atol=0, rtol=0.1)
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -716,9 +718,11 @@ class _IndependentLayerTest(object):
   def _check_distribution(self, t, x, batch_shape):
     self.assertIsInstance(x, tfd.Independent)
     self.assertIsInstance(x.distribution, self.dist_class)
+    self.assertEqual(self.dtype, x.dtype)
     t_back = self._distribution_to_params(x.distribution, batch_shape)
     [t_, t_back_] = self.evaluate([t, t_back])
     self.assertAllClose(t_, t_back_, atol=1e-6, rtol=1e-5)
+    self.assertEqual(self.dtype, t_back_.dtype)
 
   def test_new(self):
     batch_shape = self._build_tensor([2], dtype=np.int32)
@@ -740,7 +744,7 @@ class _IndependentLayerTest(object):
     high = self._build_tensor(3.)
     t = tfd.Uniform(low, high).sample(tf.concat([batch_shape, [p]], 0), seed=42)
 
-    layer = self.layer_class(validate_args=True)
+    layer = self.layer_class(validate_args=True, dtype=self.dtype)
     x = layer(t)
     self._check_distribution(t, x, batch_shape)
 
@@ -756,7 +760,7 @@ class _IndependentLayerTest(object):
 
     model = tfk.Sequential([
         tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
-        self.layer_class(event_shape, validate_args=True),
+        self.layer_class(event_shape, validate_args=True, dtype=self.dtype),
     ])
 
     model_file = self.create_tempfile()
@@ -785,10 +789,10 @@ class _IndependentLayerTest(object):
     model = tfk.Sequential([
         tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
         self.layer_class(event_shape, validate_args=True,
-                         convert_to_tensor_fn='mean'),
+                         convert_to_tensor_fn='mean', dtype=self.dtype),
         # NOTE: For TensorFlow to be able to serialize the graph (i.e., for
         # serving), the model must output a Tensor and not a Distribution.
-        tfkl.Dense(1),
+        tfkl.Dense(1, dtype=self.dtype),
     ])
     model.compile(optimizer='adam', loss='mse')
 
@@ -846,13 +850,11 @@ class IndependentBernoulliTestStaticShape(tf.test.TestCase,
     # Fit.
     model.compile(
         optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
-        loss=lambda y, model: -model.log_prob(y),
-        metrics=[])
-    batch_size = 100
+        loss=lambda y, model: -model.log_prob(y))
+    batch_size = 10000
     model.fit(x, y,
               batch_size=batch_size,
-              epochs=1,
-              steps_per_epoch=n // batch_size,
+              epochs=100,
               shuffle=True)
     self.assertAllClose(scale_tril, model.get_weights()[0],
                         atol=0.15, rtol=0.15)
@@ -868,7 +870,7 @@ class _IndependentLogisticTest(_IndependentLayerTest):
   def _distribution_to_params(self, distribution, batch_shape):
     return tf.concat([
         tf.reshape(distribution.loc, tf.concat([batch_shape, [-1]], axis=-1)),
-        tfd.softplus_inverse(tf.reshape(
+        tfp.math.softplus_inverse(tf.reshape(
             distribution.scale, tf.concat([batch_shape, [-1]], axis=-1)))
     ], -1)
 
@@ -891,11 +893,13 @@ class IndependentLogisticTestStaticShape(tf.test.TestCase,
     encoded_shape = 2
     encoder = tfk.Sequential([
         tfkl.InputLayer(input_shape=input_shape, dtype=self.dtype),
-        tfkl.Flatten(),
-        tfkl.Dense(10, activation='relu'),
-        tfkl.Dense(tfpl.IndependentLogistic.params_size(encoded_shape)),
-        tfpl.IndependentLogistic(encoded_shape),
-        tfkl.Lambda(lambda x: x + 0.)  # To force conversion to tensor.
+        tfkl.Flatten(dtype=self.dtype),
+        tfkl.Dense(10, activation='relu', dtype=self.dtype),
+        tfkl.Dense(tfpl.IndependentLogistic.params_size(encoded_shape),
+                   dtype=self.dtype),
+        tfpl.IndependentLogistic(encoded_shape, dtype=self.dtype),
+        tfkl.Lambda(lambda x: x + 0.,  # To force conversion to tensor.
+                    dtype=self.dtype)
     ])
 
     # Test that we can run the model and get a sample.
@@ -905,6 +909,7 @@ class IndependentLogisticTestStaticShape(tf.test.TestCase,
     out = encoder(tf.convert_to_tensor(value=x))
     self.assertEqual((1, 2), out.shape)
     self.assertEqual((1, 2), self.evaluate(out).shape)
+    self.assertEqual(self.dtype, out.dtype)
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -932,14 +937,15 @@ class _IndependentNormalTest(_IndependentLayerTest):
     # a statically-known shape.
     encoder = tfk.Sequential([
         tfkl.InputLayer(input_shape=input_shape, dtype=self.dtype),
-        tfkl.Flatten(),
-        tfkl.Dense(12, activation='relu'),
-        tfkl.Lambda(reshape),
+        tfkl.Flatten(dtype=self.dtype),
+        tfkl.Dense(12, activation='relu', dtype=self.dtype),
+        tfkl.Lambda(reshape, dtype=self.dtype),
         # When encoded_shape/params_size are placeholders, the input to the
         # IndependentNormal has shape (?, ?, ?) or (1, ?, ?), depending on
         # whether or not encoded_shape's shape is known.
-        tfpl.IndependentNormal(encoded_shape),
-        tfkl.Lambda(lambda x: x + 0.)  # To force conversion to tensor.
+        tfpl.IndependentNormal(encoded_shape, dtype=self.dtype),
+        tfkl.Lambda(lambda x: x + 0.,  # To force conversion to tensor.
+                    dtype=self.dtype)
     ])
 
     x = np.random.randn(*([1] + input_shape)).astype(self.dtype)
@@ -951,6 +957,7 @@ class _IndependentNormalTest(_IndependentLayerTest):
     elif self.use_static_shape:
       self.assertEqual([1, None, None], out.shape.as_list())
     self.assertEqual((1, 3, 2), self.evaluate(out).shape)
+    self.assertEqual(self.dtype, out.dtype)
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -971,11 +978,13 @@ class IndependentNormalTestStaticShape(tf.test.TestCase,
     encoded_shape = 2
     encoder = tfk.Sequential([
         tfkl.InputLayer(input_shape=input_shape, dtype=self.dtype),
-        tfkl.Flatten(),
-        tfkl.Dense(10, activation='relu'),
-        tfkl.Dense(tfpl.IndependentNormal.params_size(encoded_shape)),
-        tfpl.IndependentNormal(encoded_shape),
-        tfkl.Lambda(lambda x: x + 0.)  # To force conversion to tensor.
+        tfkl.Flatten(dtype=self.dtype),
+        tfkl.Dense(10, activation='relu', dtype=self.dtype),
+        tfkl.Dense(tfpl.IndependentNormal.params_size(encoded_shape),
+                   dtype=self.dtype),
+        tfpl.IndependentNormal(encoded_shape, dtype=self.dtype),
+        tfkl.Lambda(lambda x: x + 0.,  # To force conversion to tensor.
+                    dtype=self.dtype)
     ])
 
     # Test that we can run the model and get a sample.
@@ -985,6 +994,7 @@ class IndependentNormalTestStaticShape(tf.test.TestCase,
     out = encoder(tf.convert_to_tensor(value=x))
     self.assertEqual((1, 2), out.shape)
     self.assertEqual((1, 2), self.evaluate(out).shape)
+    self.assertEqual(self.dtype, out.dtype)
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -1021,8 +1031,8 @@ class IndependentPoissonTestStaticShape(tf.test.TestCase,
 
     # Poisson regression.
     model = tfk.Sequential([
-        tfkl.Dense(tfpl.IndependentPoisson.params_size(1)),
-        tfpl.IndependentPoisson(1)
+        tfkl.Dense(tfpl.IndependentPoisson.params_size(1), dtype=self.dtype),
+        tfpl.IndependentPoisson(1, dtype=self.dtype)
     ])
 
     # Fit.
@@ -1069,10 +1079,12 @@ class _MixtureLayerTest(object):
     self.assertIsInstance(x.components_distribution, tfd.Independent)
     self.assertIsInstance(x.components_distribution.distribution,
                           self.dist_class)
+    self.assertEqual(self.dtype, x.dtype)
 
     t_back = self._distribution_to_params(x, batch_shape)
     [t_, t_back_] = self.evaluate([t, t_back])
     self.assertAllClose(t_, t_back_, atol=1e-6, rtol=1e-5)
+    self.assertEqual(self.dtype, t_back_.dtype)
 
   def test_new(self):
     n = self._build_tensor(4, dtype=np.int32)
@@ -1097,7 +1109,8 @@ class _MixtureLayerTest(object):
     high = self._build_tensor(3.)
     t = tfd.Uniform(low, high).sample(tf.concat([batch_shape, [p]], 0), seed=42)
 
-    layer = self.layer_class(n, event_shape, validate_args=True)
+    layer = self.layer_class(n, event_shape, validate_args=True,
+                             dtype=self.dtype)
     x = layer(t)
     self._check_distribution(t, x, batch_shape)
 
@@ -1114,7 +1127,7 @@ class _MixtureLayerTest(object):
 
     model = tfk.Sequential([
         tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
-        self.layer_class(n, event_shape, validate_args=True),
+        self.layer_class(n, event_shape, validate_args=True, dtype=self.dtype),
     ])
 
     model_file = self.create_tempfile()
@@ -1144,10 +1157,10 @@ class _MixtureLayerTest(object):
     model = tfk.Sequential([
         tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
         self.layer_class(n, event_shape, validate_args=True,
-                         convert_to_tensor_fn='mean'),
+                         convert_to_tensor_fn='mean', dtype=self.dtype),
         # NOTE: For TensorFlow to be able to serialize the graph (i.e., for
         # serving), the model must output a Tensor and not a Distribution.
-        tfkl.Dense(1),
+        tfkl.Dense(1, dtype=self.dtype),
     ])
     model.compile(optimizer='adam', loss='mse')
 
@@ -1341,7 +1354,8 @@ class _MixtureSameFamilyTest(object):
     p = tfpl.MixtureSameFamily.params_size(n, cps)
 
     t = tfd.Uniform(low, high).sample(tf.concat([batch_shape, [p]], 0), seed=42)
-    normal = tfpl.MultivariateNormalTriL(event_size, validate_args=True)
+    normal = tfpl.MultivariateNormalTriL(event_size, validate_args=True,
+                                         dtype=self.dtype)
     x = tfpl.MixtureSameFamily.new(t, n, normal, validate_args=True)
     self._check_distribution(t, x, batch_shape)
 
@@ -1354,8 +1368,10 @@ class _MixtureSameFamilyTest(object):
     cps = tfpl.MultivariateNormalTriL.params_size(event_size)
     p = tfpl.MixtureSameFamily.params_size(n, cps)
 
-    normal = tfpl.MultivariateNormalTriL(event_size, validate_args=True)
-    layer = tfpl.MixtureSameFamily(n, normal, validate_args=True)
+    normal = tfpl.MultivariateNormalTriL(event_size, validate_args=True,
+                                         dtype=self.dtype)
+    layer = tfpl.MixtureSameFamily(n, normal, validate_args=True,
+                                   dtype=self.dtype)
     t = tfd.Uniform(low, high).sample(tf.concat([batch_shape, [p]], 0), seed=42)
     x = layer(t)
     self._check_distribution(t, x, batch_shape)
@@ -1452,18 +1468,26 @@ class VariationalGaussianProcessEndToEnd(tf.test.TestCase):
             amplitude=tf.nn.softplus(self._amplitude))
 
     num_inducing_points = 50
+
+    # Add a leading dimension for the event_shape.
+    eyes = np.expand_dims(np.eye(num_inducing_points), 0)
+    variational_inducing_observations_scale_initializer = (
+        tf.compat.v1.initializers.constant(1e-3 * eyes))
+
     model = tf.keras.Sequential([
         tf.keras.layers.InputLayer(input_shape=[1], dtype=dtype),
         tf.keras.layers.Dense(1, kernel_initializer='Ones', use_bias=False,
-                              activation=None),
+                              activation=None, dtype=dtype),
         tfp.layers.VariationalGaussianProcess(
             num_inducing_points=num_inducing_points,
-            kernel_provider=KernelFn(),
+            kernel_provider=KernelFn(dtype=dtype),
             inducing_index_points_initializer=(
                 tf.compat.v1.initializers.constant(
                     np.linspace(*x_range,
                                 num=num_inducing_points,
-                                dtype=dtype)[..., np.newaxis]))),
+                                dtype=dtype)[..., np.newaxis])),
+            variational_inducing_observations_scale_initializer=(
+                variational_inducing_observations_scale_initializer)),
     ])
 
     if not tf.executing_eagerly():
@@ -1483,6 +1507,7 @@ class VariationalGaussianProcessEndToEnd(tf.test.TestCase):
     num_samples = 7
     samples_ = self.evaluate(vgp.sample(num_samples))
     self.assertAllEqual(samples_.shape, (7, 1000, 1))
+    self.assertEqual(dtype, vgp.dtype)
 
 
 @test_util.run_all_in_graph_and_eager_modes

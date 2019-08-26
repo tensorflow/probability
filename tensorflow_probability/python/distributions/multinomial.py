@@ -187,11 +187,11 @@ class Multinomial(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs],
                                       dtype_hint=tf.float32)
-      self._total_count = tensor_util.convert_immutable_to_tensor(
+      self._total_count = tensor_util.convert_nonref_to_tensor(
           total_count, name='total_count', dtype=dtype)
-      self._probs = tensor_util.convert_immutable_to_tensor(
+      self._probs = tensor_util.convert_nonref_to_tensor(
           probs, dtype=dtype, name='probs')
-      self._logits = tensor_util.convert_immutable_to_tensor(
+      self._logits = tensor_util.convert_nonref_to_tensor(
           logits, dtype=dtype, name='logits')
       super(Multinomial, self).__init__(
           dtype=dtype,
@@ -331,7 +331,7 @@ class Multinomial(distribution.Distribution):
         is_init, self.validate_args, self._probs, self._logits)
     if not self.validate_args:
       return assertions
-    if is_init != tensor_util.is_mutable(self.total_count):
+    if is_init != tensor_util.is_ref(self.total_count):
       assertions.extend(distribution_util.assert_nonnegative_integer_form(
           self.total_count))
     return assertions
@@ -396,9 +396,18 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
       x = tf.reduce_sum(x, axis=-2)  # [num_samples, num_classes]
       return tf.cast(x, dtype=dtype)
 
-    x = tf.map_fn(
-        _sample_one_batch_member, [flat_logits, flat_num_trials],
-        dtype=dtype)  # [B1B2...Bm, num_samples, num_classes]
+    if seed is not None:
+      # Force parallel_iterations to 1 to ensure reproducibility
+      # b/139210489
+      x = tf.map_fn(
+          _sample_one_batch_member, [flat_logits, flat_num_trials],
+          dtype=dtype,  # [B1B2...Bm, num_samples, num_classes]
+          parallel_iterations=1)
+    else:
+      # Invoke default parallel_iterations behavior
+      x = tf.map_fn(
+          _sample_one_batch_member, [flat_logits, flat_num_trials],
+          dtype=dtype)  # [B1B2...Bm, num_samples, num_classes]
 
     # reshape the results to proper shape
     x = tf.transpose(a=x, perm=[1, 0, 2])

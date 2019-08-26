@@ -20,9 +20,10 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import v1
 from tensorflow_probability.python.internal.backend.numpy import v2
-from tensorflow_probability.python.internal.backend.numpy.internal import utils
+from tensorflow_probability.python.internal.backend.numpy.ops import dimension_value
 
 
 __all__ = [
@@ -33,24 +34,9 @@ __all__ = [
 ]
 
 
-def _dimension_value(dimension):
-  if dimension is None:
-    return None
-  return int(dimension)
-
-
 # --- Begin Public Functions --------------------------------------------------
 
 
-dimension_value = utils.copy_docstring(
-    tf.compat.dimension_value,
-    _dimension_value)
-
-
-function = utils.copy_docstring(
-    tf.function,
-    lambda func=None, input_signature=None, autograph=True,  # pylint: disable=g-long-lambda
-           experimental_autograph_options=None,
-           experimental_relax_shapes=False: func)
+function = v2.function
 
 del tf, utils

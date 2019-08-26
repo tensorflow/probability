@@ -38,9 +38,6 @@ class SoftsignBijectorTest(tf.test.TestCase):
     """Inverse log det jacobian, before being reduced."""
     return -2. * np.log1p(-np.abs(y))
 
-  def setUp(self):
-    self._rng = np.random.RandomState(42)
-
   def testBijectorBounds(self):
     bijector = tfb.Softsign(validate_args=True)
     with self.assertRaisesOpError("greater than -1"):
@@ -56,7 +53,7 @@ class SoftsignBijectorTest(tf.test.TestCase):
   def testBijectorForwardInverse(self):
     bijector = tfb.Softsign(validate_args=True)
     self.assertStartsWith(bijector.name, "softsign")
-    x = 2. * self._rng.randn(2, 10)
+    x = 2. * np.random.randn(2, 10)
     y = self._softsign(x)
 
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
@@ -64,7 +61,7 @@ class SoftsignBijectorTest(tf.test.TestCase):
 
   def testBijectorLogDetJacobianEventDimsZero(self):
     bijector = tfb.Softsign(validate_args=True)
-    y = self._rng.rand(2, 10)
+    y = np.random.rand(2, 10)
     # No reduction needed if event_dims = 0.
     ildj = self._softsign_ildj_before_reduction(y)
 
@@ -74,14 +71,14 @@ class SoftsignBijectorTest(tf.test.TestCase):
   def testBijectorForwardInverseEventDimsOne(self):
     bijector = tfb.Softsign(validate_args=True)
     self.assertStartsWith(bijector.name, "softsign")
-    x = 2. * self._rng.randn(2, 10)
+    x = 2. * np.random.randn(2, 10)
     y = self._softsign(x)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorLogDetJacobianEventDimsOne(self):
     bijector = tfb.Softsign(validate_args=True)
-    y = self._rng.rand(2, 10)
+    y = np.random.rand(2, 10)
     ildj_before = self._softsign_ildj_before_reduction(y)
     ildj = np.sum(ildj_before, axis=1)
     self.assertAllClose(
@@ -91,7 +88,7 @@ class SoftsignBijectorTest(tf.test.TestCase):
   def testScalarCongruency(self):
     bijector = tfb.Softsign(validate_args=True)
     bijector_test_util.assert_scalar_congruency(
-        bijector, lower_x=-20., upper_x=20., eval_func=self.evaluate)
+        bijector, lower_x=-20., upper_x=20., eval_func=self.evaluate, rtol=.05)
 
   def testBijectiveAndFinite(self):
     bijector = tfb.Softsign(validate_args=True)

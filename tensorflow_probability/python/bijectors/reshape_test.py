@@ -393,6 +393,13 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
                                  "must be statically known."):
       tfb.Reshape(event_shape_out=known_shape, event_shape_in=unknown_shape)
 
+  def testScalarInVectorOut(self):
+    bijector = tfb.Reshape(event_shape_in=[], event_shape_out=[-1])
+    self.assertAllEqual(np.zeros([3, 4, 5, 1]),
+                        self.evaluate(bijector.forward(np.zeros([3, 4, 5]))))
+    self.assertAllEqual(np.zeros([3, 4, 5]),
+                        self.evaluate(bijector.inverse(np.zeros([3, 4, 5, 1]))))
+
 
 if __name__ == "__main__":
   tf.test.main()

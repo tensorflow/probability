@@ -353,6 +353,14 @@ class CategoricalTest(test_case.TestCase, parameterized.TestCase):
     ans = [-(0.5*np.log(0.5) + 0.5*np.log(0.5)), -(np.log(1))]
     self.assertAllClose(self.evaluate(dist_entropy), ans)
 
+  def testEntropyWithNegInfLogits(self):
+    probs = [[0, 0.5, 0.5], [0, 1, 0]]
+    dist = tfd.Categorical(logits=np.log(probs))
+    dist_entropy = dist.entropy()
+
+    ans = [-(0.5*np.log(0.5) + 0.5*np.log(0.5)), -(np.log(1))]
+    self.assertAllClose(self.evaluate(dist_entropy), ans)
+
   def testSample(self):
     histograms = [[[0.2, 0.8], [0.4, 0.6]]]
     dist = tfd.Categorical(tf.math.log(histograms) - 50.)

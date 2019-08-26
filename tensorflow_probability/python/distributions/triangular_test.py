@@ -85,18 +85,18 @@ class _TriangularTest(object):
     self.assertAllClose(peak, self.evaluate(tri.peak))
 
   def testInvalidDistribution(self):
-    with self.assertRaisesOpError("(low >= high||low >= peak)"):
+    with self.assertRaisesOpError('(low >= high||low >= peak)'):
       tri = tfd.Triangular(
           low=2., high=1., peak=0.5, validate_args=True)
-      self.evaluate(tri.low)
-    with self.assertRaisesOpError("low > peak"):
+      self.evaluate(tri.mean())
+    with self.assertRaisesOpError('low > peak'):
       tri = tfd.Triangular(
           low=0., high=1., peak=-1., validate_args=True)
-      self.evaluate(tri.low)
-    with self.assertRaisesOpError("peak > high"):
+      self.evaluate(tri.mean())
+    with self.assertRaisesOpError('peak > high'):
       tri = tfd.Triangular(
           low=0., high=1., peak=2., validate_args=True)
-      self.evaluate(tri.low)
+      self.evaluate(tri.mean())
 
   def testTriangularPDF(self):
     low = np.arange(1.0, 5.0, dtype=self._dtype)
@@ -344,6 +344,20 @@ class _TriangularTest(object):
     tri = tfd.Triangular(low=low, peak=peak, high=high)
     self.assertAllClose(self.evaluate(tri.prob([0., 1., 4.])), [0, 0.5, 0])
 
+  def testModifiedVariableAssertion(self):
+    low = tf.Variable(0.)
+    peak = tf.Variable(0.5)
+    high = tf.Variable(1.)
+    self.evaluate([low.initializer, peak.initializer, high.initializer])
+    triangular = tfd.Triangular(
+        low=low, peak=peak, high=high, validate_args=True)
+    with self.assertRaisesOpError('low > peak'):
+      with tf.control_dependencies([low.assign(0.6)]):
+        self.evaluate(triangular.mean())
+    with self.assertRaisesOpError('peak > high'):
+      with tf.control_dependencies([low.assign(0.), peak.assign(1.2)]):
+        self.evaluate(triangular.mean())
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class TriangularTestStaticShape(test_case.TestCase, _TriangularTest):
@@ -372,5 +386,5 @@ class TriangularTestDynamicShape(test_case.TestCase, _TriangularTest):
     self._rng = np.random.RandomState(123)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

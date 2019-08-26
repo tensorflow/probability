@@ -23,8 +23,9 @@ import numpy as np
 
 import tensorflow as tf
 
-from tensorflow_probability.python.internal.backend.numpy.internal import utils
-from tensorflow_probability.python.internal.backend.numpy.linalg import norm
+from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import ops
+from tensorflow_probability.python.internal.backend.numpy.linalg_impl import norm
 
 
 __all__ = [
@@ -106,21 +107,16 @@ def _one_hot(  # pylint: disable=unused-argument
     on_value = 1
   if off_value is None:
     off_value = 0
-  if axis is None:
-    axis = -1
 
   zeros = np.zeros_like(indices)  # pylint: disable=redefined-outer-name
-  zeros = np.tile(zeros[..., None], [1] * len(indices.shape) + [depth])
+  zeros = np.tile(zeros[..., None], [1] * indices.ndim + [int(depth)])
 
-  ones = np.ones_like(zeros)  # pylint: disable=redefined-outer-name
+  cond = np.abs(np.arange(depth, dtype=np.float32) - indices[..., None]) < 0.1
 
-  cond = np.abs(np.arange(depth, dtype=np.float32)[None] + zeros
-                - indices[..., None] + zeros) < 0.1
-
-  y_out = np.where(cond, ones * on_value, zeros + off_value)
+  y_out = np.where(cond, zeros + on_value, zeros + off_value)
 
   if axis is not None:
-    y_out = np.swapaxes(y_out, axis, -1)
+    y_out = np.moveaxis(y_out, -1, axis)
 
   return y_out
 
@@ -137,8 +133,8 @@ def _pad(  # pylint: disable=unused-argument
     tensor,
     paddings,
     mode='CONSTANT',
-    name=None,
-    constant_values=0):
+    constant_values=0,
+    name=None):
   return np.pad(
       tensor, paddings,
       mode=mode.lower(),
@@ -176,22 +172,22 @@ builtin_slice = slice  # pylint: disable=invalid-name
 
 def _slice(input_, begin, size, name=None):  # pylint: disable=unused-argument,redefined-outer-name
   slices = tuple(
-      builtin_slice(b, b + s if s != -1 else -1) for b, s in zip(begin, size))
+      builtin_slice(b, b + s if s != -1 else None) for b, s in zip(begin, size))
   return input_[slices]
 
 
 def _split(value, num_or_size_splits, axis=0, num=None, name='split'):  # pylint: disable=unused-argument
   """Map tf.split -> np.split."""
-  indices_or_sections = num_or_size_splits
-  if np.array(indices_or_sections).ndim == 1:
+  indices_or_sections = np.array(num_or_size_splits)
+  if indices_or_sections.ndim == 1:
     if any(idx == -1 for idx in indices_or_sections):
       # Numpy parameterizes by split indices and returns nsplits+1 arrays.
       total_splits = sum(idx for idx in indices_or_sections if idx != -1)
-      remainder = max(0, np.array(value).shape[axis] - total_splits)
+      remainder = int(max(0, np.array(value).shape[axis] - total_splits))
       indices_or_sections = [
           idx if idx != -1 else remainder for idx in indices_or_sections
       ]
-    indices_or_sections = np.cumsum(indices_or_sections)[:-1]
+    indices_or_sections = np.cumsum(np.array(indices_or_sections))[:-1]
   return np.split(value, indices_or_sections, axis)
 
 
@@ -212,7 +208,8 @@ def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-buil
 
 concat = utils.copy_docstring(
     tf.concat,
-    lambda values, axis, name='concat': np.concatenate(values, axis))
+    lambda values, axis, name='concat': (  # pylint: disable=g-long-lambda
+        np.concatenate([ops.convert_to_tensor(v) for v in values], axis)))
 
 expand_dims = utils.copy_docstring(
     tf.expand_dims,
@@ -269,7 +266,7 @@ range = utils.copy_docstring(  # pylint: disable=redefined-builtin
 
 rank = utils.copy_docstring(
     tf.rank,
-    lambda input, name=None: len(np.array(input).shape))  # pylint: disable=redefined-builtin,g-long-lambda
+    lambda input, name=None: np.array(input).ndim)  # pylint: disable=redefined-builtin,g-long-lambda
 
 reshape = utils.copy_docstring(
     tf.reshape,

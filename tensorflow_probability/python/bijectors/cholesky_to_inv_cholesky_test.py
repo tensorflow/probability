@@ -132,8 +132,8 @@ class CholeskyToInvCholeskyTest(tf.test.TestCase):
     fldj0 = bijector.forward_log_det_jacobian(x[0], event_ndims=2)
     fldj1 = bijector.forward_log_det_jacobian(x[1], event_ndims=2)
     fldj_, fldj0_, fldj1_ = self.evaluate([fldj, fldj0, fldj1])
-    self.assertAllClose(fldj_[0], fldj0_)
-    self.assertAllClose(fldj_[1], fldj1_)
+    self.assertAllClose(fldj_[0], fldj0_, rtol=1e-5)
+    self.assertAllClose(fldj_[1], fldj1_, rtol=1e-5)
 
 if __name__ == "__main__":
   tf.test.main()

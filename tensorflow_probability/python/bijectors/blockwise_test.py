@@ -154,7 +154,7 @@ class BlockwiseBijectorTest(tf.test.TestCase, parameterized.TestCase):
     with self.assertRaisesRegexp(
         ValueError,
         r'`block_sizes` must be `None`, or a vector of the same length as '
-        r'`bijectors`. Got a `Tensor` with shape \(2,\) and `bijectors` of '
+        r'`bijectors`. Got a `Tensor` with shape \(2L?,\) and `bijectors` of '
         r'length 1'):
       tfb.Blockwise(bijectors=[tfb.Exp()], block_sizes=[1, 2])
 

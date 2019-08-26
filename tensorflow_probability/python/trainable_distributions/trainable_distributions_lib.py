@@ -27,6 +27,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import math as tfp_math
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -94,7 +95,7 @@ def tril_with_diag_softplus_and_shift(x, diag_shift=1e-5, name=None):
   with tf.compat.v1.name_scope(name, 'tril_with_diag_softplus_and_shift',
                                [x, diag_shift]):
     x = tf.convert_to_tensor(value=x, name='x')
-    x = tfd.fill_triangular(x)
+    x = tfp_math.fill_triangular(x)
     diag = softplus_and_shift(tf.linalg.diag_part(x), diag_shift)
     x = tf.linalg.set_diag(x, diag)
     return x

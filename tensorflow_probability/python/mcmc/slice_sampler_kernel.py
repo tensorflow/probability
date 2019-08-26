@@ -23,12 +23,11 @@ import collections
 
 import tensorflow as tf
 
-from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
-
 from tensorflow_probability.python.mcmc.internal import slice_sampler_utils as ssu
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -218,8 +217,7 @@ class SliceSampler(kernel_base.TransitionKernel):
       kernel_results: `collections.namedtuple` of internal calculations used to
         advance the chain.
     """
-    self._seed_stream = distributions.SeedStream(
-        seed, salt='slice_sampler')
+    self._seed_stream = SeedStream(seed, salt='slice_sampler')
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,
         step_size=step_size,
@@ -355,7 +353,7 @@ class SliceSampler(kernel_base.TransitionKernel):
 
 def _choose_random_direction(current_state_parts, batch_rank, seed=None):
   """Chooses a random direction in the event space."""
-  seed_gen = distributions.SeedStream(seed, salt='_choose_random_direction')
+  seed_gen = SeedStream(seed, salt='_choose_random_direction')
   # Chooses the random directions across each of the input components.
   rnd_direction_parts = [
       tf.random.normal(

@@ -21,7 +21,7 @@ from __future__ import print_function
 import copy
 import six
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as tfd
 from tensorflow_probability.python.util.deferred_tensor import TensorMetaClass
@@ -60,6 +60,11 @@ class _TensorCoercible(tfd.Distribution):
                distribution,
                convert_to_tensor_fn=tfd.Distribution.sample):
     pass
+
+  @property
+  def shape(self):
+    return (tf.TensorShape(None) if self._concrete_value is None
+            else self._concrete_value.shape)
 
   def _value(self, dtype=None, name=None, as_ref=False):
     """Get the value returned by `tf.convert_to_tensor(distribution)`.
@@ -115,7 +120,7 @@ class _TensorCoercible(tfd.Distribution):
             not isinstance(self._concrete_value,
                            composite_tensor.CompositeTensor)):
           self._concrete_value = tfd._convert_to_tensor(  # pylint: disable=protected-access
-              value=self._concrete_value,
+              self._concrete_value,
               name=name or 'concrete_value',
               dtype=dtype,
               dtype_hint=self.dtype)

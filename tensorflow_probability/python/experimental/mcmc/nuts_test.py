@@ -22,23 +22,25 @@ import itertools
 
 # Dependency imports
 from absl.testing import parameterized
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
+from tensorflow_probability.python.experimental.auto_batching import instructions as inst
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-nuts = tfp.experimental.mcmc.nuts
 
 
 def run_nuts_chain(
     event_size, batch_size, num_steps,
     initial_state=None, dry_run=False, stackless=False):
   def target_log_prob_fn(event):
-    with tf.compat.v1.name_scope("nuts_test_target_log_prob", values=[event]):
+    with tf.compat.v1.name_scope('nuts_test_target_log_prob', values=[event]):
       return tfd.MultivariateNormalDiag(
           tf.zeros(event_size),
           scale_identity_multiplier=1.).log_prob(event)
@@ -52,7 +54,7 @@ def run_nuts_chain(
   #     num_leapfrog_steps=3,
   #     step_size=0.3,
   #     seed=1)
-  kernel = nuts.NoUTurnSampler(
+  kernel = tfp.experimental.mcmc.NoUTurnSampler(
       target_log_prob_fn,
       step_size=[0.3],
       use_auto_batching=not dry_run,
@@ -81,7 +83,7 @@ def assert_univariate_target_conservation(
   num_samples = int(5e4)
   num_steps = 1
   target_d = mk_target()
-  strm = tfd.SeedStream(salt="univariate_nuts_test", seed=1)
+  strm = tfp.util.SeedStream(salt='univariate_nuts_test', seed=1)
   initialization = target_d.sample([num_samples], seed=strm())
   def target(*args):
     # TODO(axch): Just use target_d.log_prob directly, and accept target_d
@@ -90,7 +92,7 @@ def assert_univariate_target_conservation(
     # target_d.log_prob; that was blocked by b/122414321, but maybe tfp's port
     # of value_and_gradients_function fixed that bug.
     return mk_target().log_prob(*args)
-  operator = nuts.NoUTurnSampler(
+  operator = tfp.experimental.mcmc.NoUTurnSampler(
       target,
       step_size=step_size,
       max_tree_depth=3,
@@ -168,7 +170,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
   def testLeapfrogStepCounter(self, tree_depth, unrolled_leapfrog_steps):
     def never_u_turns_log_prob(x):
       return 1e-6 * x
-    kernel = nuts.NoUTurnSampler(
+    kernel = tfp.experimental.mcmc.NoUTurnSampler(
         never_u_turns_log_prob,
         step_size=[0.3],
         use_auto_batching=True,
@@ -221,7 +223,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
       pt1 = tf.reduce_sum(input_tensor=x, axis=[-1, -2])
       pt2 = tf.reduce_sum(input_tensor=y, axis=-1)
       return pt1 + pt2
-    kernel = nuts.NoUTurnSampler(
+    kernel = tfp.experimental.mcmc.NoUTurnSampler(
         batched_synthetic_log_prob,
         step_size=0.3,
         use_auto_batching=True,
@@ -274,6 +276,126 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
     self.evaluate(assert_univariate_target_conservation(
         self, mk_sigmoid_beta, step_size=0.02, stackless=True))
 
+  def _correlated_mvn_nuts(self, dim, step_size, num_steps):
+    # The correlated MVN example is taken from the NUTS paper
+    # https://arxiv.org/pdf/1111.4246.pdf.
+    # This implementation in terms of MVNCholPrecisionTril follows
+    # tfp/examples/jupyter_notebooks/Bayesian_Gaussian_Mixture_Model.ipynb
 
-if __name__ == "__main__":
+    class MVNCholPrecisionTriL(tfd.TransformedDistribution):
+      """MVN from loc and (Cholesky) precision matrix."""
+
+      def __init__(self, loc, chol_precision_tril, name=None):
+        super(MVNCholPrecisionTriL, self).__init__(
+            distribution=tfd.Independent(tfd.Normal(tf.zeros_like(loc),
+                                                    scale=tf.ones_like(loc)),
+                                         reinterpreted_batch_ndims=1),
+            bijector=tfb.Chain([
+                tfb.Affine(shift=loc),
+                tfb.Invert(tfb.Affine(scale_tril=chol_precision_tril,
+                                      adjoint=True)),
+            ]),
+            name=name)
+
+    strm = tfp_test_util.test_seed_stream()
+    wishart = tfd.Wishart(dim, scale=tf.eye(dim), input_output_cholesky=True)
+    chol_precision = wishart.sample(seed=strm())
+    mvn = MVNCholPrecisionTriL(
+        loc=tf.zeros(dim), chol_precision_tril=chol_precision)
+    kernel = tfp.experimental.mcmc.NoUTurnSampler(
+        mvn.log_prob,
+        step_size=[step_size],
+        num_trajectories_per_step=num_steps,
+        use_auto_batching=True,
+        stackless=False,
+        max_tree_depth=7,
+        seed=strm())
+    return kernel
+
+  def testCorrelatedMVNOneStep(self):
+    # Assert that we get a diversity of leapfrogs taken after one step
+    kernel = self._correlated_mvn_nuts(dim=10, step_size=0.1, num_steps=1)
+    _, extra_ = tfp.mcmc.sample_chain(
+        num_results=1,
+        num_burnin_steps=0,
+        current_state=[tf.zeros([30, 10])],
+        kernel=kernel,
+        parallel_iterations=1)
+    extra = self.evaluate(extra_)
+    self.assertLess(extra.leapfrogs_taken.min(), 25)
+    self.assertGreater(extra.leapfrogs_taken.max(), 40)
+    # Also sanity-check that leapfrogs_computed is computed consistently
+    for t, c in zip(extra.leapfrogs_taken[-1], extra.leapfrogs_computed[-1]):
+      self.assertLessEqual(t, c)
+
+  def testCorrelatedMVNChain(self):
+    # Assert that naive sample_chain gets bad batch utilization.
+    kernel = self._correlated_mvn_nuts(dim=10, step_size=0.4, num_steps=1)
+    _, extra_ = tfp.mcmc.sample_chain(
+        num_results=1,
+        num_burnin_steps=10,
+        current_state=[tf.zeros([20, 10])],
+        kernel=kernel,
+        parallel_iterations=1)
+    extra = self.evaluate(extra_)
+    utilization = extra.leapfrogs_taken[-1] / extra.leapfrogs_computed[-1]
+    # Average utilization is bad
+    self.assertAllLess(np.mean(utilization), 0.65)
+    # Even best-member utilization isn't 100%
+    self.assertAllLess(utilization, 0.9)
+
+  def testCorrelatedMVNManySteps(self):
+    # Assert that thinning inside the autobatched nuts gives better optimal
+    # utilization, in the sense that the number of leapfrogs computed is forced
+    # by the length of some batch member's computation.
+    kernel = self._correlated_mvn_nuts(dim=10, step_size=0.4, num_steps=10)
+    _, extra_ = tfp.mcmc.sample_chain(
+        num_results=1,
+        num_burnin_steps=0,
+        current_state=[tf.zeros([20, 10])],
+        kernel=kernel,
+        parallel_iterations=1)
+    extra = self.evaluate(extra_)
+    for c in extra.leapfrogs_computed[-1]:
+      self.assertEqual(c, extra.leapfrogs_taken.max())
+
+  def testProgramProperties(self):
+    def target(x):
+      return x
+    operator = tfp.experimental.mcmc.NoUTurnSampler(
+        target,
+        step_size=0,
+        use_auto_batching=True)
+    program = operator.autobatch_context.program_lowered('evolve_trajectory')
+    def full_var(var):
+      return program.var_alloc[var] == inst.VariableAllocation.FULL
+
+    # Check that the number of FULL variables doesn't accidentally grow.  This
+    # is an equality rather than comparison to remind the maintainer to reduce
+    # the expected number when they implement any pass that manages to reduce
+    # the count.
+    num_full_vars = 0
+    for var in program.var_alloc:
+      if full_var(var):
+        num_full_vars += 1
+    self.assertEqual(10, num_full_vars)
+
+    # Check that the number of stack pushes doesn't accidentally grow.
+    num_full_stack_pushes = 0
+    for i in range(program.graph.exit_index()):
+      block = program.graph.block(i)
+      for op in block.instructions:
+        if hasattr(op, 'vars_out'):
+          for var in inst.pattern_traverse(op.vars_out):
+            if full_var(var):
+              if (not hasattr(op, 'skip_push_mask')
+                  or var not in op.skip_push_mask):
+                num_full_stack_pushes += 1
+      if isinstance(block.terminator, inst.PushGotoOp):
+        if full_var(inst.pc_var):
+          num_full_stack_pushes += 1
+    self.assertEqual(20, num_full_stack_pushes)
+
+
+if __name__ == '__main__':
   tf.test.main()

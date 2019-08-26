@@ -24,12 +24,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util as distribution_utils
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 from tensorflow.python.ops import array_ops  # pylint: disable=g-direct-tensorflow-import
 
@@ -255,9 +255,6 @@ class MixtureSameFamily(distribution.Distribution):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          graph_parents=(
-              self._mixture_distribution._graph_parents  # pylint: disable=protected-access
-              + self._components_distribution._graph_parents),  # pylint: disable=protected-access
           name=name)
 
   @property
@@ -312,7 +309,7 @@ class MixtureSameFamily(distribution.Distribution):
 
   def _sample_n(self, n, seed):
     with tf.control_dependencies(self._runtime_assertions):
-      seed = seed_stream.SeedStream(seed, salt="MixtureSameFamily")
+      seed = SeedStream(seed, salt="MixtureSameFamily")
       x = self.components_distribution.sample(n, seed=seed())  # [n, B, k, E]
       # TODO(jvdillon): Consider using tf.gather (by way of index unrolling).
       npdt = dtype_util.as_numpy_dtype(x.dtype)

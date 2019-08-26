@@ -25,7 +25,7 @@ import numpy as np
 
 import tensorflow as tf
 
-from tensorflow_probability.python.internal.backend.numpy.internal import utils
+from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import softmax as _softmax
 
 
@@ -51,6 +51,9 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+
+
 def _shape(args, size):
   try:
     size = tuple(size)
@@ -68,8 +71,22 @@ def _categorical(logits, num_samples, dtype=None, seed=None, name=None):  # pyli
   dtype = utils.numpy_dtype(dtype or np.int64)
   if not hasattr(logits, 'shape'):
     logits = np.array(logits, np.float32)
+  probs = _softmax(logits)
   n = logits.shape[-1]
-  return rng.choice(n, p=_softmax(logits), size=num_samples).astype(dtype)
+  return np.apply_along_axis(lambda p: rng.choice(n, p=p, size=num_samples), 1,
+                             probs)
+
+
+def _categorical_jax(logits, num_samples, dtype=None, seed=None, name=None):  # pylint: disable=unused-argument
+  dtype = utils.numpy_dtype(dtype or np.int64)
+  if not hasattr(logits, 'shape') or not hasattr(logits, 'dtype'):
+    logits = np.array(logits, np.float32)
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  if seed is None:
+    raise ValueError('Must provide PRNGKey to sample in JAX.')
+  z = jaxrand.gumbel(
+      key=seed, shape=logits.shape + (num_samples,), dtype=logits.dtype)
+  return np.argmax(np.expand_dims(logits, -1) + z, axis=-2).astype(dtype)
 
 
 def _gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None,
@@ -81,12 +98,32 @@ def _gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None,
   return rng.gamma(shape=alpha, scale=scale, size=shape).astype(dtype)
 
 
+def _gamma_jax(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):  # pylint: disable=unused-argument
+  dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
+  shape = _shape([alpha, beta], shape)
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  if seed is None:
+    raise ValueError('Must provide PRNGKey to sample in JAX.')
+  samps = jaxrand.gamma(key=seed, a=alpha, shape=shape, dtype=dtype)
+  return samps if beta is None else samps * beta
+
+
 def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
             name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([mean, stddev], dtype_hint=dtype)
   shape = _shape([mean, stddev], shape)
   return rng.normal(loc=mean, scale=stddev, size=shape).astype(dtype)
+
+
+def _normal_jax(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
+                name=None):  # pylint: disable=unused-argument
+  dtype = utils.common_dtype([mean, stddev], dtype_hint=dtype)
+  shape = _shape([mean, stddev], shape)
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  if seed is None:
+    raise ValueError('Must provide PRNGKey to sample in JAX.')
+  return jaxrand.normal(key=seed, shape=shape, dtype=dtype) * stddev + mean
 
 
 def _poisson(shape, lam, dtype=tf.float32, seed=None,
@@ -106,25 +143,33 @@ def _uniform(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
   return rng.uniform(low=minval, high=maxval, size=shape).astype(dtype)
 
 
+def _uniform_jax(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
+                 name=None):  # pylint: disable=unused-argument
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  if seed is None:
+    raise ValueError('Must provide PRNGKey to sample in JAX.')
+  dtype = utils.common_dtype([minval, maxval], dtype_hint=dtype)
+  maxval = 1 if maxval is None else maxval
+  shape = _shape([], shape)
+  return jaxrand.uniform(key=seed, shape=shape, dtype=dtype, minval=minval,
+                         maxval=maxval)
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 
 categorical = utils.copy_docstring(
-    tf.random.categorical,
-    _categorical)
+    tf.random.categorical, _categorical_jax if JAX_MODE else _categorical)
 
-gamma = utils.copy_docstring(
-    tf.random.gamma,
-    _gamma)
+gamma = utils.copy_docstring(tf.random.gamma,
+                             _gamma_jax if JAX_MODE else _gamma)
 
-normal = utils.copy_docstring(
-    tf.random.normal,
-    _normal)
+normal = utils.copy_docstring(tf.random.normal,
+                              _normal_jax if JAX_MODE else _normal)
 
 poisson = utils.copy_docstring(
     tf.random.poisson,
     _poisson)
 
-uniform = utils.copy_docstring(
-    tf.random.uniform,
-    _uniform)
+uniform = utils.copy_docstring(tf.random.uniform,
+                               _uniform_jax if JAX_MODE else _uniform)

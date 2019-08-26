@@ -56,7 +56,7 @@ class SquareBijectorTest(tf.test.TestCase):
     bijector = tfb.Square(validate_args=True)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=1e-3, upper_x=1.5, eval_func=self.evaluate,
-        rtol=0.05)
+        rtol=0.08)
 
 
 if __name__ == "__main__":

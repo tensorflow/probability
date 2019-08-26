@@ -135,7 +135,7 @@ class InverseGammaTest(test_case.TestCase):
     beta_v = np.array([1.0, 4.0, 5.0])
     inv_gamma = tfd.InverseGamma(
         concentration=alpha_v, scale=beta_v, allow_nan_stats=False)
-    with self.assertRaisesOpError("x < y"):
+    with self.assertRaisesOpError('x < y'):
       self.evaluate(inv_gamma.mean())
 
   def testInverseGammaMeanNanStats(self):
@@ -163,7 +163,7 @@ class InverseGammaTest(test_case.TestCase):
     beta_v = np.array([1.0, 4.0, 5.0])
     inv_gamma = tfd.InverseGamma(
         concentration=alpha_v, scale=beta_v, allow_nan_stats=False)
-    with self.assertRaisesOpError("x < y"):
+    with self.assertRaisesOpError('x < y'):
       self.evaluate(inv_gamma.variance())
 
   def testInverseGammaVarianceNanStats(self):
@@ -288,43 +288,32 @@ class InverseGammaTest(test_case.TestCase):
     self.assertNear(1., total, err=err)
 
   def testInverseGammaNonPositiveInitializationParamsRaises(self):
-    alpha_v = tf.constant(0.0, name="alpha")
-    beta_v = tf.constant(1.0, name="beta")
-    with self.assertRaisesOpError("Concentration must be positive"):
+    alpha_v = tf.constant(0.0, name='alpha')
+    beta_v = tf.constant(1.0, name='beta')
+    with self.assertRaisesOpError('`concentration` must be positive'):
       inv_gamma = tfd.InverseGamma(
           concentration=alpha_v, scale=beta_v, validate_args=True)
       self.evaluate(inv_gamma.mean())
-    alpha_v = tf.constant(1.0, name="alpha")
-    beta_v = tf.constant(0.0, name="beta")
-    with self.assertRaisesOpError("Scale must be positive"):
+    alpha_v = tf.constant(1.0, name='alpha')
+    beta_v = tf.constant(0.0, name='beta')
+    with self.assertRaisesOpError('`scale` must be positive'):
       inv_gamma = tfd.InverseGamma(
           concentration=alpha_v, scale=beta_v, validate_args=True)
       self.evaluate(inv_gamma.mean())
 
-  def testInverseGammaWithSoftplusConcentrationScale(self):
-    alpha = tf.constant([-0.1, -2.9], name="alpha")
-    beta = tf.constant([1.0, -4.8], name="beta")
-    inv_gamma = tfd.InverseGammaWithSoftplusConcentrationScale(
-        concentration=alpha, scale=beta, validate_args=True)
-    self.assertAllClose(
-        self.evaluate(tf.math.softplus(alpha)),
-        self.evaluate(inv_gamma.concentration))
-    self.assertAllClose(
-        self.evaluate(tf.math.softplus(beta)), self.evaluate(inv_gamma.scale))
+  def testModifiedVariableAssertion(self):
+    c = tf.Variable(0.9)
+    s = tf.Variable(2.)
+    self.evaluate([c.initializer, s.initializer])
+    inv_gamma = tfd.InverseGamma(concentration=c, scale=s, validate_args=True)
+    with self.assertRaisesOpError('`concentration` must be positive'):
+      with tf.control_dependencies([c.assign(-2.)]):
+        self.evaluate(inv_gamma.mean())
 
-  def testRateArgBackwardsCompatiblity(self):
-    concentration = 1.
-    scale = 2.
-    inv_gamma = tfd.InverseGamma(concentration=concentration, rate=scale)
-    self.assertEqual(scale, self.evaluate(inv_gamma.scale))
-    self.assertEqual(scale, self.evaluate(inv_gamma.rate))
-
-  def testInverseGammaWithSoftplusConcentrationRate(self):
-    isp_concentration = -1.
-    isp_scale = -2.
-    tfd.InverseGammaWithSoftplusConcentrationRate(
-        concentration=isp_concentration, rate=isp_scale)
+    with self.assertRaisesOpError('`scale` must be positive'):
+      with tf.control_dependencies([c.assign(0.9), s.assign(-2.)]):
+        self.evaluate(inv_gamma.mean())
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

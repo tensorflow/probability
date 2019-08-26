@@ -21,8 +21,12 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.distributions import finite_discrete
+import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
+tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -44,37 +48,43 @@ class FiniteDiscreteValidateArgsTest(FiniteDiscreteTest):
     outcomes = self._build_tensor([1.0, 2.0])
     probs = self._build_tensor([0.25, 0.25, 0.5])
     with self.assertRaisesWithPredicateMatch(
-        Exception, 'Last dimension of outcomes and probs must be equal size'):
-      dist = finite_discrete.FiniteDiscrete(
+        Exception, 'Last dimension of outcomes and probs must be equal size.'):
+      dist = tfd.FiniteDiscrete(
           outcomes, probs=probs, validate_args=True)
-      self.evaluate(dist.outcomes)
+      self.evaluate(dist.mean())
 
   def testRankOfOutcomesLargerThanOneRaises(self):
     outcomes = self._build_tensor([[1.0, 2.0], [3.0, 4.0]])
     probs = self._build_tensor([0.5, 0.5])
     with self.assertRaisesWithPredicateMatch(Exception,
                                              'Rank of outcomes must be 1.'):
-      dist = finite_discrete.FiniteDiscrete(
+      dist = tfd.FiniteDiscrete(
           outcomes, probs=probs, validate_args=True)
-      self.evaluate(dist.outcomes)
+      self.evaluate(dist.mean())
 
   def testSizeOfOutcomesIsZeroRaises(self):
+    # Skip this test in dynamic mode, because the "same last dimensions" check
+    # may fail first.  Static mode is OK because the ValueError is raised in
+    # Python.
+    if not self.use_static_shape:
+      return
+
     outcomes = self._build_tensor([])
-    probs = self._build_tensor([])
+    probs = self._build_tensor([0.5, 0.5])
     with self.assertRaisesWithPredicateMatch(
         Exception, 'Size of outcomes must be greater than 0.'):
-      dist = finite_discrete.FiniteDiscrete(
+      dist = tfd.FiniteDiscrete(
           outcomes, probs=probs, validate_args=True)
-      self.evaluate(dist.outcomes)
+      self.evaluate(dist.mean())
 
   def testOutcomesNotStrictlyIncreasingRaises(self):
     outcomes = self._build_tensor([1.0, 1.0, 2.0, 2.0])
     probs = self._build_tensor([0.25, 0.25, 0.25, 0.25])
     with self.assertRaisesWithPredicateMatch(
         Exception, 'outcomes is not strictly increasing.'):
-      dist = finite_discrete.FiniteDiscrete(
+      dist = tfd.FiniteDiscrete(
           outcomes, probs=probs, validate_args=True)
-      self.evaluate(dist.outcomes)
+      self.evaluate(dist.mean())
 
 
 class FiniteDiscreteScalarTest(FiniteDiscreteTest):
@@ -83,7 +93,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
   def testShape(self):
     outcomes = self._build_tensor([0.0, 0.2, 0.3, 0.5])
     logits = self._build_tensor([-0.1, 0.0, 0.1, 0.2])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, logits=logits, validate_args=True)
     if self.use_static_shape:
       self.assertAllEqual([], dist.batch_shape)
@@ -94,7 +104,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
   def testMean(self):
     outcomes = self._build_tensor([1.0, 2.0])
     probs = self._build_tensor([0.5, 0.5])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     mean = dist.mean()
     self.assertAllEqual((), self._get_shape(mean))
@@ -103,7 +113,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
   def testStddevAndVariance(self):
     outcomes = self._build_tensor([1.0, 2.0])
     probs = self._build_tensor([0.5, 0.5])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     stddev = dist.stddev()
     self.assertAllEqual((), self._get_shape(stddev))
@@ -116,7 +126,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
     outcomes = self._build_tensor([1, 2, 3, 4])
     probs = np.array([0.125, 0.125, 0.25, 0.5])
     outcome_probs = self._build_tensor(probs)
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=outcome_probs, validate_args=True)
     entropy = dist.entropy()
     self.assertAllEqual((), self._get_shape(entropy))
@@ -125,7 +135,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
   def testMode(self):
     outcomes = self._build_tensor([1.0, 2.0, 3.0])
     probs = self._build_tensor([0.3, 0.1, 0.6])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     mode = dist.mode()
     self.assertAllEqual((), self._get_shape(mode))
@@ -134,7 +144,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
   def testModeWithIntegerOutcomes(self):
     outcomes = self._build_tensor([1, 2, 3])
     probs = self._build_tensor([0.3, 0.1, 0.6])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     mode = dist.mode()
     self.assertAllEqual((), self._get_shape(mode))
@@ -143,7 +153,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
   def testSample(self):
     outcomes = self._build_tensor([1.0, 2.0])
     probs = self._build_tensor([0.2, 0.8])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     samples = self.evaluate(dist.sample(5000, seed=1234))
     self.assertAllEqual((5000,), self._get_shape(samples))
@@ -153,7 +163,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
   def testSampleWithIntegerOutcomes(self):
     outcomes = self._build_tensor([1, 2])
     probs = self._build_tensor([0.2, 0.8])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     samples = self.evaluate(dist.sample(5000, seed=1234))
     self.assertAllClose(np.mean(samples), dist.mean(), atol=0.1)
@@ -162,7 +172,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
   def testPMF(self):
     outcomes = self._build_tensor([1.0, 2.0, 4.0, 8.0])
     probs = self._build_tensor([0.0, 0.1, 0.2, 0.7])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     prob = dist.prob(4.0)
     self.assertAllEqual((), self._get_shape(prob))
@@ -180,7 +190,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
     outcomes = self._build_tensor([1.0, 2.0, 4.0, 8.0])
     probs = self._build_tensor([0.0, 0.1, 0.2, 0.7])
     x = self._build_tensor([[1.0], [2.0], [3.0], [4.0], [8.0]])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     prob = dist.prob(x)
     self.assertAllEqual((5, 1), self._get_shape(prob))
@@ -190,7 +200,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
     outcomes = self._build_tensor([1, 2, 4, 8])
     probs = self._build_tensor([0.0, 0.1, 0.2, 0.7])
     x = self._build_tensor([[1], [2], [3], [4], [8]])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     prob = dist.prob(x)
     self.assertAllEqual((5, 1), self._get_shape(prob))
@@ -199,7 +209,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
   def testCDF(self):
     outcomes = self._build_tensor([0.1, 0.2, 0.4, 0.8])
     probs = self._build_tensor([0.0, 0.1, 0.2, 0.7])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     cdf = dist.cdf(0.4)
     self.assertAllEqual((), self._get_shape(cdf))
@@ -209,7 +219,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
     outcomes = self._build_tensor([0.1, 0.2, 0.4, 0.8])
     probs = self._build_tensor([0.0, 0.1, 0.2, 0.7])
     x = self._build_tensor([[0.0999, 0.1], [0.2, 0.4], [0.8, 0.8001]])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     cdf = dist.cdf(x)
     self.assertAllEqual((3, 2), self._get_shape(cdf))
@@ -219,7 +229,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
     outcomes = self._build_tensor([1, 2, 4, 8])
     probs = self._build_tensor([0.0, 0.1, 0.2, 0.7])
     x = self._build_tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     cdf = dist.cdf(x)
     self.assertAllEqual((10,), self._get_shape(cdf))
@@ -229,12 +239,12 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
     outcomes = self._build_tensor([0.1, 0.2, 0.4, 0.8])
     probs = self._build_tensor([0.0, 0.1, 0.2, 0.7])
     x = self._build_tensor([[0.095, 0.095], [0.395, 0.395]])
-    dist1 = finite_discrete.FiniteDiscrete(
+    dist1 = tfd.FiniteDiscrete(
         outcomes, probs=probs, atol=0.001, validate_args=True)
     cdf = dist1.cdf(x)
     self.assertAllEqual((2, 2), self._get_shape(cdf))
     self.assertAllClose([[0.0, 0.0], [0.1, 0.1]], cdf)
-    dist2 = finite_discrete.FiniteDiscrete(
+    dist2 = tfd.FiniteDiscrete(
         outcomes, probs=probs, atol=0.01, validate_args=True)
     cdf = dist2.cdf(x)
     self.assertAllEqual((2, 2), self._get_shape(cdf))
@@ -250,7 +260,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
     for batch_shape in ([1], [2], [3, 4, 5]):
       logits = self._build_tensor(
           np.random.uniform(-1, 1, size=list(batch_shape) + [len(outcomes)]))
-      dist = finite_discrete.FiniteDiscrete(
+      dist = tfd.FiniteDiscrete(
           outcomes_tensor, logits=logits, validate_args=True)
       if self.use_static_shape:
         self.assertAllEqual(batch_shape, dist.batch_shape)
@@ -262,7 +272,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
     outcomes = self._build_tensor([1.0, 2.0])
     probs = self._build_tensor([[0.5, 0.5], [0.2, 0.8]])
     expected_means = [1.5, 1.8]
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     mean = dist.mean()
     self.assertAllEqual((2,), self._get_shape(mean))
@@ -271,7 +281,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
   def testStddevAndVariance(self):
     outcomes = self._build_tensor([1.0, 2.0])
     probs = self._build_tensor([[0.5, 0.5], [0.2, 0.8]])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     stddev = dist.stddev()
     self.assertAllEqual((2,), self._get_shape(stddev))
@@ -284,7 +294,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
     outcomes = self._build_tensor([1.0, 2.0, 3.0])
     probs = self._build_tensor([[0.3, 0.1, 0.6], [0.5, 0.4, 0.1],
                                 [0.3, 0.5, 0.2]])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     mode = dist.mode()
     self.assertAllEqual((3,), self._get_shape(mode))
@@ -294,7 +304,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
     outcomes = self._build_tensor([1, 2, 3, 4])
     probs = np.array([[0.125, 0.125, 0.25, 0.5], [0.25, 0.25, 0.25, 0.25]])
     outcome_probs = self._build_tensor(probs)
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=outcome_probs, validate_args=True)
     entropy = dist.entropy()
     self.assertAllEqual((2,), self._get_shape(entropy))
@@ -303,7 +313,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
   def testSample(self):
     outcomes = self._build_tensor([1.0, 2.0])
     probs = self._build_tensor([[0.2, 0.8], [0.8, 0.2]])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     samples = self.evaluate(dist.sample(5000, seed=1234))
     self.assertAllEqual((5000, 2), self._get_shape(samples))
@@ -313,7 +323,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
   def testPMF(self):
     outcomes = self._build_tensor([1.0, 2.0, 4.0, 8.0])
     probs = self._build_tensor([[0.0, 0.1, 0.2, 0.7], [0.5, 0.3, 0.2, 0.0]])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     prob = dist.prob(8.0)
     self.assertAllEqual((2,), self._get_shape(prob))
@@ -323,7 +333,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
     outcomes = self._build_tensor([1.0, 2.0, 4.0, 8.0])
     probs = self._build_tensor([[0.0, 0.1, 0.2, 0.7], [0.5, 0.3, 0.2, 0.0]])
     x = self._build_tensor([[1.0], [2.0], [3.0], [4.0], [8.0]])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     prob = dist.prob(x)
     self.assertAllEqual((5, 2), self._get_shape(prob))
@@ -333,7 +343,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
   def testCDF(self):
     outcomes = self._build_tensor([0.1, 0.2, 0.4, 0.8])
     probs = self._build_tensor([[0.0, 0.1, 0.2, 0.7], [0.5, 0.3, 0.2, 0.0]])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     cdf = dist.cdf(0.4)
     self.assertAllEqual((2,), self._get_shape(cdf))
@@ -344,7 +354,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
     probs = self._build_tensor([[0.0, 0.1, 0.2, 0.7], [0.5, 0.3, 0.2, 0.0]])
     x = self._build_tensor([[0.0999, 0.0999], [0.1, 0.1], [0.2, 0.2],
                             [0.4, 0.4], [0.8, 0.8], [0.8001, 0.8001]])
-    dist = finite_discrete.FiniteDiscrete(
+    dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
     cdf = dist.cdf(x)
     self.assertAllEqual((6, 2), self._get_shape(cdf))
@@ -354,7 +364,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
   def testParamTensorFromLogits(self):
     outcomes = self._build_tensor([0.1, 0.2, 0.4])
     x = tf.constant([-1., 0.5, 1.])
-    d = finite_discrete.FiniteDiscrete(outcomes, logits=x, validate_args=True)
+    d = tfd.FiniteDiscrete(outcomes, logits=x, validate_args=True)
     self.assertAllClose(
         *self.evaluate([x, d.logits_parameter()]),
         atol=0, rtol=1e-4)
@@ -367,7 +377,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
   def testParamTensorFromProbs(self):
     outcomes = self._build_tensor([0.1, 0.2, 0.4])
     x = tf.constant([0.1, 0.5, 0.4])
-    d = finite_discrete.FiniteDiscrete(outcomes, probs=x, validate_args=True)
+    d = tfd.FiniteDiscrete(outcomes, probs=x, validate_args=True)
     self.assertAllClose(
         *self.evaluate([tf.math.log(x), d.logits_parameter()]),
         atol=0, rtol=1e-4)
@@ -404,6 +414,51 @@ class FiniteDiscreteVectorStaticShapeTest(FiniteDiscreteVectorTest,
 class FiniteDiscreteVectorDynamicShapeTest(FiniteDiscreteVectorTest,
                                            tf.test.TestCase):
   use_static_shape = False
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class FiniteDiscreteFromVariableTest(test_case.TestCase):
+
+  def testAssertionLastDimensionOfOutcomesAndLogits(self):
+    x = tf.Variable([0., -1., -2., -3.])
+    with self.assertRaisesRegexp(
+        ValueError,
+        'Last dimension of outcomes and logits must be equal size.'):
+      d = tfd.FiniteDiscrete([1., 2., 4.], logits=x, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.mean())
+
+  def testAssertionLastDimensionOfOutcomesAndProbs(self):
+    x = tf.Variable([0.1, 0.4, 0.3, 0.2])
+    with self.assertRaisesRegexp(
+        ValueError, 'Last dimension of outcomes and probs must be equal size.'):
+      d = tfd.FiniteDiscrete([1., 2., 4.], probs=x, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.mean())
+
+  def testAssertionOutcomesRanks(self):
+    x = tf.Variable([0.1, 0.4, 0.3, 0.2])
+    with self.assertRaisesRegexp(ValueError, 'Rank of outcomes must be 1.'):
+      d = tfd.FiniteDiscrete([[1., 2., 3., 4.], [5., 6., 7., 8.]],
+                             probs=x, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.mean())
+
+  def testAssertionOutcomesSize(self):
+    x = tf.Variable([])
+    with self.assertRaisesRegexp(
+        ValueError, 'Size of outcomes must be greater than 0.'):
+      d = tfd.FiniteDiscrete(tf.zeros([0], tf.float32),
+                             probs=x, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.mean())
+
+  def testAssertionOutcomesStrictlyIncreasing(self):
+    x = tf.Variable([0.1, 0.4, 0.3, 0.2])
+    with self.assertRaises(Exception):
+      d = tfd.FiniteDiscrete([1., 4., 3., 8.], probs=x, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.mean())
 
 
 if __name__ == '__main__':

@@ -47,7 +47,7 @@ class DummyMatrixTransform(tfb.Bijector):
         forward_min_event_ndims=2,
         is_constant_jacobian=False,
         validate_args=False,
-        name="dummy")
+        name='dummy')
 
   def _forward(self, x):
     return x
@@ -63,6 +63,33 @@ class DummyMatrixTransform(tfb.Bijector):
     return tf.linalg.det(x)
 
 
+class _ChooseLocation(tfp.bijectors.Bijector):
+  """A Bijector which chooses between one of two location parameters."""
+
+  def __init__(self, loc, name='ChooseLocation'):
+    with tf.name_scope(name) as name:
+      self._loc = tf.convert_to_tensor(loc, name='loc')
+      super(_ChooseLocation, self).__init__(
+          is_constant_jacobian=True,
+          validate_args=False,
+          forward_min_event_ndims=0,
+          name=name)
+
+  def _forward(self, x, z):
+    return x + self._gather_loc(z)
+
+  def _inverse(self, x, z):
+    return x - self._gather_loc(z)
+
+  def _inverse_log_det_jacobian(self, x, event_ndims, z=None):
+    return 0.
+
+  def _gather_loc(self, z):
+    z = tf.convert_to_tensor(z)
+    z = tf.cast((1 + z) / 2, tf.int32)
+    return tf.gather(self._loc, z)
+
+
 @test_util.run_all_in_graph_and_eager_modes
 class TransformedDistributionTest(tf.test.TestCase):
 
@@ -71,7 +98,7 @@ class TransformedDistributionTest(tf.test.TestCase):
 
   def _make_unimplemented(self, name):
     def _unimplemented(self, *args):  # pylint: disable=unused-argument
-      raise NotImplementedError("{} not implemented".format(name))
+      raise NotImplementedError('{} not implemented'.format(name))
     return _unimplemented
 
   def testTransformedDistribution(self):
@@ -203,7 +230,7 @@ class TransformedDistributionTest(tf.test.TestCase):
         [sample, exp_normal.log_prob(sample)])
     expected_log_pdf = sample_val + stats.norm.logpdf(
         np.exp(sample_val), loc=mu, scale=sigma)
-    self.assertAllClose(expected_log_pdf, log_pdf_val, atol=0.)
+    self.assertAllClose(expected_log_pdf, log_pdf_val, atol=0., rtol=1e-5)
 
   def testShapeChangingBijector(self):
     softmax = tfb.SoftmaxCentered()
@@ -213,9 +240,9 @@ class TransformedDistributionTest(tf.test.TestCase):
     x = [[[-np.log(3.)], [0.]], [[np.log(3)], [np.log(5)]]]
     x = np.float32(x)
     y = self.evaluate(softmax.forward(x))
-    expected_log_pdf = (
-        np.squeeze(stats.norm(loc=0., scale=1.).logpdf(x)) - np.sum(
-            np.log(y), axis=-1))
+    expected_log_pdf = -0.5 * np.log(2) + (
+        np.squeeze(stats.norm(loc=0., scale=1.).logpdf(x)) -
+        np.sum(np.log(y), axis=-1))
     self.assertAllClose(expected_log_pdf,
                         self.evaluate(multi_logit_normal.log_prob(y)))
     self.assertAllClose(
@@ -318,6 +345,7 @@ class ScalarToMultiTest(tf.test.TestCase):
                             [3, 2, 0],
                             [4, 3, 2]]],
                           dtype=np.float32)
+    super(ScalarToMultiTest, self).setUp()
 
   def _testMVN(self,
                base_distribution_class,
@@ -330,9 +358,9 @@ class ScalarToMultiTest(tf.test.TestCase):
     # In the case of `Affine`, if we got it wrong then it would fire an
     # exception due to incompatible dimensions.
     batch_shape_pl = tf1.placeholder_with_default(
-        input=np.int32(batch_shape), shape=None, name="dynamic_batch_shape")
+        input=np.int32(batch_shape), shape=None, name='dynamic_batch_shape')
     event_shape_pl = tf1.placeholder_with_default(
-        input=np.int32(event_shape), shape=None, name="dynamic_event_shape")
+        input=np.int32(event_shape), shape=None, name='dynamic_event_shape')
     fake_mvn_dynamic = self._cls()(
         distribution=base_distribution_class(
             validate_args=True, **base_distribution_kwargs),
@@ -353,7 +381,7 @@ class ScalarToMultiTest(tf.test.TestCase):
     actual_cov = np.matmul(self._tril, np.transpose(self._tril, [0, 2, 1]))
 
     def actual_mvn_log_prob(x):
-      return np.concatenate([[
+      return np.concatenate([[  # pylint: disable=g-complex-comprehension
           stats.multivariate_normal(actual_mean[i],
                                     actual_cov[i]).logpdf(x[:, i, :])
       ] for i in range(len(actual_cov))]).T
@@ -426,25 +454,25 @@ class ScalarToMultiTest(tf.test.TestCase):
     self._testMVN(
         base_distribution_class=tfd.Normal,
         base_distribution_kwargs={
-            "loc": 0.,
-            "scale": 1.
+            'loc': 0.,
+            'scale': 1.
         },
         batch_shape=[2],
         event_shape=[3],
-        not_implemented_message="not implemented when overriding event_shape")
+        not_implemented_message='not implemented when overriding event_shape')
 
   def testScalarBatchNonScalarEvent(self):
     self._testMVN(
         base_distribution_class=tfd.MultivariateNormalDiag,
         base_distribution_kwargs={
-            "loc": [0., 0., 0.],
-            "scale_diag": [1., 1, 1]
+            'loc': [0., 0., 0.],
+            'scale_diag': [1., 1, 1]
         },
         batch_shape=[2],
-        not_implemented_message="not implemented")
+        not_implemented_message='not implemented')
 
     # Can't override event_shape for scalar batch, non-scalar event.
-    with self.assertRaisesRegexp(ValueError, "base distribution not scalar"):
+    with self.assertRaisesRegexp(ValueError, 'base distribution not scalar'):
       self._cls()(
           distribution=tfd.MultivariateNormalDiag(loc=[0.], scale_diag=[1.]),
           bijector=tfb.Affine(shift=self._shift, scale_tril=self._tril),
@@ -456,14 +484,14 @@ class ScalarToMultiTest(tf.test.TestCase):
     self._testMVN(
         base_distribution_class=tfd.Normal,
         base_distribution_kwargs={
-            "loc": [0., 0],
-            "scale": [1., 1]
+            'loc': [0., 0],
+            'scale': [1., 1]
         },
         event_shape=[3],
-        not_implemented_message="not implemented when overriding event_shape")
+        not_implemented_message='not implemented when overriding event_shape')
 
     # Can't override batch_shape for non-scalar batch, scalar event.
-    with self.assertRaisesRegexp(ValueError, "base distribution not scalar"):
+    with self.assertRaisesRegexp(ValueError, 'base distribution not scalar'):
       self._cls()(
           distribution=tfd.Normal(loc=[0.], scale=[1.]),
           bijector=tfb.Affine(shift=self._shift, scale_tril=self._tril),
@@ -474,7 +502,7 @@ class ScalarToMultiTest(tf.test.TestCase):
   def testNonScalarBatchNonScalarEvent(self):
     # Can't override event_shape and/or batch_shape for non_scalar batch,
     # non-scalar event.
-    with self.assertRaisesRegexp(ValueError, "base distribution not scalar"):
+    with self.assertRaisesRegexp(ValueError, 'base distribution not scalar'):
       self._cls()(
           distribution=tfd.MultivariateNormalDiag(
               loc=[[0.]], scale_diag=[[1.]]),
@@ -487,9 +515,9 @@ class ScalarToMultiTest(tf.test.TestCase):
     batch_shape = [2]
     event_shape = [2, 3, 3]
     batch_shape_pl = tf1.placeholder_with_default(
-        input=np.int32(batch_shape), shape=None, name="dynamic_batch_shape")
+        input=np.int32(batch_shape), shape=None, name='dynamic_batch_shape')
     event_shape_pl = tf1.placeholder_with_default(
-        input=np.int32(event_shape), shape=None, name="dynamic_event_shape")
+        input=np.int32(event_shape), shape=None, name='dynamic_event_shape')
 
     scale = 2.
     loc = 0.
@@ -561,9 +589,9 @@ class ScalarToMultiTest(tf.test.TestCase):
         scale_diag = tf.ones(batch_shape + event_shape)
         if shapes_are_dynamic:
           loc = tf1.placeholder_with_default(
-              loc, shape=None, name="dynamic_loc")
+              loc, shape=None, name='dynamic_loc')
           scale_diag = tf1.placeholder_with_default(
-              scale_diag, shape=None, name="dynamic_scale_diag")
+              scale_diag, shape=None, name='dynamic_scale_diag')
 
         mvn = tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
 
@@ -585,6 +613,16 @@ class ScalarToMultiTest(tf.test.TestCase):
               self.evaluate(mvn.log_prob(sample_)),
               np.zeros(sample_shape + batch_shape))
 
+  def testConditioning(self):
+    conditional_normal = tfd.TransformedDistribution(
+        distribution=tfd.Normal(loc=0., scale=1.),
+        bijector=_ChooseLocation(loc=[-100., 100.]))
+    z = [-1, +1, -1, -1, +1]
+    self.assertAllClose(
+        np.sign(
+            self.evaluate(
+                conditional_normal.sample(5, bijector_kwargs={'z': z}))), z)
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
   tf.test.main()

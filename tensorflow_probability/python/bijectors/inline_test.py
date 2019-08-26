@@ -37,11 +37,10 @@ class InlineBijectorTest(tf.test.TestCase):
         forward_fn=tf.exp,
         inverse_fn=tf.math.log,
         inverse_log_det_jacobian_fn=lambda y: -tf.math.log(y),
-        forward_log_det_jacobian_fn=lambda x: x,
         forward_min_event_ndims=0,
-        name="exp")
+        name='exp')
 
-    self.assertStartsWith(inline.name, "exp")
+    self.assertStartsWith(inline.name, 'exp')
     x = [[[1., 2.], [3., 4.], [5., 6.]]]
     y = np.exp(x)
     self.assertAllClose(y, self.evaluate(inline.forward(x)))
@@ -60,7 +59,7 @@ class InlineBijectorTest(tf.test.TestCase):
         inverse_event_shape_tensor_fn=lambda x: x[:-1],
         inverse_event_shape_fn=lambda x: x[:-1],
         forward_min_event_ndims=0,
-        name="shape_only")
+        name='shape_only')
     x = tf.TensorShape([1, 2, 3])
     y = tf.TensorShape([1, 2, 3, 1])
     self.assertAllEqual(y, bijector.forward_event_shape(x))
@@ -75,5 +74,5 @@ class InlineBijectorTest(tf.test.TestCase):
             bijector.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -217,7 +218,7 @@ class CaseTest(test_case.TestCase):
   def test_true(self):
     x = tf.constant(0)
     conditions = [(True, lambda: tf.constant(1)),
-                  (x == 0, raise_exception)]
+                  (tf.equal(x, 1), raise_exception)]
     y = prefer_static.case(conditions, default=raise_exception,
                            exclusive=False)
     z = prefer_static.case(conditions, default=raise_exception,
@@ -337,12 +338,13 @@ class SizeTest(test_case.TestCase):
   def test_static(self):
     self.assertAllEqual(
         3 * 4 * 5,
-        prefer_static.size(tf.random.normal([3, 4, 5])))
+        prefer_static.size(
+            tf.random.normal([3, 4, 5], seed=tfp_test_util.test_seed())))
 
   def test_dynamic(self):
     if tf.executing_eagerly(): return
     x = tf1.placeholder_with_default(
-        tf.random.normal([3, 4, 5]), shape=None)
+        tf.random.normal([3, 4, 5], seed=tfp_test_util.test_seed()), shape=None)
     self.assertAllEqual(
         3 * 4 * 5,
         self.evaluate(prefer_static.size(x)))
@@ -363,11 +365,51 @@ class NonNegativeAxisTest(test_case.TestCase):
     positive_axis = prefer_static.non_negative_axis(axis=[0, -2], rank=4)
     self.assertAllEqual([0, 2], positive_axis)
 
+  @tfp_test_util.jax_disable_variable_test
   def test_dynamic_vector_index(self):
     axis = tf.Variable([0, -2])
     positive_axis = prefer_static.non_negative_axis(axis=axis, rank=4)
     self.evaluate(axis.initializer)
     self.assertAllEqual([0, 2], self.evaluate(positive_axis))
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class BroadcastShapeTest(test_case.TestCase):
+
+  def test_static(self):
+    self.assertAllEqual(
+        (3, 4, 2, 5),
+        prefer_static.broadcast_shape((4, 1, 1), (3, 1, 2, 5)))
+
+    self.assertAllEqual((3, 4, 2, 5), prefer_static.broadcast_shape(
+        tf.convert_to_tensor((4, 1, 1)), tf.convert_to_tensor((3, 1, 2, 5))))
+
+  def test_dynamic(self):
+    if tf.executing_eagerly():
+      return
+
+    shape = prefer_static.broadcast_shape(
+        tf.convert_to_tensor([3, 2, 1]),
+        tf.shape(tf1.placeholder_with_default(np.zeros((1, 5)),
+                                              shape=(None, 5))))
+    self.assertIsNone(tf.get_static_value(shape))
+    self.assertAllEqual([3, 2, 5], self.evaluate(shape))
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class PadTest(test_case.TestCase):
+
+  def test_num_paddings_dynamic(self):
+    n = tf1.placeholder_with_default(2, shape=None)
+    x = prefer_static.pad([2, 3], paddings=[[0, n]], constant_values=1)
+    if not prefer_static.is_numpy(x):
+      x = self.evaluate(x)
+    self.assertAllEqual([2, 3, 1, 1], x)
+
+  def test_num_paddings_static(self):
+    n = 2
+    x = prefer_static.pad([2, 3], paddings=[[0, n]], constant_values=1)
+    self.assertAllEqual([2, 3, 1, 1], x)
 
 
 if __name__ == '__main__':

@@ -698,7 +698,9 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
   # Keep track of the nan indices here (so we can impute NaN later).
   # Also eliminate any NaN indices, since there is not NaN in 32bit.
   nan_idx = tf.math.is_nan(x_idx_unclipped)
-  x_idx_unclipped = tf.where(nan_idx, 0., x_idx_unclipped)
+  x_idx_unclipped = tf.where(nan_idx,
+                             tf.cast(0., dtype=dtype),
+                             x_idx_unclipped)
 
   # x_idx.shape = [A1, ..., An, D, nd]
   x_idx = tf.clip_by_value(x_idx_unclipped, tf.zeros((), dtype=dtype), ny - 1)

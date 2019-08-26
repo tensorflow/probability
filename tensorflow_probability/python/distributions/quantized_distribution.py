@@ -275,10 +275,6 @@ class QuantizedDistribution(distributions.Distribution):
       dtype_util.assert_same_float_dtype(
           tensors=[self.distribution, low, high])
 
-      # We let QuantizedDistribution access _graph_parents since this class is
-      # more like a baseclass.
-      graph_parents = self._dist._graph_parents  # pylint: disable=protected-access
-
       checks = []
       if validate_args and low is not None and high is not None:
         message = "low must be strictly less than high."
@@ -287,12 +283,10 @@ class QuantizedDistribution(distributions.Distribution):
       with tf.control_dependencies(checks if validate_args else []):
         if low is not None:
           self._low = self._check_integer(low)
-          graph_parents += [self._low]
         else:
           self._low = None
         if high is not None:
           self._high = self._check_integer(high)
-          graph_parents += [self._high]
         else:
           self._high = None
 
@@ -302,7 +296,6 @@ class QuantizedDistribution(distributions.Distribution):
         validate_args=validate_args,
         allow_nan_stats=self._dist.allow_nan_stats,
         parameters=parameters,
-        graph_parents=graph_parents,
         name=name)
 
   @property

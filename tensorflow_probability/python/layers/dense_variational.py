@@ -24,6 +24,7 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.layers import util as tfp_layers_util
 from tensorflow_probability.python.math import random_rademacher
+from tensorflow_probability.python.util import SeedStream
 
 
 __all__ = [
@@ -148,7 +149,6 @@ class _DenseVariational(tf.keras.layers.Layer):
       self.kernel_prior = self.kernel_prior_fn(
           dtype, [in_size, self.units], 'kernel_prior',
           self.trainable, self.add_variable)
-    self._built_kernel_divergence = False
 
     if self.bias_posterior_fn is None:
       self.bias_posterior = None
@@ -163,7 +163,6 @@ class _DenseVariational(tf.keras.layers.Layer):
       self.bias_prior = self.bias_prior_fn(
           dtype, [self.units], 'bias_prior',
           self.trainable, self.add_variable)
-    self._built_bias_divergence = False
 
     self.built = True
 
@@ -174,20 +173,18 @@ class _DenseVariational(tf.keras.layers.Layer):
     outputs = self._apply_variational_bias(outputs)
     if self.activation is not None:
       outputs = self.activation(outputs)  # pylint: disable=not-callable
-    if not self._built_kernel_divergence:
-      self._apply_divergence(self.kernel_divergence_fn,
-                             self.kernel_posterior,
-                             self.kernel_prior,
-                             self.kernel_posterior_tensor,
-                             name='divergence_kernel')
-      self._built_kernel_divergence = True
-    if not self._built_bias_divergence:
-      self._apply_divergence(self.bias_divergence_fn,
-                             self.bias_posterior,
-                             self.bias_prior,
-                             self.bias_posterior_tensor,
-                             name='divergence_bias')
-      self._built_bias_divergence = True
+    self._apply_divergence(
+        self.kernel_divergence_fn,
+        self.kernel_posterior,
+        self.kernel_prior,
+        self.kernel_posterior_tensor,
+        name='divergence_kernel')
+    self._apply_divergence(
+        self.bias_divergence_fn,
+        self.bias_posterior,
+        self.bias_prior,
+        self.bias_posterior_tensor,
+        name='divergence_bias')
     return outputs
 
   def compute_output_shape(self, input_shape):
@@ -476,8 +473,8 @@ class DenseLocalReparameterization(_DenseVariational):
   import tensorflow_probability as tfp
 
   model = tf.keras.Sequential([
-      tfp.layers.DenseReparameterization(512, activation=tf.nn.relu),
-      tfp.layers.DenseReparameterization(10),
+      tfp.layers.DenseLocalReparameterization(512, activation=tf.nn.relu),
+      tfp.layers.DenseLocalReparameterization(10),
   ])
 
   logits = model(features)
@@ -692,7 +689,7 @@ class DenseFlipout(_DenseVariational):
     input_shape = tf.shape(input=inputs)
     batch_shape = input_shape[:-1]
 
-    seed_stream = tfd.SeedStream(self.seed, salt='DenseFlipout')
+    seed_stream = SeedStream(self.seed, salt='DenseFlipout')
 
     sign_input = random_rademacher(
         input_shape,

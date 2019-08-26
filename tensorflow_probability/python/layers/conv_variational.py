@@ -24,6 +24,7 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.layers import util as tfp_layers_util
 from tensorflow_probability.python.math import random_rademacher
+from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.layers import utils as tf_layers_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import nn_ops  # pylint: disable=g-direct-tensorflow-import
 
@@ -1080,7 +1081,7 @@ class _ConvFlipout(_ConvVariational):
     else:
       channels = input_shape[-1]
 
-    seed_stream = tfd.SeedStream(self.seed, salt='ConvFlipout')
+    seed_stream = SeedStream(self.seed, salt='ConvFlipout')
 
     sign_input = random_rademacher(
         tf.concat([batch_shape,

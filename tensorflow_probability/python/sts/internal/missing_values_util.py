@@ -95,6 +95,12 @@ class MaskedTimeSeries(collections.namedtuple('MaskedTimeSeries',
   # Forecast
   forecast_dist = tfp.sts.forecast(
     model, observed_time_series, num_steps_forecast=5)
+
+  # Impute missing values
+  observations_dist = tfp.sts.impute_missing_values(model, observed_time_series)
+  print('imputed means and stddevs: ',
+        observations_dist.mean(),
+        observations_dist.stddev())
   ```
 
   """

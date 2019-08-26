@@ -27,13 +27,13 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import normal
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 tfl = tf.linalg
 
@@ -169,19 +169,23 @@ def _augment_sample_shape(partial_batch_dist,
 class LinearGaussianStateSpaceModel(distribution.Distribution):
   """Observation distribution from a linear Gaussian state space model.
 
-  The state space model, sometimes called a Kalman filter, posits a
-  latent state vector `z_t` of dimension `latent_size` that evolves
+  A linear Gaussian state space model, sometimes called a Kalman filter, posits
+  a latent state vector `z[t]` of dimension `latent_size` that evolves
   over time following linear Gaussian transitions,
 
-  ```z_{t+1} = F * z_t + N(b; Q)```
+  ```
+  z[t+1] = F * z[t] + N(b; Q)  # latent state
+  x[t] = H * z[t] + N(c; R)    # observed series
+  ```
 
-  for transition matrix `F`, bias `b` and covariance matrix
-  `Q`. At each timestep, we observe a noisy projection of the
-  latent state `x_t = H * z_t + N(c; R)`. The transition and
-  observation models may be fixed or may vary between timesteps.
+  for transition matrix `F`, transition bias `b` and covariance matrix
+  `Q`, and observation matrix `H`, bias `c` and covariance matrix `R`. At each
+  timestep, the model generates an observable vector `x[t]`, a noisy projection
+  of the latent state. The transition and observation models may be fixed or
+  may vary between timesteps.
 
   This Distribution represents the marginal distribution on
-  observations, `p(x)`. The marginal `log_prob` is computed by
+  observations, `p(x)`. The marginal `log_prob` is implemented by
   Kalman filtering [1], and `sample` by an efficient forward
   recursion. Both operations require time linear in `T`, the total
   number of timesteps.
@@ -189,7 +193,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
   #### Shapes
 
   The event shape is `[num_timesteps, observation_size]`, where
-  `observation_size` is the dimension of each observation `x_t`.
+  `observation_size` is the dimension of each observation `x[t]`.
   The observation and transition models must return consistent
   shapes.
 
@@ -235,12 +239,12 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
   #### Examples
 
-  Consider a simple tracking model. The two-dimensional latent state
-  represents the true position of a vehicle, and at each timestep we
+  Consider a simple tracking model, in which a two-dimensional latent state
+  represents the position of a vehicle, and at each timestep we
   see a noisy observation of this position (e.g., a GPS reading). The
   vehicle is assumed to move by a random walk with standard deviation
   `step_std` at each step, and observation noise level `std`. We build
-  the distribution over noisy observations by
+  the marginal distribution over noisy observations as a state space model:
 
   ```python
   ndims = 2
@@ -271,12 +275,17 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
   # Compute the filtered posterior on latent states given observations,
   # and extract the mean and covariance for the current (final) timestep.
   _, filtered_means, filtered_covs, _, _ = model.forward_filter(x)
-  final_step = tfd.MultivariateNormalFullCovariance(
+  current_location_posterior = tfd.MultivariateNormalFullCovariance(
                 loc=filtered_means[..., -1, :],
                 scale=filtered_covs[..., -1, :])
-  ```
 
-  * TODO(davmre): implement and describe full posterior inference / smoothing.
+  # Run a smoothing recursion to extract posterior marginals for locations
+  # at previous timesteps.
+  posterior_means, posterior_covs = model.posterior_marginals(x)
+  initial_location_posterior = tfd.MultivariateNormalFullCovariance(
+                loc=posterior_means[..., 0, :],
+                scale=posterior_covs[..., 0, :])
+  ```
 
   * TODO(davmre): show example of fitting parameters.
   """
@@ -292,7 +301,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
                validate_args=False,
                allow_nan_stats=True,
                name="LinearGaussianStateSpaceModel"):
-    """Initialize a `LinearGaussianStateSpaceModel.
+    """Initialize a `LinearGaussianStateSpaceModel`.
 
     Args:
       num_timesteps: Integer `Tensor` total number of timesteps.
@@ -468,7 +477,6 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          graph_parents=[],
           name=name)
 
   def backward_smoothing_pass(self,
@@ -485,27 +493,27 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
     Args:
       filtered_means: Means of the per-timestep filtered marginal
-        distributions p(z_t | x_{:t}), as a Tensor of shape
+        distributions p(z[t] | x[:t]), as a Tensor of shape
         `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
       filtered_covs: Covariances of the per-timestep filtered marginal
-        distributions p(z_t | x_{:t}), as a Tensor of shape
+        distributions p(z[t] | x[:t]), as a Tensor of shape
         `batch_shape + [num_timesteps, latent_size, latent_size]`.
       predicted_means: Means of the per-timestep predictive
-         distributions over latent states, p(z_{t+1} | x_{:t}), as a
+         distributions over latent states, p(z[t+1] | x[:t]), as a
          Tensor of shape `sample_shape(x) + batch_shape +
          [num_timesteps, latent_size]`.
       predicted_covs: Covariances of the per-timestep predictive
-         distributions over latent states, p(z_{t+1} | x_{:t}), as a
+         distributions over latent states, p(z[t+1] | x[:t]), as a
          Tensor of shape `batch_shape + [num_timesteps, latent_size,
          latent_size]`.
 
     Returns:
       posterior_means: Means of the smoothed marginal distributions
-        p(z_t | x_{1:T}), as a Tensor of shape
+        p(z[t] | x[1:T]), as a Tensor of shape
         `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`,
         which is of the same shape as filtered_means.
       posterior_covs: Covariances of the smoothed marginal distributions
-        p(z_t | x_{1:T}), as a Tensor of shape
+        p(z[t] | x[1:T]), as a Tensor of shape
         `batch_shape + [num_timesteps, latent_size, latent_size]`.
         which is of the same shape as filtered_covs.
     """
@@ -618,7 +626,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """Draw a joint sample from the prior over latents and observations."""
 
     with tf.name_scope("sample_n_joint"):
-      stream = seed_stream.SeedStream(
+      stream = SeedStream(
           seed, salt="LinearGaussianStateSpaceModel_sample_n_joint")
 
       sample_and_batch_shape = distribution_util.prefer_static_value(
@@ -748,33 +756,33 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
     Returns:
       log_likelihoods: Per-timestep log marginal likelihoods `log
-        p(x_t | x_{:t-1})` evaluated at the input `x`, as a `Tensor`
+        p(x[t] | x[:t-1])` evaluated at the input `x`, as a `Tensor`
         of shape `sample_shape(x) + batch_shape + [num_timesteps].`
       filtered_means: Means of the per-timestep filtered marginal
-         distributions p(z_t | x_{:t}), as a Tensor of shape
+         distributions p(z[t] | x[:t]), as a Tensor of shape
         `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
       filtered_covs: Covariances of the per-timestep filtered marginal
-         distributions p(z_t | x_{:t}), as a Tensor of shape
+         distributions p(z[t] | x[:t]), as a Tensor of shape
         `sample_shape(mask) + batch_shape + [num_timesteps, latent_size,
         latent_size]`. Note that the covariances depend only on the model and
         the mask, not on the data, so this may have fewer dimensions than
         `filtered_means`.
       predicted_means: Means of the per-timestep predictive
-         distributions over latent states, p(z_{t+1} | x_{:t}), as a
+         distributions over latent states, p(z[t+1] | x[:t]), as a
          Tensor of shape `sample_shape(x) + batch_shape +
          [num_timesteps, latent_size]`.
       predicted_covs: Covariances of the per-timestep predictive
-         distributions over latent states, p(z_{t+1} | x_{:t}), as a
+         distributions over latent states, p(z[t+1] | x[:t]), as a
          Tensor of shape `sample_shape(mask) + batch_shape +
          [num_timesteps, latent_size, latent_size]`. Note that the covariances
          depend only on the model and the mask, not on the data, so this may
          have fewer dimensions than `predicted_means`.
       observation_means: Means of the per-timestep predictive
-         distributions over observations, p(x_{t} | x_{:t-1}), as a
+         distributions over observations, p(x[t] | x[:t-1]), as a
          Tensor of shape `sample_shape(x) + batch_shape +
          [num_timesteps, observation_size]`.
       observation_covs: Covariances of the per-timestep predictive
-         distributions over observations, p(x_{t} | x_{:t-1}), as a
+         distributions over observations, p(x[t] | x[:t-1]), as a
          Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
          observation_size, observation_size]`. Note that the covariances depend
          only on the model and the mask, not on the data, so this may have fewer
@@ -979,11 +987,11 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
     Returns:
       smoothed_means: Means of the per-timestep smoothed
-         distributions over latent states, p(x_{t} | x_{:T}), as a
+         distributions over latent states, p(z[t] | x[:T]), as a
          Tensor of shape `sample_shape(x) + batch_shape +
          [num_timesteps, observation_size]`.
       smoothed_covs: Covariances of the per-timestep smoothed
-         distributions over latent states, p(x_{t} | x_{:T}), as a
+         distributions over latent states, p(z[t] | x[:T]), as a
          Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
          observation_size, observation_size]`. Note that the covariances depend
          only on the model and the mask, not on the data, so this may have fewer
@@ -1010,10 +1018,10 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """Compute prior means for all variables via dynamic programming.
 
     Returns:
-      latent_means: Prior means of latent states `z_t`, as a `Tensor`
+      latent_means: Prior means of latent states `z[t]`, as a `Tensor`
         of shape `batch_shape + [num_timesteps, latent_size]`
       observation_means: Prior covariance matrices of observations
-        `x_t`, as a `Tensor` of shape `batch_shape + [num_timesteps,
+        `x[t]`, as a `Tensor` of shape `batch_shape + [num_timesteps,
         observation_size]`
     """
 
@@ -1070,11 +1078,11 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """Compute prior covariances for all variables via dynamic programming.
 
     Returns:
-      latent_covs: Prior covariance matrices of latent states `z_t`, as
+      latent_covs: Prior covariance matrices of latent states `z[t]`, as
         a `Tensor` of shape `batch_shape + [num_timesteps,
         latent_size, latent_size]`
       observation_covs: Prior covariance matrices of observations
-        `x_t`, as a `Tensor` of shape `batch_shape + [num_timesteps,
+        `x[t]`, as a `Tensor` of shape `batch_shape + [num_timesteps,
         observation_size, observation_size]`
     """
 
@@ -1334,11 +1342,11 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
     Args:
       state: A `KalmanFilterState` object representing the previous
         filter state at time `t-1`.
-      elems_t: A tuple of Tensors `(x_t, mask_t)`, or a `Tensor` `x_t`.
-        `x_t` is a `Tensor` with rightmost shape dimensions
+      elems_t: A tuple of Tensors `(x[t], mask_t)`, or a `Tensor` `x[t]`.
+        `x[t]` is a `Tensor` with rightmost shape dimensions
         `[observation_size, 1]` representing the vector observed at time `t`,
         and `mask_t` is a `Tensor` with rightmost dimensions`[1, 1]`
-        representing the observation mask at time `t`. Both `x_t` and `mask_t`
+        representing the observation mask at time `t`. Both `x[t]` and `mask_t`
         may have batch dimensions, which must be compatible with the batch
         dimensions of `state.predicted_mean` and `state.predictived_cov`
         respectively. If `mask_t` is not provided, it is assumed to be `None`.
@@ -1383,7 +1391,7 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
          observation_matrix, observation_noise,
          x_t)
 
-    # Compute the marginal likelihood p(x_{t} | x_{:t-1}) for this
+    # Compute the marginal likelihood p(x[t] | x[:t-1]) for this
     # observation.
     log_marginal_likelihood = observation_dist.log_prob(x_t[..., 0])
 

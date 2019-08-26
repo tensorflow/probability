@@ -27,6 +27,7 @@ from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 __all__ = [
     'LeapfrogIntegrator',
     'SimpleLeapfrogIntegrator',
+    'process_args',
 ]
 
 
@@ -256,7 +257,8 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
           state_parts,
           target,
           target_grad_parts,
-      ] = self._process_args(
+      ] = process_args(
+          self.target_fn,
           momentum_parts,
           state_parts,
           target,
@@ -342,26 +344,27 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
           next_target_grad_parts,
       ]
 
-  def _process_args(
-      self, momentum_parts, state_parts, target, target_grad_parts):
-    """Sanitize inputs to `__call__`."""
-    with tf.name_scope('process_args'):
-      momentum_parts = [
+
+def process_args(target_fn, momentum_parts, state_parts,
+                 target=None, target_grad_parts=None):
+  """Sanitize inputs to `__call__`."""
+  with tf.name_scope('process_args'):
+    momentum_parts = [
+        tf.convert_to_tensor(
+            v, dtype_hint=tf.float32, name='momentum_parts')
+        for v in momentum_parts]
+    state_parts = [
+        tf.convert_to_tensor(
+            v, dtype_hint=tf.float32, name='state_parts')
+        for v in state_parts]
+    if target is None or target_grad_parts is None:
+      [target, target_grad_parts] = mcmc_util.maybe_call_fn_and_grads(
+          target_fn, state_parts)
+    else:
+      target = tf.convert_to_tensor(
+          target, dtype_hint=tf.float32, name='target')
+      target_grad_parts = [
           tf.convert_to_tensor(
-              v, dtype_hint=tf.float32, name='momentum_parts')
-          for v in momentum_parts]
-      state_parts = [
-          tf.convert_to_tensor(
-              v, dtype_hint=tf.float32, name='state_parts')
-          for v in state_parts]
-      if target is None or target_grad_parts is None:
-        [target, target_grad_parts] = mcmc_util.maybe_call_fn_and_grads(
-            self.target_fn, state_parts)
-      else:
-        target = tf.convert_to_tensor(
-            target, dtype_hint=tf.float32, name='target')
-        target_grad_parts = [
-            tf.convert_to_tensor(
-                g, dtype_hint=tf.float32, name='target_grad_part')
-            for g in target_grad_parts]
-      return momentum_parts, state_parts, target, target_grad_parts
+              g, dtype_hint=tf.float32, name='target_grad_part')
+          for g in target_grad_parts]
+    return momentum_parts, state_parts, target, target_grad_parts

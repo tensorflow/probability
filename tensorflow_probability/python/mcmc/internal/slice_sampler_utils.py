@@ -20,7 +20,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from tensorflow_probability.python import distributions
+from tensorflow_probability.python.distributions.bernoulli import Bernoulli
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
@@ -68,8 +69,9 @@ def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
     # Output shape of the left increments tensor.
     output_shape = tf.concat(([max_doublings + 1], batch_shape), axis=0)
     # A sample realization of X_k.
-    expand_left = distributions.Bernoulli(0.5, dtype=dtype).sample(
-        sample_shape=output_shape, seed=seed)
+    expand_left = Bernoulli(
+        0.5, dtype=dtype).sample(
+            sample_shape=output_shape, seed=seed)
 
     # The widths of the successive intervals. Starts with 1.0 and ends with
     # 2^max_doublings.
@@ -177,7 +179,7 @@ def slice_bounds_by_doubling(x_initial,
   with tf.compat.v1.name_scope(
       name, 'slice_bounds_by_doubling',
       [x_initial, log_slice_heights, max_doublings, step_size]):
-    seed_gen = distributions.SeedStream(seed, salt='slice_bounds_by_doubling')
+    seed_gen = SeedStream(seed, salt='slice_bounds_by_doubling')
     x_initial = tf.convert_to_tensor(value=x_initial)
     batch_shape = tf.shape(input=x_initial)
     dtype = step_size.dtype.base_dtype
@@ -342,7 +344,7 @@ def _sample_with_shrinkage(x_initial, target_log_prob, log_slice_heights,
   with tf.compat.v1.name_scope(
       name, 'sample_with_shrinkage',
       [x_initial, log_slice_heights, step_size, lower_bounds, upper_bounds]):
-    seed_gen = distributions.SeedStream(seed, salt='_sample_with_shrinkage')
+    seed_gen = SeedStream(seed, salt='_sample_with_shrinkage')
     # Keeps track of whether an acceptable sample has been found for the chain.
     found = tf.zeros_like(x_initial, dtype=tf.bool)
     cond = lambda found, *ignored_args: ~tf.reduce_all(input_tensor=found)

@@ -128,7 +128,7 @@ class Transpose(bijector.Bijector):
       if rightmost_transposed_ndims is not None:
         rightmost_transposed_ndims = tf.convert_to_tensor(
             rightmost_transposed_ndims,
-            dtype=np.int32,
+            dtype_hint=np.int32,
             name='rightmost_transposed_ndims')
         rightmost_transposed_ndims_ = tf.get_static_value(
             rightmost_transposed_ndims)
@@ -142,7 +142,7 @@ class Transpose(bijector.Bijector):
             1)
         perm = tf.range(start=perm_start, limit=-1, delta=-1, name='perm')
       else:  # perm is not None:
-        perm = tf.convert_to_tensor(perm, dtype=np.int32, name='perm')
+        perm = tf.convert_to_tensor(perm, dtype_hint=np.int32, name='perm')
         rightmost_transposed_ndims = tf.size(
             perm, name='rightmost_transposed_ndims')
         rightmost_transposed_ndims_ = tf.get_static_value(
@@ -165,7 +165,6 @@ class Transpose(bijector.Bijector):
       self._rightmost_transposed_ndims = rightmost_transposed_ndims
       super(Transpose, self).__init__(
           forward_min_event_ndims=rightmost_transposed_ndims_,
-          graph_parents=[perm, rightmost_transposed_ndims],
           is_constant_jacobian=True,
           validate_args=validate_args,
           name=name)

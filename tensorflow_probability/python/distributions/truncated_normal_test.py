@@ -242,7 +242,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
     scale = tf.Variable(dtype(1.1))
     low = tf.Variable(dtype(-10.0))
     high = tf.Variable(dtype(5.0))
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate([v.initializer for v in (loc, scale, low, high)])
 
     def f(loc, scale, low, high):
       dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
@@ -280,7 +280,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
     high = tf.Variable(dtype(5.0))
 
     x = np.array([-1.0, 0.01, 0.1, 1., 4.9]).astype(dtype)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate([v.initializer for v in (loc, scale, low, high)])
 
     def f(loc, scale):
       dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
@@ -301,7 +301,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
     low = tf.Variable(dtype(-10.0))
     high = tf.Variable(dtype(5.0))
 
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate([v.initializer for v in (loc, scale, low, high)])
 
     def f(loc, scale):
       dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)

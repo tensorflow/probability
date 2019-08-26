@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -145,6 +146,7 @@ class AffineLinearOperatorTest(tf.test.TestCase):
         self.evaluate(-affine.inverse_log_det_jacobian(y, event_ndims=2)),
         self.evaluate(affine.forward_log_det_jacobian(x, event_ndims=2)))
 
+  @tfp_test_util.jax_disable_variable_test
   def testVariableGradient(self):
     b = tfb.AffineLinearOperator(shift=tf.Variable(-1.))
 

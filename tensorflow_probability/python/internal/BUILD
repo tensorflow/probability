@@ -98,10 +98,10 @@ py_library(
         ":dtype_util",
         ":prefer_static",
         ":reparameterization",
+        ":tensor_util",
         ":tensorshape_util",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/math",
     ],
 )
 
@@ -179,6 +179,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -228,6 +229,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -268,8 +270,23 @@ py_library(
     srcs = ["hypothesis_testlib.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":assert_util",
         ":tensorshape_util",
+        # hypothesis dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:deprecated_linalg",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/util",
+    ],
+)
+
+py_test(
+    name = "hypothesis_testlib_test",
+    srcs = ["hypothesis_testlib_test.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":hypothesis_testlib",
+        # absl/testing:parameterized dep,
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
@@ -288,7 +305,8 @@ py_library(
         # numpy dep,
         # six dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions:seed_stream",
+        "//tensorflow_probability/python/internal/backend/numpy",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -301,6 +319,6 @@ py_test(
         # absl/flags dep,
         # absl/testing:flagsaver dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions:seed_stream",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )

@@ -61,7 +61,7 @@ class Expm1BijectorTest(tf.test.TestCase):
     bijector = tfb.Expm1()
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-5., upper_x=2.5, eval_func=self.evaluate,
-        rtol=0.05)
+        rtol=0.15)
 
   def testBijectiveAndFinite(self):
     bijector = tfb.Expm1()

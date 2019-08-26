@@ -24,12 +24,13 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
+
 
 __all__ = [
     "Wishart",
@@ -157,8 +158,6 @@ class _WishartLinearOperator(distribution.Distribution):
         allow_nan_stats=allow_nan_stats,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         parameters=parameters,
-        graph_parents=(
-            [self._df, self._dimension] + self._scale_operator.graph_parents),
         name=name)
 
   @property
@@ -215,7 +214,7 @@ class _WishartLinearOperator(distribution.Distribution):
 
     ndims = batch_ndims + 3  # sample_ndims=1, event_ndims=2
     shape = tf.concat([[n], batch_shape, event_shape], 0)
-    stream = seed_stream.SeedStream(seed, salt="Wishart")
+    stream = SeedStream(seed, salt="Wishart")
 
     # Complexity: O(nbk**2)
     x = tf.random.normal(

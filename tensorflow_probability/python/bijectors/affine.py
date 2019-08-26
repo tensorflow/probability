@@ -213,11 +213,13 @@ class Affine(bijector.Bijector):
           validate_args=validate_args,
           dtype=dtype)
 
-      if scale is not None and not self._is_only_identity_multiplier:
+      if (scale is not None and
+          not self._is_only_identity_multiplier and
+          not dtype_util.SKIP_DTYPE_CHECKS):
         if (shift is not None and
             not dtype_util.base_equal(shift.dtype, scale.dtype)):
           raise TypeError(
-              "shift.dtype({}) is incompatible with scale.dtype({}).".format(
+              "shift.dtype ({}) is incompatible with scale.dtype ({}).".format(
                   shift.dtype, scale.dtype))
 
       self._scale = scale
@@ -323,7 +325,7 @@ class Affine(bijector.Bijector):
       s = (
           tf.math.conj(self._scale) if self.adjoint and
           dtype_util.is_complex(self._scale.dtype) else self._scale)
-      y *= s
+      y = y * s
       if self.shift is not None:
         return y + self.shift
       return y
@@ -331,13 +333,13 @@ class Affine(bijector.Bijector):
                                  if self.validate_args else []):
       y = self.scale.matvec(y, adjoint=self.adjoint)
     if self.shift is not None:
-      y += self.shift
+      y = y + self.shift
     return y
 
   def _inverse(self, y):
     x = y
     if self.shift is not None:
-      x -= self.shift
+      x = x - self.shift
     if self._is_only_identity_multiplier:
       s = (
           tf.math.conj(self._scale) if self.adjoint and

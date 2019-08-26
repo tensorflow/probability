@@ -29,12 +29,10 @@ from tensorflow_probability.python.distributions.categorical import Categorical
 from tensorflow_probability.python.distributions.cauchy import Cauchy
 from tensorflow_probability.python.distributions.chi import Chi
 from tensorflow_probability.python.distributions.chi2 import Chi2
-from tensorflow_probability.python.distributions.chi2 import Chi2WithAbsDf  # deprecated, remove 6/5/19
 from tensorflow_probability.python.distributions.deterministic import Deterministic
 from tensorflow_probability.python.distributions.deterministic import VectorDeterministic
 from tensorflow_probability.python.distributions.dirichlet import Dirichlet
 from tensorflow_probability.python.distributions.dirichlet_multinomial import DirichletMultinomial
-from tensorflow_probability.python.distributions.distribution import ConditionalDistribution
 from tensorflow_probability.python.distributions.distribution import Distribution
 from tensorflow_probability.python.distributions.empirical import Empirical
 from tensorflow_probability.python.distributions.exponential import Exponential
@@ -55,8 +53,6 @@ from tensorflow_probability.python.distributions.internal.moving_stats import as
 from tensorflow_probability.python.distributions.internal.moving_stats import assign_moving_mean_variance
 from tensorflow_probability.python.distributions.internal.moving_stats import moving_mean_variance
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGamma
-from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationRate  # deprecated, remove 6/5/19
-from tensorflow_probability.python.distributions.inverse_gamma import InverseGammaWithSoftplusConcentrationScale  # deprecated, remove 6/5/19
 from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
 from tensorflow_probability.python.distributions.joint_distribution import JointDistribution
 from tensorflow_probability.python.distributions.joint_distribution_coroutine import JointDistributionCoroutine
@@ -76,7 +72,6 @@ from tensorflow_probability.python.distributions.mixture_same_family import Mixt
 from tensorflow_probability.python.distributions.multinomial import Multinomial
 from tensorflow_probability.python.distributions.multivariate_student_t import MultivariateStudentTLinearOperator
 from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiag
-from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiagWithSoftplusScale  # deprecated, remove 6/5/19
 from tensorflow_probability.python.distributions.mvn_diag_plus_low_rank import MultivariateNormalDiagPlusLowRank
 from tensorflow_probability.python.distributions.mvn_full_covariance import MultivariateNormalFullCovariance
 from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
@@ -97,11 +92,9 @@ from tensorflow_probability.python.distributions.relaxed_bernoulli import Relaxe
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import ExpRelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import RelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.sample import Sample
-from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.distributions.student_t import StudentT
 from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
-from tensorflow_probability.python.distributions.transformed_distribution import ConditionalTransformedDistribution
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
 from tensorflow_probability.python.distributions.triangular import Triangular
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
@@ -118,17 +111,44 @@ from tensorflow_probability.python.distributions.von_mises_fisher import VonMise
 from tensorflow_probability.python.distributions.wishart import Wishart
 from tensorflow_probability.python.distributions.zipf import Zipf
 
-from tensorflow_probability.python.internal.distribution_util import fill_triangular
-from tensorflow_probability.python.internal.distribution_util import fill_triangular_inverse
-from tensorflow_probability.python.internal.distribution_util import matrix_diag_transform
-from tensorflow_probability.python.internal.distribution_util import reduce_weighted_logsumexp
-from tensorflow_probability.python.internal.distribution_util import softplus_inverse
-from tensorflow_probability.python.internal.distribution_util import tridiag
+from tensorflow_probability.python.distributions.deprecated_linalg import matrix_diag_transform
+from tensorflow_probability.python.distributions.deprecated_linalg import tridiag
 from tensorflow_probability.python.internal.reparameterization import FULLY_REPARAMETERIZED
 from tensorflow_probability.python.internal.reparameterization import NOT_REPARAMETERIZED
 from tensorflow_probability.python.internal.reparameterization import ReparameterizationType
+from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp as _reduce_weighted_logsumexp
+from tensorflow_probability.python.math.generic import softplus_inverse as _softplus_inverse
+from tensorflow_probability.python.math.linalg import fill_triangular as _fill_triangular
+from tensorflow_probability.python.math.linalg import fill_triangular_inverse as _fill_triangular_inverse
+from tensorflow_probability.python.util.seed_stream import SeedStream as _SeedStream
 
-import sys as _sys
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
+
+_deprecated = deprecation.deprecated(
+    '2019-10-01',
+    'This function has moved to `tfp.math`.')
+
+fill_triangular = _deprecated(_fill_triangular)
+
+fill_triangular_inverse = _deprecated(_fill_triangular_inverse)
+
+softplus_inverse = _deprecated(_softplus_inverse)
+
+reduce_weighted_logsumexp = _deprecated(_reduce_weighted_logsumexp)
+
+
+class SeedStream(_SeedStream):
+
+  __init__ = deprecation.deprecated(
+      '2019-10-01', 'SeedStream has moved to `tfp.util.SeedStream`.')(
+          _SeedStream.__init__)
+
+
+del deprecation, _deprecated
+
+
+import sys as _sys  # pylint: disable=g-import-not-at-top
 augment_kl_xent_docs(_sys.modules[__name__])
 del augment_kl_xent_docs
 del _sys
@@ -136,9 +156,6 @@ del _sys
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member,g-bad-import-order
 
 __all__ = [
-    'Cauchy',
-    'ConditionalDistribution',
-    'ConditionalTransformedDistribution',
     'FULLY_REPARAMETERIZED',
     'NOT_REPARAMETERIZED',
     'ReparameterizationType',
@@ -150,9 +167,9 @@ __all__ = [
     'Binomial',
     'Blockwise',
     'Categorical',
+    'Cauchy',
     'Chi',
     'Chi2',
-    'Chi2WithAbsDf',
     'Deterministic',
     'VectorDeterministic',
     'Empirical',
@@ -173,8 +190,6 @@ __all__ = [
     'Horseshoe',
     'Independent',
     'InverseGamma',
-    'InverseGammaWithSoftplusConcentrationRate',
-    'InverseGammaWithSoftplusConcentrationScale',
     'JointDistribution',
     'JointDistributionCoroutine',
     'JointDistributionNamed',
@@ -203,7 +218,6 @@ __all__ = [
     'MultivariateNormalLinearOperator',
     'MultivariateNormalTriL',
     'MultivariateNormalDiagPlusLowRank',
-    'MultivariateNormalDiagWithSoftplusScale',
     'MultivariateStudentTLinearOperator',
     'Dirichlet',
     'DirichletMultinomial',

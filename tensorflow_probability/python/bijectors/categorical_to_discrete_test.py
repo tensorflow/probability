@@ -24,17 +24,18 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import categorical_to_discrete
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CategoricalToDiscreteTest(tf.test.TestCase):
+class CategoricalToDiscreteTest(test_case.TestCase):
 
   def testUnsortedValuesRaises(self):
     with self.assertRaisesOpError('map_values is not strictly increasing'):
       bijector = categorical_to_discrete.CategoricalToDiscrete(
           map_values=[1, 3, 2], validate_args=True)
-      self.evaluate(bijector.map_values)
+      self.evaluate(bijector.forward([0, 1, 2]))
 
   def testMapValuesRankNotEqualToOneRaises(self):
     with self.assertRaisesWithPredicateMatch(ValueError,
@@ -98,6 +99,34 @@ class CategoricalToDiscreteTest(tf.test.TestCase):
     bijector = categorical_to_discrete.CategoricalToDiscrete(map_values=y)
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=0)
+
+  def testVariableGradients(self):
+    map_values = tf.Variable([0.3, 0.5])
+    b = categorical_to_discrete.CategoricalToDiscrete(map_values=map_values,
+                                                      validate_args=True)
+    with tf.GradientTape() as tape:
+      y = tf.reduce_sum(b.forward([0, 1]))
+    grads = tape.gradient(y, [map_values])
+    self.assertAllNotNone(grads)
+
+  def testNonVariableGradients(self):
+    map_values = tf.convert_to_tensor([0.3, 0.5])
+    b = categorical_to_discrete.CategoricalToDiscrete(map_values=map_values,
+                                                      validate_args=True)
+    with tf.GradientTape() as tape:
+      tape.watch(map_values)
+      y = tf.reduce_sum(b.forward([0, 1]))
+    grads = tape.gradient(y, [map_values])
+    self.assertAllNotNone(grads)
+
+  def testModifiedMapValuesIncreasingAssertion(self):
+    map_values = tf.Variable([0.1, 0.2])
+    b = categorical_to_discrete.CategoricalToDiscrete(map_values=map_values,
+                                                      validate_args=True)
+    self.evaluate(map_values.initializer)
+    with self.assertRaisesOpError('map_values is not strictly increasing.'):
+      with tf.control_dependencies([map_values.assign([0.2, 0.1])]):
+        self.evaluate(b.forward([0, 1]))
 
 
 if __name__ == '__main__':

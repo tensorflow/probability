@@ -47,6 +47,17 @@ class GradientTest(tf.test.TestCase):
     self.assertAllClose(f(*args), y, atol=1e-6, rtol=1e-6)
     self.assertAllClose(g(*args), dydx, atol=1e-6, rtol=1e-6)
 
+  def test_output_gradients(self):
+    jacobian = np.float32([[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]])
+    f = lambda x: tf.squeeze(tf.matmul(jacobian, x[:, tf.newaxis]))
+    x = np.ones([3], dtype=np.float32)
+    output_gradients = np.float32([1., 2., 3.])
+    y, dydx = self.evaluate(
+        tfp.math.value_and_gradient(f, x, output_gradients=output_gradients))
+    self.assertAllClose(f(x), y, atol=1e-6, rtol=1e-6)
+    self.assertAllClose(
+        np.dot(output_gradients, jacobian), dydx, atol=1e-6, rtol=1e-6)
+
 
 if __name__ == '__main__':
   tf.test.main()

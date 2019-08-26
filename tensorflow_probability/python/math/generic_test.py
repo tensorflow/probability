@@ -339,5 +339,19 @@ class LogAddExp(test_case.TestCase):
     self.assertAllEqual(1. - np.eye(2), g)
 
 
+@test_util.run_all_in_graph_and_eager_modes
+class ReduceLogMeanExp(test_case.TestCase):
+
+  def test_vector_axis_and_keepdims(self):
+    log_probs = tf.math.log(tf.random.uniform([10, 3, 4], seed=41))
+    expected = tf.math.log(
+        tf.reduce_mean(
+            tf.math.exp(log_probs),
+            axis=[1, 2],
+            keepdims=True))
+    actual = tfp.math.reduce_logmeanexp(log_probs, axis=[1, 2], keepdims=True)
+    self.assertAllClose(*self.evaluate([expected, actual]), rtol=1e-5, atol=0.)
+
+
 if __name__ == '__main__':
   tf.test.main()

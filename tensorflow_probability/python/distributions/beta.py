@@ -24,13 +24,13 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -175,9 +175,9 @@ class Beta(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       dtype_hint=tf.float32)
-      self._concentration1 = tensor_util.convert_immutable_to_tensor(
+      self._concentration1 = tensor_util.convert_nonref_to_tensor(
           concentration1, dtype=dtype, name="concentration1")
-      self._concentration0 = tensor_util.convert_immutable_to_tensor(
+      self._concentration0 = tensor_util.convert_nonref_to_tensor(
           concentration0, dtype=dtype, name="concentration0")
       super(Beta, self).__init__(
           dtype=dtype,
@@ -235,7 +235,7 @@ class Beta(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    seed = seed_stream.SeedStream(seed, "beta")
+    seed = SeedStream(seed, "beta")
     concentration1 = tf.convert_to_tensor(self.concentration1)
     concentration0 = tf.convert_to_tensor(self.concentration0)
     shape = self._batch_shape_tensor(concentration1, concentration0)
@@ -339,7 +339,7 @@ class Beta(distribution.Distribution):
       return []
     assertions = []
     for concentration in [self.concentration0, self.concentration1]:
-      if is_init != tensor_util.is_mutable(concentration):
+      if is_init != tensor_util.is_ref(concentration):
         assertions.append(assert_util.assert_positive(
             concentration,
             message="Concentration parameter must be positive."))
@@ -378,4 +378,3 @@ def _kl_beta_beta(d1, d2, name=None):
              (d2_concentration0 - d1_concentration0)) +
             (tf.math.digamma(d1_total_concentration) *
              (d2_total_concentration - d1_total_concentration)))
-

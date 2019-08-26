@@ -24,14 +24,15 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import half_cauchy
-from tensorflow_probability.python.distributions.seed_stream import SeedStream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
-    "Horseshoe",
+    'Horseshoe',
 ]
 
 
@@ -119,7 +120,7 @@ class Horseshoe(distribution.Distribution):
                scale,
                validate_args=False,
                allow_nan_stats=True,
-               name="Horseshoe"):
+               name='Horseshoe'):
     """Construct a Horseshoe distribution with `scale`.
 
     Args:
@@ -140,27 +141,23 @@ class Horseshoe(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([scale], dtype_hint=tf.float32)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies(
-          [assert_util.assert_positive(scale)] if validate_args else []):
-        self._scale = tf.identity(
-            scale, name="scale")
-    self._half_cauchy = half_cauchy.HalfCauchy(
-        loc=tf.zeros([], dtype=dtype),
-        scale=tf.ones([], dtype=dtype),
-        allow_nan_stats=True)
-    super(Horseshoe, self).__init__(
-        dtype=self._scale.dtype,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._scale],
-        name=name)
+      self._scale = tensor_util.convert_nonref_to_tensor(
+          scale, name='scale', dtype=dtype)
+      self._half_cauchy = half_cauchy.HalfCauchy(
+          loc=tf.zeros([], dtype=dtype),
+          scale=tf.ones([], dtype=dtype),
+          allow_nan_stats=True)
+      super(Horseshoe, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
-    return {"scale": tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
+    return {'scale': tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
 
   @classmethod
   def _params_event_ndims(cls):
@@ -184,26 +181,28 @@ class Horseshoe(distribution.Distribution):
     return tf.TensorShape([])
 
   def _log_prob(self, x):
+    scale = tf.convert_to_tensor(self.scale)
     # The exact HalfCauchy-Normal marginal log-density is analytically
     # intractable; we compute a (relatively accurate) numerical
     # approximation. This is a log space version of ref[2] from class docstring.
-    xx = (x / self.scale)**2 / 2
+    xx = (x / scale)**2 / 2
     g = 0.5614594835668851  # tf.exp(-0.5772156649015328606)
     b = 1.0420764938351215   # tf.sqrt(2 * (1-g) / (g * (2-g)))
     h_inf = 1.0801359952503342  #  (1-g)*(g*g-6*g+12) / (3*g * (2-g)**2 * b)
     q = 20. / 47. * xx**1.0919284281983377
     h = 1. / (1 + xx**(1.5)) + h_inf * q / (1 + q)
-    c = -.5 * np.log(2 * np.pi**3) - tf.math.log(g * self._scale)
+    c = -.5 * np.log(2 * np.pi**3) - tf.math.log(g * scale)
     return -tf.math.log1p((1 - g) / g * tf.exp(-xx / (1 - g))) + tf.math.log(
         tf.math.log1p(g / xx - (1 - g) / (h + b * xx)**2)) + c
 
   def _sample_n(self, n, seed=None):
-    shape = tf.concat([[n], self._batch_shape_tensor()], axis=0)
-    seed = SeedStream(seed, salt="random_horseshoe")
+    scale = tf.convert_to_tensor(self.scale)
+    shape = tf.concat([[n], tf.shape(scale)], axis=0)
+    seed = SeedStream(seed, salt='random_horseshoe')
     local_shrinkage = self._half_cauchy.sample(shape, seed=seed())
-    shrinkage = self.scale * local_shrinkage
+    shrinkage = scale * local_shrinkage
     sampled = tf.random.normal(
-        shape=shape, mean=0., stddev=1., dtype=self.scale.dtype, seed=seed())
+        shape=shape, mean=0., stddev=1., dtype=scale.dtype, seed=seed())
     return sampled * shrinkage
 
   def _mean(self):
@@ -216,11 +215,21 @@ class Horseshoe(distribution.Distribution):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
                      dtype_util.as_numpy_dtype(self.dtype)(np.nan))
-    raise ValueError("`stddev` is undefined for Horseshoe distribution.")
+    raise ValueError('`stddev` is undefined for Horseshoe distribution.')
 
   def _variance(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
                      dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError(
-        "`variance` is undefined for Horseshoe distribution.")
+        '`variance` is undefined for Horseshoe distribution.')
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_ref(self.scale):
+      assertions.append(assert_util.assert_positive(
+          self.scale,
+          message='Argument `scale` must be positive.'))
+    return assertions

@@ -32,24 +32,31 @@ exports_files(["LICENSE"])
 
 py_library(
     name = "mcmc",
-    srcs = [
-        "__init__.py",
-        "nuts.py",
+    srcs = ["__init__.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":nuts_autobatching",
+        # tensorflow dep,
     ],
+)
+
+py_library(
+    name = "nuts_autobatching",
+    srcs = ["nuts.py"],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
-        # six dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
-        "//tensorflow_probability/python/internal/auto_batching",
+        "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/mcmc",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
 py_library(
     name = "nuts_testlib",
+    testonly = 1,
     srcs = ["nuts_test.py"],
     srcs_version = "PY2AND3",
     deps = [
@@ -57,6 +64,8 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/experimental/auto_batching",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

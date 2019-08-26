@@ -20,6 +20,7 @@ presubmit: {
 # DevSite config files
 presubmit: {
   path_regexp: ".*\\.yaml"
-  review_notify: "tf-docs+config-reviews"
+  # skip auto-generated _toc.yaml files.
+  path_expression_exclusion: ".../api_docs/..."
   auto_reviewers: "tf-docs+reviews"
 }

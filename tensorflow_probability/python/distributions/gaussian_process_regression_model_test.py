@@ -17,13 +17,14 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -37,7 +38,9 @@ def _np_kernel_matrix_fn(amp, len_scale, x, y):
 np.random.seed(42)
 
 
-class _GaussianProcessRegressionModelTest(object):
+@test_util.run_all_in_graph_and_eager_modes
+class _GaussianProcessRegressionModelTest(test_case.TestCase,
+                                          parameterized.TestCase):
 
   def testShapes(self):
     # 5x5 grid of index points in R^2 and flatten to 25x2
@@ -323,18 +326,117 @@ class _GaussianProcessRegressionModelTest(object):
       self.assertAllEqual(self.evaluate(gprm1.index_points), index_points_1)
       self.assertAllEqual(self.evaluate(gprm2.index_points), index_points_2)
 
+  # What is the behavior?
+  #   - observation_noise_variance defaults to 0
+  #   - predictive_noise_variance defaults to observation_noise_variance
+  #
+  # Expectation:
+  #   - covariance matrix is affected by observation_noise_variance. namely,
+  #     covariance matrix is given by
+  #       (K_tt - K_tx @ (K_xx + ONV ** 2 * I) @ K_xt) + PNV
+  #   - predictive_noise_variance property is a Tensor-converted version of the
+  #     predictive_noise_variance argument to __init__
+  #   - observation_noise_variance property is a Tensor-converted version of the
+  #     effective predictive_noise_variance value. This is because of the
+  #     confusing naming choice we made with the GaussianProcess base class.
+  #
+  # Scenarios:
+  #   - ONV not given, PNV not given
+  #   - ONV given, PNV not given
+  #   - ONV not given, PNV given
+  #   - ONV given, PNV given
+  @parameterized.named_parameters(
+      {'testcase_name': '_no_args',
+       'noise_kwargs': {},
+       'implied_values': {'observation_noise_variance_parameter': 0.,
+                          'predictive_noise_variance_parameter': 0.}},
 
-@test_util.run_all_in_graph_and_eager_modes
+      {'testcase_name': '_pnv_none',
+       'noise_kwargs': {'predictive_noise_variance': None},
+       'implied_values': {'observation_noise_variance_parameter': 0.,
+                          'predictive_noise_variance_parameter': 0.}},
+
+      {'testcase_name': '_pnv_2',
+       'noise_kwargs': {'predictive_noise_variance': 2.},
+       'implied_values': {'observation_noise_variance_parameter': 0.,
+                          'predictive_noise_variance_parameter': 2.}},
+
+      {'testcase_name': '_onv_1',
+       'noise_kwargs': {'observation_noise_variance': 1.},
+       'implied_values': {'observation_noise_variance_parameter': 1.,
+                          'predictive_noise_variance_parameter': 1.}},
+
+      {'testcase_name': '_onv_1_pnv_2',
+       'noise_kwargs': {'observation_noise_variance': 1.,
+                        'predictive_noise_variance': 2.},
+       'implied_values': {'observation_noise_variance_parameter': 1.,
+                          'predictive_noise_variance_parameter': 2.}}
+  )
+  def testInitParameterVariations(self, noise_kwargs, implied_values):
+    num_test_points = 3
+    num_obs_points = 4
+    kernel = psd_kernels.ExponentiatedQuadratic()
+    index_points = np.random.uniform(-1., 1., (num_test_points, 1))
+    observation_index_points = np.random.uniform(-1., 1., (num_obs_points, 1))
+    observations = np.random.uniform(-1., 1., num_obs_points)
+    jitter = 1e-6
+
+    gprm = tfd.GaussianProcessRegressionModel(
+        kernel=kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        jitter=jitter,
+        **noise_kwargs)
+
+    # 'Property' means what was passed to CTOR. 'Parameter' is the effective
+    # value by which the distribution is parameterized.
+    implied_onv_param = implied_values['observation_noise_variance_parameter']
+    implied_pnv_param = implied_values['predictive_noise_variance_parameter']
+
+    # k_xx - k_xn @ (k_nn + ONV) @ k_nx + PNV
+    k = lambda x, y: _np_kernel_matrix_fn(1., 1., x, y)
+    k_tt_ = k(index_points, index_points)
+    k_tx_ = k(index_points, observation_index_points)
+    k_xx_plus_noise_ = (
+        k(observation_index_points, observation_index_points) +
+        (jitter + implied_onv_param) * np.eye(num_obs_points))
+
+    expected_predictive_covariance = (
+        k_tt_ - np.dot(k_tx_, np.linalg.solve(k_xx_plus_noise_, k_tx_.T)) +
+        implied_pnv_param * np.eye(num_test_points))
+
+    # Assertion 1: predictive covariance is correct.
+    self.assertAllClose(self.evaluate(gprm.covariance()),
+                        expected_predictive_covariance)
+
+    # Assertion 2: predictive_noise_variance property is correct
+    self.assertIsInstance(gprm.predictive_noise_variance, tf.Tensor)
+    self.assertAllClose(
+        self.evaluate(gprm.predictive_noise_variance), implied_pnv_param)
+
+    # Assertion 3: observation_noise_variance property is correct.
+    self.assertIsInstance(gprm.observation_noise_variance, tf.Tensor)
+    self.assertAllClose(
+        self.evaluate(gprm.observation_noise_variance),
+        # Note that this is, somewhat unintuitively, expceted to equal the
+        # predictive_noise_variance. This is because of 1) the inheritance
+        # structure of GPRM as a subclass of GaussianProcess and 2) the poor
+        # choice of name of the GaussianProcess noise parameter. The latter
+        # issue is being cleaned up in cl/256413439.
+        implied_pnv_param)
+
+
 class GaussianProcessRegressionModelStaticTest(
-    _GaussianProcessRegressionModelTest, tf.test.TestCase):
+    _GaussianProcessRegressionModelTest):
   is_static = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
 class GaussianProcessRegressionModelDynamicTest(
-    _GaussianProcessRegressionModelTest, tf.test.TestCase):
+    _GaussianProcessRegressionModelTest):
   is_static = False
 
+del _GaussianProcessRegressionModelTest
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

@@ -55,12 +55,12 @@ class ReciprocalTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       dict(
-          testcase_name='positive',
+          testcase_name='Positive',
           lower_x=.1,
           upper_x=10.
           ),
       dict(
-          testcase_name='negative',
+          testcase_name='Negative',
           lower_x=-10.,
           upper_x=-.1
           )
@@ -69,7 +69,7 @@ class ReciprocalTest(tf.test.TestCase, parameterized.TestCase):
     bijector = tfb.Reciprocal()
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=lower_x, upper_x=upper_x, eval_func=self.evaluate,
-        rtol=0.05)
+        rtol=0.2)
 
   @parameterized.named_parameters(
       dict(

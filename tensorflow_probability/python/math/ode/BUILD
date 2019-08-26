@@ -33,6 +33,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # six dep,
+        # tensorflow dep,
     ],
 )
 
@@ -98,6 +99,19 @@ py_library(
     name = "util",
     srcs = ["util.py"],
     deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
+py_test(
+    name = "util_test",
+    size = "small",
+    srcs = ["util_test.py"],
+    deps = [
+        ":util",
+        # absl/testing:parameterized dep,
+        # numpy dep,
         # tensorflow dep,
     ],
 )

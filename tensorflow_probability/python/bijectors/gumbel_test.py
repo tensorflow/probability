@@ -22,11 +22,11 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -57,7 +57,7 @@ class GumbelTest(tf.test.TestCase):
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
         tfb.Gumbel(loc=0.3, scale=20.), lower_x=1., upper_x=100.,
-        eval_func=self.evaluate, rtol=0.02)
+        eval_func=self.evaluate, rtol=0.05)
 
   def testBijectiveAndFinite(self):
     bijector = tfb.Gumbel(loc=0., scale=3.0, validate_args=True)
@@ -66,10 +66,11 @@ class GumbelTest(tf.test.TestCase):
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
 
+  @tfp_test_util.jax_disable_variable_test
   def testVariableScale(self):
     x = tf.Variable(1.)
     b = tfb.Gumbel(loc=0., scale=x, validate_args=True)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(x.initializer)
     self.assertIs(x, b.scale)
     self.assertEqual((), self.evaluate(b.forward(-3.)).shape)
     with self.assertRaisesOpError("Argument `scale` must be positive."):

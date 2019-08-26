@@ -35,13 +35,11 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     'Distribution',
-    'ConditionalDistribution',
 ]
 
 _DISTRIBUTION_PUBLIC_METHOD_WRAPPERS = [
@@ -67,6 +65,9 @@ _DISTRIBUTION_PUBLIC_METHOD_WRAPPERS = [
 ]
 
 _ALWAYS_COPY_PUBLIC_METHOD_WRAPPERS = ['kl_divergence', 'cross_entropy']
+
+
+JAX_MODE = False  # Overwritten by rewrite script.
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -492,6 +493,9 @@ class Distribution(_BaseDistribution):
     self._initial_parameter_control_dependencies = tuple(
         d for d in self._parameter_control_dependencies(is_init=True)
         if d is not None)
+    if self._initial_parameter_control_dependencies:
+      self._initial_parameter_control_dependencies = (
+          tf.group(*self._initial_parameter_control_dependencies),)
 
   @classmethod
   def param_shapes(cls, sample_shape, name='DistributionParamShapes'):
@@ -814,8 +818,9 @@ class Distribution(_BaseDistribution):
   def _call_sample_n(self, sample_shape, seed, name, **kwargs):
     """Wrapper around _sample_n."""
     with self._name_and_control_scope(name):
-      sample_shape = tf.convert_to_tensor(
-          sample_shape, dtype=tf.int32, name='sample_shape')
+      if JAX_MODE and seed is None:
+        raise ValueError('Must provide JAX PRNGKey as `dist.sample(seed=.)`')
+      sample_shape = tf.cast(sample_shape, tf.int32, name='sample_shape')
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, 'sample_shape')
       samples = self._sample_n(n, seed, **kwargs)
@@ -1468,20 +1473,3 @@ def _str_dtype(x):
   # `PrettyDict`s so __str__, __repr__ are deterministic.
   x = _recursively_replace_dict_for_pretty_dict(x)
   return str(tf.nest.map_structure(_str, x)).replace('\'', '')
-
-
-class ConditionalDistribution(Distribution):
-  """Distribution that supports intrinsic parameters (local latents).
-
-  Subclasses of this distribution may have additional keyword arguments passed
-  to their sample-based methods (i.e. `sample`, `log_prob`, etc.).
-  """
-
-  @deprecation.deprecated(
-      '2019-07-01',
-      '`ConditionalDistribution` is no longer required; `Distribution` '
-      'top-level functions now pass-through `**kwargs`.',
-      warn_once=True)
-
-  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
-    return super(ConditionalDistribution, cls).__new__(cls)

@@ -23,7 +23,7 @@ import numpy as np
 
 import tensorflow as tf
 
-from tensorflow_probability.python import distributions
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -228,7 +228,7 @@ def sample_halton_sequence(dim,
     if not randomized:
       coeffs /= radixes
       return tf.reduce_sum(input_tensor=coeffs / weights, axis=-1)
-    stream = distributions.SeedStream(seed, salt='MCMCSampleHaltonSequence')
+    stream = SeedStream(seed, salt='MCMCSampleHaltonSequence')
     coeffs = _randomize(coeffs, radixes, seed=stream())
     # Remove the contribution from randomizing the trailing zero for the
     # axes where max_size_by_axes < max_size. This will be accounted
@@ -254,7 +254,7 @@ def _randomize(coeffs, radixes, seed=None):
   coeffs = tf.cast(coeffs, dtype=tf.int32)
   num_coeffs = tf.shape(input=coeffs)[-1]
   radixes = tf.reshape(tf.cast(radixes, dtype=tf.int32), shape=[-1])
-  stream = distributions.SeedStream(seed, salt='MCMCSampleHaltonSequence2')
+  stream = SeedStream(seed, salt='MCMCSampleHaltonSequence2')
   perms = _get_permutations(num_coeffs, radixes, seed=stream())
   perms = tf.reshape(perms, shape=[-1])
   radix_sum = tf.reduce_sum(input_tensor=radixes)
@@ -288,7 +288,8 @@ def _get_permutations(num_results, dims, seed=None):
     dtype as `dims`.
   """
   sample_range = tf.range(num_results)
-  stream = distributions.SeedStream(seed, salt='MCMCSampleHaltonSequence3')
+  stream = SeedStream(seed, salt='MCMCSampleHaltonSequence3')
+
   def generate_one(d):
     seed = stream()
     fn = lambda _: tf.random.shuffle(tf.range(d), seed=seed)

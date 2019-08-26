@@ -182,7 +182,7 @@ class Dirichlet(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration], dtype_hint=tf.float32)
-      self._concentration = tensor_util.convert_immutable_to_tensor(
+      self._concentration = tensor_util.convert_nonref_to_tensor(
           concentration, dtype=dtype, name='concentration')
       super(Dirichlet, self).__init__(
           dtype=self._concentration.dtype,
@@ -343,7 +343,7 @@ class Dirichlet(distribution.Distribution):
       assert not assertions  # Should never happen.
       return []
 
-    if is_init != tensor_util.is_mutable(self.concentration):
+    if is_init != tensor_util.is_ref(self.concentration):
       assertions.append(assert_util.assert_positive(
           self.concentration,
           message='Argument `concentration` must be positive.'))

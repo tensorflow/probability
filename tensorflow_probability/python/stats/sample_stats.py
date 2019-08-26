@@ -22,16 +22,20 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math.generic import reduce_logmeanexp
+
 
 __all__ = [
     'auto_correlation',
     'cholesky_covariance',
     'correlation',
     'covariance',
+    'log_average_probs',
     'stddev',
     'variance',
 ]
@@ -637,6 +641,131 @@ def variance(x, sample_axis=0, keepdims=False, name=None):
   with tf.name_scope(name or 'variance'):
     return covariance(
         x, y=None, sample_axis=sample_axis, event_axis=None, keepdims=keepdims)
+
+
+def log_average_probs(logits, sample_axis=0, event_axis=None, keepdims=False,
+                      validate_args=False, name=None):
+  """Computes `log(average(to_probs(logits)))` in a numerically stable manner.
+
+  The meaning of `to_probs` is controlled by the `event_axis` argument. When
+  `event_axis` is `None`, `to_probs = tf.math.sigmoid` and otherwise
+  `to_probs = lambda x: tf.math.log_softmax(x, axis=event_axis)`.
+
+  `sample_axis` and `event_axis` should have a null intersection. This
+  requirement is always verified when `validate_args` is `True`.
+
+  Args:
+    logits: A `float` `Tensor` representing logits.
+    sample_axis: Scalar or vector `Tensor` designating axis holding samples, or
+      `None` (meaning all axis hold samples).
+      Default value: `0` (leftmost dimension).
+    event_axis: Scalar or vector `Tensor` designating the axis representing
+      categorical logits.
+      Default value: `None` (i.e., Bernoulli logits).
+    keepdims:  Boolean.  Whether to keep the sample axis as singletons.
+      Default value: `False` (i.e., squeeze the reduced dimensions).
+    validate_args: Python `bool`, default `False`. When `True` distribution
+      parameters are checked for validity despite possibly degrading runtime
+      performance. When `False` invalid inputs may silently render incorrect
+      outputs.
+      Default value: `False` (i.e., do not validate args).
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'log_average_probs'`).
+
+  Returns:
+    log_avg_probs: The natural log of the average of probs computed from logits.
+  """
+  with tf.name_scope(name or 'average_sigmoid'):
+    logits = tf.convert_to_tensor(logits, dtype_hint=tf.float32, name='logits')
+    if sample_axis is not None:
+      sample_axis = tf.convert_to_tensor(
+          sample_axis, dtype_hint=tf.int32, name='sample_axis')
+    if event_axis is not None:
+      event_axis = tf.convert_to_tensor(
+          event_axis, dtype_hint=tf.int32, name='event_axis')
+    if event_axis is None:
+      # log(sigmoid(x)) = log(1 / (1 + exp(-x))) = -log1p(exp(-x)) = -sp(-x)
+      log_probs = -tf.math.softplus(-logits)
+    else:
+      sample_axis, event_axis = _log_average_probs_process_args(
+          logits, validate_args, sample_axis, event_axis)
+      with tf.control_dependencies(_log_average_probs_maybe_check_args(
+          sample_axis, event_axis, validate_args)):
+        log_probs = _log_softmax(logits, axis=event_axis)
+    return reduce_logmeanexp(log_probs, axis=sample_axis, keepdims=keepdims)
+
+
+# TODO(b/137873989): Use tf.log_softmax once it correctly supports axis arg.
+def _log_softmax(x, axis, name=None):
+  """Alternative to `tf.log_softmax` which correctly supports axis arg."""
+  with tf.name_scope(name or 'log_softmax'):
+    if axis is None:
+      return tf.math.log_softmax(x, axis=None, name=name)
+    rank = prefer_static.rank(axis)
+    if rank == 0:
+      return tf.math.log_softmax(x, axis=axis, name=name)
+    if rank == 1:
+      return tf.math.log_softmax(x, axis=axis[0], name=name)
+    # The following handles the case when axis is a vector and which is not
+    # currently supported by tf.math.log_softmax.
+    x = tf.convert_to_tensor(x, dtype_hint=tf.float32, name='x')
+    return x - tf.reduce_logsumexp(x, axis=axis, keepdims=True)
+
+
+def _log_average_probs_process_args(
+    logits, validate_args, sample_axis, event_axis):
+  """Processes args for `log_average_probs`."""
+  rank = prefer_static.rank(logits)
+  if sample_axis is None or validate_args:
+    event_axis = prefer_static.reshape(
+        prefer_static.non_negative_axis(event_axis, rank),
+        shape=[-1])
+  if sample_axis is None:
+    sample_axis = prefer_static.setdiff1d(
+        prefer_static.range(rank), event_axis)
+  elif validate_args:
+    sample_axis = prefer_static.reshape(
+        prefer_static.non_negative_axis(sample_axis, rank),
+        shape=[-1])
+  return sample_axis, event_axis
+
+
+def _log_average_probs_maybe_check_args(sample_axis, event_axis, validate_args):
+  """Assertions for `log_average_probs`."""
+  assertions = []
+  msg = 'Arguments `sample_axis` and `event_axis` must be distinct.'
+  sample_setdiff = prefer_static.setdiff1d(sample_axis, event_axis)
+  if prefer_static.is_numpy(sample_setdiff):
+    if not np.array_equal(sample_setdiff, tf.get_static_value(sample_axis)):
+      raise ValueError(msg)
+  elif validate_args:
+    assertions.append(_assert_array_equal(
+        sample_setdiff, sample_axis,
+        message=msg, name='sample_setdiff_rank_check'))
+  event_setdiff = prefer_static.setdiff1d(event_axis, sample_axis)
+  if prefer_static.is_numpy(event_setdiff):
+    if not np.array_equal(event_setdiff, tf.get_static_value(event_axis)):
+      raise ValueError(msg)
+  elif validate_args:
+    assertions.append(_assert_array_equal(
+        event_setdiff, event_axis,
+        message=msg, name='event_setdiff_rank_check'))
+  return assertions
+
+
+def _assert_array_equal(x, y, message, name=None):
+  """TF assertion similar to checking `np.array_equal`."""
+  with tf.name_scope(name or 'array_equal_check'):
+    rank_check = assert_util.assert_equal(
+        tf.rank(x), tf.rank(y),
+        message=message, name='rank_check')
+    shape_check = assert_util.assert_equal(
+        tf.shape(x), tf.shape(y),
+        message=message, name='shape_check')
+    with tf.control_dependencies([rank_check]):
+      with tf.control_dependencies([shape_check]):
+        return assert_util.assert_equal(
+            x, y, message=message, name='value_check')
 
 
 def _is_list_like(x):
