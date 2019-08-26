@@ -116,6 +116,8 @@ TreeDoublingMetaState = collections.namedtuple(
     [
         'candidate_state',  # A namedtuple of TreeDoublingStateCandidate
         'is_accepted',
+        'momentum_sum',     # sum of momentum of the current tree for
+                            # generalized U turn criteria
         'energy_diff_sum',  # sum of the energy differences (H' - H0) within the
                             # single subtree
         'leapfrog_count',
@@ -128,13 +130,13 @@ class NoUTurnSampler(TransitionKernel):
   """Runs one step of the No U-Turn Sampler.
 
   The No U-Turn Sampler (NUTS) is an adaptive variant of the Hamiltonian Monte
-  Carlo (HMC) method for MCMC.  NUTS adapts the distance traveled in response to
-  the curvature of the target density.  Conceptually, one proposal consists of
+  Carlo (HMC) method for MCMC. NUTS adapts the distance traveled in response to
+  the curvature of the target density. Conceptually, one proposal consists of
   reversibly evolving a trajectory through the sample space, continuing until
-  that trajectory turns back on itself (hence the name, 'No U-Turn').  This
-  class implements one random NUTS step from a given
-  `current_state`.  Mathematical details and derivations can be found in
-  [Hoffman, Gelman (2011)][1].
+  that trajectory turns back on itself (hence the name, 'No U-Turn'). This class
+  implements one random NUTS step from a given `current_state`.
+  Mathematical details and derivations can be found in
+  [Hoffman, Gelman (2011)][1] and [Betancourt (2018)][2].
 
   The `one_step` function can update multiple chains in parallel. It assumes
   that a prefix of leftmost dimensions of `current_state` index independent
@@ -148,9 +150,12 @@ class NoUTurnSampler(TransitionKernel):
 
   #### References
 
-  [1] Matthew D. Hoffman, Andrew Gelman.  The No-U-Turn Sampler: Adaptively
+  [1]: Matthew D. Hoffman, Andrew Gelman.  The No-U-Turn Sampler: Adaptively
   Setting Path Lengths in Hamiltonian Monte Carlo.  2011.
   https://arxiv.org/pdf/1111.4246.pdf.
+
+  [2]: Michael Betancourt. A Conceptual Introduction to Hamiltonian Monte Carlo.
+  _arXiv preprint arXiv:1701.02434_, 2018. https://arxiv.org/abs/1701.02434
   """
 
   def __init__(self,
@@ -314,6 +319,7 @@ class NoUTurnSampler(TransitionKernel):
       initial_step_metastate = TreeDoublingMetaState(
           candidate_state=candidate_state,
           is_accepted=tf.zeros_like(init_energy, dtype=tf.bool),
+          momentum_sum=init_momentum,
           energy_diff_sum=tf.zeros_like(init_energy),
           leapfrog_count=tf.zeros_like(init_energy, dtype=TREE_COUNT_DTYPE),
           continue_tree=tf.ones_like(init_energy, dtype=tf.bool),
@@ -510,7 +516,7 @@ class NoUTurnSampler(TransitionKernel):
           final_not_divergence,
           continue_tree_final,
           energy_diff_tree_sum,
-          momentum_tree_cumsum,
+          momentum_subtree_cumsum,
           leapfrogs_taken
       ] = self._build_sub_tree(
           directions_expanded,
@@ -593,6 +599,8 @@ class NoUTurnSampler(TransitionKernel):
                           tf.nest.flatten(tree_otherend_states))
       ])
 
+      momentum_tree_cumsum = [p0 + p1 for p0, p1 in zip(
+          initial_step_metastate.momentum_sum, momentum_subtree_cumsum)]
       if GENERALIZED_UTURN:
         state_diff = momentum_tree_cumsum
       else:
@@ -607,6 +615,7 @@ class NoUTurnSampler(TransitionKernel):
       new_step_metastate = TreeDoublingMetaState(
           candidate_state=new_candidate_state,
           is_accepted=choose_new_state | initial_step_metastate.is_accepted,
+          momentum_sum=momentum_tree_cumsum,
           energy_diff_sum=(
               energy_diff_tree_sum + initial_step_metastate.energy_diff_sum),
           continue_tree=continue_tree_final & no_u_turns_trajectory,
