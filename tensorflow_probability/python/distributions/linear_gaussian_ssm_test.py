@@ -336,6 +336,34 @@ class SanityChecks(tf.test.TestCase):
 
     self.assertAllClose(observation_variances, variance_[..., 0])
 
+  def testWhenNumTimestepsIsOne(self):
+
+    num_timesteps = 1
+    latent_size = 5
+    transition_std = 3.0
+    observation_std = 5.0
+
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=tfl.LinearOperatorIdentity(latent_size),
+        transition_noise=tfd.MultivariateNormalDiag(
+            scale_diag=tf.fill([latent_size], tf.square(transition_std))),
+        observation_matrix=tfl.LinearOperatorIdentity(latent_size),
+        observation_noise=tfd.MultivariateNormalDiag(
+            scale_diag=tf.fill([latent_size], tf.square(observation_std))),
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            scale_diag=tf.ones([latent_size])))
+
+    sample_, mean_, variance_ = self.evaluate(
+        [model.sample(), model.mean(), model.variance()])
+
+    result_shape = [num_timesteps, latent_size]
+    self.assertAllEqual(tensorshape_util.as_list(sample_.shape), result_shape)
+    self.assertAllEqual(tensorshape_util.as_list(mean_.shape), result_shape)
+    self.assertAllEqual(
+        tensorshape_util.as_list(variance_.shape),
+        result_shape)
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class BatchTest(tf.test.TestCase):
