@@ -196,7 +196,7 @@ def matmul_compatible_pairs(draw,
 
 
 @hps.composite
-def psd_matrices(draw, eps=1e-2):
+def pd_matrices(draw, eps=1.):
   x = draw(
       single_arrays(
           shape=shapes(min_dims=2),
@@ -210,7 +210,7 @@ def psd_matrices(draw, eps=1e-2):
 
 @hps.composite
 def nonsingular_matrices(draw):
-  mat = draw(psd_matrices())  # pylint: disable=no-value-for-parameter
+  mat = draw(pd_matrices())  # pylint: disable=no-value-for-parameter
   signs = draw(
       hnp.arrays(
           mat.dtype,
@@ -326,8 +326,8 @@ NUMPY_TEST_CASES = [
     #         defaults=(None,))
     TestCase('linalg.cholesky_solve', [
         matmul_compatible_pairs(
-            x_strategy=psd_matrices().map(np.linalg.cholesky))
-    ], jax_disabled='See discussion in http://b/140073324'),
+            x_strategy=pd_matrices().map(np.linalg.cholesky))
+    ]),
 
     # ArgSpec(args=['coeffs', 'x', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -362,7 +362,7 @@ NUMPY_TEST_CASES = [
              [single_arrays(dtype=np.complex64, elements=complex_numbers())]),
     TestCase('math.real',
              [single_arrays(dtype=np.complex64, elements=complex_numbers())]),
-    TestCase('linalg.cholesky', [psd_matrices()]),
+    TestCase('linalg.cholesky', [pd_matrices()]),
     TestCase('linalg.lu', [nonsingular_matrices()]),
     TestCase('linalg.diag_part', [single_arrays(shape=shapes(min_dims=2))]),
     TestCase('identity', [single_arrays()]),
@@ -442,7 +442,7 @@ NUMPY_TEST_CASES = [
     # keywords=None, defaults=(True, False, None))
     TestCase('linalg.triangular_solve', [
         matmul_compatible_pairs(
-            x_strategy=psd_matrices().map(np.linalg.cholesky))
+            x_strategy=pd_matrices().map(np.linalg.cholesky))
     ]),
 
     # ArgSpec(args=['shape_x', 'shape_y'], varargs=None, keywords=None,
