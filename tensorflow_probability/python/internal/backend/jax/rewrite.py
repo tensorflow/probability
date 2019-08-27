@@ -45,6 +45,7 @@ def main(argv):
   contents = contents.replace('np.generic', 'onp.generic')
   contents = contents.replace('np.broadcast', 'onp.broadcast')
   contents = contents.replace('JAX_MODE = False', 'JAX_MODE = True')
+  contents = contents.replace('NumpyTest', 'JaxTest')
 
   print(contents)
 
