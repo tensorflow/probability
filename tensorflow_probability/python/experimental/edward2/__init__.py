@@ -18,9 +18,9 @@
 For user guides, see:
 
 + [Overview](
-   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/README.md)
+   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/README.md)
 + [Upgrading from Edward to Edward2](
-   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/Upgrading_From_Edward_To_Edward2.md)
+   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/Upgrading_From_Edward_To_Edward2.md)
 
 """
 
