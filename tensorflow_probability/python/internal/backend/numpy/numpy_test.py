@@ -662,8 +662,8 @@ class NumpyTest(test_case.TestCase, parameterized.TestCase):
                       tensorflow_function,
                       numpy_function,
                       strategy_list,
-                      atol=1e-6,
-                      rtol=1e-6,
+                      atol=1e-5,
+                      rtol=1e-5,
                       jax_disabled=False,
                       assert_shape_only=False,
                       jax_kwargs=lambda: {}):
