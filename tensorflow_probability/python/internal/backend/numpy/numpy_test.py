@@ -327,7 +327,7 @@ NUMPY_TEST_CASES = [
     TestCase('linalg.cholesky_solve', [
         matmul_compatible_pairs(
             x_strategy=psd_matrices().map(np.linalg.cholesky))
-    ]),
+    ], jax_disabled='See discussion in http://b/140073324'),
 
     # ArgSpec(args=['coeffs', 'x', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
