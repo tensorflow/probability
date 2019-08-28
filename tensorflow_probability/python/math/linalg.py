@@ -50,11 +50,53 @@ __all__ = [
     'sparse_or_dense_matvecmul',
 ]
 
+
+def matrix_rank(a, tol=None, validate_args=False, name=None):
+  """Compute the matrix rank; the number of non-zero SVD singular values.
+
+  Arguments:
+    a: (Batch of) `float`-like matrix-shaped `Tensor`(s) which are to be
+      pseudo-inverted.
+    tol: Threshold below which the singular value is counted as 'zero'.
+      Default value: `None` (i.e., `eps * max(rows, cols) * max(singular_val)`).
+    validate_args: When `True`, additional assertions might be embedded in the
+      graph.
+      Default value: `False` (i.e., no graph assertions are added).
+    name: Python `str` prefixed to ops created by this function.
+      Default value: 'matrix_rank'.
+
+  Returns:
+    matrix_rank: (Batch of) `int32` scalars representing the number of non-zero
+      singular values.
+  """
+  with tf.name_scope(name or 'matrix_rank'):
+    a = tf.convert_to_tensor(a, dtype_hint=tf.float32, name='a')
+    assertions = _maybe_validate_matrix(a, validate_args)
+    if assertions:
+      with tf.control_dependencies(assertions):
+        a = tf.identity(a)
+    s = tf.linalg.svd(a, compute_uv=False)
+    if tol is None:
+      if tensorshape_util.is_fully_defined(a.shape[-2:]):
+        m = np.max(a.shape[-2:].as_list())
+      else:
+        m = tf.reduce_max(tf.shape(a)[-2:])
+      eps = np.finfo(dtype_util.as_numpy_dtype(a.dtype)).eps
+      tol = (
+          eps * tf.cast(m, a.dtype) * tf.reduce_max(s, axis=-1, keepdims=True))
+    return tf.reduce_sum(tf.cast(s > tol, tf.int32), axis=-1)
+
+
+try:
+  matrix_rank = tf.linalg.matrix_rank
+except AttributeError:
+  pass
+
+
 matrix_rank = deprecation.deprecated(
     '2019-10-01',
     'tfp.math.matrix_rank is deprecated. Use tf.linalg.matrix_rank instead',
-    warn_once=True)(
-        tf.linalg.matrix_rank)
+    warn_once=True)(matrix_rank)
 
 
 def cholesky_concat(chol, cols, name=None):
@@ -296,11 +338,141 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
     return pchol
 
 
+def pinv(a, rcond=None, validate_args=False, name=None):
+  """Compute the Moore-Penrose pseudo-inverse of a matrix.
+
+  Calculate the [generalized inverse of a matrix](
+  https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse) using its
+  singular-value decomposition (SVD) and including all large singular values.
+
+  The pseudo-inverse of a matrix `A`, is defined as: 'the matrix that 'solves'
+  [the least-squares problem] `A @ x = b`,' i.e., if `x_hat` is a solution, then
+  `A_pinv` is the matrix such that `x_hat = A_pinv @ b`. It can be shown that if
+  `U @ Sigma @ V.T = A` is the singular value decomposition of `A`, then
+  `A_pinv = V @ inv(Sigma) U^T`. [(Strang, 1980)][1]
+
+  This function is analogous to [`numpy.linalg.pinv`](
+  https://docs.scipy.org/doc/numpy/reference/generated/numpy.linalg.pinv.html).
+  It differs only in default value of `rcond`. In `numpy.linalg.pinv`, the
+  default `rcond` is `1e-15`. Here the default is
+  `10. * max(num_rows, num_cols) * np.finfo(dtype).eps`.
+
+  Args:
+    a: (Batch of) `float`-like matrix-shaped `Tensor`(s) which are to be
+      pseudo-inverted.
+    rcond: `Tensor` of small singular value cutoffs.  Singular values smaller
+      (in modulus) than `rcond` * largest_singular_value (again, in modulus) are
+      set to zero. Must broadcast against `tf.shape(a)[:-2]`.
+      Default value: `10. * max(num_rows, num_cols) * np.finfo(a.dtype).eps`.
+    validate_args: When `True`, additional assertions might be embedded in the
+      graph.
+      Default value: `False` (i.e., no graph assertions are added).
+    name: Python `str` prefixed to ops created by this function.
+      Default value: 'pinv'.
+
+  Returns:
+    a_pinv: The pseudo-inverse of input `a`. Has same shape as `a` except
+      rightmost two dimensions are transposed.
+
+  Raises:
+    TypeError: if input `a` does not have `float`-like `dtype`.
+    ValueError: if input `a` has fewer than 2 dimensions.
+
+  #### Examples
+
+  ```python
+  import tensorflow as tf
+  import tensorflow_probability as tfp
+
+  a = tf.constant([[1.,  0.4,  0.5],
+                   [0.4, 0.2,  0.25],
+                   [0.5, 0.25, 0.35]])
+  tf.matmul(tfp.math.pinv(a), a)
+  # ==> array([[1., 0., 0.],
+               [0., 1., 0.],
+               [0., 0., 1.]], dtype=float32)
+
+  a = tf.constant([[1.,  0.4,  0.5,  1.],
+                   [0.4, 0.2,  0.25, 2.],
+                   [0.5, 0.25, 0.35, 3.]])
+  tf.matmul(tfp.math.pinv(a), a)
+  # ==> array([[ 0.76,  0.37,  0.21, -0.02],
+               [ 0.37,  0.43, -0.33,  0.02],
+               [ 0.21, -0.33,  0.81,  0.01],
+               [-0.02,  0.02,  0.01,  1.  ]], dtype=float32)
+  ```
+
+  #### References
+
+  [1]: G. Strang. 'Linear Algebra and Its Applications, 2nd Ed.' Academic Press,
+       Inc., 1980, pp. 139-142.
+  """
+  with tf.name_scope(name or 'pinv'):
+    a = tf.convert_to_tensor(a, name='a')
+
+    assertions = _maybe_validate_matrix(a, validate_args)
+    if assertions:
+      with tf.control_dependencies(assertions):
+        a = tf.identity(a)
+
+    dtype = dtype_util.as_numpy_dtype(a.dtype)
+
+    if rcond is None:
+      def get_dim_size(dim):
+        if tf.compat.dimension_value(a.shape[dim]) is not None:
+          return tf.compat.dimension_value(a.shape[dim])
+        return tf.shape(a)[dim]
+
+      num_rows = get_dim_size(-2)
+      num_cols = get_dim_size(-1)
+      if isinstance(num_rows, int) and isinstance(num_cols, int):
+        max_rows_cols = float(max(num_rows, num_cols))
+      else:
+        max_rows_cols = tf.cast(tf.maximum(num_rows, num_cols), dtype)
+      rcond = 10. * max_rows_cols * np.finfo(dtype).eps
+
+    rcond = tf.convert_to_tensor(rcond, dtype=dtype, name='rcond')
+
+    # Calculate pseudo inverse via SVD.
+    # Note: if a is symmetric then u == v. (We might observe additional
+    # performance by explicitly setting `v = u` in such cases.)
+    [
+        singular_values,         # Sigma
+        left_singular_vectors,   # U
+        right_singular_vectors,  # V
+    ] = tf.linalg.svd(a, full_matrices=False, compute_uv=True)
+
+    # Saturate small singular values to inf. This has the effect of make
+    # `1. / s = 0.` while not resulting in `NaN` gradients.
+    cutoff = rcond * tf.reduce_max(singular_values, axis=-1)
+    singular_values = tf.where(
+        singular_values > cutoff[..., tf.newaxis], singular_values,
+        np.array(np.inf, dtype))
+
+    # Although `a == tf.matmul(u, s * v, transpose_b=True)` we swap
+    # `u` and `v` here so that `tf.matmul(pinv(A), A) = tf.eye()`, i.e.,
+    # a matrix inverse has 'transposed' semantics.
+    a_pinv = tf.matmul(
+        right_singular_vectors / singular_values[..., tf.newaxis, :],
+        left_singular_vectors,
+        adjoint_b=True)
+
+    if tensorshape_util.rank(a.shape) is not None:
+      a_pinv.set_shape(a.shape[:-2].concatenate([a.shape[-1], a.shape[-2]]))
+
+    return a_pinv
+
+
+try:
+  pinv = tf.linalg.pinv
+except AttributeError:
+  pass
+
+
 pinv = deprecation.deprecated(
     '2019-10-01',
     'tfp.math.pinv is deprecated. Use tf.linalg.pinv instead',
-    warn_once=True)(
-        tf.linalg.pinv)
+    warn_once=True)(pinv)
 
 
 def lu_solve(lower_upper, perm, rhs,
