@@ -204,6 +204,11 @@ class DeferredTensor(tf.Module):
     """Represents the shape of a `Tensor`."""
     return self._shape
 
+  # TODO(b/140157055): Remove this shim.
+  def get_shape(self):
+    """Legacy means of getting Tensor shape, for compat with 2.0.0 LinOp."""
+    return self._shape
+
   @property
   def name(self):
     """The string name of this object."""
