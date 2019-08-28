@@ -282,8 +282,11 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
     self.assertTrue(
         np.any(np.isin(np.asarray([5, 9, 11, 13]), np.unique(leapfrogs_taken))))
 
-  def testDynamicShape(self):
-    nsample, batch_size, nd = 7, 5, 3
+  @parameterized.parameters(
+      (7, 5, 3, None),
+      (7, 5, 1, tf.TensorShape([None, 1])),
+  )
+  def testDynamicShape(self, nsample, batch_size, nd, dynamic_shape):
     dtype = np.float32
 
     kernel = tfp.mcmc.NoUTurnSampler(
@@ -291,7 +294,7 @@ class NutsTest(parameterized.TestCase, tf.test.TestCase):
             tfd.Normal(tf.zeros(nd, dtype=dtype), 1.), 1).log_prob,
         step_size=.1)
     x_ = np.zeros([batch_size, nd], dtype=dtype)
-    x = tf1.placeholder_with_default(x_, shape=None)
+    x = tf1.placeholder_with_default(x_, shape=dynamic_shape)
     mcmc_trace_ = tfp.mcmc.sample_chain(
         num_results=nsample,
         current_state=x,

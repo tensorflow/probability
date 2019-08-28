@@ -579,6 +579,15 @@ class NoUTurnSampler(TransitionKernel):
               candidate_tree_state.energy, last_candidate_state.energy),
           weight=weight_sum)
 
+      for new_candidate_state_temp, old_candidate_state_temp in zip(
+          new_candidate_state.state, last_candidate_state.state):
+        new_candidate_state_temp.set_shape(old_candidate_state_temp.shape)
+
+      for new_candidate_grad_temp, old_candidate_grad_temp in zip(
+          new_candidate_state.target_grad_parts,
+          last_candidate_state.target_grad_parts):
+        new_candidate_grad_temp.set_shape(old_candidate_grad_temp.shape)
+
       # Update left right information of the trajectory, and check trajectory
       # level U turn
       tree_otherend_states = tf.nest.map_structure(
@@ -599,8 +608,18 @@ class NoUTurnSampler(TransitionKernel):
                           tf.nest.flatten(tree_otherend_states))
       ])
 
-      momentum_tree_cumsum = [p0 + p1 for p0, p1 in zip(
-          initial_step_metastate.momentum_sum, momentum_subtree_cumsum)]
+      momentum_tree_cumsum = []
+      for p0, p1 in zip(
+          initial_step_metastate.momentum_sum, momentum_subtree_cumsum):
+        momentum_part_temp = p0 + p1
+        momentum_part_temp.set_shape(p0.shape)
+        momentum_tree_cumsum.append(momentum_part_temp)
+
+      for new_state_temp, old_state_temp in zip(
+          tf.nest.flatten(new_step_state),
+          tf.nest.flatten(initial_step_state)):
+        new_state_temp.set_shape(old_state_temp.shape)
+
       if GENERALIZED_UTURN:
         state_diff = momentum_tree_cumsum
       else:
