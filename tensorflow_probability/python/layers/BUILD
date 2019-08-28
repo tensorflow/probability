@@ -219,3 +219,25 @@ py_test(
         "//tensorflow_probability",
     ],
 )
+
+py_library(
+    name = "weight_norm",
+    srcs = [
+        "weight_norm.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "weight_norm_test",
+    srcs = ["weight_norm_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/layers:weight_norm",
+    ],
+)
