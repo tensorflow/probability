@@ -94,6 +94,7 @@ def gen_module(module_name):
       'from tensorflow.python.ops.distributions import '
       'util as distribution_util', DIST_UTIL_IMPORT)
   code = code.replace('.base_dtype', '')
+  code = code.replace('.get_shape()', '.shape')
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+\.shape)([^(_])',
                 '_ops.TensorShape(\\1)\\2', code)
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_complex',
