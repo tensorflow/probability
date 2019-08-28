@@ -148,8 +148,7 @@ def vector_size_to_square_matrix_size(d, validate_args, name=None):
             assert_util.assert_equal(
                 tf.cast(tf.cast(n, dtype=tf.int32), dtype=tf.float32),
                 n,
-                data=[d],
-                message='Vector length is not a triangular number')
+                data=['Vector length is not a triangular number: ', d])
         ]):
           n = tf.identity(n)
       return tf.cast(n, d.dtype)

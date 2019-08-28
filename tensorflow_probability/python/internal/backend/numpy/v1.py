@@ -68,14 +68,13 @@ __all__ = [
 
 
 def _assert_equal(x, y, data=None, summarize=None, message=None, name=None):
-  del data
   del summarize
   del name
   x = convert_to_tensor(x)
   y = convert_to_tensor(y)
   if not np.all(np.equal(x, y)):
-    raise ValueError('Expected x == y but got {} vs {} {}'.format(
-        x, y, message or ''))
+    raise ValueError('Expected x == y but got {} vs {} {} {}'.format(
+        x, y, message or '', data or ''))
 
 
 def _assert_greater(*_, **__):  # pylint: disable=unused-argument
