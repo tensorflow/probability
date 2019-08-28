@@ -269,9 +269,15 @@ matmul = utils.copy_docstring(
     tf.linalg.matmul,
     _matmul)
 
-matrix_rank = utils.copy_docstring(
-    tf.linalg.matrix_rank,
-    lambda input, name=None: np.linalg.matrix_rank(input))
+# TODO(b/140157055): Remove the try/except.
+matrix_rank = lambda input, name=None: np.linalg.matrix_rank(input)
+
+try:
+  matrix_rank = utils.copy_docstring(
+      tf.linalg.matrix_rank,
+      lambda input, name=None: np.linalg.matrix_rank(input))
+except AttributeError:
+  pass
 
 norm = utils.copy_docstring(
     tf.norm,
@@ -282,8 +288,14 @@ norm = utils.copy_docstring(
                axis=-1 if axis is None else axis, keepdims=bool(keepdims))
 )
 
-pinv = utils.copy_docstring(
-    tf.linalg.pinv, lambda input, name=None: np.linalg.pinv(input))
+# TODO(b/140157055): Remove the try/except.
+pinv = lambda input, name=None: np.linalg.pinv(input)
+
+try:
+  pinv = utils.copy_docstring(
+      tf.linalg.pinv, lambda input, name=None: np.linalg.pinv(input))
+except AttributeError:
+  pass
 
 set_diag = utils.copy_docstring(
     tf.linalg.set_diag,
