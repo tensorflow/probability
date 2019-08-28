@@ -32,7 +32,7 @@ def convert_nonref_to_tensor(value, dtype=None, dtype_hint=None, name=None):
   """Converts the given `value` to a `Tensor` if input is nonreference type.
 
   This function converts Python objects of various types to `Tensor` objects
-  except if the input has nonreference semantics. Reference semantics are
+  only if the input has nonreference semantics. Reference semantics are
   characterized by `tensor_util.is_ref` and is any object which is a
   `tf.Variable` or instance of `tf.Module`. This function accepts any input
   which `tf.convert_to_tensor` would also.
