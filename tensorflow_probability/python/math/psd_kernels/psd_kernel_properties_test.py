@@ -28,6 +28,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfpk = tfp.positive_semidefinite_kernels
@@ -40,23 +41,30 @@ FLAGS = flags.FLAGS
 TF2_FRIENDLY_KERNELS = (
     'ExpSinSquared',
     'ExponentiatedQuadratic',
+    'FeatureScaled',
+    'Linear',
     'MaternOneHalf',
     'MaternThreeHalves',
     'MaternFiveHalves',
+    'Polynomial',
     'RationalQuadratic',
     'SchurComplement',
 )
 
 SPECIAL_KERNELS = [
+    'FeatureScaled',
     'SchurComplement'
 ]
 
 INSTANTIABLE_BASE_KERNELS = {
     'ExpSinSquared': dict(amplitude=0, length_scale=0, period=0),
     'ExponentiatedQuadratic': dict(amplitude=0, length_scale=0),
+    'Linear': dict(bias_variance=0, slope_variance=0, shift=0),
     'MaternOneHalf': dict(amplitude=0, length_scale=0),
     'MaternThreeHalves': dict(amplitude=0, length_scale=0),
     'MaternFiveHalves': dict(amplitude=0, length_scale=0),
+    'Polynomial': dict(
+        bias_variance=0, slope_variance=0, shift=0, exponent=0),
     'RationalQuadratic': dict(
         amplitude=0, length_scale=0, scale_mixture_rate=0),
 }
@@ -93,57 +101,83 @@ def broadcasting_params(draw,
           mutex_params=MUTEX_PARAMS))
 
 
+def depths():
+  # TODO(b/139841600): Increase the depth after we can generate kernel input
+  # that are not too close to each other.
+  return hps.integers(min_value=0, max_value=1)
+
+
 @hps.composite
-def kernel_input(
+def feature_scaleds(
     draw,
-    batch_shape,
-    example_dim=None,
-    example_ndims=None,
+    batch_shape=None,
+    event_dim=None,
     feature_dim=None,
-    feature_ndims=None):
-  """Strategy for drawing arbitrary Kernel input.
+    feature_ndims=None,
+    enable_vars=None,
+    depth=None):
+  """Strategy for drawing `FeatureScaled` kernels.
+
+  The underlying kernel is drawn from the `kernels` strategy.
 
   Args:
-    draw: Hypothesis function supplied by `@hps.composite`.
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     batch_shape: An optional `TensorShape`.  The batch shape of the resulting
-      kernel input.  Hypothesis will pick a batch shape if omitted.
-    example_dim: Optional Python int giving the size of each example dimension.
-      If omitted, Hypothesis will choose one.
-    example_ndims: Optional Python int giving the number of example dimensions
-      of the input. If omitted, Hypothesis will choose one.
+      Kernel.  Hypothesis will pick a batch shape if omitted.
+    event_dim: Optional Python int giving the size of each of the
+      kernel's parameters' event dimensions.  This is shared across all
+      parameters, permitting square event matrices, compatible location and
+      scale Tensors, etc. If omitted, Hypothesis will choose one.
     feature_dim: Optional Python int giving the size of each feature dimension.
       If omitted, Hypothesis will choose one.
     feature_ndims: Optional Python int stating the number of feature dimensions
       inputs will have. If omitted, Hypothesis will choose one.
-  Returns:
-    kernel_input: A strategy for drawing kernel_input with the prescribed shape
-      (or an arbitrary one if omitted).
-  """
-  if example_ndims is None:
-    example_ndims = draw(hps.integers(min_value=1, max_value=4))
-  if example_dim is None:
-    example_dim = draw(hps.integers(min_value=2, max_value=6))
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test.  If `False`, the returned parameters are
+      all Tensors, never Variables or DeferredTensor.
+    depth: Python `int` giving maximum nesting depth of compound kernel.
 
-  if feature_ndims is None:
-    feature_ndims = draw(hps.integers(min_value=1, max_value=4))
+  Returns:
+    kernels: A strategy for drawing `FeatureScaled` kernels with the specified
+      `batch_shape` (or an arbitrary one if omitted).
+  """
+  if depth is None:
+    depth = draw(depths())
+  if batch_shape is None:
+    batch_shape = draw(tfp_hps.shapes())
+  if event_dim is None:
+    event_dim = draw(hps.integers(min_value=2, max_value=6))
   if feature_dim is None:
     feature_dim = draw(hps.integers(min_value=2, max_value=6))
+  if feature_ndims is None:
+    feature_ndims = draw(hps.integers(min_value=2, max_value=6))
 
-  input_shape = batch_shape
-  input_shape += [example_dim] * example_ndims
-  input_shape += [feature_dim] * feature_ndims
-  # We would like kernel inputs to be unique. This is to avoid computing kernel
-  # matrices that are semi-definite.
-  return draw(hpnp.arrays(
-      dtype=np.float32,
-      shape=input_shape,
-      elements=hps.floats(
-          -100, 100, allow_nan=False, allow_infinity=False),
-      unique=True))
+  base_kernel, kernel_variable_names = draw(kernels(
+      batch_shape=batch_shape,
+      event_dim=event_dim,
+      feature_dim=feature_dim,
+      feature_ndims=feature_ndims,
+      enable_vars=False,
+      depth=depth-1))
+  scale_diag = tfp_hps.softplus_plus_eps()(draw(kernel_hps.kernel_input(
+      batch_shape=batch_shape,
+      example_ndims=0,
+      feature_dim=feature_dim,
+      feature_ndims=feature_ndims)))
 
+  hp.note('Forming FeatureScaled kernel with scale_diag: {} '.format(
+      scale_diag))
 
-def depths():
-  return hps.integers(min_value=0, max_value=2)
+  if enable_vars and draw(hps.booleans()):
+    kernel_variable_names.append('scale_diag')
+    scale_diag = tf.Variable(scale_diag, name='scale_diag')
+    # Don't enable variable counting. This is because rescaling is
+    # done for each input, which will exceed two convert_to_tensor calls.
+  result_kernel = tfp.positive_semidefinite_kernels.FeatureScaled(
+      kernel=base_kernel,
+      scale_diag=scale_diag,
+      validate_args=True)
+  return result_kernel, kernel_variable_names
 
 
 @hps.composite
@@ -200,7 +234,7 @@ def schur_complements(
       depth=depth-1))
 
   # SchurComplement requires the inputs to have one example dimension.
-  fixed_inputs = draw(kernel_input(
+  fixed_inputs = draw(kernel_hps.kernel_input(
       batch_shape=batch_shape,
       example_ndims=1,
       feature_dim=feature_dim,
@@ -240,6 +274,7 @@ def base_kernels(
     kernel_name=None,
     batch_shape=None,
     event_dim=None,
+    feature_dim=None,
     feature_ndims=None,
     enable_vars=False):
   if kernel_name is None:
@@ -248,6 +283,8 @@ def base_kernels(
     batch_shape = draw(tfp_hps.shapes())
   if event_dim is None:
     event_dim = draw(hps.integers(min_value=2, max_value=6))
+  if feature_dim is None:
+    feature_dim = draw(hps.integers(min_value=2, max_value=6))
   if feature_ndims is None:
     feature_ndims = draw(hps.integers(min_value=2, max_value=6))
 
@@ -318,6 +355,7 @@ def kernels(
             kernel_name,
             batch_shape=batch_shape,
             event_dim=event_dim,
+            feature_dim=feature_dim,
             feature_ndims=feature_ndims,
             enable_vars=enable_vars))
 
@@ -329,6 +367,15 @@ def kernels(
         feature_ndims=feature_ndims,
         enable_vars=enable_vars,
         depth=depth))
+  elif kernel_name == 'FeatureScaled':
+    return draw(feature_scaleds(
+        batch_shape=batch_shape,
+        event_dim=event_dim,
+        feature_dim=feature_dim,
+        feature_ndims=feature_ndims,
+        enable_vars=enable_vars,
+        depth=depth))
+
   raise ValueError('Kernel name not found.')
 
 
@@ -374,7 +421,7 @@ class KernelPropertiesTest(tf.test.TestCase, parameterized.TestCase):
     example_ndims = data.draw(hps.integers(min_value=1, max_value=3))
     input_batch_shape = data.draw(tfp_hps.broadcast_compatible_shape(
         kernel.batch_shape))
-    xs = tf.identity(data.draw(kernel_input(
+    xs = tf.identity(data.draw(kernel_hps.kernel_input(
         batch_shape=input_batch_shape,
         example_ndims=example_ndims,
         feature_dim=feature_dim,
@@ -393,13 +440,14 @@ class KernelPropertiesTest(tf.test.TestCase, parameterized.TestCase):
 
 
 CONSTRAINTS = {
-    'amplitude': tfp_hps.softplus_plus_eps(),
+    # Keep amplitudes large enough so that the matrices are well conditioned.
+    'amplitude': tfp_hps.softplus_plus_eps(1.),
+    'bias_variance': tfp_hps.softplus_plus_eps(1.),
+    'slope_variance': tfp_hps.softplus_plus_eps(1.),
+    'exponent': tfp_hps.softplus_plus_eps(),
     'length_scale': tfp_hps.softplus_plus_eps(),
     'period': tfp_hps.softplus_plus_eps(),
     'scale_mixture_rate': tfp_hps.softplus_plus_eps(),
-    'bias_variance': tfp_hps.softplus_plus_eps(),
-    'slope_variance': tfp_hps.softplus_plus_eps(),
-    'exponent': tfp_hps.softplus_plus_eps(),
 }
 
 

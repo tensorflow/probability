@@ -279,9 +279,20 @@ PSD_KERNEL_PROPERTIES_DEPS = [
     "//tensorflow_probability",
     "//tensorflow_probability/python/internal:assert_util",
     "//tensorflow_probability/python/internal:hypothesis_testlib",
+    "//tensorflow_probability/python/math/psd_kernels:hypothesis_testlib",
     "//tensorflow_probability/python/internal:tensor_util",
     "//tensorflow_probability/python/internal:tensorshape_util",
 ]
+
+py_library(
+    name = "hypothesis_testlib",
+    testonly = True,
+    srcs = ["hypothesis_testlib.py"],
+    deps = [
+        # hypothesis dep,
+        # numpy dep,
+    ],
+)
 
 py_test(
     name = "psd_kernel_properties_test_eager",

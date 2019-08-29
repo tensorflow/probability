@@ -166,6 +166,8 @@ class Polynomial(PositiveSemidefiniteKernel):
           x1 * x2, ndims=self.feature_ndims)
     else:
       shift = tf.convert_to_tensor(self.shift)
+      shift = util.pad_shape_with_ones(
+          shift, example_ndims + self.feature_ndims)
       dot_prod = util.sum_rightmost_ndims_preserving_shape(
           (x1 - shift) * (x2 - shift),
           ndims=self.feature_ndims)

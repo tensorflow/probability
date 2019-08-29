@@ -80,7 +80,10 @@ class FeatureScaled(FeatureTransformed):
         return x / scale_diag
 
       super(FeatureScaled, self).__init__(
-          kernel, transformation_fn=rescale_input, validate_args=validate_args)
+          kernel,
+          transformation_fn=rescale_input,
+          validate_args=validate_args,
+          name=name)
 
   @property
   def scale_diag(self):
