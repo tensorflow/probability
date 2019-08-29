@@ -54,6 +54,7 @@ TF2_FRIENDLY_DISTS = (
     'Binomial',
     'Chi',
     'Chi2',
+    'CholeskyLKJ',
     'Categorical',
     'Cauchy',
     'Deterministic',
@@ -1109,6 +1110,8 @@ CONSTRAINTS = {
         lambda x: tf.floor(tf.sigmoid(x / 100) * 100) + 1,
     'Bernoulli':
         lambda d: dict(d, dtype=tf.float32),
+    'CholeskyLKJ':
+        fix_lkj,
     'LKJ':
         fix_lkj,
     'Triangular':

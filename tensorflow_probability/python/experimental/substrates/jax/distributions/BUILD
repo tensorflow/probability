@@ -37,6 +37,7 @@ FILENAMES = [
     "cauchy",
     "chi2",
     "chi",
+    "cholesky_lkj",
     "deprecated_linalg",
     "deterministic",
     "dirichlet_multinomial",
@@ -139,6 +140,7 @@ COMMON_DEPS = {
 
 DEPS = {
     "lkj": [":beta"],
+    "cholesky_lkj": [":lkj"],
 }
 
 [py_library(

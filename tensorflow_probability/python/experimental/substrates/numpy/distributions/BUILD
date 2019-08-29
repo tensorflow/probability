@@ -37,6 +37,7 @@ FILENAMES = [
     "cauchy",
     "chi2",
     "chi",
+    "cholesky_lkj",
     "deprecated_linalg",
     "deterministic",
     "dirichlet_multinomial",

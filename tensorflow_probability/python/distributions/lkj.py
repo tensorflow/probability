@@ -66,6 +66,144 @@ def _replicate(n, tensor):
   return tf.tile(tensor[tf.newaxis], multiples)
 
 
+def sample_lkj(
+    num_samples,
+    dimension,
+    concentration,
+    cholesky_space=False,
+    seed=None,
+    name=None):
+  """Returns a Tensor of samples from an LKJ distribution.
+
+  Args:
+    num_samples: Python `int`. The number of samples to draw.
+    dimension: Python `int`. The dimension of correlation matrices.
+    concentration: `Tensor` representing the concentration of the LKJ
+      distribution.
+    cholesky_space: Python `bool`. Whether to take samples from LKJ or
+      Chol(LKJ).
+    seed: Python integer seed for RNG
+    name: Python `str` name prefixed to Ops created by this function.
+
+  Returns:
+    samples: A Tensor of correlation matrices (or Cholesky factors of
+      correlation matrices if `cholesky_space = True`) with shape
+      `[n] + B + [D, D]`, where `B` is the shape of the `concentration`
+      parameter, and `D` is the `dimension`.
+
+  Raises:
+    ValueError: If `dimension` is negative.
+  """
+  if dimension < 0:
+    raise ValueError(
+        'Cannot sample negative-dimension correlation matrices.')
+  # Notation below: B is the batch shape, i.e., tf.shape(concentration)
+  seed = SeedStream(seed, 'sample_lkj')
+  with tf.name_scope('sample_lkj' or name):
+    concentration = tf.convert_to_tensor(concentration)
+    if not dtype_util.is_floating(concentration.dtype):
+      raise TypeError(
+          'The concentration argument should have floating type, not '
+          '{}'.format(dtype_util.name(concentration.dtype)))
+
+    concentration = _replicate(num_samples, concentration)
+    concentration_shape = tf.shape(concentration)
+    if dimension <= 1:
+      # For any dimension <= 1, there is only one possible correlation matrix.
+      shape = tf.concat([
+          concentration_shape, [dimension, dimension]], axis=0)
+      return tf.ones(shape=shape, dtype=concentration.dtype)
+    beta_conc = concentration + (dimension - 2.) / 2.
+    beta_dist = beta.Beta(concentration1=beta_conc, concentration0=beta_conc)
+
+    # Note that the sampler below deviates from [1], by doing the sampling in
+    # cholesky space. This does not change the fundamental logic of the
+    # sampler, but does speed up the sampling.
+
+    # This is the correlation coefficient between the first two dimensions.
+    # This is also `r` in reference [1].
+    corr12 = 2. * beta_dist.sample(seed=seed()) - 1.
+
+    # Below we construct the Cholesky of the initial 2x2 correlation matrix,
+    # which is of the form:
+    # [[1, 0], [r, sqrt(1 - r**2)]], where r is the correlation between the
+    # first two dimensions.
+    # This is the top-left corner of the cholesky of the final sample.
+    first_row = tf.concat([
+        tf.ones_like(corr12)[..., tf.newaxis],
+        tf.zeros_like(corr12)[..., tf.newaxis]], axis=-1)
+    second_row = tf.concat([
+        corr12[..., tf.newaxis],
+        tf.sqrt(1 - corr12**2)[..., tf.newaxis]], axis=-1)
+
+    chol_result = tf.concat([
+        first_row[..., tf.newaxis, :],
+        second_row[..., tf.newaxis, :]], axis=-2)
+
+    for n in range(2, dimension):
+      # Loop invariant: on entry, result has shape B + [n, n]
+      beta_conc = beta_conc - 0.5
+      # norm is y in reference [1].
+      norm = beta.Beta(
+          concentration1=n/2.,
+          concentration0=beta_conc
+      ).sample(seed=seed())
+      # distance shape: B + [1] for broadcast
+      distance = tf.sqrt(norm)[..., tf.newaxis]
+      # direction is u in reference [1].
+      # direction shape: B + [n]
+      direction = _uniform_unit_norm(
+          n, concentration_shape, concentration.dtype, seed)
+      # raw_correlation is w in reference [1].
+      raw_correlation = distance * direction  # shape: B + [n]
+
+      # This is the next row in the cholesky of the result,
+      # which differs from the construction in reference [1].
+      # In the reference, the new row `z` = chol_result @ raw_correlation^T
+      # = C @ raw_correlation^T (where as short hand we use C = chol_result).
+      # We prove that the below equation is the right row to add to the
+      # cholesky, by showing equality with reference [1].
+      # Let S be the sample constructed so far, and let `z` be as in
+      # reference [1]. Then at this iteration, the new sample S' will be
+      # [[S z^T]
+      #  [z 1]]
+      # In our case we have the cholesky decomposition factor C, so
+      # we want our new row x (same size as z) to satisfy:
+      #  [[S z^T]  [[C 0]    [[C^T  x^T]         [[CC^T  Cx^T]
+      #   [z 1]] =  [x k]]    [0     k]]  =       [xC^t   xx^T + k**2]]
+      # Since C @ raw_correlation^T = z = C @ x^T, and C is invertible,
+      # we have that x = raw_correlation. Also 1 = xx^T + k**2, so k
+      # = sqrt(1 - xx^T) = sqrt(1 - |raw_correlation|**2) = sqrt(1 -
+      # distance**2).
+      new_row = tf.concat(
+          [raw_correlation, tf.sqrt(1. - norm[..., tf.newaxis])], axis=-1)
+
+      # Finally add this new row, by growing the cholesky of the result.
+      chol_result = tf.concat([
+          chol_result,
+          tf.zeros_like(chol_result[..., 0][..., tf.newaxis])], axis=-1)
+
+      chol_result = tf.concat(
+          [chol_result, new_row[..., tf.newaxis, :]], axis=-2)
+
+    if cholesky_space:
+      return chol_result
+
+    result = tf.matmul(chol_result, chol_result, transpose_b=True)
+    # The diagonal for a correlation matrix should always be ones. Due to
+    # numerical instability the matmul might not achieve that, so manually set
+    # these to ones.
+    result = tf.linalg.set_diag(
+        result, tf.ones(shape=tf.shape(result)[:-1], dtype=result.dtype))
+    # This sampling algorithm can produce near-PSD matrices on which standard
+    # algorithms such as `tf.cholesky` or `tf.linalg.self_adjoint_eigvals`
+    # fail. Specifically, as documented in b/116828694, around 2% of trials
+    # of 900,000 5x5 matrices (distributed according to 9 different
+    # concentration parameter values) contained at least one matrix on which
+    # the Cholesky decomposition failed.
+    return result
+
+
 class LKJ(distribution.Distribution):
   """The LKJ distribution on correlation matrices.
 
@@ -77,6 +215,9 @@ class LKJ(distribution.Distribution):
 
   The distribution is named after Lewandowski, Kurowicka, and Joe, who gave a
   sampler for the distribution in [(Lewandowski, Kurowicka, Joe, 2009)][1].
+
+  Note: For better numerical stability, it is recommended that you use
+  `CholeskyLKJ` instead.
 
   #### Examples
 
@@ -118,7 +259,9 @@ class LKJ(distribution.Distribution):
         distribution. Additionally, validation checks which are only defined on
         the multiplied-out form are omitted, even if `validate_args` is `True`.
         Default value: `False` (i.e., input/output does not have Cholesky
-        semantics).
+        semantics). WARNING: Do not set this boolean to true, when using
+        `tfp.mcmc`. The density is not the density of Cholesky factors of
+        correlation matrices drawn via LKJ.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -197,122 +340,20 @@ class LKJ(distribution.Distribution):
     Raises:
       ValueError: If `dimension` is negative.
     """
-    if self.dimension < 0:
-      raise ValueError(
-          'Cannot sample negative-dimension correlation matrices.')
-    # Notation below: B is the batch shape, i.e., tf.shape(concentration)
-    seed = SeedStream(seed, 'sample_lkj')
-    with tf.name_scope('sample_lkj' or name):
-      concentration = tf.convert_to_tensor(self.concentration)
-      if not dtype_util.is_floating(concentration.dtype):
-        raise TypeError(
-            'The concentration argument should have floating type, not '
-            '{}'.format(dtype_util.name(concentration.dtype)))
+    return sample_lkj(
+        num_samples=num_samples,
+        dimension=self.dimension,
+        concentration=self.concentration,
+        cholesky_space=self.input_output_cholesky,
+        seed=seed,
+        name=name)
 
-      concentration = _replicate(num_samples, concentration)
-      concentration_shape = tf.shape(concentration)
-      if self.dimension <= 1:
-        # For any dimension <= 1, there is only one possible correlation matrix.
-        shape = tf.concat([
-            concentration_shape, [self.dimension, self.dimension]], axis=0)
-        return tf.ones(shape=shape, dtype=concentration.dtype)
-      beta_conc = concentration + (self.dimension - 2.) / 2.
-      beta_dist = beta.Beta(concentration1=beta_conc, concentration0=beta_conc)
-
-      # Note that the sampler below deviates from [1], by doing the sampling in
-      # cholesky space. This does not change the fundamental logic of the
-      # sampler, but does speed up the sampling.
-
-      # This is the correlation coefficient between the first two dimensions.
-      # This is also `r` in reference [1].
-      corr12 = 2. * beta_dist.sample(seed=seed()) - 1.
-
-      # Below we construct the Cholesky of the initial 2x2 correlation matrix,
-      # which is of the form:
-      # [[1, 0], [r, sqrt(1 - r**2)]], where r is the correlation between the
-      # first two dimensions.
-      # This is the top-left corner of the cholesky of the final sample.
-      first_row = tf.concat([
-          tf.ones_like(corr12)[..., tf.newaxis],
-          tf.zeros_like(corr12)[..., tf.newaxis]], axis=-1)
-      second_row = tf.concat([
-          corr12[..., tf.newaxis],
-          tf.sqrt(1 - corr12**2)[..., tf.newaxis]], axis=-1)
-
-      chol_result = tf.concat([
-          first_row[..., tf.newaxis, :],
-          second_row[..., tf.newaxis, :]], axis=-2)
-
-      for n in range(2, self.dimension):
-        # Loop invariant: on entry, result has shape B + [n, n]
-        beta_conc = beta_conc - 0.5
-        # norm is y in reference [1].
-        norm = beta.Beta(
-            concentration1=n/2.,
-            concentration0=beta_conc
-        ).sample(seed=seed())
-        # distance shape: B + [1] for broadcast
-        distance = tf.sqrt(norm)[..., tf.newaxis]
-        # direction is u in reference [1].
-        # direction shape: B + [n]
-        direction = _uniform_unit_norm(
-            n, concentration_shape, concentration.dtype, seed)
-        # raw_correlation is w in reference [1].
-        raw_correlation = distance * direction  # shape: B + [n]
-
-        # This is the next row in the cholesky of the result,
-        # which differs from the construction in reference [1].
-        # In the reference, the new row `z` = chol_result @ raw_correlation^T
-        # = C @ raw_correlation^T (where as short hand we use C = chol_result).
-        # We prove that the below equation is the right row to add to the
-        # cholesky, by showing equality with reference [1].
-        # Let S be the sample constructed so far, and let `z` be as in
-        # reference [1]. Then at this iteration, the new sample S' will be
-        # [[S z^T]
-        #  [z 1]]
-        # In our case we have the cholesky decomposition factor C, so
-        # we want our new row x (same size as z) to satisfy:
-        #  [[S z^T]  [[C 0]    [[C^T  x^T]         [[CC^T  Cx^T]
-        #   [z 1]] =  [x k]]    [0     k]]  =       [xC^t   xx^T + k**2]]
-        # Since C @ raw_correlation^T = z = C @ x^T, and C is invertible,
-        # we have that x = raw_correlation. Also 1 = xx^T + k**2, so k
-        # = sqrt(1 - xx^T) = sqrt(1 - |raw_correlation|**2) = sqrt(1 -
-        # distance**2).
-        new_row = tf.concat(
-            [raw_correlation, tf.sqrt(1. - norm[..., tf.newaxis])], axis=-1)
-
-        # Finally add this new row, by growing the cholesky of the result.
-        chol_result = tf.concat([
-            chol_result,
-            tf.zeros_like(chol_result[..., 0][..., tf.newaxis])], axis=-1)
-
-        chol_result = tf.concat(
-            [chol_result, new_row[..., tf.newaxis, :]], axis=-2)
-
-      if self.input_output_cholesky:
-        return chol_result
-
-      result = tf.matmul(chol_result, chol_result, transpose_b=True)
-      # The diagonal for a correlation matrix should always be ones. Due to
-      # numerical instability the matmul might not achieve that, so manually set
-      # these to ones.
-      result = tf.linalg.set_diag(
-          result, tf.ones(shape=tf.shape(result)[:-1], dtype=result.dtype))
-      # This sampling algorithm can produce near-PSD matrices on which standard
-      # algorithms such as `tf.cholesky` or `tf.linalg.self_adjoint_eigvals`
-      # fail. Specifically, as documented in b/116828694, around 2% of trials
-      # of 900,000 5x5 matrices (distributed according to 9 different
-      # concentration parameter values) contained at least one matrix on which
-      # the Cholesky decomposition failed.
-      return result
-
-  def _validate_dimension(self, x):
-    x = tf.convert_to_tensor(x, name='x')
+  def _has_valid_dimensions(self, x):
     if tensorshape_util.is_fully_defined(x.shape[-2:]):
       if (tensorshape_util.dims(x.shape)[-2] ==
           tensorshape_util.dims(x.shape)[-1] ==
           self.dimension):
-        pass
+        return []
       else:
         raise ValueError(
             'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
@@ -320,19 +361,18 @@ class LKJ(distribution.Distribution):
     elif self.validate_args:
       msg = 'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
           self.dimension, self.dimension, tf.shape(x))
-      with tf.control_dependencies([
+      return [
           assert_util.assert_equal(
               tf.shape(x)[-2], self.dimension, message=msg),
           assert_util.assert_equal(
               tf.shape(x)[-1], self.dimension, message=msg)
-      ]):
-        x = tf.identity(x)
-    return x
+      ]
+    return []
 
-  def _validate_correlationness(self, x):
+  def _is_valid_correlation_matrix(self, x):
     if not self.validate_args or self.input_output_cholesky:
-      return x
-    checks = [
+      return []
+    return [
         assert_util.assert_less_equal(
             dtype_util.as_numpy_dtype(x.dtype)(-1),
             x,
@@ -350,18 +390,17 @@ class LKJ(distribution.Distribution):
             tf.linalg.matrix_transpose(x),
             message='Correlation matrices must be symmetric')
     ]
-    with tf.control_dependencies(checks):
-      return tf.identity(x)
 
   def _log_prob(self, x):
     # Despite what one might infer from Eq 15 in [1], the formula
     # given for the normalization constant should be read in the sense
     # of division, not multiplication.
-    x = self._validate_dimension(x)
-    x = self._validate_correlationness(x)
-    concentration = tf.convert_to_tensor(self.concentration)
-    normalizer = self._log_normalization(concentration=concentration)
-    return self._log_unnorm_prob(x, concentration) - normalizer
+    with tf.control_dependencies(
+        self._has_valid_dimensions(x) +
+        self._is_valid_correlation_matrix(x)):
+      concentration = tf.convert_to_tensor(self.concentration)
+      normalizer = self._log_normalization(concentration=concentration)
+      return self._log_unnorm_prob(x, concentration) - normalizer
 
   def _log_unnorm_prob(self, x, concentration, name=None):
     """Returns the unnormalized log density of an LKJ distribution.
