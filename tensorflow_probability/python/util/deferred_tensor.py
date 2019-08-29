@@ -184,6 +184,15 @@ class DeferredTensor(tf.Module):
     self._shape = tf.TensorShape(
         pretransformed_input.shape if shape == 'None' else shape)
 
+    # Secret handshake with tf.is_tensor to return True for DT.
+    #
+    # Works around an exception in LinearOperator (which in 2.0.0 checks only
+    # `tf.is_tensor`, not also `linear_operator_util.is_ref`:
+    # ValueError: Graph parent item 0 is not a Tensor;
+    #   <DeferredTensor: dtype=float32, shape=[2], fn=exp>.
+    # TODO(b/140157055): Remove this shim after LinOp is patched in 2.0.
+    self.is_tensor_like = True
+
   @property
   def transform_fn(self):
     """Function which characterizes the `Tensor`ization of this object."""

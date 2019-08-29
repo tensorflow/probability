@@ -88,7 +88,7 @@ def convert_nonref_to_tensor(value, dtype=None, dtype_hint=None, name=None):
   x is y
   # ==> True
   tf.is_tensor(y)
-  # ==> False
+  # ==> True
   tf.equal(y, 13.37)
   # ==> True
   ```
