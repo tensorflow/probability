@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors.kumaraswamy import Kumaraswamy
@@ -91,6 +93,20 @@ class KumaraswamyTransformed(FeatureTransformed):
   @property
   def concentration0(self):
     return self._concentration0
+
+  def _batch_shape(self):
+    return functools.reduce(
+        tf.broadcast_static_shape,
+        [self.kernel.batch_shape,
+         self.concentration1.shape[:-self.kernel.feature_ndims],
+         self.concentration0.shape[:-self.kernel.feature_ndims]])
+
+  def _batch_shape_tensor(self):
+    return functools.reduce(
+        tf.broadcast_dynamic_shape,
+        [self.kernel.batch_shape_tensor(),
+         tf.shape(self.concentration1)[:-self.kernel.feature_ndims],
+         tf.shape(self.concentration0)[:-self.kernel.feature_ndims]])
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
