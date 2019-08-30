@@ -448,11 +448,11 @@ class Distribution(_BaseDistribution):
     Args:
       dtype: The type of the event samples. `None` implies no type-enforcement.
       reparameterization_type: Instance of `ReparameterizationType`.
-        If `tfd.FULLY_REPARAMETERIZED`, this
-        `Distribution` can be reparameterized in terms of some standard
-        distribution with a function whose Jacobian is constant for the support
-        of the standard distribution. If `tfd.NOT_REPARAMETERIZED`,
-        then no such reparameterization is available.
+        If `tfd.FULLY_REPARAMETERIZED`, then samples from the distribution are
+        fully reparameterized, and straight-through gradients are supported.
+        If `tfd.NOT_REPARAMETERIZED`, then samples from the distribution are not
+        fully reparameterized, and straight-through gradients are either
+        partially unsupported or are not supported at all.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
