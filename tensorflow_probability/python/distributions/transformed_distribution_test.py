@@ -19,19 +19,19 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 from scipy import stats
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 class DummyMatrixTransform(tfb.Bijector):
@@ -91,7 +91,7 @@ class _ChooseLocation(tfp.bijectors.Bijector):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TransformedDistributionTest(tf.test.TestCase):
+class TransformedDistributionTest(test_case.TestCase):
 
   def _cls(self):
     return tfd.TransformedDistribution
@@ -331,7 +331,7 @@ class TransformedDistributionTest(tf.test.TestCase):
     self.assertAllClose(base_log_prob - ildj, log_prob_, rtol=1e-6, atol=0.)
 
 
-class ScalarToMultiTest(tf.test.TestCase):
+class ScalarToMultiTest(test_case.TestCase):
 
   def _cls(self):
     return tfd.TransformedDistribution

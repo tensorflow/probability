@@ -17,21 +17,22 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import layers as tfpl
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfk = tf.keras
 tfkl = tf.keras.layers
-tfb = tfp.bijectors
-tfd = tfp.distributions
-tfpl = tfp.layers
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoregressiveTransformTest(tf.test.TestCase):
+class AutoregressiveTransformTest(test_case.TestCase):
 
   def test_doc_string(self):
     # Generate data -- as in Figure 1 in [Papamakarios et al. (2017)][1]).

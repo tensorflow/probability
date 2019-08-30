@@ -19,12 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.mcmc.diagnostic import _reduce_variance
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import spectral_ops_test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -320,7 +322,7 @@ class _EffectiveSampleSizeTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class EffectiveSampleSizeStaticTest(tf.test.TestCase,
+class EffectiveSampleSizeStaticTest(test_case.TestCase,
                                     _EffectiveSampleSizeTest):
 
   @property
@@ -329,7 +331,7 @@ class EffectiveSampleSizeStaticTest(tf.test.TestCase,
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class EffectiveSampleSizeDynamicTest(tf.test.TestCase,
+class EffectiveSampleSizeDynamicTest(test_case.TestCase,
                                      _EffectiveSampleSizeTest):
 
   @property
@@ -524,7 +526,7 @@ class _PotentialScaleReductionTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PotentialScaleReductionStaticTest(tf.test.TestCase,
+class PotentialScaleReductionStaticTest(test_case.TestCase,
                                         _PotentialScaleReductionTest):
 
   @property
@@ -541,7 +543,7 @@ class PotentialScaleReductionStaticTest(tf.test.TestCase,
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PotentialScaleReductionDynamicTest(tf.test.TestCase,
+class PotentialScaleReductionDynamicTest(test_case.TestCase,
                                          _PotentialScaleReductionTest):
 
   @property
@@ -608,7 +610,7 @@ class _ReduceVarianceTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ReduceVarianceTestStaticShape(tf.test.TestCase, _ReduceVarianceTest):
+class ReduceVarianceTestStaticShape(test_case.TestCase, _ReduceVarianceTest):
 
   @property
   def use_static_shape(self):
@@ -616,7 +618,7 @@ class ReduceVarianceTestStaticShape(tf.test.TestCase, _ReduceVarianceTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ReduceVarianceTestDynamicShape(tf.test.TestCase, _ReduceVarianceTest):
+class ReduceVarianceTestDynamicShape(test_case.TestCase, _ReduceVarianceTest):
 
   @property
   def use_static_shape(self):

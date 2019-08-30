@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -235,12 +236,12 @@ class _StudentTProcessTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class StudentTProcessStaticTest(_StudentTProcessTest, tf.test.TestCase):
+class StudentTProcessStaticTest(_StudentTProcessTest, test_case.TestCase):
   is_static = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class StudentTProcessDynamicTest(_StudentTProcessTest, tf.test.TestCase):
+class StudentTProcessDynamicTest(_StudentTProcessTest, test_case.TestCase):
   is_static = False
 
 

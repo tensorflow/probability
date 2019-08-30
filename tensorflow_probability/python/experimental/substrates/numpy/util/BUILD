@@ -56,6 +56,7 @@ TEST_FILENAMES = ["{}_test".format(filename) for filename in FILENAMES]
     deps = [
         ":util",
         "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/substrates/numpy/internal:test_case",
     ],
 ) for filename in TEST_FILENAMES]
 

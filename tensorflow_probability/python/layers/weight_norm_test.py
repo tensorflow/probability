@@ -25,15 +25,16 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.layers import weight_norm
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
 tfk = tf.keras
+
 tfkl = tf.keras.layers
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class WeightNormTest(tf.test.TestCase, parameterized.TestCase):
+class WeightNormTest(test_case.TestCase, parameterized.TestCase):
 
   def setUp(self):
     super(WeightNormTest, self).setUp()

@@ -23,12 +23,12 @@ import six
 import tensorflow as tf
 
 from tensorflow_probability import edward2 as ed
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class InterceptorTest(parameterized.TestCase, tf.test.TestCase):
+class InterceptorTest(parameterized.TestCase, test_case.TestCase):
 
   @parameterized.parameters(
       {"cls": ed.Normal, "value": 2., "kwargs": {"loc": 0.5, "scale": 1.}},

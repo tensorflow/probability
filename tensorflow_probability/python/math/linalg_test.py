@@ -29,11 +29,11 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-class _CholeskyExtend(tf.test.TestCase):
+class _CholeskyExtend(test_case.TestCase):
 
   def testCholeskyExtension(self):
     xs = np.random.random(7).astype(self.dtype)[:, tf.newaxis]
@@ -112,7 +112,7 @@ class CholeskyExtend64Dynamic(_CholeskyExtend):
 del _CholeskyExtend
 
 
-class _PivotedCholesky(tf.test.TestCase, parameterized.TestCase):
+class _PivotedCholesky(test_case.TestCase, parameterized.TestCase):
 
   def _random_batch_psd(self, dim):
     matrix = np.random.random([2, dim, dim])
@@ -285,12 +285,12 @@ class _LUReconstruct(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LUReconstructStatic(tf.test.TestCase, _LUReconstruct):
+class LUReconstructStatic(test_case.TestCase, _LUReconstruct):
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LUReconstructDynamic(tf.test.TestCase, _LUReconstruct):
+class LUReconstructDynamic(test_case.TestCase, _LUReconstruct):
   use_static_shape = False
 
 
@@ -333,12 +333,12 @@ class _LUMatrixInverse(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LUMatrixInverseStatic(tf.test.TestCase, _LUMatrixInverse):
+class LUMatrixInverseStatic(test_case.TestCase, _LUMatrixInverse):
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LUMatrixInverseDynamic(tf.test.TestCase, _LUMatrixInverse):
+class LUMatrixInverseDynamic(test_case.TestCase, _LUMatrixInverse):
   use_static_shape = False
 
 
@@ -398,12 +398,12 @@ class _LUSolve(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LUSolveStatic(tf.test.TestCase, _LUSolve):
+class LUSolveStatic(test_case.TestCase, _LUSolve):
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LUSolveDynamic(tf.test.TestCase, _LUSolve):
+class LUSolveDynamic(test_case.TestCase, _LUSolve):
   use_static_shape = False
 
 
@@ -507,29 +507,30 @@ class _SparseOrDenseMatmul(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SparseOrDenseMatmulStatic(tf.test.TestCase, _SparseOrDenseMatmul):
+class SparseOrDenseMatmulStatic(test_case.TestCase, _SparseOrDenseMatmul):
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SparseOrDenseMatmulDynamic(tf.test.TestCase, _SparseOrDenseMatmul):
+class SparseOrDenseMatmulDynamic(test_case.TestCase, _SparseOrDenseMatmul):
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SparseOrDenseMatmulStaticSparse(tf.test.TestCase, _SparseOrDenseMatmul):
+class SparseOrDenseMatmulStaticSparse(test_case.TestCase, _SparseOrDenseMatmul):
   use_static_shape = True
   use_sparse_tensor = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SparseOrDenseMatmulDynamicSparse(tf.test.TestCase, _SparseOrDenseMatmul):
+class SparseOrDenseMatmulDynamicSparse(test_case.TestCase,
+                                       _SparseOrDenseMatmul):
   use_static_shape = False
   use_sparse_tensor = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class FillTriangularTest(tf.test.TestCase):
+class FillTriangularTest(test_case.TestCase):
 
   def _fill_triangular(self, x, upper=False):
     """Numpy implementation of `fill_triangular`."""

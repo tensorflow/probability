@@ -19,16 +19,16 @@ from __future__ import division
 from __future__ import print_function
 
 import re
+
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-
 from tensorflow_probability import edward2 as ed
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-
-tfd = tfp.distributions
 
 
 class FakeDistribution(tfd.Distribution):
@@ -43,7 +43,7 @@ class FakeDistribution(tfd.Distribution):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class RandomVariableTest(parameterized.TestCase, tf.test.TestCase):
+class RandomVariableTest(parameterized.TestCase, test_case.TestCase):
 
   def testConstructor(self):
     x = ed.RandomVariable(tfd.Poisson(rate=tf.ones([2, 5])),

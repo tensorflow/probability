@@ -22,11 +22,12 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.math.psd_kernels.internal import util
 
 
-class UtilTest(tf.test.TestCase):
+class UtilTest(test_case.TestCase):
 
   def testPadShapeRightWithOnes(self):
     # Test nominal behavior.

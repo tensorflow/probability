@@ -23,6 +23,8 @@ import collections
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -43,7 +45,7 @@ ValueAndGradient = collections.namedtuple('ValueAndGradient', ['x', 'f', 'df'])
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HagerZhangTest(tf.test.TestCase):
+class HagerZhangTest(test_case.TestCase):
   """Tests for Hager Zhang line search algorithm."""
 
   def test_quadratic(self):

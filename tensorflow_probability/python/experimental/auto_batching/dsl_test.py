@@ -29,10 +29,11 @@ from tensorflow_probability.python.experimental.auto_batching import numpy_backe
 from tensorflow_probability.python.experimental.auto_batching import tf_backend
 from tensorflow_probability.python.experimental.auto_batching import type_inference
 from tensorflow_probability.python.experimental.auto_batching import virtual_machine as vm
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 TF_BACKEND = tf_backend.TensorFlowBackend()
+
 NP_BACKEND = numpy_backend.NumpyBackend()
 
 
@@ -115,7 +116,7 @@ def synthetic_pattern_program():
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoBatchingTest(tf.test.TestCase):
+class AutoBatchingTest(test_case.TestCase):
 
   def testAutoBatchingFibonacciNumpy(self):
     for inputs, outputs in ([5], [8]), ([5, 6, 8, 9], [8, 13, 34, 55]):

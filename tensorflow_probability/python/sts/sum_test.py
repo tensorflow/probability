@@ -23,15 +23,16 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability import distributions as tfd
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.sts import AdditiveStateSpaceModel
 from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
-
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
+
 tfl = tf.linalg
 
 
-class _AdditiveStateSpaceModelTest(tf.test.TestCase):
+class _AdditiveStateSpaceModelTest(test_case.TestCase):
 
   def test_identity(self):
 

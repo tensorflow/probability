@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.math.psd_kernels.internal import util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -199,11 +200,13 @@ class _FeatureTransformedTest(parameterized.TestCase):
         self.evaluate(vector_transformed_kernel.matrix(z, z)))
 
 
-class FeatureTransformedFloat32Test(_FeatureTransformedTest, tf.test.TestCase):
+class FeatureTransformedFloat32Test(_FeatureTransformedTest,
+                                    test_case.TestCase):
   dtype = np.float32
 
 
-class FeatureTransformedFloat64Test(_FeatureTransformedTest, tf.test.TestCase):
+class FeatureTransformedFloat64Test(_FeatureTransformedTest,
+                                    test_case.TestCase):
   dtype = np.float64
 
 

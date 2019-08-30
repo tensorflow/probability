@@ -15,15 +15,17 @@
 """Tests for STS forecasting methods."""
 
 # Dependency imports
+
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util
 from tensorflow.python.platform import test
 
 tfl = tf.linalg
-tfd = tfp.distributions
 
 
 class _ForecastTest(object):
@@ -318,19 +320,19 @@ class _ForecastTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ForecastTestStatic32(tf.test.TestCase, _ForecastTest):
+class ForecastTestStatic32(test_case.TestCase, _ForecastTest):
   dtype = np.float32
   use_static_shape = True
 
 
 # Run in graph mode only to reduce test weight.
-class ForecastTestDynamic32(tf.test.TestCase, _ForecastTest):
+class ForecastTestDynamic32(test_case.TestCase, _ForecastTest):
   dtype = np.float32
   use_static_shape = False
 
 
 # Run in graph mode only to reduce test weight.
-class ForecastTestStatic64(tf.test.TestCase, _ForecastTest):
+class ForecastTestStatic64(test_case.TestCase, _ForecastTest):
   dtype = np.float64
   use_static_shape = True
 

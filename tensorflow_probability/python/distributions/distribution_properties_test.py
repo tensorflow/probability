@@ -32,15 +32,18 @@ from hypothesis import strategies as hps
 import numpy as np
 import six
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+
+from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
 
 flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
                   'TF execution mode to use')
@@ -679,7 +682,7 @@ def get_event_dim(dist):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DistributionParamsAreVarsTest(parameterized.TestCase, tf.test.TestCase):
+class DistributionParamsAreVarsTest(parameterized.TestCase, test_case.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
@@ -853,7 +856,7 @@ def no_tf_rank_errors():
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ReproducibilityTest(parameterized.TestCase, tf.test.TestCase):
+class ReproducibilityTest(parameterized.TestCase, test_case.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
@@ -873,7 +876,7 @@ class ReproducibilityTest(parameterized.TestCase, tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DistributionSlicingTest(tf.test.TestCase):
+class DistributionSlicingTest(test_case.TestCase):
 
   def _test_slicing(self, data, dist):
     strm = tfp_test_util.test_seed_stream()
@@ -976,7 +979,6 @@ class DistributionSlicingTest(tf.test.TestCase):
 
   def disabled_testFailureCase(self):
     # TODO(b/140229057): This test should pass.
-    tfb = tfp.bijectors
     dist = tfd.Chi(df=np.float32(27.744131))
     dist = tfd.TransformedDistribution(
         bijector=tfb.NormalCDF(), distribution=dist, batch_shape=[4])

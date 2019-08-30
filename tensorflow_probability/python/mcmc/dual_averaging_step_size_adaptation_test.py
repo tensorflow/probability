@@ -26,12 +26,12 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
 
 _INITIAL_T = 10.0
 _EXPLORATION_SHRINKAGE = 0.05
@@ -138,7 +138,7 @@ class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DualAveragingStepSizeAdaptationTest(tf.test.TestCase,
+class DualAveragingStepSizeAdaptationTest(test_case.TestCase,
                                           parameterized.TestCase):
 
   def testTurnOnStoreParametersInKernelResults(self):
@@ -311,7 +311,7 @@ class DualAveragingStepSizeAdaptationTest(tf.test.TestCase,
 
 @test_util.run_all_in_graph_and_eager_modes
 class DualAveragingStepSizeAdaptationStaticBroadcastingTest(
-    tf.test.TestCase,
+    test_case.TestCase,
     parameterized.TestCase):
   use_static_shape = True
 

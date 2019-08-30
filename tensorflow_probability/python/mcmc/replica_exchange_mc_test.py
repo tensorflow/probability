@@ -19,14 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-tfd = tfp.distributions
 
 
 def _set_seed(seed):
@@ -38,7 +38,7 @@ def _set_seed(seed):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DefaultExchangeProposedFnTest(tf.test.TestCase):
+class DefaultExchangeProposedFnTest(test_case.TestCase):
 
   def setUp(self):
     tf.compat.v1.set_random_seed(123)
@@ -155,7 +155,7 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class REMCTest(tf.test.TestCase):
+class REMCTest(test_case.TestCase):
 
   def setUp(self):
     tf.compat.v1.set_random_seed(123)

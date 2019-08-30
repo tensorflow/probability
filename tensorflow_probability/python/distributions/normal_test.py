@@ -21,17 +21,17 @@ from __future__ import print_function
 import math
 
 # Dependency imports
+
 import numpy as np
 from scipy import stats as sp_stats
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -494,7 +494,7 @@ class NormalTest(test_case.TestCase):
       tfd.Normal(loc=tf.zeros([2, 3]), scale=scale, validate_args=True)
 
 
-class NormalEagerGCTest(tf.test.TestCase):
+class NormalEagerGCTest(test_case.TestCase):
 
   @test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def testNormalMeanAndMode(self):

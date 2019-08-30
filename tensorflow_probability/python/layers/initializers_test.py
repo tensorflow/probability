@@ -23,12 +23,12 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BlockwiseInitializerTest(tf.test.TestCase):
+class BlockwiseInitializerTest(test_case.TestCase):
 
   def test_works_correctly(self):
     init = tfp.layers.BlockwiseInitializer(['glorot_uniform', 'zeros'], [3, 4])

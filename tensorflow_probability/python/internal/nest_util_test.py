@@ -27,6 +27,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import nest_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -63,7 +64,7 @@ class LeafNamedTuple(
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NestUtilTest(tf.test.TestCase, parameterized.TestCase):
+class NestUtilTest(test_case.TestCase, parameterized.TestCase):
 
   @parameterized.parameters((1, [2, 2], [1, 1]),
                             ([1], [2, 2], [1, 1]),

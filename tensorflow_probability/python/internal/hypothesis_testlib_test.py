@@ -28,11 +28,12 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HypothesisTestlibTest(parameterized.TestCase, tf.test.TestCase):
+class HypothesisTestlibTest(parameterized.TestCase, test_case.TestCase):
 
   @parameterized.parameters((support,) for support in tfp_hps.ALL_SUPPORTS)
   @hp.given(hps.data())

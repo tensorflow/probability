@@ -19,16 +19,15 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-import tensorflow_probability as tfp
-
 from tensorflow_probability import edward2 as ed
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
-tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ProgramTransformationsTest(tf.test.TestCase):
+class ProgramTransformationsTest(test_case.TestCase):
 
   def testMakeLogJointFnUnconditional(self):
     """Test `make_log_joint_fn` on unconditional Edward program."""

@@ -19,15 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
-
 import tensorflow as tf
-
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-tfd = tfp.distributions
 
 
 def _reduce_variance(x, axis=None, keepdims=False):
@@ -39,7 +38,7 @@ def _reduce_variance(x, axis=None, keepdims=False):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class RWMTest(tf.test.TestCase):
+class RWMTest(test_case.TestCase):
 
   def testRWM1DUniform(self):
     """Sampling from the Standard Normal Distribution."""

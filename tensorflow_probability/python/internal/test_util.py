@@ -21,13 +21,12 @@ from __future__ import print_function
 import os
 
 # Dependency imports
+
 from absl import flags
 from absl import logging
 import numpy as np
 import six
-
 import tensorflow as tf
-
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.util.seed_stream import SeedStream
@@ -124,7 +123,7 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
   `--fixed_seed` takes precedence over `--vary_seed` when both are present.
 
   Note that TensorFlow graph mode operations tend to read seed state from two
-  sources: a "graph-level seed" and an "op-level seed".  tf.test.TestCase will
+  sources: a "graph-level seed" and an "op-level seed".  test_case.TestCase will
   set the former to a fixed value per test, but in general it may be necessary
   to explicitly set both to ensure reproducibility.
 
@@ -190,7 +189,7 @@ def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
   `--vary_seed` when both are present.
 
   Note that TensorFlow graph mode operations tend to read seed state from two
-  sources: a "graph-level seed" and an "op-level seed".  tf.test.TestCase will
+  sources: a "graph-level seed" and an "op-level seed".  test_case.TestCase will
   set the former to a fixed value per test, but in general it may be necessary
   to explicitly set both to ensure reproducibility.
 

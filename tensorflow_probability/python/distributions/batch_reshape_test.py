@@ -19,16 +19,15 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 
+import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -591,14 +590,14 @@ class _BatchReshapeTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BatchReshapeStaticTest(_BatchReshapeTest, tf.test.TestCase):
+class BatchReshapeStaticTest(_BatchReshapeTest, test_case.TestCase):
 
   dtype = np.float32
   is_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BatchReshapeDynamicTest(_BatchReshapeTest, tf.test.TestCase):
+class BatchReshapeDynamicTest(_BatchReshapeTest, test_case.TestCase):
 
   dtype = np.float64
   is_static_shape = False

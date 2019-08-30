@@ -19,15 +19,15 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.sts import DynamicLinearRegression
 from tensorflow_probability.python.sts import DynamicLinearRegressionStateSpaceModel
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-tfd = tfp.distributions
 
 
 class _DynamicLinearRegressionStateSpaceModelTest(object):
@@ -144,21 +144,21 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
 
 @test_util.run_all_in_graph_and_eager_modes
 class DynamicRegressionStateSpaceModelTestStaticShape32(
-    tf.test.TestCase, _DynamicLinearRegressionStateSpaceModelTest):
+    test_case.TestCase, _DynamicLinearRegressionStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class DynamicRegressionStateSpaceModelTestDynamicShape32(
-    tf.test.TestCase, _DynamicLinearRegressionStateSpaceModelTest):
+    test_case.TestCase, _DynamicLinearRegressionStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class DynamicRegressionStateSpaceModelTestStaticShape64(
-    tf.test.TestCase, _DynamicLinearRegressionStateSpaceModelTest):
+    test_case.TestCase, _DynamicLinearRegressionStateSpaceModelTest):
   dtype = np.float64
   use_static_shape = True
 

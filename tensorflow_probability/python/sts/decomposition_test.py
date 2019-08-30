@@ -15,18 +15,19 @@
 """Tests for STS decomposition methods."""
 
 # Dependency imports
+
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfl = tf.linalg
-tfd = tfp.distributions
 
 
-class _DecompositionTest(tf.test.TestCase):
+class _DecompositionTest(test_case.TestCase):
 
   def _build_model_and_params(self,
                               num_timesteps,

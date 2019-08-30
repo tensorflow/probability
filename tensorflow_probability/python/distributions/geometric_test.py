@@ -19,14 +19,15 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-tfd = tfp.distributions
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -34,7 +35,7 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 # represents the "Shifted" Geometric distribution. Hence, loc=-1 is passed
 # in to each scipy function for testing.
 @test_util.run_all_in_graph_and_eager_modes
-class GeometricTest(tf.test.TestCase):
+class GeometricTest(test_case.TestCase):
 
   def testGeometricShape(self):
     probs = tf.constant([.1] * 5)

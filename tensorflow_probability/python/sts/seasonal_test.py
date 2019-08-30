@@ -19,19 +19,20 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.sts import ConstrainedSeasonalStateSpaceModel
 from tensorflow_probability.python.sts import SeasonalStateSpaceModel
 
-tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
 tfl = tf.linalg
 
 
-class _SeasonalStateSpaceModelTest(tf.test.TestCase):
+class _SeasonalStateSpaceModelTest(test_case.TestCase):
 
   def test_day_of_week_example(self):
 
@@ -305,7 +306,7 @@ class SeasonalStateSpaceModelTestStaticShape64(_SeasonalStateSpaceModelTest):
   use_static_shape = True
 
 
-class _ConstrainedSeasonalStateSpaceModelTest(tf.test.TestCase):
+class _ConstrainedSeasonalStateSpaceModelTest(test_case.TestCase):
 
   # TODO(b/128635942): write additional tests for ConstrainedSeasonalSSM
 

@@ -21,9 +21,10 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import docstring_util
+from tensorflow_probability.python.internal import test_case
 
 
-class DocstringUtil(tf.test.TestCase):
+class DocstringUtil(test_case.TestCase):
 
   def _testFunction(self):
     doc_args = """x: Input to return as output.

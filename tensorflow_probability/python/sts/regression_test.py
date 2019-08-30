@@ -19,9 +19,11 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import SparseLinearRegression
 from tensorflow_probability.python.sts import Sum
@@ -30,10 +32,9 @@ from tensorflow.python.framework import test_util
 from tensorflow.python.platform import test
 
 tfl = tf.linalg
-tfd = tfp.distributions
 
 
-class _LinearRegressionTest(tf.test.TestCase):
+class _LinearRegressionTest(test_case.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_basic_statistics(self):
@@ -154,7 +155,7 @@ class _LinearRegressionTest(tf.test.TestCase):
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-class _SparseLinearRegressionTest(tf.test.TestCase):
+class _SparseLinearRegressionTest(test_case.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_builds_without_errors(self):

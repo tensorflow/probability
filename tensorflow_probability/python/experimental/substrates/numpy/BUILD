@@ -53,5 +53,6 @@ py_test(
     tags = ["tfp_numpy"],
     deps = [
         "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/substrates/numpy/internal:test_case",
     ],
 )

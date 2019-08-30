@@ -19,10 +19,12 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import spectral_ops_test_util  # pylint: disable=g-direct-tensorflow-import
@@ -227,7 +229,7 @@ class _AutoCorrelationTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoCorrelationTestStaticShapeFloat32(tf.test.TestCase,
+class AutoCorrelationTestStaticShapeFloat32(test_case.TestCase,
                                             _AutoCorrelationTest):
 
   @property
@@ -240,7 +242,7 @@ class AutoCorrelationTestStaticShapeFloat32(tf.test.TestCase,
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoCorrelationTestStaticShapeComplex64(tf.test.TestCase,
+class AutoCorrelationTestStaticShapeComplex64(test_case.TestCase,
                                               _AutoCorrelationTest):
 
   @property
@@ -253,7 +255,7 @@ class AutoCorrelationTestStaticShapeComplex64(tf.test.TestCase,
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoCorrelationTestDynamicShapeFloat32(tf.test.TestCase,
+class AutoCorrelationTestDynamicShapeFloat32(test_case.TestCase,
                                              _AutoCorrelationTest):
 
   @property
@@ -266,7 +268,7 @@ class AutoCorrelationTestDynamicShapeFloat32(tf.test.TestCase,
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CovarianceTest(tf.test.TestCase):
+class CovarianceTest(test_case.TestCase):
 
   def _np_cov_1d(self, x, y):
     return ((x - x.mean(axis=0)) * (y - y.mean(axis=0))).mean(axis=0)
@@ -421,7 +423,7 @@ class CovarianceTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CorrelationTest(tf.test.TestCase):
+class CorrelationTest(test_case.TestCase):
 
   def _np_corr_1d(self, x, y):
     assert x.ndim == y.ndim == 1
@@ -481,7 +483,7 @@ class CorrelationTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CholeskyCovarianceTest(tf.test.TestCase):
+class CholeskyCovarianceTest(test_case.TestCase):
 
   def test_batch_vector_sampaxis1_eventaxis2(self):
     # x.shape = [2, 5000, 2],
@@ -510,7 +512,7 @@ class CholeskyCovarianceTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class VarianceTest(tf.test.TestCase):
+class VarianceTest(test_case.TestCase):
   """Light test:  Most methods tested implicitly by CovarianceTest."""
 
   def test_independent_uniform_samples(self):
@@ -530,7 +532,7 @@ class VarianceTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class StddevTest(tf.test.TestCase):
+class StddevTest(test_case.TestCase):
   """Light test:  Most methods tested implicitly by VarianceTest."""
 
   def test_independent_uniform_samples(self):
@@ -550,7 +552,7 @@ class StddevTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LogAverageProbsTest(tf.test.TestCase):
+class LogAverageProbsTest(test_case.TestCase):
 
   def test_mathematical_correctness_bernoulli(self):
     logits = tf.random.normal([10, 3, 4], seed=42)

@@ -19,12 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow as tf
-
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -39,7 +41,7 @@ class ShapeChanging(tfb.Bijector):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ChainBijectorTest(tf.test.TestCase):
+class ChainBijectorTest(test_case.TestCase):
   """Tests the correctness of the Y = Chain(bij1, bij2, bij3) transformation."""
 
   def testBijector(self):

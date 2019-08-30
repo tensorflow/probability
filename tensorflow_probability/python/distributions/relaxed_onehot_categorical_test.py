@@ -19,17 +19,17 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 from scipy.special import gamma
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 def make_relaxed_categorical(batch_shape, num_classes, dtype=tf.float32):
@@ -83,7 +83,7 @@ def analytical_pdf(x, temperature, logits):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class RelaxedOneHotCategoricalTest(tf.test.TestCase):
+class RelaxedOneHotCategoricalTest(test_case.TestCase):
 
   def assertRaises(self, error_class, msg):
     if tf.executing_eagerly():

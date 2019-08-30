@@ -24,11 +24,13 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GradientTest(tf.test.TestCase):
+class GradientTest(test_case.TestCase):
 
   def test_non_list(self):
     f = lambda x: x**2 / 2

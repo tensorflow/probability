@@ -23,10 +23,9 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow_probability import distributions as tfd
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.sts import AutoregressiveStateSpaceModel
 from tensorflow_probability.python.sts import LocalLevelStateSpaceModel
-
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -51,7 +50,7 @@ def ar_explicit_logp(y, coefs, level_scale):
   return lp
 
 
-class _AutoregressiveStateSpaceModelTest(tf.test.TestCase):
+class _AutoregressiveStateSpaceModelTest(test_case.TestCase):
 
   def testEqualsLocalLevel(self):
     # An AR1 process with coef 1 is just a random walk, equivalent to a local

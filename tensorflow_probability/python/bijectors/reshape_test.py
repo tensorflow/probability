@@ -19,11 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python import bijectors as tfb
-
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_case
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -218,7 +220,7 @@ class _ReshapeBijectorTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
+class ReshapeBijectorTestStatic(test_case.TestCase, _ReshapeBijectorTest):
 
   def build_shapes(self, shape_in, shape_out):
     return shape_in, shape_out
@@ -313,7 +315,7 @@ class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
         "(Input to reshape|Cannot reshape a tensor with|cannot reshape array)")
 
 
-class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
+class ReshapeBijectorTestDynamic(test_case.TestCase, _ReshapeBijectorTest):
 
   def build_shapes(self, shape_in, shape_out):
     shape_in = np.array(shape_in, np.int32)

@@ -24,11 +24,13 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ExponentiatedQuadraticTest(tf.test.TestCase, parameterized.TestCase):
+class ExponentiatedQuadraticTest(test_case.TestCase, parameterized.TestCase):
 
   def testMismatchedFloatTypesAreBad(self):
     tfp.math.psd_kernels.ExponentiatedQuadratic(

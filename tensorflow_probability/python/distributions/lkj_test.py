@@ -19,20 +19,18 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,
-
-
-tfd = tfp.distributions
 
 
 def _det_ok_mask(x, det_bounds, input_output_cholesky=False):
@@ -376,7 +374,7 @@ class LKJTest(parameterized.TestCase, test_case.TestCase):
         self.evaluate(d.mean())
 
 
-class LKJTestGraphOnly(tf.test.TestCase):
+class LKJTestGraphOnly(test_case.TestCase):
 
   def testDimensionGuardDynamicShape(self):
     if tf.executing_eagerly():

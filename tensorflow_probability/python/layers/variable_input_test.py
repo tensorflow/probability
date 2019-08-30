@@ -20,14 +20,14 @@ from __future__ import print_function
 
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
-
 
 @test_util.run_all_in_graph_and_eager_modes
-class VariableInputLayerTest(tf.test.TestCase):
+class VariableInputLayerTest(test_case.TestCase):
 
   def test_sequential_api(self):
     # Create a trainable distribution using the Sequential API.
