@@ -942,7 +942,7 @@ class DistributionSlicingTest(tf.test.TestCase):
     possibly_nonpacket_lp = lp[slices].reshape(-1)[-3:]
     possibly_nonpacket_sliced_lp = sliced_lp.reshape(-1)[-3:]
 
-    # TODO(b/266018543): Resolve nan disagreement between eigen vec/scalar paths
+    # TODO(b/140229057): Resolve nan disagreement between eigen vec/scalar paths
     hasnan = (np.isnan(possibly_nonpacket_lp) |
               np.isnan(possibly_nonpacket_sliced_lp))
     possibly_nonpacket_lp = np.where(hasnan, 0, possibly_nonpacket_lp)
