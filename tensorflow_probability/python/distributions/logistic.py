@@ -182,7 +182,7 @@ class Logistic(distribution.Distribution):
         maxval=1.,
         dtype=self.dtype,
         seed=seed)
-    sampled = tf.math.log(uniform) - tf.math.log1p(-1. * uniform)
+    sampled = tf.math.log(uniform) - tf.math.log1p(-uniform)
     return sampled * scale + loc
 
   def _log_prob(self, x):
@@ -224,6 +224,9 @@ class Logistic(distribution.Distribution):
     """Standardize input `x` to a unit logistic."""
     with tf.name_scope('standardize'):
       return (x - self.loc) / self.scale
+
+  def _quantile(self, x):
+    return self.loc + self.scale * (tf.math.log(x) - tf.math.log1p(-x))
 
   def _parameter_control_dependencies(self, is_init):
     if is_init:
