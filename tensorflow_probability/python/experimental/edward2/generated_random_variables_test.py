@@ -22,7 +22,8 @@ import inspect
 from absl.testing import parameterized
 import numpy as np
 import six
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability import distributions as tfd
 from tensorflow_probability import edward2 as ed
@@ -157,7 +158,7 @@ class GeneratedRandomVariablesTest(parameterized.TestCase, test_case.TestCase):
   def testValueUnknownShape(self):
     if tf.executing_eagerly(): return
     # should not raise error
-    ed.Bernoulli(probs=0.5, value=tf.compat.v1.placeholder(tf.int32))
+    ed.Bernoulli(probs=0.5, value=tf1.placeholder(tf.int32))
 
   def testAsRandomVariable(self):
     # A wrapped Normal distribution should behave identically to
@@ -177,7 +178,7 @@ class GeneratedRandomVariablesTest(parameterized.TestCase, test_case.TestCase):
 
     # Check that our attempt to back out the variable name from the
     # Distribution name is robust to name scoping.
-    with tf.compat.v1.name_scope("nested_scope"):
+    with tf1.name_scope("nested_scope"):
       dist = tfd.Normal(1., 0.1, name="x")
       def model_scoped():
         return ed.as_random_variable(dist)

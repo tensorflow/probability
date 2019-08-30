@@ -19,7 +19,7 @@ from __future__ import print_function
 # Dependency imports
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import layers as tfpl
@@ -65,7 +65,7 @@ class AutoregressiveTransformTest(test_case.TestCase):
     ])
 
     model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(),
+        optimizer=tf.optimizers.Adam(),
         loss=lambda y, rv_y: -rv_y.log_prob(y))
 
     model.fit(x=np.zeros((n, 0)),

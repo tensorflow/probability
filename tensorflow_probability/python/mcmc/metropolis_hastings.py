@@ -21,7 +21,8 @@ from __future__ import print_function
 import collections
 import warnings
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
@@ -181,7 +182,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       ValueError: if `inner_kernel` results doesn't contain the member
         "target_log_prob".
     """
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name=mcmc_util.make_name(self.name, 'mh', 'one_step'),
         values=[current_state, previous_kernel_results]):
       # Take one inner step.
@@ -258,7 +259,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       ValueError: if `inner_kernel` results doesn't contain the member
         "target_log_prob".
     """
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name=mcmc_util.make_name(self.name, 'mh', 'bootstrap_results'),
         values=[init_state]):
       pkr = self.inner_kernel.bootstrap_results(init_state)

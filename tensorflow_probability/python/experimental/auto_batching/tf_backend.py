@@ -26,7 +26,8 @@ import contextlib
 
 # Dependency imports
 import six
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.auto_batching import instructions
 from tensorflow_probability.python.experimental.auto_batching import xla
@@ -46,7 +47,7 @@ def _control_flow_v2():
 
 
 def _generalized_where(mask, value, old_value):
-  """Version of tf.compat.v1.where that broadcasts `value` to `old_value`."""
+  """Version of tf1.where that broadcasts `value` to `old_value`."""
   mask = tf.convert_to_tensor(value=mask, name='mask')
   mask.shape.assert_has_rank(1)
   value = tf.convert_to_tensor(value=value, name='value', dtype=old_value.dtype)
@@ -58,7 +59,7 @@ def _generalized_where(mask, value, old_value):
       value |= tf.zeros_like(old_value)
     else:
       value += tf.zeros_like(old_value)
-  new_value = tf.compat.v1.where(mask, value, old_value, name='new_value')
+  new_value = tf1.where(mask, value, old_value, name='new_value')
   # TODO(b/78655271): Do we need 'new_val.set_shape(old_value.shape)'?
   return new_value
 
@@ -139,12 +140,12 @@ class Stack(collections.namedtuple('Stack', ['stack', 'stack_index'])):
           by `mask`.
       read: The batch of values at the newly-current stack frame.
     """
-    with tf.compat.v2.name_scope(name or 'Stack.pop'):
+    with tf.name_scope(name or 'Stack.pop'):
       mask = tf.convert_to_tensor(value=mask, name='mask')
       new_stack_index = self.stack_index - tf.cast(mask, self.stack_index.dtype)
       if self._safety_checks():
         with tf.control_dependencies(
-            [tf.compat.v1.assert_greater_equal(
+            [tf1.assert_greater_equal(
                 new_stack_index, tf.constant(0, new_stack_index.dtype))]):
           new_stack_index = tf.identity(new_stack_index)
       new_stack_index.set_shape(self.stack_index.shape)
@@ -181,7 +182,7 @@ class Stack(collections.namedtuple('Stack', ['stack', 'stack_index'])):
       asserted_value: A assertion-bound snapshot of the input `value`,
           assertions used to catch stack overflows.
     """
-    with tf.compat.v2.name_scope(name or 'Stack.push'):
+    with tf.name_scope(name or 'Stack.push'):
       value = tf.convert_to_tensor(value=value, name='value')
       mask = tf.convert_to_tensor(value=mask, name='mask')
       # self.stack:       [max_stack_depth * batch_size, ...]
@@ -206,7 +207,7 @@ class Stack(collections.namedtuple('Stack', ['stack', 'stack_index'])):
           on_value=True,
           off_value=False,
           dtype=tf.bool)
-      new_stack = tf.compat.v1.where(
+      new_stack = tf1.where(
           tf.reshape(update_stack_mask, [-1]),
           tf.reshape(tiled_value, tf.shape(input=self.stack)), self.stack)
       new_stack.set_shape(self.stack.shape)
@@ -214,7 +215,7 @@ class Stack(collections.namedtuple('Stack', ['stack', 'stack_index'])):
       new_stack_index.set_shape(self.stack_index.shape)
       if self._safety_checks():
         with tf.control_dependencies(
-            [tf.compat.v1.assert_less(
+            [tf1.assert_less(
                 new_stack_index, tf.cast(
                     max_stack_depth_tensor, new_stack_index.dtype))]):
           value = tf.identity(value)
@@ -244,7 +245,7 @@ def _create_stack(max_stack_depth, value, safety_checks=True, name=None):
   Returns:
     stack: An initialized Stack object.
   """
-  with tf.compat.v2.name_scope(name or 'Stack.initialize'):
+  with tf.name_scope(name or 'Stack.initialize'):
     value = tf.convert_to_tensor(value=value, name='value')
     batch_size = _get_leftmost_dim_size(value)
     # Home the stack index in the same memory space as the value.  The
@@ -283,7 +284,7 @@ class FullTensorFlowVariable(
 
   def read(self, name=None):
     """Returns the batch of top values."""
-    with tf.compat.v2.name_scope(name or '{}.read'.format(self._name())):
+    with tf.name_scope(name or '{}.read'.format(self._name())):
       return tf.identity(self.current)
 
   def update(self, value, mask, name=None):
@@ -300,7 +301,7 @@ class FullTensorFlowVariable(
     Returns:
       var: Updated variable. Does not mutate `self`.
     """
-    with tf.compat.v2.name_scope(name or '{}.update'.format(self._name())):
+    with tf.name_scope(name or '{}.update'.format(self._name())):
       new_value = _generalized_where(mask, value, self.current)
       return type(self)(new_value, self.stack)
 
@@ -318,7 +319,7 @@ class FullTensorFlowVariable(
     Returns:
       var: Updated variable. Does not mutate `self`.
     """
-    with tf.compat.v2.name_scope(name or '{}.push'.format(self._name())):
+    with tf.name_scope(name or '{}.push'.format(self._name())):
       new_stack, asserted_value = self.stack.push(self.current, mask)
       return type(self)(asserted_value, new_stack)
 
@@ -333,10 +334,10 @@ class FullTensorFlowVariable(
     Returns:
       var: Updated variable. Does not mutate `self`.
     """
-    with tf.compat.v2.name_scope(name or '{}.pop'.format(self._name())):
+    with tf.name_scope(name or '{}.pop'.format(self._name())):
       mask = tf.convert_to_tensor(value=mask, name='mask')
       new_stack, stack_value = self.stack.pop(mask)
-      new_value = tf.compat.v1.where(
+      new_value = tf1.where(
           mask, stack_value, self.current, name='new_value')
       return type(self)(new_value, new_stack)
 
@@ -409,7 +410,7 @@ class TensorFlowBackend(object):
       outputs: pattern of backend-specific objects whose types may be
         analyzed by the caller with `type_of`.
     """
-    with tf.compat.v2.name_scope('VM.run_on_dummies'):
+    with tf.name_scope('VM.run_on_dummies'):
       # We cannot use a temporary graph in eager mode because user code may
       # close over eager tensors, causing `RuntimeError: Attempting to capture
       # an EagerTensor without building a function.`
@@ -474,7 +475,7 @@ class TensorFlowBackend(object):
     Raises:
       ValueError: If dtype does not match.
     """
-    with tf.compat.v2.name_scope('VM.assert_matching_dtype'):
+    with tf.name_scope('VM.assert_matching_dtype'):
       value = tf.convert_to_tensor(
           value=value, name='value', dtype=expected_dtype)
       if value.dtype.base_dtype.as_numpy_dtype != expected_dtype:
@@ -483,7 +484,7 @@ class TensorFlowBackend(object):
 
   def batch_size(self, value, name=None):
     """Returns the first (batch) dimension of `value`."""
-    with tf.compat.v2.name_scope(name or 'VM.batch_size'):
+    with tf.name_scope(name or 'VM.batch_size'):
       value = tf.convert_to_tensor(value=value, name='value')
       return _get_leftmost_dim_size(value)
 
@@ -506,7 +507,7 @@ class TensorFlowBackend(object):
     Returns:
       result: `Tensor` of `dtype` `value`s with shape `[size, *shape]`
     """
-    with tf.compat.v2.name_scope(name or 'VM.fill'):
+    with tf.name_scope(name or 'VM.fill'):
       size = tf.convert_to_tensor(value=size, name='size')
       shape = tf.convert_to_tensor(value=shape, name='shape', dtype=size.dtype)
       return tf.fill(tf.concat([[size], shape], axis=0),
@@ -535,7 +536,7 @@ class TensorFlowBackend(object):
       name = 'Variable' if name is None else 'VM.var_{}'.format(name)
       dtype, event_shape = type_
 
-      with tf.compat.v2.name_scope('{}.initialize'.format(name)):
+      with tf.name_scope('{}.initialize'.format(name)):
         if (alloc is instructions.VariableAllocation.REGISTER and
             tf.executing_eagerly()):
           # Don't need to construct the empty value in Eager mode, because there
@@ -563,7 +564,7 @@ class TensorFlowBackend(object):
 
   def full_mask(self, size, name=None):
     """Returns an all-True mask `Tensor` with shape `[size]`."""
-    with tf.compat.v2.name_scope(name or 'VM.full_mask'):
+    with tf.name_scope(name or 'VM.full_mask'):
       size = tf.convert_to_tensor(value=size, name='size')
       return tf.ones(size, dtype=tf.bool)
 
@@ -585,8 +586,8 @@ class TensorFlowBackend(object):
         returned value will be the shape of `target`.
     """
     # TODO(b/78594182): This is a compatibility shim, required because
-    # `tf.compat.v1.where` does not support broadcasting of its value operands.
-    with tf.compat.v2.name_scope(name or 'VM.broadcast_to_shape_of'):
+    # `tf1.where` does not support broadcasting of its value operands.
+    with tf.name_scope(name or 'VM.broadcast_to_shape_of'):
       dtype = getattr(target, 'dtype', getattr(val, 'dtype', None))
       target = tf.convert_to_tensor(value=target, name='target', dtype=dtype)
       val = tf.convert_to_tensor(value=val, name='val', dtype=target.dtype)
@@ -608,7 +609,7 @@ class TensorFlowBackend(object):
     Returns:
       state: Output state, matching nest structure of input argument `state`.
     """
-    with tf.compat.v2.name_scope(name or 'VM.cond'):
+    with tf.name_scope(name or 'VM.cond'):
       with _control_flow_v2():
         return tf.cond(pred=pred, true_fn=true_fn, false_fn=false_fn)
 
@@ -632,10 +633,10 @@ class TensorFlowBackend(object):
       # Eager, lazy initialization for register variables means that the state
       # may not always be correct to convert to a Tensor.
       return state
-    with tf.compat.v2.name_scope('VM.prepare_for_cond'):
+    with tf.name_scope('VM.prepare_for_cond'):
       state_flat = [tf.convert_to_tensor(value=x)
-                    for x in tf.compat.v2.nest.flatten(state)]
-      return tf.compat.v2.nest.pack_sequence_as(state, state_flat)
+                    for x in tf.nest.flatten(state)]
+      return tf.nest.pack_sequence_as(state, state_flat)
 
   def where(self, condition, x, y, name=None):
     """Implements a where selector for the TF backend.
@@ -656,21 +657,21 @@ class TensorFlowBackend(object):
       masked: A broadcast-shaped `Tensor` where elements corresponding to `True`
         values of `condition` come from `x`, and others come from `y`.
     """
-    with tf.compat.v2.name_scope(name or 'VM.where'):
+    with tf.name_scope(name or 'VM.where'):
       condition = tf.convert_to_tensor(value=condition, name='condition')
       dtype = getattr(x, 'dtype', getattr(y, 'dtype', None))
       x = tf.convert_to_tensor(value=x, name='x', dtype=dtype)
       y = tf.convert_to_tensor(value=y, name='y', dtype=x.dtype)
-      return tf.compat.v1.where(condition, x, y)
+      return tf1.where(condition, x, y)
 
   def reduce_min(self, t, name=None):
     """Implements reduce_min for TF backend."""
-    with tf.compat.v2.name_scope('VM.reduce_min'):
+    with tf.name_scope('VM.reduce_min'):
       return tf.reduce_min(input_tensor=t, name=name)
 
   def while_loop(self, cond, body, loop_vars, name=None):
     """Implements while loops for TF backend."""
-    with tf.compat.v2.name_scope('VM.while_loop'):
+    with tf.name_scope('VM.while_loop'):
       if tf.executing_eagerly():
         # The reg. variable optimization (see create_variable) may change loop
         # structure across iterations, which now triggers an exception for eager
@@ -690,22 +691,22 @@ class TensorFlowBackend(object):
 
   def switch_case(self, branch_selector, branch_callables, name=None):
     """Implements a switch (branch_selector) { case ... } construct."""
-    with tf.compat.v2.name_scope('VM.switch_case'):
+    with tf.name_scope('VM.switch_case'):
       with _control_flow_v2():
         return tf.switch_case(branch_selector, branch_callables, name=name)
 
   def equal(self, t1, t2, name=None):
     """Implements equality comparison for TF backend."""
-    with tf.compat.v2.name_scope('VM.equal'):
+    with tf.name_scope('VM.equal'):
       return tf.equal(t1, t2, name=name)
 
   def not_equal(self, t1, t2, name=None):
     """Implements inequality comparison for TF backend."""
-    with tf.compat.v2.name_scope('VM.not_equal'):
+    with tf.name_scope('VM.not_equal'):
       return tf.not_equal(t1, t2, name=name)
 
   def any(self, t, name=None):
-    with tf.compat.v2.name_scope(name or 'VM.any'):
+    with tf.name_scope(name or 'VM.any'):
       return tf.reduce_any(input_tensor=t)
 
   def wrap_straightline_callable(self, f):
@@ -741,7 +742,7 @@ class TensorFlowBackend(object):
 
 def _get_leftmost_dim_size(x, name=None):
   """Returns the size of the left most dimension, statically if possible."""
-  with tf.compat.v2.name_scope(name or 'get_leftmost_dim_size'):
+  with tf.name_scope(name or 'get_leftmost_dim_size'):
     x = tf.convert_to_tensor(value=x, name='x')
     if x.shape.ndims is None:
       # If tf.shape(x) is scalar, the [:1] will produce the empty list, whose

@@ -19,7 +19,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
@@ -208,7 +209,7 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     {seasonal_init_args}
     """
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'SeasonalStateSpaceModel',
         values=[drift_scale, observation_noise_scale]) as name:
 
@@ -423,7 +424,7 @@ class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     {seasonal_init_args}
     """
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'ConstrainedSeasonalStateSpaceModel',
         values=[drift_scale, observation_noise_scale]) as name:
 
@@ -575,7 +576,7 @@ def build_seasonal_transition_matrix(
     basis_change_matrix=None, basis_change_matrix_inv=None):
   """Build a function computing transitions for a seasonal effect model."""
 
-  with tf.compat.v1.name_scope('build_seasonal_transition_matrix'):
+  with tf1.name_scope('build_seasonal_transition_matrix'):
     # If the season is changing, the transition matrix permutes the latent
     # state to shift all seasons up by a dimension, and sends the current
     # season's effect to the bottom.
@@ -823,7 +824,7 @@ class Seasonal(StructuralTimeSeries):
         Default value: 'Seasonal'.
     """
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'Seasonal', values=[observed_time_series]) as name:
 
       _, observed_stddev, observed_initial = (

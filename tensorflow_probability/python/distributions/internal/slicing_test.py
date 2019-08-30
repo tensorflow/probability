@@ -18,7 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions.internal import slicing
 from tensorflow_probability.python.internal import tensorshape_util
@@ -120,9 +121,9 @@ class SlicingTest(test_case.TestCase):
     self.assertAllEqual((7, 5, 4, 3), self.evaluate(sliced).shape)
 
   def test_single_param_slice_tensor(self):
-    param = tf.compat.v1.placeholder_with_default(
+    param = tf1.placeholder_with_default(
         tf.zeros([7, 6, 5, 4, 3]), shape=None)
-    idx = tf.compat.v1.placeholder_with_default(
+    idx = tf1.placeholder_with_default(
         tf.constant(2, dtype=tf.int32), shape=[])
     sliced = slicing._slice_single_param(
         param,
@@ -132,9 +133,9 @@ class SlicingTest(test_case.TestCase):
     self.assertAllEqual((7, 5, 4, 3), self.evaluate(sliced).shape)
 
   def test_single_param_slice_tensor_broadcastdim(self):
-    param = tf.compat.v1.placeholder_with_default(
+    param = tf1.placeholder_with_default(
         tf.zeros([7, 1, 5, 4, 3]), shape=None)
-    idx = tf.compat.v1.placeholder_with_default(
+    idx = tf1.placeholder_with_default(
         tf.constant(2, dtype=tf.int32), shape=[])
     sliced = slicing._slice_single_param(
         param,

@@ -26,7 +26,8 @@ from absl import flags
 from absl import logging
 import numpy as np
 import six
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.util.seed_stream import SeedStream
@@ -159,7 +160,7 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
 def _wrap_seed(seed, set_eager_seed):
   # TODO(b/68017812): Remove this clause once eager correctly supports seeding.
   if tf.executing_eagerly() and set_eager_seed:
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
   return seed
 
 
@@ -345,7 +346,7 @@ class DiscreteScalarDistributionTestHelpers(object):
         `counts[i] = sum{ edges[i-1] <= values[j] < edges[i] : j }`.
       edges: 1D `Tensor` characterizing intervals used for counting.
     """
-    with tf.compat.v2.name_scope(name or 'histogram'):
+    with tf.name_scope(name or 'histogram'):
       x = tf.convert_to_tensor(value=x, name='x')
       if value_range is None:
         value_range = [
@@ -460,13 +461,13 @@ class VectorDistributionTestHelpers(object):
       x = dist.sample(num_samples, seed=seed)
       x = tf.identity(x)  # Invalidate bijector cacheing.
       inverse_log_prob = tf.exp(-dist.log_prob(x))
-      importance_weights = tf.compat.v1.where(
+      importance_weights = tf1.where(
           tf.norm(tensor=x - center, axis=-1) <= radius, inverse_log_prob,
           tf.zeros_like(inverse_log_prob))
       return tf.reduce_mean(input_tensor=importance_weights, axis=0)
 
     # Build graph.
-    with tf.compat.v2.name_scope('run_test_sample_consistent_log_prob'):
+    with tf.name_scope('run_test_sample_consistent_log_prob'):
       batch_shape = dist.batch_shape_tensor()
       actual_volume = actual_hypersphere_volume(
           dims=dist.event_shape_tensor()[0],
@@ -476,7 +477,7 @@ class VectorDistributionTestHelpers(object):
           num_samples=num_samples,
           radius=radius,
           center=center)
-      init_op = tf.compat.v1.global_variables_initializer()
+      init_op = tf1.global_variables_initializer()
 
     # Execute graph.
     sess_run_fn(init_op)
@@ -561,5 +562,5 @@ class VectorDistributionTestHelpers(object):
 
 def _vec_outer_square(x, name=None):
   """Computes the outer-product of a vector, i.e., x.T x."""
-  with tf.compat.v2.name_scope(name or 'vec_osquare'):
+  with tf.name_scope(name or 'vec_osquare'):
     return x[..., :, tf.newaxis] * x[..., tf.newaxis, :]

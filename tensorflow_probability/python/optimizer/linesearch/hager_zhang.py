@@ -33,7 +33,8 @@ from __future__ import print_function
 import collections
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer.linesearch.internal import hager_zhang_lib as hzl
 
@@ -246,7 +247,7 @@ def hager_zhang(value_and_gradients_function,
         equal to those of `left` on batch members where converged is True.
         Otherwise, it corresponds to the last interval computed.
   """
-  with tf.compat.v1.name_scope(name, 'hager_zhang', [
+  with tf1.name_scope(name, 'hager_zhang', [
       initial_step_size, value_at_initial_step, value_at_zero, converged,
       threshold_use_approximate_wolfe_condition, shrinkage_param,
       expansion_param, sufficient_decrease_param, curvature_param]):
@@ -310,7 +311,7 @@ def _fix_step_size(value_and_gradients_function,
     return (i < iter_max) & tf.reduce_any(input_tensor=to_fix)
 
   def _body(i, val_c, to_fix):
-    next_c = tf.compat.v1.where(to_fix, val_c.x * step_size_shrink_param,
+    next_c = tf1.where(to_fix, val_c.x * step_size_shrink_param,
                                 val_c.x)
     next_val_c = value_and_gradients_function(next_c)
     still_to_fix = to_fix & ~hzl.is_finite(next_val_c)
@@ -659,7 +660,7 @@ def _to_str(x):
   """Converts a bool tensor to a string with True/False values."""
   x = tf.convert_to_tensor(value=x)
   if x.dtype == tf.bool:
-    return tf.compat.v1.where(x, tf.fill(x.shape, 'True'),
+    return tf1.where(x, tf.fill(x.shape, 'True'),
                               tf.fill(x.shape, 'False'))
   return x
 
@@ -679,4 +680,4 @@ def _print(pass_through_tensor, values):
         flat_values.append(_to_str(v))
       continue
     flat_values.append(_to_str(value))
-  return tf.compat.v1.Print(pass_through_tensor, flat_values)
+  return tf1.Print(pass_through_tensor, flat_values)

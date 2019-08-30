@@ -22,7 +22,7 @@ import importlib
 import types
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 
 __all__ = [

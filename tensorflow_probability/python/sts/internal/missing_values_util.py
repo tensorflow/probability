@@ -20,7 +20,8 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 tfl = tf.linalg
 
@@ -130,13 +131,13 @@ def moments_of_masked_time_series(time_series_tensor, broadcast_mask):
   # Manually compute mean and variance, excluding masked entries.
   mean = (
       tf.reduce_sum(
-          input_tensor=tf.compat.v1.where(broadcast_mask,
+          input_tensor=tf1.where(broadcast_mask,
                                           tf.zeros_like(time_series_tensor),
                                           time_series_tensor),
           axis=-1) / num_unmasked_entries)
   variance = (
       tf.reduce_sum(
-          input_tensor=tf.compat.v1.where(
+          input_tensor=tf1.where(
               broadcast_mask, tf.zeros_like(time_series_tensor),
               (time_series_tensor - mean[..., tf.newaxis])**2),
           axis=-1) / num_unmasked_entries)

@@ -18,7 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability import edward2 as ed
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_case
@@ -159,7 +160,7 @@ class ProgramTransformationsTest(test_case.TestCase):
   def testMakeLogJointFnTemplate(self):
     """Test `make_log_joint_fn` on program returned by tf.make_template."""
     def variational():
-      loc = tf.compat.v1.get_variable("loc", [])
+      loc = tf1.get_variable("loc", [])
       qz = ed.Normal(loc=loc, scale=0.5, name="qz")
       return qz
 
@@ -169,16 +170,16 @@ class ProgramTransformationsTest(test_case.TestCase):
       return log_prob
 
     qz_value = 1.23
-    variational_template = tf.compat.v1.make_template("variational",
+    variational_template = tf1.make_template("variational",
                                                       variational)
 
     log_joint = ed.make_log_joint_fn(variational_template)
     expected_log_prob = log_joint(qz=qz_value)
-    loc = tf.compat.v1.trainable_variables("variational")[0]
+    loc = tf1.trainable_variables("variational")[0]
     actual_log_prob = true_log_joint(loc, qz_value)
 
     with self.cached_session() as sess:
-      sess.run(tf.compat.v1.initialize_all_variables())
+      sess.run(tf1.initialize_all_variables())
       actual_log_prob_, expected_log_prob_ = sess.run(
           [actual_log_prob, expected_log_prob])
       self.assertEqual(actual_log_prob_, expected_log_prob_)

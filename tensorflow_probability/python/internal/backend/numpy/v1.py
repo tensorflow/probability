@@ -23,7 +23,8 @@ import contextlib
 import numpy as np
 import six
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import initializers
@@ -195,91 +196,91 @@ def _placeholder_with_default(input, shape, name=None):  # pylint: disable=redef
 
 
 assert_equal = utils.copy_docstring(
-    tf.compat.v1.assert_equal,
+    tf1.assert_equal,
     _assert_equal)
 
 assert_greater = utils.copy_docstring(
-    tf.compat.v1.assert_greater,
+    tf1.assert_greater,
     _assert_greater)
 
 assert_less = utils.copy_docstring(
-    tf.compat.v1.assert_less,
+    tf1.assert_less,
     _assert_less)
 
 assert_rank = utils.copy_docstring(
-    tf.compat.v1.assert_rank,
+    tf1.assert_rank,
     _assert_rank)
 
 assert_scalar = utils.copy_docstring(
-    tf.compat.v1.assert_scalar,
+    tf1.assert_scalar,
     _assert_scalar)
 
 assert_greater_equal = utils.copy_docstring(
-    tf.compat.v1.assert_greater_equal,
+    tf1.assert_greater_equal,
     _assert_greater_equal)
 
 assert_integer = utils.copy_docstring(
-    tf.compat.v1.assert_integer,
+    tf1.assert_integer,
     _assert_integer)
 
 assert_less_equal = utils.copy_docstring(
-    tf.compat.v1.assert_less_equal,
+    tf1.assert_less_equal,
     _assert_less_equal)
 
 assert_near = utils.copy_docstring(
-    tf.compat.v1.assert_near,
+    tf1.assert_near,
     _assert_near)
 
 assert_negative = utils.copy_docstring(
-    tf.compat.v1.assert_negative,
+    tf1.assert_negative,
     _assert_negative)
 
 assert_non_negative = utils.copy_docstring(
-    tf.compat.v1.assert_non_negative,
+    tf1.assert_non_negative,
     _assert_non_negative)
 
 assert_non_positive = utils.copy_docstring(
-    tf.compat.v1.assert_non_positive,
+    tf1.assert_non_positive,
     _assert_non_positive)
 
 assert_none_equal = utils.copy_docstring(
-    tf.compat.v1.assert_none_equal,
+    tf1.assert_none_equal,
     _assert_none_equal)
 
 assert_positive = utils.copy_docstring(
-    tf.compat.v1.assert_positive,
+    tf1.assert_positive,
     _assert_positive)
 
 assert_proper_iterable = utils.copy_docstring(
-    tf.compat.v1.assert_proper_iterable,
+    tf1.assert_proper_iterable,
     _assert_proper_iterable)
 
 assert_rank_at_least = utils.copy_docstring(
-    tf.compat.v1.assert_rank_at_least,
+    tf1.assert_rank_at_least,
     _assert_rank_at_least)
 
 assert_rank_in = utils.copy_docstring(
-    tf.compat.v1.assert_rank_in,
+    tf1.assert_rank_in,
     _assert_rank_in)
 
 colocate_with = utils.copy_docstring(
-    tf.compat.v1.colocate_with,
+    tf1.colocate_with,
     _colocate_with)
 
 get_variable = utils.copy_docstring(
-    tf.compat.v1.get_variable,
+    tf1.get_variable,
     _get_variable)
 
 placeholder_with_default = utils.copy_docstring(
-    tf.compat.v1.placeholder_with_default,
+    tf1.placeholder_with_default,
     _placeholder_with_default)
 
 global_variables_initializer = utils.copy_docstring(
-    tf.compat.v1.global_variables_initializer,
+    tf1.global_variables_initializer,
     lambda: None)
 
 set_random_seed = utils.copy_docstring(
-    tf.compat.v1.set_random_seed,
+    tf1.set_random_seed,
     lambda seed: np.random.seed(seed % (2**32 - 1)))
 
 

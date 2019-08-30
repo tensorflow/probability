@@ -30,7 +30,8 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static
@@ -204,7 +205,7 @@ def minimize(value_and_gradients_function,
   if stopping_condition is None:
     stopping_condition = bfgs_utils.converged_all
 
-  with tf.compat.v1.name_scope(name, 'minimize', [initial_position, tolerance]):
+  with tf1.name_scope(name, 'minimize', [initial_position, tolerance]):
     initial_position = tf.convert_to_tensor(
         value=initial_position, name='initial_position')
     dtype = initial_position.dtype.base_dtype
@@ -463,4 +464,4 @@ def _queue_push(queue, should_update, new_vecs):
   update_pattern = tf.broadcast_to(
       should_update[tf.newaxis, ..., tf.newaxis],
       distribution_util.prefer_static_shape(queue))
-  return tf.compat.v1.where(update_pattern, new_queue, queue)
+  return tf1.where(update_pattern, new_queue, queue)

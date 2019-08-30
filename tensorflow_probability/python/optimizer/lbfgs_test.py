@@ -22,7 +22,8 @@ import functools
 import numpy as np
 from scipy.stats import special_ortho_group
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -365,7 +366,7 @@ class LBfgsTest(test_case.TestCase):
 
     # Test with a vector of unknown dimension, and a fully unknown shape.
     for shape in ([None], None):
-      start = tf.compat.v1.placeholder(tf.float32, shape=shape)
+      start = tf1.placeholder(tf.float32, shape=shape)
       lbfgs_op = tfp.optimizer.lbfgs_minimize(
           quadratic, initial_position=start, tolerance=1e-8)
       self.assertFalse(lbfgs_op.position.shape.is_fully_defined())

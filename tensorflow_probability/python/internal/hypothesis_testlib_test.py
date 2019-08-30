@@ -25,7 +25,7 @@ from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_case

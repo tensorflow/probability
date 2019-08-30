@@ -20,7 +20,8 @@ from __future__ import print_function
 
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
@@ -189,7 +190,7 @@ def fit(
   graph_deps = [model_matrix, response, model_coefficients_start,
                 predicted_linear_response_start, dispersion, offset,
                 learning_rate, maximum_iterations]
-  with tf.compat.v1.name_scope(name, 'fit', graph_deps):
+  with tf1.name_scope(name, 'fit', graph_deps):
     [
         model_matrix,
         response,
@@ -341,7 +342,7 @@ def fit_one_step(
   """
   graph_deps = [model_matrix, response, model_coefficients_start,
                 predicted_linear_response_start, dispersion, learning_rate]
-  with tf.compat.v1.name_scope(name, 'fit_one_step', graph_deps):
+  with tf1.name_scope(name, 'fit_one_step', graph_deps):
 
     [
         model_matrix,
@@ -370,7 +371,7 @@ def fit_one_step(
     def mask_if_invalid(x, mask):
       mask = tf.fill(
           tf.shape(input=x), value=np.array(mask, x.dtype.as_numpy_dtype))
-      return tf.compat.v1.where(is_valid, x, mask)
+      return tf1.where(is_valid, x, mask)
 
     # Run one step of iteratively reweighted least-squares.
     # Compute "`z`", the adjusted predicted linear response.
@@ -595,7 +596,7 @@ def prepare_args(model_matrix,
   """
   graph_deps = [model_matrix, response, model_coefficients,
                 predicted_linear_response, offset]
-  with tf.compat.v1.name_scope(name, 'prepare_args', graph_deps):
+  with tf1.name_scope(name, 'prepare_args', graph_deps):
     dtype = dtype_util.common_dtype(graph_deps, np.float32)
 
     model_matrix = tf.convert_to_tensor(
@@ -656,7 +657,7 @@ def prepare_args(model_matrix,
 def calculate_linear_predictor(model_matrix, model_coefficients, offset=None,
                                name=None):
   """Computes `model_matrix @ model_coefficients + offset`."""
-  with tf.compat.v1.name_scope(name, 'calculate_linear_predictor',
+  with tf1.name_scope(name, 'calculate_linear_predictor',
                                [model_matrix, model_coefficients, offset]):
     predicted_linear_response = tf.linalg.matvec(model_matrix,
                                                  model_coefficients)

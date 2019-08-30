@@ -24,7 +24,7 @@ import collections
 
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import test_case

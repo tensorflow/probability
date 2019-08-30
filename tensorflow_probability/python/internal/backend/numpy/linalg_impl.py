@@ -22,7 +22,7 @@ import collections
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 

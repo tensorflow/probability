@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
@@ -52,9 +53,9 @@ class _TransposeBijectorTest(object):
       actual_y = tf.constant(actual_y_)
       perm = tf.constant(perm_)
     else:
-      actual_x = tf.compat.v1.placeholder_with_default(actual_x_, shape=None)
-      actual_y = tf.compat.v1.placeholder_with_default(actual_y_, shape=None)
-      perm = tf.compat.v1.placeholder_with_default(perm_, shape=[3])
+      actual_x = tf1.placeholder_with_default(actual_x_, shape=None)
+      actual_y = tf1.placeholder_with_default(actual_y_, shape=None)
+      perm = tf1.placeholder_with_default(perm_, shape=[3])
 
     bijector = tfb.Transpose(perm=perm, validate_args=True)
     y = bijector.forward(actual_x)
@@ -89,8 +90,8 @@ class _TransposeBijectorTest(object):
       actual_y = tf.constant(actual_y_)
       rightmost_transposed_ndims = tf.constant(rightmost_transposed_ndims_)
     else:
-      actual_x = tf.compat.v1.placeholder_with_default(actual_x_, shape=None)
-      actual_y = tf.compat.v1.placeholder_with_default(actual_y_, shape=None)
+      actual_x = tf1.placeholder_with_default(actual_x_, shape=None)
+      actual_y = tf1.placeholder_with_default(actual_y_, shape=None)
       rightmost_transposed_ndims = tf.constant(rightmost_transposed_ndims_)
 
     bijector = tfb.Transpose(
@@ -117,7 +118,7 @@ class _TransposeBijectorTest(object):
     else:
       with self.assertRaisesOpError(msg):
         bijector = tfb.Transpose(
-            perm=tf.compat.v1.placeholder_with_default([1, 2], shape=[2]),
+            perm=tf1.placeholder_with_default([1, 2], shape=[2]),
             validate_args=True)
         self.evaluate(bijector.forward([[0, 1]]))
 
@@ -137,14 +138,14 @@ class _TransposeBijectorTest(object):
 
   def testEventShapes(self):
     shape_static = [5, 4, 3, 2]
-    shape_dynamic = tf.compat.v1.placeholder_with_default(
+    shape_dynamic = tf1.placeholder_with_default(
         tf.constant(shape_static), shape=None)
 
     def make_bijector(perm=None, rightmost_transposed_ndims=None):
       if perm is not None:
         perm = tf.convert_to_tensor(value=perm)
         if not self.is_static:
-          perm = tf.compat.v1.placeholder_with_default(perm, shape=perm.shape)
+          perm = tf1.placeholder_with_default(perm, shape=perm.shape)
       return tfb.Transpose(
           perm, rightmost_transposed_ndims=rightmost_transposed_ndims)
 
@@ -192,8 +193,8 @@ class _TransposeBijectorTest(object):
     if tf.executing_eagerly(): return  # this test is not interesting in eager.
     perm = tf.convert_to_tensor(value=[
         tf.constant(2),
-        tf.compat.v1.placeholder_with_default(0, []),
-        tf.compat.v1.placeholder_with_default(1, [])
+        tf1.placeholder_with_default(0, []),
+        tf1.placeholder_with_default(1, [])
     ])
     self.assertAllEqual([2, None, None], tf.get_static_value(
         perm, partial=True))
@@ -206,7 +207,7 @@ class _TransposeBijectorTest(object):
     # Process of elimination should allow us to deduce one non-static perm idx.
     perm = tf.convert_to_tensor(value=[
         tf.constant(2),
-        tf.compat.v1.placeholder_with_default(0, []),
+        tf1.placeholder_with_default(0, []),
         tf.constant(1)
     ])
     self.assertAllEqual([2, None, 1], tf.get_static_value(perm, partial=True))

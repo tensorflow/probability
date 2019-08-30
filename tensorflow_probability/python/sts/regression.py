@@ -18,7 +18,8 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
@@ -179,7 +180,7 @@ class LinearRegression(StructuralTimeSeries):
       name: the name of this model component.
         Default value: 'LinearRegression'.
     """
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'LinearRegression', values=[design_matrix]) as name:
 
       if not isinstance(design_matrix, tfl.LinearOperator):
@@ -406,7 +407,7 @@ class SparseLinearRegression(StructuralTimeSeries):
       name: the name of this model component.
         Default value: 'SparseLinearRegression'.
     """
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'SparseLinearRegression',
         values=[design_matrix, weights_prior_scale]) as name:
 

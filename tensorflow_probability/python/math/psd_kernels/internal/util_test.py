@@ -20,7 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.math.gradient import value_and_gradient
@@ -61,7 +62,7 @@ class UtilTest(test_case.TestCase):
   def testPadShapeRightWithOnesDynamicShape(self):
     if tf.executing_eagerly(): return
     # Test partially unknown shape
-    x = tf.compat.v1.placeholder_with_default(np.ones([3], np.float32), [None])
+    x = tf1.placeholder_with_default(np.ones([3], np.float32), [None])
     expanded = util.pad_shape_with_ones(x, 3)
     self.assertAllEqual(expanded.shape.as_list(), [None, 1, 1, 1])
     self.assertAllEqual(self.evaluate(expanded).shape, [3, 1, 1, 1])
@@ -71,7 +72,7 @@ class UtilTest(test_case.TestCase):
     self.assertAllEqual(self.evaluate(expanded).shape, [1, 1, 1, 3])
 
     # Test totally unknown shape
-    x = tf.compat.v1.placeholder_with_default(np.ones([3], np.float32), None)
+    x = tf1.placeholder_with_default(np.ones([3], np.float32), None)
     expanded = util.pad_shape_with_ones(x, 3)
     self.assertIsNone(expanded.shape.ndims)
     self.assertAllEqual(self.evaluate(expanded).shape, [3, 1, 1, 1])
@@ -101,7 +102,7 @@ class UtilTest(test_case.TestCase):
         util.sum_rightmost_ndims_preserving_shape(x, ndims=2).shape,
         [5, 4])
 
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         np.ones((5, 4, 3, 2)), shape=[5, 4, None, None])
     self.assertAllEqual(
         util.sum_rightmost_ndims_preserving_shape(x, ndims=1).shape.as_list(),
@@ -109,7 +110,7 @@ class UtilTest(test_case.TestCase):
 
   def testSumRightmostNdimsPreservingShapeDynamicRank(self):
     if tf.executing_eagerly(): return
-    x = tf.compat.v1.placeholder_with_default(np.ones((5, 4, 3, 2)), shape=None)
+    x = tf1.placeholder_with_default(np.ones((5, 4, 3, 2)), shape=None)
     self.assertIsNone(
         util.sum_rightmost_ndims_preserving_shape(x, ndims=2).shape.ndims)
     self.assertAllEqual(
@@ -162,7 +163,7 @@ class UtilTest(test_case.TestCase):
                         rtol=1e-10)
 
   def testSqrtWithFiniteGradsWithDynamicShape(self):
-    x = tf.compat.v1.placeholder_with_default([1.], shape=[None])
+    x = tf1.placeholder_with_default([1.], shape=[None])
     _, grad_tf_sqrt = value_and_gradient(tf.sqrt, x)
     _, grad_safe_sqrt = value_and_gradient(
         util.sqrt_with_finite_grads, x)

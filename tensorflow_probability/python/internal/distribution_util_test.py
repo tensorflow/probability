@@ -23,7 +23,8 @@ import itertools
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import Categorical
 from tensorflow_probability.python.distributions import Mixture
@@ -243,7 +244,7 @@ class ShapesFromLocAndScaleTest(test_case.TestCase):
 
   def test_static_loc_dynamic_scale(self):
     loc = tf.zeros([2, 3])
-    diag = tf.compat.v1.placeholder_with_default(np.ones([5, 1, 3]), shape=None)
+    diag = tf1.placeholder_with_default(np.ones([5, 1, 3]), shape=None)
     batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
         loc, tf.linalg.LinearOperatorDiag(diag))
 
@@ -259,7 +260,7 @@ class ShapesFromLocAndScaleTest(test_case.TestCase):
     self.assertAllEqual([3], event_shape_)
 
   def test_dynamic_loc_static_scale(self):
-    loc = tf.compat.v1.placeholder_with_default(np.zeros([2, 3]), shape=None)
+    loc = tf1.placeholder_with_default(np.zeros([2, 3]), shape=None)
     diag = tf.ones([5, 2, 3])
     batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
         loc, tf.linalg.LinearOperatorDiag(diag))
@@ -276,8 +277,8 @@ class ShapesFromLocAndScaleTest(test_case.TestCase):
     self.assertAllEqual([3], event_shape_)
 
   def test_dynamic_loc_dynamic_scale(self):
-    loc = tf.compat.v1.placeholder_with_default(np.ones([2, 3]), shape=None)
-    diag = tf.compat.v1.placeholder_with_default(np.ones([5, 2, 3]), shape=None)
+    loc = tf1.placeholder_with_default(np.ones([2, 3]), shape=None)
+    diag = tf1.placeholder_with_default(np.ones([5, 2, 3]), shape=None)
     batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
         loc, tf.linalg.LinearOperatorDiag(diag))
 
@@ -305,7 +306,7 @@ class ShapesFromLocAndScaleTest(test_case.TestCase):
 
   def test_none_loc_dynamic_scale(self):
     loc = None
-    diag = tf.compat.v1.placeholder_with_default(np.ones([5, 1, 3]), shape=None)
+    diag = tf1.placeholder_with_default(np.ones([5, 1, 3]), shape=None)
     batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
         loc, tf.linalg.LinearOperatorDiag(diag))
 
@@ -331,7 +332,7 @@ class GetBroadcastShapeTest(test_case.TestCase):
   def test_with_some_dynamic_shapes_works(self):
     if tf.executing_eagerly(): return
     x = tf.ones([2, 1, 3])
-    y = tf.compat.v1.placeholder_with_default(
+    y = tf1.placeholder_with_default(
         np.ones([1, 5, 3], dtype=np.float32),
         shape=None)
     z = tf.ones([])
@@ -416,14 +417,14 @@ class _PadTest(object):
     value_ = np.float32(0.25)
     count_ = np.int32(2)
 
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.is_static_shape else None)
     value = (
         tf.constant(value_) if self.is_static_shape else
-        tf.compat.v1.placeholder_with_default(value_, shape=None))
+        tf1.placeholder_with_default(value_, shape=None))
     count = (
         tf.constant(count_) if self.is_static_shape else
-        tf.compat.v1.placeholder_with_default(count_, shape=None))
+        tf1.placeholder_with_default(count_, shape=None))
 
     x0_front = distribution_util.pad(
         x, axis=-2, value=value, count=count, front=True)
@@ -464,14 +465,14 @@ class _PadTest(object):
                      [4, 5, 6]])
     value_ = np.float32(0.25)
     count_ = np.int32(2)
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.is_static_shape else None)
     value = (
         tf.constant(value_) if self.is_static_shape else
-        tf.compat.v1.placeholder_with_default(value_, shape=None))
+        tf1.placeholder_with_default(value_, shape=None))
     count = (
         tf.constant(count_) if self.is_static_shape else
-        tf.compat.v1.placeholder_with_default(count_, shape=None))
+        tf1.placeholder_with_default(count_, shape=None))
 
     x1_front = distribution_util.pad(
         x, axis=1, value=value, count=count, front=True)
@@ -544,8 +545,8 @@ class PickScalarConditionTest(test_case.TestCase):
     neg = -np.exp(np.random.randn(3, 2, 4)).astype(np.float32)
 
     # TF dynamic cond
-    dynamic_true = tf.compat.v1.placeholder_with_default(input=True, shape=None)
-    dynamic_false = tf.compat.v1.placeholder_with_default(
+    dynamic_true = tf1.placeholder_with_default(input=True, shape=None)
+    dynamic_false = tf1.placeholder_with_default(
         input=False, shape=None)
     pos_ = self.evaluate(distribution_util.pick_scalar_condition(
         dynamic_true, pos, neg))
@@ -555,8 +556,8 @@ class PickScalarConditionTest(test_case.TestCase):
     self.assertAllEqual(neg_, neg)
 
     # TF dynamic everything
-    pos_dynamic = tf.compat.v1.placeholder_with_default(input=pos, shape=None)
-    neg_dynamic = tf.compat.v1.placeholder_with_default(input=neg, shape=None)
+    pos_dynamic = tf1.placeholder_with_default(input=pos, shape=None)
+    neg_dynamic = tf1.placeholder_with_default(input=neg, shape=None)
     pos_ = self.evaluate(distribution_util.pick_scalar_condition(
         dynamic_true, pos_dynamic, neg_dynamic))
     neg_ = self.evaluate(distribution_util.pick_scalar_condition(
@@ -591,7 +592,7 @@ class TestMoveDimension(test_case.TestCase):
   def test_move_dimension_dynamic_shape(self):
 
     x_ = tf.random.normal(shape=[200, 30, 4, 1, 6])
-    x = tf.compat.v1.placeholder_with_default(input=x_, shape=None)
+    x = tf1.placeholder_with_default(input=x_, shape=None)
 
     x_perm1 = distribution_util.move_dimension(x, 1, 1)
     x_perm2 = distribution_util.move_dimension(x, 0, 3)
@@ -620,27 +621,27 @@ class TestMoveDimension(test_case.TestCase):
   def test_move_dimension_dynamic_indices(self):
 
     x_ = tf.random.normal(shape=[200, 30, 4, 1, 6])
-    x = tf.compat.v1.placeholder_with_default(input=x_, shape=None)
+    x = tf1.placeholder_with_default(input=x_, shape=None)
 
     x_perm1 = distribution_util.move_dimension(
-        x, tf.compat.v1.placeholder_with_default(input=1, shape=[]),
-        tf.compat.v1.placeholder_with_default(input=1, shape=[]))
+        x, tf1.placeholder_with_default(input=1, shape=[]),
+        tf1.placeholder_with_default(input=1, shape=[]))
 
     x_perm2 = distribution_util.move_dimension(
-        x, tf.compat.v1.placeholder_with_default(input=0, shape=[]),
-        tf.compat.v1.placeholder_with_default(input=3, shape=[]))
+        x, tf1.placeholder_with_default(input=0, shape=[]),
+        tf1.placeholder_with_default(input=3, shape=[]))
 
     x_perm3 = distribution_util.move_dimension(
-        x, tf.compat.v1.placeholder_with_default(input=0, shape=[]),
-        tf.compat.v1.placeholder_with_default(input=-2, shape=[]))
+        x, tf1.placeholder_with_default(input=0, shape=[]),
+        tf1.placeholder_with_default(input=-2, shape=[]))
 
     x_perm4 = distribution_util.move_dimension(
-        x, tf.compat.v1.placeholder_with_default(input=4, shape=[]),
-        tf.compat.v1.placeholder_with_default(input=2, shape=[]))
+        x, tf1.placeholder_with_default(input=4, shape=[]),
+        tf1.placeholder_with_default(input=2, shape=[]))
 
     x_perm5 = distribution_util.move_dimension(
-        x, tf.compat.v1.placeholder_with_default(input=-1, shape=[]),
-        tf.compat.v1.placeholder_with_default(input=2, shape=[]))
+        x, tf1.placeholder_with_default(input=-1, shape=[]),
+        tf1.placeholder_with_default(input=2, shape=[]))
 
     x_perm1_, x_perm2_, x_perm3_, x_perm4_, x_perm5_ = self.evaluate([
         tf.shape(input=x_perm1),
@@ -666,15 +667,15 @@ class AssertCloseTest(test_case.TestCase):
 
   def testAssertIntegerForm(self):
     # This should only be detected as an integer.
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         np.array([1., 5, 10, 15, 20], dtype=np.float32), shape=None)
-    y = tf.compat.v1.placeholder_with_default(
+    y = tf1.placeholder_with_default(
         np.array([1.1, 5, 10, 15, 20], dtype=np.float32), shape=None)
     # First component isn't less than float32.eps = 1e-7
-    z = tf.compat.v1.placeholder_with_default(
+    z = tf1.placeholder_with_default(
         np.array([1.0001, 5, 10, 15, 20], dtype=np.float32), shape=None)
     # This shouldn't be detected as an integer.
-    w = tf.compat.v1.placeholder_with_default(
+    w = tf1.placeholder_with_default(
         np.array([1e-8, 5, 10, 15, 20], dtype=np.float32), shape=None)
 
     with tf.control_dependencies([distribution_util.assert_integer_form(x)]):
@@ -723,7 +724,7 @@ class MaybeGetStaticTest(test_case.TestCase):
 
   def testGetStaticPlaceholder(self):
     if tf.executing_eagerly(): return
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         np.array([2.], dtype=np.int32), shape=[1])
     self.assertEqual(None, distribution_util.maybe_get_static_value(x))
     self.assertEqual(
@@ -859,7 +860,7 @@ class GetLogitsAndProbsTest(test_case.TestCase):
     with self.assertRaisesOpError(
         'Number of classes exceeds `dtype` precision'):
       p = np.ones([int(2**11+1)], dtype=np.float16)
-      p = tf.compat.v1.placeholder_with_default(p, shape=None)
+      p = tf1.placeholder_with_default(p, shape=None)
       self.evaluate(distribution_util.get_logits_and_probs(
           probs=p, multidimensional=True, validate_args=True))
 
@@ -874,7 +875,7 @@ class GetLogitsAndProbsTest(test_case.TestCase):
     with self.assertRaisesOpError(
         'Number of classes exceeds `dtype` precision'):
       l = np.ones([int(2**11+1)], dtype=np.float16)
-      l = tf.compat.v1.placeholder_with_default(l, shape=None)
+      l = tf1.placeholder_with_default(l, shape=None)
       logit, _ = distribution_util.get_logits_and_probs(
           logits=l, multidimensional=True, validate_args=True)
       self.evaluate(logit)
@@ -892,7 +893,7 @@ class EmbedCheckCategoricalEventShapeTest(test_case.TestCase):
     if tf.executing_eagerly(): return
     with self.assertRaisesOpError(
         'must have at least 2 events'):
-      param = tf.compat.v1.placeholder_with_default(
+      param = tf1.placeholder_with_default(
           np.ones([1], dtype=np.float16), shape=None)
       checked_param = distribution_util.embed_check_categorical_event_shape(
           param)
@@ -907,7 +908,7 @@ class EmbedCheckCategoricalEventShapeTest(test_case.TestCase):
     if tf.executing_eagerly(): return
     with self.assertRaisesOpError(
         'Number of classes exceeds `dtype` precision'):
-      param = tf.compat.v1.placeholder_with_default(
+      param = tf1.placeholder_with_default(
           np.ones([int(2**11+1)], dtype=np.float16), shape=None)
       checked_param = distribution_util.embed_check_categorical_event_shape(
           param)
@@ -926,7 +927,7 @@ class EmbedCheckIntegerCastingClosedTest(test_case.TestCase):
 
   def testCorrectlyAssertsNonnegative(self):
     with self.assertRaisesOpError('Elements must be non-negative'):
-      x = tf.compat.v1.placeholder_with_default(
+      x = tf1.placeholder_with_default(
           np.array([1, -1], dtype=np.float16), shape=None)
       x_checked = distribution_util.embed_check_integer_casting_closed(
           x, target_dtype=tf.int16)
@@ -934,7 +935,7 @@ class EmbedCheckIntegerCastingClosedTest(test_case.TestCase):
 
   def testCorrectlyAssertsPositive(self):
     with self.assertRaisesOpError('Elements must be positive'):
-      x = tf.compat.v1.placeholder_with_default(
+      x = tf1.placeholder_with_default(
           np.array([1, 0], dtype=np.float16), shape=None)
       x_checked = distribution_util.embed_check_integer_casting_closed(
           x, target_dtype=tf.int16, assert_positive=True)
@@ -942,7 +943,7 @@ class EmbedCheckIntegerCastingClosedTest(test_case.TestCase):
 
   def testCorrectlyAssersIntegerForm(self):
     with self.assertRaisesOpError('Elements must be int16-equivalent.'):
-      x = tf.compat.v1.placeholder_with_default(
+      x = tf1.placeholder_with_default(
           np.array([1, 1.5], dtype=np.float16), shape=None)
       x_checked = distribution_util.embed_check_integer_casting_closed(
           x, target_dtype=tf.int16)
@@ -950,7 +951,7 @@ class EmbedCheckIntegerCastingClosedTest(test_case.TestCase):
 
   def testCorrectlyAssertsLargestPossibleInteger(self):
     with self.assertRaisesOpError('Elements cannot exceed 32767.'):
-      x = tf.compat.v1.placeholder_with_default(
+      x = tf1.placeholder_with_default(
           np.array([1, 2**15], dtype=np.int32), shape=None)
       x_checked = distribution_util.embed_check_integer_casting_closed(
           x, target_dtype=tf.int16)
@@ -958,7 +959,7 @@ class EmbedCheckIntegerCastingClosedTest(test_case.TestCase):
 
   def testCorrectlyAssertsSmallestPossibleInteger(self):
     with self.assertRaisesOpError('Elements cannot be smaller than 0.'):
-      x = tf.compat.v1.placeholder_with_default(
+      x = tf1.placeholder_with_default(
           np.array([1, -1], dtype=np.int32), shape=None)
       x_checked = distribution_util.embed_check_integer_casting_closed(
           x, target_dtype=tf.uint16, assert_nonnegative=False)
@@ -970,23 +971,23 @@ class DynamicShapeTest(test_case.TestCase):
 
   def testSameDynamicShape(self):
     scalar = tf.constant(2.)
-    scalar1 = tf.compat.v1.placeholder_with_default(
+    scalar1 = tf1.placeholder_with_default(
         np.array(2., dtype=np.float32), shape=None)
 
     vector = tf.constant([0.3, 0.4, 0.5])
-    vector1 = tf.compat.v1.placeholder_with_default(
+    vector1 = tf1.placeholder_with_default(
         np.array([2., 3., 4.], dtype=np.float32), shape=[None])
-    vector2 = tf.compat.v1.placeholder_with_default(
+    vector2 = tf1.placeholder_with_default(
         np.array([2., 3.5, 6.], dtype=np.float32), shape=[None])
 
     multidimensional = tf.constant([[0.3, 0.4], [0.2, 0.6]])
-    multidimensional1 = tf.compat.v1.placeholder_with_default(
+    multidimensional1 = tf1.placeholder_with_default(
         np.array([[2., 3.], [3., 4.]], dtype=np.float32),
         shape=[None, None])
-    multidimensional2 = tf.compat.v1.placeholder_with_default(
+    multidimensional2 = tf1.placeholder_with_default(
         np.array([[1., 3.5], [6.3, 2.3]], dtype=np.float32),
         shape=[None, None])
-    multidimensional3 = tf.compat.v1.placeholder_with_default(
+    multidimensional3 = tf1.placeholder_with_default(
         np.array([[1., 3.5, 5.], [6.3, 2.3, 7.1]], dtype=np.float32),
         shape=[None, None])
 
@@ -1065,8 +1066,8 @@ class RotateTransposeTest(test_case.TestCase):
                     np.ones([2, 1], dtype=np.float32),
                     np.ones([3, 2, 1], dtype=np.float32)):
       for shift_value in np.arange(-5, 5).astype(np.int32):
-        x = tf.compat.v1.placeholder_with_default(x_value, shape=None)
-        shift = tf.compat.v1.placeholder_with_default(shift_value, shape=None)
+        x = tf1.placeholder_with_default(x_value, shape=None)
+        shift = tf1.placeholder_with_default(shift_value, shape=None)
         self.assertAllEqual(
             self._np_rotate_transpose(x_value, shift_value),
             self.evaluate(distribution_util.rotate_transpose(x, shift)))
@@ -1116,21 +1117,21 @@ class PreferStaticRankTest(test_case.TestCase):
 
   def testDynamicRankEndsUpBeingNonEmpty(self):
     if tf.executing_eagerly(): return
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         np.zeros([2, 3], dtype=np.float64), shape=None)
     rank = distribution_util.prefer_static_rank(x)
     self.assertAllEqual(2, self.evaluate(rank))
 
   def testDynamicRankEndsUpBeingEmpty(self):
     if tf.executing_eagerly(): return
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         np.array([], dtype=np.int32), shape=None)
     rank = distribution_util.prefer_static_rank(x)
     self.assertAllEqual(1, self.evaluate(rank))
 
   def testDynamicRankEndsUpBeingScalar(self):
     if tf.executing_eagerly(): return
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         np.array(1, dtype=np.int32), shape=None)
     rank = distribution_util.prefer_static_rank(x)
     self.assertAllEqual(0, self.evaluate(rank))
@@ -1159,21 +1160,21 @@ class PreferStaticShapeTest(test_case.TestCase):
 
   def testDynamicShapeEndsUpBeingNonEmpty(self):
     if tf.executing_eagerly(): return
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         np.zeros([2, 3], dtype=np.float64), shape=None)
     shape = distribution_util.prefer_static_shape(x)
     self.assertAllEqual([2, 3], self.evaluate(shape))
 
   def testDynamicShapeEndsUpBeingEmpty(self):
     if tf.executing_eagerly(): return
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         np.array([], dtype=np.int32), shape=None)
     shape = distribution_util.prefer_static_shape(x)
     self.assertAllEqual([0], self.evaluate(shape))
 
   def testDynamicShapeEndsUpBeingScalar(self):
     if tf.executing_eagerly(): return
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         np.array(1, dtype=np.int32), shape=None)
     shape = distribution_util.prefer_static_shape(x)
     self.assertAllEqual([], self.evaluate(shape))
@@ -1203,7 +1204,7 @@ class PreferStaticValueTest(test_case.TestCase):
 
   def testDynamicValueEndsUpBeingNonEmpty(self):
     if tf.executing_eagerly(): return
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         np.zeros((2, 3), dtype=np.float64), shape=None)
     value = distribution_util.prefer_static_value(x)
     self.assertAllEqual(np.zeros((2, 3)),
@@ -1211,14 +1212,14 @@ class PreferStaticValueTest(test_case.TestCase):
 
   def testDynamicValueEndsUpBeingEmpty(self):
     if tf.executing_eagerly(): return
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         np.array([], dtype=np.int32), shape=None)
     value = distribution_util.prefer_static_value(x)
     self.assertAllEqual(np.array([]), self.evaluate(value))
 
   def testDynamicValueEndsUpBeingScalar(self):
     if tf.executing_eagerly(): return
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         np.array(1, dtype=np.int32), shape=None)
     value = distribution_util.prefer_static_value(x)
     self.assertAllEqual(np.array(1), self.evaluate(value))
@@ -1356,7 +1357,7 @@ class ExpandToVectorTest(test_case.TestCase):
     # Helper to construct a placeholder and call expand_to_tensor on it.
     def _expand_tensor(x, shape=None, dtype=np.int32, validate_args=False):
       return distribution_util.expand_to_vector(
-          tf.compat.v1.placeholder_with_default(
+          tf1.placeholder_with_default(
               np.array(x, dtype=dtype), shape=shape),
           tensor_name='name_for_tensor',
           validate_args=validate_args)
@@ -1394,24 +1395,24 @@ class ExpandToVectorTest(test_case.TestCase):
 class WithDependenciesTestCase(test_util.TensorFlowTestCase):
 
   def testTupleDependencies(self):
-    counter = tf.compat.v2.Variable(0, name='my_counter')
+    counter = tf.Variable(0, name='my_counter')
     const_with_dep = distribution_util.with_dependencies(
-        (tf.compat.v1.assign_add(counter, 1), tf.constant(42)),
+        (tf1.assign_add(counter, 1), tf.constant(42)),
         tf.constant(7))
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     self.assertEqual(1 if tf.executing_eagerly() else 0,
                      self.evaluate(counter))
     self.assertEqual(7, self.evaluate(const_with_dep))
     self.assertEqual(1, self.evaluate(counter))
 
   def testListDependencies(self):
-    counter = tf.compat.v2.Variable(0, name='my_counter')
+    counter = tf.Variable(0, name='my_counter')
     const_with_dep = distribution_util.with_dependencies(
-        [tf.compat.v1.assign_add(counter, 1), tf.constant(42)],
+        [tf1.assign_add(counter, 1), tf.constant(42)],
         tf.constant(7))
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     self.assertEqual(1 if tf.executing_eagerly() else 0,
                      self.evaluate(counter))
     self.assertEqual(7, self.evaluate(const_with_dep))

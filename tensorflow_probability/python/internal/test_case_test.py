@@ -20,7 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_case
@@ -108,7 +109,7 @@ class _TestCaseTest(object):
   def test_assert_all_nan_input_placeholder_with_default(self):
     all_nan = np.full((10, 10, 10),
                       np.nan).astype(dtype_util.as_numpy_dtype(self.dtype))
-    a = tf.compat.v1.placeholder_with_default(
+    a = tf1.placeholder_with_default(
         input=all_nan, shape=all_nan.shape)
     self.assertAllNan(a)
 

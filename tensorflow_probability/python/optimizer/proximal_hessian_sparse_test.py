@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -31,7 +32,7 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 class _ProximalHessianTest(object):
 
   def _make_placeholder(self, x):
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=x, shape=(x.shape if self.use_static_shape else None))
 
   def _adjust_dtype_and_shape_hints(self, x):

@@ -22,7 +22,8 @@ import os
 
 # Dependency imports
 from absl import flags
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.auto_batching import xla
 from tensorflow_probability.python.internal import test_case
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
@@ -55,5 +56,5 @@ class TFPXLATestCase(test_case.TestCase):
 
   def wrap_fn(self, f):
     return xla.compile_nested_output(
-        f, (tf.compat.v1.tpu.rewrite if 'TPU' in self.device
+        f, (tf1.tpu.rewrite if 'TPU' in self.device
             else tf.xla.experimental.compile))

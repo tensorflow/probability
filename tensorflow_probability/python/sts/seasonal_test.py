@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.sts import ConstrainedSeasonalStateSpaceModel
@@ -284,7 +285,7 @@ class _SeasonalStateSpaceModelTest(test_case.TestCase):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
@@ -378,7 +379,7 @@ class _ConstrainedSeasonalStateSpaceModelTest(test_case.TestCase):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 

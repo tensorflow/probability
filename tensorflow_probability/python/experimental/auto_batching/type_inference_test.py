@@ -26,7 +26,8 @@ from absl.testing import parameterized
 
 import numpy as np
 import six
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
 from tensorflow_probability.python.experimental.auto_batching import instructions
@@ -133,7 +134,7 @@ class TypeInferenceTest(test_case.TestCase, parameterized.TestCase):
     for inputs, outputs in ([5], [8]), ([5, 6, 8, 9], [8, 13, 34, 55]):
       inputs = np.array(inputs, dtype=dtype)
       outputs = np.array(outputs, dtype=dtype)
-      tf.compat.v1.logging.debug('np.fib {} {} {}'.format(
+      tf1.logging.debug('np.fib {} {} {}'.format(
           dtype, inputs.shape, outputs.shape))
       prog = test_programs.fibonacci_function_calls(include_types=False)
       typed = type_inference.infer_types(prog, [inputs], NP_BACKEND)
@@ -153,7 +154,7 @@ class TypeInferenceTest(test_case.TestCase, parameterized.TestCase):
     for inputs, outputs in ([5], [8]), ([5, 6, 8, 9], [8, 13, 34, 55]):
       inputs = np.array(inputs, dtype=dtype)
       outputs = np.array(outputs, dtype=dtype)
-      tf.compat.v1.logging.debug('tf.fib {} {} {}'.format(
+      tf1.logging.debug('tf.fib {} {} {}'.format(
           dtype, inputs.shape, outputs.shape))
       inputs_t = tf.constant(inputs, dtype=dtype)
       prog = test_programs.fibonacci_function_calls(include_types=False)
@@ -171,7 +172,7 @@ class TypeInferenceTest(test_case.TestCase, parameterized.TestCase):
                             ([5, 6, 0, 3], [False, True, True, False])]:
       inputs = np.array(inputs, dtype=dtype)
       outputs = np.array(outputs, dtype=np.bool)
-      tf.compat.v1.logging.debug('np.even {} {} {}'.format(
+      tf1.logging.debug('np.even {} {} {}'.format(
           dtype, inputs.shape, outputs.shape))
       prog = test_programs.is_even_function_calls(include_types=False)
       typed = type_inference.infer_types(prog, [inputs], NP_BACKEND)
@@ -193,7 +194,7 @@ class TypeInferenceTest(test_case.TestCase, parameterized.TestCase):
                             ([5, 6, 0, 3], [False, True, True, False])]:
       inputs = np.array(inputs, dtype=dtype)
       outputs = np.array(outputs, dtype=np.bool)
-      tf.compat.v1.logging.debug('tf.even {} {} {}'.format(
+      tf1.logging.debug('tf.even {} {} {}'.format(
           dtype, inputs.shape, outputs.shape))
       inputs_t = tf.constant(inputs, dtype=dtype)
       prog = test_programs.is_even_function_calls(include_types=False)

@@ -18,7 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -30,7 +31,7 @@ __all__ = [
 ]
 
 
-class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
+class VariationalSGD(tf.optimizers.Optimizer):
   """An optimizer module for constant stochastic gradient descent.
 
   This implements an optimizer module for the constant stochastic gradient
@@ -89,7 +90,7 @@ class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
                use_single_learning_rate=False,
                name=None):
     default_name = 'VariationalSGD'
-    with tf.compat.v1.name_scope(name, default_name, [
+    with tf1.name_scope(name, default_name, [
         max_learning_rate, preconditioner_decay_rate, batch_size, burnin,
         burnin_max_learning_rate
     ]):
@@ -111,44 +112,44 @@ class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
       self._use_single_learning_rate = use_single_learning_rate
 
       self._preconditioner_decay_rate = distribution_util.with_dependencies([
-          tf.compat.v1.assert_non_negative(
+          tf1.assert_non_negative(
               self._preconditioner_decay_rate,
               message='`preconditioner_decay_rate` must be non-negative'),
-          tf.compat.v1.assert_less_equal(
+          tf1.assert_less_equal(
               self._preconditioner_decay_rate,
               1.,
               message='`preconditioner_decay_rate` must be at most 1.'),
       ], self._preconditioner_decay_rate)
 
       self._batch_size = distribution_util.with_dependencies([
-          tf.compat.v1.assert_greater(
+          tf1.assert_greater(
               self._batch_size,
               0,
               message='`batch_size` must be greater than zero')
       ], self._batch_size)
 
       self._total_num_examples = distribution_util.with_dependencies([
-          tf.compat.v1.assert_greater(
+          tf1.assert_greater(
               self._total_num_examples,
               0,
               message='`total_num_examples` must be greater than zero')
       ], self._total_num_examples)
 
       self._burnin = distribution_util.with_dependencies([
-          tf.compat.v1.assert_non_negative(
+          tf1.assert_non_negative(
               self._burnin, message='`burnin` must be non-negative'),
-          tf.compat.v1.assert_integer(
+          tf1.assert_integer(
               self._burnin, message='`burnin` must be an integer')
       ], self._burnin)
 
       self._burnin_max_learning_rate = distribution_util.with_dependencies([
-          tf.compat.v1.assert_non_negative(
+          tf1.assert_non_negative(
               self._burnin_max_learning_rate,
               message='`burnin_max_learning_rate` must be non-negative')
       ], self._burnin_max_learning_rate)
 
       self._max_learning_rate = distribution_util.with_dependencies([
-          tf.compat.v1.assert_non_negative(
+          tf1.assert_non_negative(
               self._max_learning_rate,
               message='`max_learning_rate` must be non-negative')
       ], self._max_learning_rate)
@@ -185,7 +186,7 @@ class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
     # via Welford's algorithm
     if isinstance(grad, tf.Tensor):
       delta = grad - avg_first
-      first_moment_update = avg_first.assign_add(delta * tf.compat.v1.where(
+      first_moment_update = avg_first.assign_add(delta * tf1.where(
           self.iterations < 1, tf.cast(1, var.dtype), 1. - decay_tensor))
 
       with tf.control_dependencies([first_moment_update]):
@@ -197,13 +198,13 @@ class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
           tf.clip_by_value(avg_second, 1e-12, 1e12))
     elif isinstance(grad, tf.IndexedSlices):
       delta = grad.values - tf.gather_nd(avg_first, grad.indices)
-      first_moment_update = tf.compat.v1.scatter_add(
+      first_moment_update = tf1.scatter_add(
           avg_first, grad.indices,
-          delta * tf.compat.v1.where(self.iterations < 1, tf.cast(
+          delta * tf1.where(self.iterations < 1, tf.cast(
               1., var.dtype), 1. - decay_tensor))
 
       with tf.control_dependencies([first_moment_update]):
-        avg_second = tf.compat.v1.scatter_add(
+        avg_second = tf1.scatter_add(
             avg_second, grad.indices,
             tf.cast(self.iterations < 1, var.dtype) * -(1. - decay_tensor) *
             (tf.gather_nd(avg_second, grad.indices) -
@@ -226,7 +227,7 @@ class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
         diag_preconditioner)
 
   def _resource_apply_dense(self, grad, var):
-    max_learning_rate = tf.compat.v1.where(
+    max_learning_rate = tf1.where(
         self.iterations < tf.cast(self._burnin, tf.int64),
         self._burnin_max_learning_rate, self._max_learning_rate)
 
@@ -242,7 +243,7 @@ class VariationalSGD(tf.compat.v2.optimizers.Optimizer):
         use_locking=self._use_locking)
 
   def _resource_apply_sparse(self, grad, var, indices):
-    max_learning_rate = tf.compat.v1.where(
+    max_learning_rate = tf1.where(
         self.iterations < tf.cast(self._burnin, tf.int64),
         self._burnin_max_learning_rate, self._max_learning_rate)
 

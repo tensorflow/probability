@@ -24,7 +24,8 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.math.generic import soft_threshold
@@ -85,7 +86,7 @@ def _sparse_or_dense_matmul_onehot(sparse_or_dense_matrix, col_index):
       `sparse_or_dense_matrix`.
   """
   if isinstance(sparse_or_dense_matrix,
-                (tf.SparseTensor, tf.compat.v1.SparseTensorValue)):
+                (tf.SparseTensor, tf1.SparseTensorValue)):
     # TODO(b/111924846): Implement better (ideally in a way that allows us to
     # eliminate the `num_rows` arg, if possible).
     num_rows = _get_shape(sparse_or_dense_matrix)[-2]
@@ -234,7 +235,7 @@ def minimize_one_step(gradient_unregularized_loss,
       tolerance,
       learning_rate,
   ]
-  with tf.compat.v1.name_scope(name, 'minimize_one_step', graph_deps):
+  with tf1.name_scope(name, 'minimize_one_step', graph_deps):
     x_shape = _get_shape(x_start)
     batch_shape = x_shape[:-1]
     dims = x_shape[-1]
@@ -353,7 +354,7 @@ def minimize_one_step(gradient_unregularized_loss,
       # computed incrementally, where x_update_end and x_update_start are as
       # defined in the convergence criteria.  Accordingly, we reset
       # x_update_diff_norm_sq to zero at the beginning of each sweep.
-      x_update_diff_norm_sq = tf.compat.v1.where(
+      x_update_diff_norm_sq = tf1.where(
           tf.equal(coord, 0), tf.zeros_like(x_update_diff_norm_sq),
           x_update_diff_norm_sq)
 
@@ -559,7 +560,7 @@ def minimize(grad_and_hessian_loss_fn,
       tolerance,
       learning_rate,
   ],
-  with tf.compat.v1.name_scope(name, 'minimize', graph_deps):
+  with tf1.name_scope(name, 'minimize', graph_deps):
 
     def _loop_cond(x_start, converged, iter_):
       del x_start

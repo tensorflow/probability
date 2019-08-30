@@ -24,7 +24,8 @@ import collections
 from absl import logging
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.auto_batching import frontend
 from tensorflow_probability.python.experimental.auto_batching import instructions
@@ -588,7 +589,7 @@ class _TestHidingTFBatchSize(object):
       shape = ndarray.shape
     else:
       shape = [None] + list(ndarray.shape[1:])
-    return tf.compat.v1.placeholder_with_default(input=ndarray, shape=shape)
+    return tf1.placeholder_with_default(input=ndarray, shape=shape)
 
   def _check_batch_size(self, tensor, expected):
     if self.use_static_batch_size or tf.executing_eagerly():

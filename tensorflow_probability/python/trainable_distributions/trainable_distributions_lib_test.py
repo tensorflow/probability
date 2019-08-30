@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_case
 
@@ -48,7 +49,7 @@ class TestMVNTriL(test_case.TestCase):
         tf.zeros(np.concatenate([batch_shape, [mvn_size]]), scale.dtype))
     scale_diag = tf.linalg.diag_part(scale)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -90,7 +91,7 @@ class TestMVNTriL(test_case.TestCase):
         num_lower=-1,
         num_upper=0)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -129,7 +130,7 @@ class TestBernoulli(test_case.TestCase):
     x = tf.constant(x_)
     bernoulli = tfp.trainable_distributions.bernoulli(x)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -188,7 +189,7 @@ class TestNormal(test_case.TestCase):
     x = tf.constant(x_)
     normal = tfp.trainable_distributions.normal(x)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -247,7 +248,7 @@ class TestPoisson(test_case.TestCase):
     x = tf.constant(x_)
     poisson = tfp.trainable_distributions.poisson(x)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
