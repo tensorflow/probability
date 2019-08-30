@@ -25,7 +25,8 @@ import warnings
 
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.mcmc.internal import util
@@ -180,7 +181,7 @@ class SmartForLoopTest(test_case.TestCase):
 
   def test_tf_while_loop(self):
     iters = 10
-    n = tf.compat.v1.placeholder_with_default(input=np.int64(iters), shape=())
+    n = tf1.placeholder_with_default(input=np.int64(iters), shape=())
     counter = collections.Counter()
     def body(x):
       counter['body_calls'] += 1
@@ -379,7 +380,7 @@ class SimpleTensorWarningTest(test_case.TestCase, parameterized.TestCase):
   # We must defer creating the TF objects until the body of the test.
   # pylint: disable=unnecessary-lambda
   @parameterized.parameters([lambda: tf.Variable(0)],
-                            [lambda: tf.compat.v2.Variable(0)],
+                            [lambda: tf.Variable(0)],
                             [lambda: TensorConvertible()])
   def testWarn(self, tensor_callable):
     tensor = tensor_callable()

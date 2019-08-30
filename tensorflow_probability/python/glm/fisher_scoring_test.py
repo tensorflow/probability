@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_case
@@ -274,7 +275,7 @@ class FitTestSlow(FitTestFast):
     ] = self.make_dataset(n=n, d=3, link='probit')
     l2_regularizer = np.array(0.07 * n, model_matrix.dtype.as_numpy_dtype)
     if not static_l2:
-      l2_regularizer = tf.compat.v1.placeholder_with_default(
+      l2_regularizer = tf1.placeholder_with_default(
           l2_regularizer, shape=[])
     [
         expected_model_coefficients,

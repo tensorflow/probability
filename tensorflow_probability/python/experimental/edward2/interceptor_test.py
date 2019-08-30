@@ -20,7 +20,7 @@ from __future__ import print_function
 
 from absl.testing import parameterized
 import six
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability import edward2 as ed
 from tensorflow_probability.python.internal import test_case

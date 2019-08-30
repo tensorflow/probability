@@ -19,7 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
@@ -33,7 +34,7 @@ class LeapfrogIntegratorTest(test_case.TestCase):
     self._shape_param = 5.
     self._rate_param = 10.
 
-    tf.compat.v1.random.set_random_seed(10003)
+    tf1.random.set_random_seed(10003)
     np.random.seed(10003)
 
   def assertAllFinite(self, x):
@@ -77,7 +78,7 @@ class LeapfrogIntegratorTest(test_case.TestCase):
         input_tensor=new_m**2., axis=event_dims)
 
     old_energy_, new_energy_ = self.evaluate([old_energy, new_energy])
-    tf.compat.v1.logging.vlog(
+    tf1.logging.vlog(
         1, 'average energy relative change: {}'.format(
             (1. - new_energy_ / old_energy_).mean()))
     self.assertAllClose(old_energy_, new_energy_, atol=0., rtol=0.02)

@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -188,7 +189,7 @@ class ChainBijectorTest(test_case.TestCase):
 
   def testChainIldjWithPlaceholder(self):
     chain = tfb.Chain((tfb.Exp(), tfb.Exp()))
-    samples = tf.compat.v1.placeholder_with_default(
+    samples = tf1.placeholder_with_default(
         np.zeros([2, 10], np.float32), shape=None)
     ildj = chain.inverse_log_det_jacobian(samples, event_ndims=0)
     self.assertTrue(ildj is not None)
@@ -199,7 +200,7 @@ class ChainBijectorTest(test_case.TestCase):
       return
 
     def xform_dynamic(x):
-      return tf.compat.v1.placeholder_with_default(x, shape=None)
+      return tf1.placeholder_with_default(x, shape=None)
 
     def xform_static(x):
       tensorshape_util.set_shape(x, [1])

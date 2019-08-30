@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
@@ -178,7 +179,7 @@ def sample_halton_sequence(dim,
   if not dtype.is_floating:
     raise ValueError('dtype must be of `float`-type')
 
-  with tf.compat.v1.name_scope(
+  with tf1.name_scope(
       name, 'sample', values=[num_results, sequence_indices]):
     # Here and in the following, the shape layout is as follows:
     # [sample dimension, event dimension, coefficient dimension].
@@ -211,7 +212,7 @@ def sample_halton_sequence(dim,
 
     # The mask is true for those coefficients that are irrelevant.
     weight_mask = exponents_by_axes >= max_sizes_by_axes
-    capped_exponents = tf.compat.v1.where(weight_mask,
+    capped_exponents = tf1.where(weight_mask,
                                           tf.zeros_like(exponents_by_axes),
                                           exponents_by_axes)
     weights = radixes ** capped_exponents
@@ -326,7 +327,7 @@ def _get_indices(num_results, sequence_indices, dtype, name=None):
   Returns:
     indices: `Tensor` of dtype `dtype` and shape = `[n, 1, 1]`.
   """
-  with tf.compat.v1.name_scope(name, '_get_indices',
+  with tf1.name_scope(name, '_get_indices',
                                [num_results, sequence_indices]):
     if sequence_indices is None:
       num_results = tf.cast(num_results, dtype=dtype)

@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
@@ -31,7 +32,7 @@ __all__ = [
 ]
 
 constant = utils.copy_docstring(
-    tf.compat.v1.initializers.constant,
+    tf1.initializers.constant,
     lambda value=0, dtype=tf.dtypes.float32, verify_shape=False: (  # pylint: disable=g-long-lambda
         lambda shape, dtype=None, partition_info=None, verify_shape=None: (  # pylint: disable=g-long-lambda
             np.ones(shape, dtype=dtype) * value))

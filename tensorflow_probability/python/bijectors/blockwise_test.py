@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 
 from absl.testing import parameterized
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -36,7 +37,7 @@ class BlockwiseBijectorTest(test_case.TestCase, parameterized.TestCase):
   @parameterized.parameters((False, []), (True, []), (False, [2]), (True, [2]))
   def testExplicitBlocks(self, dynamic_shape, batch_shape):
     block_sizes = tf.convert_to_tensor(value=[2, 1, 3])
-    block_sizes = tf.compat.v1.placeholder_with_default(
+    block_sizes = tf1.placeholder_with_default(
         block_sizes, shape=None if dynamic_shape else block_sizes.shape)
     exp = tfb.Exp()
     sp = tfb.Softplus()
@@ -47,7 +48,7 @@ class BlockwiseBijectorTest(test_case.TestCase, parameterized.TestCase):
     for s in batch_shape:
       x = tf.expand_dims(x, 0)
       x = tf.tile(x, [s] + [1] * (tensorshape_util.rank(x.shape) - 1))
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         x, shape=None if dynamic_shape else x.shape)
 
     # Identity to break the caching.
@@ -106,7 +107,7 @@ class BlockwiseBijectorTest(test_case.TestCase, parameterized.TestCase):
     blockwise = tfb.Blockwise(bijectors=[exp, sp, aff], block_sizes=[2, 1, 3])
 
     x = tf.cast([0.1, 0.2, 0.3, 0.4, 0.5, 0.6], dtype=tf.float32)
-    x = tf.compat.v1.placeholder_with_default(x, shape=x.shape)
+    x = tf1.placeholder_with_default(x, shape=x.shape)
     # Identity to break the caching.
     blockwise_y = tf.identity(blockwise.forward(x))
 
@@ -162,13 +163,13 @@ class BlockwiseBijectorTest(test_case.TestCase, parameterized.TestCase):
   def testRaisesBadBlocksDynamic(self):
     if tf.executing_eagerly(): return
     with self.assertRaises(tf.errors.InvalidArgumentError):
-      block_sizes = tf.compat.v1.placeholder_with_default([1, 2], shape=None)
+      block_sizes = tf1.placeholder_with_default([1, 2], shape=None)
       blockwise = tfb.Blockwise(
           bijectors=[tfb.Exp()], block_sizes=block_sizes, validate_args=True)
       self.evaluate(blockwise.block_sizes)
 
     with self.assertRaises(tf.errors.InvalidArgumentError):
-      block_sizes = tf.compat.v1.placeholder_with_default([[1]], shape=None)
+      block_sizes = tf1.placeholder_with_default([[1]], shape=None)
       blockwise = tfb.Blockwise(
           bijectors=[tfb.Exp()], block_sizes=block_sizes, validate_args=True)
       self.evaluate(blockwise.block_sizes)

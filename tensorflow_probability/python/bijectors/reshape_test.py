@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import test_case
@@ -321,9 +322,9 @@ class ReshapeBijectorTestDynamic(test_case.TestCase, _ReshapeBijectorTest):
     shape_in = np.array(shape_in, np.int32)
     shape_out = np.array(shape_out, np.int32)
     return (
-        tf.compat.v1.placeholder_with_default(
+        tf1.placeholder_with_default(
             shape_in, shape=[len(shape_in)]),
-        tf.compat.v1.placeholder_with_default(
+        tf1.placeholder_with_default(
             shape_out, shape=[len(shape_out)]),
     )
 
@@ -384,7 +385,7 @@ class ReshapeBijectorTestDynamic(test_case.TestCase, _ReshapeBijectorTest):
 
   def testUnknownShapeRank(self):
     if tf.executing_eagerly(): return
-    unknown_shape = tf.compat.v1.placeholder_with_default([2, 2], shape=None)
+    unknown_shape = tf1.placeholder_with_default([2, 2], shape=None)
     known_shape = [2, 2]
 
     with self.assertRaisesRegexp(NotImplementedError,

@@ -21,7 +21,7 @@ from __future__ import print_function
 # Dependency imports
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_case
@@ -89,7 +89,7 @@ class DenseVariationalLayerTest(test_case.TestCase):
     ])
 
     # Do inference.
-    model.compile(optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.05),
+    model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.05),
                   loss=negloglik)
     model.fit(x, y, epochs=2, verbose=False)
 

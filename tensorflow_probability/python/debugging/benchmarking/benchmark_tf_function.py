@@ -33,7 +33,7 @@ import time
 
 # Dependency imports
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 RUNTIME_EAGER = 'eager'
 RUNTIME_FUNCTION = 'function/graph'

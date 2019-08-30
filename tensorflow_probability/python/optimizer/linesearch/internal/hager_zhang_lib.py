@@ -32,14 +32,15 @@ from __future__ import print_function
 
 import collections
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import prefer_static
 
 
 def val_where(cond, tval, fval):
   """Like tf.where but works on namedtuples."""
   if isinstance(tval, tf.Tensor):
-    return tf.compat.v1.where(cond, tval, fval)
+    return tf1.where(cond, tval, fval)
   elif isinstance(tval, tuple):
     cls = type(tval)
     return cls(*(val_where(cond, t, f) for t, f in zip(tval, fval)))
@@ -137,7 +138,7 @@ def secant2(value_and_gradients_function,
       right: Return value of value_and_gradients_function at the updated right
         end point of the interval.
   """
-  with tf.compat.v1.name_scope(name, 'secant2', [
+  with tf1.name_scope(name, 'secant2', [
       val_0, search_interval, f_lim, sufficient_decrease_param,
       curvature_param]):
     # This will always be s.t. left <= c <= right
@@ -202,9 +203,9 @@ def _secant2_inner(value_and_gradients_function,
   updated_right = active & tf.equal(val_right.x, val_c.x)
   is_new = updated_left | updated_right
 
-  next_c = tf.compat.v1.where(updated_left, _secant(initial_args.left,
+  next_c = tf1.where(updated_left, _secant(initial_args.left,
                                                     val_left), val_c.x)
-  next_c = tf.compat.v1.where(updated_right,
+  next_c = tf1.where(updated_right,
                               _secant(initial_args.right, val_right), next_c)
   in_range = (val_left.x <= next_c) & (next_c <= val_right.x)
 

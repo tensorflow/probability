@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -811,7 +812,7 @@ class CsiszarVIMCOTest(test_case.TestCase):
       # We want the seed to be the same since we will use computations
       # with the same underlying sample to show correctness of vimco.
       if tf.executing_eagerly():
-        tf.compat.v1.set_random_seed(seed)
+        tf1.set_random_seed(seed)
       x = q.sample(sample_shape=[num_draws, num_batch_draws], seed=seed)
       x = tf.stop_gradient(x)
       logu = p.log_prob(x) - q.log_prob(x)

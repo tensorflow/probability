@@ -25,7 +25,8 @@ import numpy as np
 from scipy import special as sp_special
 from scipy import stats as sp_stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import test_case
@@ -78,7 +79,7 @@ class NdtriTest(test_case.TestCase):
   def testNdtriDynamicShape(self):
     """Verifies that ndtri computation is correct."""
     p_ = np.linspace(0., 1., 50).astype(np.float32)
-    p = tf.compat.v1.placeholder_with_default(p_, shape=None)
+    p = tf1.placeholder_with_default(p_, shape=None)
     self.assertAllClose(sp_special.ndtri(p_),
                         self.evaluate(special_math.ndtri(p)),
                         atol=0.)

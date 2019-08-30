@@ -22,7 +22,8 @@ import re
 
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability import edward2 as ed
 from tensorflow_probability.python import distributions as tfd
@@ -298,7 +299,7 @@ class RandomVariableTest(parameterized.TestCase, test_case.TestCase):
     if tf.executing_eagerly(): return
     with self.cached_session() as sess:
       x = ed.RandomVariable(tfd.Normal(0.0, 0.1))
-      x_ph = tf.compat.v1.placeholder(tf.float32, [])
+      x_ph = tf1.placeholder(tf.float32, [])
       y = ed.RandomVariable(tfd.Normal(x_ph, 0.1))
       self.assertLess(x.eval(), 5.0)
       self.assertLess(x.eval(sess), 5.0)
@@ -312,7 +313,7 @@ class RandomVariableTest(parameterized.TestCase, test_case.TestCase):
     if tf.executing_eagerly(): return
     with self.cached_session() as sess:
       x = ed.RandomVariable(tfd.Normal(0.0, 0.1))
-      x_ph = tf.compat.v1.placeholder(tf.float32, [])
+      x_ph = tf1.placeholder(tf.float32, [])
       y = ed.RandomVariable(tfd.Normal(x_ph, 0.1))
       self.assertLess(sess.run(x), 5.0)
       self.assertLess(sess.run(x, feed_dict={x_ph: 100.0}), 5.0)

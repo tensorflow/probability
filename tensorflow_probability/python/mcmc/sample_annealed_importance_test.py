@@ -23,7 +23,8 @@ import collections
 # Dependency imports
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_case
@@ -39,7 +40,7 @@ def _compute_sample_variance(x, axis=None, keepdims=False):
       keepdims=keepdims)
 
 
-_maybe_seed = lambda s: tf.compat.v1.set_random_seed(s) if tf.executing_eagerly(
+_maybe_seed = lambda s: tf1.set_random_seed(s) if tf.executing_eagerly(
 ) else s
 
 
@@ -50,7 +51,7 @@ class SampleAnnealedImportanceTest(test_case.TestCase):
     self._shape_param = 5.
     self._rate_param = 10.
 
-    tf.compat.v1.random.set_random_seed(10003)
+    tf1.random.set_random_seed(10003)
     np.random.seed(10003)
 
   def _log_gamma_log_prob(self, x, event_dims=()):
@@ -142,7 +143,7 @@ class SampleAnnealedImportanceTest(test_case.TestCase):
         event_size,
     ])
 
-    tf.compat.v1.logging.vlog(
+    tf1.logging.vlog(
         1, '        log_true_normalizer: {}\n'
         '   log_estimated_normalizer: {}\n'
         '           ais_weights_size: {}\n'
@@ -154,7 +155,7 @@ class SampleAnnealedImportanceTest(test_case.TestCase):
   def _ais_gets_correct_log_normalizer_wrapper(self, independent_chain_ndims):
     """Tests that AIS yields reasonable estimates of normalizers."""
     initial_draws = np.random.normal(size=[30, 2, 1])
-    x_ph = tf.compat.v1.placeholder_with_default(
+    x_ph = tf1.placeholder_with_default(
         np.float32(initial_draws), shape=initial_draws.shape, name='x_ph')
     self._ais_gets_correct_log_normalizer(x_ph, independent_chain_ndims)
 

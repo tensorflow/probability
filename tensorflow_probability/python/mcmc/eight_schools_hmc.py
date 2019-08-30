@@ -21,7 +21,8 @@ from __future__ import print_function
 import time
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
@@ -110,7 +111,7 @@ def benchmark_eight_schools_hmc(
   # trial.
   is_accepted_tensor = computation()
   if not tf.executing_eagerly():
-    session = tf.compat.v1.Session()
+    session = tf1.Session()
     session.run(is_accepted_tensor)
 
   start_time = time.time()

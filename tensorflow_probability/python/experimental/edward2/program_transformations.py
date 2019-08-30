@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import inspect
 import six
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.edward2.interceptor import interceptable
 from tensorflow_probability.python.experimental.edward2.interceptor import interception

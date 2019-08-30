@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 __all__ = ['compile_nested_output']
 
@@ -39,7 +39,7 @@ def compile_nested_output(f, compile_fn=None):
     g: Callable wrapping `f` which returns XLA-compiled, nested outputs.
   """
   def _wrapper(*inputs):  # pylint:disable=missing-docstring
-    nest = tf.compat.v2.nest
+    nest = tf.nest
     struct = [None]
     def _flattened(*inputs):
       result = f(*inputs)

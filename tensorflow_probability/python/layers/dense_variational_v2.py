@@ -18,7 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import kullback_leibler
 
@@ -164,7 +165,7 @@ def _make_kl_divergence_penalty(
   # Closure over: kl_divergence_fn, weight.
   def _fn(distribution_a, distribution_b):
     """Closure that computes KLDiv as a function of `a` as in `KL[a, b]`."""
-    with tf.compat.v1.name_scope('kldivergence_loss'):
+    with tf1.name_scope('kldivergence_loss'):
       kl = kl_divergence_fn(distribution_a, distribution_b)
       if weight is not None:
         kl = tf.cast(weight, dtype=kl.dtype) * kl

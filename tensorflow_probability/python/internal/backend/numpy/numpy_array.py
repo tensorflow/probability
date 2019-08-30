@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import ops
@@ -313,7 +314,7 @@ unstack = utils.copy_docstring(
     lambda value, num=None, axis=0, name=None: np.split(value, num, axis))
 
 where = utils.copy_docstring(
-    tf.compat.v1.where,
+    tf1.where,
     lambda condition, x=None, y=None, name=None: np.where(condition, x, y))
 
 zeros = utils.copy_docstring(

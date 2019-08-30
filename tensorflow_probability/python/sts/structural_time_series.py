@@ -20,7 +20,8 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import distribution_util
@@ -195,7 +196,7 @@ class StructuralTimeSeries(object):
     seed = distributions.SeedStream(
         seed, salt='StructuralTimeSeries_prior_sample')
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         'prior_sample',
         values=[num_timesteps, params_sample_shape, trajectories_sample_shape]):
       param_samples = [
@@ -232,7 +233,7 @@ class StructuralTimeSeries(object):
        inference.
     """
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         'joint_log_prob', values=[observed_time_series]):
       [
           observed_time_series,
