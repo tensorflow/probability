@@ -19,20 +19,23 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-
 from tensorflow_probability.python.bijectors.masked_autoregressive import _gen_mask
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
+
 tfk = tf.keras
+
 tfkl = tf.keras.layers
 
 
@@ -87,7 +90,7 @@ def _masked_autoregressive_gated_bijector_fn(hidden_units,
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GenMaskTest(tf.test.TestCase):
+class GenMaskTest(test_case.TestCase):
 
   def test346Exclusive(self):
     expected_mask = np.array(
@@ -114,7 +117,7 @@ class GenMaskTest(tf.test.TestCase):
 
 @test_util.run_all_in_graph_and_eager_modes
 class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
-                                   tf.test.TestCase):
+                                   test_case.TestCase):
 
   event_shape = [4]
 
@@ -375,7 +378,7 @@ class MaskedAutoregressive2DLayerTest(MaskedAutoregressiveFlowTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoregressiveNetworkTest(tf.test.TestCase):
+class AutoregressiveNetworkTest(test_case.TestCase):
 
   def _count_trainable_params(self, layer):
     ret = 0

@@ -19,18 +19,19 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.math import diag_jacobian
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class StochasticGradientLangevinDynamicsOptimizerTest(tf.test.TestCase):
+class StochasticGradientLangevinDynamicsOptimizerTest(test_case.TestCase):
 
   def testBasic(self):
     if tf.executing_eagerly():

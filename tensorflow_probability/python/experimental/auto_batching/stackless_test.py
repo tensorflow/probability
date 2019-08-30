@@ -27,6 +27,7 @@ from tensorflow_probability.python.experimental.auto_batching import numpy_backe
 from tensorflow_probability.python.experimental.auto_batching import stackless
 from tensorflow_probability.python.experimental.auto_batching import test_programs
 from tensorflow_probability.python.experimental.auto_batching import tf_backend
+from tensorflow_probability.python.internal import test_case
 
 TF_BACKEND = tf_backend.TensorFlowBackend()
 NP_BACKEND = numpy_backend.NumpyBackend()
@@ -45,7 +46,7 @@ def _is_even_stackless_execute(inputs, backend):
 
 
 # Stackless autobatching doesn't work in TF graph mode.
-class StacklessTest(tf.test.TestCase):
+class StacklessTest(test_case.TestCase):
 
   def testStacklessFibonacciNumpy(self):
     self.assertEqual([8], list(_fibonacci_stackless_execute([5], NP_BACKEND)))

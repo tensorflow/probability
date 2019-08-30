@@ -20,10 +20,10 @@ import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-tfd = tfp.distributions
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -368,25 +368,25 @@ class _InverseGaussianTest(object):
         self.evaluate(inverse_gaussian.mean())
 
 
-class InverseGaussianTestStaticShapeFloat32(tf.test.TestCase,
+class InverseGaussianTestStaticShapeFloat32(test_case.TestCase,
                                             _InverseGaussianTest):
   dtype = tf.float32
   use_static_shape = True
 
 
-class InverseGaussianTestDynamicShapeFloat32(tf.test.TestCase,
+class InverseGaussianTestDynamicShapeFloat32(test_case.TestCase,
                                              _InverseGaussianTest):
   dtype = tf.float32
   use_static_shape = False
 
 
-class InverseGaussianTestStaticShapeFloat64(tf.test.TestCase,
+class InverseGaussianTestStaticShapeFloat64(test_case.TestCase,
                                             _InverseGaussianTest):
   dtype = tf.float64
   use_static_shape = True
 
 
-class InverseGaussianTestDynamicShapeFloat64(tf.test.TestCase,
+class InverseGaussianTestDynamicShapeFloat64(test_case.TestCase,
                                              _InverseGaussianTest):
   dtype = tf.float64
   use_static_shape = False

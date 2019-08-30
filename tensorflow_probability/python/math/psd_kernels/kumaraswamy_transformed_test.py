@@ -24,6 +24,8 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -143,12 +145,12 @@ class _KumaraswamyTransformedTest(parameterized.TestCase):
 
 
 class KumaraswamyTransformedFloat32Test(
-    _KumaraswamyTransformedTest, tf.test.TestCase):
+    _KumaraswamyTransformedTest, test_case.TestCase):
   dtype = np.float32
 
 
 class KumaraswamyTransformedFloat64Test(
-    _KumaraswamyTransformedTest, tf.test.TestCase):
+    _KumaraswamyTransformedTest, test_case.TestCase):
   dtype = np.float64
 
 

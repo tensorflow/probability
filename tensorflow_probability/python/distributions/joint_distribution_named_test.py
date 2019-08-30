@@ -21,20 +21,18 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
+
 from absl.testing import parameterized
-
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-tfd = tfp.distributions
-
-
 @test_util.run_all_in_graph_and_eager_modes
-class JointDistributionNamedTest(tf.test.TestCase, parameterized.TestCase):
+class JointDistributionNamedTest(test_case.TestCase, parameterized.TestCase):
 
   def test_dict_sample_log_prob(self):
     # pylint: disable=bad-whitespace

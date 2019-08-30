@@ -19,18 +19,19 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ReciprocalTest(tf.test.TestCase, parameterized.TestCase):
+class ReciprocalTest(test_case.TestCase, parameterized.TestCase):
   """Tests correctness of the `b(x) = 1 / x` bijector."""
 
   @parameterized.named_parameters(

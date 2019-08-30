@@ -27,9 +27,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
 
 TestTransitionKernelResults = collections.namedtuple(
     'TestTransitionKernelResults', 'counter_1, counter_2')
@@ -50,7 +49,7 @@ class TestTransitionKernel(tfp.mcmc.TransitionKernel):
     return True
 
 
-class SampleChainTest(tf.test.TestCase):
+class SampleChainTest(test_case.TestCase):
 
   def setUp(self):
     self._shape_param = 5.

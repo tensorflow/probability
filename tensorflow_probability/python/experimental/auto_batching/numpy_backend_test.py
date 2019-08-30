@@ -28,6 +28,7 @@ import tensorflow as tf
 from tensorflow_probability.python.experimental.auto_batching import backend_test_lib as backend_test
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst
 from tensorflow_probability.python.experimental.auto_batching import numpy_backend
+from tensorflow_probability.python.internal import test_case
 
 NP_BACKEND = numpy_backend.NumpyBackend()
 
@@ -43,7 +44,7 @@ def var_init(max_stack_depth, initial_value):
 
 # A TF test case for self.assertAllEqual, but doesn't use TF so doesn't care
 # about Eager vs Graph mode.
-class NumpyVariableTest(tf.test.TestCase, backend_test.VariableTestCase):
+class NumpyVariableTest(test_case.TestCase, backend_test.VariableTestCase):
 
   def testNumpySmoke(self):
     """Test the property on specific example, without relying on Hypothesis."""

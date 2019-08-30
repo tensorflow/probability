@@ -28,13 +28,14 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions.von_mises_fisher import _bessel_ive
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
-                         tf.test.TestCase):
+                         test_case.TestCase):
 
   def testBesselIve(self):
     self.assertRaises(ValueError, lambda: _bessel_ive(2.0, 1.0))

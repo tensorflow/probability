@@ -19,15 +19,16 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
-
 import tensorflow as tf
-
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math import value_and_gradient
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -126,11 +127,11 @@ class _SoftFloorBijectorBase(object):
     self.assertAllClose(_softfloor_grad_np(x_np, 1.2), grad)
 
 
-class SoftFloor32Test(_SoftFloorBijectorBase, tf.test.TestCase):
+class SoftFloor32Test(_SoftFloorBijectorBase, test_case.TestCase):
   dtype = np.float32
 
 
-class SoftFloor64Test(_SoftFloorBijectorBase, tf.test.TestCase):
+class SoftFloor64Test(_SoftFloorBijectorBase, test_case.TestCase):
   dtype = np.float64
 
 

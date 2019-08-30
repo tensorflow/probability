@@ -19,14 +19,16 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-# Dependency imports
-import numpy as np
 
+# Dependency imports
+
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 def _compute_sample_variance(x, axis=None, keepdims=False):
@@ -42,7 +44,7 @@ _maybe_seed = lambda s: tf.compat.v1.set_random_seed(s) if tf.executing_eagerly(
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SampleAnnealedImportanceTest(tf.test.TestCase):
+class SampleAnnealedImportanceTest(test_case.TestCase):
 
   def setUp(self):
     self._shape_param = 5.

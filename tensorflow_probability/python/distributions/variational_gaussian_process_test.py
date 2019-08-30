@@ -26,8 +26,8 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability import distributions as tfd
 from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
-
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -258,13 +258,13 @@ class _VariationalGaussianProcessTest(object):
 
 @test_util.run_all_in_graph_and_eager_modes
 class VariationalGaussianProcessStaticTest(
-    _VariationalGaussianProcessTest, tf.test.TestCase):
+    _VariationalGaussianProcessTest, test_case.TestCase):
   is_static = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class VariationalGaussianProcessDynamicTest(
-    _VariationalGaussianProcessTest, tf.test.TestCase):
+    _VariationalGaussianProcessTest, test_case.TestCase):
   is_static = False
 
 

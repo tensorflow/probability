@@ -19,17 +19,17 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_case
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestMVNTriL(tf.test.TestCase):
+class TestMVNTriL(test_case.TestCase):
 
   def setUp(self):
     np.random.seed(142)
@@ -116,7 +116,7 @@ class TestMVNTriL(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestBernoulli(tf.test.TestCase):
+class TestBernoulli(test_case.TestCase):
 
   def setUp(self):
     np.random.seed(142)
@@ -175,7 +175,7 @@ class TestBernoulli(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestNormal(tf.test.TestCase):
+class TestNormal(test_case.TestCase):
 
   def setUp(self):
     np.random.seed(142)
@@ -234,7 +234,7 @@ class TestNormal(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestPoisson(tf.test.TestCase):
+class TestPoisson(test_case.TestCase):
 
   def setUp(self):
     np.random.seed(142)
@@ -293,7 +293,7 @@ class TestPoisson(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestMakePositiveFunctions(tf.test.TestCase):
+class TestMakePositiveFunctions(test_case.TestCase):
 
   def softplus(self, x):
     return np.log1p(np.exp(x))

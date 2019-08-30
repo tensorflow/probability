@@ -22,14 +22,14 @@ import math
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
-tfd = tfp.distributions
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NormalTest(tf.test.TestCase):
+class NormalTest(test_case.TestCase):
 
   def testNormalConjugateKnownSigmaPosterior(self):
     with tf1.Session():

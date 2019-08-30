@@ -17,23 +17,23 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 # In all tests that follow, we use scipy.stats.nbinom, which
 # represents a Negative Binomial distribution, with success and failure
 # probabilities flipped.
 @test_util.run_all_in_graph_and_eager_modes
-class NegativeBinomialTest(tf.test.TestCase):
+class NegativeBinomialTest(test_case.TestCase):
 
   def testNegativeBinomialShape(self):
     probs = [.1] * 5
@@ -256,7 +256,7 @@ class NegativeBinomialTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NegativeBinomialFromVariableTest(tf.test.TestCase):
+class NegativeBinomialFromVariableTest(test_case.TestCase):
 
   def testAssertionsProbsMutation(self):
     x = tf.Variable([0.1, 0.7, 0.0])

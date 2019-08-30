@@ -22,18 +22,17 @@ import operator
 
 from absl.testing import parameterized
 import numpy as np
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
-
 
 @test_util.run_all_in_graph_and_eager_modes
-class DeferredTensorTest(tf.test.TestCase):
+class DeferredTensorTest(test_case.TestCase):
 
   def test_docstring_example(self):
     trainable_normal = tfd.Normal(
@@ -62,7 +61,7 @@ class DeferredTensorTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DeferredTensorBehavesLikeTensorTest(tf.test.TestCase,
+class DeferredTensorBehavesLikeTensorTest(test_case.TestCase,
                                           parameterized.TestCase):
 
   def testArrayPriority(self):

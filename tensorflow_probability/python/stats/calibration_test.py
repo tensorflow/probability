@@ -23,9 +23,10 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import test_case
 
 
-class CalibrationTest(parameterized.TestCase, tf.test.TestCase):
+class CalibrationTest(parameterized.TestCase, test_case.TestCase):
 
   _TEMPERATURES = [0.01, 1.0, 5.0]
   _NLABELS = [2, 4]

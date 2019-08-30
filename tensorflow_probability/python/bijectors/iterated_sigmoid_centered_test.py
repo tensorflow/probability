@@ -19,15 +19,17 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math.gradient import batch_jacobian
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -127,13 +129,13 @@ class _IteratedSigmoidCenteredBijectorTest(object):
 
 
 class IteratedSigmoidCenteredBijectorTestFloat32(
-    tf.test.TestCase,
+    test_case.TestCase,
     _IteratedSigmoidCenteredBijectorTest):
   dtype = np.float32
 
 
 class IteratedSigmoidCenteredBijectorTestFloat64(
-    tf.test.TestCase,
+    test_case.TestCase,
     _IteratedSigmoidCenteredBijectorTest):
   dtype = np.float64
 

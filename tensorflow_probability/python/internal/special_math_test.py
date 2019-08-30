@@ -28,8 +28,8 @@ from scipy import stats as sp_stats
 import tensorflow as tf
 
 from tensorflow_probability.python.internal import special_math
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.math.gradient import value_and_gradient
-
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -56,7 +56,7 @@ ErrorSpec = collections.namedtuple("ErrorSpec", ["rtol", "atol"])
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NdtriTest(tf.test.TestCase):
+class NdtriTest(test_case.TestCase):
 
   def assertAllFinite(self, x):
     is_finite = np.isfinite(x)
@@ -108,7 +108,7 @@ class NdtriTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NdtrTest(tf.test.TestCase):
+class NdtrTest(test_case.TestCase):
   _use_log = False
   # Grid min/max chosen to ensure 0 < cdf(x) < 1.
   _grid32 = GridSpec(min=-12.9, max=5., shape=[100])
@@ -224,7 +224,7 @@ class LogNdtrTestUpper(NdtrTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NdtrGradientTest(tf.test.TestCase):
+class NdtrGradientTest(test_case.TestCase):
   _use_log = False
   _grid = GridSpec(min=-100., max=100., shape=[1, 2, 3, 8])
   _error32 = ErrorSpec(rtol=1e-4, atol=0)
@@ -299,7 +299,7 @@ class LogNdtrGradientTest(NdtrGradientTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ErfInvTest(tf.test.TestCase):
+class ErfInvTest(test_case.TestCase):
 
   def testErfInvValues(self):
     x = np.linspace(0., 1., 50).astype(np.float64)
@@ -318,7 +318,7 @@ class ErfInvTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LogCDFLaplaceTest(tf.test.TestCase):
+class LogCDFLaplaceTest(test_case.TestCase):
   # Note that scipy.stats.laplace does not have a stable Log CDF, so we cannot
   # rely on scipy to cross check the extreme values.
 

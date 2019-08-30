@@ -18,21 +18,20 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
 # Dependency imports
+
 from absl.testing import parameterized
 import numpy as np
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_case
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @tf.function(autograph=False)
@@ -140,7 +139,7 @@ def assert_mvn_target_conservation(event_size, batch_size, **kwargs):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NutsTest(parameterized.TestCase, tf.test.TestCase):
+class NutsTest(parameterized.TestCase, test_case.TestCase):
 
   def testUnivariateNormalTargetConservation(self):
     normal_dist = tfd.Normal(loc=1., scale=2.)

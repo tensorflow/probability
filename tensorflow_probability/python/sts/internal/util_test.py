@@ -23,14 +23,14 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.sts.internal import missing_values_util
 from tensorflow_probability.python.sts.internal import util as sts_util
-
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalUtilsTest(tf.test.TestCase):
+class MultivariateNormalUtilsTest(test_case.TestCase):
 
   def test_factored_joint_mvn_diag_full(self):
     batch_shape = [3, 2]
@@ -144,7 +144,7 @@ class MultivariateNormalUtilsTest(tf.test.TestCase):
                                       mvn3.covariance()))
 
 
-class _UtilityTests(tf.test.TestCase):
+class _UtilityTests(test_case.TestCase):
 
   def test_broadcast_batch_shape(self):
     batch_shapes = ([2], [3, 2], [1, 2])

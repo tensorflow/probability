@@ -23,9 +23,10 @@ import tensorflow as tf
 
 from tensorflow_probability.python.experimental.auto_batching import instructions
 from tensorflow_probability.python.experimental.auto_batching import test_programs
+from tensorflow_probability.python.internal import test_case
 
 
-class InstructionsTest(tf.test.TestCase):
+class InstructionsTest(test_case.TestCase):
 
   def testConstant(self):
     # This program always returns 2.
@@ -220,7 +221,7 @@ def main(n1):
 """.strip()
 
 
-class PrettyPrintingTest(tf.test.TestCase):
+class PrettyPrintingTest(test_case.TestCase):
 
   def verify_program_pretty_print(self, expected_text, program, **kwargs):
     actual_text = str(program.__str__(**kwargs))

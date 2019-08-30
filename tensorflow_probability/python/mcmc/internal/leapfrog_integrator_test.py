@@ -21,12 +21,13 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LeapfrogIntegratorTest(tf.test.TestCase):
+class LeapfrogIntegratorTest(test_case.TestCase):
 
   def setUp(self):
     self._shape_param = 5.

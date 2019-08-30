@@ -19,17 +19,17 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-# Dependency imports
-import numpy as np
 
+# Dependency imports
+
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-
-tfd = tfp.distributions
-tfb = tfp.bijectors
 
 
 FakeInnerKernelResults = collections.namedtuple(
@@ -66,7 +66,7 @@ class FakeInnerKernel(tfp.mcmc.TransitionKernel):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TransformedTransitionKernelTest(tf.test.TestCase):
+class TransformedTransitionKernelTest(test_case.TestCase):
 
   def setUp(self):
     super(TransformedTransitionKernelTest, self).setUp()

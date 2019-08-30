@@ -20,22 +20,21 @@ from __future__ import print_function
 
 import collections
 import warnings
+
 # Dependency imports
 
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.mcmc.internal import util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
-
 
 @test_util.run_all_in_graph_and_eager_modes
-class ChooseTest(tf.test.TestCase):
+class ChooseTest(test_case.TestCase):
 
   def test_works_for_nested_namedtuple(self):
     Results = collections.namedtuple('Results', ['field1', 'inner'])  # pylint: disable=invalid-name
@@ -94,7 +93,7 @@ class ChooseTest(tf.test.TestCase):
     self.assertAllEqual(expected, chosen_)
 
 
-class IsNamedTupleLikeTest(tf.test.TestCase):
+class IsNamedTupleLikeTest(test_case.TestCase):
 
   def test_true_for_namedtuple_without_fields(self):
     NoFields = collections.namedtuple('NoFields', [])  # pylint: disable=invalid-name
@@ -114,7 +113,7 @@ class IsNamedTupleLikeTest(tf.test.TestCase):
     self.assertFalse(util.is_namedtuple_like(np.int32()))
 
 
-class GradientTest(tf.test.TestCase):
+class GradientTest(test_case.TestCase):
 
   def testGradientComputesCorrectly(self):
     dtype = np.float32
@@ -160,7 +159,7 @@ class GradientTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SmartForLoopTest(tf.test.TestCase):
+class SmartForLoopTest(test_case.TestCase):
 
   def test_python_for_loop(self):
     counter = None
@@ -195,7 +194,7 @@ class SmartForLoopTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TraceScanTest(tf.test.TestCase):
+class TraceScanTest(test_case.TestCase):
 
   def testBasic(self):
 
@@ -228,7 +227,7 @@ def _test_setter_fn(simple_results, increment=1):
   return simple_results._replace(value=simple_results.value + increment)
 
 
-class MakeInnermostSetterTest(tf.test.TestCase):
+class MakeInnermostSetterTest(test_case.TestCase):
 
   def testNoWrapper(self):
     results = SimpleResults(1)
@@ -262,7 +261,7 @@ class MakeInnermostSetterTest(tf.test.TestCase):
     self.assertEqual(2, new_results.inner_results.inner_results.value)
 
 
-class MakeInnermostGetterTest(tf.test.TestCase):
+class MakeInnermostGetterTest(test_case.TestCase):
 
   def testNoWrapper(self):
     results = SimpleResults(1)
@@ -323,7 +322,7 @@ class FakeInnerNoParameters(object):
   pass
 
 
-class EnableStoreParametersInResultsTest(tf.test.TestCase,
+class EnableStoreParametersInResultsTest(test_case.TestCase,
                                          parameterized.TestCase):
 
   @parameterized.parameters(FakeInnerOld(),
@@ -375,7 +374,7 @@ tf.register_tensor_conversion_function(
     TensorConvertible, conversion_func=lambda *args: tf.constant(0))
 
 
-class SimpleTensorWarningTest(tf.test.TestCase, parameterized.TestCase):
+class SimpleTensorWarningTest(test_case.TestCase, parameterized.TestCase):
 
   # We must defer creating the TF objects until the body of the test.
   # pylint: disable=unnecessary-lambda

@@ -65,6 +65,7 @@ py_library(
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/experimental/auto_batching",
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -78,6 +79,7 @@ py_test(
     tags = ["nozapfhahn"],
     deps = [
         ":nuts_testlib",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -92,5 +94,8 @@ py_test(
         "nozapfhahn",
         "requires-gpu-sm35",
     ],
-    deps = [":nuts_testlib"],
+    deps = [
+        ":nuts_testlib",
+        "//tensorflow_probability/python/internal:test_case",
+    ],
 )

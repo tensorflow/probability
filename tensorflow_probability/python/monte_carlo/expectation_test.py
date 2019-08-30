@@ -19,17 +19,16 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.monte_carlo.expectation import _get_samples
 
-tfd = tfp.distributions
 
-
-class GetSamplesTest(tf.test.TestCase):
+class GetSamplesTest(test_case.TestCase):
   """Test the private method 'get_samples'."""
 
   def test_raises_if_both_z_and_n_are_none(self):
@@ -65,7 +64,7 @@ class GetSamplesTest(tf.test.TestCase):
     self.assertEqual((10,), z.shape)
 
 
-class ExpectationTest(tf.test.TestCase):
+class ExpectationTest(test_case.TestCase):
 
   def test_works_correctly(self):
     x = tf.constant([-1e6, -100, -10, -1, 1, 10, 100, 1e6])
