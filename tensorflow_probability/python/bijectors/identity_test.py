@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import weakref
+
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
@@ -45,6 +47,19 @@ class IdentityTest(tf.test.TestCase):
     bijector = tfb.Identity()
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
+
+  def testMemoryLeak(self):
+    if not tf.executing_eagerly(): return
+    # Verifies the fix for a memory leak caused by the mapped value being
+    # strongly ref'ed, and the weak key being the same as the value, `x is y`.
+    bijector = tfb.Identity()
+    x = tf.constant(123)
+    y = bijector.forward(x)
+    self.assertIs(y, x)
+    del x
+    y = weakref.ref(y)
+    # We now expect the reference to be gone.
+    self.assertIsNone(y())
 
 
 if __name__ == "__main__":
