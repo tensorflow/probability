@@ -19,15 +19,20 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import logistic
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
-class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
+class RelaxedBernoulli(distribution.Distribution):
   """RelaxedBernoulli distribution with temperature and logits parameters.
 
   The RelaxedBernoulli is a distribution over the unit interval (0,1), which
@@ -138,8 +143,8 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
     """Construct RelaxedBernoulli distributions.
 
     Args:
-      temperature: An 0-D `Tensor`, representing the temperature
-        of a set of RelaxedBernoulli distributions. The temperature should be
+      temperature: A `Tensor`, representing the temperature of a set of
+        RelaxedBernoulli distributions. The temperature values should be
         positive.
       logits: An N-D `Tensor` representing the log-odds
         of a positive event. Each entry in the `Tensor` parametrizes
@@ -165,25 +170,45 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([logits, probs, temperature], tf.float32)
-      self._temperature = tf.convert_to_tensor(
+
+      self._temperature = tensor_util.convert_nonref_to_tensor(
           temperature, name='temperature', dtype=dtype)
-      if validate_args:
-        with tf.control_dependencies(
-            [assert_util.assert_positive(temperature)]):
-          self._temperature = tf.identity(self._temperature)
-      self._logits, self._probs = distribution_util.get_logits_and_probs(
-          logits=logits, probs=probs, validate_args=validate_args, dtype=dtype)
+      self._probs = tensor_util.convert_nonref_to_tensor(
+          probs, name='probs', dtype=dtype)
+      self._logits = tensor_util.convert_nonref_to_tensor(
+          logits, name='logits', dtype=dtype)
+
+      if logits is None:
+        logits_parameter = tfp_util.DeferredTensor(
+            lambda x: tf.math.log(x) - tf.math.log1p(-x), self._probs)
+      else:
+        logits_parameter = self._logits
+
+      shape = prefer_static.broadcast_shape(
+          prefer_static.shape(self._temperature),
+          prefer_static.shape(logits_parameter))
+
+      logistic_scale = tfp_util.DeferredTensor(
+          tf.math.reciprocal, self._temperature)
+      logistic_loc = tfp_util.DeferredTensor(
+          lambda x: x * logistic_scale, logits_parameter, shape=shape)
+
+      self._transformed_logistic = (
+          transformed_distribution.TransformedDistribution(
+              distribution=logistic.Logistic(
+                  logistic_loc,
+                  logistic_scale,
+                  allow_nan_stats=allow_nan_stats,
+                  name=name + '/Logistic'),
+              bijector=sigmoid_bijector.Sigmoid()))
+
       super(RelaxedBernoulli, self).__init__(
-          distribution=logistic.Logistic(
-              self._logits / self._temperature,
-              1. / self._temperature,
-              validate_args=validate_args,
-              allow_nan_stats=allow_nan_stats,
-              name=name + '/Logistic'),
-          bijector=sigmoid_bijector.Sigmoid(validate_args=validate_args),
+          dtype=dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
           validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
           name=name)
-    self._parameters = parameters
 
   @staticmethod
   def _param_shapes(sample_shape):
@@ -201,23 +226,104 @@ class RelaxedBernoulli(transformed_distribution.TransformedDistribution):
   @property
   def logits(self):
     """Input argument `logits`."""
+    if self._logits is None:
+      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
+    if self._probs is None:
+      return self._probs_deprecated_behavior()
     return self._probs
 
   def logits_parameter(self, name=None):
     """Logits computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'logits_parameter'):
-      if self.logits is None:
-        return tf.math.log(self.probs) - tf.math.log1p(-self.probs)
-      return tf.identity(self.logits)
+      return self._logits_parameter_no_checks()
+
+  def _logits_parameter_no_checks(self):
+    if self._logits is None:
+      probs = tf.convert_to_tensor(self._probs)
+      return tf.math.log(probs) - tf.math.log1p(-probs)
+    return tf.identity(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'probs_parameter'):
-      if self.logits is None:
-        return tf.identity(self.probs)
-      return tf.math.sigmoid(self.logits)
+      return self._probs_parameter_no_checks()
+
+  def _probs_parameter_no_checks(self):
+    if self._logits is None:
+      return tf.identity(self._probs)
+    return tf.math.sigmoid(self._logits)
+
+  def _event_shape_tensor(self):
+    return tf.constant([], dtype=tf.int32)
+
+  def _event_shape(self):
+    return tf.TensorShape([])
+
+  def _batch_shape_tensor(self):
+    return self._transformed_logistic.batch_shape_tensor()
+
+  def _batch_shape(self):
+    return self._transformed_logistic.batch_shape
+
+  def _sample_n(self, n, seed=None, **kwargs):
+    return self._transformed_logistic.sample(n, seed=seed, **kwargs)
+
+  def _log_prob(self, y, **kwargs):
+    return self._transformed_logistic.log_prob(y, **kwargs)
+
+  def _prob(self, y, **kwargs):
+    return self._transformed_logistic.prob(y, **kwargs)
+
+  def _log_survival_function(self, y, **kwargs):
+    return self._transformed_logistic.log_survival_function(y, **kwargs)
+
+  def _cdf(self, y, **kwargs):
+    return self._transformed_logistic.cdf(y, **kwargs)
+
+  def _log_cdf(self, y, **kwargs):
+    return self._transformed_logistic.log_cdf(y, **kwargs)
+
+  @deprecation.deprecated(
+      '2019-10-01',
+      'The `logits` property will return `None` when the distribution is '
+      'parameterized with `logits=None`. Use `logits_parameter()` instead.',
+      warn_once=True)
+  def _logits_deprecated_behavior(self):
+    return self.logits_parameter()
+
+  @deprecation.deprecated(
+      '2019-10-01',
+      'The `probs` property will return `None` when the distribution is '
+      'parameterized with `probs=None`. Use `probs_parameter()` instead.',
+      warn_once=True)
+  def _probs_deprecated_behavior(self):
+    return self.probs_parameter()
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+
+    assertions = []
+    if is_init != tensor_util.is_ref(self._temperature):
+      msg1 = 'Argument `temperature` must be positive.'
+      temperature = tf.convert_to_tensor(self._temperature)
+      assertions.append(assert_util.assert_positive(temperature, message=msg1))
+
+    if self._probs is not None:
+      if is_init != tensor_util.is_ref(self._probs):
+        probs = tf.convert_to_tensor(self._probs)
+        one = tf.constant(1., probs.dtype)
+        assertions.extend([
+            assert_util.assert_non_negative(
+                probs, message='Argument `probs` has components less than 0.'),
+            assert_util.assert_less_equal(
+                probs, one,
+                message='Argument `probs` has components greater than 1.')
+        ])
+
+    return assertions

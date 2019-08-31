@@ -90,6 +90,7 @@ TF2_FRIENDLY_DISTS = (
     # 'PoissonLogNormalQuadratureCompound' TODO(b/137956955): Add support
     # for hypothesis testing
     'ProbitBernoulli',
+    'RelaxedBernoulli',
     'ExpRelaxedOneHotCategorical',
     # 'SinhArcsinh' TODO(b/137956955): Add support for hypothesis testing
     'StudentT',
@@ -118,6 +119,10 @@ SPECIAL_DISTS = (
     'Independent',
     'MixtureSameFamily',
     'TransformedDistribution',
+)
+
+EXTRA_TENSOR_CONVERSION_DISTS = (
+    'RelaxedBernoulli',
 )
 
 
@@ -681,6 +686,14 @@ def get_event_dim(dist):
       return tf.compat.dimension_value(val.shape[-1])
 
 
+def extra_tensor_conversion_allowed(dist):
+  """Returns `True` for dists that are allowed one extra tensor conversion."""
+  if (isinstance(dist, tfd.TransformedDistribution) or
+      (type(dist).__name__ in EXTRA_TENSOR_CONVERSION_DISTS)):
+    return True
+  return False
+
+
 @test_util.run_all_in_graph_and_eager_modes
 class DistributionParamsAreVarsTest(parameterized.TestCase, test_case.TestCase):
 
@@ -738,8 +751,7 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, test_case.TestCase):
     with tf.GradientTape() as tape:
       # TDs do bijector assertions twice (once by distribution.sample, and once
       # by bijector.forward).
-      max_permissible = (
-          3 if isinstance(dist, tfd.TransformedDistribution) else 2)
+      max_permissible = 3 if extra_tensor_conversion_allowed(dist) else 2
       with tfp_hps.assert_no_excessive_var_usage(
           'method `sample` of `{}`'.format(dist),
           max_permissible=max_permissible):
@@ -810,8 +822,7 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, test_case.TestCase):
       try:
         # No validation => 1 convert. But for TD we allow 2:
         # dist.log_prob(bijector.inverse(samp)) + bijector.ildj(samp)
-        max_permissible = (
-            2 if isinstance(dist, tfd.TransformedDistribution) else 1)
+        max_permissible = 2 if extra_tensor_conversion_allowed(dist) else 1
         with tfp_hps.assert_no_excessive_var_usage(
             'evaluative `{}` of `{}`'.format(evaluative, dist),
             max_permissible=max_permissible):
