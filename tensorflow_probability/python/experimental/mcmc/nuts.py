@@ -240,6 +240,14 @@ class NoUTurnSampler(mcmc.TransitionKernel):
                                len(current_state), len(step_size)))
 
       num_steps = tf.constant([self.num_trajectories_per_step], dtype=tf.int64)
+      if self.backend is None:
+        if self._seed_stream() is not None:
+          # The user wanted reproducible results; limit the parallel iterations
+          backend = ab.TensorFlowBackend(while_parallel_iterations=1)
+        else:
+          backend = ab.TensorFlowBackend()
+      else:
+        backend = self.backend
       # The `dry_run` and `max_stack_depth` arguments are added by the
       # @ctx.batch decorator, confusing pylint.
       # pylint: disable=unexpected-keyword-arg
@@ -253,8 +261,7 @@ class NoUTurnSampler(mcmc.TransitionKernel):
            tf.zeros_like(leapfrogs_taken),  # leapfrogs
            dry_run=not self.use_auto_batching,
            stackless=self.stackless,
-           backend=(ab.TensorFlowBackend()
-                    if self.backend is None else self.backend),
+           backend=backend,
            max_stack_depth=self.max_tree_depth + 4,
            block_code_cache=self._block_code_cache)
 

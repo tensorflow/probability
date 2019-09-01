@@ -39,7 +39,9 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 def run_nuts_chain(
     event_size, batch_size, num_steps,
-    initial_state=None, dry_run=False, stackless=False):
+    initial_state=None, dry_run=False, stackless=False, seed=None):
+  if seed is None:
+    seed = 1
   def target_log_prob_fn(event):
     with tf1.name_scope('nuts_test_target_log_prob', values=[event]):
       return tfd.MultivariateNormalDiag(
@@ -54,7 +56,7 @@ def run_nuts_chain(
   #     target_log_prob_fn,
   #     num_leapfrog_steps=3,
   #     step_size=0.3,
-  #     seed=1)
+  #     seed=seed)
   kernel = tfp.experimental.mcmc.NoUTurnSampler(
       target_log_prob_fn,
       step_size=[0.3],
@@ -62,7 +64,7 @@ def run_nuts_chain(
       stackless=stackless,
       unrolled_leapfrog_steps=2,
       max_tree_depth=4,
-      seed=1)
+      seed=seed)
   chain_state, extra = tfp.mcmc.sample_chain(
       num_results=num_steps,
       num_burnin_steps=0,
@@ -187,6 +189,14 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
         parallel_iterations=1)
     self.assertEqual([(2**tree_depth - 1) * unrolled_leapfrog_steps],
                      self.evaluate(extra.leapfrogs_taken))
+
+  def testReproducibility(self):
+    seed = tfp_test_util.test_seed()
+    s1 = self.evaluate(run_nuts_chain(2, 5, 10, seed=seed)[0])
+    if tf.executing_eagerly():
+      tf.random.set_seed(seed)
+    s2 = self.evaluate(run_nuts_chain(2, 5, 10, seed=seed)[0])
+    self.assertAllEqual(s1, s2)
 
   def testUnivariateNormalTargetConservation(self):
     def mk_normal():
