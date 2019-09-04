@@ -262,6 +262,4 @@ class DeferredTensor(tf.Module):
       raise TypeError(
           'Actual shape ({}) is incompatible with deferred shape ({}).'.format(
               y.shape, self.shape))
-    self._dtype = y.dtype
-    self.set_shape(y.shape)
     return tf.convert_to_tensor(y, dtype=dtype, name=name)
