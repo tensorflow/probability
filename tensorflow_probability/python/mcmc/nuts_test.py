@@ -30,6 +30,7 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -73,7 +74,7 @@ def assert_univariate_target_conservation(test, target_d, step_size):
   # the sample count.
   num_samples = int(5e4)
   num_steps = 1
-  strm = tfp.util.SeedStream(salt='univariate_nuts_test', seed=1)
+  strm = tfp_test_util.test_seed_stream()
   initialization = target_d.sample([num_samples], seed=strm())
 
   @tf.function(autograph=False)
@@ -174,7 +175,7 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
       ([2, 5], 100),  # test rank 2 case
   )
   def testLatentsOfMixedRank(self, batch_shape, num_steps):
-    strm = tfp.util.SeedStream(5, salt='LatentsOfMixedRankTest')
+    strm = tfp_test_util.test_seed_stream()
 
     init0 = [tf.ones(batch_shape + [6])]
     init1 = [tf.ones(batch_shape + []),
@@ -230,7 +231,7 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
       # (500, 1000, 20),
   )
   def testMultivariateNormalNdConvergence(self, nsamples, nchains, nd):
-    strm = tfp.util.SeedStream(1, salt='MultivariateNormalNdConvergence')
+    strm = tfp_test_util.test_seed_stream()
     theta0 = np.zeros((nchains, nd))
     mu = np.arange(nd)
     w = np.random.randn(nd, nd) * 0.1
@@ -238,7 +239,7 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
     step_size = np.random.rand(nchains, 1) * 0.1 + 1.
 
     @tf.function(autograph=False)
-    def run_nuts(mu, scale_tril, step_size, nsamples, state):
+    def run_chain_and_get_summary(mu, scale_tril, step_size, nsamples, state):
       def target_log_prob_fn(event):
         with tf.name_scope('nuts_test_target_log_prob'):
           return tfd.MultivariateNormalTriL(
@@ -272,7 +273,8 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
           leapfrogs_taken_[is_accepted[1:]])
 
     sample_shape, sample_mean, sample_cov, leapfrogs_taken = self.evaluate(
-        run_nuts(mu, np.linalg.cholesky(cov), step_size, nsamples, theta0))
+        run_chain_and_get_summary(
+            mu, np.linalg.cholesky(cov), step_size, nsamples, theta0))
 
     self.assertAllEqual(sample_shape, [nsamples, nchains, nd])
     self.assertAllClose(mu, sample_mean, atol=0.1, rtol=0.1)
@@ -280,6 +282,54 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
     # Test early stopping in tree building
     self.assertTrue(
         np.any(np.isin(np.asarray([5, 9, 11, 13]), np.unique(leapfrogs_taken))))
+
+  def testCorrelated2dNormalwithinMCError(self):
+    strm = tfp_test_util.test_seed_stream()
+    nchains, num_steps = 10, 500
+    mu = np.asarray([0., 3.], dtype=np.float32)
+    rho = 0.75
+    sigma1 = 1.
+    sigma2 = 2.
+    cov = np.asarray([[sigma1 * sigma1, rho * sigma1 * sigma2],
+                      [rho * sigma1 * sigma2, sigma2 * sigma2]],
+                     dtype=np.float32)
+    true_param = np.hstack([mu, np.array([sigma1**2, sigma2**2, rho])])
+    scale_tril = np.linalg.cholesky(cov)
+    initial_state = np.zeros((nchains, 2), np.float32)
+
+    @tf.function(autograph=False)
+    def run_chain_and_get_estimation_error():
+      chain_state = tfp.mcmc.sample_chain(
+          num_results=num_steps,
+          num_burnin_steps=0,
+          current_state=initial_state,
+          kernel=tfp.mcmc.NoUTurnSampler(
+              tfd.MultivariateNormalTriL(loc=mu,
+                                         scale_tril=scale_tril).log_prob,
+              step_size=1.,
+              seed=strm()),
+          trace_fn=None)
+      variance_est = tf.square(chain_state - mu)
+      correlation_est = ((chain_state[..., 0] - mu[0]) *
+                         (chain_state[..., 1] - mu[1]) /
+                         (sigma1 * sigma2))[..., tf.newaxis]
+      mcmc_samples = tf.concat([chain_state, variance_est, correlation_est],
+                               axis=-1)
+
+      expected = tf.reduce_mean(mcmc_samples, axis=[0, 1])
+
+      ess = tf.reduce_sum(tfp.mcmc.effective_sample_size(mcmc_samples), axis=0)
+      avg_monte_carlo_standard_error = tf.reduce_mean(
+          tf.math.reduce_std(mcmc_samples, axis=0),
+          axis=0) / tf.sqrt(ess)
+      scaled_error = (
+          tf.abs(expected - true_param) / avg_monte_carlo_standard_error)
+
+      return tfd.Normal(loc=0., scale=1.).prob(scaled_error)
+
+    # Probability of getting this error
+    error_prob = self.evaluate(run_chain_and_get_estimation_error())
+    self.assertAllGreater(error_prob, 0.01)
 
   @parameterized.parameters(
       (7, 5, 3, None),
@@ -314,7 +364,7 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
     )
 
     @tf.function(autograph=False)
-    def run_chain():
+    def run_chain_and_get_divergence():
       nchains = 5
       init_states = neals_funnel.sample(nchains, seed=strm())
       _, has_divergence = tfp.mcmc.sample_chain(
@@ -327,14 +377,14 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
           trace_fn=lambda _, pkr: pkr.has_divergence)
       return tf.reduce_sum(tf.cast(has_divergence, dtype=tf.int32))
 
-    divergence_count = self.evaluate(run_chain())
+    divergence_count = self.evaluate(run_chain_and_get_divergence())
 
     # Test that we observe a fair among of divergence.
     self.assertAllGreater(divergence_count, 100)
 
   def testSampleEndtoEnd(self):
     """An end-to-end test of sampling using NUTS."""
-    strm = tfp.util.SeedStream(1, salt='EndtoEndTest')
+    strm = tfp_test_util.test_seed_stream()
     predictors = tf.cast([
         201., 244., 47., 287., 203., 58., 210., 202., 198., 158., 165., 201.,
         157., 131., 166., 160., 186., 125., 218., 146.
@@ -369,7 +419,7 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
     number_of_steps, burnin, nchain = 100, 50, 50
 
     @tf.function(autograph=False)
-    def run_chain():
+    def run_chain_and_get_diagnostic():
       # random initialization of the starting postion of each chain
       b0, b1, df, _ = robust_lm.sample(nchain, seed=strm())
 
@@ -417,7 +467,7 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
     # Sample from posterior distribution and get diagnostic
     [
         final_step_size, average_accept_ratio, average_rhat
-    ] = self.evaluate(run_chain())
+    ] = self.evaluate(run_chain_and_get_diagnostic())
 
     # Check that step size adaptation reduced the initial step size
     self.assertAllLess(
