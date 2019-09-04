@@ -26,7 +26,6 @@ from tensorflow_probability.python.distributions import logistic
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -184,9 +183,8 @@ class RelaxedBernoulli(distribution.Distribution):
       else:
         logits_parameter = self._logits
 
-      shape = prefer_static.broadcast_shape(
-          prefer_static.shape(self._temperature),
-          prefer_static.shape(logits_parameter))
+      shape = tf.broadcast_static_shape(logits_parameter.shape,
+                                        self._temperature.shape)
 
       logistic_scale = tfp_util.DeferredTensor(
           tf.math.reciprocal, self._temperature)

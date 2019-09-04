@@ -22,6 +22,7 @@ from __future__ import print_function
 
 import numpy as np
 import scipy.special
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
@@ -164,6 +165,17 @@ class RelaxedBernoulliTest(test_case.TestCase):
     self.assertAllClose(
         *self.evaluate([x, d.probs_parameter()]),
         atol=0, rtol=1e-4)
+
+  def testUnknownShape(self):
+    logits = tf.Variable(np.zeros((1, 5)), shape=tf.TensorShape((1, None)))
+    d = tfd.RelaxedBernoulli(0.5, logits)
+    self.evaluate(logits.initializer)
+    d.sample()
+
+    if not tf.executing_eagerly():
+      logits = tf1.placeholder(tf.float32, shape=(1, None))
+      d = tfd.RelaxedBernoulli(0.5, logits=logits)
+      d.sample()
 
 
 @test_util.run_all_in_graph_and_eager_modes
