@@ -240,7 +240,6 @@ py_test(
     ],
     main = "latent_dirichlet_allocation_distributions.py",
     srcs_version = "PY2AND3",
-    tags = ["manual"],
     deps = [
         ":latent_dirichlet_allocation_distributions_lib",
     ],
@@ -281,7 +280,6 @@ py_test(
     ],
     main = "latent_dirichlet_allocation_edward2.py",
     srcs_version = "PY2AND3",
-    tags = ["manual"],
     deps = [
         ":latent_dirichlet_allocation_edward2_lib",
     ],
@@ -373,7 +371,6 @@ py_test(
     ],
     main = "vae.py",
     srcs_version = "PY2AND3",
-    tags = ["manual"],
     deps = [
         ":vae_lib",
     ],
