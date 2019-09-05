@@ -52,6 +52,9 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:kullback_leibler",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:docstring_util",
         "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/util:seed_stream",
@@ -79,6 +82,9 @@ py_library(
     deps = [
         ":util",
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:kullback_leibler",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:docstring_util",
         "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/util:seed_stream",
@@ -129,8 +135,21 @@ py_library(
     deps = [
         # cloudpickle dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
-        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/bijectors:scale_tril",
+        "//tensorflow_probability/python/bijectors:transpose",
+        "//tensorflow_probability/python/distributions:bernoulli",
+        "//tensorflow_probability/python/distributions:categorical",
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:kullback_leibler",
+        "//tensorflow_probability/python/distributions:logistic",
+        "//tensorflow_probability/python/distributions:mixture_same_family",
+        "//tensorflow_probability/python/distributions:mvn_tril",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:onehot_categorical",
+        "//tensorflow_probability/python/distributions:poisson",
+        "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/distributions:variational_gaussian_process",
         "//tensorflow_probability/python/layers/internal",
     ],
 )
@@ -175,8 +194,8 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
-        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/bijectors:masked_autoregressive",
+        "//tensorflow_probability/python/distributions:transformed_distribution",
     ],
 )
 
@@ -201,6 +220,9 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:deterministic",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
     ],
 )
 

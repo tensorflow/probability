@@ -24,8 +24,10 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import util as util
+from tensorflow_probability.python.distributions import deterministic as deterministic_lib
+from tensorflow_probability.python.distributions import independent as independent_lib
+from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow.python.keras.utils import generic_utils
 
 
@@ -188,11 +190,12 @@ def default_mean_field_normal_fn(
     """
     loc, scale = loc_scale_fn(dtype, shape, name, trainable, add_variable_fn)
     if scale is None:
-      dist = tfd.Deterministic(loc=loc)
+      dist = deterministic_lib.Deterministic(loc=loc)
     else:
-      dist = tfd.Normal(loc=loc, scale=scale)
+      dist = normal_lib.Normal(loc=loc, scale=scale)
     batch_ndims = tf.size(input=dist.batch_shape_tensor())
-    return tfd.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
+    return independent_lib.Independent(
+        dist, reinterpreted_batch_ndims=batch_ndims)
   return _fn
 
 
@@ -214,9 +217,11 @@ def default_multivariate_normal_fn(dtype, shape, name, trainable,
     Multivariate standard `Normal` distribution.
   """
   del name, trainable, add_variable_fn   # unused
-  dist = tfd.Normal(loc=tf.zeros(shape, dtype), scale=dtype.as_numpy_dtype(1))
+  dist = normal_lib.Normal(
+      loc=tf.zeros(shape, dtype), scale=dtype.as_numpy_dtype(1))
   batch_ndims = tf.size(input=dist.batch_shape_tensor())
-  return tfd.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
+  return independent_lib.Independent(
+      dist, reinterpreted_batch_ndims=batch_ndims)
 
 
 def deserialize_function(serial, function_type):

@@ -20,7 +20,9 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import independent as independent_lib
+from tensorflow_probability.python.distributions import kullback_leibler as kl_lib
+from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.layers import util as tfp_layers_util
 from tensorflow_probability.python.math import random_rademacher
@@ -112,11 +114,12 @@ class _ConvVariational(tf.keras.layers.Layer):
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
-      kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
+      kernel_divergence_fn=(lambda q, p, ignore: kl_lib.kl_divergence(q, p)),
+      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
+          is_singular=True),
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
-      bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      bias_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -456,11 +459,12 @@ class _ConvReparameterization(_ConvVariational):
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
-      kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
+      kernel_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
+      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
+          is_singular=True),
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
-      bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      bias_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -605,11 +609,12 @@ class Conv1DReparameterization(_ConvReparameterization):
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
-      kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
+      kernel_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
+      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
+          is_singular=True),
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
-      bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      bias_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -747,11 +752,12 @@ class Conv2DReparameterization(_ConvReparameterization):
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
-      kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
+      kernel_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
+      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
+          is_singular=True),
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
-      bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      bias_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -891,11 +897,12 @@ class Conv3DReparameterization(_ConvReparameterization):
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
-      kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
+      kernel_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
+      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
+          is_singular=True),
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
-      bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      bias_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -997,11 +1004,12 @@ class _ConvFlipout(_ConvVariational):
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
-      kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
+      kernel_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
+      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
+          is_singular=True),
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
-      bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      bias_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       seed=None,
       **kwargs):
     # pylint: disable=g-doc-args
@@ -1056,15 +1064,15 @@ class _ConvFlipout(_ConvVariational):
     self.seed = seed
 
   def _apply_variational_kernel(self, inputs):
-    if (not isinstance(self.kernel_posterior, tfd.Independent) or
-        not isinstance(self.kernel_posterior.distribution, tfd.Normal)):
+    if (not isinstance(self.kernel_posterior, independent_lib.Independent) or
+        not isinstance(self.kernel_posterior.distribution, normal_lib.Normal)):
       raise TypeError(
           '`{}` requires '
           '`kernel_posterior_fn` produce an instance of '
           '`tfd.Independent(tfd.Normal)` '
           '(saw: \"{}\").'.format(
               type(self).__name__, self.kernel_posterior.name))
-    self.kernel_posterior_affine = tfd.Normal(
+    self.kernel_posterior_affine = normal_lib.Normal(
         loc=tf.zeros_like(self.kernel_posterior.distribution.loc),
         scale=self.kernel_posterior.distribution.scale)
     self.kernel_posterior_affine_tensor = (
@@ -1213,11 +1221,12 @@ class Conv1DFlipout(_ConvFlipout):
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
-      kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
+      kernel_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
+      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
+          is_singular=True),
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
-      bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      bias_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       seed=None,
       **kwargs):
     # pylint: disable=g-doc-args
@@ -1358,11 +1367,12 @@ class Conv2DFlipout(_ConvFlipout):
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
-      kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
+      kernel_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
+      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
+          is_singular=True),
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
-      bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      bias_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       seed=None,
       **kwargs):
     # pylint: disable=g-doc-args
@@ -1509,11 +1519,12 @@ class Conv3DFlipout(_ConvFlipout):
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
-      kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
+      kernel_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
+      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
+          is_singular=True),
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
-      bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      bias_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       seed=None,
       **kwargs):
     # pylint: disable=g-doc-args

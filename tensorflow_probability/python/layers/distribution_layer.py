@@ -31,10 +31,21 @@ import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-# By importing `distributions` as `tfd`, docstrings will show
-# `tfd.Distribution`. We import `bijectors` the same way, for consistency.
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import scale_tril as scale_tril_lib
+from tensorflow_probability.python.bijectors import transpose as transpose_lib
+from tensorflow_probability.python.distributions import bernoulli as bernoulli_lib
+from tensorflow_probability.python.distributions import categorical as categorical_lib
+from tensorflow_probability.python.distributions import distribution as tfd
+from tensorflow_probability.python.distributions import independent as independent_lib
+from tensorflow_probability.python.distributions import kullback_leibler as kl_lib
+from tensorflow_probability.python.distributions import logistic as logistic_lib
+from tensorflow_probability.python.distributions import mixture_same_family as mixture_same_family_lib
+from tensorflow_probability.python.distributions import mvn_tril as mvn_tril_lib
+from tensorflow_probability.python.distributions import normal as normal_lib
+from tensorflow_probability.python.distributions import onehot_categorical as onehot_categorical_lib
+from tensorflow_probability.python.distributions import poisson as poisson_lib
+from tensorflow_probability.python.distributions import transformed_distribution as transformed_distribution_lib
+from tensorflow_probability.python.distributions import variational_gaussian_process as variational_gaussian_process_lib
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.layers.internal import distribution_tensor_coercible as dtc
 from tensorflow_probability.python.layers.internal import tensor_tuple as tensor_tuple
@@ -351,10 +362,10 @@ class MultivariateNormalTriL(DistributionLambda):
     with tf1.name_scope(name, 'MultivariateNormalTriL',
                                  [params, event_size]):
       params = tf.convert_to_tensor(value=params, name='params')
-      scale_tril = tfb.ScaleTriL(
+      scale_tril = scale_tril_lib.ScaleTriL(
           diag_shift=np.array(1e-5, params.dtype.as_numpy_dtype()),
           validate_args=validate_args)
-      return tfd.MultivariateNormalTriL(
+      return mvn_tril_lib.MultivariateNormalTriL(
           loc=params[..., :event_size],
           scale_tril=scale_tril(params[..., event_size:]),
           validate_args=validate_args)
@@ -457,7 +468,7 @@ class OneHotCategorical(DistributionLambda):
     """Create the distribution instance from a `params` vector."""
     with tf1.name_scope(name, 'OneHotCategorical',
                                  [params, event_size]):
-      return tfd.OneHotCategorical(
+      return onehot_categorical_lib.OneHotCategorical(
           logits=params,
           dtype=dtype or params.dtype.base_dtype,
           validate_args=validate_args)
@@ -708,8 +719,8 @@ class IndependentBernoulli(DistributionLambda):
           tf.shape(input=params)[:-1],
           event_shape,
       ], axis=0)
-      dist = tfd.Independent(
-          tfd.Bernoulli(
+      dist = independent_lib.Independent(
+          bernoulli_lib.Bernoulli(
               logits=tf.reshape(params, new_shape),
               dtype=dtype or params.dtype.base_dtype,
               validate_args=validate_args),
@@ -717,8 +728,8 @@ class IndependentBernoulli(DistributionLambda):
           validate_args=validate_args)
       dist._logits = dist.distribution._logits  # pylint: disable=protected-access
       dist._probs = dist.distribution._probs  # pylint: disable=protected-access
-      dist.logits = tfd.Bernoulli.logits
-      dist.probs = tfd.Bernoulli.probs
+      dist.logits = bernoulli_lib.Bernoulli.logits
+      dist.probs = bernoulli_lib.Bernoulli.probs
       return dist
 
   @staticmethod
@@ -848,8 +859,8 @@ class IndependentLogistic(DistributionLambda):
       ],
                                axis=0)
       loc_params, scale_params = tf.split(params, 2, axis=-1)
-      return tfd.Independent(
-          tfd.Logistic(
+      return independent_lib.Independent(
+          logistic_lib.Logistic(
               loc=tf.reshape(loc_params, output_shape),
               scale=tf.math.softplus(tf.reshape(scale_params, output_shape)),
               validate_args=validate_args),
@@ -965,8 +976,8 @@ class IndependentNormal(DistributionLambda):
       ],
                                axis=0)
       loc_params, scale_params = tf.split(params, 2, axis=-1)
-      return tfd.Independent(
-          tfd.Normal(
+      return independent_lib.Independent(
+          normal_lib.Normal(
               loc=tf.reshape(loc_params, output_shape),
               scale=tf.math.softplus(tf.reshape(scale_params, output_shape)),
               validate_args=validate_args),
@@ -1097,8 +1108,8 @@ class IndependentPoisson(DistributionLambda):
           event_shape,
       ],
                                axis=0)
-      return tfd.Independent(
-          tfd.Poisson(
+      return independent_lib.Independent(
+          poisson_lib.Poisson(
               log_rate=tf.reshape(params, output_shape),
               validate_args=validate_args),
           reinterpreted_batch_ndims=tf.size(input=event_shape),
@@ -1317,7 +1328,7 @@ def _make_kl_divergence_fn(
   """Creates a callable computing `KL[a,b]` from `a`, a `tfd.Distribution`."""
 
   if use_exact_kl is None:
-    kl_divergence_fn = tfd.kl_divergence
+    kl_divergence_fn = kl_lib.kl_divergence
   else:
     # Closure over: test_points_fn, test_points_reduce_axis.
     def kl_divergence_fn(distribution_a, distribution_b):
@@ -1440,8 +1451,9 @@ class MixtureSameFamily(DistributionLambda):
               params[..., num_components:],
               tf.concat([tf.shape(input=params)[:-1], [num_components, -1]],
                         axis=0)))
-      mixture_dist = tfd.Categorical(logits=params[..., :num_components])
-      return tfd.MixtureSameFamily(
+      mixture_dist = categorical_lib.Categorical(
+          logits=params[..., :num_components])
+      return mixture_same_family_lib.MixtureSameFamily(
           mixture_dist,
           components_dist,
           # TODO(b/120154797): Change following to `validate_args=True` after
@@ -1889,7 +1901,7 @@ class VariationalGaussianProcess(DistributionLambda):
           observation_noise_variance,
           jitter=1e-6,
           name=None):
-    vgp = tfd.VariationalGaussianProcess(
+    vgp = variational_gaussian_process_lib.VariationalGaussianProcess(
         kernel=kernel_provider.kernel,
         index_points=x,
         inducing_index_points=inducing_index_points,
@@ -1900,9 +1912,9 @@ class VariationalGaussianProcess(DistributionLambda):
         mean_fn=mean_fn,
         observation_noise_variance=observation_noise_variance,
         jitter=jitter)
-    ind = tfd.Independent(vgp, reinterpreted_batch_ndims=1)
-    bij = tfb.Transpose(rightmost_transposed_ndims=2)
-    d = tfd.TransformedDistribution(ind, bijector=bij)
+    ind = independent_lib.Independent(vgp, reinterpreted_batch_ndims=1)
+    bij = transpose_lib.Transpose(rightmost_transposed_ndims=2)
+    d = transformed_distribution_lib.TransformedDistribution(ind, bijector=bij)
     def _transposed_variational_loss(y, kl_weight=1.):
       loss = vgp.variational_loss(bij.forward(y), kl_weight=kl_weight)
       return loss

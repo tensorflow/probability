@@ -21,10 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-# By importing `distributions` as `tfd`, docstrings will show
-# `tfd.Distribution`. We import `bijectors` the same way, for consistency.
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import masked_autoregressive as masked_autoregressive_lib
+from tensorflow_probability.python.distributions import transformed_distribution as transformed_distribution_lib
 
 from tensorflow_probability.python.layers.distribution_layer import DistributionLambda
 
@@ -146,7 +144,7 @@ class AutoregressiveTransform(DistributionLambda):
     super(AutoregressiveTransform, self).build(input_shape)
 
   def _transform(self, distribution):
-    return tfd.TransformedDistribution(
-        bijector=tfb.MaskedAutoregressiveFlow(
+    return transformed_distribution_lib.TransformedDistribution(
+        bijector=masked_autoregressive_lib.MaskedAutoregressiveFlow(
             lambda x: tf.unstack(self._made(x), axis=-1)),
         distribution=distribution)
