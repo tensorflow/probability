@@ -61,7 +61,7 @@ class SkewGeneralizedNormal(Normal, Distribution):
         self._peak = tf.identity(peak)
 
         tf.debugging.assert_same_float_dtype(
-          [self._loc,self._scale,self._peak]
+            [self._loc, self._scale, self._peak]
         )
 
     super(Normal, self).__init__(
