@@ -361,7 +361,7 @@ def _size(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bui
 size = _copy_docstring(tf.size, _size)
 
 
-def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin
+def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin,missing-docstring
   if not hasattr(input, 'shape'):
     x = np.array(input)
     input = tf.convert_to_tensor(input) if x.dtype is np.object else x
@@ -369,7 +369,9 @@ def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bu
   if tensorshape_util.is_fully_defined(input.shape):
     return np.array(tensorshape_util.as_list(input_shape)).astype(
         _numpy_dtype(out_type))
-  return tf.shape(input, out_type=out_type, name=name)
+  # NOTE: tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**, so we
+  # pre-emptively convert-to-tensor.
+  return tf.shape(tf.convert_to_tensor(input), out_type=out_type, name=name)
 
 
 shape = _copy_docstring(tf.shape, _shape)
