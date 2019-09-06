@@ -29,15 +29,14 @@ class SkewGeneralizedNormal(Normal, Distribution):
   accessed January 2019.
 
   Quantile, survival, log_survival, and all other essential functions
-  that are not given in the Wikipedia article were defined by
+  were derived and defined by
   Daniel Luria, legally Daniel Maryanovsky, of vAIral, Kabbalah AI,
   and formerly of Lofty AI and Locbit Inc.
-
-  Implemented by Daniel Luria
 
   The distribution returns NaN when evaluating
   probability of points outside its support
   '''
+
   def __init__(self,
                loc,
                scale,
@@ -157,7 +156,9 @@ class SkewGeneralizedNormal(Normal, Distribution):
 
   def _mean(self):
     broadcast_ones = tf.ones_like(self.scale)
-    mean = self._z((tf.exp(tf.square(self.peak) / 2.) - 1.)/self.peak)
+    esp = (tf.exp(tf.square(self.peak) / 2.) - 1.)
+    mean = self.loc - (self.scale*esp/self.peak)
+
     return mean * broadcast_ones
 
   def _quantile(self, p):
@@ -168,7 +169,7 @@ class SkewGeneralizedNormal(Normal, Distribution):
     broadcast_ones = tf.ones_like(self.loc)
     root_sq_offset = tf.sqrt(tf.exp(tf.square(self.peak)) - 1.)
     exp_square_peak = tf.exp(tf.square(self.peak)/2)
-    scale_q = self.scale/self.peak
+    scale_q = self.scale/tf.abs(self.peak)
     return scale_q * exp_square_peak * root_sq_offset * broadcast_ones
 
   def _mode(self):
@@ -178,7 +179,7 @@ class SkewGeneralizedNormal(Normal, Distribution):
 
   def _z(self, x):
     """Standardize input `x` to a unit normal."""
-    with tf.name_scope("standardize", values=[x]):
+    with tf.name_scope("standardize"):
       return (x - self.loc) / self.scale
 
   def _inv_z(self, z):
