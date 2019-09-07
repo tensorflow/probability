@@ -389,5 +389,24 @@ class DualAveragingStepSizeAdaptationDynamicBroadcastingTest(
   use_static_shape = False
 
 
+class TfFunctionTest(test_case.TestCase):
+
+  def testDtypeIssue(self):
+    # Test issue https://github.com/tensorflow/probability/issues/543
+    # There were some stray, implicit, float64 typed values cropping up, but
+    # only when one_step was executed in a tf.function context. The fix was to
+    # use the correct dtype in those spots; this test verifies the fix.
+    normal_2d = tfd.MultivariateNormalDiag([0., 0.], [1., 1.])
+
+    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+        normal_2d.log_prob, step_size=np.float32(1e-3), num_leapfrog_steps=3)
+    adaptive_kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+        kernel, num_adaptation_steps=100)
+
+    init = tf.constant([0.0, 0.0])
+    extra = adaptive_kernel.bootstrap_results(init)
+    tf.function(lambda: adaptive_kernel.one_step(init, extra))()
+
+
 if __name__ == '__main__':
   tf.test.main()

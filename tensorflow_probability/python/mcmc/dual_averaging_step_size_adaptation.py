@@ -45,7 +45,8 @@ def _hmc_like_step_size_getter_fn(kernel_results):
 
 @mcmc_util.make_innermost_getter
 def _hmc_like_log_accept_prob_getter_fn(kernel_results):
-  return prefer_static.minimum(kernel_results.log_accept_ratio, 0.)
+  return prefer_static.minimum(kernel_results.log_accept_ratio,
+                               tf.zeros_like(kernel_results.log_accept_ratio))
 
 
 def _get_differing_dims(a, b):
@@ -526,7 +527,7 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
             reduced_log_accept_prob,
             axis=reduce_indices,
             keepdims=True)
-        error_sum.append(tf.zeros_like(reduced_log_accept_prob))
+        error_sum.append(tf.zeros_like(reduced_log_accept_prob, dtype=dtype))
         log_averaging_step.append(tf.zeros_like(step_size_part, dtype=dtype))
         shrinkage_target.append(np.log(10.) + tf.math.log(step_size_part))
 
