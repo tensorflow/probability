@@ -292,7 +292,7 @@ class MemoryLeakTest(test_case.TestCase):
     del dist
 
     # This was 43150(py2)/43750(py3) before PR#532.
-    self.assertEqual(after_objs - before_objs, 0)
+    self.assertLess(after_objs - before_objs, 1)
 
 
 if __name__ == '__main__':
