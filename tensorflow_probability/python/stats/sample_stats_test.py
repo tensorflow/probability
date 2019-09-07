@@ -27,7 +27,6 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops import spectral_ops_test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 rng = np.random.RandomState(0)
@@ -48,27 +47,25 @@ class _AutoCorrelationTest(object):
     x_ = np.array([[0., 0., 0.], [1., 1., 1.]]).astype(self.dtype)
     x_ph = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
-    with spectral_ops_test_util.fft_kernel_label_map():
-      # Setting normalize = True means we divide by zero.
-      auto_corr = tfp.stats.auto_correlation(
-          x_ph, axis=1, center=False, normalize=False)
-      if self.use_static_shape:
-        self.assertEqual((2, 3), auto_corr.shape)
-      auto_corr_ = self.evaluate(auto_corr)
-      self.assertAllClose([[0., 0., 0.], [1., 1., 1.]], auto_corr_)
+    # Setting normalize = True means we divide by zero.
+    auto_corr = tfp.stats.auto_correlation(
+        x_ph, axis=1, center=False, normalize=False)
+    if self.use_static_shape:
+      self.assertEqual((2, 3), auto_corr.shape)
+    auto_corr_ = self.evaluate(auto_corr)
+    self.assertAllClose([[0., 0., 0.], [1., 1., 1.]], auto_corr_)
 
   def test_constant_sequence_axis_0_max_lags_none_center_true(self):
     x_ = np.array([[0., 0., 0.], [1., 1., 1.]]).astype(self.dtype)
     x_ph = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
-    with spectral_ops_test_util.fft_kernel_label_map():
-      # Setting normalize = True means we divide by zero.
-      auto_corr = tfp.stats.auto_correlation(
-          x_ph, axis=1, normalize=False, center=True)
-      if self.use_static_shape:
-        self.assertEqual((2, 3), auto_corr.shape)
-      auto_corr_ = self.evaluate(auto_corr)
-      self.assertAllClose([[0., 0., 0.], [0., 0., 0.]], auto_corr_)
+    # Setting normalize = True means we divide by zero.
+    auto_corr = tfp.stats.auto_correlation(
+        x_ph, axis=1, normalize=False, center=True)
+    if self.use_static_shape:
+      self.assertEqual((2, 3), auto_corr.shape)
+    auto_corr_ = self.evaluate(auto_corr)
+    self.assertAllClose([[0., 0., 0.], [0., 0., 0.]], auto_corr_)
 
   def check_results_versus_brute_force(self, x, axis, max_lags, center,
                                        normalize):
@@ -93,18 +90,17 @@ class _AutoCorrelationTest(object):
 
     x_ph = tf1.placeholder_with_default(
         x, shape=x.shape if self.use_static_shape else None)
-    with spectral_ops_test_util.fft_kernel_label_map():
-      auto_corr = tfp.stats.auto_correlation(
-          x_ph,
-          axis=axis,
-          max_lags=max_lags,
-          center=center,
-          normalize=normalize)
-      if self.use_static_shape:
-        output_shape = list(x.shape)
-        output_shape[axis] = max_lags + 1
-        self.assertAllEqual(output_shape, auto_corr.shape)
-      self.assertAllClose(rxx, self.evaluate(auto_corr), rtol=1e-5, atol=1e-5)
+    auto_corr = tfp.stats.auto_correlation(
+        x_ph,
+        axis=axis,
+        max_lags=max_lags,
+        center=center,
+        normalize=normalize)
+    if self.use_static_shape:
+      output_shape = list(x.shape)
+      output_shape[axis] = max_lags + 1
+      self.assertAllEqual(output_shape, auto_corr.shape)
+    self.assertAllClose(rxx, self.evaluate(auto_corr), rtol=1e-5, atol=1e-5)
 
   def test_axis_n1_center_false_max_lags_none(self):
     x = rng.randn(2, 3, 4).astype(self.dtype)
@@ -162,19 +158,17 @@ class _AutoCorrelationTest(object):
     x = rng.randn(l).astype(self.dtype)
     x_ph = tf1.placeholder_with_default(
         x, shape=(l,) if self.use_static_shape else None)
-    with spectral_ops_test_util.fft_kernel_label_map():
-      rxx = tfp.stats.auto_correlation(
-          x_ph, max_lags=l // 2, center=True, normalize=False)
-      if self.use_static_shape:
-        self.assertAllEqual((l // 2 + 1,), rxx.shape)
-      rxx_ = self.evaluate(rxx)
-      # OSS CPU FFT has some accuracy issues is not the most accurate.
-      # So this tolerance is a bit bad.
-      self.assertAllClose(1., rxx_[0], rtol=0.05)
-      # The maximal error in the rest of the sequence is not great.
-      self.assertAllClose(np.zeros(l // 2), rxx_[1:], atol=0.1)
-      # The mean error in the rest is ok, actually 0.008 when I tested it.
-      self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
+    rxx = tfp.stats.auto_correlation(
+        x_ph, max_lags=l // 2, center=True, normalize=False)
+    if self.use_static_shape:
+      self.assertAllEqual((l // 2 + 1,), rxx.shape)
+    rxx_ = self.evaluate(rxx)
+    # OSS CPU FFT has some accuracy issues, so this tolerance is a bit bad.
+    self.assertAllClose(1., rxx_[0], rtol=0.05)
+    # The maximal error in the rest of the sequence is not great.
+    self.assertAllClose(np.zeros(l // 2), rxx_[1:], atol=0.1)
+    # The mean error in the rest is ok, actually 0.008 when I tested it.
+    self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
 
   def test_step_function_sequence(self):
     if tf.executing_eagerly() and not self.use_static_shape:
@@ -187,45 +181,42 @@ class _AutoCorrelationTest(object):
         (1, 10))).ravel().astype(self.dtype)
     x_ph = tf1.placeholder_with_default(
         x, shape=(1000 * 10,) if self.use_static_shape else None)
-    with spectral_ops_test_util.fft_kernel_label_map():
-      rxx = tfp.stats.auto_correlation(
-          x_ph, max_lags=1000 * 10 // 2, center=True, normalize=False)
-      if self.use_static_shape:
-        self.assertAllEqual((1000 * 10 // 2 + 1,), rxx.shape)
-      rxx_ = self.evaluate(rxx)
-      rxx_ /= rxx_[0]
-      # Expect positive correlation for the first 10 lags, then significantly
-      # smaller negative.
-      self.assertGreater(rxx_[:10].min(), 0)
+    rxx = tfp.stats.auto_correlation(
+        x_ph, max_lags=1000 * 10 // 2, center=True, normalize=False)
+    if self.use_static_shape:
+      self.assertAllEqual((1000 * 10 // 2 + 1,), rxx.shape)
+    rxx_ = self.evaluate(rxx)
+    rxx_ /= rxx_[0]
+    # Expect positive correlation for the first 10 lags, then significantly
+    # smaller negative.
+    self.assertGreater(rxx_[:10].min(), 0)
 
-      # TODO(b/138375951): Re-enable this assertion once we know why its
-      # failing.
-      # self.assertGreater(rxx_[9], 5 * rxx_[10:20].mean())
+    # TODO(b/138375951): Re-enable this assertion once we know why its
+    # failing.
+    # self.assertGreater(rxx_[9], 5 * rxx_[10:20].mean())
 
-      # RXX should be decreasing for the first 10 lags.
-      diff = np.diff(rxx_)
-      self.assertLess(diff[:10].max(), 0)
+    # RXX should be decreasing for the first 10 lags.
+    diff = np.diff(rxx_)
+    self.assertLess(diff[:10].max(), 0)
 
   def test_normalization(self):
     l = 10000
     x = 3 * rng.randn(l).astype(self.dtype)
     x_ph = tf1.placeholder_with_default(
         x, shape=(l,) if self.use_static_shape else None)
-    with spectral_ops_test_util.fft_kernel_label_map():
-      rxx = tfp.stats.auto_correlation(
-          x_ph, max_lags=l // 2, center=True, normalize=True)
-      if self.use_static_shape:
-        self.assertAllEqual((l // 2 + 1,), rxx.shape)
-      rxx_ = self.evaluate(rxx)
-      # Note that RXX[0] = 1, despite the fact that E[X^2] = 9, and this is
-      # due to normalize=True.
-      # OSS CPU FFT has some accuracy issues is not the most accurate.
-      # So this tolerance is a bit bad.
-      self.assertAllClose(1., rxx_[0], rtol=0.05)
-      # The maximal error in the rest of the sequence is not great.
-      self.assertAllClose(np.zeros(l // 2), rxx_[1:], atol=0.1)
-      # The mean error in the rest is ok, actually 0.008 when I tested it.
-      self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
+    rxx = tfp.stats.auto_correlation(
+        x_ph, max_lags=l // 2, center=True, normalize=True)
+    if self.use_static_shape:
+      self.assertAllEqual((l // 2 + 1,), rxx.shape)
+    rxx_ = self.evaluate(rxx)
+    # Note that RXX[0] = 1, despite the fact that E[X^2] = 9, and this is
+    # due to normalize=True.
+    # OSS CPU FFT has some accuracy issues, so this tolerance is a bit bad.
+    self.assertAllClose(1., rxx_[0], rtol=0.05)
+    # The maximal error in the rest of the sequence is not great.
+    self.assertAllClose(np.zeros(l // 2), rxx_[1:], atol=0.1)
+    # The mean error in the rest is ok, actually 0.008 when I tested it.
+    self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
 
 
 @test_util.run_all_in_graph_and_eager_modes
