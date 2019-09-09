@@ -286,14 +286,13 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
         np.any(np.isin(np.asarray([5, 9, 11, 13]), np.unique(leapfrogs_taken))))
 
   def testCorrelated2dNormalwithinMCError(self):
-    # Test is flaky with 500 samples, set specific seed here.
-    strm = tfd.SeedStream(1, salt='Correlated2dNormalwithinMCError')
+    strm = tfp_test_util.test_seed_stream()
     nchains = 100
-    num_steps = 500
+    num_steps = 1000
     mu = np.asarray([0., 3.], dtype=np.float32)
     rho = 0.75
-    sigma1 = 1.
-    sigma2 = 2.
+    sigma1 = np.float32(1.)
+    sigma2 = np.float32(2.)
     cov = np.asarray([[sigma1 * sigma1, rho * sigma1 * sigma2],
                       [rho * sigma1 * sigma2, sigma2 * sigma2]],
                      dtype=np.float32)
@@ -310,13 +309,12 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
           kernel=tfp.mcmc.NoUTurnSampler(
               tfd.MultivariateNormalTriL(loc=mu,
                                          scale_tril=scale_tril).log_prob,
-              step_size=1.,
+              step_size=np.asarray([sigma1, sigma2]),
               seed=strm()),
           trace_fn=None)
       variance_est = tf.square(chain_state - mu)
-      correlation_est = ((chain_state[..., 0] - mu[0]) *
-                         (chain_state[..., 1] - mu[1]) /
-                         (sigma1 * sigma2))[..., tf.newaxis]
+      correlation_est = tf.reduce_prod(
+          chain_state - mu, axis=-1, keepdims=True) / (sigma1 * sigma2)
       mcmc_samples = tf.concat([chain_state, variance_est, correlation_est],
                                axis=-1)
 
@@ -335,8 +333,8 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
     error_prob = self.evaluate(run_chain_and_get_estimation_error())
 
     # Check convergence using Markov chain central limit theorem, this is a
-    # z-test at p=.025
-    self.assertAllGreater(error_prob, 0.0125)
+    # z-test at p=.01
+    self.assertAllGreater(error_prob, 0.005)
 
   @parameterized.parameters(
       (7, 5, 3, None),
