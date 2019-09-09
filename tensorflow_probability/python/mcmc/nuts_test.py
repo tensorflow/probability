@@ -86,10 +86,11 @@ def assert_univariate_target_conservation(test, target_d, step_size):
         max_tree_depth=3,
         unrolled_leapfrog_steps=2,
         seed=strm())
-    result, _ = tfp.mcmc.sample_chain(
+    result = tfp.mcmc.sample_chain(
         num_results=num_steps,
         num_burnin_steps=0,
         current_state=initialization,
+        trace_fn=None,
         kernel=nuts)
     return result
 
@@ -143,6 +144,34 @@ def assert_mvn_target_conservation(event_size, batch_size, **kwargs):
 
 @test_util.run_all_in_graph_and_eager_modes
 class NutsTest(parameterized.TestCase, test_case.TestCase):
+
+  def testCorrectReadWriteInstruction(self):
+    mocknuts = tfp.mcmc.NoUTurnSampler(
+        target_log_prob_fn=lambda x: x,
+        max_tree_depth=4,
+        step_size=1.)
+
+    self.assertAllEqual(
+        mocknuts._write_instruction,
+        np.array([0, 4, 1, 4, 1, 4, 2, 4, 1, 4, 2, 4, 2, 4, 3, 4]))
+    self.assertAllEqual(
+        mocknuts._read_instruction,
+        np.array([[0, 0],
+                  [0, 1],
+                  [0, 0],
+                  [0, 2],
+                  [0, 0],
+                  [1, 2],
+                  [0, 0],
+                  [0, 3],
+                  [0, 0],
+                  [1, 2],
+                  [0, 0],
+                  [1, 3],
+                  [0, 0],
+                  [2, 3],
+                  [0, 0],
+                  [0, 4]]))
 
   def testUnivariateNormalTargetConservation(self):
     normal_dist = tfd.Normal(loc=1., scale=2.)
@@ -421,7 +450,7 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
     init_step_size = [1., .2, .5]
     step_size0 = [tf.cast(x, dtype=tf.float32) for x in init_step_size]
 
-    number_of_steps, burnin, nchain = 100, 50, 50
+    number_of_steps, burnin, nchain = 200, 50, 10
 
     @tf.function(autograph=False)
     def run_chain_and_get_diagnostic():
@@ -446,6 +475,7 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
                   step_size=step_size0,
                   seed=strm()),
               bijector=unconstraining_bijectors),
+          target_accept_prob=.8,
           num_adaptation_steps=burnin,
           step_size_setter_fn=lambda pkr, new_step_size: pkr._replace(  # pylint: disable=g-long-lambda
               inner_results=pkr.inner_results._replace(step_size=new_step_size)

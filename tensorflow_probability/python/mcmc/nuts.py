@@ -61,7 +61,7 @@ MULTINOMIAL_SAMPLE = True             # Default: True
 
 # Whether to use U turn criteria in [1] or generalized U turn criteria in [2]
 # to check the tree trajectory.
-GENERALIZED_UTURN = False             # Default: True
+GENERALIZED_UTURN = True              # Default: True
 ##############################################################
 ### END STATIC CONFIGURATION #################################
 ##############################################################
@@ -345,8 +345,8 @@ class NoUTurnSampler(TransitionKernel):
 
       _, _, new_step_metastate = tf.while_loop(
           cond=lambda iter_, state, metastate: (  # pylint: disable=g-long-lambda
-              ((iter_ < self.max_tree_depth) &
-               tf.reduce_any(metastate.continue_tree))),
+              (iter_ < self.max_tree_depth) &
+              tf.reduce_any(metastate.continue_tree)),
           body=lambda iter_, state, metastate: self.loop_tree_doubling(  # pylint: disable=g-long-lambda
               previous_kernel_results.step_size,
               previous_kernel_results.momentum_state_memory,
@@ -762,14 +762,28 @@ class NoUTurnSampler(TransitionKernel):
       read_instruction = current_step_meta_info.read_instruction
       init_energy = current_step_meta_info.init_energy
 
-      # Get index to write state into memory swap
-      write_index = write_instruction.gather([iter_])
-
       if GENERALIZED_UTURN:
-        state_to_write = momentum_cumsum
+        state_to_write = momentum_cumsum_previous
+        state_to_check = momentum_cumsum
       else:
         state_to_write = next_state_parts
+        state_to_check = next_state_parts
 
+      batch_shape = prefer_static.shape(next_target)
+      has_not_u_turn_init = prefer_static.ones(batch_shape, dtype=tf.bool)
+
+      read_index = read_instruction.gather([iter_])[0]
+      no_u_turns_within_tree = has_not_u_turn_at_all_index(  # pylint: disable=g-long-lambda
+          read_index,
+          directions,
+          momentum_state_memory,
+          next_momentum_parts,
+          state_to_check,
+          has_not_u_turn_init,
+          log_prob_rank=prefer_static.rank(next_target))
+
+      # Get index to write state into memory swap
+      write_index = write_instruction.gather([iter_])
       momentum_state_memory = MomentumStateSwap(
           momentum_swap=[
               tf.tensor_scatter_nd_update(old, [write_index], [new])
@@ -781,14 +795,6 @@ class NoUTurnSampler(TransitionKernel):
               for old, new in zip(momentum_state_memory.state_swap,
                                   state_to_write)
           ])
-      batch_shape = prefer_static.shape(next_target)
-      has_not_u_turn_init = tf.ones(batch_shape, dtype=tf.bool)
-
-      read_index = read_instruction.gather([iter_])[0]
-      no_u_turns_within_tree = has_not_u_turn_at_all_index(  # pylint: disable=g-long-lambda
-          read_index, directions, momentum_state_memory, next_momentum_parts,
-          state_to_write, has_not_u_turn_init,
-          log_prob_rank=prefer_static.rank(next_target))
 
       energy = compute_hamiltonian(next_target, next_momentum_parts)
       current_energy = tf.where(tf.math.is_nan(energy),
@@ -848,9 +854,10 @@ class NoUTurnSampler(TransitionKernel):
       continue_tree = not_divergent & continue_tree_previous
       continue_tree_next = no_u_turns_within_tree & continue_tree
 
-      not_divergent_tokeep = tf.where(continue_tree_previous,
-                                      not_divergent,
-                                      tf.ones(batch_shape, dtype=tf.bool))
+      not_divergent_tokeep = tf.where(
+          continue_tree_previous,
+          not_divergent,
+          prefer_static.ones(batch_shape, dtype=tf.bool))
 
       # min(1., exp(energy_diff)).
       exp_energy_diff = tf.clip_by_value(tf.exp(energy_diff), 0., 1.)
@@ -898,7 +905,8 @@ def has_not_u_turn_at_all_index(read_indexes, direction, momentum_state_memory,
     return left_current_index + 1, no_u_turns_current & no_u_turns_last
 
   _, no_u_turns_within_tree = tf.while_loop(
-      cond=lambda i, no_u_turn: i < tf.gather(read_indexes, 1),
+      cond=lambda i, no_u_turn: ((i < tf.gather(read_indexes, 1)) &  # pylint: disable=g-long-lambda
+                                 tf.reduce_any(no_u_turn)),
       body=_get_left_state_and_check_u_turn,
       loop_vars=(tf.gather(read_indexes, 0), no_u_turns_within_tree),
       parallel_iterations=TF_WHILE_PARALLEL_ITERATIONS)
@@ -980,10 +988,8 @@ def generate_efficient_write_read_instruction(instruction_array):
   # In the classical U-turn check, the writing is only at odd step and the
   # instruction follows squence A000120 (https://oeis.org/A000120)
   to_write_temp = np.sum(instruction_mat > -1, axis=0)
-  to_read_temp = np.sum(instruction_mat == 1, axis=0)
-
   write_instruction = to_write_temp - 1
-  write_instruction[to_write_temp == to_read_temp] = max(to_write_temp)
+  write_instruction[np.diag(instruction_mat) == -1] = max(to_write_temp)
 
   read_instruction = []
   for i in range(nsteps_within_tree):
