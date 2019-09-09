@@ -70,7 +70,7 @@ find_version_str() {
 install_python_packages() {
   # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
   TF_VERSION_STR=$(find_version_str tf-nightly)
-  pip install tf-nightly==$TF_VERSION_STR
+  pip install tf-nightly==$TF_VERSION_STR gast==0.2.2
 
   # The following unofficial dependencies are used only by tests.
   pip install scipy hypothesis matplotlib mock
