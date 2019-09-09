@@ -29,8 +29,11 @@ from tensorflow_probability.python.internal.backend.numpy.ops import is_tensor
 
 __all__ = [
     'argsort',
-    'sort',
     'is_tensor',
+    'sort',
+    'tensor_scatter_nd_add',
+    'tensor_scatter_nd_sub',
+    'tensor_scatter_nd_update',
     # 'clip_by_norm',
     # 'floormod',
     # 'meshgrid',
@@ -46,6 +49,9 @@ __all__ = [
     # 'unique',
     # 'unique_with_counts',
 ]
+
+
+JAX_MODE = False
 
 
 def _argsort(values, axis=-1, direction='ASCENDING', stable=False, name=None):  # pylint: disable=unused-argument
@@ -73,6 +79,39 @@ def _sort(values, axis=-1, direction='ASCENDING', stable=False, name=None):  # p
   return result
 
 
+# TODO(b/140685491): Add unit-test.
+def _tensor_scatter_nd_add(tensor, indices, updates, name=None):  # pylint: disable=unused-argument
+  """Numpy implementation of `tf.tensor_scatter_nd_add`."""
+  indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
+  if JAX_MODE:
+    import jax.ops as jaxops  # pylint: disable=g-import-not-at-top
+    return jaxops.index_add(tensor, indices, updates)
+  tensor[indices] += updates
+  return tensor
+
+
+# TODO(b/140685491): Add unit-test.
+def _tensor_scatter_nd_sub(tensor, indices, updates, name=None):  # pylint: disable=unused-argument
+  """Numpy implementation of `tf.tensor_scatter_nd_sub`."""
+  indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
+  if JAX_MODE:
+    import jax.ops as jaxops  # pylint: disable=g-import-not-at-top
+    return jaxops.index_add(tensor, indices, np.negative(updates))
+  tensor[indices] -= updates
+  return tensor
+
+
+# TODO(b/140685491): Add unit-test.
+def _tensor_scatter_nd_update(tensor, indices, updates, name=None):  # pylint: disable=unused-argument
+  """Numpy implementation of `tf.tensor_scatter_nd_update`."""
+  indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
+  if JAX_MODE:
+    import jax.ops as jaxops  # pylint: disable=g-import-not-at-top
+    return jaxops.index_update(tensor, indices, updates)
+  tensor[indices] = updates
+  return tensor
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 argsort = utils.copy_docstring(
@@ -82,3 +121,15 @@ argsort = utils.copy_docstring(
 sort = utils.copy_docstring(
     tf.sort,
     _sort)
+
+tensor_scatter_nd_add = utils.copy_docstring(
+    tf.tensor_scatter_nd_add,
+    _tensor_scatter_nd_add)
+
+tensor_scatter_nd_sub = utils.copy_docstring(
+    tf.tensor_scatter_nd_sub,
+    _tensor_scatter_nd_sub)
+
+tensor_scatter_nd_update = utils.copy_docstring(
+    tf.tensor_scatter_nd_update,
+    _tensor_scatter_nd_update)

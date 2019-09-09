@@ -55,6 +55,7 @@ FILENAMES = [
     # "matveclu",
     "normal_cdf",
     "ordered",
+    "pad",
     "permute",
     "power_transform",
     # "real_nvp",

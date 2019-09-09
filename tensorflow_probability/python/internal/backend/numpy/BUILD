@@ -229,6 +229,7 @@ py_library(
         ":_utils",
         # numpy dep,
         # tensorflow dep,
+        # wrapt dep,
     ],
 )
 

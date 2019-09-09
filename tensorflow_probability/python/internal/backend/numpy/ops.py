@@ -22,12 +22,14 @@ import functools
 
 # Dependency imports
 import numpy as np
+import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 import six
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+import wrapt
 from tensorflow.python.ops.unconnected_gradients import UnconnectedGradients  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -57,6 +59,9 @@ __all__ = [
     'Variable',
     # 'gradients',
 ]
+
+
+JAX_MODE = False
 
 
 class _NullContext(object):
@@ -182,7 +187,7 @@ broadcast_to = utils.copy_docstring(
 
 cast = utils.copy_docstring(
     tf.cast,
-    lambda x, dtype, name=None: np.array(x).astype(utils.numpy_dtype(dtype)))
+    lambda x, dtype, name=None: np.array(x, dtype=utils.numpy_dtype(dtype)))
 
 clip_by_value = utils.copy_docstring(
     tf.clip_by_value,
@@ -285,8 +290,10 @@ def dimension_at_index(shape, index):
   return Dimension(int(shape[index]))
 
 
-class NumpyVariable(object):
+class NumpyVariable(wrapt.ObjectProxy):
   """Stand-in for tf.Variable."""
+
+  __slots__ = ('initializer',)
 
   # pylint: disable=unused-argument
   def __init__(
@@ -301,23 +308,27 @@ class NumpyVariable(object):
       import_scope=None,
       constraint=None):
     assert constraint is None
-    self._value = np.array(initial_value, dtype=dtype or np.float32)
+    super(NumpyVariable, self).__init__(
+        onp.array(initial_value, dtype=dtype or onp.float32))
     self.initializer = None
-    self.dtype = dtype or self._value.dtype
-
   # pylint: enable=unused-argument
 
   def __array__(self, dtype=None):
     if dtype is not None:
-      return self._value.astype(dtype)
-    return self._value
-
-  @property
-  def shape(self):
-    return self._value.shape
+      return self.astype(dtype)
+    return self
 
   def assign(self, value):
-    self._value = np.array(value, dtype=self.dtype)
+    super(NumpyVariable, self).__init__(onp.array(value, dtype=self.dtype))
+    return self
+
+
+if JAX_MODE:
+  from jax.interpreters.xla import canonicalize_dtype_handlers  # pylint: disable=g-import-not-at-top
+  from jax.interpreters.xla import pytype_aval_mappings  # pylint: disable=g-import-not-at-top
+  canonicalize_dtype_handlers[NumpyVariable] = (
+      canonicalize_dtype_handlers[onp.ndarray])
+  pytype_aval_mappings[NumpyVariable] = pytype_aval_mappings[onp.ndarray]
 
 
 Variable = NumpyVariable

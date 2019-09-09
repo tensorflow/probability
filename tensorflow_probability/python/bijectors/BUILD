@@ -60,6 +60,7 @@ py_library(
         ":matveclu",
         ":normal_cdf",
         ":ordered",
+        ":pad",
         ":permute",
         ":power_transform",
         ":rational_quadratic_spline",
@@ -455,6 +456,20 @@ py_library(
 )
 
 py_library(
+    name = "pad",
+    srcs = ["pad.py"],
+    deps = [
+        ":bijector",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+py_library(
     name = "permute",
     srcs = ["permute.py"],
     deps = [
@@ -580,6 +595,7 @@ py_library(
     srcs = ["softmax_centered.py"],
     deps = [
         ":bijector",
+        ":pad",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
@@ -1089,6 +1105,19 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_test(
+    name = "pad_test",
+    size = "small",
+    srcs = ["pad_test.py"],
+    deps = [
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

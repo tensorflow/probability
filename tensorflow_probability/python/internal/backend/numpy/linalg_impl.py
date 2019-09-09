@@ -85,9 +85,8 @@ def _band_part(input, num_lower, num_upper, name=None):  # pylint: disable=redef
   return result
 
 
-def _cholesky_solve(chol, rhs, name=None):
+def _cholesky_solve(chol, rhs, name=None):  # pylint: disable=unused-argument
   """Scipy cho_solve does not broadcast, so we must do so explicitly."""
-  del name
   if JAX_MODE:  # But JAX uses XLA, which can do a batched solve.
     chol = chol + np.zeros(rhs.shape[:-2] + (1, 1), dtype=chol.dtype)
     rhs = rhs + np.zeros(chol.shape[:-2] + (1, 1), dtype=rhs.dtype)

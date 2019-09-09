@@ -68,7 +68,7 @@ __all__ = [
 ]
 
 
-# TODO(b/256095991): Add unit test.
+# TODO(b/136555907): Add unit-test.
 def _gather(  # pylint: disable=unused-argument
     params,
     indices,
@@ -262,8 +262,9 @@ pad = utils.copy_docstring(
 
 range = utils.copy_docstring(  # pylint: disable=redefined-builtin
     tf.range,
-    lambda start, limit=None, delta=1, dtype=None, name='range': (  # pylint: disable=g-long-lambda
-        np.arange(start, limit, delta, utils.numpy_dtype(dtype))))
+    lambda start, limit=None, delta=1, dtype=None, name='range': np.arange(  # pylint: disable=g-long-lambda
+        start, limit, delta).astype(utils.numpy_dtype(
+            dtype or np.array(start).dtype)))
 
 rank = utils.copy_docstring(
     tf.rank,
@@ -311,7 +312,9 @@ transpose = utils.copy_docstring(
 
 unstack = utils.copy_docstring(
     tf.unstack,
-    lambda value, num=None, axis=0, name=None: np.split(value, num, axis))
+    lambda value, num=None, axis=0, name='unstack': tuple(  # pylint: disable=g-long-lambda
+        np.squeeze(x, axis=axis) for x in
+        np.split(value, value.shape[axis] if num is None else num, axis)))
 
 where = utils.copy_docstring(
     tf1.where,

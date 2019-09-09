@@ -171,6 +171,7 @@ py_library(
         # decorator dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy",
     ],
 )
 
