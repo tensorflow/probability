@@ -1126,6 +1126,4 @@ class HMCEMAdaptiveStepSize(test_case.TestCase):
 
 
 if __name__ == '__main__':
-  # TODO(b/138844773): Enable this.
-  tf1.disable_control_flow_v2()
   tf.test.main()
