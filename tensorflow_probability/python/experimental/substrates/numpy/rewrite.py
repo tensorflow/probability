@@ -18,11 +18,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import sys
+if not sys.path[0].endswith('.runfiles'):
+  sys.path.pop(0)
+
+# pylint: disable=g-import-not-at-top,g-bad-import-order
 import collections
 
 # Dependency imports
 from absl import app
 from absl import flags
+# pylint: enable=g-import-not-at-top,g-bad-import-order
 
 flags.DEFINE_boolean('numpy_to_jax', False,
                      'Whether or not to rewrite numpy imports to jax.numpy')
