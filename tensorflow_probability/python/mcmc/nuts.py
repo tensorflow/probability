@@ -51,8 +51,6 @@ from tensorflow_probability.python.util.seed_stream import SeedStream
 ##############################################################
 ### BEGIN STATIC CONFIGURATION ###############################
 ##############################################################
-TF_WHILE_PARALLEL_ITERATIONS = 10     # Default: 10
-
 TREE_COUNT_DTYPE = tf.int32           # Default: tf.int32
 
 # Whether to use slice sampling (original NUTS implementation in [1]) or
@@ -164,6 +162,7 @@ class NoUTurnSampler(TransitionKernel):
                max_tree_depth=10,
                max_energy_diff=1000.,
                unrolled_leapfrog_steps=1,
+               parallel_iterations=10,
                seed=None,
                name=None):
     """Initializes this transition kernel.
@@ -188,6 +187,10 @@ class NoUTurnSampler(TransitionKernel):
       unrolled_leapfrog_steps: The number of leapfrogs to unroll per tree
         expansion step. Applies a direct linear multipler to the maximum
         trajectory length implied by max_tree_depth. Defaults to 1.
+      parallel_iterations: The number of iterations allowed to run in parallel.
+        It must be a positive integer. See `tf.while_loop` for more details.
+        Note that if you set the seed to have deterministic output you should
+        also set `parallel_iterations` to 1.
       seed: Python integer to seed the random number generator.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'nuts_kernel').
@@ -230,9 +233,11 @@ class NoUTurnSampler(TransitionKernel):
           max_tree_depth=max_tree_depth,
           max_energy_diff=max_energy_diff,
           unrolled_leapfrog_steps=unrolled_leapfrog_steps,
+          parallel_iterations=parallel_iterations,
           seed=seed,
           name=name,
       )
+      self._parallel_iterations = parallel_iterations
       self._seed_stream = SeedStream(seed, salt='nuts_one_step')
       self._unrolled_leapfrog_steps = unrolled_leapfrog_steps
       self._name = name
@@ -261,6 +266,10 @@ class NoUTurnSampler(TransitionKernel):
   @property
   def name(self):
     return self._name
+
+  @property
+  def parallel_iterations(self):
+    return self._parallel_iterations
 
   @property
   def write_instruction(self):
@@ -358,7 +367,7 @@ class NoUTurnSampler(TransitionKernel):
               tf.zeros([], dtype=tf.int32, name='iter'),
               initial_step_state,
               initial_step_metastate),
-          parallel_iterations=TF_WHILE_PARALLEL_ITERATIONS,
+          parallel_iterations=self.parallel_iterations,
       )
 
       kernel_results = NUTSKernelResults(
@@ -708,7 +717,7 @@ class NoUTurnSampler(TransitionKernel):
               not_divergence,
               momentum_state_memory,
           ),
-          parallel_iterations=TF_WHILE_PARALLEL_ITERATIONS,
+          parallel_iterations=self.parallel_iterations
       )
 
     return (
@@ -904,12 +913,13 @@ def has_not_u_turn_at_all_index(read_indexes, direction, momentum_state_memory,
         log_prob_rank)
     return left_current_index + 1, no_u_turns_current & no_u_turns_last
 
+  # Note that we dont need to set parallel_iterations arg in the while_loop
+  # below as there is no random Ops in `_get_left_state_and_check_u_turn`.
   _, no_u_turns_within_tree = tf.while_loop(
       cond=lambda i, no_u_turn: ((i < tf.gather(read_indexes, 1)) &  # pylint: disable=g-long-lambda
                                  tf.reduce_any(no_u_turn)),
       body=_get_left_state_and_check_u_turn,
-      loop_vars=(tf.gather(read_indexes, 0), no_u_turns_within_tree),
-      parallel_iterations=TF_WHILE_PARALLEL_ITERATIONS)
+      loop_vars=(tf.gather(read_indexes, 0), no_u_turns_within_tree))
   return no_u_turns_within_tree
 
 
