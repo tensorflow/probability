@@ -28,6 +28,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import warnings
+
 # pylint: disable=wildcard-import
 from tensorflow_probability.python.experimental.edward2.generated_random_variables import *
 from tensorflow_probability.python.experimental.edward2.generated_random_variables import as_random_variable
@@ -42,6 +44,11 @@ from tensorflow_probability.python.experimental.edward2.random_variable import R
 # pylint: enable=wildcard-import
 
 from tensorflow.python.util.all_util import remove_undocumented
+
+warnings.warn(
+    "tfp.edward2 module is deprecated and will be removed on "
+    "2019-12-01. Use https://github.com/google/edward2 library instead.",
+    stacklevel=5)
 
 _allowed_symbols = list(rv_dict.keys()) + [
     "RandomVariable",
