@@ -21,11 +21,11 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import positive_semidefinite_kernels as tfpk
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import psd_kernels as tfpk
 
 __all__ = [
     'GaussianProcessRegressionModel',

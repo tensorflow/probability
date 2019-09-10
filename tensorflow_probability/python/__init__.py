@@ -21,7 +21,6 @@ from __future__ import print_function
 from tensorflow_probability.python import bijectors
 from tensorflow_probability.python import debugging
 from tensorflow_probability.python import distributions
-from tensorflow_probability.python import edward2
 from tensorflow_probability.python import experimental
 from tensorflow_probability.python import glm
 from tensorflow_probability.python import layers
@@ -29,14 +28,20 @@ from tensorflow_probability.python import math
 from tensorflow_probability.python import mcmc
 from tensorflow_probability.python import monte_carlo
 from tensorflow_probability.python import optimizer
-from tensorflow_probability.python import positive_semidefinite_kernels
 from tensorflow_probability.python import stats
 from tensorflow_probability.python import sts
 from tensorflow_probability.python import trainable_distributions
 from tensorflow_probability.python import util
 from tensorflow_probability.python import vi
 
+from tensorflow.python.util import lazy_loader  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
+
+edward2 = lazy_loader.LazyLoader('edward2', globals(),
+                                 'tensorflow_probability.python.edward2')
+positive_semidefinite_kernels = lazy_loader.LazyLoader(
+    'positive_semidefinite_kernels', globals(),
+    'tensorflow_probability.python.positive_semidefinite_kernels')
 
 _allowed_symbols = [
     'bijectors',
