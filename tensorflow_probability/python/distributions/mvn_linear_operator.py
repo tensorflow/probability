@@ -245,10 +245,14 @@ class MultivariateNormalLinearOperator(
       return tf.square(self.scale.diag_part())
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
-      return tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense()))
+      return self.scale.matmul(self.scale.adjoint()).diag_part()
+    elif isinstance(self.scale, tf.linalg.LinearOperatorKronecker):
+      factors_sq_operators = [
+          factor.matmul(factor.adjoint()) for factor in self.scale.operators
+      ]
+      return tf.linalg.LinearOperatorKronecker(factors_sq_operators).diag_part()
     else:
-      return tf.linalg.diag_part(
-          self.scale.matmul(self.scale.to_dense(), adjoint_arg=True))
+      return self.scale.matmul(self.scale.adjoint()).diag_part()
 
   def _stddev(self):
     if distribution_util.is_diagonal_scale(self.scale):
