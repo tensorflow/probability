@@ -610,7 +610,7 @@ class VariationalGaussianProcess(
       self._variational_inducing_observations_posterior = (
           mvn_linear_operator.MultivariateNormalLinearOperator(
               loc=variational_inducing_observations_loc,
-              scale=tf.linalg.LinearOperatorFullMatrix(
+              scale=tf.linalg.LinearOperatorLowerTriangular(
                   variational_inducing_observations_scale),
               name='variational_inducing_observations_posterior'))
 
