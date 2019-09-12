@@ -310,6 +310,7 @@ class SeasonalWithMultipleStepsAndNoiseTest(test_case.TestCase,
   def _build_sts(self, observed_time_series=None):
     day_of_week = tfp.sts.Seasonal(num_seasons=7,
                                    num_steps_per_season=24,
+                                   allow_drift=False,
                                    observed_time_series=observed_time_series,
                                    name='day_of_week')
     return tfp.sts.Sum(components=[day_of_week],
@@ -330,6 +331,19 @@ class SmoothSeasonalTest(test_case.TestCase, _StsTestHarness):
     return SmoothSeasonal(period=42,
                           frequency_multipliers=[1, 2, 4],
                           observed_time_series=observed_time_series)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class SmoothSeasonalWithNoDriftTest(test_case.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    smooth_seasonal = SmoothSeasonal(period=42,
+                                     frequency_multipliers=[1, 2, 4],
+                                     allow_drift=False,
+                                     observed_time_series=observed_time_series)
+    # The test harness doesn't like models with no parameters, so wrap with Sum.
+    return tfp.sts.Sum([smooth_seasonal],
+                       observed_time_series=observed_time_series)
 
 
 @test_util.run_all_in_graph_and_eager_modes

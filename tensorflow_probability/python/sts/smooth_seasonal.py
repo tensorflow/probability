@@ -364,6 +364,7 @@ class SmoothSeasonal(StructuralTimeSeries):
   def __init__(self,
                period,
                frequency_multipliers,
+               allow_drift=True,
                drift_scale_prior=None,
                initial_state_prior=None,
                observed_time_series=None,
@@ -382,6 +383,13 @@ class SmoothSeasonal(StructuralTimeSeries):
         2, ..., floor(period / 2)]`. However, it is often desirable to enforce a
         smoothness assumption (and reduce the computational burden) by dropping
         some of the higher frequencies.
+      allow_drift: optional Python `bool` specifying whether the seasonal
+        effects can drift over time.  Setting this to `False`
+        removes the `drift_scale` parameter from the model. This is
+        mathematically equivalent to
+        `drift_scale_prior = tfd.Deterministic(0.)`, but removing drift
+        directly is preferred because it avoids the use of a degenerate prior.
+        Default value: `True`.
       drift_scale_prior: optional `tfd.Distribution` instance specifying a prior
         on the `drift_scale` parameter. If `None`, a heuristic default prior is
         constructed based on the provided `observed_time_series`.
@@ -428,14 +436,23 @@ class SmoothSeasonal(StructuralTimeSeries):
       self._period = period
       self._frequency_multipliers = frequency_multipliers
 
+      parameters = []
+      if allow_drift:
+        parameters.append(Parameter(
+            'drift_scale', drift_scale_prior,
+            tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
+                       tfb.Softplus()])))
+      self._allow_drift = allow_drift
+
       super(SmoothSeasonal, self).__init__(
-          parameters=[
-              Parameter('drift_scale', drift_scale_prior,
-                        tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
-                                   tfb.Softplus()])),
-          ],
+          parameters=parameters,
           latent_size=latent_size,
           name=name)
+
+  @property
+  def allow_drift(self):
+    """Whether the seasonal effects are allowed to drift over time."""
+    return self._allow_drift
 
   @property
   def period(self):
@@ -460,6 +477,9 @@ class SmoothSeasonal(StructuralTimeSeries):
 
     if initial_state_prior is None:
       initial_state_prior = self.initial_state_prior
+
+    if not self.allow_drift:
+      param_map['drift_scale'] = 0.
 
     return SmoothSeasonalStateSpaceModel(
         num_timesteps=num_timesteps,
