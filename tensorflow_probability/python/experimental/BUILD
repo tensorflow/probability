@@ -34,5 +34,6 @@ py_library(
         "//tensorflow_probability/python/experimental/edward2",
         "//tensorflow_probability/python/experimental/mcmc",
         "//tensorflow_probability/python/experimental/substrates",
+        "//tensorflow_probability/python/experimental/vi",
     ],
 )

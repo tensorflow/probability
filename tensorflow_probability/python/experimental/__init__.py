@@ -35,6 +35,7 @@ from tensorflow_probability.python.experimental import auto_batching
 from tensorflow_probability.python.experimental import edward2
 from tensorflow_probability.python.experimental import mcmc
 from tensorflow_probability.python.experimental import substrates
+from tensorflow_probability.python.experimental import vi
 
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
@@ -43,6 +44,7 @@ _allowed_symbols = [
     'edward2',
     'mcmc',
     'substrates',
+    'vi',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)
