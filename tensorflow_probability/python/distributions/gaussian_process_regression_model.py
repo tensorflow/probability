@@ -172,7 +172,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
 
     where
 
-    loc = k(t, x) @ inv(k(x, x) + v * I) @ (y - loc)
+    loc = k(t, x) @ inv(k(x, x) + v * I) @ f(x)
     cov = k(t, t) - k(t, x) @ inv(k(x, x) + v * I) @ k(x, t)
   ```
 
