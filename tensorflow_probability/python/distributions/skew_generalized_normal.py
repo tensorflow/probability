@@ -18,7 +18,7 @@ __all__ = [
 ]
 
 
-class SkewGeneralizedNormal(Normal, Distribution):
+class SkewGeneralizedNormal(Distribution):
   '''
   The skew-generalized normal distribution.
   Also known as the generalized Gaussian distribution of the second type.
@@ -64,7 +64,7 @@ class SkewGeneralizedNormal(Normal, Distribution):
             [self._loc, self._scale, self._peak]
         )
 
-    super(Normal, self).__init__(
+    super(SkewGeneralizedNormal, self).__init__(
         dtype=dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
