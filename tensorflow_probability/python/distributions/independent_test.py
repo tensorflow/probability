@@ -19,33 +19,39 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 from scipy import stats as sp_stats
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-tfd = tfp.distributions
-
-
 @test_util.run_all_in_graph_and_eager_modes
-class IndependentDistributionTest(tf.test.TestCase):
+class IndependentDistributionTest(test_case.TestCase):
 
   def setUp(self):
+    super(IndependentDistributionTest, self).setUp()
     self._rng = np.random.RandomState(42)
+
+  def assertRaises(self, error_class, msg):
+    if tf.executing_eagerly():
+      return self.assertRaisesRegexp(error_class, msg)
+    return self.assertRaisesOpError(msg)
 
   def testSampleAndLogProbUnivariate(self):
     loc = np.float32([-1., 1])
     scale = np.float32([0.1, 0.5])
     ind = tfd.Independent(
         distribution=tfd.Normal(loc=loc, scale=scale),
-        reinterpreted_batch_ndims=1)
+        reinterpreted_batch_ndims=1,
+        validate_args=True)
 
     x = ind.sample([4, 5], seed=tfp_test_util.test_seed(hardcoded_seed=42))
     log_prob_x = ind.log_prob(x)
@@ -66,7 +72,8 @@ class IndependentDistributionTest(tf.test.TestCase):
     ind = tfd.Independent(
         distribution=tfd.MultivariateNormalDiag(
             loc=loc, scale_identity_multiplier=scale),
-        reinterpreted_batch_ndims=1)
+        reinterpreted_batch_ndims=1,
+        validate_args=True)
 
     x = ind.sample([4, 5], seed=tfp_test_util.test_seed())
     log_prob_x = ind.log_prob(x)
@@ -85,7 +92,8 @@ class IndependentDistributionTest(tf.test.TestCase):
   def testCdfMultivariate(self):
     ind = tfd.Independent(
         distribution=tfd.Normal(loc=tf.zeros([3]), scale=1.),
-        reinterpreted_batch_ndims=1)
+        reinterpreted_batch_ndims=1,
+        validate_args=True)
 
     cdfs = ind.cdf([[-50., 0., 0.], [0., 0., 0.], [50., 0., 0.], [50., 0., 50.],
                     [50., 50., 50.]])
@@ -103,7 +111,8 @@ class IndependentDistributionTest(tf.test.TestCase):
     ind = tfd.Independent(
         distribution=tfd.MultivariateNormalDiag(
             loc=loc, scale_identity_multiplier=scale),
-        reinterpreted_batch_ndims=1)
+        reinterpreted_batch_ndims=1,
+        validate_args=True)
 
     x = ind.sample(int(n_samp), seed=tfp_test_util.test_seed(hardcoded_seed=42))
     sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
@@ -140,12 +149,13 @@ class IndependentDistributionTest(tf.test.TestCase):
     self.assertAllClose(sample_entropy_, actual_entropy_, rtol=0.01, atol=0.)
     self.assertAllClose(loc, actual_mode_, rtol=1e-6, atol=0.)
 
-  def test_event_ndims_is_static_when_possible(self):
+  def testEventNdimsIsStaticWhenPossible(self):
     ind = tfd.Independent(
         distribution=tfd.Normal(
             loc=tf1.placeholder_with_default(input=[2.], shape=None),
             scale=tf1.placeholder_with_default(input=1., shape=None)),
-        reinterpreted_batch_ndims=1)
+        reinterpreted_batch_ndims=1,
+        validate_args=True)
     # Even though `event_shape` is not static, event_ndims must equal
     # `reinterpreted_batch_ndims + rank(distribution.event_shape)`.
     self.assertEqual(tensorshape_util.rank(ind.event_shape), 1)
@@ -154,37 +164,61 @@ class IndependentDistributionTest(tf.test.TestCase):
     ind1 = tfd.Independent(
         distribution=tfd.Normal(
             loc=np.float32([-1., 1]), scale=np.float32([0.1, 0.5])),
-        reinterpreted_batch_ndims=1)
+        reinterpreted_batch_ndims=1,
+        validate_args=True)
     ind2 = tfd.Independent(
         distribution=tfd.Normal(
             loc=np.float32(-1), scale=np.float32(0.5)),
-        reinterpreted_batch_ndims=0)
+        reinterpreted_batch_ndims=0, validate_args=True)
 
     with self.assertRaisesRegexp(
-        ValueError, "Event shapes do not match"):
+        ValueError, 'Event shapes do not match'):
       tfd.kl_divergence(ind1, ind2)
 
     ind1 = tfd.Independent(
         distribution=tfd.Normal(
             loc=np.float32([-1., 1]), scale=np.float32([0.1, 0.5])),
-        reinterpreted_batch_ndims=1)
+        reinterpreted_batch_ndims=1, validate_args=True)
     ind2 = tfd.Independent(
         distribution=tfd.MultivariateNormalDiag(
             loc=np.float32([-1., 1]), scale_diag=np.float32([0.1, 0.5])),
-        reinterpreted_batch_ndims=0)
+        reinterpreted_batch_ndims=0, validate_args=True)
 
     with self.assertRaisesRegexp(
-        NotImplementedError, "different event shapes"):
+        NotImplementedError, 'different event shapes'):
       tfd.kl_divergence(ind1, ind2)
+
+  def testKlWithDynamicShapes(self):
+    dist1 = tfd.Independent(
+        tfd.Normal(loc=np.zeros((4, 5, 2, 3)), scale=1., validate_args=True),
+        reinterpreted_batch_ndims=2, validate_args=True)
+
+    loc2 = tf.Variable(np.zeros((4, 5, 2, 3)), shape=tf.TensorShape(None))
+    scale2 = tf.Variable(np.ones([]), shape=tf.TensorShape(None))
+    ndims2 = tf.Variable(2, trainable=False, shape=tf.TensorShape(None))
+    dist2 = tfd.Independent(
+        tfd.Normal(loc=loc2, scale=scale2, validate_args=True),
+        reinterpreted_batch_ndims=ndims2, validate_args=True)
+
+    self.evaluate([v.initializer for v in dist1.variables]
+                  + [v.initializer for v in dist2.variables])
+    kl = self.evaluate(dist1.kl_divergence(dist2))
+    self.assertAllEqual((4, 5), kl.shape)
+
+    with tf.control_dependencies([loc2.assign(np.zeros((4, 5, 3, 2)))]):
+      with self.assertRaisesRegexp(Exception, 'Event shapes do not match'):
+        self.evaluate(dist1.kl_divergence(dist2))
 
   def testKLScalarToMultivariate(self):
     normal1 = tfd.Normal(
         loc=np.float32([-1., 1]), scale=np.float32([0.1, 0.5]))
-    ind1 = tfd.Independent(distribution=normal1, reinterpreted_batch_ndims=1)
+    ind1 = tfd.Independent(distribution=normal1, reinterpreted_batch_ndims=1,
+                           validate_args=True)
 
     normal2 = tfd.Normal(
         loc=np.float32([-3., 3]), scale=np.float32([0.3, 0.3]))
-    ind2 = tfd.Independent(distribution=normal2, reinterpreted_batch_ndims=1)
+    ind2 = tfd.Independent(distribution=normal2, reinterpreted_batch_ndims=1,
+                           validate_args=True)
 
     normal_kl = tfd.kl_divergence(normal1, normal2)
     ind_kl = tfd.kl_divergence(ind1, ind2)
@@ -197,13 +231,15 @@ class IndependentDistributionTest(tf.test.TestCase):
         loc=np.float32([-1., 1]), scale=np.float32([0.1, 0.5]))
     # This is functionally just a wrapper around normal1,
     # and doesn't change any outputs.
-    ind1 = tfd.Independent(distribution=normal1, reinterpreted_batch_ndims=0)
+    ind1 = tfd.Independent(distribution=normal1, reinterpreted_batch_ndims=0,
+                           validate_args=True)
 
     normal2 = tfd.Normal(
         loc=np.float32([-3., 3]), scale=np.float32([0.3, 0.3]))
     # This is functionally just a wrapper around normal2,
     # and doesn't change any outputs.
-    ind2 = tfd.Independent(distribution=normal2, reinterpreted_batch_ndims=0)
+    ind2 = tfd.Independent(distribution=normal2, reinterpreted_batch_ndims=0,
+                           validate_args=True)
 
     normal_kl = tfd.kl_divergence(normal1, normal2)
     ind_kl = tfd.kl_divergence(ind1, ind2)
@@ -215,14 +251,16 @@ class IndependentDistributionTest(tf.test.TestCase):
     mvn1 = tfd.MultivariateNormalDiag(
         loc=np.float32([[[[-1., 1, 3.], [2., 4., 3.]]]]),
         scale_diag=np.float32([[[0.2, 0.1, 5.], [2., 3., 4.]]]))
-    ind1 = tfd.Independent(distribution=mvn1, reinterpreted_batch_ndims=2)
+    ind1 = tfd.Independent(distribution=mvn1, reinterpreted_batch_ndims=2,
+                           validate_args=True)
 
     # (1, 1, 2) batch of MVNDiag
     mvn2 = tfd.MultivariateNormalDiag(
         loc=np.float32([[[[-2., 3, 2.], [1., 3., 2.]]]]),
         scale_diag=np.float32([[[0.1, 0.5, 3.], [1., 2., 1.]]]))
 
-    ind2 = tfd.Independent(distribution=mvn2, reinterpreted_batch_ndims=2)
+    ind2 = tfd.Independent(distribution=mvn2, reinterpreted_batch_ndims=2,
+                           validate_args=True)
 
     mvn_kl = tfd.kl_divergence(mvn1, mvn2)
     ind_kl = tfd.kl_divergence(ind1, ind2)
@@ -243,7 +281,7 @@ class IndependentDistributionTest(tf.test.TestCase):
     logits_ph = tf1.placeholder_with_default(
         input=logits, shape=logits.shape if static_shape else None)
     ind = tfd.Independent(
-        distribution=tfd.Bernoulli(logits=logits_ph))
+        distribution=tfd.Bernoulli(logits=logits_ph), validate_args=True)
     x = ind.sample(sample_shape, seed=tfp_test_util.test_seed())
     log_prob_x = ind.log_prob(x)
     [
@@ -289,7 +327,7 @@ class IndependentDistributionTest(tf.test.TestCase):
     rank(underlying.batch_shape)-1 to take over, which we don't want in the
     slice case.
     """
-    d = tfd.Independent(tfd.Bernoulli(logits=0))
+    d = tfd.Independent(tfd.Bernoulli(logits=0), validate_args=True)
     self.assertAllEqual([], d[...].batch_shape)
     self.assertAllEqual([], d[...].event_shape)
     self.assertAllEqual([1], d[tf.newaxis].batch_shape)
@@ -300,20 +338,22 @@ class IndependentDistributionTest(tf.test.TestCase):
     self.assertAllEqual([], d[tf.newaxis, ..., tf.newaxis].event_shape)
 
   def testSlicingGeneral(self):
-    d = tfd.Independent(tfd.Bernoulli(logits=tf.zeros([5, 6])))
+    d = tfd.Independent(tfd.Bernoulli(logits=tf.zeros([5, 6])),
+                        validate_args=True)
     self.assertAllEqual([5], d.batch_shape)
     self.assertAllEqual([6], d.event_shape)
     self.assertAllEqual([1, 5], d[tf.newaxis].batch_shape)
     self.assertAllEqual([6], d[tf.newaxis].event_shape)
 
-    d = tfd.Independent(tfd.Bernoulli(logits=tf.zeros([4, 5, 6])))
+    d = tfd.Independent(tfd.Bernoulli(logits=tf.zeros([4, 5, 6])),
+                        validate_args=True)
     self.assertAllEqual([4], d.batch_shape)
     self.assertAllEqual([5, 6], d.event_shape)
     self.assertAllEqual([1, 3], d[tf.newaxis, ..., :3].batch_shape)
     self.assertAllEqual([5, 6], d[tf.newaxis, ..., :3].event_shape)
 
     d = tfd.Independent(tfd.Bernoulli(logits=tf.zeros([4, 5, 6])),
-                        reinterpreted_batch_ndims=1)
+                        reinterpreted_batch_ndims=1, validate_args=True)
     self.assertAllEqual([4, 5], d.batch_shape)
     self.assertAllEqual([6], d.event_shape)
     self.assertAllEqual([1, 4, 3], d[tf.newaxis, ..., :3].batch_shape)
@@ -326,11 +366,11 @@ class IndependentDistributionTest(tf.test.TestCase):
         super(IndepBern1d, self).__init__(tfd.Bernoulli(logits=logits,
                                                         dtype=tf.float32),
                                           reinterpreted_batch_ndims=1)
-        self._parameters = {"logits": logits}
+        self._parameters = {'logits': logits}
 
     d = IndepBern1d(tf.zeros([4, 5, 6]))
     with self.assertRaisesRegexp(NotImplementedError,
-                                 "does not support batch slicing"):
+                                 'does not support batch slicing'):
       d[:3]  # pylint: disable=pointless-statement
 
     class IndepBern1dSliceable(IndepBern1d):
@@ -342,6 +382,115 @@ class IndependentDistributionTest(tf.test.TestCase):
     self.assertAllEqual([3, 5], d_sliceable[:3].batch_shape)
     self.assertAllEqual([6], d_sliceable[:3].event_shape)
 
+  def testGradientsThroughParams(self):
+    loc = tf.Variable(np.zeros((4, 5, 2, 3)), shape=tf.TensorShape(None))
+    scale = tf.Variable(np.ones([]), shape=tf.TensorShape(None))
+    ndims = tf.Variable(2, trainable=False, shape=tf.TensorShape(None))
+    dist = tfd.Independent(
+        tfd.Logistic(loc=loc, scale=scale),
+        reinterpreted_batch_ndims=ndims, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -dist.log_prob(np.zeros((4, 5, 2, 3)))
+    grad = tape.gradient(loss, dist.trainable_variables)
+    self.assertLen(grad, 2)
+    self.assertAllNotNone(grad)
 
-if __name__ == "__main__":
+  def testExcessiveConcretizationOfParams(self):
+    loc = tfp_hps.defer_and_count_usage(
+        tf.Variable(np.zeros((4, 2, 2)), shape=tf.TensorShape(None)))
+    scale = tfp_hps.defer_and_count_usage(
+        tf.Variable(np.ones([]), shape=tf.TensorShape(None)))
+    ndims = tf.Variable(1, trainable=False, shape=tf.TensorShape(None))
+    dist = tfd.Independent(
+        tfd.Logistic(loc=loc, scale=scale, validate_args=True),
+        reinterpreted_batch_ndims=ndims, validate_args=True)
+
+    # TODO(b/140579567): All methods of `dist` may require four concretizations
+    # of parameters `loc` and `scale`:
+    #  - `Independent._parameter_control_dependencies` calls
+    #    `Logistic.batch_shape_tensor`, which:
+    #    * Reads `loc`, `scale` in `Logistic._parameter_control_dependencies`.
+    #    * Reads `loc`, `scale` in `Logistic._batch_shape_tensor`.
+    #  - The method `dist.m` will call `dist.self.m`, which:
+    #    * Reads `loc`, `scale` in `Logistic._parameter_control_dependencies`.
+    #    * Reads `loc`, `scale` in the implementation of method  `Logistic._m`.
+    #
+    # NOTE: If `dist.distribution` had dynamic batch shape and event shape,
+    # there could be two more reads of the parameters of `dist.distribution`
+    # in `dist.event_shape_tensor`, from calling
+    # `dist.distribution.event_shape_tensor()`.
+
+    for method in ('batch_shape_tensor', 'event_shape_tensor',
+                   'mode', 'stddev', 'sample', 'entropy'):
+      with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=4):
+        getattr(dist, method)()
+
+    for method in ('log_prob', 'log_cdf', 'prob', 'cdf'):
+      with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=4):
+        getattr(dist, method)(np.zeros((3, 4, 2, 2)))
+
+    # `Distribution.survival_function` and `Distribution.log_survival_function`
+    # will call `Distribution.cdf` and `Distribution.log_cdf`, resulting in
+    # one additional call to `Independent._parameter_control_dependencies`,
+    # and thus two additional concretizations of the parameters.
+
+    for method in ('survival_function', 'log_survival_function'):
+      with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=6):
+        getattr(dist, method)(np.zeros((3, 4, 2, 2)))
+
+  def testExcessiveConcretizationWithDefaultReinterpretedBatchNdims(self):
+    loc = tfp_hps.defer_and_count_usage(
+        tf.Variable(np.zeros((5, 2, 3)), shape=tf.TensorShape(None)))
+    scale = tfp_hps.defer_and_count_usage(
+        tf.Variable(np.ones([]), shape=tf.TensorShape(None)))
+    dist = tfd.Independent(
+        tfd.Logistic(loc=loc, scale=scale, validate_args=True),
+        reinterpreted_batch_ndims=None, validate_args=True)
+
+    for method in ('batch_shape_tensor', 'event_shape_tensor',
+                   'mean', 'variance', 'sample'):
+      with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=4):
+        getattr(dist, method)()
+
+    # In addition to the four reads of `loc`, `scale` described above in
+    # `testExcessiveConcretizationOfParams`, the methods below have two more
+    # reads of these parameters -- from computing a default value for
+    # `reinterpreted_batch_ndims`, which requires calling
+    # `dist.distribution.batch_shape_tensor()`.
+
+    for method in ('log_prob', 'log_cdf', 'prob', 'cdf'):
+      with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=6):
+        getattr(dist, method)(np.zeros((4, 5, 2, 3)))
+
+    with tfp_hps.assert_no_excessive_var_usage('entropy', max_permissible=6):
+      dist.entropy()
+
+    # `Distribution.survival_function` and `Distribution.log_survival_function`
+    # will call `Distribution.cdf` and `Distribution.log_cdf`, resulting in
+    # one additional call to `Independent._parameter_control_dependencies`,
+    # and thus two additional concretizations of the parameters.
+
+    for method in ('survival_function', 'log_survival_function'):
+      with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=8):
+        getattr(dist, method)(np.zeros((4, 5, 2, 3)))
+
+  def testChangingVariableShapes(self):
+    if not tf.executing_eagerly():
+      return
+
+    loc = tf.Variable(np.zeros((4, 5, 2, 3)), shape=tf.TensorShape(None))
+    scale = tf.Variable(np.ones([]), shape=tf.TensorShape(None))
+    dist = tfd.Independent(
+        tfd.Logistic(loc=loc, scale=scale),
+        reinterpreted_batch_ndims=None, validate_args=True)
+
+    self.assertAllEqual((4,), dist.batch_shape_tensor())
+
+    loc.assign(np.zeros((3, 7, 1, 1, 1)))
+    self.assertAllEqual((3,), dist.batch_shape_tensor())
+    self.assertAllEqual(
+        (2, 3), tf.shape(dist.log_prob(np.zeros((2, 3, 7, 1, 1, 1)))))
+
+
+if __name__ == '__main__':
   tf.test.main()

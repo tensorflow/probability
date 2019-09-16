@@ -19,13 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
-
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -104,7 +104,7 @@ class _GLMTestHarness(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BernoulliTest(tf.test.TestCase, _GLMTestHarness):
+class BernoulliTest(test_case.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -114,7 +114,7 @@ class BernoulliTest(tf.test.TestCase, _GLMTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BernoulliNormalCDFTest(tf.test.TestCase, _GLMTestHarness):
+class BernoulliNormalCDFTest(test_case.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -129,7 +129,7 @@ class BernoulliNormalCDFTest(tf.test.TestCase, _GLMTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GammaExpTest(tf.test.TestCase, _GLMTestHarness):
+class GammaExpTest(test_case.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -141,7 +141,7 @@ class GammaExpTest(tf.test.TestCase, _GLMTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GammaSoftplusTest(tf.test.TestCase, _GLMTestHarness):
+class GammaSoftplusTest(test_case.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -153,7 +153,7 @@ class GammaSoftplusTest(tf.test.TestCase, _GLMTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LogNormalTest(tf.test.TestCase, _GLMTestHarness):
+class LogNormalTest(test_case.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -163,7 +163,7 @@ class LogNormalTest(tf.test.TestCase, _GLMTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LogNormalSoftplusTest(tf.test.TestCase, _GLMTestHarness):
+class LogNormalSoftplusTest(test_case.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -173,7 +173,7 @@ class LogNormalSoftplusTest(tf.test.TestCase, _GLMTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NormalTest(tf.test.TestCase, _GLMTestHarness):
+class NormalTest(test_case.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -183,7 +183,7 @@ class NormalTest(tf.test.TestCase, _GLMTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NormalReciprocalTest(tf.test.TestCase, _GLMTestHarness):
+class NormalReciprocalTest(test_case.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -193,7 +193,7 @@ class NormalReciprocalTest(tf.test.TestCase, _GLMTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PoissonTest(tf.test.TestCase, _GLMTestHarness):
+class PoissonTest(test_case.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -203,7 +203,7 @@ class PoissonTest(tf.test.TestCase, _GLMTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PoissonSoftplusTest(tf.test.TestCase, _GLMTestHarness):
+class PoissonSoftplusTest(test_case.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32

@@ -28,13 +28,14 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 
 class Chi(transformed_distribution.TransformedDistribution):
   """Chi distribution.
 
   The Chi distribution is defined over nonnegative real numbers and uses a
-  degrees of freedom ("df") parameter.
+  degrees of freedom ('df') parameter.
 
   #### Mathematical Details
 
@@ -62,7 +63,7 @@ class Chi(transformed_distribution.TransformedDistribution):
                df,
                validate_args=False,
                allow_nan_stats=True,
-               name="Chi"):
+               name='Chi'):
     """Construct Chi distributions with parameter `df`.
 
     Args:
@@ -81,20 +82,16 @@ class Chi(transformed_distribution.TransformedDistribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      df = tf.convert_to_tensor(
-          df,
-          name="df",
-          dtype=dtype_util.common_dtype([df], dtype_hint=tf.float32))
-      validation_assertions = (
-          [assert_util.assert_positive(df)] if validate_args else [])
-      with tf.control_dependencies(validation_assertions):
-        self._df = tf.identity(df, name="df")
-
+      dtype = dtype_util.common_dtype([df], dtype_hint=tf.float32)
+      self._df = tensor_util.convert_nonref_to_tensor(
+          df, name='df', dtype=dtype)
       super(Chi, self).__init__(
           distribution=chi2.Chi2(df=self._df,
                                  validate_args=validate_args,
                                  allow_nan_stats=allow_nan_stats),
-          bijector=invert_bijector.Invert(square_bijector.Square()),
+          bijector=invert_bijector.Invert(
+              square_bijector.Square(validate_args=validate_args)),
+          validate_args=validate_args,
           parameters=parameters,
           name=name)
 
@@ -107,17 +104,29 @@ class Chi(transformed_distribution.TransformedDistribution):
     """Distribution parameter for degrees of freedom."""
     return self._df
 
-  def _mean(self):
-    return np.sqrt(2) * tf.exp(
-        tf.math.lgamma(0.5 * (self.df + 1)) - tf.math.lgamma(0.5 * self.df))
+  def _mean(self, df=None):
+    df = tf.convert_to_tensor(self.df if df is None else df)
+    return np.sqrt(2.) * tf.exp(
+        tf.math.lgamma(0.5 * (df + 1.)) - tf.math.lgamma(0.5 * df))
 
   def _variance(self):
-    return self.df - tf.square(self._mean())
+    df = tf.convert_to_tensor(self.df)
+    return df - self._mean(df) ** 2
 
   def _entropy(self):
-    return (tf.math.lgamma(self.df / 2) + 0.5 *
-            (self.df - np.log(2) -
-             (self.df - 1) * tf.math.digamma(0.5 * self.df)))
+    df = tf.convert_to_tensor(self.df)
+    return (tf.math.lgamma(0.5 * df) +
+            0.5 * (df - np.log(2.) -
+                   (df - 1.) * tf.math.digamma(0.5 * df)))
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_ref(self._df):
+      assertions.append(assert_util.assert_positive(
+          self._df, message='Argument `df` must be positive.'))
+    return assertions
 
 
 @kullback_leibler.RegisterKL(Chi, Chi)
@@ -128,15 +137,17 @@ def _kl_chi_chi(a, b, name=None):
     a: instance of a Chi distribution object.
     b: instance of a Chi distribution object.
     name: (optional) Name to use for created operations.
-      default is "kl_chi_chi".
+      default is 'kl_chi_chi'.
 
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name or "kl_chi_chi"):
+  with tf.name_scope(name or 'kl_chi_chi'):
+    a_df = tf.convert_to_tensor(a.df)
+    b_df = tf.convert_to_tensor(b.df)
     # Consistent with
     # https://mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 118
     # The paper introduces an additional scaling parameter; setting that
     # parameter to 1 and simplifying yields the expression we use here.
-    return (0.5 * tf.math.digamma(0.5 * a.df) * (a.df - b.df) +
-            tf.math.lgamma(0.5 * b.df) - tf.math.lgamma(0.5 * a.df))
+    return (0.5 * tf.math.digamma(0.5 * a_df) * (a_df - b_df) +
+            tf.math.lgamma(0.5 * b_df) - tf.math.lgamma(0.5 * a_df))

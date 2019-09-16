@@ -19,14 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 
-import tensorflow as tf
+import numpy as np
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-tfd = tfp.distributions
 
 
 def create_dataset():
@@ -76,7 +76,7 @@ negloglik = lambda y, rv_y: -rv_y.log_prob(y)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DenseVariationalLayerTest(tf.test.TestCase):
+class DenseVariationalLayerTest(test_case.TestCase):
 
   def test_end_to_end(self):
     # Get dataset.
@@ -89,7 +89,7 @@ class DenseVariationalLayerTest(tf.test.TestCase):
     ])
 
     # Do inference.
-    model.compile(optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.05),
+    model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.05),
                   loss=negloglik)
     model.fit(x, y, epochs=2, verbose=False)
 

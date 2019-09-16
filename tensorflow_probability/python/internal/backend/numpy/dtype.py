@@ -21,22 +21,20 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal.backend.numpy.internal import utils
+from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
 
 __all__ = [
     'as_dtype',
     'bool',
-    'complex',
     'complex128',
     'complex64',
     'double',
     'float16',
     'float32',
     'float64',
-    'half',
     'int16',
     'int32',
     'int64',
@@ -64,9 +62,9 @@ as_dtype = utils.copy_docstring(
     lambda type_value: np.dtype(  # pylint: disable=g-long-lambda
         type_value.name if hasattr(type_value, 'name') else type_value).type)
 
-bool = np.bool  # pylint: disable=redefined-builtin
+real_dtype = lambda dtype: np.real(np.zeros((0,), dtype=as_dtype(dtype))).dtype
 
-complex = np.complex  # pylint: disable=redefined-builtin
+bool = np.bool  # pylint: disable=redefined-builtin
 
 complex128 = np.complex128
 
@@ -80,8 +78,6 @@ float32 = np.float32
 
 float64 = np.float64
 
-half = np.half
-
 int16 = np.int16
 
 int32 = np.int32
@@ -90,7 +86,8 @@ int64 = np.int64
 
 int8 = np.int8
 
-string = np.str
+# Handle version drift between internal/external/jax numpy.
+string = getattr(np, 'str', getattr(np, 'string', None))
 
 uint16 = np.uint16
 

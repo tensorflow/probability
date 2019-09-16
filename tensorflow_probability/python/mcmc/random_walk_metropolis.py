@@ -21,12 +21,13 @@ from __future__ import print_function
 import collections
 # Dependency imports
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -87,14 +88,14 @@ def random_walk_normal_fn(scale=1., name=None):
     Raises:
       ValueError: if `scale` does not broadcast with `state_parts`.
     """
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'random_walk_normal_fn', values=[state_parts, scale, seed]):
       scales = scale if mcmc_util.is_list_like(scale) else [scale]
       if len(scales) == 1:
         scales *= len(state_parts)
       if len(state_parts) != len(scales):
         raise ValueError('`scale` must broadcast with `state_parts`.')
-      seed_stream = distributions.SeedStream(seed, salt='RandomWalkNormalFn')
+      seed_stream = SeedStream(seed, salt='RandomWalkNormalFn')
       next_state_parts = [
           tf.random.normal(
               mean=state_part,
@@ -149,14 +150,14 @@ def random_walk_uniform_fn(scale=1., name=None):
     Raises:
       ValueError: if `scale` does not broadcast with `state_parts`.
     """
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'random_walk_uniform_fn', values=[state_parts, scale, seed]):
       scales = scale if mcmc_util.is_list_like(scale) else [scale]
       if len(scales) == 1:
         scales *= len(state_parts)
       if len(state_parts) != len(scales):
         raise ValueError('`scale` must broadcast with `state_parts`.')
-      seed_stream = distributions.SeedStream(seed, salt='RandomWalkUniformFn')
+      seed_stream = SeedStream(seed, salt='RandomWalkUniformFn')
       next_state_parts = [
           tf.random.uniform(
               minval=state_part - scale_part,
@@ -315,7 +316,7 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
     cauchy = tfd.Cauchy(loc=dtype(0), scale=dtype(scale))
     def _fn(state_parts, seed):
       next_state_parts = []
-      seed_stream  = tfd.SeedStream(seed, salt='RandomCauchy')
+      seed_stream  = tfp.util.SeedStream(seed, salt='RandomCauchy')
       for sp in state_parts:
         next_state_parts.append(sp + cauchy.sample(
           sample_shape=sp.shape, seed=seed_stream()))
@@ -466,8 +467,7 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
       new_state_fn = random_walk_normal_fn()
 
     self._target_log_prob_fn = target_log_prob_fn
-    self._seed_stream = distributions.SeedStream(
-        seed, salt='RandomWalkMetropolis')
+    self._seed_stream = SeedStream(seed, salt='RandomWalkMetropolis')
     self._name = name
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,
@@ -502,12 +502,12 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(RandomWalkMetropolis.one_step.__doc__)
   def one_step(self, current_state, previous_kernel_results):
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name=mcmc_util.make_name(self.name, 'rwm', 'one_step'),
         values=[
             self.seed, current_state, previous_kernel_results.target_log_prob
         ]):
-      with tf.compat.v1.name_scope('initialize'):
+      with tf1.name_scope('initialize'):
         if mcmc_util.is_list_like(current_state):
           current_state_parts = list(current_state)
         else:
@@ -537,7 +537,7 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(RandomWalkMetropolis.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
-    with tf.compat.v1.name_scope(self.name, 'rwm_bootstrap_results',
+    with tf1.name_scope(self.name, 'rwm_bootstrap_results',
                                  [init_state]):
       if not mcmc_util.is_list_like(init_state):
         init_state = [init_state]

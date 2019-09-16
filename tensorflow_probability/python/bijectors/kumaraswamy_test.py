@@ -21,12 +21,12 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -73,7 +73,7 @@ class KumaraswamyTest(test_case.TestCase):
         upper_x=1.,
         eval_func=self.evaluate,
         n=int(10e3),
-        rtol=0.02)
+        rtol=0.05)
 
   def testBijectiveAndFinite(self):
     concentration1 = 1.2
@@ -90,10 +90,11 @@ class KumaraswamyTest(test_case.TestCase):
         bijector, x, y, eval_func=self.evaluate, event_ndims=0,
         rtol=1e-3)
 
+  @tfp_test_util.jax_disable_variable_test
   def testVariableConcentration1(self):
     x = tf.Variable(1.)
     b = tfb.Kumaraswamy(concentration0=1., concentration1=x, validate_args=True)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(x.initializer)
     self.assertIs(x, b.concentration1)
     self.assertEqual((), self.evaluate(b.forward(1.)).shape)
     with self.assertRaisesOpError(
@@ -101,10 +102,11 @@ class KumaraswamyTest(test_case.TestCase):
       with tf.control_dependencies([x.assign(-1.)]):
         self.assertEqual((), self.evaluate(b.forward(1.)).shape)
 
+  @tfp_test_util.jax_disable_variable_test
   def testVariableConcentration0(self):
     x = tf.Variable(1.)
     b = tfb.Kumaraswamy(concentration0=x, concentration1=1., validate_args=True)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(x.initializer)
     self.assertIs(x, b.concentration0)
     self.assertEqual((), self.evaluate(b.forward(1.)).shape)
     with self.assertRaisesOpError(
@@ -114,7 +116,7 @@ class KumaraswamyTest(test_case.TestCase):
 
   def testShapeGetterRaisesException(self):
     x = tf.Variable(-1.)
-    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(x.initializer)
     with self.assertRaisesOpError(
         'Argument `concentration1` must be positive.'):
       b = tfb.Kumaraswamy(concentration0=1.,
@@ -128,6 +130,8 @@ class KumaraswamyTest(test_case.TestCase):
                           validate_args=True)
       self.evaluate(b.forward_event_shape_tensor(tf.constant([1, 2, 3])))
 
+  @tfp_test_util.numpy_disable_gradient_test
+  @tfp_test_util.jax_disable_variable_test
   def testGradient(self):
     x = tf.Variable(1.)
     y = tf.Variable(2.)

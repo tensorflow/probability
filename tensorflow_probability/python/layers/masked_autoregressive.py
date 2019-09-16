@@ -19,12 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
-# By importing `distributions` as `tfd`, docstrings will show
-# `tfd.Distribution`. We import `bijectors` the same way, for consistency.
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import masked_autoregressive as masked_autoregressive_lib
+from tensorflow_probability.python.distributions import transformed_distribution as transformed_distribution_lib
 
 from tensorflow_probability.python.layers.distribution_layer import DistributionLambda
 
@@ -66,6 +64,7 @@ class AutoregressiveTransform(DistributionLambda):
   ```python
   tfd = tfp.distributions
   tfpl = tfp.layers
+  tfb = tfp.bijectors
   tfk = tf.keras
 
   # Generate data -- as in Figure 1 in [Papamakarios et al. (2017)][1]).
@@ -82,7 +81,7 @@ class AutoregressiveTransform(DistributionLambda):
       #
       # For conditional density estimation, the model would take the
       # conditioning values as input.)
-      tfkl.InputLayer(input_shape=(0,), dtype=tf.float32),
+      tfk.layers.InputLayer(input_shape=(0,), dtype=tf.float32),
 
       # Given the empty input, return a standard normal distribution with
       # matching batch_shape and event_shape of [2].
@@ -145,7 +144,7 @@ class AutoregressiveTransform(DistributionLambda):
     super(AutoregressiveTransform, self).build(input_shape)
 
   def _transform(self, distribution):
-    return tfd.TransformedDistribution(
-        bijector=tfb.MaskedAutoregressiveFlow(
+    return transformed_distribution_lib.TransformedDistribution(
+        bijector=masked_autoregressive_lib.MaskedAutoregressiveFlow(
             lambda x: tf.unstack(self._made(x), axis=-1)),
         distribution=distribution)

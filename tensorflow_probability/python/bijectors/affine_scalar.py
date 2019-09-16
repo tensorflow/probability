@@ -97,11 +97,11 @@ class AffineScalar(bijector.Bijector):
         raise ValueError('At most one of `scale` and `log_scale` should be '
                          'specified')
 
-      self._shift = tensor_util.convert_immutable_to_tensor(
+      self._shift = tensor_util.convert_nonref_to_tensor(
           shift, dtype=dtype, name='shift')
-      self._scale = tensor_util.convert_immutable_to_tensor(
+      self._scale = tensor_util.convert_nonref_to_tensor(
           scale, dtype=dtype, name='scale')
-      self._log_scale = tensor_util.convert_immutable_to_tensor(
+      self._log_scale = tensor_util.convert_nonref_to_tensor(
           log_scale, dtype=dtype, name='log_scale')
 
       super(AffineScalar, self).__init__(
@@ -143,7 +143,7 @@ class AffineScalar(bijector.Bijector):
     if self.scale is not None:
       x = x / self.scale
     if self.log_scale is not None:
-      x = x / tf.exp(self.log_scale)
+      x = x * tf.exp(-self.log_scale)
     return x
 
   def _forward_log_det_jacobian(self, x):
@@ -152,17 +152,17 @@ class AffineScalar(bijector.Bijector):
     elif self.scale is not None:
       return tf.math.log(tf.abs(self.scale))
     else:
-    # is_constant_jacobian = True for this bijector, hence the
-    # `log_det_jacobian` need only be specified for a single input, as this will
-    # be tiled to match `event_ndims`.
-      return tf.constant(0., dtype=dtype_util.base_dtype(x.dtype))
+      # is_constant_jacobian = True for this bijector, hence the
+      # `log_det_jacobian` need only be specified for a single input, as this
+      # will be tiled to match `event_ndims`.
+      return tf.zeros([], dtype=x.dtype)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
     assertions = []
     if (self.scale is not None and
-        is_init != tensor_util.is_mutable(self.scale)):
+        is_init != tensor_util.is_ref(self.scale)):
       assertions.append(
           assert_util.assert_none_equal(
               self.scale,

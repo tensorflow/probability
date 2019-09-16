@@ -44,6 +44,7 @@ py_library(
         ":root_search",
         ":sparse",
         "//tensorflow_probability/python/math/ode",
+        "//tensorflow_probability/python/math/psd_kernels",
     ],
 )
 
@@ -68,6 +69,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -81,6 +83,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -116,6 +119,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -143,6 +147,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -167,6 +172,7 @@ py_test(
     size = "medium",
     srcs = ["linalg_test.py"],
     shard_count = 5,
+    tags = ["hypothesis"],
     deps = [
         # absl/testing:parameterized dep,
         # hypothesis dep,
@@ -174,6 +180,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -197,6 +204,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -247,6 +255,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -270,6 +279,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -293,6 +303,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -316,5 +327,6 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )

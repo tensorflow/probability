@@ -19,11 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
-import tensorflow as tf
-from tensorflow_probability.python import bijectors as tfb
 
+import numpy as np
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_case
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -218,7 +221,7 @@ class _ReshapeBijectorTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
+class ReshapeBijectorTestStatic(test_case.TestCase, _ReshapeBijectorTest):
 
   def build_shapes(self, shape_in, shape_out):
     return shape_in, shape_out
@@ -313,15 +316,15 @@ class ReshapeBijectorTestStatic(tf.test.TestCase, _ReshapeBijectorTest):
         "(Input to reshape|Cannot reshape a tensor with|cannot reshape array)")
 
 
-class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
+class ReshapeBijectorTestDynamic(test_case.TestCase, _ReshapeBijectorTest):
 
   def build_shapes(self, shape_in, shape_out):
     shape_in = np.array(shape_in, np.int32)
     shape_out = np.array(shape_out, np.int32)
     return (
-        tf.compat.v1.placeholder_with_default(
+        tf1.placeholder_with_default(
             shape_in, shape=[len(shape_in)]),
-        tf.compat.v1.placeholder_with_default(
+        tf1.placeholder_with_default(
             shape_out, shape=[len(shape_out)]),
     )
 
@@ -382,7 +385,7 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
 
   def testUnknownShapeRank(self):
     if tf.executing_eagerly(): return
-    unknown_shape = tf.compat.v1.placeholder_with_default([2, 2], shape=None)
+    unknown_shape = tf1.placeholder_with_default([2, 2], shape=None)
     known_shape = [2, 2]
 
     with self.assertRaisesRegexp(NotImplementedError,
@@ -392,6 +395,13 @@ class ReshapeBijectorTestDynamic(tf.test.TestCase, _ReshapeBijectorTest):
     with self.assertRaisesRegexp(NotImplementedError,
                                  "must be statically known."):
       tfb.Reshape(event_shape_out=known_shape, event_shape_in=unknown_shape)
+
+  def testScalarInVectorOut(self):
+    bijector = tfb.Reshape(event_shape_in=[], event_shape_out=[-1])
+    self.assertAllEqual(np.zeros([3, 4, 5, 1]),
+                        self.evaluate(bijector.forward(np.zeros([3, 4, 5]))))
+    self.assertAllEqual(np.zeros([3, 4, 5]),
+                        self.evaluate(bijector.inverse(np.zeros([3, 4, 5, 1]))))
 
 
 if __name__ == "__main__":

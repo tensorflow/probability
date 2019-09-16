@@ -22,13 +22,15 @@ import numpy as np
 from scipy.stats import special_ortho_group
 
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DifferentialEvolutionTest(tf.test.TestCase):
+class DifferentialEvolutionTest(test_case.TestCase):
   """Tests for Differential Evolution optimization algorithm."""
 
   def test_quadratic_bowl_2d(self):

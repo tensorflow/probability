@@ -18,12 +18,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import independent as independent_lib
+from tensorflow_probability.python.distributions import kullback_leibler as kl_lib
+from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.layers import util as tfp_layers_util
 from tensorflow_probability.python.math import random_rademacher
+from tensorflow_probability.python.util import SeedStream
 
 
 __all__ = [
@@ -98,11 +101,12 @@ class _DenseVariational(tf.keras.layers.Layer):
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
-      kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
-      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),  # pylint: disable=line-too-long
+      kernel_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
+      bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
+          is_singular=True),
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
-      bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      bias_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -148,7 +152,6 @@ class _DenseVariational(tf.keras.layers.Layer):
       self.kernel_prior = self.kernel_prior_fn(
           dtype, [in_size, self.units], 'kernel_prior',
           self.trainable, self.add_variable)
-    self._built_kernel_divergence = False
 
     if self.bias_posterior_fn is None:
       self.bias_posterior = None
@@ -163,7 +166,6 @@ class _DenseVariational(tf.keras.layers.Layer):
       self.bias_prior = self.bias_prior_fn(
           dtype, [self.units], 'bias_prior',
           self.trainable, self.add_variable)
-    self._built_bias_divergence = False
 
     self.built = True
 
@@ -174,20 +176,18 @@ class _DenseVariational(tf.keras.layers.Layer):
     outputs = self._apply_variational_bias(outputs)
     if self.activation is not None:
       outputs = self.activation(outputs)  # pylint: disable=not-callable
-    if not self._built_kernel_divergence:
-      self._apply_divergence(self.kernel_divergence_fn,
-                             self.kernel_posterior,
-                             self.kernel_prior,
-                             self.kernel_posterior_tensor,
-                             name='divergence_kernel')
-      self._built_kernel_divergence = True
-    if not self._built_bias_divergence:
-      self._apply_divergence(self.bias_divergence_fn,
-                             self.bias_posterior,
-                             self.bias_prior,
-                             self.bias_posterior_tensor,
-                             name='divergence_bias')
-      self._built_bias_divergence = True
+    self._apply_divergence(
+        self.kernel_divergence_fn,
+        self.kernel_posterior,
+        self.kernel_prior,
+        self.kernel_posterior_tensor,
+        name='divergence_kernel')
+    self._apply_divergence(
+        self.bias_divergence_fn,
+        self.bias_posterior,
+        self.bias_prior,
+        self.bias_posterior_tensor,
+        name='divergence_bias')
     return outputs
 
   def compute_output_shape(self, input_shape):
@@ -393,12 +393,12 @@ class DenseReparameterization(_DenseVariational):
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
-      kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      kernel_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
           is_singular=True),
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
-      bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      bias_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -476,8 +476,8 @@ class DenseLocalReparameterization(_DenseVariational):
   import tensorflow_probability as tfp
 
   model = tf.keras.Sequential([
-      tfp.layers.DenseReparameterization(512, activation=tf.nn.relu),
-      tfp.layers.DenseReparameterization(10),
+      tfp.layers.DenseLocalReparameterization(512, activation=tf.nn.relu),
+      tfp.layers.DenseLocalReparameterization(10),
   ])
 
   logits = model(features)
@@ -515,12 +515,12 @@ class DenseLocalReparameterization(_DenseVariational):
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
-      kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      kernel_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
           is_singular=True),
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
-      bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      bias_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       **kwargs):
     # pylint: disable=g-doc-args
     """Construct layer.
@@ -545,14 +545,14 @@ class DenseLocalReparameterization(_DenseVariational):
         **kwargs)
 
   def _apply_variational_kernel(self, inputs):
-    if (not isinstance(self.kernel_posterior, tfd.Independent) or
-        not isinstance(self.kernel_posterior.distribution, tfd.Normal)):
+    if (not isinstance(self.kernel_posterior, independent_lib.Independent) or
+        not isinstance(self.kernel_posterior.distribution, normal_lib.Normal)):
       raise TypeError(
           '`DenseLocalReparameterization` requires '
           '`kernel_posterior_fn` produce an instance of '
           '`tfd.Independent(tfd.Normal)` '
           '(saw: \"{}\").'.format(self.kernel_posterior.name))
-    self.kernel_posterior_affine = tfd.Normal(
+    self.kernel_posterior_affine = normal_lib.Normal(
         loc=self._matmul(inputs, self.kernel_posterior.distribution.loc),
         scale=tf.sqrt(self._matmul(
             tf.square(inputs),
@@ -640,12 +640,12 @@ class DenseFlipout(_DenseVariational):
       kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
       kernel_posterior_tensor_fn=lambda d: d.sample(),
       kernel_prior_fn=tfp_layers_util.default_multivariate_normal_fn,
-      kernel_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      kernel_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(
           is_singular=True),
       bias_posterior_tensor_fn=lambda d: d.sample(),
       bias_prior_fn=None,
-      bias_divergence_fn=lambda q, p, ignore: tfd.kl_divergence(q, p),
+      bias_divergence_fn=lambda q, p, ignore: kl_lib.kl_divergence(q, p),
       seed=None,
       **kwargs):
     # pylint: disable=g-doc-args
@@ -675,14 +675,14 @@ class DenseFlipout(_DenseVariational):
     self.seed = seed
 
   def _apply_variational_kernel(self, inputs):
-    if (not isinstance(self.kernel_posterior, tfd.Independent) or
-        not isinstance(self.kernel_posterior.distribution, tfd.Normal)):
+    if (not isinstance(self.kernel_posterior, independent_lib.Independent) or
+        not isinstance(self.kernel_posterior.distribution, normal_lib.Normal)):
       raise TypeError(
           '`DenseFlipout` requires '
           '`kernel_posterior_fn` produce an instance of '
           '`tfd.Independent(tfd.Normal)` '
           '(saw: \"{}\").'.format(self.kernel_posterior.name))
-    self.kernel_posterior_affine = tfd.Normal(
+    self.kernel_posterior_affine = normal_lib.Normal(
         loc=tf.zeros_like(self.kernel_posterior.distribution.loc),
         scale=self.kernel_posterior.distribution.scale)
     self.kernel_posterior_affine_tensor = (
@@ -692,7 +692,7 @@ class DenseFlipout(_DenseVariational):
     input_shape = tf.shape(input=inputs)
     batch_shape = input_shape[:-1]
 
-    seed_stream = tfd.SeedStream(self.seed, salt='DenseFlipout')
+    seed_stream = SeedStream(self.seed, salt='DenseFlipout')
 
     sign_input = random_rademacher(
         input_shape,

@@ -18,15 +18,15 @@
 from absl.testing import parameterized
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-tfd = tfp.distributions
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-tfl = tf.linalg
 
 
-class VariationalInferenceTests(tf.test.TestCase):
+class _VariationalInferenceTests(object):
 
   def _build_model(self, observed_time_series):
     day_of_week = tfp.sts.Seasonal(
@@ -39,51 +39,75 @@ class VariationalInferenceTests(tf.test.TestCase):
     return tfp.sts.Sum(components=[day_of_week, local_linear_trend],
                        observed_time_series=observed_time_series)
 
-  def test_multiple_inits_example(self):
+  def test_basic_variational_fitting(self):
     batch_shape = [2, 3]
     num_timesteps = 5
     num_inits = 10
-    observed_time_series = np.random.randn(
-        *(batch_shape + [num_timesteps])).astype(np.float32)
+    observed_time_series = self._build_tensor(np.random.randn(
+        *(batch_shape + [num_timesteps])))
 
     model = self._build_model(observed_time_series)
 
-    def build_variational_loss():
-      (variational_loss, _) = tfp.sts.build_factored_variational_loss(
-          model=model,
-          observed_time_series=observed_time_series,
-          init_batch_shape=num_inits)
-      return variational_loss
+    variational_posterior = tfp.sts.build_factored_surrogate_posterior(
+        model, batch_shape=num_inits)
+    loss_curve = tfp.vi.fit_surrogate_posterior(
+        model.joint_log_prob(observed_time_series),
+        surrogate_posterior=variational_posterior,
+        sample_size=3,
+        num_steps=10,
+        optimizer=tf1.train.AdamOptimizer(learning_rate=0.1))
+    self.evaluate(tf1.global_variables_initializer())
+    with tf.control_dependencies([loss_curve]):
+      posterior_samples = variational_posterior.sample(10)
+    loss_curve_, _ = self.evaluate((loss_curve, posterior_samples))
+    self.assertLess(np.mean(loss_curve_[-1]), np.mean(loss_curve_[0]))
 
-    # We provide graph- and eager-mode optimization for TF 2.0 compatibility.
-    optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=0.1)
-    if tf.executing_eagerly():
-      for _ in range(5):  # don't actually run to completion
-        optimizer.minimize(build_variational_loss)
-      # Draw multiple samples to reduce Monte Carlo error in the optimized
-      # variational bounds.
-      avg_loss = np.mean(
-          [self.evaluate(build_variational_loss()) for _ in range(25)], axis=0)
-    else:
-      variational_loss = build_variational_loss()
-      train_op = optimizer.minimize(variational_loss)
-      self.evaluate(tf.compat.v1.global_variables_initializer())
-      for _ in range(5):  # don't actually run to completion
-        _ = self.evaluate(train_op)
-      # Draw multiple samples to reduce Monte Carlo error in the optimized
-      # variational bounds.
-      avg_loss = np.mean(
-          [self.evaluate(variational_loss) for _ in range(25)], axis=0)
-    self.assertAllEqual(avg_loss.shape, [num_inits] + batch_shape)
+  def test_custom_eager_optimization_loop(self):
+    if not tf.executing_eagerly():
+      return
+
+    batch_shape = [2, 3]
+    num_timesteps = 5
+    observed_time_series = self._build_tensor(np.random.randn(
+        *(batch_shape + [num_timesteps])))
+
+    model = self._build_model(observed_time_series)
+
+    surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
+        model=model)
+    self.assertLen(surrogate_posterior.trainable_variables,
+                   len(model.parameters) * 2)  # Loc and scale for each param.
+
+    @tf.function(autograph=False)  # Ensure the loss is computed efficiently
+    def loss_fn(sample_size=3):
+      return tfp.vi.monte_carlo_variational_loss(
+          model.joint_log_prob(observed_time_series),
+          surrogate_posterior,
+          sample_size=sample_size)
+
+    initial_loss = self.evaluate(loss_fn(sample_size=10))
+
+    # TODO(b/137299119) Replace with TF2 optimizer.
+    optimizer = tf1.train.AdamOptimizer(learning_rate=0.1)
+    for _ in range(10):
+      with tf.GradientTape() as tape:
+        loss = loss_fn()
+      grads = tape.gradient(loss, surrogate_posterior.trainable_variables)
+      self.evaluate(optimizer.apply_gradients(
+          zip(grads, surrogate_posterior.trainable_variables)))
+
+    final_loss = self.evaluate(loss_fn(sample_size=10))
+    self.assertAllEqual(final_loss.shape, batch_shape)
+    self.assertLess(np.mean(final_loss), np.mean(initial_loss))
 
   def test_init_is_valid_for_large_observations(self):
     num_timesteps = 20
-    observed_time_series = (
-        -1e8 + 1e6 * np.random.randn(num_timesteps)).astype(np.float32)
+    observed_time_series = self._build_tensor(
+        -1e8 + 1e6 * np.random.randn(num_timesteps))
     model = self._build_model(observed_time_series)
     variational_loss, _ = tfp.sts.build_factored_variational_loss(
         model=model, observed_time_series=observed_time_series)
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     loss_ = self.evaluate(variational_loss)
     self.assertTrue(np.isfinite(loss_))
 
@@ -92,6 +116,37 @@ class VariationalInferenceTests(tf.test.TestCase):
     # not 'incorrect' as such, but if your change makes the next line fail,
     # you have probably done something questionable.
     self.assertLessEqual(loss_, 10000)
+
+  def _build_tensor(self, ndarray, dtype=None):
+    """Convert a numpy array to a TF placeholder.
+
+    Args:
+      ndarray: any object convertible to a numpy array via `np.asarray()`.
+      dtype: optional `dtype`.
+
+    Returns:
+      placeholder: a TensorFlow `placeholder` with default value given by the
+      provided `ndarray`, dtype given by `self.dtype` (if not specified), and
+      shape specified statically only if `self.use_static_shape` is `True`.
+    """
+
+    ndarray = np.asarray(ndarray).astype(self.dtype if dtype is None else dtype)
+    return tf1.placeholder_with_default(
+        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class VariationalInferenceTestsStatic64(test_case.TestCase,
+                                        _VariationalInferenceTests):
+  dtype = np.float64
+  use_static_shape = True
+
+
+# This test runs in graph mode only to reduce test weight.
+class VariationalInferenceTestsDynamic32(test_case.TestCase,
+                                         _VariationalInferenceTests):
+  dtype = np.float32
+  use_static_shape = False
 
 
 class _HMCTests(object):
@@ -120,7 +175,7 @@ class _HMCTests(object):
         num_warmup_steps=2,
         num_variational_steps=2)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     samples_, kernel_results_ = self.evaluate((samples, kernel_results))
 
     acceptance_rate = np.mean(
@@ -162,7 +217,7 @@ class _HMCTests(object):
         num_warmup_steps=2,
         num_variational_steps=2)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     samples_, kernel_results_ = self.evaluate((samples, kernel_results))
 
     acceptance_rate = np.mean(
@@ -213,12 +268,12 @@ class _HMCTests(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype if dtype is None else dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HMCTestsStatic32(tf.test.TestCase, parameterized.TestCase, _HMCTests):
+class HMCTestsStatic32(test_case.TestCase, parameterized.TestCase, _HMCTests):
   dtype = np.float32
   use_static_shape = True
 
@@ -245,7 +300,7 @@ class HMCTestsStatic32(tf.test.TestCase, parameterized.TestCase, _HMCTests):
         num_warmup_steps=1,
         num_variational_steps=1)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     for parameter, parameter_samples in zip(model.parameters, samples):
       self.assertAllEqual(self._shape_as_list(parameter_samples),
                           [num_results] +
@@ -255,13 +310,13 @@ class HMCTestsStatic32(tf.test.TestCase, parameterized.TestCase, _HMCTests):
 
 
 # This test runs in graph mode only to reduce test weight.
-class HMCTestsDynamic32(tf.test.TestCase, _HMCTests):
+class HMCTestsDynamic32(test_case.TestCase, _HMCTests):
   dtype = np.float32
   use_static_shape = False
 
 
 # This test runs in graph mode only to reduce test weight.
-class HMCTestsStatic64(tf.test.TestCase, _HMCTests):
+class HMCTestsStatic64(test_case.TestCase, _HMCTests):
   dtype = np.float64
   use_static_shape = True
 

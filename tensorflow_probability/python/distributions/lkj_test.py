@@ -19,19 +19,18 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,
-
-
-tfd = tfp.distributions
 
 
 def _det_ok_mask(x, det_bounds, input_output_cholesky=False):
@@ -75,7 +74,7 @@ volume_bounds = {
 
 @test_util.run_all_in_graph_and_eager_modes
 @parameterized.parameters(np.float32, np.float64)
-class LKJTest(parameterized.TestCase, tf.test.TestCase):
+class LKJTest(parameterized.TestCase, test_case.TestCase):
 
   def testNormConst2D(self, dtype):
     expected = 2.
@@ -357,8 +356,25 @@ class LKJTest(parameterized.TestCase, tf.test.TestCase):
         0.08)
     self.evaluate([check1, check2])
 
+  def testValidateConcentration(self, dtype):
+    dimension = 3
+    concentration = tf.Variable(0.5, dtype=dtype)
+    d = tfd.LKJ(dimension, concentration, validate_args=True)
+    with self.assertRaisesOpError('Argument `concentration` must be >= 1.'):
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.sample())
 
-class LKJTestGraphOnly(tf.test.TestCase):
+  def testValidateConcentrationAfterMutation(self, dtype):
+    dimension = 3
+    concentration = tf.Variable(1.5, dtype=dtype)
+    d = tfd.LKJ(dimension, concentration, validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
+    with self.assertRaisesOpError('Argument `concentration` must be >= 1.'):
+      with tf.control_dependencies([concentration.assign(0.5)]):
+        self.evaluate(d.mean())
+
+
+class LKJTestGraphOnly(test_case.TestCase):
 
   def testDimensionGuardDynamicShape(self):
     if tf.executing_eagerly():

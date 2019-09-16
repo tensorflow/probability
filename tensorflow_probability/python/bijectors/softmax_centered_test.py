@@ -19,13 +19,16 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -33,7 +36,7 @@ rng = np.random.RandomState(42)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SoftmaxCenteredBijectorTest(tf.test.TestCase):
+class SoftmaxCenteredBijectorTest(test_case.TestCase):
   """Tests correctness of the Y = g(X) = exp(X) / sum(exp(X)) transformation."""
 
   def testBijectorVector(self):
@@ -44,7 +47,7 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
     self.assertAllClose(y, self.evaluate(softmax.forward(x)))
     self.assertAllClose(x, self.evaluate(softmax.inverse(y)))
     self.assertAllClose(
-        -np.sum(np.log(y), axis=1),
+        -np.sum(np.log(y), axis=1) - 0.5 * np.log(4.)[np.newaxis, ...],
         self.evaluate(softmax.inverse_log_det_jacobian(y, event_ndims=1)),
         atol=0.,
         rtol=1e-7)
@@ -65,7 +68,7 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
     self.assertAllClose(y_, self.evaluate(softmax.forward(x)))
     self.assertAllClose(x_, self.evaluate(softmax.inverse(y)))
     self.assertAllClose(
-        -np.sum(np.log(y_), axis=1),
+        -np.sum(np.log(y_), axis=1) - 0.5 * np.log(4.)[np.newaxis, ...],
         self.evaluate(softmax.inverse_log_det_jacobian(y, event_ndims=1)),
         atol=0.,
         rtol=1e-7)
@@ -126,6 +129,20 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
     y = y.T  # y.shape = [5, 3]
     bijector_test_util.assert_bijective_and_finite(
         softmax, x, y, eval_func=self.evaluate, event_ndims=1)
+
+  @tfp_test_util.numpy_disable_gradient_test
+  def testTheoreticalFldj(self):
+    softmax = tfb.SoftmaxCentered()
+    x = np.linspace(-15, 15, num=10).reshape(5, 2).astype(np.float64)
+
+    fldj = softmax.forward_log_det_jacobian(x, event_ndims=1)
+    fldj_theoretical = bijector_test_util.get_fldj_theoretical(
+        softmax, x, event_ndims=1)
+    self.assertAllClose(
+        self.evaluate(fldj_theoretical),
+        self.evaluate(fldj),
+        atol=1e-5,
+        rtol=1e-5)
 
 
 if __name__ == "__main__":

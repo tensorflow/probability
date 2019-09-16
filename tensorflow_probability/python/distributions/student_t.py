@@ -23,13 +23,13 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -173,11 +173,11 @@ class StudentT(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([df, loc, scale], tf.float32)
-      self._df = tensor_util.convert_immutable_to_tensor(
+      self._df = tensor_util.convert_nonref_to_tensor(
           df, name='df', dtype=dtype)
-      self._loc = tensor_util.convert_immutable_to_tensor(
+      self._loc = tensor_util.convert_nonref_to_tensor(
           loc, name='loc', dtype=dtype)
-      self._scale = tensor_util.convert_immutable_to_tensor(
+      self._scale = tensor_util.convert_nonref_to_tensor(
           scale, name='scale', dtype=dtype)
       dtype_util.assert_same_float_dtype((self._df, self._loc, self._scale))
       super(StudentT, self).__init__(
@@ -244,7 +244,7 @@ class StudentT(distribution.Distribution):
     scale = tf.convert_to_tensor(self.scale)
     batch_shape = self._batch_shape_tensor(df=df, loc=loc, scale=scale)
     shape = tf.concat([[n], batch_shape], 0)
-    seed = seed_stream.SeedStream(seed, 'student_t')
+    seed = SeedStream(seed, 'student_t')
 
     normal_sample = tf.random.normal(shape, dtype=self.dtype, seed=seed())
     df = df * tf.ones(batch_shape, dtype=self.dtype)
@@ -353,7 +353,7 @@ class StudentT(distribution.Distribution):
     if not self.validate_args:
       return []
     assertions = []
-    if is_init != tensor_util.is_mutable(self._df):
+    if is_init != tensor_util.is_ref(self._df):
       assertions.append(assert_util.assert_positive(
           self._df, message='Argument `df` must be positive.'))
     return assertions

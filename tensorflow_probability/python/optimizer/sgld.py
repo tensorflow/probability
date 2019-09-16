@@ -18,7 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -31,7 +32,7 @@ __all__ = [
 ]
 
 
-class StochasticGradientLangevinDynamics(tf.compat.v2.optimizers.Optimizer):
+class StochasticGradientLangevinDynamics(tf.optimizers.Optimizer):
   """An optimizer module for stochastic gradient Langevin dynamics.
 
   This implements the preconditioned Stochastic Gradient Langevin Dynamics
@@ -67,8 +68,8 @@ class StochasticGradientLangevinDynamics(tf.compat.v2.optimizers.Optimizer):
     # Loss is defined through the Cholesky decomposition
     chol = tf.linalg.cholesky(true_cov)
 
-    var_1 = tf.compat.v2.Variable(name='var_1', initial_value=[1., 1.])
-    var_2 = tf.compat.v2.Variable(name='var_2', initial_value=[1.])
+    var_1 = tf.Variable(name='var_1', initial_value=[1., 1.])
+    var_2 = tf.Variable(name='var_2', initial_value=[1.])
 
     def loss_fn():
       var = tf.concat([var_1, var_2], axis=-1)
@@ -76,7 +77,7 @@ class StochasticGradientLangevinDynamics(tf.compat.v2.optimizers.Optimizer):
       return tf.linalg.matvec(loss_part, var, transpose_a=True)
 
     # Set up the learning rate with a polynomial decay
-    step = tf.compat.v2.Variable(0, dtype=tf.int64)
+    step = tf.Variable(0, dtype=tf.int64)
     starter_learning_rate = .3
     end_learning_rate = 1e-4
     decay_steps = 1e4
@@ -154,7 +155,7 @@ class StochasticGradientLangevinDynamics(tf.compat.v2.optimizers.Optimizer):
                name=None,
                parallel_iterations=10):
     default_name = 'StochasticGradientLangevinDynamics'
-    with tf.compat.v1.name_scope(name, default_name, [
+    with tf1.name_scope(name, default_name, [
         learning_rate, preconditioner_decay_rate, data_size, burnin,
         diagonal_bias
     ]):
@@ -180,31 +181,31 @@ class StochasticGradientLangevinDynamics(tf.compat.v2.optimizers.Optimizer):
       self._parallel_iterations = parallel_iterations
 
       self._preconditioner_decay_rate = distribution_util.with_dependencies([
-          tf.compat.v1.assert_non_negative(
+          tf1.assert_non_negative(
               self._preconditioner_decay_rate,
               message='`preconditioner_decay_rate` must be non-negative'),
-          tf.compat.v1.assert_less_equal(
+          tf1.assert_less_equal(
               self._preconditioner_decay_rate,
               1.,
               message='`preconditioner_decay_rate` must be at most 1.'),
       ], self._preconditioner_decay_rate)
 
       self._data_size = distribution_util.with_dependencies([
-          tf.compat.v1.assert_greater(
+          tf1.assert_greater(
               self._data_size,
               0,
               message='`data_size` must be greater than zero')
       ], self._data_size)
 
       self._burnin = distribution_util.with_dependencies([
-          tf.compat.v1.assert_non_negative(
+          tf1.assert_non_negative(
               self._burnin, message='`burnin` must be non-negative'),
-          tf.compat.v1.assert_integer(
+          tf1.assert_integer(
               self._burnin, message='`burnin` must be an integer')
       ], self._burnin)
 
       self._diagonal_bias = distribution_util.with_dependencies([
-          tf.compat.v1.assert_non_negative(
+          tf1.assert_non_negative(
               self._diagonal_bias,
               message='`diagonal_bias` must be non-negative')
       ], self._diagonal_bias)
@@ -226,7 +227,7 @@ class StochasticGradientLangevinDynamics(tf.compat.v2.optimizers.Optimizer):
     # want to decay the learning rate dynamically.
     self._learning_rate_tensor = distribution_util.with_dependencies(
         [
-            tf.compat.v1.assert_non_negative(
+            tf1.assert_non_negative(
                 self._learning_rate,
                 message='`learning_rate` must be non-negative')
         ],
@@ -261,7 +262,7 @@ class StochasticGradientLangevinDynamics(tf.compat.v2.optimizers.Optimizer):
   def _apply_noisy_update(self, mom, grad, var, indices=None):
     # Compute and apply the gradient update following
     # preconditioned Langevin dynamics
-    stddev = tf.compat.v1.where(
+    stddev = tf1.where(
         tf.squeeze(self.iterations > tf.cast(self._burnin, tf.int64)),
         tf.cast(tf.math.rsqrt(self._learning_rate), grad.dtype),
         tf.zeros([], grad.dtype))

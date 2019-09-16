@@ -116,8 +116,27 @@ It also includes example scripts such as:
 To install the latest version, run the following:
 
 ```shell
-# Installing with the `--upgrade` flag ensures you'll get the latest version.
-pip install --user --upgrade tensorflow-probability  # depends on tensorflow (CPU-only)
+# Notes:
+# - We recommend that users move towards using TensorFlow 2.x as soon as
+#   possible. Until the TF2 stable package is released (due in Sep. 2019),
+#   the best way to use TFP with TF2 is to use nightly TFP and TF2 packages:
+#     - Nightly TFP: [tfp-nightly](http://pypi.python.org/pypi/tfp-nightly)
+#     - Nightly TF2: [tf-nightly-2.0-preview](http://pypi.python.org/pypi/tf-nightly-2.0-preview)
+#   Once the TF2 stable release comes out, TFP will issue its 0.8.0 release,
+#   which will be tested and stable against TF 2.0.0.
+# - You need the latest version of `pip` in order to get the latest version of
+#   `tf-nightly-2.0-preview`.
+# - For GPU TF, use `tf-nightly-2.0-preview-gpu`.
+# - The `--upgrade` flag ensures you'll get the latest version.
+# - The `--user` flag ensures the packages are installed to your user directory
+#   rather than the system directory.
+python -m pip install pip --upgrade --user
+python -m pip install tf-nightly-2.0-preview tfp-nightly --upgrade --user
+TFVERSION=$(python -c 'import tensorflow; print(tensorflow.__version__)')
+# If you have an older pip, you might get this older version of
+# tf-nightly-2.0-preview, so check to be sure.
+[[ $TFVERSION == '2.0.0-dev20190731' ]] &&
+  echo >&2 "Failed to install the most recent TF. Found: ${TFVERSION}."
 ```
 
 TensorFlow Probability depends on a recent stable release of

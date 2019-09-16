@@ -20,23 +20,24 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions.internal import moving_stats
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MovingReduceMeanVarianceTest(tf.test.TestCase):
+class MovingReduceMeanVarianceTest(test_case.TestCase):
 
   def test_assign_moving_mean_variance(self):
     shape = [1, 2]
     true_mean = np.array([[0., 3.]])
     true_stddev = np.array([[1.1, 0.5]])
     # Start "x" out with this mean.
-    mean_var = tf.compat.v2.Variable(tf.zeros_like(true_mean))
-    variance_var = tf.compat.v2.Variable(tf.ones_like(true_stddev))
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    mean_var = tf.Variable(tf.zeros_like(true_mean))
+    variance_var = tf.Variable(tf.ones_like(true_stddev))
+    self.evaluate([mean_var.initializer, variance_var.initializer])
 
     def body(it):
       x = tf.random.normal(shape, dtype=np.float64, seed=17)
@@ -46,7 +47,7 @@ class MovingReduceMeanVarianceTest(tf.test.TestCase):
       self.assertEqual(ema.dtype.base_dtype, tf.float64)
       self.assertEqual(emv.dtype.base_dtype, tf.float64)
       with tf.control_dependencies([ema, emv]):
-        return it + 1
+        return [it + 1]
 
     def cond(it):
       return it < 10000
@@ -94,7 +95,7 @@ class MovingReduceMeanVarianceTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MovingLogExponentialMovingMeanExpTest(tf.test.TestCase):
+class MovingLogExponentialMovingMeanExpTest(test_case.TestCase):
 
   def test_assign_log_moving_mean_exp(self):
     shape = [1, 2]
@@ -102,9 +103,9 @@ class MovingLogExponentialMovingMeanExpTest(tf.test.TestCase):
     true_stddev = np.array([[1.1, 0.5]])
     decay = 0.99
     # Start "x" out with this mean.
-    log_mean_exp_var = tf.compat.v2.Variable(tf.zeros_like(true_mean))
-    expected_var = tf.compat.v2.Variable(tf.zeros_like(true_mean))
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    log_mean_exp_var = tf.Variable(tf.zeros_like(true_mean))
+    expected_var = tf.Variable(tf.zeros_like(true_mean))
+    self.evaluate([log_mean_exp_var.initializer, expected_var.initializer])
 
     def body(it):
       x = tf.random.normal(shape, dtype=np.float64, seed=0)
@@ -113,11 +114,11 @@ class MovingLogExponentialMovingMeanExpTest(tf.test.TestCase):
           log_mean_exp_var, x, decay=decay)
       expected = tf.math.log(
           decay * tf.math.exp(expected_var) + (1 - decay) * tf.math.exp(x))
-      expected = tf.compat.v1.assign(expected_var, expected)
+      expected = expected_var.assign(expected)
       relerr = tf.abs((log_mean_exp - expected) / expected)
-      op = tf.compat.v1.assert_less(relerr, np.array(1e-6, dtype=np.float64))
+      op = tf.debugging.assert_less(relerr, np.array(1e-6, dtype=np.float64))
       with tf.control_dependencies([op]):
-        return it + 1
+        return [it + 1]
 
     def cond(it):
       return it < 2000

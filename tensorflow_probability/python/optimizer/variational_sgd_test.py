@@ -18,20 +18,23 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class VariationalSGDTest(tf.test.TestCase):
+class VariationalSGDTest(test_case.TestCase):
 
   def testBasic(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.compat.v2.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.compat.v2.Variable([3.0, 4.0], dtype=dtype)
+        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.53
@@ -44,7 +47,7 @@ class VariationalSGDTest(tf.test.TestCase):
             use_single_learning_rate=True)
         if not tf.executing_eagerly():
           sgd_op = sgd_opt.apply_gradients(zip([grads0, grads1], [var0, var1]))
-        self.evaluate(tf.compat.v1.global_variables_initializer())
+        self.evaluate(tf1.global_variables_initializer())
 
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
@@ -63,12 +66,12 @@ class VariationalSGDTest(tf.test.TestCase):
   def testBasicMultiInstance(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.compat.v2.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.compat.v2.Variable([3.0, 4.0], dtype=dtype)
+        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
-        vara = tf.compat.v2.Variable([1.1, 2.1], dtype=dtype)
-        varb = tf.compat.v2.Variable([3.0, 4.0], dtype=dtype)
+        vara = tf.Variable([1.1, 2.1], dtype=dtype)
+        varb = tf.Variable([3.0, 4.0], dtype=dtype)
         gradsa = tf.constant([0.1, 0.1], dtype=dtype)
         gradsb = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.5
@@ -92,7 +95,7 @@ class VariationalSGDTest(tf.test.TestCase):
               zip([grads0, grads1], [var0, var1]))
           sgd_op2 = optimizer2.apply_gradients(
               zip([gradsa, gradsb], [vara, varb]))
-        self.evaluate(tf.compat.v1.global_variables_initializer())
+        self.evaluate(tf1.global_variables_initializer())
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
         self.assertAllCloseAccordingToType([3.0, 4.0], self.evaluate(var1))
@@ -126,8 +129,8 @@ class VariationalSGDTest(tf.test.TestCase):
     # for dtype in [tf.half, tf.float32, tf.float64]:
     for dtype in [tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.compat.v2.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.compat.v2.Variable([3.0, 4.0], dtype=dtype)
+        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         lrate = tf.constant(3.0)
@@ -143,7 +146,7 @@ class VariationalSGDTest(tf.test.TestCase):
         if not tf.executing_eagerly():
           sgd_op = optimizer.apply_gradients(
               zip([grads0, grads1], [var0, var1]))
-        self.evaluate(tf.compat.v1.global_variables_initializer())
+        self.evaluate(tf1.global_variables_initializer())
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
         self.assertAllCloseAccordingToType([3.0, 4.0], self.evaluate(var1))
@@ -161,7 +164,7 @@ class VariationalSGDTest(tf.test.TestCase):
   def testBurnin(self):
     for burnin_dtype in [tf.int8, tf.int16, tf.int32, tf.int64]:
       with self.cached_session():
-        var0 = tf.compat.v2.Variable([1.1, 2.1], dtype=tf.float32)
+        var0 = tf.Variable([1.1, 2.1], dtype=tf.float32)
         grads0 = tf.constant([0.1, 0.1], dtype=tf.float32)
         decay_rate = 0.53
         sgd_optimizer = tfp.optimizer.VariationalSGD(
@@ -176,7 +179,7 @@ class VariationalSGDTest(tf.test.TestCase):
         if not tf.executing_eagerly():
           sgd_op = sgd_optimizer.apply_gradients([(grads0, var0)])
 
-        self.evaluate(tf.compat.v1.global_variables_initializer())
+        self.evaluate(tf1.global_variables_initializer())
 
         # Validate iterations is initialized to 0.
         self.assertAllCloseAccordingToType(
@@ -197,11 +200,11 @@ class VariationalSGDTest(tf.test.TestCase):
 
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.compat.v2.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.compat.v2.Variable([3.0, 4.0], dtype=dtype)
+        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
-        lrate = tf.compat.v2.Variable(3.0)
+        lrate = tf.Variable(3.0)
         decay_rate = 0.5
         batch_size = 2
         total_num_examples = 10
@@ -214,7 +217,7 @@ class VariationalSGDTest(tf.test.TestCase):
         if not tf.executing_eagerly():
           sgd_op = optimizer.apply_gradients(
               zip([grads0, grads1], [var0, var1]))
-        self.evaluate(tf.compat.v1.global_variables_initializer())
+        self.evaluate(tf1.global_variables_initializer())
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
         self.assertAllCloseAccordingToType([3.0, 4.0], self.evaluate(var1))
@@ -253,19 +256,19 @@ class VariationalSGDTest(tf.test.TestCase):
       with self.cached_session():
         opt = tfp.optimizer.VariationalSGD(1, 1, max_learning_rate=1.0)
         values = [1.0, 3.0]
-        vars_ = [tf.compat.v2.Variable([v], dtype=dtype) for v in values]
+        vars_ = [tf.Variable([v], dtype=dtype) for v in values]
         loss = lambda: vars_[0] + vars_[1]  # pylint: disable=cell-var-from-loop
         grads_and_vars = opt._compute_gradients(loss, vars_)
-        self.evaluate(tf.compat.v1.global_variables_initializer())
+        self.evaluate(tf1.global_variables_initializer())
         for grad, _ in grads_and_vars:
           self.assertAllCloseAccordingToType([1.0], self.evaluate(grad))
 
   def testWithGlobalStep(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        global_step = tf.compat.v2.Variable(0, dtype=tf.int64)
-        var0 = tf.compat.v2.Variable([1.1, 2.1], dtype=dtype)
-        var1 = tf.compat.v2.Variable([3.0, 4.0], dtype=dtype)
+        global_step = tf.Variable(0, dtype=tf.int64)
+        var0 = tf.Variable([1.1, 2.1], dtype=dtype)
+        var1 = tf.Variable([3.0, 4.0], dtype=dtype)
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.1
@@ -283,7 +286,7 @@ class VariationalSGDTest(tf.test.TestCase):
           sgd_op = sgd_optimizer.apply_gradients(
               zip([grads0, grads1], [var0, var1]))
 
-        self.evaluate(tf.compat.v1.global_variables_initializer())
+        self.evaluate(tf1.global_variables_initializer())
         init_step_value = self.evaluate(global_step)
 
         # Fetch params to validate initial values
@@ -308,8 +311,8 @@ class VariationalSGDTest(tf.test.TestCase):
   def testSparseBasic(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        var0 = tf.compat.v2.Variable([[1.1], [2.1]], dtype=dtype)
-        var1 = tf.compat.v2.Variable([[3.0], [4.0]], dtype=dtype)
+        var0 = tf.Variable([[1.1], [2.1]], dtype=dtype)
+        var1 = tf.Variable([[3.0], [4.0]], dtype=dtype)
         grads0 = tf.IndexedSlices(
             tf.constant([0.1], shape=[1, 1], dtype=dtype),
             tf.constant([0]), tf.constant([2, 1]))
@@ -329,7 +332,7 @@ class VariationalSGDTest(tf.test.TestCase):
           sgd_op = sgd_optimizer.apply_gradients(
               zip([grads0, grads1], [var0, var1]))
 
-        self.evaluate(tf.compat.v1.global_variables_initializer())
+        self.evaluate(tf1.global_variables_initializer())
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([[1.1], [2.1]], self.evaluate(var0))
         self.assertAllCloseAccordingToType([[3.0], [4.0]], self.evaluate(var1))

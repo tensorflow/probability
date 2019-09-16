@@ -19,15 +19,17 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SliceSamplerTest(tf.test.TestCase):
+class SliceSamplerTest(test_case.TestCase):
 
   def testOneDimNormal(self):
     """Sampling from the Standard Normal Distribution."""
@@ -128,8 +130,8 @@ class SliceSamplerTest(tf.test.TestCase):
     init_state = [np.ones([num_chains, 1], dtype=dtype),
                   np.ones([num_chains, 1], dtype=dtype)]
     placeholder_init_state = [
-        tf.compat.v1.placeholder_with_default(init_state[0], shape=[None, 1]),
-        tf.compat.v1.placeholder_with_default(init_state[1], shape=[None, 1])
+        tf1.placeholder_with_default(init_state[0], shape=[None, 1]),
+        tf1.placeholder_with_default(init_state[1], shape=[None, 1])
     ]
     # Run Slice Samper for `num_results` iterations for `num_chains`
     # independent chains:
@@ -179,8 +181,8 @@ class SliceSamplerTest(tf.test.TestCase):
     init_state = [np.ones([num_chains, 1], dtype=dtype),
                   np.ones([num_chains, 1], dtype=dtype)]
     placeholder_init_state = [
-        tf.compat.v1.placeholder_with_default(init_state[0], shape=None),
-        tf.compat.v1.placeholder_with_default(init_state[1], shape=None)
+        tf1.placeholder_with_default(init_state[0], shape=None),
+        tf1.placeholder_with_default(init_state[1], shape=None)
     ]
     # Run Slice Samper for `num_results` iterations for `num_chains`
     # independent chains:

@@ -33,6 +33,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":deferred_tensor",
+        ":seed_stream",
     ],
 )
 
@@ -42,6 +43,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:name_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
@@ -57,5 +59,22 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_library(
+    name = "seed_stream",
+    srcs = ["seed_stream.py"],
+)
+
+py_test(
+    name = "seed_stream_test",
+    size = "small",
+    srcs = ["seed_stream_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )

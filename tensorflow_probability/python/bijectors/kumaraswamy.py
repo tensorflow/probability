@@ -66,9 +66,9 @@ class Kumaraswamy(bijector.Bijector):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration0, concentration1],
                                       dtype_hint=tf.float32)
-      self._concentration0 = tensor_util.convert_immutable_to_tensor(
+      self._concentration0 = tensor_util.convert_nonref_to_tensor(
           concentration0, dtype=dtype, name="concentration0")
-      self._concentration1 = tensor_util.convert_immutable_to_tensor(
+      self._concentration1 = tensor_util.convert_nonref_to_tensor(
           concentration1, dtype=dtype, name="concentration1")
       super(Kumaraswamy, self).__init__(
           forward_min_event_ndims=0,
@@ -121,11 +121,11 @@ class Kumaraswamy(bijector.Bijector):
     if not self.validate_args:
       return []
     assertions = []
-    if is_init != tensor_util.is_mutable(self.concentration0):
+    if is_init != tensor_util.is_ref(self.concentration0):
       assertions.append(assert_util.assert_positive(
           self.concentration0,
           message="Argument `concentration0` must be positive."))
-    if is_init != tensor_util.is_mutable(self.concentration1):
+    if is_init != tensor_util.is_ref(self.concentration1):
       assertions.append(assert_util.assert_positive(
           self.concentration1,
           message="Argument `concentration1` must be positive."))

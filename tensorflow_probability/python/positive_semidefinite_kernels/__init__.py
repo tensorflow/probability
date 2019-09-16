@@ -18,22 +18,29 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_probability.python.positive_semidefinite_kernels.exp_sin_squared import ExpSinSquared
-from tensorflow_probability.python.positive_semidefinite_kernels.exponentiated_quadratic import ExponentiatedQuadratic
-from tensorflow_probability.python.positive_semidefinite_kernels.feature_scaled import FeatureScaled
-from tensorflow_probability.python.positive_semidefinite_kernels.feature_transformed import FeatureTransformed
-from tensorflow_probability.python.positive_semidefinite_kernels.kumaraswamy_transformed import KumaraswamyTransformed
-from tensorflow_probability.python.positive_semidefinite_kernels.matern import MaternFiveHalves
-from tensorflow_probability.python.positive_semidefinite_kernels.matern import MaternOneHalf
-from tensorflow_probability.python.positive_semidefinite_kernels.matern import MaternThreeHalves
-from tensorflow_probability.python.positive_semidefinite_kernels.polynomial import Linear
-from tensorflow_probability.python.positive_semidefinite_kernels.polynomial import Polynomial
-from tensorflow_probability.python.positive_semidefinite_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
-from tensorflow_probability.python.positive_semidefinite_kernels.rational_quadratic import RationalQuadratic
-from tensorflow_probability.python.positive_semidefinite_kernels.schur_complement import SchurComplement
+import warnings
+
+from tensorflow_probability.python.math.psd_kernels.exp_sin_squared import ExpSinSquared
+from tensorflow_probability.python.math.psd_kernels.exponentiated_quadratic import ExponentiatedQuadratic
+from tensorflow_probability.python.math.psd_kernels.feature_scaled import FeatureScaled
+from tensorflow_probability.python.math.psd_kernels.feature_transformed import FeatureTransformed
+from tensorflow_probability.python.math.psd_kernels.kumaraswamy_transformed import KumaraswamyTransformed
+from tensorflow_probability.python.math.psd_kernels.matern import MaternFiveHalves
+from tensorflow_probability.python.math.psd_kernels.matern import MaternOneHalf
+from tensorflow_probability.python.math.psd_kernels.matern import MaternThreeHalves
+from tensorflow_probability.python.math.psd_kernels.polynomial import Linear
+from tensorflow_probability.python.math.psd_kernels.polynomial import Polynomial
+from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
+from tensorflow_probability.python.math.psd_kernels.rational_quadratic import RationalQuadratic
+from tensorflow_probability.python.math.psd_kernels.schur_complement import SchurComplement
 
 
 from tensorflow.python.util.all_util import remove_undocumented
+
+warnings.warn(
+    'tfp.positive_semidefinite_kernels module has been moved to '
+    'tfp.math.psd_kernels. This alias will be deleted on 2019-12-01',
+    stacklevel=5)
 
 _allowed_symbols = [
     'ExponentiatedQuadratic',

@@ -24,12 +24,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 class Mixture(distribution.Distribution):
@@ -193,11 +193,6 @@ class Mixture(distribution.Distribution):
       if use_static_graph and static_num_components is None:
         raise ValueError("Number of categories must be known statically when "
                          "`static_sample=True`.")
-    # We let the Mixture distribution access _graph_parents since its arguably
-    # more like a baseclass.
-    graph_parents = self._cat._graph_parents  # pylint: disable=protected-access
-    for c in self._components:
-      graph_parents += c._graph_parents  # pylint: disable=protected-access
 
     super(Mixture, self).__init__(
         dtype=dtype,
@@ -205,7 +200,6 @@ class Mixture(distribution.Distribution):
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
-        graph_parents=graph_parents,
         name=name)
 
   @property
@@ -315,7 +309,7 @@ class Mixture(distribution.Distribution):
         # path.
         samples = []
         cat_samples = self.cat.sample(n, seed=seed)
-        stream = seed_stream.SeedStream(seed, salt="Mixture")
+        stream = SeedStream(seed, salt="Mixture")
 
         for c in range(self.num_components):
           samples.append(self.components[c].sample(n, seed=stream()))
@@ -397,7 +391,7 @@ class Mixture(distribution.Distribution):
           num_partitions=self.num_components)
       samples_class = [None for _ in range(self.num_components)]
 
-      stream = seed_stream.SeedStream(seed, salt="Mixture")
+      stream = SeedStream(seed, salt="Mixture")
 
       for c in range(self.num_components):
         n_class = tf.size(partitioned_samples_indices[c])

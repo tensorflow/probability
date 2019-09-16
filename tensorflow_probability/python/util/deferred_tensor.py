@@ -65,9 +65,18 @@ class TensorMetaClass(type):
   """A type of class which will make objects which act like Tensors."""
 
   def __new__(mcs, name, bases, attrs):
+    operators = tf.Tensor.OVERLOADABLE_OPERATORS
+    operators.difference_update({'__eq__', '__ne__'})
+    operators.update({'__iter__'})
+    attrs.update((attr, _wrap_method(tf.Tensor, attr)) for attr in operators)
+
+    # Support methods for __iter__ and __bool__
+    private_methods = {
+        name for name in dir(tf.Tensor) if name.startswith('_disallow')
+    }
     attrs.update(
-        (attr, _wrap_method(tf.Tensor, attr))
-        for attr in tf.Tensor.OVERLOADABLE_OPERATORS.union({'__iter__'}))
+        (attr, _wrap_method(tf.Tensor, attr)) for attr in private_methods)
+
     attrs.update(
         (attr, getattr(tf.Tensor, attr))
         for attr in {'__nonzero__', '__bool__', '__array_priority__'})
@@ -175,6 +184,15 @@ class DeferredTensor(tf.Module):
     self._shape = tf.TensorShape(
         pretransformed_input.shape if shape == 'None' else shape)
 
+    # Secret handshake with tf.is_tensor to return True for DT.
+    #
+    # Works around an exception in LinearOperator (which in 2.0.0 checks only
+    # `tf.is_tensor`, not also `linear_operator_util.is_ref`:
+    # ValueError: Graph parent item 0 is not a Tensor;
+    #   <DeferredTensor: dtype=float32, shape=[2], fn=exp>.
+    # TODO(b/140157055): Remove this shim after LinOp is patched in 2.0.
+    self.is_tensor_like = True
+
   @property
   def transform_fn(self):
     """Function which characterizes the `Tensor`ization of this object."""
@@ -193,6 +211,11 @@ class DeferredTensor(tf.Module):
   @property
   def shape(self):
     """Represents the shape of a `Tensor`."""
+    return self._shape
+
+  # TODO(b/140157055): Remove this shim.
+  def get_shape(self):
+    """Legacy means of getting Tensor shape, for compat with 2.0.0 LinOp."""
     return self._shape
 
   @property
@@ -239,6 +262,4 @@ class DeferredTensor(tf.Module):
       raise TypeError(
           'Actual shape ({}) is incompatible with deferred shape ({}).'.format(
               y.shape, self.shape))
-    self._dtype = y.dtype
-    self.set_shape(y.shape)
     return tf.convert_to_tensor(y, dtype=dtype, name=name)

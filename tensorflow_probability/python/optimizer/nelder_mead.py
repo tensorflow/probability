@@ -28,7 +28,8 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static
 
@@ -247,7 +248,7 @@ def minimize(objective_function,
         supplied.
       2. If `initial_simplex` and `step_sizes` are both specified.
   """
-  with tf.compat.v1.name_scope(name, 'minimize', [
+  with tf1.name_scope(name, 'minimize', [
       initial_simplex, initial_vertex, step_sizes, objective_at_initial_simplex,
       objective_at_initial_vertex, func_tolerance, position_tolerance
   ]):
@@ -353,7 +354,7 @@ def nelder_mead_one_step(current_simplex,
                          shrinkage=None,
                          name=None):
   """A single iteration of the Nelder Mead algorithm."""
-  with tf.compat.v1.name_scope(name, 'nelder_mead_one_step'):
+  with tf1.name_scope(name, 'nelder_mead_one_step'):
     domain_dtype = current_simplex.dtype.base_dtype
     order = tf.argsort(
         current_objective_values, direction='ASCENDING', stable=True)
@@ -757,7 +758,7 @@ def _default_step_sizes(reference_vertex):
   small_sizes = tf.ones_like(reference_vertex) * 0.00025
   # Step size to choose when the coordinate is non-zero.
   large_sizes = reference_vertex * 0.05
-  return tf.compat.v1.where(
+  return tf1.where(
       tf.abs(reference_vertex) < _EPSILON, small_sizes, large_sizes)
 
 

@@ -19,17 +19,18 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
-
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_case
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestMVNTriL(tf.test.TestCase):
+class TestMVNTriL(test_case.TestCase):
 
   def setUp(self):
     np.random.seed(142)
@@ -48,7 +49,7 @@ class TestMVNTriL(tf.test.TestCase):
         tf.zeros(np.concatenate([batch_shape, [mvn_size]]), scale.dtype))
     scale_diag = tf.linalg.diag_part(scale)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -82,7 +83,7 @@ class TestMVNTriL(tf.test.TestCase):
         x,
         dims=mvn_size,
         loc_fn=tf.zeros_like,
-        scale_fn=lambda x: tfd.fill_triangular(tf.ones_like(x)))
+        scale_fn=lambda x: tfp.math.fill_triangular(tf.ones_like(x)))
     scale = mvn.scale.to_dense()
     expected_scale = tf.linalg.band_part(
         tf.ones(
@@ -90,7 +91,7 @@ class TestMVNTriL(tf.test.TestCase):
         num_lower=-1,
         num_upper=0)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -116,7 +117,7 @@ class TestMVNTriL(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestBernoulli(tf.test.TestCase):
+class TestBernoulli(test_case.TestCase):
 
   def setUp(self):
     np.random.seed(142)
@@ -129,7 +130,7 @@ class TestBernoulli(tf.test.TestCase):
     x = tf.constant(x_)
     bernoulli = tfp.trainable_distributions.bernoulli(x)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -175,7 +176,7 @@ class TestBernoulli(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestNormal(tf.test.TestCase):
+class TestNormal(test_case.TestCase):
 
   def setUp(self):
     np.random.seed(142)
@@ -188,7 +189,7 @@ class TestNormal(tf.test.TestCase):
     x = tf.constant(x_)
     normal = tfp.trainable_distributions.normal(x)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -234,7 +235,7 @@ class TestNormal(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestPoisson(tf.test.TestCase):
+class TestPoisson(test_case.TestCase):
 
   def setUp(self):
     np.random.seed(142)
@@ -247,7 +248,7 @@ class TestPoisson(tf.test.TestCase):
     x = tf.constant(x_)
     poisson = tfp.trainable_distributions.poisson(x)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     [
         batch_shape_,
         event_shape_,
@@ -293,7 +294,7 @@ class TestPoisson(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestMakePositiveFunctions(tf.test.TestCase):
+class TestMakePositiveFunctions(test_case.TestCase):
 
   def softplus(self, x):
     return np.log1p(np.exp(x))
@@ -304,7 +305,7 @@ class TestMakePositiveFunctions(tf.test.TestCase):
         x_, diag_shift=1.)
     y_ = self.evaluate(y)
     # Recall that:
-    # self.evaluate(tfd.fill_triangular(np.arange(6) - 3))
+    # self.evaluate(tfp.math.fill_triangular(np.arange(6) - 3))
     # ==> array([[ 0,  0,  0],
     #            [ 2,  1,  0],
     #            [-1, -2, -3]])

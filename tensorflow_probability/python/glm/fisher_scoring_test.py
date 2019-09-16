@@ -19,16 +19,19 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 
-import tensorflow as tf
+import numpy as np
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-tfd = tfp.distributions
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class FitTestFast(tf.test.TestCase):
+class FitTestFast(test_case.TestCase):
 
   dtype = np.float32
   fast = True
@@ -200,6 +203,60 @@ class FitTestFast(tf.test.TestCase):
     self.assertAllClose(
         model_coefficients_true_, model_coefficients_, atol=0.03, rtol=0.15)
 
+  def testRegularizationWithPenaltyFactor(self):
+    n = int(1e4)
+    [
+        model_matrix,
+        response,
+        _,  # model_coefficients_true
+        _,  # linear_response_true
+    ] = self.make_dataset(
+        n=n, d=2, link='linear')
+    # Really strong regularization should bring all regularized coefficients to
+    # approximately 0.
+    l2_regularizer = np.array(1e9 * n, model_matrix.dtype.as_numpy_dtype)
+
+    model_coefficients_uniform_penalty, _, is_converged_uniform_penalty, _ = (
+        tfp.glm.fit(
+            model_matrix,
+            response,
+            tfp.glm.Normal(),
+            l2_regularizer=l2_regularizer,
+            fast_unsafe_numerics=self.fast,
+            maximum_iterations=10))
+
+    model_coefficients_penalty_factor, _, is_converged_penalty_factor, _ = (
+        tfp.glm.fit(
+            model_matrix,
+            response,
+            tfp.glm.Normal(),
+            l2_regularizer=l2_regularizer,
+            # only penalize (apply regularization to) second coefficient
+            l2_regularization_penalty_factor=[0.0, 1.0],
+            fast_unsafe_numerics=self.fast,
+            maximum_iterations=10))
+
+    [
+        model_coefficients_uniform_penalty_, is_converged_uniform_penalty_,
+        model_coefficients_penalty_factor_, is_converged_penalty_factor_
+    ] = self.evaluate([
+        model_coefficients_uniform_penalty, is_converged_uniform_penalty,
+        model_coefficients_penalty_factor, is_converged_penalty_factor
+    ])
+
+    self.assertTrue(is_converged_uniform_penalty_)
+    self.assertTrue(is_converged_penalty_factor_)
+    # When regularization is applied to all coefficients, they should all be
+    # close to 0.
+    self.assertAllClose([0., 0.],
+                        model_coefficients_uniform_penalty_,
+                        rtol=1e-6,
+                        atol=1e-6)
+    # When regularization is applied only to second coefficient, only it should
+    # be close to 0.
+    self.assertGreater(np.abs(model_coefficients_penalty_factor_[0]), 1e-6)
+    self.assertNear(0., model_coefficients_penalty_factor_[1], err=1e-6)
+
 
 class FitTestSlow(FitTestFast):
 
@@ -218,7 +275,7 @@ class FitTestSlow(FitTestFast):
     ] = self.make_dataset(n=n, d=3, link='probit')
     l2_regularizer = np.array(0.07 * n, model_matrix.dtype.as_numpy_dtype)
     if not static_l2:
-      l2_regularizer = tf.compat.v1.placeholder_with_default(
+      l2_regularizer = tf1.placeholder_with_default(
           l2_regularizer, shape=[])
     [
         expected_model_coefficients,

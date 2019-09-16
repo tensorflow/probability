@@ -26,7 +26,6 @@ from tensorflow_probability.python.bijectors.affine_linear_operator import Affin
 from tensorflow_probability.python.bijectors.affine_scalar import AffineScalar
 from tensorflow_probability.python.bijectors.batch_normalization import BatchNormalization
 from tensorflow_probability.python.bijectors.bijector import Bijector
-from tensorflow_probability.python.bijectors.bijector import ConditionalBijector
 from tensorflow_probability.python.bijectors.blockwise import Blockwise
 from tensorflow_probability.python.bijectors.chain import Chain
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
@@ -52,8 +51,10 @@ from tensorflow_probability.python.bijectors.matrix_inverse_tril import MatrixIn
 from tensorflow_probability.python.bijectors.matveclu import MatvecLU
 from tensorflow_probability.python.bijectors.normal_cdf import NormalCDF
 from tensorflow_probability.python.bijectors.ordered import Ordered
+from tensorflow_probability.python.bijectors.pad import Pad
 from tensorflow_probability.python.bijectors.permute import Permute
 from tensorflow_probability.python.bijectors.power_transform import PowerTransform
+from tensorflow_probability.python.bijectors.rational_quadratic_spline import RationalQuadraticSpline
 from tensorflow_probability.python.bijectors.real_nvp import real_nvp_default_template
 from tensorflow_probability.python.bijectors.real_nvp import RealNVP
 from tensorflow_probability.python.bijectors.reciprocal import Reciprocal
@@ -87,7 +88,7 @@ __all__ = [
     "Chain",
     "CholeskyOuterProduct",
     "CholeskyToInvCholesky",
-    "ConditionalBijector",
+    "CorrelationCholesky",
     "Cumsum",
     "DiscreteCosineTransform",
     "Exp",
@@ -104,8 +105,10 @@ __all__ = [
     "MatvecLU",
     "NormalCDF",
     "Ordered",
+    "Pad",
     "Permute",
     "PowerTransform",
+    "RationalQuadraticSpline",
     "RealNVP",
     "Reciprocal",
     "Reshape",

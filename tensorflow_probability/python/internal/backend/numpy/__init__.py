@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal.backend.numpy import nn
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
 from tensorflow_probability.python.internal.backend.numpy import numpy_math as math
+from tensorflow_probability.python.internal.backend.numpy import numpy_signal as signal
 from tensorflow_probability.python.internal.backend.numpy import random_generators as random
 from tensorflow_probability.python.internal.backend.numpy import sets_lib as sets
 from tensorflow_probability.python.internal.backend.numpy import sparse_lib as sparse

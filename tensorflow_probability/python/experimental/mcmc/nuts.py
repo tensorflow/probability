@@ -44,12 +44,13 @@ import functools
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python import mcmc
 from tensorflow_probability.python.experimental import auto_batching as ab
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 # TODO(axch): Sensibly support field references from auto-batched code
@@ -109,6 +110,7 @@ class NoUTurnSampler(mcmc.TransitionKernel):
                step_size,
                max_tree_depth=10,
                unrolled_leapfrog_steps=1,
+               num_trajectories_per_step=1,
                use_auto_batching=True,
                stackless=False,
                backend=None,
@@ -139,6 +141,12 @@ class NoUTurnSampler(mcmc.TransitionKernel):
         trajectory length implied by max_tree_depth. Defaults to 1. This
         parameter can be useful for amortizing the auto-batching control flow
         overhead.
+      num_trajectories_per_step: Python `int` giving the number of NUTS
+        trajectories to run as "one" step.  Setting this higher than 1 may be
+        favorable for performance by giving the autobatching system the
+        opportunity to batch gradients across consecutive trajectories.  The
+        intermediate samples are thinned: only the last sample from the run (in
+        each batch member) is returned.
       use_auto_batching: Boolean.  If `False`, do not invoke the auto-batching
         system; operate on batch size 1 only.
       stackless: Boolean.  If `True`, invoke the stackless version of
@@ -158,10 +166,11 @@ class NoUTurnSampler(mcmc.TransitionKernel):
           "max_tree_depth must be >= 1 but was {}".format(max_tree_depth))
     self.max_tree_depth = max_tree_depth
     self.unrolled_leapfrog_steps = unrolled_leapfrog_steps
+    self.num_trajectories_per_step = num_trajectories_per_step
     self.use_auto_batching = use_auto_batching
     self.stackless = stackless
     self.backend = backend
-    self._seed_stream = distributions.SeedStream(seed, "nuts_one_step")
+    self._seed_stream = SeedStream(seed, "nuts_one_step")
     self.name = "nuts_kernel" if name is None else name
     # TODO(b/125544625): Identify why we need `use_gradient_tape=True`, i.e.,
     # what's different between `tape.gradient` and `tf.gradient`.
@@ -170,7 +179,7 @@ class NoUTurnSampler(mcmc.TransitionKernel):
     self.value_and_gradients_fn = _embed_no_none_gradient_check(
         value_and_gradients_fn)
     max_tree_edges = max_tree_depth - 1
-    self.evolve_trajectory = _make_evolve_trajectory(
+    self.many_steps, self.autobatch_context = _make_evolve_trajectory(
         self.value_and_gradients_fn, max_tree_edges, unrolled_leapfrog_steps,
         self._seed_stream)
     self._block_code_cache = {}
@@ -196,8 +205,8 @@ class NoUTurnSampler(mcmc.TransitionKernel):
 
     Returns:
       next_state: `Tensor` or Python list of `Tensor`s representing the state(s)
-        of the Markov chain(s) after taking exactly one step. Has same type and
-        shape as `current_state`.
+        of the Markov chain(s) after taking `self.num_trajectories_per_step`
+        steps. Has same type and shape as `current_state`.
       kernel_results: `collections.namedtuple` of internal calculations used to
         advance the chain.
     """
@@ -207,20 +216,20 @@ class NoUTurnSampler(mcmc.TransitionKernel):
     current_grads_log_prob = previous_kernel_results.grads_target_log_prob
     leapfrogs_taken = previous_kernel_results.leapfrogs_taken
     leapfrogs_computed = previous_kernel_results.leapfrogs_computed
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         self.name,
         values=[
             current_state, self.step_size, current_target_log_prob,
             current_grads_log_prob
         ]):
       unwrap_state_list = False
-      with tf.compat.v1.name_scope("initialize"):
-        if not tf.compat.v2.nest.is_nested(current_state):
+      with tf1.name_scope("initialize"):
+        if not tf.nest.is_nested(current_state):
           unwrap_state_list = True
           current_state = [current_state]
         current_state = [tf.convert_to_tensor(value=s) for s in current_state]
         step_size = self.step_size
-        if not tf.compat.v2.nest.is_nested(step_size):
+        if not tf.nest.is_nested(step_size):
           step_size = [step_size]
         step_size = [tf.convert_to_tensor(value=s) for s in step_size]
         if len(step_size) == 1:
@@ -230,46 +239,44 @@ class NoUTurnSampler(mcmc.TransitionKernel):
                            "`current_state`), but found {}".format(
                                len(current_state), len(step_size)))
 
-        current_momentum, log_slice_sample = _start_trajectory_batched(
-            current_state, current_target_log_prob, seed=self._seed_stream())
-
-        current = Point(
-            current_state, current_target_log_prob,
-            current_grads_log_prob, current_momentum)
-
+      num_steps = tf.constant([self.num_trajectories_per_step], dtype=tf.int64)
+      if self.backend is None:
+        if self._seed_stream() is not None:
+          # The user wanted reproducible results; limit the parallel iterations
+          backend = ab.TensorFlowBackend(while_parallel_iterations=1)
+        else:
+          backend = ab.TensorFlowBackend()
+      else:
+        backend = self.backend
       # The `dry_run` and `max_stack_depth` arguments are added by the
       # @ctx.batch decorator, confusing pylint.
       # pylint: disable=unexpected-keyword-arg
-      next_, new_leapfrogs = self.evolve_trajectory(
-          current,
-          current,
-          current,
-          step_size,
-          log_slice_sample,
-          tf.constant([0], dtype=tf.int64),  # depth
-          tf.constant([1], dtype=tf.int64),  # num_states
-          tf.zeros_like(leapfrogs_taken),  # leapfrogs
-          tf.constant([True]),
-          dry_run=not self.use_auto_batching,
-          stackless=self.stackless,
-          backend=(ab.TensorFlowBackend()
-                   if self.backend is None else self.backend),
-          max_stack_depth=self.max_tree_depth + 3,
-          block_code_cache=self._block_code_cache)
+      ((next_state, next_target_log_prob, next_grads_target_log_prob),
+       new_leapfrogs) = self.many_steps(
+           num_steps,
+           current_state,
+           current_target_log_prob,
+           current_grads_log_prob,
+           step_size,
+           tf.zeros_like(leapfrogs_taken),  # leapfrogs
+           dry_run=not self.use_auto_batching,
+           stackless=self.stackless,
+           backend=backend,
+           max_stack_depth=self.max_tree_depth + 4,
+           block_code_cache=self._block_code_cache)
 
-      result_state = next_.state
       if unwrap_state_list:
-        result_state = result_state[0]
-      return result_state, NUTSKernelResults(
-          next_.target_log_prob, next_.grads_target_log_prob,
+        next_state = next_state[0]
+      return next_state, NUTSKernelResults(
+          next_target_log_prob, next_grads_target_log_prob,
           leapfrogs_taken + new_leapfrogs,
           leapfrogs_computed + tf.math.reduce_max(input_tensor=new_leapfrogs))
 
   def bootstrap_results(self, init_state):
     """Creates initial `previous_kernel_results` using a supplied `state`."""
-    if not tf.compat.v2.nest.is_nested(init_state):
+    if not tf.nest.is_nested(init_state):
       init_state = [init_state]
-    with tf.compat.v1.name_scope("NoUTurnSampler.bootstrap_results"):
+    with tf1.name_scope("NoUTurnSampler.bootstrap_results"):
       batch_size = tf.shape(input=init_state[0])[0]
       (current_target_log_prob,
        current_grads_log_prob) = self.value_and_gradients_fn(*init_state)
@@ -311,6 +318,48 @@ def _make_evolve_trajectory(value_and_gradients_fn, max_depth,
     evolve_trajectory: Function for running the trajectory evolution.
   """
   ctx = ab.Context()
+
+  def many_steps_type(args):
+    _, state_type, prob_type, grad_type, _, leapfrogs_type = args
+    return (state_type, prob_type, grad_type), leapfrogs_type
+
+  @ctx.batch(type_inference=many_steps_type)
+  def many_steps(
+      num_steps,
+      current_state,
+      current_target_log_prob,
+      current_grads_log_prob,
+      step_size,
+      leapfrogs):
+    """Runs `evolve_trajectory` the requested number of times sequentially."""
+    current_momentum, log_slice_sample = _start_trajectory_batched(
+        current_state, current_target_log_prob, seed_stream)
+
+    current = Point(
+        current_state, current_target_log_prob,
+        current_grads_log_prob, current_momentum)
+
+    if truthy(num_steps > 0):
+      next_, new_leapfrogs = evolve_trajectory(
+          current,
+          current,
+          current,
+          step_size,
+          log_slice_sample,
+          tf.constant([0], dtype=tf.int64),  # depth
+          tf.constant([1], dtype=tf.int64),  # num_states
+          tf.constant([0], dtype=tf.int64),  # leapfrogs_taken
+          True)  # continue_trajectory
+      return many_steps(
+          num_steps - 1,
+          next_.state,
+          next_.target_log_prob,
+          next_.grads_target_log_prob,
+          step_size,
+          leapfrogs + new_leapfrogs)
+    else:
+      return ((current.state, current.target_log_prob,
+               current.grads_target_log_prob), leapfrogs)
 
   def evolve_trajectory_type(args):
     point_type, _, _, _, _, _, _, leapfrogs_type, _ = args
@@ -400,8 +449,9 @@ def _make_evolve_trajectory(value_and_gradients_fn, max_depth,
       # Continue the NUTS trajectory if the tree-building did not terminate,
       # and if the reverse-most and forward-most states do not exhibit a
       # U-turn.
+      continue_trajectory_in = continue_trajectory
       continue_trajectory = _continue_test_batched(
-          continue_trajectory & (depth < max_depth), forward, reverse)
+          continue_trajectory_in & (depth < max_depth), forward, reverse)
       return evolve_trajectory(
           reverse,
           forward,
@@ -525,7 +575,7 @@ def _make_evolve_trajectory(value_and_gradients_fn, max_depth,
       return (next_, next_, next_, num_states, unrolled_leapfrog_steps,
               continue_trajectory)
 
-  return evolve_trajectory
+  return many_steps, ctx
 
 
 def _embed_no_none_gradient_check(value_and_gradients_fn):
@@ -541,10 +591,10 @@ def _embed_no_none_gradient_check(value_and_gradients_fn):
   return func_wrapped
 
 
-def _start_trajectory_batched(current_state, current_target_log_prob, seed):
+def _start_trajectory_batched(
+    current_state, current_target_log_prob, seed_stream):
   """Computations needed to start a trajectory."""
-  with tf.compat.v1.name_scope("start_trajectory_batched"):
-    seed_stream = distributions.SeedStream(seed, "start_trajectory_batched")
+  with tf1.name_scope("start_trajectory_batched"):
     batch_size = tf.shape(input=current_state[0])[0]
     current_momentum = []
     for state_tensor in current_state:
@@ -569,13 +619,13 @@ def _start_trajectory_batched(current_state, current_target_log_prob, seed):
 
 
 def _batchwise_reduce_sum(x):
-  with tf.compat.v1.name_scope("batchwise_reduce_sum"):
+  with tf1.name_scope("batchwise_reduce_sum"):
     return tf.reduce_sum(input_tensor=x, axis=tf.range(1, tf.rank(x)))
 
 
 def _has_no_u_turn(state_one, state_two, momentum):
   """If two given states and momentum do not exhibit a U-turn pattern."""
-  with tf.compat.v1.name_scope("has_no_u_turn"):
+  with tf1.name_scope("has_no_u_turn"):
     batch_dot_product = sum(
         [_batchwise_reduce_sum((s1 - s2) * m)
          for s1, s2, m in zip(state_one, state_two, momentum)])
@@ -588,7 +638,7 @@ def _leapfrog_base(value_and_gradients_fn,
                    direction,
                    unrolled_leapfrog_steps):
   """Runs `unrolled_leapfrog_steps` steps of leapfrog integration."""
-  with tf.compat.v1.name_scope("leapfrog"):
+  with tf1.name_scope("leapfrog"):
     step_size = [d * s for d, s in zip(direction, step_size)]
     for _ in range(unrolled_leapfrog_steps):
       mid_momentum = [
@@ -597,7 +647,7 @@ def _leapfrog_base(value_and_gradients_fn,
       next_state = [
           s + step * m for s, step, m in
           zip(current.state, step_size, mid_momentum)]
-      with tf.compat.v1.name_scope("gradients"):
+      with tf1.name_scope("gradients"):
         [next_target_log_prob,
          next_grads_target_log_prob] = value_and_gradients_fn(*next_state)
       next_momentum = [
@@ -655,7 +705,7 @@ def _expand_dims_under_batch_dim(tensor, new_rank):
 
 def _log_joint(current):
   """Log-joint probability given a state's log-probability and momentum."""
-  with tf.compat.v1.name_scope("log_joint"):
+  with tf1.name_scope("log_joint"):
     momentum_log_prob = -sum([
         _batchwise_reduce_sum(0.5 * (m ** 2)) for m in current.momentum])
     return current.target_log_prob + momentum_log_prob
@@ -665,13 +715,13 @@ def _compute_num_states_batched(next_log_joint, log_slice_sample):
   # Returns the number of states (of necessity, at most one per batch member)
   # represented by the `next_log_joint` Tensor that are good enough to pass the
   # slice variable.
-  with tf.compat.v1.name_scope("compute_num_states_batched"):
+  with tf1.name_scope("compute_num_states_batched"):
     return tf.cast(next_log_joint > log_slice_sample, dtype=tf.int64)
 
 
 def _random_bernoulli(shape, probs, dtype=tf.int64, seed=None, name=None):
   """Returns samples from a Bernoulli distribution."""
-  with tf.compat.v1.name_scope(name, "random_bernoulli", [shape, probs]):
+  with tf1.name_scope(name, "random_bernoulli", [shape, probs]):
     probs = tf.convert_to_tensor(value=probs)
     random_uniform = tf.random.uniform(shape, dtype=probs.dtype, seed=seed)
     return tf.cast(tf.less(random_uniform, probs), dtype)
@@ -679,7 +729,7 @@ def _random_bernoulli(shape, probs, dtype=tf.int64, seed=None, name=None):
 
 def _continue_test_batched(
     continue_trajectory, forward, reverse):
-  with tf.compat.v1.name_scope("continue_test_batched"):
+  with tf1.name_scope("continue_test_batched"):
     return (continue_trajectory &
             _has_no_u_turn(forward.state, reverse.state, forward.momentum) &
             _has_no_u_turn(forward.state, reverse.state, reverse.momentum))
@@ -687,7 +737,7 @@ def _continue_test_batched(
 
 def _binomial_subtree_acceptance_batched(
     num_states_in_subtree, num_states, seed_stream):
-  with tf.compat.v1.name_scope("binomial_subtree_acceptance_batched"):
+  with tf1.name_scope("binomial_subtree_acceptance_batched"):
     batch_size = tf.shape(input=num_states_in_subtree)[0]
     return _random_bernoulli(
         [batch_size],
@@ -699,7 +749,7 @@ def _binomial_subtree_acceptance_batched(
 
 
 def _choose_direction_batched(point, seed_stream):
-  with tf.compat.v1.name_scope("choose_direction_batched"):
+  with tf1.name_scope("choose_direction_batched"):
     batch_size = tf.shape(input=point.state[0])[0]
     dtype = point.state[0].dtype
     return tfp_math.random_rademacher(
@@ -708,4 +758,4 @@ def _choose_direction_batched(point, seed_stream):
 
 def _tf_where(condition, x, y):
   return ab.instructions.pattern_map2(
-      lambda x_elt, y_elt: tf.compat.v1.where(condition, x_elt, y_elt), x, y)
+      lambda x_elt, y_elt: tf1.where(condition, x_elt, y_elt), x, y)

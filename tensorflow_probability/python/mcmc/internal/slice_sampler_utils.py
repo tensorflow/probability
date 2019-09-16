@@ -18,9 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions
+from tensorflow_probability.python.distributions.bernoulli import Bernoulli
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
@@ -60,7 +62,7 @@ def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
     widths: A tensor of shape (max_doublings+1, ones_like(batch_shape)). The
       widths of the intervals at each stage of the doubling.
   """
-  with tf.compat.v1.name_scope(name, 'left_doubling_increments',
+  with tf1.name_scope(name, 'left_doubling_increments',
                                [batch_shape, max_doublings, step_size]):
 
     step_size = tf.convert_to_tensor(value=step_size)
@@ -68,8 +70,9 @@ def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
     # Output shape of the left increments tensor.
     output_shape = tf.concat(([max_doublings + 1], batch_shape), axis=0)
     # A sample realization of X_k.
-    expand_left = distributions.Bernoulli(0.5, dtype=dtype).sample(
-        sample_shape=output_shape, seed=seed)
+    expand_left = Bernoulli(
+        0.5, dtype=dtype).sample(
+            sample_shape=output_shape, seed=seed)
 
     # The widths of the successive intervals. Starts with 1.0 and ends with
     # 2^max_doublings.
@@ -113,7 +116,7 @@ def _find_best_interval_idx(x, name=None):
       first set of bounds outside the slice and if there are none, the index of
       the widest set.
   """
-  with tf.compat.v1.name_scope(name, 'find_best_interval_idx', [x]):
+  with tf1.name_scope(name, 'find_best_interval_idx', [x]):
     # Returns max_doublings + 1. Positive int32.
     k = tf.shape(input=x)[0]
     dtype = x.dtype.base_dtype
@@ -174,10 +177,10 @@ def slice_bounds_by_doubling(x_initial,
        No. 3 , 705-767.
        https://projecteuclid.org/download/pdf_1/euclid.aos/1056562461
   """
-  with tf.compat.v1.name_scope(
+  with tf1.name_scope(
       name, 'slice_bounds_by_doubling',
       [x_initial, log_slice_heights, max_doublings, step_size]):
-    seed_gen = distributions.SeedStream(seed, salt='slice_bounds_by_doubling')
+    seed_gen = SeedStream(seed, salt='slice_bounds_by_doubling')
     x_initial = tf.convert_to_tensor(value=x_initial)
     batch_shape = tf.shape(input=x_initial)
     dtype = step_size.dtype.base_dtype
@@ -259,7 +262,7 @@ def _test_acceptance(x_initial, target_log_prob, decided, log_slice_heights,
     acceptable: A boolean tensor of same shape as `x_initial` indicating whether
       the proposed points are acceptable for reversibility or not.
   """
-  with tf.compat.v1.name_scope(name, 'test_acceptance', [
+  with tf1.name_scope(name, 'test_acceptance', [
       x_initial, decided, log_slice_heights, x_proposed, step_size,
       lower_bounds, upper_bounds
   ]):
@@ -278,8 +281,8 @@ def _test_acceptance(x_initial, target_log_prob, decided, log_slice_heights,
       divided = (((x_initial < midpoint) & (x_proposed >= midpoint)) |
                  ((x_proposed < midpoint) & (x_initial >= midpoint)))
       next_d = d | divided
-      next_right = tf.compat.v1.where(x_proposed < midpoint, midpoint, right)
-      next_left = tf.compat.v1.where(x_proposed >= midpoint, midpoint, left)
+      next_right = tf1.where(x_proposed < midpoint, midpoint, right)
+      next_left = tf1.where(x_proposed >= midpoint, midpoint, left)
       left_test = (log_slice_heights >= target_log_prob(next_left))
       right_test = (log_slice_heights >= target_log_prob(next_right))
       unacceptable = next_d & left_test & right_test
@@ -287,7 +290,7 @@ def _test_acceptance(x_initial, target_log_prob, decided, log_slice_heights,
       # and are unacceptable, set acceptable to False. For others, let them
       # be as they were.
       now_decided = ~decided & unacceptable
-      next_acceptable = tf.compat.v1.where(now_decided, ~unacceptable,
+      next_acceptable = tf1.where(now_decided, ~unacceptable,
                                            acceptable)
       # Decided if (a) was already decided, or
       # (b) the new width is less than 1.1 step_size, or
@@ -339,10 +342,10 @@ def _sample_with_shrinkage(x_initial, target_log_prob, log_slice_heights,
     x_proposed: A tensor of the same shape and dtype as `x_initial`. The next
       proposed state of the chain.
   """
-  with tf.compat.v1.name_scope(
+  with tf1.name_scope(
       name, 'sample_with_shrinkage',
       [x_initial, log_slice_heights, step_size, lower_bounds, upper_bounds]):
-    seed_gen = distributions.SeedStream(seed, salt='_sample_with_shrinkage')
+    seed_gen = SeedStream(seed, salt='_sample_with_shrinkage')
     # Keeps track of whether an acceptable sample has been found for the chain.
     found = tf.zeros_like(x_initial, dtype=tf.bool)
     cond = lambda found, *ignored_args: ~tf.reduce_all(input_tensor=found)
@@ -353,7 +356,7 @@ def _sample_with_shrinkage(x_initial, target_log_prob, log_slice_heights,
       """Iterates until every chain has found a suitable next state."""
       proportions = tf.random.uniform(
           x_initial_shape, dtype=x_initial_dtype, seed=seed_gen())
-      x_proposed = tf.compat.v1.where(~found,
+      x_proposed = tf1.where(~found,
                                       left + proportions * (right - left),
                                       x_next)
       accept_res = _test_acceptance(x_initial, target_log_prob=target_log_prob,
@@ -369,8 +372,8 @@ def _sample_with_shrinkage(x_initial, target_log_prob, log_slice_heights,
       # algorithm in Neal). However, this does not matter because the endpoints
       # for points that have been already accepted are not used again so it
       # doesn't matter what we do with them.
-      next_left = tf.compat.v1.where(x_proposed < x_initial, x_proposed, left)
-      next_right = tf.compat.v1.where(x_proposed >= x_initial, x_proposed,
+      next_left = tf1.where(x_proposed < x_initial, x_proposed, left)
+      next_right = tf1.where(x_proposed >= x_initial, x_proposed,
                                       right)
       return next_found, next_left, next_right, x_proposed
 
@@ -413,7 +416,7 @@ def slice_sampler_one_dim(target_log_prob, x_initial, step_size=0.01,
     lower_bounds: Tensor of the same shape and dtype as `x_initial`. The lower
       bounds for the slice found.
   """
-  with tf.compat.v1.name_scope(name, 'slice_sampler_one_dim',
+  with tf1.name_scope(name, 'slice_sampler_one_dim',
                                [x_initial, step_size, max_doublings]):
     x_initial = tf.convert_to_tensor(value=x_initial)
     # Obtain the input dtype of the array.

@@ -22,7 +22,9 @@ import collections
 
 # Dependency imports
 from absl.testing import parameterized
+import numpy as np
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -311,6 +313,14 @@ class JointDistributionSequentialTest(
           a=tfd.Normal(0, 1),
           b=tfd.Normal(1, 2)))
 
+  def test_simple_example_with_dynamic_shapes(self):
+    dist = tfd.JointDistributionSequential([
+        tfd.Normal(tf1.placeholder_with_default(0., shape=None),
+                   tf1.placeholder_with_default(1., shape=None)),
+        lambda a: tfd.Normal(a, 1.)], validate_args=True)
+    lp = dist.log_prob(dist.sample(5))
+    self.assertAllEqual(self.evaluate(lp).shape, [5])
+
   def test_latent_dirichlet_allocation(self):
     """Tests Latent Dirichlet Allocation joint model.
 
@@ -359,8 +369,9 @@ class JointDistributionSequentialTest(
     self.assertEqual(docs_shape, log_probs.shape)
 
     # Verify we correctly track trainable variables.
-    self.assertAllEqual((alpha.pretransformed_input, beta),
-                        lda.trainable_variables)
+    self.assertLen(lda.trainable_variables, 2)
+    self.assertIs(alpha.pretransformed_input, lda.trainable_variables[0])
+    self.assertIs(beta, lda.trainable_variables[1])
 
     # Ensure we can compute gradients.
     with tf.GradientTape() as tape:
@@ -372,6 +383,43 @@ class JointDistributionSequentialTest(
     self.assertAllEqual((alpha.pretransformed_input.shape, beta.shape),
                         (grads[0].shape, grads[1].shape))
     self.assertAllNotNone(grads)
+
+  def test_poisson_switchover_graphical_model(self):
+    # Build a pretend dataset.
+    n = [43, 31]
+    count_data = tf.cast(
+        tf.concat([
+            tfd.Poisson(rate=15.).sample(n[0], seed=1),
+            tfd.Poisson(rate=25.).sample(n[1], seed=2),
+        ], axis=0),
+        dtype=tf.float32)
+    count_data = self.evaluate(count_data)
+    n = np.sum(n).astype(np.float32)
+
+    # Make model.
+    gather = lambda tau, lambda_: tf.gather(  # pylint: disable=g-long-lambda
+        lambda_,
+        indices=tf.cast(
+            tau[..., tf.newaxis] < tf.linspace(0., 1., n),
+            dtype=tf.int32),
+        # TODO(b/139204153): Remove static value hack after bug closed.
+        batch_dims=int(tf.get_static_value(tf.rank(tau))))
+
+    alpha = tf.math.reciprocal(tf.reduce_mean(count_data))
+
+    joint = tfd.JointDistributionSequential([
+        tfd.Sample(tfd.Exponential(rate=alpha),
+                   sample_shape=[2]),
+        tfd.Uniform(),
+        lambda tau, lambda_: tfd.Independent(  # pylint: disable=g-long-lambda
+            tfd.Poisson(rate=gather(tau, lambda_)),
+            reinterpreted_batch_ndims=1),
+    ], validate_args=True)
+
+    # Verify model correctly "compiles".
+    batch_shape = [3, 4]
+    self.assertEqual(batch_shape,
+                     joint.log_prob(joint.sample(batch_shape)).shape)
 
 
 if __name__ == '__main__':

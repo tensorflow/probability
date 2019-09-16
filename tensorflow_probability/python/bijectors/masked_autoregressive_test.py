@@ -19,29 +19,34 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import six
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-
 from tensorflow_probability.python.bijectors.masked_autoregressive import _gen_mask
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
+
 tfk = tf.keras
+
 tfkl = tf.keras.layers
 
 
-def masked_autoregressive_2d_template(base_template, event_shape):
+def _masked_autoregressive_2d_template(base_template, event_shape):
 
   def wrapper(x):
     x_flat = tf.reshape(
-        x, tf.concat([tf.shape(input=x)[:-len(event_shape)], [-1]], -1))
+        x, tf.concat([tf.shape(x)[:-len(event_shape)], [-1]], -1))
     x_shift, x_log_scale = base_template(x_flat)
-    return tf.reshape(x_shift, tf.shape(input=x)), tf.reshape(
-        x_log_scale, tf.shape(input=x))
+    return tf.reshape(x_shift, tf.shape(x)), tf.reshape(
+        x_log_scale, tf.shape(x))
 
   return wrapper
 
@@ -61,8 +66,31 @@ def _masked_autoregressive_shift_and_log_scale_fn(hidden_units,
   return lambda x: tf.unstack(layer(x), axis=-1)
 
 
+def _masked_autoregressive_gated_bijector_fn(hidden_units,
+                                             activation="relu",
+                                             name=None,
+                                             **kwargs):
+  layer = tfb.AutoregressiveNetwork(
+      2, hidden_units=hidden_units, activation=activation, name=name, **kwargs)
+
+  def _bijector_fn(x):
+    if tensorshape_util.rank(x.shape) == 1:
+      x = x[tf.newaxis, ...]
+      reshape_output = lambda x: x[0]
+    else:
+      reshape_output = lambda x: x
+
+    shift, logit_gate = tf.unstack(layer(x), axis=-1)
+    shift = reshape_output(shift)
+    logit_gate = reshape_output(logit_gate)
+    gate = tf.nn.sigmoid(logit_gate)
+    return tfb.AffineScalar(shift=(1. - gate) * shift, scale=gate)
+
+  return _bijector_fn
+
+
 @test_util.run_all_in_graph_and_eager_modes
-class GenMaskTest(tf.test.TestCase):
+class GenMaskTest(test_case.TestCase):
 
   def test346Exclusive(self):
     expected_mask = np.array(
@@ -89,7 +117,7 @@ class GenMaskTest(tf.test.TestCase):
 
 @test_util.run_all_in_graph_and_eager_modes
 class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
-                                   tf.test.TestCase):
+                                   test_case.TestCase):
 
   event_shape = [4]
 
@@ -117,7 +145,7 @@ class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
     # Use identity to invalidate cache.
     ildj = ma.inverse_log_det_jacobian(
         tf.identity(forward_x), event_ndims=len(self.event_shape))
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     [
         forward_x_,
         inverse_y_,
@@ -150,7 +178,7 @@ class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
     # Use identity to invalidate cache.
     ildj = ma.inverse_log_det_jacobian(
         tf.identity(forward_x), event_ndims=len(self.event_shape))
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     [
         forward_x_,
         inverse_y_,
@@ -209,7 +237,32 @@ class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
         num_samples=int(1e6),
         radius=1.,
         center=0.,
-        rtol=0.025)
+        rtol=0.03)
+
+  def testVectorBijectorRaises(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "Bijectors with `forward_min_event_ndims` > 0 are not supported"):
+
+      def bijector_fn(*args, **kwargs):
+        del args, kwargs
+        return tfb.Inline(forward_min_event_ndims=1)
+
+      maf = tfb.MaskedAutoregressiveFlow(
+          bijector_fn=bijector_fn, validate_args=True)
+      maf.forward([1., 2.])
+
+  def testRankChangingBijectorRaises(self):
+    with self.assertRaisesRegexp(
+        ValueError, "Bijectors which alter `event_ndims` are not supported."):
+
+      def bijector_fn(*args, **kwargs):
+        del args, kwargs
+        return tfb.Inline(forward_min_event_ndims=0, inverse_min_event_ndims=1)
+
+      maf = tfb.MaskedAutoregressiveFlow(
+          bijector_fn=bijector_fn, validate_args=True)
+      maf.forward([1., 2.])
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -280,7 +333,7 @@ class MaskedAutoregressive2DTest(MaskedAutoregressiveFlowTest):
   def _autoregressive_flow_kwargs(self):
     return {
         "shift_and_log_scale_fn":
-            masked_autoregressive_2d_template(
+            _masked_autoregressive_2d_template(
                 tfb.masked_autoregressive_default_template(
                     hidden_layers=[np.prod(self.event_shape)],
                     shift_only=False), self.event_shape),
@@ -292,6 +345,20 @@ class MaskedAutoregressive2DTest(MaskedAutoregressiveFlowTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
+class MaskedAutoregressiveGatedTest(MaskedAutoregressiveFlowTest):
+
+  @property
+  def _autoregressive_flow_kwargs(self):
+    return {
+        "bijector_fn":
+            _masked_autoregressive_gated_bijector_fn(
+                hidden_units=[10, 10], activation="relu"),
+        "is_constant_jacobian":
+            False,
+    }
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class MaskedAutoregressive2DLayerTest(MaskedAutoregressiveFlowTest):
   event_shape = [3, 2]
 
@@ -299,7 +366,7 @@ class MaskedAutoregressive2DLayerTest(MaskedAutoregressiveFlowTest):
   def _autoregressive_flow_kwargs(self):
     return {
         "shift_and_log_scale_fn":
-            masked_autoregressive_2d_template(
+            _masked_autoregressive_2d_template(
                 _masked_autoregressive_shift_and_log_scale_fn(
                     hidden_units=[np.prod(self.event_shape)],
                     shift_only=False), self.event_shape),
@@ -311,7 +378,7 @@ class MaskedAutoregressive2DLayerTest(MaskedAutoregressiveFlowTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoregressiveNetworkTest(tf.test.TestCase):
+class AutoregressiveNetworkTest(test_case.TestCase):
 
   def _count_trainable_params(self, layer):
     ret = 0
@@ -349,11 +416,12 @@ class AutoregressiveNetworkTest(tf.test.TestCase):
         params=3, event_shape=4, activation=None, input_order="right-to-left",
         dtype=tf.float64, hidden_degrees="random", hidden_units=[10, 7, 10])
     self.assertEqual((4, 3), made(np.zeros(4, dtype=np.float64)).shape)
+    self.assertEqual("float64", made(np.zeros(4, dtype=np.float64)).dtype)
     self.assertEqual(5 * 10 + 11 * 7 + 8 * 10 + 11 * 12,
                      self._count_trainable_params(made))
     if not tf.executing_eagerly():
       self.evaluate(
-          tf.compat.v1.initializers.variables(made.trainable_variables))
+          tf1.initializers.variables(made.trainable_variables))
     self.assertIsAutoregressive(made, event_size=4, order="right-to-left")
 
   def test_layer_callable_activation(self):
@@ -365,7 +433,7 @@ class AutoregressiveNetworkTest(tf.test.TestCase):
     self.assertEqual(6 * 9 + 10 * 10, self._count_trainable_params(made))
     if not tf.executing_eagerly():
       self.evaluate(
-          tf.compat.v1.initializers.variables(made.trainable_variables))
+          tf1.initializers.variables(made.trainable_variables))
     self.assertIsAutoregressive(made, event_size=5, order=made._input_order)
 
   def test_layer_smaller_hidden_layers_than_input(self):
@@ -377,7 +445,7 @@ class AutoregressiveNetworkTest(tf.test.TestCase):
     self.assertEqual(9 * 5 + 5 * 5 + 5 * 9, self._count_trainable_params(made))
     if not tf.executing_eagerly():
       self.evaluate(
-          tf.compat.v1.initializers.variables(made.trainable_variables))
+          tf1.initializers.variables(made.trainable_variables))
     self.assertIsAutoregressive(made, event_size=9, order="right-to-left")
 
   def test_layer_no_hidden_units(self):
@@ -388,11 +456,11 @@ class AutoregressiveNetworkTest(tf.test.TestCase):
     self.assertEqual(3 * 12, self._count_trainable_params(made))
     if not tf.executing_eagerly():
       self.evaluate(
-          tf.compat.v1.initializers.variables(made.trainable_variables))
+          tf1.initializers.variables(made.trainable_variables))
     self.assertIsAutoregressive(made, event_size=3, order="left-to-right")
 
   def test_layer_v2_kernel_initializer(self):
-    init = tf.compat.v2.keras.initializers.GlorotNormal()
+    init = tf.keras.initializers.GlorotNormal()
     made = tfb.AutoregressiveNetwork(
         params=2, event_shape=4, activation="relu",
         hidden_units=[5, 5], kernel_initializer=init)
@@ -400,7 +468,7 @@ class AutoregressiveNetworkTest(tf.test.TestCase):
     self.assertEqual(5 * 5 + 6 * 5 + 6 * 8, self._count_trainable_params(made))
     if not tf.executing_eagerly():
       self.evaluate(
-          tf.compat.v1.initializers.variables(made.trainable_variables))
+          tf1.initializers.variables(made.trainable_variables))
     self.assertIsAutoregressive(made, event_size=4, order="left-to-right")
 
   def test_doc_string(self):
@@ -424,7 +492,7 @@ class AutoregressiveNetworkTest(tf.test.TestCase):
     log_prob_ = distribution.log_prob(x_)
     model = tfk.Model(x_, log_prob_)
 
-    model.compile(optimizer=tf.compat.v1.train.AdamOptimizer(),
+    model.compile(optimizer=tf1.train.AdamOptimizer(),
                   loss=lambda _, log_prob: -log_prob)
 
     batch_size = 25
@@ -470,7 +538,7 @@ class AutoregressiveNetworkTest(tf.test.TestCase):
     log_prob_ = distribution.log_prob(x_)
     model = tfk.Model(x_, log_prob_)
 
-    model.compile(optimizer=tf.compat.v1.train.AdamOptimizer(),
+    model.compile(optimizer=tf1.train.AdamOptimizer(),
                   loss=lambda _, log_prob: -log_prob)
 
     batch_size = 10
@@ -516,7 +584,7 @@ class AutoregressiveNetworkTest(tf.test.TestCase):
     log_prob_ = distribution.log_prob(x_)
     model = tfk.Model(x_, log_prob_)
 
-    model.compile(optimizer=tf.compat.v1.train.AdamOptimizer(),
+    model.compile(optimizer=tf1.train.AdamOptimizer(),
                   loss=lambda _, log_prob: -log_prob)
 
     batch_size = 10

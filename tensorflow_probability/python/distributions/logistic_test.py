@@ -152,6 +152,14 @@ class LogisticTest(test_case.TestCase):
     self.assertAllClose(
         self.evaluate(sample), [6.22460556, 3.79602098, 2.05084133])
 
+  def testLogisticQuantile(self):
+    loc = [3.0, 4.0, 2.0]
+    scale = np.random.randn(3)**2 + 1e-3
+    x = [.2, .5, .99]
+    expected_quantile = stats.logistic.ppf(x, loc=loc, scale=scale)
+    dist = tfd.Logistic(loc, scale)
+    self.assertAllClose(self.evaluate(dist.quantile(x)), expected_quantile)
+
   def testDtype(self):
     loc = tf.constant([0.1, 0.4], dtype=tf.float32)
     scale = tf.constant(1.0, dtype=tf.float32)

@@ -19,19 +19,29 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
+from absl import logging
+import hypothesis as hp
+import hypothesis.strategies as hps
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
+from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
+
+def _preserves_vector_dim(dim):
+  return lambda bijector: bijector.forward_event_shape([dim]) == [dim]
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TransformDiagonalBijectorTest(tf.test.TestCase):
+class TransformDiagonalBijectorTest(test_case.TestCase):
   """Tests correctness of the TransformDiagonal bijector."""
-
-  def setUp(self):
-    self._rng = np.random.RandomState(42)
 
   def testBijector(self):
     x = np.float32(np.random.randn(3, 4, 4))
@@ -62,6 +72,64 @@ class TransformDiagonalBijectorTest(tf.test.TestCase):
             np.array([np.diag(y_mat) for y_mat in y]),
             event_ndims=1)))
 
+  @tfp_test_util.numpy_disable_gradient_test
+  def testTheoreticalFldjNormalCDF(self):
+    # b/137367959 test failure trigger case (resolved by using
+    # experimental_use_pfor=False as fallback instead of primary in
+    # bijector_test_util.get_fldj_theoretical)
+    bijector = tfb.TransformDiagonal(diag_bijector=tfb.NormalCDF())
+    x = np.zeros([0, 0])
+    fldj = bijector.forward_log_det_jacobian(x, event_ndims=2)
+    fldj_theoretical = bijector_test_util.get_fldj_theoretical(
+        bijector,
+        x,
+        event_ndims=2,
+        inverse_event_ndims=2)
+    self.assertAllClose(
+        self.evaluate(fldj_theoretical),
+        self.evaluate(fldj),
+        atol=1e-5,
+        rtol=1e-5)
 
-if __name__ == "__main__":
+  @tfp_test_util.numpy_disable_gradient_test
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  def testTheoreticalFldj(self, data):
+    dim = data.draw(hps.integers(min_value=0, max_value=10))
+    diag_bijector = data.draw(
+        bijector_hps.unconstrained_bijectors(
+            max_forward_event_ndims=1,
+            must_preserve_event_ndims=True).filter(_preserves_vector_dim(dim)))
+    logging.info('Using diagonal bijector %s %s', diag_bijector.name,
+                 diag_bijector)
+
+    bijector = tfb.TransformDiagonal(diag_bijector=diag_bijector)
+    ensure_nonzero_batch = lambda shape: [d if d > 0 else 1 for d in shape]
+    shape = data.draw(tfp_hps.shapes().map(ensure_nonzero_batch)) + [dim, dim]
+    x = np.random.randn(*shape).astype(np.float64)
+    y = self.evaluate(bijector.forward(x))
+    bijector_test_util.assert_bijective_and_finite(
+        bijector,
+        x,
+        y,
+        eval_func=self.evaluate,
+        event_ndims=2,
+        inverse_event_ndims=2,
+        rtol=1e-5)
+    fldj = bijector.forward_log_det_jacobian(x, event_ndims=2)
+    # For constant-jacobian bijectors, the zero fldj may not be broadcast.
+    fldj = fldj + tf.zeros(tf.shape(x)[:-2], dtype=x.dtype)
+    fldj_theoretical = bijector_test_util.get_fldj_theoretical(
+        bijector,
+        x,
+        event_ndims=2,
+        inverse_event_ndims=2)
+    self.assertAllClose(
+        self.evaluate(fldj_theoretical),
+        self.evaluate(fldj),
+        atol=1e-5,
+        rtol=1e-5)
+
+
+if __name__ == '__main__':
   tf.test.main()

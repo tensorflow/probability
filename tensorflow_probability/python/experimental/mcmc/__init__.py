@@ -12,20 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""TensorFlow Probability Google-internal NUTS package.
-"""
+"""TensorFlow Probability experimental NUTS package."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_probability.python.experimental.mcmc import nuts
 from tensorflow_probability.python.experimental.mcmc.nuts import NoUTurnSampler
 
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
-    'nuts',
     'NoUTurnSampler',
 ]
 

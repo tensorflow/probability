@@ -144,7 +144,7 @@ def _slice_params_to_dict(dist, params_event_ndims, slices):
 
 def _apply_single_step(dist, params_event_ndims, slices, params_overrides):
   """Applies a single slicing step to `dist`, returning a new instance."""
-  if len(slices) == 1 and slices[0] == Ellipsis:
+  if len(slices) == 1 and slices[0] is Ellipsis:
     # The path used by Distribution.copy: batch_slice(...args..., Ellipsis)
     override_dict = {}
   else:

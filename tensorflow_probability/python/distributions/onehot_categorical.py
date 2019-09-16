@@ -24,8 +24,12 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 class OneHotCategorical(distribution.Distribution):
@@ -113,142 +117,269 @@ class OneHotCategorical(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      self._logits, self._probs = distribution_util.get_logits_and_probs(
-          name=name, logits=logits, probs=probs, validate_args=validate_args,
-          multidimensional=True)
-
-      logits_shape_static = tensorshape_util.with_rank_at_least(
-          self._logits.shape, 1)
-      if tensorshape_util.rank(logits_shape_static) is not None:
-        self._batch_rank = tf.convert_to_tensor(
-            tensorshape_util.rank(logits_shape_static) - 1,
-            dtype=tf.int32,
-            name='batch_rank')
-      else:
-        with tf.name_scope('batch_rank'):
-          self._batch_rank = tf.rank(self._logits) - 1
-
-      with tf.name_scope('event_size'):
-        self._event_size = tf.shape(self._logits)[-1]
-
-    super(OneHotCategorical, self).__init__(
-        dtype=dtype,
-        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._logits, self._probs],
-        name=name)
+      self._probs = tensor_util.convert_nonref_to_tensor(
+          probs, dtype_hint=tf.float32, name='probs')
+      self._logits = tensor_util.convert_nonref_to_tensor(
+          logits, dtype_hint=tf.float32, name='logits')
+      if (self._probs is None) == (self._logits is None):
+        raise ValueError('Must pass `probs` or `logits`, but not both.')
+      super(OneHotCategorical, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
     return dict(logits=1, probs=1)
 
   @property
+  @deprecation.deprecated(
+      '2019-10-01', 'The `event_size` property is deprecated.  Use '
+      '`tf.shape(self.probs if self.logits is None else self.logits)[-1]` '
+      'instead.')
   def event_size(self):
     """Scalar `int32` tensor: the number of classes."""
-    return self._event_size
+    with self._name_and_control_scope('event_size'):
+      return self._event_size()
+
+  def _event_size(self, param=None):
+    if param is None:
+      param = self._logits if self._logits is not None else self._probs
+    if param.shape is not None:
+      event_size = tf.compat.dimension_value(param.shape[-1])
+      if event_size is not None:
+        return event_size
+    return tf.shape(param)[-1]
 
   @property
   def logits(self):
     """Input argument `logits`."""
+    if self._logits is None:
+      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
+    if self._probs is None:
+      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.logits)[:-1]
+    param = self._logits if self._logits is not None else self._probs
+    return prefer_static.shape(param)[:-1]
 
   def _batch_shape(self):
-    return self.logits.shape[:-1]
+    param = self._logits if self._logits is not None else self._probs
+    return param.shape[:-1]
 
   def _event_shape_tensor(self):
-    return tf.shape(self.logits)[-1:]
+    param = self._logits if self._logits is not None else self._probs
+    # NOTE: If the last dimension of `param.shape` is statically-known, but
+    # the `param.shape` is not statically-known, then we will *not* return a
+    # statically-known event size here.  This could be fixed.
+    return prefer_static.shape(param)[-1:]
 
   def _event_shape(self):
-    return tensorshape_util.with_rank_at_least(self.logits.shape, 1)[-1:]
+    param = self._logits if self._logits is not None else self._probs
+    return tensorshape_util.with_rank_at_least(param.shape, 1)[-1:]
 
   def _sample_n(self, n, seed=None):
-    sample_shape = tf.concat([[n], tf.shape(self.logits)], 0)
-    logits = self.logits
+    logits = self._logits_parameter_no_checks()
+    sample_shape = prefer_static.concat([[n], prefer_static.shape(logits)], 0)
+    event_size = self._event_size(logits)
     if tensorshape_util.rank(logits.shape) == 2:
       logits_2d = logits
     else:
-      logits_2d = tf.reshape(logits, [-1, self.event_size])
+      logits_2d = tf.reshape(logits, [-1, event_size])
     samples = tf.random.categorical(logits_2d, n, seed=seed)
     samples = tf.transpose(a=samples)
-    samples = tf.one_hot(samples, self.event_size, dtype=self.dtype)
+    samples = tf.one_hot(samples, event_size, dtype=self.dtype)
     ret = tf.reshape(samples, sample_shape)
     return ret
 
   def _log_prob(self, x):
-    x = tf.cast(x, self.logits.dtype)
-    x = self._assert_valid_sample(x)
+    logits = self._logits_parameter_no_checks()
+    event_size = self._event_size(logits)
+
+    x = tf.cast(x, logits.dtype)
+    x = self._maybe_assert_valid_sample(x, dtype=logits.dtype)
+
     # broadcast logits or x if need be.
-    logits = self.logits
     if (not tensorshape_util.is_fully_defined(x.shape) or
         not tensorshape_util.is_fully_defined(logits.shape) or
         x.shape != logits.shape):
-      logits = tf.ones_like(x, dtype=logits.dtype) * logits
-      x = tf.ones_like(logits, dtype=x.dtype) * x
+      broadcast_shape = tf.broadcast_dynamic_shape(
+          tf.shape(logits), tf.shape(x))
+      logits = tf.broadcast_to(logits, broadcast_shape)
+      x = tf.broadcast_to(x, broadcast_shape)
 
     logits_shape = tf.shape(tf.reduce_sum(logits, axis=-1))
-    logits_2d = tf.reshape(logits, [-1, self.event_size])
-    x_2d = tf.reshape(x, [-1, self.event_size])
+    logits_2d = tf.reshape(logits, [-1, event_size])
+    x_2d = tf.reshape(x, [-1, event_size])
     ret = -tf.nn.softmax_cross_entropy_with_logits(
         labels=tf.stop_gradient(x_2d),
         logits=logits_2d)
+
     # Reshape back to user-supplied batch and sample dims prior to 2D reshape.
     ret = tf.reshape(ret, logits_shape)
     return ret
 
   def _entropy(self):
-    return -tf.reduce_sum(
-        tf.math.log_softmax(self.logits) * self.probs, axis=-1)
+    if self._logits is None:
+      # If we only have probs, there's not much we can do to ensure numerical
+      # precision.
+      probs = tf.convert_to_tensor(self._probs)
+      return -tf.reduce_sum(
+          tf.math.multiply_no_nan(tf.math.log(probs), probs),
+          axis=-1)
+
+    # The following result can be derived as follows. Write log(p[i]) as:
+    # s[i]-m-lse(s[i]-m) where m=max(s), then you have:
+    #   sum_i exp(s[i]-m-lse(s-m)) (s[i] - m - lse(s-m))
+    #   = -m - lse(s-m) + sum_i s[i] exp(s[i]-m-lse(s-m))
+    #   = -m - lse(s-m) + (1/exp(lse(s-m))) sum_i s[i] exp(s[i]-m)
+    #   = -m - lse(s-m) + (1/sumexp(s-m)) sum_i s[i] exp(s[i]-m)
+    # Write x[i]=s[i]-m then you have:
+    #   = -m - lse(x) + (1/sum_exp(x)) sum_i s[i] exp(x[i])
+    # Negating all of this result is the Shanon (discrete) entropy.
+    logits = tf.convert_to_tensor(self._logits)
+    m = tf.reduce_max(logits, axis=-1, keepdims=True)
+    x = logits - m
+    lse_logits = m[..., 0] + tf.reduce_logsumexp(x, axis=-1)
+    sum_exp_x = tf.reduce_sum(tf.math.exp(x), axis=-1)
+    return lse_logits - tf.reduce_sum(
+        tf.math.multiply_no_nan(logits, tf.math.exp(x)), axis=-1) / sum_exp_x
 
   def _mean(self):
-    return self.probs
+    return self._probs_parameter_no_checks()
 
   def _mode(self):
-    ret = tf.argmax(self.logits, axis=self._batch_rank)
-    ret = tf.one_hot(ret, self.event_size, dtype=self.dtype)
-    tensorshape_util.set_shape(ret, self.logits.shape)
+    logits = self._logits_parameter_no_checks()
+    ret = tf.one_hot(
+        tf.argmax(logits, axis=-1), self._event_size(logits), dtype=self.dtype)
+    tensorshape_util.set_shape(ret, logits.shape)
     return ret
 
   def _covariance(self):
-    p = self.probs
+    p = self._probs_parameter_no_checks()
     ret = -tf.matmul(p[..., None], p[..., None, :])
-    return tf.linalg.set_diag(ret, self._variance())
+    return tf.linalg.set_diag(ret, self._variance(p))
 
-  def _variance(self):
-    return self.probs * (1. - self.probs)
+  def _variance(self, probs=None):
+    if probs is None:
+      probs = self._probs_parameter_no_checks()
+    return probs * (1. - probs)
 
   def logits_parameter(self, name=None):
     """Logits vec computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'logits_parameter'):
-      if self.logits is None:
-        return tf.math.log(self.probs)
-      return tf.identity(self.logits)
+      return self._logits_parameter_no_checks()
+
+  def _logits_parameter_no_checks(self):
+    if self._logits is None:
+      return tf.math.log(self._probs)
+    return tf.identity(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'probs_parameter'):
-      if self.logits is None:
-        return tf.identity(self.probs)
-      return tf.math.softmax(self.logits)
+      return self._probs_parameter_no_checks()
 
-  def _assert_valid_sample(self, x):
+  def _probs_parameter_no_checks(self):
+    if self._logits is None:
+      return tf.identity(self._probs)
+    return tf.math.softmax(self._logits)
+
+  def _maybe_assert_valid_sample(self, x, dtype):
     if not self.validate_args:
       return x
+    one = tf.ones([], dtype=dtype)
     return distribution_util.with_dependencies([
-        assert_util.assert_non_positive(x),
-        assert_util.assert_near(
-            tf.zeros([], dtype=self.logits.dtype),
-            tf.reduce_logsumexp(x, axis=[-1])),
+        assert_util.assert_non_negative(x),
+        assert_util.assert_less_equal(x, one),
+        assert_util.assert_near(one, tf.reduce_sum(x, axis=[-1])),
     ], x)
+
+  @deprecation.deprecated(
+      '2019-11-01',
+      ('The `logits` property will return `None` when the distribution is '
+       'parameterized with `logits=None`. Use `logits_parameter()` instead.'),
+      warn_once=True)
+  def _logits_deprecated_behavior(self):
+    return self.logits_parameter()
+
+  @deprecation.deprecated(
+      '2019-11-01',
+      ('The `probs` property will return `None` when the distribution is '
+       'parameterized with `probs=None`. Use `probs_parameter()` instead.'),
+      warn_once=True)
+  def _probs_deprecated_behavior(self):
+    return self.probs_parameter()
+
+  def _parameter_control_dependencies(self, is_init):
+    assertions = []
+
+    logits = self._logits
+    probs = self._probs
+    param, name = (probs, 'probs') if logits is None else (logits, 'logits')
+
+    # In init, we can always build shape and dtype checks because
+    # we assume shape doesn't change for Variable backed args.
+    if is_init:
+      if not dtype_util.is_floating(param.dtype):
+        raise TypeError('Argument `{}` must having floating type.'.format(name))
+
+      msg = 'Argument `{}` must have rank at least 1.'.format(name)
+      shape_static = tensorshape_util.dims(param.shape)
+      if shape_static is not None:
+        if len(shape_static) < 1:
+          raise ValueError(msg)
+      elif self.validate_args:
+        param = tf.convert_to_tensor(param)
+        assertions.append(
+            assert_util.assert_rank_at_least(param, 1, message=msg))
+        with tf.control_dependencies(assertions):
+          param = tf.identity(param)
+
+      msg1 = 'Argument `{}` must have final dimension >= 1.'.format(name)
+      msg2 = 'Argument `{}` must have final dimension <= {}.'.format(
+          name, tf.int32.max)
+      event_size = shape_static[-1] if shape_static is not None else None
+      if event_size is not None:
+        if event_size < 1:
+          raise ValueError(msg1)
+        if event_size > tf.int32.max:
+          raise ValueError(msg2)
+      elif self.validate_args:
+        param = tf.convert_to_tensor(param)
+        assertions.append(assert_util.assert_greater_equal(
+            tf.shape(param)[-1], 1, message=msg1))
+        # NOTE: For now, we leave out a runtime assertion that
+        # `tf.shape(param)[-1] <= tf.int32.max`.  An earlier `tf.shape` call
+        # will fail before we get to this point.
+
+    if not self.validate_args:
+      assert not assertions  # Should never happen.
+      return []
+
+    if probs is not None:
+      probs = param  # reuse tensor conversion from above
+      if is_init != tensor_util.is_ref(probs):
+        probs = tf.convert_to_tensor(probs)
+        one = tf.ones([], dtype=probs.dtype)
+        assertions.extend([
+            assert_util.assert_non_negative(probs),
+            assert_util.assert_less_equal(probs, one),
+            assert_util.assert_near(
+                tf.reduce_sum(probs, axis=-1), one,
+                message='Argument `probs` must sum to 1.'),
+        ])
+
+    return assertions
 
 
 @kullback_leibler.RegisterKL(OneHotCategorical, OneHotCategorical)
@@ -265,9 +396,11 @@ def _kl_categorical_categorical(a, b, name=None):
     Batchwise KL(a || b)
   """
   with tf.name_scope(name or 'kl_categorical_categorical'):
+    # pylint: disable=protected-access
+    a_logits = a._logits_parameter_no_checks()
+    # pylint: disable=protected-access
+    b_logits = b._logits_parameter_no_checks()
     # sum(p ln(p / q))
-    a_logits = a.logits_parameter()
-    b_logits = b.logits_parameter()
     return tf.reduce_sum(
         (tf.math.softmax(a_logits) *
          (tf.math.log_softmax(a_logits) - tf.math.log_softmax(b_logits))),

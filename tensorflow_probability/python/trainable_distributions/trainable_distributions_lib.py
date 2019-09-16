@@ -24,9 +24,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import math as tfp_math
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -59,7 +61,7 @@ def softplus_and_shift(x, shift=1e-5, name=None):
   Returns:
     scale: (Batch of) scalars`with `x.dtype` and `x.shape`.
   """
-  with tf.compat.v1.name_scope(name, 'softplus_and_shift', [x, shift]):
+  with tf1.name_scope(name, 'softplus_and_shift', [x, shift]):
     x = tf.convert_to_tensor(value=x, name='x')
     y = tf.nn.softplus(x)
     if shift is not None:
@@ -91,10 +93,10 @@ def tril_with_diag_softplus_and_shift(x, diag_shift=1e-5, name=None):
       rightmost shape `[dims, dims]` where `n = dims * (dims + 1) / 2` where
       `n = x.shape[-1]`.
   """
-  with tf.compat.v1.name_scope(name, 'tril_with_diag_softplus_and_shift',
+  with tf1.name_scope(name, 'tril_with_diag_softplus_and_shift',
                                [x, diag_shift]):
     x = tf.convert_to_tensor(value=x, name='x')
-    x = tfd.fill_triangular(x)
+    x = tfp_math.fill_triangular(x)
     diag = softplus_and_shift(tf.linalg.diag_part(x), diag_shift)
     x = tf.linalg.set_diag(x, diag)
     return x
@@ -107,7 +109,7 @@ def tril_with_diag_softplus_and_shift(x, diag_shift=1e-5, name=None):
     warn_once=True)
 def multivariate_normal_tril(x,
                              dims,
-                             layer_fn=tf.compat.v1.layers.dense,
+                             layer_fn=tf1.layers.dense,
                              loc_fn=lambda x: x,
                              scale_fn=tril_with_diag_softplus_and_shift,
                              name=None):
@@ -205,7 +207,7 @@ def multivariate_normal_tril(x,
   Returns:
     mvntril: An instance of `tfd.MultivariateNormalTriL`.
   """
-  with tf.compat.v1.name_scope(name, 'multivariate_normal_tril', [x, dims]):
+  with tf1.name_scope(name, 'multivariate_normal_tril', [x, dims]):
     x = tf.convert_to_tensor(value=x, name='x')
     x = layer_fn(x, dims + dims * (dims + 1) // 2)
     return tfd.MultivariateNormalTriL(
@@ -218,7 +220,7 @@ def multivariate_normal_tril(x,
     '`multivariate_normal_tril` is deprecated; '
     'use `tfp.layers.DistributionLambda` or `tfp.util.DeferredTensor`.',
     warn_once=True)
-def bernoulli(x, layer_fn=tf.compat.v1.layers.dense, name=None):
+def bernoulli(x, layer_fn=tf1.layers.dense, name=None):
   """Constructs a trainable `tfd.Bernoulli` distribution.
 
   This function creates a Bernoulli distribution parameterized by logits.
@@ -296,7 +298,7 @@ def bernoulli(x, layer_fn=tf.compat.v1.layers.dense, name=None):
   Returns:
     bernoulli: An instance of `tfd.Bernoulli`.
   """
-  with tf.compat.v1.name_scope(name, 'bernoulli', [x]):
+  with tf1.name_scope(name, 'bernoulli', [x]):
     x = tf.convert_to_tensor(value=x, name='x')
     logits = tf.squeeze(layer_fn(x, 1), axis=-1)
     return tfd.Bernoulli(logits=logits)
@@ -308,7 +310,7 @@ def bernoulli(x, layer_fn=tf.compat.v1.layers.dense, name=None):
     'use `tfp.layers.DistributionLambda` or `tfp.util.DeferredTensor`.',
     warn_once=True)
 def normal(x,
-           layer_fn=tf.compat.v1.layers.dense,
+           layer_fn=tf1.layers.dense,
            loc_fn=lambda x: x,
            scale_fn=1.,
            name=None):
@@ -400,7 +402,7 @@ def normal(x,
   Returns:
     normal: An instance of `tfd.Normal`.
   """
-  with tf.compat.v1.name_scope(name, 'normal', [x]):
+  with tf1.name_scope(name, 'normal', [x]):
     x = tf.convert_to_tensor(value=x, name='x')
     if callable(scale_fn):
       y = layer_fn(x, 2)
@@ -419,7 +421,7 @@ def normal(x,
     'use `tfp.layers.DistributionLambda` or `tfp.util.DeferredTensor`.',
     warn_once=True)
 def poisson(x,
-            layer_fn=tf.compat.v1.layers.dense,
+            layer_fn=tf1.layers.dense,
             log_rate_fn=lambda x: x,
             name=None):
   """Constructs a trainable `tfd.Poisson` distribution.
@@ -503,7 +505,7 @@ def poisson(x,
   Returns:
     poisson: An instance of `tfd.Poisson`.
   """
-  with tf.compat.v1.name_scope(name, 'poisson', [x]):
+  with tf1.name_scope(name, 'poisson', [x]):
     x = tf.convert_to_tensor(value=x, name='x')
     log_rate = log_rate_fn(tf.squeeze(layer_fn(x, 1), axis=-1))
     return tfd.Poisson(log_rate=log_rate)

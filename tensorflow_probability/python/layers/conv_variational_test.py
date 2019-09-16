@@ -21,7 +21,8 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_case
@@ -331,7 +332,7 @@ class ConvVariational(object):
     bias_divergence = MockKLDivergence(
         result=tf.random.uniform([], seed=seed()))
 
-    tf.compat.v1.set_random_seed(5995)
+    tf1.set_random_seed(5995)
     layer = layer_class(
         filters=filters,
         kernel_size=kernel_size,
@@ -428,7 +429,7 @@ class ConvVariational(object):
            depth=depth, height=height, width=width, channels=channels,
            filters=filters, seed=44)
 
-      tf.compat.v1.set_random_seed(5995)
+      tf1.set_random_seed(5995)
 
       convolution_op = nn_ops.Convolution(
           tf.TensorShape(inputs.shape),
@@ -454,7 +455,7 @@ class ConvVariational(object):
         channels = input_shape[-1]
       rank = len(inputs.shape) - 2
 
-      seed_stream = tfd.SeedStream(layer.seed, salt='ConvFlipout')
+      seed_stream = tfp.util.SeedStream(layer.seed, salt='ConvFlipout')
 
       sign_input = tf.random.uniform(
           tf.concat([batch_shape, tf.expand_dims(channels, 0)], 0),
@@ -615,7 +616,7 @@ class ConvVariational(object):
       output = net(inputs)
 
       # Verify that the network runs without errors
-      sess.run(tf.compat.v1.global_variables_initializer())
+      sess.run(tf1.global_variables_initializer())
       sess.run(output)
 
   def testKerasLayerConvolution1DReparameterization(self):

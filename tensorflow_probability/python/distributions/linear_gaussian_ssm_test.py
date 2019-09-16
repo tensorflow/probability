@@ -19,11 +19,12 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import _augment_sample_shape
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import backward_smoothing_update
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import BackwardPassState
@@ -35,13 +36,11 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import buil
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import kalman_transition
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import KalmanFilterState
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
-
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case as tfp_test_case
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
 tfl = tf.linalg
 
 
@@ -169,25 +168,25 @@ class _IIDNormalTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTestStatic32(_IIDNormalTest, tf.test.TestCase):
+class IIDNormalTestStatic32(_IIDNormalTest, test_case.TestCase):
   use_static_shape = True
   dtype = np.float32
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTestStatic64(_IIDNormalTest, tf.test.TestCase):
+class IIDNormalTestStatic64(_IIDNormalTest, test_case.TestCase):
   use_static_shape = True
   dtype = np.float64
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTestDynamic32(_IIDNormalTest, tf.test.TestCase):
+class IIDNormalTestDynamic32(_IIDNormalTest, test_case.TestCase):
   use_static_shape = False
   dtype = np.float32
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SanityChecks(tf.test.TestCase):
+class SanityChecks(test_case.TestCase):
 
   def test_deterministic_system(self):
 
@@ -336,9 +335,37 @@ class SanityChecks(tf.test.TestCase):
 
     self.assertAllClose(observation_variances, variance_[..., 0])
 
+  def testWhenNumTimestepsIsOne(self):
+
+    num_timesteps = 1
+    latent_size = 5
+    transition_std = 3.0
+    observation_std = 5.0
+
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=tfl.LinearOperatorIdentity(latent_size),
+        transition_noise=tfd.MultivariateNormalDiag(
+            scale_diag=tf.fill([latent_size], tf.square(transition_std))),
+        observation_matrix=tfl.LinearOperatorIdentity(latent_size),
+        observation_noise=tfd.MultivariateNormalDiag(
+            scale_diag=tf.fill([latent_size], tf.square(observation_std))),
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            scale_diag=tf.ones([latent_size])))
+
+    sample_, mean_, variance_ = self.evaluate(
+        [model.sample(), model.mean(), model.variance()])
+
+    result_shape = [num_timesteps, latent_size]
+    self.assertAllEqual(tensorshape_util.as_list(sample_.shape), result_shape)
+    self.assertAllEqual(tensorshape_util.as_list(mean_.shape), result_shape)
+    self.assertAllEqual(
+        tensorshape_util.as_list(variance_.shape),
+        result_shape)
+
 
 @test_util.run_all_in_graph_and_eager_modes
-class BatchTest(tf.test.TestCase):
+class BatchTest(test_case.TestCase):
   """Test that methods broadcast batch dimensions for each parameter."""
 
   def setUp(self):
@@ -537,7 +564,7 @@ class BatchTest(tf.test.TestCase):
     self.assertAllClose(pushforward_covs_, observation_covs_)
 
 
-class MissingObservationsTests(tfp_test_case.TestCase):
+class MissingObservationsTests(test_case.TestCase):
 
   # One test requires derivative with respect to
   # transition_noise.scale_diag so we allow this to be
@@ -776,7 +803,7 @@ class MissingObservationsTests(tfp_test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class KalmanSmootherTest(tf.test.TestCase):
+class KalmanSmootherTest(test_case.TestCase):
 
   def build_kf(self):
     # Define a simple model with 3D latents and 2D observations.
@@ -1252,7 +1279,7 @@ class _KalmanStepsTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class KalmanStepsTestStatic(tf.test.TestCase, _KalmanStepsTest):
+class KalmanStepsTestStatic(test_case.TestCase, _KalmanStepsTest):
 
   use_static_shape = True
 
@@ -1264,7 +1291,7 @@ class KalmanStepsTestStatic(tf.test.TestCase, _KalmanStepsTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class KalmanStepsTestDynamic(tf.test.TestCase, _KalmanStepsTest):
+class KalmanStepsTestDynamic(test_case.TestCase, _KalmanStepsTest):
 
   use_static_shape = False
 
@@ -1320,7 +1347,7 @@ class _AugmentSampleShapeTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AugmentSampleShapeTestStatic(tf.test.TestCase, _AugmentSampleShapeTest):
+class AugmentSampleShapeTestStatic(test_case.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
     return self.assertRaisesRegexp(Exception, msg)
@@ -1337,7 +1364,8 @@ class AugmentSampleShapeTestStatic(tf.test.TestCase, _AugmentSampleShapeTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AugmentSampleShapeTestDynamic(tf.test.TestCase, _AugmentSampleShapeTest):
+class AugmentSampleShapeTestDynamic(test_case.TestCase,
+                                    _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
     if tf.executing_eagerly():

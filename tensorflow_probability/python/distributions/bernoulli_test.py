@@ -18,21 +18,19 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
 # Dependency imports
+
 import numpy as np
 from scipy import special as sp_special
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 def make_bernoulli(batch_shape, dtype=tf.int32):
@@ -326,7 +324,7 @@ make_slicer = _MakeSlicer()
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BernoulliSlicingTest(tf.test.TestCase):
+class BernoulliSlicingTest(test_case.TestCase):
 
   def testScalarSlice(self):
     logits = self.evaluate(tf.random.normal([]))

@@ -18,21 +18,24 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import inspect
 import os
 
 # Dependency imports
+
 from absl import flags
+from absl import logging
 import numpy as np
 import six
-
-import tensorflow as tf
-
-from tensorflow_probability.python.distributions import seed_stream
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal.backend.numpy import ops
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
-    'numpy_disable',
+    'numpy_disable_gradient_test',
+    'jax_disable_variable_test',
+    'jax_disable_test_missing_functionality',
     'test_seed',
     'test_seed_stream',
     'DiscreteScalarDistributionTestHelpers',
@@ -51,14 +54,51 @@ flags.DEFINE_string('fixed_seed', None,
                      'Takes precedence over --vary-seed when both appear.'))
 
 
-def numpy_disable(test_fn):
+JAX_MODE = False
+
+
+def numpy_disable_gradient_test(test_fn):
+  """Disable a gradient-using test when using the numpy backend."""
+
+  if JAX_MODE:
+    return test_fn
 
   def new_test(self, *args, **kwargs):
-    if not inspect.isclass(tf.Variable):
-      self.skipTest('test disabled for numpy')
+    if tf.Variable == ops.NumpyVariable:
+      self.skipTest('gradient-using test disabled for numpy')
     return test_fn(self, *args, **kwargs)
 
   return new_test
+
+
+def jax_disable_variable_test(test_fn):
+  """Disable a Variable-using test when using the JAX backend."""
+
+  if not JAX_MODE:
+    return test_fn
+
+  def new_test(self, *args, **kwargs):
+    self.skipTest('tf.Variable-using test disabled for JAX')
+    return test_fn(self, *args, **kwargs)
+
+  return new_test
+
+
+def jax_disable_test_missing_functionality(issue_link):
+  """Disable a test for unimplemented JAX functionality."""
+
+  def f(test_fn):
+    if not JAX_MODE:
+      return test_fn
+
+    def new_test(self, *args, **kwargs):
+      self.skipTest(
+          'Test disabled for JAX missing functionality: {}'.format(issue_link))
+      return test_fn(self, *args, **kwargs)
+
+    return new_test
+
+  return f
 
 
 def test_seed(hardcoded_seed=None, set_eager_seed=True):
@@ -79,12 +119,12 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
     (e.g., debugging a crash that only some seeds trigger).
 
   To those ends, this function returns 17, but respects the command line flags
-  `--fixed_seed=<seed>` and `--vary-seed` (Boolean, default False).
+  `--fixed_seed=<seed>` and `--vary_seed` (Boolean, default False).
   `--vary_seed` uses system entropy to produce unpredictable seeds.
   `--fixed_seed` takes precedence over `--vary_seed` when both are present.
 
   Note that TensorFlow graph mode operations tend to read seed state from two
-  sources: a "graph-level seed" and an "op-level seed".  tf.test.TestCase will
+  sources: a "graph-level seed" and an "op-level seed".  test_case.TestCase will
   set the former to a fixed value per test, but in general it may be necessary
   to explicitly set both to ensure reproducibility.
 
@@ -109,15 +149,24 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
       answer = int(entropy.encode('hex'), 16)
     else:
       answer = int.from_bytes(entropy, 'big')
-    tf.compat.v1.logging.warning('Using seed {}'.format(answer))
+    logging.warning('Using seed %s', answer)
   elif hardcoded_seed is not None:
     answer = hardcoded_seed
   else:
     answer = 17
+  return (_wrap_seed_jax if JAX_MODE else _wrap_seed)(answer, set_eager_seed)
+
+
+def _wrap_seed(seed, set_eager_seed):
   # TODO(b/68017812): Remove this clause once eager correctly supports seeding.
   if tf.executing_eagerly() and set_eager_seed:
-    tf.compat.v1.set_random_seed(answer)
-  return answer
+    tf1.set_random_seed(seed)
+  return seed
+
+
+def _wrap_seed_jax(seed, _):
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  return jaxrand.PRNGKey(seed % (2**32 - 1))
 
 
 def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
@@ -141,7 +190,7 @@ def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
   `--vary_seed` when both are present.
 
   Note that TensorFlow graph mode operations tend to read seed state from two
-  sources: a "graph-level seed" and an "op-level seed".  tf.test.TestCase will
+  sources: a "graph-level seed" and an "op-level seed".  test_case.TestCase will
   set the former to a fixed value per test, but in general it may be necessary
   to explicitly set both to ensure reproducibility.
 
@@ -156,7 +205,7 @@ def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
     strm: A SeedStream instance seeded with 17, unless otherwise specified by
       arguments or command line flags.
   """
-  return seed_stream.SeedStream(salt, test_seed(hardcoded_seed))
+  return SeedStream(test_seed(hardcoded_seed), salt=salt)
 
 
 class DiscreteScalarDistributionTestHelpers(object):
@@ -297,7 +346,7 @@ class DiscreteScalarDistributionTestHelpers(object):
         `counts[i] = sum{ edges[i-1] <= values[j] < edges[i] : j }`.
       edges: 1D `Tensor` characterizing intervals used for counting.
     """
-    with tf.compat.v2.name_scope(name or 'histogram'):
+    with tf.name_scope(name or 'histogram'):
       x = tf.convert_to_tensor(value=x, name='x')
       if value_range is None:
         value_range = [
@@ -412,13 +461,13 @@ class VectorDistributionTestHelpers(object):
       x = dist.sample(num_samples, seed=seed)
       x = tf.identity(x)  # Invalidate bijector cacheing.
       inverse_log_prob = tf.exp(-dist.log_prob(x))
-      importance_weights = tf.compat.v1.where(
+      importance_weights = tf1.where(
           tf.norm(tensor=x - center, axis=-1) <= radius, inverse_log_prob,
           tf.zeros_like(inverse_log_prob))
       return tf.reduce_mean(input_tensor=importance_weights, axis=0)
 
     # Build graph.
-    with tf.compat.v2.name_scope('run_test_sample_consistent_log_prob'):
+    with tf.name_scope('run_test_sample_consistent_log_prob'):
       batch_shape = dist.batch_shape_tensor()
       actual_volume = actual_hypersphere_volume(
           dims=dist.event_shape_tensor()[0],
@@ -428,7 +477,7 @@ class VectorDistributionTestHelpers(object):
           num_samples=num_samples,
           radius=radius,
           center=center)
-      init_op = tf.compat.v1.global_variables_initializer()
+      init_op = tf1.global_variables_initializer()
 
     # Execute graph.
     sess_run_fn(init_op)
@@ -513,5 +562,5 @@ class VectorDistributionTestHelpers(object):
 
 def _vec_outer_square(x, name=None):
   """Computes the outer-product of a vector, i.e., x.T x."""
-  with tf.compat.v2.name_scope(name or 'vec_osquare'):
+  with tf.name_scope(name or 'vec_osquare'):
     return x[..., :, tf.newaxis] * x[..., tf.newaxis, :]

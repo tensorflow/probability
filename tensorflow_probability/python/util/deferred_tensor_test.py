@@ -22,18 +22,17 @@ import operator
 
 from absl.testing import parameterized
 import numpy as np
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
-
 
 @test_util.run_all_in_graph_and_eager_modes
-class DeferredTensorTest(tf.test.TestCase):
+class DeferredTensorTest(test_case.TestCase):
 
   def test_docstring_example(self):
     trainable_normal = tfd.Normal(
@@ -60,9 +59,38 @@ class DeferredTensorTest(tf.test.TestCase):
         '<DeferredTensor: dtype=float32, shape=[], fn=exp>',
         repr(x))
 
+  def test_variable_shape_changes(self):
+    v = tf.Variable(np.zeros((3, 2, 3)), shape=tf.TensorShape((None, 2, None)))
+    self.evaluate(v.initializer)
+    x = tfp.util.DeferredTensor(tf.math.softmax, v)
+
+    self.assertAllEqual((None, 2, None), x.shape.as_list())
+    self.assertAllEqual((3, 2, 3), self.evaluate(tf.shape(x)))
+
+    with tf.control_dependencies([v.assign(np.zeros((1, 2, 4)))]):
+      self.assertAllEqual((1, 2, 4), self.evaluate(tf.shape(x)))
+      self.assertAllEqual((None, 2, None), x.shape.as_list())
+
+  def test_variable_rank_changes(self):
+    def f(x):
+      shape = tf.shape(x)
+      return tf.reshape(
+          x, tf.concat([[2, (shape[0] * shape[1]) // 2], shape[2:]], axis=0))
+
+    v = tf.Variable(np.zeros((3, 4, 3)), shape=tf.TensorShape(None))
+    self.evaluate(v.initializer)
+    x = tfp.util.DeferredTensor(f, v)
+
+    self.assertIsNone(x.shape.rank)
+    self.assertAllEqual((2, 6, 3), self.evaluate(tf.shape(x)))
+
+    with tf.control_dependencies([v.assign(np.zeros((4, 5, 1, 1)))]):
+      self.assertAllEqual((2, 10, 1, 1), self.evaluate(tf.shape(x)))
+      self.assertIsNone(x.shape.rank)
+
 
 @test_util.run_all_in_graph_and_eager_modes
-class DeferredTensorBehavesLikeTensorTest(tf.test.TestCase,
+class DeferredTensorBehavesLikeTensorTest(test_case.TestCase,
                                           parameterized.TestCase):
 
   def testArrayPriority(self):

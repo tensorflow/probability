@@ -14,6 +14,7 @@
 # ============================================================================
 """Methods and objectives for variational inference."""
 
+from tensorflow_probability.python.vi import mutual_information
 from tensorflow_probability.python.vi.csiszar_divergence import amari_alpha
 from tensorflow_probability.python.vi.csiszar_divergence import arithmetic_geometric
 from tensorflow_probability.python.vi.csiszar_divergence import chi_square
@@ -55,6 +56,7 @@ _allowed_symbols = [
     'modified_gan',
     'monte_carlo_csiszar_f_divergence',
     'monte_carlo_variational_loss',
+    'mutual_information',
     'pearson',
     'squared_hellinger',
     'symmetrized_csiszar_function',

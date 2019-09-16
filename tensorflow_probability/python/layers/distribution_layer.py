@@ -28,12 +28,24 @@ import pickle
 from cloudpickle import CloudPickler
 import numpy as np
 import six
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
-# By importing `distributions` as `tfd`, docstrings will show
-# `tfd.Distribution`. We import `bijectors` the same way, for consistency.
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import scale_tril as scale_tril_lib
+from tensorflow_probability.python.bijectors import transpose as transpose_lib
+from tensorflow_probability.python.distributions import bernoulli as bernoulli_lib
+from tensorflow_probability.python.distributions import categorical as categorical_lib
+from tensorflow_probability.python.distributions import distribution as tfd
+from tensorflow_probability.python.distributions import independent as independent_lib
+from tensorflow_probability.python.distributions import kullback_leibler as kl_lib
+from tensorflow_probability.python.distributions import logistic as logistic_lib
+from tensorflow_probability.python.distributions import mixture_same_family as mixture_same_family_lib
+from tensorflow_probability.python.distributions import mvn_tril as mvn_tril_lib
+from tensorflow_probability.python.distributions import normal as normal_lib
+from tensorflow_probability.python.distributions import onehot_categorical as onehot_categorical_lib
+from tensorflow_probability.python.distributions import poisson as poisson_lib
+from tensorflow_probability.python.distributions import transformed_distribution as transformed_distribution_lib
+from tensorflow_probability.python.distributions import variational_gaussian_process as variational_gaussian_process_lib
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.layers.internal import distribution_tensor_coercible as dtc
 from tensorflow_probability.python.layers.internal import tensor_tuple as tensor_tuple
@@ -75,7 +87,7 @@ def _event_size(event_shape, name=None):
     when the number of elements can be computed immediately.  Otherwise, returns
     a scalar tensor.
   """
-  with tf.compat.v1.name_scope(name, 'event_size', [event_shape]):
+  with tf1.name_scope(name, 'event_size', [event_shape]):
     event_shape = tf.convert_to_tensor(
         value=event_shape, dtype=tf.int32, name='event_shape')
 
@@ -347,13 +359,13 @@ class MultivariateNormalTriL(DistributionLambda):
   @staticmethod
   def new(params, event_size, validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.compat.v1.name_scope(name, 'MultivariateNormalTriL',
+    with tf1.name_scope(name, 'MultivariateNormalTriL',
                                  [params, event_size]):
       params = tf.convert_to_tensor(value=params, name='params')
-      scale_tril = tfb.ScaleTriL(
+      scale_tril = scale_tril_lib.ScaleTriL(
           diag_shift=np.array(1e-5, params.dtype.as_numpy_dtype()),
           validate_args=validate_args)
-      return tfd.MultivariateNormalTriL(
+      return mvn_tril_lib.MultivariateNormalTriL(
           loc=params[..., :event_size],
           scale_tril=scale_tril(params[..., event_size:]),
           validate_args=validate_args)
@@ -361,7 +373,7 @@ class MultivariateNormalTriL(DistributionLambda):
   @staticmethod
   def params_size(event_size, name=None):
     """The number of `params` needed to create a single distribution."""
-    with tf.compat.v1.name_scope(name, 'MultivariateNormalTriL_params_size',
+    with tf1.name_scope(name, 'MultivariateNormalTriL_params_size',
                                  [event_size]):
       return event_size + event_size * (event_size + 1) // 2
 
@@ -454,9 +466,9 @@ class OneHotCategorical(DistributionLambda):
   @staticmethod
   def new(params, event_size, dtype=None, validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.compat.v1.name_scope(name, 'OneHotCategorical',
+    with tf1.name_scope(name, 'OneHotCategorical',
                                  [params, event_size]):
-      return tfd.OneHotCategorical(
+      return onehot_categorical_lib.OneHotCategorical(
           logits=params,
           dtype=dtype or params.dtype.base_dtype,
           validate_args=validate_args)
@@ -562,14 +574,16 @@ class CategoricalMixtureOfOneHotCategorical(DistributionLambda):
   def new(params, event_size, num_components,
           dtype=None, validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.compat.v1.name_scope(name, 'CategoricalMixtureOfOneHotCategorical',
+    with tf1.name_scope(name, 'CategoricalMixtureOfOneHotCategorical',
                                  [params, event_size, num_components]):
+      params = tf.convert_to_tensor(value=params, name='params')
       dist = MixtureSameFamily.new(
           params,
           num_components,
           OneHotCategorical(
               event_size,
               validate_args=False,  # So we can eval on simplex interior.
+              dtype=params.dtype,
               name=name),
           validate_args=validate_args,
           name=name)
@@ -584,7 +598,7 @@ class CategoricalMixtureOfOneHotCategorical(DistributionLambda):
   @staticmethod
   def params_size(event_size, num_components, name=None):
     """The number of `params` needed to create a single distribution."""
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'CategoricalMixtureOfOneHotCategorical_params_size',
         [event_size, num_components]):
       return MixtureSameFamily.params_size(
@@ -694,7 +708,7 @@ class IndependentBernoulli(DistributionLambda):
   @staticmethod
   def new(params, event_shape=(), dtype=None, validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.compat.v1.name_scope(name, 'IndependentBernoulli',
+    with tf1.name_scope(name, 'IndependentBernoulli',
                                  [params, event_shape]):
       params = tf.convert_to_tensor(value=params, name='params')
       event_shape = dist_util.expand_to_vector(
@@ -705,8 +719,8 @@ class IndependentBernoulli(DistributionLambda):
           tf.shape(input=params)[:-1],
           event_shape,
       ], axis=0)
-      dist = tfd.Independent(
-          tfd.Bernoulli(
+      dist = independent_lib.Independent(
+          bernoulli_lib.Bernoulli(
               logits=tf.reshape(params, new_shape),
               dtype=dtype or params.dtype.base_dtype,
               validate_args=validate_args),
@@ -714,14 +728,14 @@ class IndependentBernoulli(DistributionLambda):
           validate_args=validate_args)
       dist._logits = dist.distribution._logits  # pylint: disable=protected-access
       dist._probs = dist.distribution._probs  # pylint: disable=protected-access
-      dist.logits = tfd.Bernoulli.logits
-      dist.probs = tfd.Bernoulli.probs
+      dist.logits = bernoulli_lib.Bernoulli.logits
+      dist.probs = bernoulli_lib.Bernoulli.probs
       return dist
 
   @staticmethod
   def params_size(event_shape=(), name=None):
     """The number of `params` needed to create a single distribution."""
-    with tf.compat.v1.name_scope(name, 'IndependentBernoulli_params_size',
+    with tf1.name_scope(name, 'IndependentBernoulli_params_size',
                                  [event_shape]):
       event_shape = tf.convert_to_tensor(
           value=event_shape, name='event_shape', dtype_hint=tf.int32)
@@ -752,7 +766,7 @@ class IndependentBernoulli(DistributionLambda):
 
 def _eval_all_one_hot(fn, dist, name=None):
   """OneHotCategorical helper computing probs, cdf, etc over its support."""
-  with tf.compat.v1.name_scope(name, 'eval_all_one_hot'):
+  with tf1.name_scope(name, 'eval_all_one_hot'):
     event_size = dist.event_shape_tensor()[-1]
     batch_ndims = tf.size(input=dist.batch_shape_tensor())
     # Reshape `eye(d)` to: `[d] + [1]*batch_ndims + [d]`.
@@ -832,7 +846,7 @@ class IndependentLogistic(DistributionLambda):
   @staticmethod
   def new(params, event_shape=(), validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.compat.v1.name_scope(name, 'IndependentLogistic',
+    with tf1.name_scope(name, 'IndependentLogistic',
                                  [params, event_shape]):
       params = tf.convert_to_tensor(value=params, name='params')
       event_shape = dist_util.expand_to_vector(
@@ -845,8 +859,8 @@ class IndependentLogistic(DistributionLambda):
       ],
                                axis=0)
       loc_params, scale_params = tf.split(params, 2, axis=-1)
-      return tfd.Independent(
-          tfd.Logistic(
+      return independent_lib.Independent(
+          logistic_lib.Logistic(
               loc=tf.reshape(loc_params, output_shape),
               scale=tf.math.softplus(tf.reshape(scale_params, output_shape)),
               validate_args=validate_args),
@@ -856,7 +870,7 @@ class IndependentLogistic(DistributionLambda):
   @staticmethod
   def params_size(event_shape=(), name=None):
     """The number of `params` needed to create a single distribution."""
-    with tf.compat.v1.name_scope(name, 'IndependentLogistic_params_size',
+    with tf1.name_scope(name, 'IndependentLogistic_params_size',
                                  [event_shape]):
       event_shape = tf.convert_to_tensor(
           value=event_shape, name='event_shape', dtype_hint=tf.int32)
@@ -949,7 +963,7 @@ class IndependentNormal(DistributionLambda):
   @staticmethod
   def new(params, event_shape=(), validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.compat.v1.name_scope(name, 'IndependentNormal',
+    with tf1.name_scope(name, 'IndependentNormal',
                                  [params, event_shape]):
       params = tf.convert_to_tensor(value=params, name='params')
       event_shape = dist_util.expand_to_vector(
@@ -962,8 +976,8 @@ class IndependentNormal(DistributionLambda):
       ],
                                axis=0)
       loc_params, scale_params = tf.split(params, 2, axis=-1)
-      return tfd.Independent(
-          tfd.Normal(
+      return independent_lib.Independent(
+          normal_lib.Normal(
               loc=tf.reshape(loc_params, output_shape),
               scale=tf.math.softplus(tf.reshape(scale_params, output_shape)),
               validate_args=validate_args),
@@ -973,7 +987,7 @@ class IndependentNormal(DistributionLambda):
   @staticmethod
   def params_size(event_shape=(), name=None):
     """The number of `params` needed to create a single distribution."""
-    with tf.compat.v1.name_scope(name, 'IndependentNormal_params_size',
+    with tf1.name_scope(name, 'IndependentNormal_params_size',
                                  [event_shape]):
       event_shape = tf.convert_to_tensor(
           value=event_shape, name='event_shape', dtype_hint=tf.int32)
@@ -1082,7 +1096,7 @@ class IndependentPoisson(DistributionLambda):
   @staticmethod
   def new(params, event_shape=(), validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.compat.v1.name_scope(name, 'IndependentPoisson',
+    with tf1.name_scope(name, 'IndependentPoisson',
                                  [params, event_shape]):
       params = tf.convert_to_tensor(value=params, name='params')
       event_shape = dist_util.expand_to_vector(
@@ -1094,8 +1108,8 @@ class IndependentPoisson(DistributionLambda):
           event_shape,
       ],
                                axis=0)
-      return tfd.Independent(
-          tfd.Poisson(
+      return independent_lib.Independent(
+          poisson_lib.Poisson(
               log_rate=tf.reshape(params, output_shape),
               validate_args=validate_args),
           reinterpreted_batch_ndims=tf.size(input=event_shape),
@@ -1104,7 +1118,7 @@ class IndependentPoisson(DistributionLambda):
   @staticmethod
   def params_size(event_shape=(), name=None):
     """The number of `params` needed to create a single distribution."""
-    with tf.compat.v1.name_scope(name, 'IndependentPoisson_params_size',
+    with tf1.name_scope(name, 'IndependentPoisson_params_size',
                                  [event_shape]):
       event_shape = tf.convert_to_tensor(
           value=event_shape, name='event_shape', dtype_hint=tf.int32)
@@ -1314,7 +1328,7 @@ def _make_kl_divergence_fn(
   """Creates a callable computing `KL[a,b]` from `a`, a `tfd.Distribution`."""
 
   if use_exact_kl is None:
-    kl_divergence_fn = tfd.kl_divergence
+    kl_divergence_fn = kl_lib.kl_divergence
   else:
     # Closure over: test_points_fn, test_points_reduce_axis.
     def kl_divergence_fn(distribution_a, distribution_b):
@@ -1326,7 +1340,7 @@ def _make_kl_divergence_fn(
   # Closure over: distribution_b, kl_divergence_fn, weight.
   def _fn(distribution_a):
     """Closure that computes KLDiv as a function of `a` as in `KL[a, b]`."""
-    with tf.compat.v1.name_scope('kldivergence_loss'):
+    with tf1.name_scope('kldivergence_loss'):
       # TODO(b/119756336): Due to eager/graph Jacobian graph caching bug
       # we add here the capability for deferred construction of the prior.
       # This capability can probably be removed once b/119756336 is resolved.
@@ -1426,7 +1440,7 @@ class MixtureSameFamily(DistributionLambda):
   def new(params, num_components, component_layer,
           validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
-    with tf.compat.v1.name_scope(name, 'MixtureSameFamily',
+    with tf1.name_scope(name, 'MixtureSameFamily',
                                  [params, num_components, component_layer]):
       params = tf.convert_to_tensor(value=params, name='params')
       num_components = tf.convert_to_tensor(
@@ -1437,8 +1451,9 @@ class MixtureSameFamily(DistributionLambda):
               params[..., num_components:],
               tf.concat([tf.shape(input=params)[:-1], [num_components, -1]],
                         axis=0)))
-      mixture_dist = tfd.Categorical(logits=params[..., :num_components])
-      return tfd.MixtureSameFamily(
+      mixture_dist = categorical_lib.Categorical(
+          logits=params[..., :num_components])
+      return mixture_same_family_lib.MixtureSameFamily(
           mixture_dist,
           components_dist,
           # TODO(b/120154797): Change following to `validate_args=True` after
@@ -1462,7 +1477,7 @@ class MixtureSameFamily(DistributionLambda):
      params_size: The number of parameters needed to create the mixture
        distribution.
     """
-    with tf.compat.v1.name_scope(name, 'MixtureSameFamily_params_size',
+    with tf1.name_scope(name, 'MixtureSameFamily_params_size',
                                  [num_components, component_params_size]):
       num_components = tf.convert_to_tensor(
           value=num_components, name='num_components', dtype_hint=tf.int32)
@@ -1562,10 +1577,12 @@ class MixtureNormal(DistributionLambda):
   def new(params, num_components, event_shape=(),
           validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
+    params = tf.convert_to_tensor(value=params, name='params')
     return MixtureSameFamily.new(
         params,
         num_components,
-        IndependentNormal(event_shape, validate_args=validate_args, name=name),
+        IndependentNormal(event_shape, validate_args=validate_args,
+                          dtype=params.dtype, name=name),
         validate_args=validate_args,
         name=name)
 
@@ -1685,11 +1702,13 @@ class MixtureLogistic(DistributionLambda):
   def new(params, num_components, event_shape=(),
           validate_args=False, name=None):
     """Create the distribution instance from a `params` vector."""
+    params = tf.convert_to_tensor(value=params, name='params')
     return MixtureSameFamily.new(
         params,
         num_components,
         IndependentLogistic(
-            event_shape, validate_args=validate_args, name=name),
+            event_shape, validate_args=validate_args, dtype=params.dtype,
+            name=name),
         validate_args=validate_args,
         name=name)
 
@@ -1744,9 +1763,11 @@ class VariationalGaussianProcess(DistributionLambda):
       event_shape=(1,),
       inducing_index_points_initializer=None,
       unconstrained_observation_noise_variance_initializer=(
-          tf.compat.v1.initializers.constant(-10.)),
+          tf1.initializers.constant(-10.)),
+      variational_inducing_observations_scale_initializer=None,
       mean_fn=None,
       jitter=1e-6,
+      convert_to_tensor_fn=tfd.Distribution.sample,
       name=None):
     """Construct a VariationalGaussianProcess Layer.
 
@@ -1771,16 +1792,24 @@ class VariationalGaussianProcess(DistributionLambda):
         `tf.keras.initializer.Initializer` used to initialize the unconstrained
         observation noise variable. The observation noise variance is computed
         from this variable via the `tf.nn.softplus` function.
+      variational_inducing_observations_scale_initializer: a
+        `tf.keras.initializer.Initializer` used to initialize the variational
+        inducing observations scale.
       mean_fn: a callable that maps layer inputs to mean function values. Passed
         to the mean_fn parameter of VariationalGaussianProcess distribution. If
         omitted, defaults to a constant function with trainable variable value.
       jitter: a small term added to the diagonal of various kernel matrices for
         numerical stability.
+      convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
+        instance and returns a `tf.Tensor`-like object. For examples, see
+        `class` docstring.
       name: name to give to this layer and the scope of ops and variables it
         contains.
     """
+    convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
+
     super(VariationalGaussianProcess, self).__init__(
-        lambda x: VariationalGaussianProcess.new(  # pylint: disable=g-long-lambda
+        make_distribution_fn=lambda x: VariationalGaussianProcess.new(  # pylint: disable=g-long-lambda
             x,
             kernel_provider=self._kernel_provider,
             event_shape=self._event_shape,
@@ -1790,9 +1819,11 @@ class VariationalGaussianProcess(DistributionLambda):
             variational_inducing_observations_scale=(
                 self._variational_inducing_observations_scale),
             mean_fn=self._mean_fn,
-            observation_noise_variance=tf.nn.softplus(
+            observation_noise_variance=(
                 self._unconstrained_observation_noise_variance),
-            jitter=self._jitter))
+            jitter=self._jitter),
+        convert_to_tensor_fn=convert_to_tensor_fn,
+        dtype=kernel_provider.dtype)
 
     tmp_kernel = kernel_provider.kernel
     self._dtype = tmp_kernel.dtype.as_numpy_dtype
@@ -1804,6 +1835,8 @@ class VariationalGaussianProcess(DistributionLambda):
     self._inducing_index_points_initializer = inducing_index_points_initializer
     self._unconstrained_observation_noise_variance_initializer = (
         unconstrained_observation_noise_variance_initializer)
+    self._variational_inducing_observations_scale_initializer = (
+        variational_inducing_observations_scale_initializer)
     self._kernel_provider = kernel_provider
 
   def build(self, input_shape):
@@ -1816,15 +1849,23 @@ class VariationalGaussianProcess(DistributionLambda):
 
     if self._mean_fn is None:
       self.mean = self.add_variable(
-          initializer=tf.compat.v1.initializers.constant([0.]),
+          initializer=tf1.initializers.constant([0.]),
           dtype=self._dtype,
           name='mean')
       self._mean_fn = lambda x: self.mean
 
-    self._unconstrained_observation_noise_variance = self.add_variable(
-        initializer=self._unconstrained_observation_noise_variance_initializer,
-        dtype=self._dtype,
-        name='observation_noise_variance')
+    # This matches the default value of observation_noise_variance in the
+    # VariationalGaussianProcess distribution itself. As that logic changes
+    # (see b/136668249) we'll need to keep this in sync.
+    self._unconstrained_observation_noise_variance = 0.
+    if self._unconstrained_observation_noise_variance_initializer is not None:
+      unconstrained_observation_noise_variance = self.add_variable(
+          initializer=(
+              self._unconstrained_observation_noise_variance_initializer),
+          dtype=self._dtype,
+          name='observation_noise_variance')
+      self._unconstrained_observation_noise_variance = tf.nn.softplus(
+          unconstrained_observation_noise_variance)
 
     self._inducing_index_points = self.add_variable(
         name='inducing_index_points',
@@ -1835,16 +1876,19 @@ class VariationalGaussianProcess(DistributionLambda):
     self._variational_inducing_observations_loc = self.add_variable(
         name='variational_inducing_observations_loc',
         shape=self._event_shape.as_list() + [self._num_inducing_points],
-        initializer=tf.compat.v1.initializers.zeros(),
+        initializer=tf1.initializers.zeros(),
         dtype=self._dtype)
 
-    eyes = (np.ones(self._event_shape.as_list() + [1, 1]) *
-            np.eye(self._num_inducing_points, dtype=self._dtype))
+    if self._variational_inducing_observations_scale_initializer is None:
+      eyes = (np.ones(self._event_shape.as_list() + [1, 1]) *
+              np.eye(self._num_inducing_points, dtype=self._dtype))
+      self._variational_inducing_observations_scale_initializer = (
+          tf1.initializers.constant(1e-5 * eyes))
     self._variational_inducing_observations_scale = self.add_variable(
         name='variational_inducing_observations_scale',
         shape=(self._event_shape.as_list() +
                [self._num_inducing_points, self._num_inducing_points]),
-        initializer=tf.compat.v1.initializers.constant(1e-5 * eyes))
+        initializer=self._variational_inducing_observations_scale_initializer)
 
   @staticmethod
   def new(x,
@@ -1857,7 +1901,7 @@ class VariationalGaussianProcess(DistributionLambda):
           observation_noise_variance,
           jitter=1e-6,
           name=None):
-    vgp = tfd.VariationalGaussianProcess(
+    vgp = variational_gaussian_process_lib.VariationalGaussianProcess(
         kernel=kernel_provider.kernel,
         index_points=x,
         inducing_index_points=inducing_index_points,
@@ -1868,13 +1912,15 @@ class VariationalGaussianProcess(DistributionLambda):
         mean_fn=mean_fn,
         observation_noise_variance=observation_noise_variance,
         jitter=jitter)
-    ind = tfd.Independent(vgp, reinterpreted_batch_ndims=1)
-    bij = tfb.Transpose(rightmost_transposed_ndims=2)
-    d = tfd.TransformedDistribution(ind, bijector=bij)
+    ind = independent_lib.Independent(vgp, reinterpreted_batch_ndims=1)
+    bij = transpose_lib.Transpose(rightmost_transposed_ndims=2)
+    d = transformed_distribution_lib.TransformedDistribution(ind, bijector=bij)
     def _transposed_variational_loss(y, kl_weight=1.):
       loss = vgp.variational_loss(bij.forward(y), kl_weight=kl_weight)
       return loss
     d.variational_loss = _transposed_variational_loss
+    d.surrogate_posterior_kl_divergence_prior = (
+        vgp.surrogate_posterior_kl_divergence_prior)
     return d
 
 

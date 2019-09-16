@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal.backend import numpy as nptf
 from tensorflow.python import pywrap_tensorflow as c_api  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
@@ -80,12 +81,8 @@ def _numpy_dtype(dtype):
 
 def _get_static_predicate(pred):
   """Helper function for statically evaluating predicates in `cond`."""
-  if pred in {0, 1}:  # Accept 1/0 as valid boolean values
-    pred_value = bool(pred)
-  elif isinstance(pred, bool):
-    pred_value = pred
-  elif isinstance(pred, tf.Tensor):
-    pred_value = tf.get_static_value(pred)
+  if tf.is_tensor(pred):
+    pred_value = tf.get_static_value(tf.convert_to_tensor(pred))
 
     # TODO(jamieas): remove the dependency on `pywrap_tensorflow`.
     # pylint: disable=protected-access
@@ -93,7 +90,12 @@ def _get_static_predicate(pred):
       pred_value = c_api.TF_TryEvaluateConstant_wrapper(pred.graph._c_graph,
                                                         pred._as_tf_output())
     # pylint: enable=protected-access
+    if pred_value in (0, 1, True, False):
+      pred_value = bool(pred_value)
 
+  elif pred in (0, 1, True, False):  # Accept 1/0 as valid boolean values
+    # This branch also casts np.array(False), tf.EagerTensor(True), etc.
+    pred_value = bool(pred)
   else:
     raise TypeError('`pred` must be a Tensor, or a Python bool, or 1 or 0. '
                     'Found instead: {}'.format(pred))
@@ -142,7 +144,7 @@ def broadcast_shape(x_shape, y_shape):
     return tf.broadcast_dynamic_shape(x_shape, y_shape)
 
   return tf.broadcast_static_shape(
-      tf.TensorShape(x_shape), tf.TensorShape(y_shape))
+      tf.TensorShape(x_shape_static), tf.TensorShape(y_shape_static))
 
 
 def cond(pred, true_fn=None, false_fn=None, name=None):
@@ -203,60 +205,36 @@ def case(pred_fn_pairs, default=None, exclusive=False, name='smart_case'):
     TypeError: If `fns[i]` is not callable for any i, or `default` is not
                callable.
   """
+  if isinstance(pred_fn_pairs, (list, tuple)):
+    # We don't expect much usage of the `dict` option, esp. with unhashable
+    # Tensors, but could always add another branch for that if it comes up.
+    def maybe_static(pred):
+      p = _get_static_predicate(pred)
+      if p is None:
+        return pred
+      return p
+    pred_fn_pairs = [(maybe_static(pred), fn) for pred, fn in pred_fn_pairs]
   return control_flow_ops._case_helper(  # pylint: disable=protected-access
       cond, pred_fn_pairs, default, exclusive, name, allow_python_preds=True)
 
-# The following functions are intended as drop-in replacements for their
-# TensorFlow counterparts.
 
-cast = _prefer_static(
-    tf.cast,
-    lambda x, dtype, name=None: np.array(x, dtype=_numpy_dtype(dtype)))
-
-concat = _prefer_static(
-    tf.concat,
-    lambda values, axis, name='concat': np.concatenate(values, axis))
-
-equal = _prefer_static(
-    tf.equal,
-    lambda x, y, name=None: np.equal(x, y))
-
-greater = _prefer_static(
-    tf.greater,
-    lambda x, y, name=None: np.greater(x, y))
-
-less = _prefer_static(
-    tf.less,
-    lambda x, y, name=None: np.less(x, y))
-
-log = _prefer_static(
-    tf.math.log,
-    lambda x, name=None: np.log(x))
-
-logical_and = _prefer_static(
-    tf.logical_and,
-    lambda x, y, name=None: np.logical_and(x, y))
-
-logical_not = _prefer_static(
-    tf.logical_not,
-    lambda x, name=None: np.logical_not(x))
-
-logical_or = _prefer_static(
-    tf.logical_or,
-    lambda x, y, name=None: np.logical_or(x, y))
-
-maximum = _prefer_static(
-    tf.maximum,
-    lambda x, y, name=None: np.maximum(x, y))
-
-minimum = _prefer_static(
-    tf.minimum,
-    lambda x, y, name=None: np.minimum(x, y))
-
-ones = _prefer_static(
-    tf.ones,
-    lambda shape, dtype=tf.float32, name=None: np.ones(  # pylint: disable=g-long-lambda
-        shape, _numpy_dtype(dtype)))
+def size0(x):
+  """Returns the size of the first dimension (0 if scalar)."""
+  # First, ensure hasattr(x, 'shape').
+  x_ = tf.get_static_value(x)
+  if x_ is not None:
+    x = np.array(x_)
+  if not hasattr(x, 'shape'):
+    x = tf.convert_to_tensor(x)
+  # Next, try to read shape[0].
+  ndims = tensorshape_util.rank(x.shape)
+  if ndims is None or ndims == 0:
+    n = ndims
+  else:
+    n = tf.compat.dimension_value(x.shape[0])
+  if n is not None:
+    return np.int32(n)
+  return pad(shape(x)[:1], paddings=[[0, 1]], constant_values=0)[0]
 
 
 def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
@@ -267,37 +245,11 @@ def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-built
   return tf.ones(s, dtype or s.dtype, name)
 ones_like = _copy_docstring(tf.ones_like, _ones_like)
 
-range = _prefer_static(  # pylint: disable=redefined-builtin
-    tf.range,
-    lambda start, limit=None, delta=1, dtype=None, name='range': np.arange(  # pylint: disable=g-long-lambda
-        start, limit, delta).astype(_numpy_dtype(
-            dtype or np.array(tf.get_static_value(start)).dtype)))
-
 rank = _copy_docstring(
     tf.rank,
     lambda input, name=None: (  # pylint: disable=redefined-builtin,g-long-lambda
         tf.rank(input) if tensorshape_util.rank(input.shape) is None
         else np.int32(tensorshape_util.rank(input.shape))))
-
-reduce_all = _prefer_static(
-    tf.reduce_all,
-    lambda input_tensor, axis=None, keepdims=False, name=None: np.all(  # pylint: disable=g-long-lambda
-        input_tensor, axis, keepdims=keepdims))
-
-reduce_any = _prefer_static(
-    tf.reduce_any,
-    lambda input_tensor, axis=None, keepdims=False, name=None: np.any(  # pylint: disable=g-long-lambda
-        input_tensor, axis, keepdims=keepdims))
-
-reduce_prod = _prefer_static(
-    tf.reduce_prod,
-    lambda input_tensor, axis=None, keepdims=False, name=None: np.prod(  # pylint: disable=g-long-lambda
-        input_tensor, axis, keepdims=keepdims))
-
-reduce_sum = _prefer_static(
-    tf.reduce_sum,
-    lambda input_tensor, axis=None, keepdims=False, name=None: np.sum(  # pylint: disable=g-long-lambda
-        input_tensor, axis, keepdims=keepdims))
 
 
 def _setdiff1d(a, b, aminusb=True, validate_indices=True):
@@ -321,8 +273,6 @@ def _setdiff1d(a, b, aminusb=True, validate_indices=True):
     a_ = np.array(a_, dtype=dtype)
     b_ = np.array(b_, dtype=dtype)
     return np.setdiff1d(a_, b_)
-
-
 setdiff1d = _copy_docstring(
     tf.sets.difference,
     _setdiff1d)
@@ -336,12 +286,10 @@ def _size(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bui
   if n is None:
     return tf.size(input, out_type=out_type, name=name)
   return np.array(n).astype(_numpy_dtype(out_type))
-
-
 size = _copy_docstring(tf.size, _size)
 
 
-def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin
+def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin,missing-docstring
   if not hasattr(input, 'shape'):
     x = np.array(input)
     input = tf.convert_to_tensor(input) if x.dtype is np.object else x
@@ -349,19 +297,10 @@ def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bu
   if tensorshape_util.is_fully_defined(input.shape):
     return np.array(tensorshape_util.as_list(input_shape)).astype(
         _numpy_dtype(out_type))
-  return tf.shape(input, out_type=out_type, name=name)
-
-
+  # NOTE: tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**, so we
+  # pre-emptively convert-to-tensor.
+  return tf.shape(tf.convert_to_tensor(input), out_type=out_type, name=name)
 shape = _copy_docstring(tf.shape, _shape)
-
-where = _prefer_static(
-    tf.where,
-    lambda condition, x=None, y=None, name=None: np.where(condition, x, y))
-
-zeros = _prefer_static(
-    tf.zeros,
-    lambda shape, dtype=tf.float32, name=None: np.zeros(  # pylint: disable=g-long-lambda
-        shape, _numpy_dtype(dtype)))
 
 
 def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
@@ -396,3 +335,38 @@ def non_negative_axis(axis, rank, name=None):  # pylint:disable=redefined-outer-
 def is_numpy(x):
   """Returns true if `x` is a numpy object."""
   return isinstance(x, (np.ndarray, np.generic))
+
+
+# The following functions only work in numpy if the inputs' *values are known
+# statically*. Often (e.g., above) we dont need static values, just static
+# properties.
+add = _prefer_static(tf.add, nptf.add)
+cast = _prefer_static(tf.cast, nptf.cast)
+concat = _prefer_static(tf.concat, nptf.concat)
+equal = _prefer_static(tf.equal, nptf.equal)
+greater = _prefer_static(tf.greater, nptf.greater)
+identity = _prefer_static(tf.identity, nptf.identity)
+less = _prefer_static(tf.less, nptf.less)
+log = _prefer_static(tf.math.log, nptf.math.log)
+logical_and = _prefer_static(tf.logical_and, nptf.logical_and)
+logical_not = _prefer_static(tf.logical_not, nptf.logical_not)
+logical_or = _prefer_static(tf.logical_or, nptf.logical_or)
+maximum = _prefer_static(tf.maximum, nptf.maximum)
+minimum = _prefer_static(tf.minimum, nptf.minimum)
+ones = _prefer_static(tf.ones, nptf.ones)
+pad = _prefer_static(tf.pad, nptf.pad)
+range = _prefer_static(tf.range, nptf.range)  # pylint: disable=redefined-builtin
+reduce_all = _prefer_static(tf.reduce_all, nptf.reduce_all)
+reduce_any = _prefer_static(tf.reduce_any, nptf.reduce_any)
+reduce_prod = _prefer_static(tf.reduce_prod, nptf.reduce_prod)
+reduce_sum = _prefer_static(tf.reduce_sum, nptf.reduce_sum)
+reshape = _prefer_static(tf.reshape, nptf.reshape)
+tensor_scatter_nd_add = _prefer_static(
+    tf.tensor_scatter_nd_add, nptf.tensor_scatter_nd_add)
+tensor_scatter_nd_sub = _prefer_static(
+    tf.tensor_scatter_nd_sub, nptf.tensor_scatter_nd_sub)
+tensor_scatter_nd_update = _prefer_static(
+    tf.tensor_scatter_nd_update, nptf.tensor_scatter_nd_update)
+unstack = _prefer_static(tf.unstack, nptf.unstack)
+where = _prefer_static(tf.where, nptf.where)
+zeros = _prefer_static(tf.zeros, nptf.zeros)

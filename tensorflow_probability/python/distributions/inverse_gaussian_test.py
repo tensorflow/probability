@@ -20,10 +20,10 @@ import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-tfd = tfp.distributions
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -73,24 +73,24 @@ class _InverseGaussianTest(object):
     concentration_v = 1.
 
     for loc_v in invalid_locs:
-      with self.assertRaisesOpError("Condition x > 0"):
+      with self.assertRaisesOpError('`loc` must be positive'):
         inverse_gaussian = tfd.InverseGaussian(
             self.make_tensor(loc_v),
             self.make_tensor(concentration_v),
             validate_args=True)
-        self.evaluate(inverse_gaussian.loc)
+        self.evaluate(inverse_gaussian.mean())
 
   def testInvalidConcentration(self):
     loc_v = 3.
     invalid_concentrations = [-.01, 0., -2.]
 
     for concentration_v in invalid_concentrations:
-      with self.assertRaisesOpError("Condition x > 0"):
+      with self.assertRaisesOpError('`concentration` must be positive'):
         inverse_gaussian = tfd.InverseGaussian(
             self.make_tensor(loc_v),
             self.make_tensor(concentration_v),
             validate_args=True)
-        self.evaluate(inverse_gaussian.concentration)
+        self.evaluate(inverse_gaussian.mean())
 
   def testInverseGaussianLogPdf(self):
     batch_size = 6
@@ -123,7 +123,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(loc, concentration,
                                            validate_args=True)
 
-    with self.assertRaisesOpError("x must be positive."):
+    with self.assertRaisesOpError('must be positive.'):
       self.evaluate(inverse_gaussian.log_prob(x))
 
   def testInverseGaussianPdfValidateArgs(self):
@@ -134,7 +134,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(loc, concentration,
                                            validate_args=True)
 
-    with self.assertRaisesOpError("x must be positive."):
+    with self.assertRaisesOpError('must be positive.'):
       self.evaluate(inverse_gaussian.prob(x))
 
   def testInverseGaussianLogPdfMultidimensional(self):
@@ -191,7 +191,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(loc, concentration,
                                            validate_args=True)
 
-    with self.assertRaisesOpError("x must be positive."):
+    with self.assertRaisesOpError('must be positive.'):
       self.evaluate(inverse_gaussian.log_cdf(x))
 
   def testInverseGaussianCdfValidateArgs(self):
@@ -202,7 +202,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(loc, concentration,
                                            validate_args=True)
 
-    with self.assertRaisesOpError("x must be positive."):
+    with self.assertRaisesOpError('must be positive.'):
       self.evaluate(inverse_gaussian.cdf(x))
 
   def testInverseGaussianLogCdfMultidimensional(self):
@@ -354,30 +354,43 @@ class _InverseGaussianTest(object):
         rtol=.02,
         atol=0)
 
+  def testModifiedVariableAssertion(self):
+    concentration = tf.Variable(0.9)
+    loc = tf.Variable(1.2)
+    self.evaluate([concentration.initializer, loc.initializer])
+    inverse_gaussian = tfd.InverseGaussian(
+        loc=loc, concentration=concentration, validate_args=True)
+    with self.assertRaisesOpError('`concentration` must be positive'):
+      with tf.control_dependencies([concentration.assign(-2.)]):
+        self.evaluate(inverse_gaussian.mean())
+    with self.assertRaisesOpError('`loc` must be positive'):
+      with tf.control_dependencies([loc.assign(-2.), concentration.assign(2.)]):
+        self.evaluate(inverse_gaussian.mean())
 
-class InverseGaussianTestStaticShapeFloat32(tf.test.TestCase,
+
+class InverseGaussianTestStaticShapeFloat32(test_case.TestCase,
                                             _InverseGaussianTest):
   dtype = tf.float32
   use_static_shape = True
 
 
-class InverseGaussianTestDynamicShapeFloat32(tf.test.TestCase,
+class InverseGaussianTestDynamicShapeFloat32(test_case.TestCase,
                                              _InverseGaussianTest):
   dtype = tf.float32
   use_static_shape = False
 
 
-class InverseGaussianTestStaticShapeFloat64(tf.test.TestCase,
+class InverseGaussianTestStaticShapeFloat64(test_case.TestCase,
                                             _InverseGaussianTest):
   dtype = tf.float64
   use_static_shape = True
 
 
-class InverseGaussianTestDynamicShapeFloat64(tf.test.TestCase,
+class InverseGaussianTestDynamicShapeFloat64(test_case.TestCase,
                                              _InverseGaussianTest):
   dtype = tf.float64
   use_static_shape = False
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

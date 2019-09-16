@@ -25,8 +25,8 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -206,7 +206,6 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
           validate_args=validate_args,
           allow_nan_stats=False,
           parameters=parameters,
-          graph_parents=[],
           name=name)
       # Check valid structure.
       self._model_unflatten(self._model_flatten(model))
@@ -226,7 +225,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     #   self._dist_fn_wrapped
     #   self._dist_fn_args
     #   self._always_use_specified_sample_shape
-    seed = seed_stream.SeedStream('JointDistributionSequential', seed)
+    seed = SeedStream('JointDistributionSequential', seed)
     ds = []
     xs = [None]*len(self._dist_fn_wrapped) if value is None else list(value)
     if len(xs) != len(self._dist_fn_wrapped):

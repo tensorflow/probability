@@ -25,11 +25,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class FillTriangularBijectorTest(tf.test.TestCase):
+class FillTriangularBijectorTest(test_case.TestCase):
   """Tests the correctness of the FillTriangular bijector."""
 
   def testBijector(self):
@@ -84,19 +85,19 @@ class FillTriangularBijectorTest(tf.test.TestCase):
     b = tfb.FillTriangular(validate_args=True)
 
     x_shape_bad = tf.TensorShape([5, 4, 7])
-    with self.assertRaisesRegexp(ValueError, "is not a triangular number"):
+    with self.assertRaisesRegexp(ValueError, 'is not a triangular number'):
       b.forward_event_shape(x_shape_bad)
-    with self.assertRaisesOpError("is not a triangular number"):
+    with self.assertRaisesOpError('is not a triangular number'):
       self.evaluate(
           b.forward_event_shape_tensor(tensorshape_util.as_list(x_shape_bad)))
 
     y_shape_bad = tf.TensorShape([5, 4, 3, 2])
-    with self.assertRaisesRegexp(ValueError, "Matrix must be square"):
+    with self.assertRaisesRegexp(ValueError, 'Matrix must be square'):
       b.inverse_event_shape(y_shape_bad)
-    with self.assertRaisesOpError("Matrix must be square"):
+    with self.assertRaisesOpError('Matrix must be square'):
       self.evaluate(
           b.inverse_event_shape_tensor(tensorshape_util.as_list(y_shape_bad)))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

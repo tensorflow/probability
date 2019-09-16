@@ -21,11 +21,10 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import numpy_array
-
-from tensorflow_probability.python.internal.backend.numpy.internal import utils
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import l2_normalize
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import log_softmax
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import reduce_logsumexp

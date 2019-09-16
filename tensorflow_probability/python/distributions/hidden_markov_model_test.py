@@ -19,14 +19,16 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-tfd = tfp.distributions
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 # pylint: disable=no-member
@@ -36,7 +38,7 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 class _HiddenMarkovModelTest(
     tfp_test_util.VectorDistributionTestHelpers,
     tfp_test_util.DiscreteScalarDistributionTestHelpers,
-    tf.test.TestCase,
+    test_case.TestCase,
     parameterized.TestCase):
 
   @staticmethod
@@ -99,6 +101,32 @@ class _HiddenMarkovModelTest(
                                     validate_args=True)
       self.evaluate(model.mean())
 
+  def test_reproducibility(self):
+    initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
+    transition_matrix_data = tf.constant([[0.6, 0.4],
+                                          [0.3, 0.7]], dtype=self.dtype)
+    observation_locs_data = tf.constant([0.0, 1.0], dtype=self.dtype)
+    observation_scale_data = tf.constant(0.5, dtype=self.dtype)
+
+    (initial_prob, transition_matrix,
+     observation_locs, observation_scale) = self.make_placeholders([
+         initial_prob_data, transition_matrix_data,
+         observation_locs_data, observation_scale_data])
+
+    [num_steps] = self.make_placeholders([30])
+    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
+                                  tfd.Categorical(probs=transition_matrix),
+                                  tfd.Normal(loc=observation_locs,
+                                             scale=observation_scale),
+                                  num_steps=num_steps)
+
+    seed = tfp_test_util.test_seed()
+    s1 = self.evaluate(model.sample(5, seed=seed))
+    if tf.executing_eagerly():
+      tf.random.set_seed(seed)
+    s2 = self.evaluate(model.sample(5, seed=seed))
+    self.assertAllEqual(s1, s2)
+
   def test_consistency(self):
     initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
     transition_matrix_data = tf.constant([[0.6, 0.4],
@@ -119,10 +147,11 @@ class _HiddenMarkovModelTest(
                                   num_steps=num_steps,
                                   validate_args=True)
 
-    self.run_test_sample_consistent_log_prob(self.evaluate, model,
-                                             num_samples=100000,
-                                             center=0.5, radius=0.5,
-                                             rtol=0.05)
+    self.run_test_sample_consistent_log_prob(
+        self.evaluate, model,
+        num_samples=100000,
+        center=0.5, radius=0.5,
+        rtol=0.05, seed=tfp_test_util.test_seed())
 
   def test_broadcast_initial_probs(self):
     initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
@@ -143,10 +172,11 @@ class _HiddenMarkovModelTest(
                                              scale=observation_scale),
                                   num_steps=num_steps)
 
-    self.run_test_sample_consistent_log_prob(self.evaluate, model,
-                                             num_samples=100000,
-                                             center=0.5, radius=1.,
-                                             rtol=0.02)
+    self.run_test_sample_consistent_log_prob(
+        self.evaluate, model,
+        num_samples=100000,
+        center=0.5, radius=1.,
+        rtol=0.02, seed=tfp_test_util.test_seed())
 
   def test_broadcast_transitions(self):
     initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
@@ -170,10 +200,11 @@ class _HiddenMarkovModelTest(
                                              scale=observation_scale),
                                   num_steps=num_steps)
 
-    self.run_test_sample_consistent_log_prob(self.evaluate, model,
-                                             num_samples=100000,
-                                             center=0.5, radius=1.,
-                                             rtol=2e-2)
+    self.run_test_sample_consistent_log_prob(
+        self.evaluate, model,
+        num_samples=100000,
+        center=0.5, radius=1.,
+        rtol=2e-2, seed=tfp_test_util.test_seed())
 
   def test_broadcast_observations(self):
     initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
@@ -197,10 +228,11 @@ class _HiddenMarkovModelTest(
                                              scale=observation_scale),
                                   num_steps=num_steps)
 
-    self.run_test_sample_consistent_log_prob(self.evaluate, model,
-                                             num_samples=100000,
-                                             center=0.5, radius=1.,
-                                             rtol=2e-2)
+    self.run_test_sample_consistent_log_prob(
+        self.evaluate, model,
+        num_samples=100000,
+        center=0.5, radius=1.,
+        rtol=2e-2, seed=tfp_test_util.test_seed())
 
   def test_edge_case_sample_n_no_transitions(self):
     initial_prob_data = tf.constant([0.5, 0.5], dtype=self.dtype)

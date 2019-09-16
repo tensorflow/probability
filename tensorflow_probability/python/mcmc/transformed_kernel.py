@@ -20,7 +20,8 @@ from __future__ import print_function
 
 import collections
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
@@ -253,7 +254,7 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
       kernel_results: `collections.namedtuple` of internal calculations used to
         advance the chain.
     """
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name=mcmc_util.make_name(self.name, 'transformed_kernel', 'one_step'),
         values=[previous_kernel_results]):
       transformed_next_state, kernel_results = self._inner_kernel.one_step(
@@ -320,7 +321,7 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
     if (init_state is None) == (transformed_init_state is None):
       raise ValueError('Must specify exactly one of `init_state` '
                        'or `transformed_init_state`.')
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name=mcmc_util.make_name(self.name, 'transformed_kernel',
                                  'bootstrap_results'),
         values=[init_state, transformed_init_state]):

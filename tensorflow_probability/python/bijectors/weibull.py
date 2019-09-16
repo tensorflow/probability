@@ -22,12 +22,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
-    "Weibull",
+    'Weibull',
 ]
 
 
@@ -51,7 +51,7 @@ class Weibull(bijector.Bijector):
                scale=1.,
                concentration=1.,
                validate_args=False,
-               name="weibull"):
+               name='weibull'):
     """Instantiates the `Weibull` bijector.
 
     Args:
@@ -66,20 +66,12 @@ class Weibull(bijector.Bijector):
       name: Python `str` name given to ops managed by this object.
     """
     with tf.name_scope(name) as name:
-      self._scale = tf.convert_to_tensor(scale, name="scale")
-      self._concentration = tf.convert_to_tensor(
-          concentration, name="concentration")
-      dtype_util.assert_same_float_dtype([self._scale, self._concentration])
-      if validate_args:
-        self._scale = distribution_util.with_dependencies([
-            assert_util.assert_positive(
-                self._scale, message="Argument scale was not positive")
-        ], self._scale)
-        self._concentration = distribution_util.with_dependencies([
-            assert_util.assert_positive(
-                self._concentration,
-                message="Argument concentration was not positive")
-        ], self._concentration)
+      dtype = dtype_util.common_dtype(
+          [scale, concentration], dtype_hint=tf.float32)
+      self._scale = tensor_util.convert_nonref_to_tensor(
+          scale, dtype=dtype, name='scale')
+      self._concentration = tensor_util.convert_nonref_to_tensor(
+          concentration, dtype=dtype, name='concentration')
       super(Weibull, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
@@ -96,40 +88,57 @@ class Weibull(bijector.Bijector):
     return self._concentration
 
   def _forward(self, x):
-    x = self._maybe_assert_valid_x(x)
-    return -tf.math.expm1(-((x / self.scale)**self.concentration))
+    with tf.control_dependencies(self._maybe_assert_valid_x(x)):
+      return -tf.math.expm1(-((x / self.scale) ** self.concentration))
 
   def _inverse(self, y):
-    y = self._maybe_assert_valid_y(y)
-    return self.scale * (-tf.math.log1p(-y))**(1 / self.concentration)
+    with tf.control_dependencies(self._maybe_assert_valid_y(y)):
+      return self.scale * (-tf.math.log1p(-y)) ** (1 / self.concentration)
 
   def _inverse_log_det_jacobian(self, y):
-    y = self._maybe_assert_valid_y(y)
-    return (-tf.math.log1p(-y) +
-            tf.math.xlogy(1 / self.concentration - 1, -tf.math.log1p(-y)) +
-            tf.math.log(self.scale / self.concentration))
+    with tf.control_dependencies(self._maybe_assert_valid_y(y)):
+      scale = tf.convert_to_tensor(self.scale)
+      concentration = tf.convert_to_tensor(self.concentration)
+      return (-tf.math.log1p(-y) +
+              tf.math.xlogy(1 / concentration - 1, -tf.math.log1p(-y)) +
+              tf.math.log(scale / concentration))
 
   def _forward_log_det_jacobian(self, x):
-    x = self._maybe_assert_valid_x(x)
-    return (-(x / self.scale)**self.concentration +
-            tf.math.xlogy(self.concentration - 1, x) +
-            tf.math.log(self.concentration) -
-            self.concentration * tf.math.log(self.scale))
+    with tf.control_dependencies(self._maybe_assert_valid_x(x)):
+      scale = tf.convert_to_tensor(self.scale)
+      concentration = tf.convert_to_tensor(self.concentration)
+      return (-(x / scale) ** concentration +
+              tf.math.xlogy(concentration - 1, x) +
+              tf.math.log(concentration) -
+              concentration * tf.math.log(scale))
 
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args:
-      return x
-    is_valid = assert_util.assert_non_negative(
-        x, message="Forward transformation input must be at least 0.")
-    return distribution_util.with_dependencies([is_valid], x)
+      return []
+    return [assert_util.assert_non_negative(
+        x, message='Forward transformation input must be at least 0.')]
 
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:
-      return y
+      return []
     is_positive = assert_util.assert_non_negative(
-        y, message="Inverse transformation input must be greater than 0.")
+        y, message='Inverse transformation input must be greater than 0.')
     less_than_one = assert_util.assert_less_equal(
         y,
         tf.constant(1., y.dtype),
-        message="Inverse transformation input must be less than or equal to 1.")
-    return distribution_util.with_dependencies([is_positive, less_than_one], y)
+        message='Inverse transformation input must be less than or equal to 1.')
+    return [is_positive, less_than_one]
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_ref(self.scale):
+      assertions.append(assert_util.assert_positive(
+          self.scale,
+          message='Argument `scale` must be positive.'))
+    if is_init != tensor_util.is_ref(self.concentration):
+      assertions.append(assert_util.assert_positive(
+          self.concentration,
+          message='Argument `concentration` must be positive.'))
+    return assertions

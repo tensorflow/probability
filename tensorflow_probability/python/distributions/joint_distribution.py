@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import abc
+import numpy as np
 import six
 
 import tensorflow.compat.v2 as tf
@@ -26,7 +27,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import prefer_static
 
 
 __all__ = [
@@ -334,9 +335,9 @@ def maybe_check_wont_broadcast(flat_xs, validate_args):
     # Only when `validate_args` is `True` do we enforce the validation.
     return flat_xs
   msg = 'Broadcasting probably indicates an error in model specification.'
-  s = tuple(x.shape for x in flat_xs)
-  if all(tensorshape_util.is_fully_defined(s_) for s_ in s):
-    if not all(a == b for a, b in zip(s[1:], s[:-1])):
+  s = tuple(prefer_static.shape(x) for x in flat_xs)
+  if all(prefer_static.is_numpy(s_) for s_ in s):
+    if not all(np.all(a == b) for a, b in zip(s[1:], s[:-1])):
       raise ValueError(msg)
     return flat_xs
   assertions = [assert_util.assert_equal(a, b, message=msg)

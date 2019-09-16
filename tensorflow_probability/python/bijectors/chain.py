@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import itertools
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
@@ -187,8 +185,6 @@ class Chain(bijector.Bijector):
           bijectors, compute_forward=True)
 
       super(Chain, self).__init__(
-          graph_parents=list(itertools.chain.from_iterable(
-              b.graph_parents for b in bijectors)),
           forward_min_event_ndims=forward_min_event_ndims,
           inverse_min_event_ndims=inverse_min_event_ndims,
           is_constant_jacobian=all(b.is_constant_jacobian for b in bijectors),

@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -27,40 +26,11 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
-    "HalfCauchy",
+    'HalfCauchy',
 ]
-
-
-def check_arg_in_support(f):
-  """Decorator function for argument bounds checking.
-
-  This decorator is meant to be used with methods that require the first
-  argument to be in the support of the distribution. If `validate_args` is
-  `True`, the method is wrapped with an assertion that the first argument is
-  greater than or equal to `loc`, since the support of the half-Cauchy
-  distribution is given by `[loc, infinity)`.
-
-
-  Args:
-    f: method to be decorated.
-
-  Returns:
-    Returns a decorated method that, when `validate_args` attribute of the class
-    is `True`, will assert that all elements in the first argument are within
-    the support of the distribution before executing the original method.
-  """
-  @functools.wraps(f)
-  def _check_arg_and_apply_f(*args, **kwargs):
-    dist = args[0]
-    x = args[1]
-    with tf.control_dependencies([
-        assert_util.assert_greater_equal(
-            x, dist.loc, message="x is not in the support of the distribution")
-    ] if dist.validate_args else []):
-      return f(*args, **kwargs)
-  return _check_arg_and_apply_f
 
 
 class HalfCauchy(distribution.Distribution):
@@ -90,7 +60,7 @@ class HalfCauchy(distribution.Distribution):
                scale,
                validate_args=False,
                allow_nan_stats=True,
-               name="HalfCauchy"):
+               name='HalfCauchy'):
     """Construct a half-Cauchy distribution with `loc` and `scale`.
 
     Args:
@@ -115,26 +85,22 @@ class HalfCauchy(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], dtype_hint=tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies(
-          [assert_util.assert_positive(scale)] if validate_args else []):
-        self._loc = tf.identity(loc, name="loc")
-        self._scale = tf.identity(scale, name="loc")
-      dtype_util.assert_same_float_dtype([self._loc, self._scale])
-    super(HalfCauchy, self).__init__(
-        dtype=self._scale.dtype,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._loc, self._scale],
-        name=name)
+      self._loc = tensor_util.convert_nonref_to_tensor(
+          loc, name='loc', dtype=dtype)
+      self._scale = tensor_util.convert_nonref_to_tensor(
+          scale, name='scale', dtype=dtype)
+      super(HalfCauchy, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("loc", "scale"),
+        zip(('loc', 'scale'),
             ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
@@ -151,8 +117,10 @@ class HalfCauchy(distribution.Distribution):
     """Distribution parameter for the scale."""
     return self._scale
 
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(tf.shape(self.loc), tf.shape(self.scale))
+  def _batch_shape_tensor(self, loc=None, scale=None):
+    return tf.broadcast_dynamic_shape(
+        tf.shape(self.loc if loc is None else loc),
+        tf.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
@@ -164,36 +132,33 @@ class HalfCauchy(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    shape = tf.concat([[n], self._batch_shape_tensor()], 0)
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    shape = tf.concat([[n], self._batch_shape_tensor(
+        loc=loc, scale=scale)], 0)
     probs = tf.random.uniform(
         shape, minval=0., maxval=1., dtype=self.dtype, seed=seed)
-    return self._quantile(probs)
+    # Quantile function.
+    return loc + scale * tf.tan((np.pi / 2) * probs)
 
-  @check_arg_in_support
   def _log_prob(self, x):
-    def log_prob_on_support(x):
-      return (np.log(2 / np.pi) - tf.math.log(self.scale) -
-              tf.math.log1p(self._z(x)**2))
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x, loc)):
+      safe_x = self._get_safe_input(x, loc=loc, scale=scale)
+      log_prob = (np.log(2 / np.pi) - tf.math.log(scale) - tf.math.log1p(
+          ((safe_x - loc) / scale)**2))
+      return tf.where(x < loc, dtype_util.as_numpy_dtype(
+          self.dtype)(-np.inf), log_prob)
 
-    return self._extend_support_with_default_value(
-        x, log_prob_on_support, default_value=-np.inf)
-
-  @check_arg_in_support
   def _log_cdf(self, x):
-    return self._extend_support_with_default_value(
-        x,
-        lambda x: np.log(2 / np.pi) + tf.math.log(tf.atan(self._z(x))),
-        default_value=-np.inf)
-
-  def _z(self, x):
-    """Standardize input `x`."""
-    with tf.name_scope("standardize"):
-      return (x - self.loc) / self.scale
-
-  def _inv_z(self, z):
-    """Reconstruct input `x` from a its normalized version."""
-    with tf.name_scope("reconstruct"):
-      return z * self.scale + self.loc
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x, loc)):
+      safe_x = self._get_safe_input(x, loc=loc, scale=scale)
+      log_cdf = np.log(2 / np.pi) + tf.math.log(tf.atan((safe_x - loc) / scale))
+      return tf.where(x < loc, dtype_util.as_numpy_dtype(
+          self.dtype)(-np.inf), log_cdf)
 
   def _entropy(self):
     h = np.log(2 * np.pi) + tf.math.log(self.scale)
@@ -209,48 +174,40 @@ class HalfCauchy(distribution.Distribution):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
                      dtype_util.as_numpy_dtype(self.dtype)(np.nan))
-    raise ValueError("`mean` is undefined for the half-Cauchy distribution.")
+    raise ValueError('`mean` is undefined for the half-Cauchy distribution.')
 
   def _stddev(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
                      dtype_util.as_numpy_dtype(self.dtype)(np.nan))
-    raise ValueError("`stddev` is undefined for the half-Cauchy distribution.")
+    raise ValueError('`stddev` is undefined for the half-Cauchy distribution.')
 
   def _variance(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
                      dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError(
-        "`variance` is undefined for the half-Cauchy distribution.")
+        '`variance` is undefined for the half-Cauchy distribution.')
 
-  def _extend_support_with_default_value(self, x, f, default_value):
-    """Returns `f(x)` if x is in the support, and `default_value` otherwise.
+  def _get_safe_input(self, x, loc, scale):
+    safe_value = 0.5 * scale + loc
+    return tf.where(x < loc, safe_value, x)
 
-    Given `f` which is defined on the support of this distribution
-    (`x >= loc`), extend the function definition to the real line
-    by defining `f(x) = default_value` for `x < loc`.
+  def _maybe_assert_valid_sample(self, x, loc):
+    """Checks the validity of a sample."""
+    if not self.validate_args:
+      return []
+    return [
+        assert_util.assert_greater_equal(
+            x, loc, message='x is not in the support of the distribution')]
 
-    Args:
-      x: Floating-point `Tensor` to evaluate `f` at.
-      f: Callable that takes in a `Tensor` and returns a `Tensor`. This
-        represents the function whose domain of definition we want to extend.
-      default_value: Python or numpy literal representing the value to use for
-        extending the domain.
-    Returns:
-      `Tensor` representing an extension of `f(x)`.
-    """
-    with tf.name_scope("extend_support_with_default_value"):
-      x = tf.convert_to_tensor(x, dtype=self.dtype, name="x")
-      loc = self.loc + tf.zeros_like(self.scale) + tf.zeros_like(x)
-      x = x + tf.zeros_like(loc)
-      # Substitute out-of-support values in x with values that are in the
-      # support of the distribution before applying f.
-      y = f(tf.where(x < self.loc, self._inv_z(0.5), x))
-      if default_value == 0.:
-        default_value = tf.zeros_like(y)
-      elif default_value == 1.:
-        default_value = tf.ones_like(y)
-      else:
-        default_value = dtype_util.as_numpy_dtype(self.dtype)(default_value)
-      return tf.where(x < self.loc, default_value, y)
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_ref(self.scale):
+      assertions.append(assert_util.assert_positive(
+          self.scale,
+          message='Argument `scale` must be positive.'))
+    return assertions
+

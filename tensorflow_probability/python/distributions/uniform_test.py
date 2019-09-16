@@ -18,22 +18,21 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
 # Dependency imports
+
 import numpy as np
 from scipy import stats as sp_stats
-
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class UniformTest(tf.test.TestCase):
+class UniformTest(test_case.TestCase):
 
   def testUniformRange(self):
     a = 3.0
@@ -132,10 +131,9 @@ class UniformTest(tf.test.TestCase):
     a_v = np.array([1.0, 1.0, 1.0], dtype=np.float32)
     b_v = np.array([1.0, 2.0, 3.0], dtype=np.float32)
 
-    with self.assertRaisesWithPredicateMatch(
-        tf.errors.InvalidArgumentError, "x < y"):
+    with self.assertRaisesOpError('not defined when low >= high'):
       uniform = tfd.Uniform(low=a_v, high=b_v, validate_args=True)
-      self.evaluate(uniform.low)
+      self.evaluate(uniform.mean())
 
   def testUniformSample(self):
     a = tf.constant([3.0, 4.0])
@@ -170,7 +168,7 @@ class UniformTest(tf.test.TestCase):
 
     n_v = 100000
     n = tf.constant(n_v)
-    samples = uniform.sample(n)
+    samples = uniform.sample(n, seed=tfp_test_util.test_seed())
     self.assertEqual(samples.shape, (n_v, batch_size, 2))
 
     sample_values = self.evaluate(samples)
@@ -228,9 +226,8 @@ class UniformTest(tf.test.TestCase):
     a = 10.0
     b = [11.0, 100.0]
     uniform = tfd.Uniform(a, b)
-    self.assertTrue(
-        self.evaluate(
-            tf.reduce_all(input_tensor=uniform.prob(uniform.sample(10)) > 0)))
+    samps = uniform.sample(10, seed=tfp_test_util.test_seed())
+    self.assertTrue(self.evaluate(tf.reduce_all(uniform.prob(samps) > 0)))
 
   def testUniformBroadcasting(self):
     a = 10.0
@@ -246,7 +243,7 @@ class UniformTest(tf.test.TestCase):
     b = [11.0, 20.0]
     uniform = tfd.Uniform(a, b)
 
-    pdf = uniform.prob(uniform.sample((2, 3)))
+    pdf = uniform.prob(uniform.sample((2, 3), seed=tfp_test_util.test_seed()))
     # pylint: disable=bad-continuation
     expected_pdf = [
         [[1.0, 0.1], [1.0, 0.1], [1.0, 0.1]],
@@ -255,7 +252,7 @@ class UniformTest(tf.test.TestCase):
     # pylint: enable=bad-continuation
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
-    pdf = uniform.prob(uniform.sample())
+    pdf = uniform.prob(uniform.sample(seed=tfp_test_util.test_seed()))
     expected_pdf = [1.0, 0.1]
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
@@ -263,7 +260,8 @@ class UniformTest(tf.test.TestCase):
     a = tf.constant(0.1)
     b = tf.constant(0.8)
     _, [grad_a, grad_b] = tfp.math.value_and_gradient(
-        lambda a_, b_: tfd.Uniform(a_, b_).sample(100),
+        lambda a_, b_: (  # pylint: disable=g-long-lambda
+            tfd.Uniform(a_, b_).sample(100, seed=tfp_test_util.test_seed())),
         [a, b])
     self.assertIsNotNone(grad_a)
     self.assertIsNotNone(grad_b)
@@ -334,5 +332,15 @@ class UniformTest(tf.test.TestCase):
     true_kl_, kl_ = self.evaluate([true_kl, kl])
     self.assertAllEqual(true_kl_, kl_)
 
-if __name__ == "__main__":
+  def testModifiedVariableAssertion(self):
+    low = tf.Variable(0.)
+    high = tf.Variable(1.)
+    self.evaluate([low.initializer, high.initializer])
+    uniform = tfd.Uniform(low=low, high=high, validate_args=True)
+    with self.assertRaisesOpError('not defined when low >= high'):
+      with tf.control_dependencies([low.assign(2.)]):
+        self.evaluate(uniform.mean())
+
+
+if __name__ == '__main__':
   tf.test.main()

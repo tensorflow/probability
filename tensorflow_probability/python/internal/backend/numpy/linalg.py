@@ -19,162 +19,30 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 
-import tensorflow as tf
+# pylint: disable=unused-import
+from tensorflow_probability.python.internal.backend.numpy import adjoint_registrations as _adjoint_registrations
+from tensorflow_probability.python.internal.backend.numpy import cholesky_registrations as _cholesky_registrations
+from tensorflow_probability.python.internal.backend.numpy import inverse_registrations as _inverse_registrations
+from tensorflow_probability.python.internal.backend.numpy import linear_operator_algebra as _linear_operator_algebra
+from tensorflow_probability.python.internal.backend.numpy import matmul_registrations as _matmul_registrations
+from tensorflow_probability.python.internal.backend.numpy import solve_registrations as _solve_registrations
 
-from tensorflow_probability.python.internal.backend.numpy.internal import utils
-
-from tensorflow_probability.python.internal.backend.numpy.linear_operator import *  # pylint: disable=wildcard-import
-
-scipy_linalg = utils.try_import('scipy.linalg')
-
-
-__all__ = [
-    'band_part',
-    'cholesky',
-    'cholesky_solve',
-    'det',
-    'diag',
-    'diag_part',
-    'eye',
-    'matmul',
-    'matrix_transpose',
-    'norm',
-    'set_diag',
-    'slogdet',
-    'triangular_solve',
-    # 'adjoint',
-    # 'cross',
-    # 'eigh',
-    # 'eigvalsh',
-    # 'einsum',
-    # 'expm',
-    # 'global_norm',
-    # 'inv',
-    # 'l2_normalize',
-    # 'logdet',
-    # 'logm',
-    # 'lstsq',
-    # 'lu',
-    # 'matvec',
-    # 'norm',
-    # 'qr',
-    # 'solve',
-    # 'sqrtm',
-    # 'svd',
-    # 'tensor_diag',
-    # 'tensor_diag_part',
-    # 'tensordot',
-    # 'trace',
-    # 'tridiagonal_solve',
-]
+# pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.linalg_impl import *
+from tensorflow_probability.python.internal.backend.numpy.linear_operator import *
+from tensorflow_probability.python.internal.backend.numpy.linear_operator_block_diag import *
+from tensorflow_probability.python.internal.backend.numpy.linear_operator_circulant import *
+from tensorflow_probability.python.internal.backend.numpy.linear_operator_composition import *
+from tensorflow_probability.python.internal.backend.numpy.linear_operator_diag import *
+from tensorflow_probability.python.internal.backend.numpy.linear_operator_full_matrix import *
+from tensorflow_probability.python.internal.backend.numpy.linear_operator_identity import *
+from tensorflow_probability.python.internal.backend.numpy.linear_operator_kronecker import *
+from tensorflow_probability.python.internal.backend.numpy.linear_operator_low_rank_update import *
+from tensorflow_probability.python.internal.backend.numpy.linear_operator_lower_triangular import *
+from tensorflow_probability.python.internal.backend.numpy.linear_operator_toeplitz import *
+from tensorflow_probability.python.internal.backend.numpy.linear_operator_zeros import *
 
 
-def _eye(num_rows, num_columns=None, batch_shape=None,
-         dtype=tf.float32, name=None):  # pylint: disable=unused-argument
-  dt = utils.numpy_dtype(dtype)
-  x = np.eye(num_rows, num_columns).astype(dt)
-  if batch_shape is not None:
-    x = x * np.ones(np.concatenate([batch_shape, [1, 1]], axis=0)).astype(dt)
-  return x
 
 
-def _fill_diagonal(input, diagonal, name=None):  # pylint: disable=unused-argument,redefined-builtin
-  x = np.array(input).copy()
-  if np.isscalar(diagonal):
-    np.fill_diagonal(x, diagonal)
-    return x
-  else:
-    diag_inds = np.diag_indices(x.shape[-1])
-    # TODO(iansf): This won't work for jax.
-    x[(slice(None, None, 1),) * len(x.shape[:-2]) + diag_inds] = diagonal
-    return x
-
-
-def _matrix_transpose(a, name='matrix_transpose', conjugate=False):  # pylint: disable=unused-argument
-  a = np.array(a)
-  if a.ndim < 2:
-    raise ValueError(
-        'Input must have rank at least `2`; found {}.'.format(a.ndim))
-  perm = np.concatenate([np.arange(a.ndim - 2), [a.ndim - 1, a.ndim - 2]],
-                        axis=0)
-  x = np.transpose(a, perm)
-  return np.conjugate(x) if conjugate else x
-
-
-def _matmul(a, b,
-            transpose_a=False, transpose_b=False,
-            adjoint_a=False, adjoint_b=False,
-            a_is_sparse=False, b_is_sparse=False,
-            name=None):  # pylint: disable=unused-argument
-  """Numpy matmul wrapper."""
-  if a_is_sparse or b_is_sparse:
-    raise NotImplementedError('Numpy backend does not support sparse matmul.')
-  if transpose_a or adjoint_a:
-    a = _matrix_transpose(a, conjugate=adjoint_a)
-  if transpose_b or adjoint_b:
-    b = _matrix_transpose(b, conjugate=adjoint_b)
-  return np.matmul(a, b)
-
-
-# --- Begin Public Functions --------------------------------------------------
-
-band_part = utils.copy_docstring(
-    tf.linalg.band_part,
-    lambda input, num_lower, num_upper, name=None: (  # pylint: disable=g-long-lambda
-        np.tril(np.triu(input, -num_lower), num_upper)))
-
-cholesky = utils.copy_docstring(
-    tf.linalg.cholesky,
-    lambda input, name=None: np.linalg.cholesky(input))
-
-cholesky_solve = utils.copy_docstring(
-    tf.linalg.cholesky_solve,
-    lambda chol, rhs, name=None: scipy_linalg.cho_solve((chol, True), rhs))
-
-det = utils.copy_docstring(
-    tf.linalg.det,
-    lambda input, name=None: np.linalg.det(input))
-
-diag = utils.copy_docstring(
-    tf.linalg.diag,
-    lambda diagonal, name=None: np.diag(diagonal))
-
-diag_part = utils.copy_docstring(
-    tf.linalg.diag_part,
-    lambda input, name=None: np.diagonal(input, axis1=-2, axis2=-1))
-
-eye = utils.copy_docstring(
-    tf.eye,
-    _eye)
-
-matmul = utils.copy_docstring(
-    tf.linalg.matmul,
-    _matmul)
-
-norm = utils.copy_docstring(
-    tf.norm,
-    lambda tensor, ord='euclidean', axis=None, keepdims=None, name=None,  # pylint: disable=g-long-lambda
-           keep_dims=None: np.linalg.norm(
-               tensor, ord=2 if ord == 'euclidean' else ord,
-               axis=axis, keepdims=keep_dims)
-)
-
-set_diag = utils.copy_docstring(
-    tf.linalg.set_diag,
-    _fill_diagonal)
-
-# TODO(b/136555907): Add unit-test.
-slogdet = utils.copy_docstring(
-    tf.linalg.slogdet,
-    np.linalg.slogdet)
-
-matrix_transpose = utils.copy_docstring(
-    tf.linalg.matrix_transpose,
-    _matrix_transpose)
-
-triangular_solve = utils.copy_docstring(
-    tf.linalg.triangular_solve,
-    lambda matrix, rhs, lower=True, adjoint=False, name=None: (  # pylint: disable=g-long-lambda
-        scipy_linalg.solve_triangular(matrix, rhs)))

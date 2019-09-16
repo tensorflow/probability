@@ -27,6 +27,12 @@ __all__ = [
 ]
 
 
+class _NoOpCache(dict):
+
+  def __getitem__(self, _):
+    return {}
+
+
 class Identity(bijector.Bijector):
   """Compute Y = g(X) = X.
 
@@ -50,6 +56,9 @@ class Identity(bijector.Bijector):
           is_constant_jacobian=True,
           validate_args=validate_args,
           name=name)
+    # Override superclass private fields to eliminate caching, avoiding a memory
+    # leak caused by the `y is x` characteristic of this bijector.
+    self._from_x = self._from_y = _NoOpCache()
 
   def _forward(self, x):
     return x

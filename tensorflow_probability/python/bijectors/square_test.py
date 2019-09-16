@@ -19,16 +19,18 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_case
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SquareBijectorTest(tf.test.TestCase):
+class SquareBijectorTest(test_case.TestCase):
   """Tests the correctness of the Y = X ** 2 transformation."""
 
   def testBijectorScalar(self):
@@ -56,7 +58,7 @@ class SquareBijectorTest(tf.test.TestCase):
     bijector = tfb.Square(validate_args=True)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=1e-3, upper_x=1.5, eval_func=self.evaluate,
-        rtol=0.05)
+        rtol=0.08)
 
 
 if __name__ == "__main__":

@@ -21,7 +21,8 @@ from __future__ import print_function
 import collections
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
@@ -49,6 +50,7 @@ def _hmc_like_log_accept_prob_getter_fn(kernel_results):
 def _reduce_logmeanexp(value, dims, keepdims=False):
   # This is intentionally numerically imprecise for simplicity. For the purposes
   # of computing the mean acceptance probability this is more than sufficient.
+  # TODO(b/139011227): Use tfp.math.general.reduce_logmeanexp
   return tf.math.log(
       tf.reduce_mean(input_tensor=tf.exp(value), axis=dims, keepdims=keepdims))
 
@@ -61,7 +63,7 @@ def _get_differing_dims(a, b):
     b_shape = np.array(b.shape.as_list())
     return np.where(a_shape != b_shape[:len(a_shape)])[0]
   else:
-    return tf.compat.v1.where(
+    return tf1.where(
         tf.not_equal(tf.shape(input=a),
                      tf.shape(input=b)[:tf.rank(a)]))[:, 0]
 
@@ -253,7 +255,7 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
 
     inner_kernel = mcmc_util.enable_store_parameters_in_results(inner_kernel)
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         mcmc_util.make_name(name, 'simple_step_size_adaptation', '__init__'),
         values=[target_accept_prob, adaptation_rate,
                 num_adaptation_steps]) as name:
@@ -310,7 +312,7 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
     return self._parameters
 
   def one_step(self, current_state, previous_kernel_results):
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name=mcmc_util.make_name(self.name, 'simple_step_size_adaptation',
                                  'one_step'),
         values=[current_state, previous_kernel_results]):
@@ -390,7 +392,7 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
             step_size_part / (1. + previous_kernel_results.adaptation_rate))
 
         new_step_size_parts.append(
-            tf.compat.v1.where(
+            tf1.where(
                 previous_kernel_results.step < self.num_adaptation_steps,
                 new_step_size_part, step_size_part))
       new_step_size = tf.nest.pack_sequence_as(step_size, new_step_size_parts)
@@ -401,7 +403,7 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
           new_step_size=new_step_size)
 
   def bootstrap_results(self, init_state):
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name=mcmc_util.make_name(self.name, 'simple_step_size_adaptation',
                                  'bootstrap_results'),
         values=[init_state]):
@@ -425,9 +427,9 @@ def _maybe_validate_target_accept_prob(target_accept_prob, validate_args):
   if not validate_args:
     return target_accept_prob
   with tf.control_dependencies([
-      tf.compat.v1.assert_positive(
+      tf1.assert_positive(
           target_accept_prob, message='`target_accept_prob` must be > 0.'),
-      tf.compat.v1.assert_less(
+      tf1.assert_less(
           target_accept_prob,
           tf.ones_like(target_accept_prob),
           message='`target_accept_prob` must be < 1.')

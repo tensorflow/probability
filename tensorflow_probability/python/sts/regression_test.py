@@ -19,9 +19,12 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
-import tensorflow as tf
-import tensorflow_probability as tfp
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import SparseLinearRegression
 from tensorflow_probability.python.sts import Sum
@@ -30,10 +33,9 @@ from tensorflow.python.framework import test_util
 from tensorflow.python.platform import test
 
 tfl = tf.linalg
-tfd = tfp.distributions
 
 
-class _LinearRegressionTest(tf.test.TestCase):
+class _LinearRegressionTest(test_case.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_basic_statistics(self):
@@ -82,7 +84,7 @@ class _LinearRegressionTest(tf.test.TestCase):
     model = Sum(components=[linear_regression],
                 observation_noise_scale_prior=observation_noise_scale_prior)
 
-    learnable_weights = tf.compat.v2.Variable(
+    learnable_weights = tf.Variable(
         tf.zeros([num_features], dtype=true_weights.dtype))
 
     def build_loss():
@@ -95,13 +97,13 @@ class _LinearRegressionTest(tf.test.TestCase):
 
     # We provide graph- and eager-mode optimization for TF 2.0 compatibility.
     num_train_steps = 80
-    optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=0.1)
+    optimizer = tf1.train.AdamOptimizer(learning_rate=0.1)
     if tf.executing_eagerly():
       for _ in range(num_train_steps):
         optimizer.minimize(build_loss)
     else:
       train_op = optimizer.minimize(build_loss())
-      self.evaluate(tf.compat.v1.global_variables_initializer())
+      self.evaluate(tf1.global_variables_initializer())
       for _ in range(num_train_steps):
         _ = self.evaluate(train_op)
     self.assertAllClose(*self.evaluate((true_weights, learnable_weights)),
@@ -150,11 +152,11 @@ class _LinearRegressionTest(tf.test.TestCase):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-class _SparseLinearRegressionTest(tf.test.TestCase):
+class _SparseLinearRegressionTest(test_case.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_builds_without_errors(self):
@@ -166,7 +168,7 @@ class _SparseLinearRegressionTest(tf.test.TestCase):
 
     weights_batch_shape = []
     if not self.use_static_shape:
-      weights_batch_shape = tf.compat.v1.placeholder_with_default(
+      weights_batch_shape = tf1.placeholder_with_default(
           np.array(weights_batch_shape, dtype=np.int32), shape=None)
     sparse_regression = SparseLinearRegression(
         design_matrix=design_matrix,
@@ -196,7 +198,7 @@ class _SparseLinearRegressionTest(tf.test.TestCase):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 

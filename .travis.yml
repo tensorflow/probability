@@ -41,7 +41,7 @@ python:
   - "3.5"
 env:
   global:
-    - NUM_SHARDS=4
+    - NUM_SHARDS=5
   matrix:
     # We shard our tests to avoid timeouts. The run_tests.sh script uses the
     # $NUM_SHARDS and $SHARD environment variables to select a partition of the
@@ -50,4 +50,5 @@ env:
     - SHARD=1
     - SHARD=2
     - SHARD=3
+    - SHARD=4
 script: ./testing/run_tests.sh

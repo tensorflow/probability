@@ -121,18 +121,32 @@ def minimize(loss_fn,
     return state
 
   with tf.name_scope(name) as name:
-    # Compute the shape of the trace without executing the graph.
+
+    # Compute the shape of the trace without executing the graph, if possible.
     concrete_loop_body = train_loop_body.get_concrete_function(
         tf.TensorSpec([]), tf.TensorSpec([]))  # Inputs ignored.
-    state_initializer = tf.nest.map_structure(
-        lambda shape, dtype: tf.zeros(shape, dtype=dtype),
-        concrete_loop_body.output_shapes,
-        concrete_loop_body.output_dtypes)
+    if all([shape.is_fully_defined()
+            for shape in tf.nest.flatten(concrete_loop_body.output_shapes)]):
+      state_initializer = tf.nest.map_structure(
+          lambda shape, dtype: tf.zeros(shape, dtype=dtype),
+          concrete_loop_body.output_shapes,
+          concrete_loop_body.output_dtypes)
+      initial_trace_step = None
+    else:
+      state_initializer = concrete_loop_body(
+          tf.convert_to_tensor(0.), tf.convert_to_tensor(0.))  # Inputs ignored.
+      num_steps = num_steps - 1
+      initial_trace_step = state_initializer
 
     # TODO(b/136103064): Rewrite as explicit `while_loop` to support custom
     # convergence criteria and Tensor-valued `num_steps`, and avoid
     # re-tracing the train loop body.
-    return tf.scan(train_loop_body,
-                   elems=np.arange(num_steps),
-                   initializer=state_initializer)
+    trace = tf.scan(train_loop_body,
+                    elems=np.arange(num_steps),
+                    initializer=state_initializer)
+    if initial_trace_step is not None:
+      trace = tf.nest.map_structure(
+          lambda a, b: tf.concat([a[tf.newaxis, ...], b], axis=0),
+          initial_trace_step, trace)
+    return trace
 

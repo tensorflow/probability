@@ -19,14 +19,15 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 
-import tensorflow as tf
+import numpy as np
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-tfd = tfp.distributions
 
 
 def _set_seed(seed):
@@ -38,10 +39,10 @@ def _set_seed(seed):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DefaultExchangeProposedFnTest(tf.test.TestCase):
+class DefaultExchangeProposedFnTest(test_case.TestCase):
 
   def setUp(self):
-    tf.compat.v1.set_random_seed(123)
+    tf1.set_random_seed(123)
 
   def generate_exchanges(self, exchange_proposed_fn, num_replica, seed):
 
@@ -49,11 +50,11 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
       exchange = exchange_proposed_fn(num_replica, seed)
       flat_replicas = tf.reshape(exchange, [-1])
       with tf.control_dependencies([
-          tf.compat.v1.assert_equal(
+          tf1.assert_equal(
               tf.size(input=flat_replicas),
               tf.size(input=tf.unique(flat_replicas)[0])),
-          tf.compat.v1.assert_greater_equal(flat_replicas, 0),
-          tf.compat.v1.assert_less(flat_replicas, num_replica),
+          tf1.assert_greater_equal(flat_replicas, 0),
+          tf1.assert_less(flat_replicas, num_replica),
       ]):
         return tf.shape(input=exchange)[0]
 
@@ -155,10 +156,10 @@ class DefaultExchangeProposedFnTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class REMCTest(tf.test.TestCase):
+class REMCTest(test_case.TestCase):
 
   def setUp(self):
-    tf.compat.v1.set_random_seed(123)
+    tf1.set_random_seed(123)
 
   def _getNormalREMCSamples(self,
                             inverse_temperatures,
@@ -306,7 +307,7 @@ class REMCTest(tf.test.TestCase):
             axis=0))
     [sample_mean_, sample_std_, log_accept_ratios_] = self.evaluate(
         [sample_mean, sample_std, log_accept_ratios])
-    tf.compat.v1.logging.vlog(1, 'log_accept_ratios: %s  eager: %s',
+    tf1.logging.vlog(1, 'log_accept_ratios: %s  eager: %s',
                               log_accept_ratios_, tf.executing_eagerly())
 
     self.assertAllClose(sample_mean_, [0., 0.], atol=0.3, rtol=0.3)

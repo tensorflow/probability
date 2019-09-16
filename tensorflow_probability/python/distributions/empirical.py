@@ -23,9 +23,12 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow.python.ops import gen_array_ops  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
     'Empirical'
@@ -44,9 +47,9 @@ def _broadcast_event_and_samples(event, samples, event_ndims):
           tf.shape(samples)[tf.rank(samples) - event_ndims:]
       ],
       axis=0)
-  event *= tf.ones(samples_shape, dtype=event.dtype)
+  event = event * tf.ones(samples_shape, dtype=event.dtype)
   event = tf.expand_dims(event, axis=-event_ndims - 1)
-  samples *= tf.ones_like(event, dtype=samples.dtype)
+  samples = samples * tf.ones_like(event, dtype=samples.dtype)
 
   return event, samples
 
@@ -140,29 +143,30 @@ class Empirical(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
 
     Raises:
-      ValueError: if the rank of `samples` < event_ndims + 1.
+      ValueError: if the rank of `samples` is statically known and less than
+        event_ndims + 1.
     """
 
     parameters = dict(locals())
     with tf.name_scope(name):
-      self._samples = tf.convert_to_tensor(samples, name='samples')
+      self._samples = tensor_util.convert_nonref_to_tensor(samples)
+      dtype = dtype_util.common_dtype(
+          [self._samples], dtype_hint=self._samples.dtype)
       self._event_ndims = event_ndims
-      self._samples_axis = (
-          (tensorshape_util.rank(self.samples.shape) or tf.rank(self.samples)) -
-          self._event_ndims - 1)
-      with tf.control_dependencies(
-          [assert_util.assert_rank_at_least(self._samples, event_ndims + 1)]):
-        samples_shape = distribution_util.prefer_static_shape(self._samples)
-        self._num_samples = samples_shape[self._samples_axis]
 
-    super(Empirical, self).__init__(
-        dtype=self._samples.dtype,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._samples],
-        name=name)
+      # Note: this tf.rank call affects the graph, but is ok in `__init__`
+      # because we don't expect shapes (or ranks) to be runtime-variable, nor
+      # ever need to differentiate with respect to them.
+      samples_rank = prefer_static.rank(self.samples)
+      self._samples_axis = samples_rank - self._event_ndims - 1
+
+      super(Empirical, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
@@ -177,119 +181,182 @@ class Empirical(distribution.Distribution):
     return self._samples
 
   @property
+  @deprecation.deprecated(
+      '2019-11-01', 'The `num_samples` property is deprecated. Use '
+      'Empirical.compute_num_samples() instead.')
+  # Note this function has graph side-effects which is why it must be
+  # deprecated.
   def num_samples(self):
     """Number of samples."""
-    return self._num_samples
+    return self.compute_num_samples()
 
-  def _batch_shape_tensor(self):
-    return tf.shape(self.samples)[:self._samples_axis]
+  def compute_num_samples(self):
+    """Compute and return the number of values in `self.samples`.
+
+    Returns:
+      num_samples: int32 `Tensor` containing the number of entries in
+        `self.samples`. If `self.samples` has shape `[..., S, E1, ..., Ee]`
+        where the `E`'s are event dims, this method returns a `Tensor` whose
+        values is `S`.
+    """
+    with self._name_and_control_scope('compute_num_samples'):
+      return self._compute_num_samples(self.samples)
+
+  def _compute_num_samples(self, samples):
+    samples_shape = distribution_util.prefer_static_shape(samples)
+    return tf.convert_to_tensor(
+        samples_shape[self._samples_axis],
+        dtype_hint=tf.int32,
+        name='num_samples')
+
+  def _batch_shape_tensor(self, samples=None):
+    if samples is None:
+      samples = tf.convert_to_tensor(self.samples)
+    return tf.shape(samples)[:self._samples_axis]
 
   def _batch_shape(self):
-    if tensorshape_util.rank(self.samples.shape) is None:
+    if self.samples.shape.rank is None:
       return tf.TensorShape(None)
     return self.samples.shape[:self._samples_axis]
 
-  def _event_shape_tensor(self):
-    return tf.shape(self.samples)[self._samples_axis + 1:]
+  def _event_shape_tensor(self, samples=None):
+    if samples is None:
+      samples = tf.convert_to_tensor(self.samples)
+    return tf.shape(samples)[self._samples_axis + 1:]
 
   def _event_shape(self):
-    if tensorshape_util.rank(self.samples.shape) is None:
+    if self.samples.shape.rank is None:
       return tf.TensorShape(None)
     return self.samples.shape[self._samples_axis + 1:]
 
-  def _mean(self):
-    return tf.reduce_mean(self.samples, axis=self._samples_axis)
+  def _mean(self, samples=None):
+    if samples is None:
+      samples = tf.convert_to_tensor(self._samples)
+    return tf.reduce_mean(samples, axis=self._samples_axis)
 
   def _stddev(self):
-    r = self.samples - tf.expand_dims(self.mean(), axis=self._samples_axis)
-    var = tf.reduce_mean(tf.square(r), axis=self._samples_axis)
+    samples = tf.convert_to_tensor(self._samples)
+    axis = self._samples_axis
+    r = samples - tf.expand_dims(self._mean(samples), axis=axis)
+    var = tf.reduce_mean(tf.square(r), axis=axis)
     return tf.sqrt(var)
 
   def _sample_n(self, n, seed=None):
-    indices = tf.random.uniform([n], maxval=self.num_samples,
+    samples = tf.convert_to_tensor(self._samples)
+    indices = tf.random.uniform([n], maxval=self._compute_num_samples(samples),
                                 dtype=tf.int32, seed=seed)
-    draws = tf.gather(self.samples, indices, axis=self._samples_axis)
+    draws = tf.gather(samples, indices, axis=self._samples_axis)
     axes = tf.concat(
         [[self._samples_axis],
-         tf.range(self._samples_axis),
-         tf.range(self._event_ndims) + self._samples_axis + 1],
+         tf.range(self._samples_axis, dtype=tf.int32),
+         tf.range(self._event_ndims, dtype=tf.int32) + self._samples_axis + 1],
         axis=0)
     draws = tf.transpose(a=draws, perm=axes)
     return draws
 
-  def _mode(self):
+  def _mode(self, samples=None):
     # Samples count can vary by batch member. Use map_fn to compute mode for
     # each batch separately.
     def _get_mode(samples):
-      # TODO(b/123985779): Swith to tf.unique_with_counts_v2 when exposed
+      # TODO(b/123985779): Switch to tf.unique_with_counts_v2 when exposed
       count = gen_array_ops.unique_with_counts_v2(samples, axis=[0]).count
       return tf.argmax(count)
 
+    if samples is None:
+      samples = tf.convert_to_tensor(self._samples)
+    num_samples = self._compute_num_samples(samples)
+
     # Flatten samples for each batch.
     if self._event_ndims == 0:
-      samples = tf.reshape(self.samples, [-1, self.num_samples])
-      mode_shape = self.batch_shape_tensor()
+      flattened_samples = tf.reshape(samples, [-1, num_samples])
+      mode_shape = self._batch_shape_tensor(samples)
     else:
-      event_size = tf.reduce_prod(self.event_shape_tensor())
-      samples = tf.reshape(self.samples, [-1, self.num_samples, event_size])
+      event_size = tf.reduce_prod(self._event_shape_tensor(samples))
       mode_shape = tf.concat(
-          [self.batch_shape_tensor(), self.event_shape_tensor()],
+          [self._batch_shape_tensor(samples),
+           self._event_shape_tensor(samples)],
           axis=0)
+      flattened_samples = tf.reshape(samples, [-1, num_samples, event_size])
 
-    indices = tf.map_fn(_get_mode, samples, dtype=tf.int64)
+    indices = tf.map_fn(_get_mode, flattened_samples, dtype=tf.int64)
     full_indices = tf.stack(
         [tf.range(tf.shape(indices)[0]),
          tf.cast(indices, tf.int32)], axis=1)
 
-    mode = tf.gather_nd(samples, full_indices)
+    mode = tf.gather_nd(flattened_samples, full_indices)
     return tf.reshape(mode, mode_shape)
 
   def _entropy(self):
-    # Use map_fn to compute entropy for each batch separately.
-    def _get_entropy(samples):
-      # TODO(b/123985779): Swith to tf.unique_with_counts_v2 when exposed
-      count = gen_array_ops.unique_with_counts_v2(samples, axis=[0]).count
-      prob = count / self.num_samples
-      entropy = tf.reduce_sum(-prob * tf.math.log(prob))
-      return entropy
+    samples = tf.convert_to_tensor(self.samples)
+    num_samples = self._compute_num_samples(samples)
+    entropy_shape = self._batch_shape_tensor(samples)
 
     # Flatten samples for each batch.
     if self._event_ndims == 0:
-      samples = tf.reshape(self.samples, [-1, self.num_samples])
+      samples = tf.reshape(samples, [-1, num_samples])
     else:
       event_size = tf.reduce_prod(self.event_shape_tensor())
-      samples = tf.reshape(self.samples, [-1, self.num_samples, event_size])
+      samples = tf.reshape(samples, [-1, num_samples, event_size])
 
-    entropy = tf.map_fn(_get_entropy, samples)
-    entropy_shape = self.batch_shape_tensor()
-    if dtype_util.is_floating(self.dtype):
-      entropy = tf.cast(entropy, self.dtype)
+    # Use map_fn to compute entropy for each batch separately.
+    def _get_entropy(samples):
+      # TODO(b/123985779): Switch to tf.unique_with_counts_v2 when exposed
+      count = gen_array_ops.unique_with_counts_v2(samples, axis=[0]).count
+      prob = tf.cast(count / num_samples, dtype=self.dtype)
+      entropy = tf.reduce_sum(-prob * tf.math.log(prob))
+      return entropy
+
+    entropy = tf.map_fn(_get_entropy, samples, dtype=self.dtype)
     return tf.reshape(entropy, entropy_shape)
 
   def _cdf(self, event):
+    samples = tf.convert_to_tensor(self._samples)
+    num_samples = self._compute_num_samples(samples)
     event = tf.convert_to_tensor(event, name='event', dtype=self.dtype)
-    event, samples = _broadcast_event_and_samples(event, self.samples,
+    event, samples = _broadcast_event_and_samples(event, samples,
                                                   event_ndims=self._event_ndims)
     cdf = tf.reduce_sum(
         tf.cast(
             tf.reduce_all(
                 samples <= event, axis=tf.range(-self._event_ndims, 0)),
             dtype=tf.int32),
-        axis=-1) / self.num_samples
+        axis=-1) / num_samples
     if dtype_util.is_floating(self.dtype):
       cdf = tf.cast(cdf, self.dtype)
     return cdf
 
   def _prob(self, event):
+    samples = tf.convert_to_tensor(self._samples)
+    num_samples = self._compute_num_samples(samples)
     event = tf.convert_to_tensor(event, name='event', dtype=self.dtype)
-    event, samples = _broadcast_event_and_samples(event, self.samples,
+    event, samples = _broadcast_event_and_samples(event, samples,
                                                   event_ndims=self._event_ndims)
     prob = tf.reduce_sum(
         tf.cast(
             tf.reduce_all(
                 tf.equal(samples, event), axis=tf.range(-self._event_ndims, 0)),
             dtype=tf.int32),
-        axis=-1) / self.num_samples
+        axis=-1) / num_samples
     if dtype_util.is_floating(self.dtype):
       prob = tf.cast(prob, self.dtype)
     return prob
+
+  def _parameter_control_dependencies(self, is_init):
+    assertions = []
+
+    message = 'Rank of `samples` must be at least `event_ndims + 1`.'
+    if is_init:
+      samples_rank = self.samples.shape.rank
+      if samples_rank is not None:
+        if self.samples.shape.rank < self._event_ndims + 1:
+          raise ValueError(message)
+      elif self._validate_args:
+        assertions.append(
+            assert_util.assert_rank_at_least(
+                self._samples, self._event_ndims + 1, message=message))
+
+    if not self._validate_args:
+      assert not assertions  # Should never happen.
+      return []
+
+    return assertions

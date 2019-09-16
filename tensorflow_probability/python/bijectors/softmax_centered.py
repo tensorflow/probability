@@ -21,13 +21,12 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
-from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.bijectors import pad as pad_lib
+from tensorflow_probability.python.internal import prefer_static
 
 
 __all__ = [
-    "SoftmaxCentered",
+    'SoftmaxCentered',
 ]
 
 
@@ -60,51 +59,28 @@ class SoftmaxCentered(bijector.Bijector):
 
   def __init__(self,
                validate_args=False,
-               name="softmax_centered"):
+               name='softmax_centered'):
     with tf.name_scope(name) as name:
+      self._pad = pad_lib.Pad(validate_args=validate_args)
       super(SoftmaxCentered, self).__init__(
           forward_min_event_ndims=1,
           validate_args=validate_args,
           name=name)
 
   def _forward_event_shape(self, input_shape):
-    if not input_shape[-1:].is_fully_defined():
-      return input_shape
-    return input_shape[:-1].concatenate(input_shape[-1] + 1)
+    return self._pad.forward_event_shape(input_shape)
 
   def _forward_event_shape_tensor(self, input_shape):
-    return tf.concat([input_shape[:-1], [input_shape[-1] + 1]], axis=0)
+    return self._pad.forward_event_shape_tensor(input_shape)
 
   def _inverse_event_shape(self, output_shape):
-    if not output_shape[-1:].is_fully_defined():
-      return output_shape
-    if output_shape[-1] <= 1:
-      raise ValueError("output_shape[-1] = %d <= 1" % output_shape[-1])
-    return output_shape[:-1].concatenate(output_shape[-1] - 1)
+    return self._pad.inverse_event_shape(output_shape)
 
   def _inverse_event_shape_tensor(self, output_shape):
-    if self.validate_args:
-      # It is not possible for a negative shape so we need only check <= 1.
-      is_greater_one = assert_util.assert_greater(
-          output_shape[-1], 1, message="Need last dimension greater than 1.")
-      with tf.control_dependencies([is_greater_one]):
-        output_shape = tf.identity(output_shape)
-    return tf.concat([output_shape[:-1], [output_shape[-1] - 1]], axis=0)
+    return self._pad.inverse_event_shape_tensor(output_shape)
 
   def _forward(self, x):
-    # Pad the last dim with a zeros vector. We need this because it lets us
-    # infer the scale in the inverse function.
-    y = distribution_util.pad(x, axis=-1, back=True)
-
-    # Set shape hints.
-    if tensorshape_util.rank(x.shape) is not None:
-      last_dim = tf.compat.dimension_value(x.shape[-1])
-      shape = tensorshape_util.concatenate(
-          x.shape[:-1],
-          None if last_dim is None else last_dim + 1)
-      tensorshape_util.set_shape(y, shape)
-
-    return tf.math.softmax(y)
+    return tf.math.softmax(self._pad.forward(x))
 
   def _inverse(self, y):
     # To derive the inverse mapping note that:
@@ -119,38 +95,48 @@ class SoftmaxCentered(bijector.Bijector):
     # Do this first to make sure CSE catches that it'll happen again in
     # _inverse_log_det_jacobian.
     x = tf.math.log(y)
-
-    log_normalization = (-x[..., -1])[..., tf.newaxis]
-    x = x[..., :-1] + log_normalization
-
-    # Set shape hints.
-    if tensorshape_util.rank(y.shape) is not None:
-      last_dim = tf.compat.dimension_value(y.shape[-1])
-      shape = tensorshape_util.concatenate(
-          y.shape[:-1],
-          None if last_dim is None else last_dim - 1)
-      tensorshape_util.set_shape(x, shape)
-
-    return x
+    x, log_normalization = tf.split(x, num_or_size_splits=[-1, 1], axis=-1)
+    return x - log_normalization
 
   def _inverse_log_det_jacobian(self, y):
-    # WLOG, consider the vector case:
-    #   x = log(y[:-1]) - log(y[-1])
-    # where,
-    #   y[-1] = 1 - sum(y[:-1]).
-    # We have:
-    #   det{ dX/dY } = det{ diag(1 ./ y[:-1]) + 1 / y[-1] }
-    #                = det{ inv{ diag(y[:-1]) - y[:-1]' y[:-1] } }   (1)
-    #                = 1 / det{ diag(y[:-1]) - y[:-1]' y[:-1] }
-    #                = 1 / { (1 + y[:-1]' inv(diag(y[:-1])) y[:-1]) *
-    #                        det(diag(y[:-1])) }                     (2)
-    #                = 1 / { y[-1] prod(y[:-1]) }
-    #                = 1 / prod(y)
+    # Let B be the forward map defined by the bijector. Consider the map
+    # F : R^n -> R^n where the image of B in R^{n+1} is restricted to the first
+    # n coordinates.
+    #
+    # Claim: det{ dF(X)/dX } = prod(Y) where Y = B(X).
+    # Proof: WLOG, in vector notation:
+    #     X = log(Y[:-1]) - log(Y[-1])
+    #   where,
+    #     Y[-1] = 1 - sum(Y[:-1]).
+    #   We have:
+    #     det{dF} = 1 / det{ dX/dF(X} }                                      (1)
+    #             = 1 / det{ diag(1 / Y[:-1]) + 1 / Y[-1] }
+    #             = 1 / det{ inv{ diag(Y[:-1]) - Y[:-1]' Y[:-1] } }
+    #             = det{ diag(Y[:-1]) - Y[:-1]' Y[:-1] }
+    #             = (1 + Y[:-1]' inv{diag(Y[:-1])} Y[:-1]) det{diag(Y[:-1])} (2)
+    #             = Y[-1] prod(Y[:-1])
+    #             = prod(Y)
+    #
+    # Let P be the image of R^n under F. Define the lift G, from P to R^{n+1},
+    # which appends the last coordinate, Y[-1] := 1 - \sum_k Y_k. G is linear,
+    # so its Jacobian is constant.
+    #
+    # The differential of G, DG, is eye(n) with a row of -1s appended to the
+    # bottom. To compute the Jacobian sqrt{det{(DG)^T(DG)}}, one can see that
+    # (DG)^T(DG) = A + eye(n), where A is the n x n matrix of 1s. This has
+    # eigenvalues (n + 1, 1,...,1), so the determinant is (n + 1). Hence, the
+    # Jacobian of G is sqrt{n + 1} everywhere.
+    #
+    # Putting it all together, the forward bijective map B can be written as
+    # B(X) = G(F(X)) and has Jacobian sqrt{n + 1} * prod(F(X)).
+    #
     # (1) - https://en.wikipedia.org/wiki/Sherman%E2%80%93Morrison_formula
     #       or by noting that det{ dX/dY } = 1 / det{ dY/dX } from Bijector
     #       docstring "Tip".
     # (2) - https://en.wikipedia.org/wiki/Matrix_determinant_lemma
-    return -tf.reduce_sum(tf.math.log(y), axis=-1)
+    np1 = prefer_static.cast(prefer_static.shape(y)[-1], dtype=y.dtype)
+    return -(0.5 * prefer_static.log(np1) +
+             tf.reduce_sum(tf.math.log(y), axis=-1))
 
   def _forward_log_det_jacobian(self, x):
     # This code is similar to tf.math.log_softmax but different because we have
@@ -159,9 +145,7 @@ class SoftmaxCentered(bijector.Bijector):
     # we must do:
     #   log_normalization = 1 + reduce_sum(exp(logits))
     #   -log_normalization + reduce_sum(logits - log_normalization)
-    log_normalization = tf.math.softplus(
-        tf.reduce_logsumexp(x, axis=-1, keepdims=True))
-    return tf.squeeze(
-        (-log_normalization +
-         tf.reduce_sum(x - log_normalization, axis=-1, keepdims=True)),
-        axis=-1)
+    np1 = prefer_static.cast(1 + prefer_static.shape(x)[-1], dtype=x.dtype)
+    return (0.5 * prefer_static.log(np1) +
+            tf.reduce_sum(x, axis=-1) -
+            np1 * tf.math.softplus(tf.reduce_logsumexp(x, axis=-1)))

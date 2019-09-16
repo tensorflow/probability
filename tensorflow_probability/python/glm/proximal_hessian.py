@@ -26,7 +26,8 @@ from __future__ import print_function
 
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
@@ -95,7 +96,7 @@ def _grad_neg_log_likelihood_and_fim(model_matrix, linear_response, response,
   def _mask_if_invalid(x, mask):
     mask = tf.fill(
         tf.shape(input=x), value=np.array(mask, x.dtype.as_numpy_dtype))
-    return tf.compat.v1.where(is_valid, x, mask)
+    return tf1.where(is_valid, x, mask)
 
   # TODO(b/111923449): Link to derivation once it's available.
   v = (response - mean) * _mask_if_invalid(grad_mean, 1) / _mask_if_invalid(
@@ -213,7 +214,7 @@ def fit_sparse_one_step(model_matrix,
       tolerance,
       learning_rate,
   ]
-  with tf.compat.v1.name_scope(name, 'fit_sparse_one_step', graph_deps):
+  with tf1.name_scope(name, 'fit_sparse_one_step', graph_deps):
     predicted_linear_response = sparse_or_dense_matvecmul(
         model_matrix, model_coefficients_start)
     g, h_middle = _grad_neg_log_likelihood_and_fim(
@@ -468,7 +469,7 @@ def fit_sparse(model_matrix,
       tolerance,
       learning_rate,
   ]
-  with tf.compat.v1.name_scope(name, 'fit_sparse', graph_deps):
+  with tf1.name_scope(name, 'fit_sparse', graph_deps):
     # TODO(b/111922388): Include dispersion and offset parameters.
     def _grad_neg_log_likelihood_and_fim_fn(x):
       predicted_linear_response = sparse_or_dense_matvecmul(model_matrix, x)
@@ -513,7 +514,7 @@ def _fit_sparse_exact_hessian(  # pylint: disable = missing-docstring
       tolerance,
       learning_rate,
   ]
-  with tf.compat.v1.name_scope(name, 'fit_sparse_exact_hessian', graph_deps):
+  with tf1.name_scope(name, 'fit_sparse_exact_hessian', graph_deps):
     # TODO(b/111922388): Include dispersion and offset parameters.
     def _neg_log_likelihood(x):
       predicted_linear_response = sparse_or_dense_matvecmul(model_matrix, x)

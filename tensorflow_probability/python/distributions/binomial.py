@@ -24,7 +24,9 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 _binomial_sample_note = """
@@ -162,25 +164,24 @@ class Binomial(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
+    if (probs is None) == (logits is None):
+      raise ValueError(
+          'Construct `Binomial` with `probs` or `logits`, but not both.')
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
-      self._total_count = self._maybe_assert_valid_total_count(
-          tf.convert_to_tensor(total_count, name='total_count', dtype=dtype),
-          validate_args)
-      self._logits, self._probs = distribution_util.get_logits_and_probs(
-          logits=logits,
-          probs=probs,
+      self._total_count = tensor_util.convert_nonref_to_tensor(
+          total_count, dtype=dtype, name='total_count')
+      self._logits = tensor_util.convert_nonref_to_tensor(
+          logits, dtype=dtype, name='logits')
+      self._probs = tensor_util.convert_nonref_to_tensor(
+          probs, dtype=dtype, name='probs')
+      super(Binomial, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
-          name=name,
-          dtype=dtype)
-    super(Binomial, self).__init__(
-        dtype=self._probs.dtype,
-        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._total_count, self._logits, self._probs],
-        name=name)
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -194,20 +195,25 @@ class Binomial(distribution.Distribution):
   @property
   def logits(self):
     """Input argument `logits`."""
+    if self._logits is None:
+      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
+    if self._probs is None:
+      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self):
+    x = self._probs if self._logits is None else self._logits
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.total_count), tf.shape(self.probs))
+        tf.shape(self._total_count), tf.shape(x))
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(self.total_count.shape,
-                                     self.probs.shape)
+    x = self._probs if self._logits is None else self._logits
+    return tf.broadcast_static_shape(self.total_count.shape, x.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -217,7 +223,12 @@ class Binomial(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_binomial_sample_note)
   def _log_prob(self, counts):
-    return self._log_unnormalized_prob(counts) - self._log_normalization(counts)
+    counts = self._maybe_assert_valid_sample(counts)
+    logits = self._logits_parameter_no_checks()
+    total_count = tf.convert_to_tensor(self.total_count)
+    unnorm = _log_unnormalized_prob(logits, counts, total_count)
+    norm = _log_normalization(counts, total_count)
+    return unnorm - norm
 
   @distribution_util.AppendDocstring(_binomial_sample_note)
   def _prob(self, counts):
@@ -225,26 +236,15 @@ class Binomial(distribution.Distribution):
 
   def _cdf(self, counts):
     counts = self._maybe_assert_valid_sample(counts)
-    probs = self.probs
+    probs = self._probs_parameter_no_checks()
     if not (tensorshape_util.is_fully_defined(counts.shape) and
-            tensorshape_util.is_fully_defined(self.probs.shape) and
-            tensorshape_util.is_compatible_with(counts.shape,
-                                                self.probs.shape)):
+            tensorshape_util.is_fully_defined(probs.shape) and
+            tensorshape_util.is_compatible_with(counts.shape, probs.shape)):
       # If both shapes are well defined and equal, we skip broadcasting.
-      probs += tf.zeros_like(counts)
-      counts += tf.zeros_like(self.probs)
+      probs = probs + tf.zeros_like(counts)
+      counts = counts + tf.zeros_like(probs)
 
-    return _bdtr(k=counts, n=self.total_count, p=probs)
-
-  def _log_unnormalized_prob(self, counts):
-    counts = self._maybe_assert_valid_sample(counts)
-    return counts * self.logits - self.total_count * tf.math.softplus(
-        self.logits)
-
-  def _log_normalization(self, counts):
-    counts = self._maybe_assert_valid_sample(counts)
-    return (tf.math.lgamma(1. + self.total_count - counts) +
-            tf.math.lgamma(1. + counts) - tf.math.lgamma(1. + self.total_count))
+    return _bdtr(k=counts, n=tf.convert_to_tensor(self.total_count), p=probs)
 
   @distribution_util.AppendDocstring(_binomial_sample_note)
   def _sample_n(self, n, seed=None):
@@ -256,13 +256,11 @@ class Binomial(distribution.Distribution):
     # sampler, we'll have to be careful.
     # log(p) = log(sigmoid(logits)) = logits - softplus(logits)
     # log(1 - p) = log(1 - sigmoid(logits)) = -softplus(logits)
-    # Because softmax is invariant to a constnat shift in all inputs,
+    # Because softmax is invariant to a constant shift in all inputs,
     # we can offset the logits by softplus(logits) so that we can use
     # [logits, 0.] as our input.
-    logits = tf.stack(
-        [self.logits,
-         tf.zeros_like(self.logits)],
-        axis=-1)
+    orig_logits = self._logits_parameter_no_checks()
+    logits = tf.stack([orig_logits, tf.zeros_like(orig_logits)], axis=-1)
     return multinomial.draw_sample(
         num_samples=n,
         num_classes=2,
@@ -272,10 +270,10 @@ class Binomial(distribution.Distribution):
         seed=seed)[..., 0]
 
   def _mean(self):
-    return self.total_count * self.probs
+    return self._total_count * self._probs_parameter_no_checks()
 
   def _variance(self):
-    return self._mean() * (1. - self.probs)
+    return self._mean() * (1. - self._probs_parameter_no_checks())
 
   @distribution_util.AppendDocstring(
       """Note that when `(1 + total_count) * probs` is an integer, there are
@@ -283,41 +281,75 @@ class Binomial(distribution.Distribution):
       `(1 + total_count) * probs - 1` are both modes. Here we return only the
       larger of the two modes.""")
   def _mode(self):
-    return tf.floor((1. + self.total_count) * self.probs)
+    return tf.floor(
+        (1. + self._total_count) * self._probs_parameter_no_checks())
 
   def logits_parameter(self, name=None):
     """Logits computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'logits_parameter'):
-      if self.logits is None:
-        return tf.math.log(self.probs) - tf.math.log1p(-self.probs)
-      return tf.identity(self.logits)
+      return self._logits_parameter_no_checks()
+
+  def _logits_parameter_no_checks(self):
+    if self._logits is None:
+      probs = tf.convert_to_tensor(self._probs)
+      return tf.math.log(probs) - tf.math.log1p(-probs)
+    return tf.identity(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'probs_parameter'):
-      if self.logits is None:
-        return tf.identity(self.probs)
-      return tf.math.sigmoid(self.logits)
+      return self._probs_parameter_no_checks()
 
-  def _maybe_assert_valid_total_count(self, total_count, validate_args):
-    if not validate_args:
-      return total_count
-    return distribution_util.with_dependencies([
-        assert_util.assert_non_negative(
-            total_count, message='total_count must be non-negative.'),
-        distribution_util.assert_integer_form(
-            total_count,
-            message='total_count cannot contain fractional components.'),
-    ], total_count)
+  def _probs_parameter_no_checks(self):
+    if self._logits is None:
+      return tf.identity(self._probs)
+    return tf.math.sigmoid(self._logits)
+
+  @deprecation.deprecated(
+      '2019-11-01',
+      ('The `logits` property will return `None` when the distribution is '
+       'parameterized with `logits=None`. Use `logits_parameter()` instead.'),
+      warn_once=True)
+  def _logits_deprecated_behavior(self):
+    return self.logits_parameter()
+
+  @deprecation.deprecated(
+      '2019-11-01',
+      ('The `probs` property will return `None` when the distribution is '
+       'parameterized with `probs=None`. Use `probs_parameter()` instead.'),
+      warn_once=True)
+  def _probs_deprecated_behavior(self):
+    return self.probs_parameter()
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    if is_init == tensor_util.is_ref(self.total_count):
+      return []
+    total_count = tf.convert_to_tensor(self.total_count)
+    msg1 = 'Argument `total_count` must be non-negative.'
+    msg2 = 'Argument `total_count` cannot contain fractional components.'
+    return [
+        assert_util.assert_non_negative(total_count, message=msg1),
+        distribution_util.assert_integer_form(total_count, message=msg2),
+    ]
 
   def _maybe_assert_valid_sample(self, counts):
     """Check counts for proper shape, values, then return tensor version."""
     if not self.validate_args:
       return counts
     counts = distribution_util.embed_check_nonnegative_integer_form(counts)
+    msg = ('Sampled counts must be itemwise less than '
+           'or equal to `total_count` parameter.')
     return distribution_util.with_dependencies([
-        assert_util.assert_less_equal(
-            counts,
-            self.total_count,
-            message='counts are not less than or equal to n.'),
+        assert_util.assert_less_equal(counts, self.total_count, message=msg),
     ], counts)
+
+
+def _log_unnormalized_prob(logits, counts, total_count):
+  return counts * logits - total_count * tf.math.softplus(logits)
+
+
+def _log_normalization(counts, total_count):
+  return (tf.math.lgamma(1. + total_count - counts) +
+          tf.math.lgamma(1. + counts) - tf.math.lgamma(1. + total_count))

@@ -18,16 +18,20 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-import tensorflow.compat.v2 as tf
+import weakref
 
+# Dependency imports
+
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_case
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IdentityTest(tf.test.TestCase):
+class IdentityTest(test_case.TestCase):
   """Tests correctness of the Y = g(X) = X transformation."""
 
   def testBijector(self):
@@ -45,6 +49,19 @@ class IdentityTest(tf.test.TestCase):
     bijector = tfb.Identity()
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
+
+  def testMemoryLeak(self):
+    if not tf.executing_eagerly(): return
+    # Verifies the fix for a memory leak caused by the mapped value being
+    # strongly ref'ed, and the weak key being the same as the value, `x is y`.
+    bijector = tfb.Identity()
+    x = tf.constant(123)
+    y = bijector.forward(x)
+    self.assertIs(y, x)
+    del x
+    y = weakref.ref(y)
+    # We now expect the reference to be gone.
+    self.assertIsNone(y())
 
 
 if __name__ == "__main__":

@@ -56,12 +56,13 @@ class _VonMisesTest(object):
       self.assertEqual(tf.TensorShape([5]), von_mises.batch_shape)
     self.assertEqual(tf.TensorShape([]), von_mises.event_shape)
 
-  def testInvalidconcentration(self):
-    with self.assertRaisesOpError("Condition x >= 0"):
+  def testInvalidConcentration(self):
+    with self.assertRaisesOpError(
+        'Argument `concentration` must be non-negative'):
       loc = self.make_tensor(0.)
       concentration = self.make_tensor(-.01)
       von_mises = tfd.VonMises(loc, concentration, validate_args=True)
-      self.evaluate(von_mises.concentration)
+      self.evaluate(von_mises.entropy())
 
   def testVonMisesLogPdf(self):
     locs_v = .1
@@ -381,6 +382,15 @@ class _VonMisesTest(object):
     # Check that it does not end up in an infinite loop.
     self.assertEqual(self.evaluate(samples).shape, (5,))
 
+  def testAssertsNonNegativeConcentration(self):
+    concentration = tf.Variable(1.)
+    d = tfd.VonMises(loc=0., concentration=concentration, validate_args=True)
+    with self.assertRaisesOpError(
+        'Argument `concentration` must be non-negative'):
+      self.evaluate([v.initializer for v in d.variables])
+      with tf.control_dependencies([concentration.assign(-1.)]):
+        _ = self.evaluate(d.entropy())
+
 
 class VonMisesTestStaticShapeFloat32(test_case.TestCase, _VonMisesTest):
   dtype = tf.float32
@@ -392,5 +402,5 @@ class VonMisesTestDynamicShapeFloat64(test_case.TestCase, _VonMisesTest):
   use_static_shape = False
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

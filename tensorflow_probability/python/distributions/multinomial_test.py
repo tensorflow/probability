@@ -328,6 +328,8 @@ class MultinomialTest(test_case.TestCase):
         actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
 
   def testNotReparameterized(self):
+    if tf1.control_flow_v2_enabled():
+      self.skipTest('b/138796859')
     total_count = tf.constant(5.0)
     probs = tf.constant([0.2, 0.6])
     _, [grad_total_count, grad_probs] = tfp.math.value_and_gradient(
@@ -373,7 +375,7 @@ class MultinomialFromVariableTest(test_case.TestCase):
 
   def testGradientProbs(self):
     x = tf.Variable([0.1, 0.7, 0.2])
-    d = tfd.Multinomial(total_count=2., logits=x, validate_args=True)
+    d = tfd.Multinomial(total_count=2., probs=x, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([0, 1, 1])
     g = tape.gradient(loss, d.trainable_variables)

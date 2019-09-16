@@ -26,6 +26,8 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 class Geometric(distribution.Distribution):
@@ -81,22 +83,21 @@ class Geometric(distribution.Distribution):
     """
 
     parameters = dict(locals())
+    if (probs is None) == (logits is None):
+      raise ValueError('Must pass probs or logits, but not both.')
     with tf.name_scope(name) as name:
-      self._logits, self._probs = distribution_util.get_logits_and_probs(
-          logits, probs, validate_args=validate_args, name=name)
-
-      with tf.control_dependencies(
-          [assert_util.assert_positive(self._probs)] if validate_args else []):
-        self._probs = tf.identity(self._probs, name='probs')
-
-    super(Geometric, self).__init__(
-        dtype=self._probs.dtype,
-        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._probs, self._logits],
-        name=name)
+      self._probs = tensor_util.convert_nonref_to_tensor(
+          probs, dtype_hint=tf.float32, name='probs')
+      self._logits = tensor_util.convert_nonref_to_tensor(
+          logits, dtype_hint=tf.float32, name='logits')
+      super(Geometric, self).__init__(
+          dtype=(self._logits.dtype if self._probs is None
+                 else self._probs.dtype),
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -105,18 +106,24 @@ class Geometric(distribution.Distribution):
   @property
   def logits(self):
     """Input argument `logits`."""
+    if self._logits is None:
+      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
+    if self._probs is None:
+      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self):
-    return tf.shape(self._probs)
+    x = self._probs if self._logits is None else self._logits
+    return tf.shape(x)
 
   def _batch_shape(self):
-    return self.probs.shape
+    x = self._probs if self._logits is None else self._logits
+    return x.shape
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -133,70 +140,72 @@ class Geometric(distribution.Distribution):
     # numbers x, y have the reasonable property that, `x + y >= max(x, y)`. In
     # this case, a subnormal number (i.e., np.nextafter) can cause us to sample
     # 0.
+    probs = self._probs_parameter_no_checks()
     sampled = tf.random.uniform(
-        tf.concat([[n], tf.shape(self._probs)], 0),
+        tf.concat([[n], tf.shape(probs)], 0),
         minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,
         seed=seed,
         dtype=self.dtype)
 
-    return tf.floor(tf.math.log(sampled) / tf.math.log1p(-self.probs))
+    return tf.floor(tf.math.log(sampled) / tf.math.log1p(-probs))
 
   def _cdf(self, x):
-    if self.validate_args:
-      x = distribution_util.embed_check_nonnegative_integer_form(x)
-    else:
-      # Whether or not x is integer-form, the following is well-defined.
-      # However, scipy takes the floor, so we do too.
-      x = tf.floor(x)
-    return tf.where(x < 0., tf.zeros_like(x), -tf.math.expm1(
-        (1. + x) * tf.math.log1p(-self.probs)))
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
+      probs = self._probs_parameter_no_checks()
+      if not self.validate_args:
+        # Whether or not x is integer-form, the following is well-defined.
+        # However, scipy takes the floor, so we do too.
+        x = tf.floor(x)
+      return tf.where(x < 0., tf.zeros_like(x), -tf.math.expm1(
+          (1. + x) * tf.math.log1p(-probs)))
 
   def _log_prob(self, x):
-    if self.validate_args:
-      x = distribution_util.embed_check_nonnegative_integer_form(x)
-    else:
-      # For consistency with cdf, we take the floor.
-      x = tf.floor(x)
-    safe_domain = tf.where(
-        tf.equal(x, 0.), tf.zeros_like(self.probs), self.probs)
-    return x * tf.math.log1p(-safe_domain) + tf.math.log(self.probs)
+    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
+      probs = self._probs_parameter_no_checks()
+      if not self.validate_args:
+        # For consistency with cdf, we take the floor.
+        x = tf.floor(x)
+      safe_domain = tf.where(
+          tf.equal(x, 0.), tf.zeros_like(probs), probs)
+      return x * tf.math.log1p(-safe_domain) + tf.math.log(probs)
 
   def _entropy(self):
-    probs = self._probs
-    if self.validate_args:
-      probs = distribution_util.with_dependencies([
-          assert_util.assert_less(
-              probs,
-              tf.constant(1., probs.dtype),
-              message='Entropy is undefined when logits = inf or probs = 1.')
-      ], probs)
-    # Claim: entropy(p) = softplus(s)/p - s
-    # where s=logits and p=probs.
-    #
-    # Proof:
-    #
-    # entropy(p)
-    # := -[(1-p)log(1-p) + plog(p)]/p
-    # = -[log(1-p) + plog(p/(1-p))]/p
-    # = -[-softplus(s) + ps]/p
-    # = softplus(s)/p - s
-    #
-    # since,
-    # log[1-sigmoid(s)]
-    # = log[1/(1+exp(s)]
-    # = -log[1+exp(s)]
-    # = -softplus(s)
-    #
-    # using the fact that,
-    # 1-sigmoid(s) = sigmoid(-s) = 1/(1+exp(s))
-    return tf.math.softplus(self.logits) / probs - self.logits
+    logits, probs = self._logits_and_probs_no_checks()
+    if not self.validate_args:
+      assertions = []
+    else:
+      assertions = [assert_util.assert_less(
+          probs, dtype_util.as_numpy_dtype(self.dtype)(1.),
+          message='Entropy is undefined when logits = inf or probs = 1.')]
+    with tf.control_dependencies(assertions):
+      # Claim: entropy(p) = softplus(s)/p - s
+      # where s=logits and p=probs.
+      #
+      # Proof:
+      #
+      # entropy(p)
+      # := -[(1-p)log(1-p) + plog(p)]/p
+      # = -[log(1-p) + plog(p/(1-p))]/p
+      # = -[-softplus(s) + ps]/p
+      # = softplus(s)/p - s
+      #
+      # since,
+      # log[1-sigmoid(s)]
+      # = log[1/(1+exp(s)]
+      # = -log[1+exp(s)]
+      # = -softplus(s)
+      #
+      # using the fact that,
+      # 1-sigmoid(s) = sigmoid(-s) = 1/(1+exp(s))
+      return tf.math.softplus(logits) / probs - logits
 
   def _mean(self):
-    return tf.exp(-self.logits)
+    return tf.exp(-self._logits_parameter_no_checks())
 
   def _variance(self):
-    return self._mean() / self.probs
+    logits, probs = self._logits_and_probs_no_checks()
+    return tf.exp(-logits) / probs
 
   def _mode(self):
     return tf.zeros(self.batch_shape_tensor(), dtype=self.dtype)
@@ -204,13 +213,68 @@ class Geometric(distribution.Distribution):
   def logits_parameter(self, name=None):
     """Logits computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'logits_parameter'):
-      if self.logits is None:
-        return tf.math.log(self.probs) - tf.math.log1p(-self.probs)
-      return tf.identity(self.logits)
+      if self._logits is None:
+        return tf.math.log(self._probs) - tf.math.log1p(-self._probs)
+      return tf.identity(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'probs_parameter'):
-      if self.logits is None:
-        return tf.identity(self.probs)
-      return tf.math.sigmoid(self.logits)
+      if self._logits is None:
+        return tf.identity(self._probs)
+      return tf.math.sigmoid(self._logits)
+
+  def _logits_parameter_no_checks(self):
+    if self._logits is None:
+      probs = tf.convert_to_tensor(self._probs)
+      return tf.math.log(probs) - tf.math.log1p(-probs)
+    return tf.identity(self._logits)
+
+  def _probs_parameter_no_checks(self):
+    if self._logits is None:
+      return tf.identity(self._probs)
+    return tf.math.sigmoid(self._logits)
+
+  def _logits_and_probs_no_checks(self):
+    if self._logits is None:
+      probs = tf.convert_to_tensor(self._probs)
+      logits = tf.math.log(probs) - tf.math.log1p(-probs)
+    else:
+      logits = tf.convert_to_tensor(self._logits)
+      probs = tf.math.sigmoid(logits)
+    return logits, probs
+
+  @deprecation.deprecated(
+      '2019-10-01',
+      'The `logits` property will return `None` when the distribution is '
+      'parameterized with `logits=None`. Use `logits_parameter()` instead.',
+      warn_once=True)
+  def _logits_deprecated_behavior(self):
+    return self.logits_parameter()
+
+  @deprecation.deprecated(
+      '2019-10-01',
+      'The `probs` property will return `None` when the distribution is '
+      'parameterized with `probs=None`. Use `probs_parameter()` instead.',
+      warn_once=True)
+  def _probs_deprecated_behavior(self):
+    return self.probs_parameter()
+
+  def _maybe_assert_valid_sample(self, x):
+    if not self.validate_args:
+      return []
+    return distribution_util.assert_nonnegative_integer_form(x)
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if self._probs is not None:
+      if is_init != tensor_util.is_ref(self._probs):
+        probs = tf.convert_to_tensor(self._probs)
+        assertions.append(assert_util.assert_positive(
+            probs, message='Argument `probs` must be positive.'))
+        assertions.append(assert_util.assert_less_equal(
+            probs, dtype_util.as_numpy_dtype(self.dtype)(1.),
+            message='Argument `probs` must be less than or equal to 1.'))
+    return assertions

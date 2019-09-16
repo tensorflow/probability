@@ -22,12 +22,14 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import kumaraswamy as kumaraswamy_bijector
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
     "Kumaraswamy",
@@ -149,24 +151,24 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
-                                      tf.float32)
-      concentration1 = tf.convert_to_tensor(
+                                      dtype_hint=tf.float32)
+      concentration1 = tensor_util.convert_nonref_to_tensor(
           concentration1, name="concentration1", dtype=dtype)
-      concentration0 = tf.convert_to_tensor(
+      concentration0 = tensor_util.convert_nonref_to_tensor(
           concentration0, name="concentration0", dtype=dtype)
-    super(Kumaraswamy, self).__init__(
-        distribution=uniform.Uniform(
-            low=tf.zeros([], dtype=concentration1.dtype),
-            high=tf.ones([], dtype=concentration1.dtype),
-            allow_nan_stats=allow_nan_stats),
-        bijector=kumaraswamy_bijector.Kumaraswamy(
-            concentration1=concentration1,
-            concentration0=concentration0,
-            validate_args=validate_args),
-        batch_shape=distribution_util.get_broadcast_shape(
-            concentration1, concentration0),
-        parameters=parameters,
-        name=name)
+      super(Kumaraswamy, self).__init__(
+          distribution=uniform.Uniform(
+              low=tf.zeros([], dtype=dtype),
+              high=tf.ones([], dtype=dtype),
+              allow_nan_stats=allow_nan_stats),
+          bijector=kumaraswamy_bijector.Kumaraswamy(
+              concentration1=concentration1,
+              concentration0=concentration0,
+              validate_args=validate_args),
+          batch_shape=distribution_util.get_broadcast_shape(
+              concentration1, concentration0),
+          parameters=parameters,
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -183,29 +185,42 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
     return self.bijector.concentration0
 
   def _entropy(self):
-    a = self.concentration1
-    b = self.concentration0
+    a = tf.convert_to_tensor(self.concentration1)
+    b = tf.convert_to_tensor(self.concentration0)
     return ((1 - 1. / b) + (1 - 1. / a) * _harmonic_number(b) -
             tf.math.log(a) - tf.math.log(b))
 
-  def _moment(self, n):
+  def _log_moment(self, n, concentration1=None, concentration0=None):
     """Compute the n'th (uncentered) moment."""
-    total_concentration = self.concentration1 + self.concentration0
-    expanded_concentration1 = tf.ones_like(
-        total_concentration, dtype=self.dtype) * self.concentration1
-    expanded_concentration0 = tf.ones_like(
-        total_concentration, dtype=self.dtype) * self.concentration0
+    concentration0 = tf.convert_to_tensor(
+        self.concentration0) if concentration0 is None else concentration0
+    concentration1 = tf.convert_to_tensor(
+        self.concentration1) if concentration1 is None else concentration1
+    total_concentration = concentration1 + concentration0
+    expanded_concentration1 = tf.broadcast_to(concentration1,
+                                              tf.shape(total_concentration))
+    expanded_concentration0 = tf.broadcast_to(concentration0,
+                                              tf.shape(total_concentration))
     beta_arg0 = 1 + n / expanded_concentration1
     beta_arg = tf.stack([beta_arg0, expanded_concentration0], -1)
-    log_moment = tf.math.log(expanded_concentration0) + tf.math.lbeta(beta_arg)
-    return tf.exp(log_moment)
+    return tf.math.log(expanded_concentration0) + tf.math.lbeta(beta_arg)
 
   def _mean(self):
-    return self._moment(1)
+    return tf.exp(self._log_moment(1))
 
   def _variance(self):
-    # TODO(b/72696533): Investigate a more numerically stable version.
-    return self._moment(2) - tf.square(self._moment(1))
+    concentration1 = tf.convert_to_tensor(self.concentration1)
+    concentration0 = tf.convert_to_tensor(self.concentration0)
+    log_moment2 = self._log_moment(
+        2, concentration1=concentration1, concentration0=concentration0)
+    log_moment1 = self._log_moment(
+        1, concentration1=concentration1, concentration0=concentration0)
+    lswe, sign = tfp_math.reduce_weighted_logsumexp(
+        tf.stack([log_moment2, 2 * log_moment1], axis=-1),
+        [1., -1],
+        axis=-1,
+        return_sign=True)
+    return sign * tf.exp(lswe)
 
   @distribution_util.AppendDocstring(
       """Note: The mode is undefined when `concentration1 <= 1` or
@@ -213,22 +228,24 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
       is used for undefined modes. If `self.allow_nan_stats` is `False` an
       exception is raised when one or more modes are undefined.""")
   def _mode(self):
-    a = self.concentration1
-    b = self.concentration0
+    a = tf.convert_to_tensor(self.concentration1)
+    b = tf.convert_to_tensor(self.concentration0)
     mode = ((a - 1) / (a * b - 1))**(1. / a)
     if self.allow_nan_stats:
-      return tf.where(
-          (self.concentration1 > 1.) & (self.concentration0 > 1.),
-          mode,
-          dtype_util.as_numpy_dtype(self.dtype)(np.nan))
+      return tf.where((a > 1.) & (b > 1.), mode,
+                      dtype_util.as_numpy_dtype(self.dtype)(np.nan))
 
     return distribution_util.with_dependencies([
         assert_util.assert_less(
-            tf.ones([], dtype=self.concentration1.dtype),
-            self.concentration1,
+            tf.ones([], dtype=a.dtype),
+            a,
             message="Mode undefined for concentration1 <= 1."),
         assert_util.assert_less(
-            tf.ones([], dtype=self.concentration0.dtype),
-            self.concentration0,
+            tf.ones([], dtype=b.dtype),
+            b,
             message="Mode undefined for concentration0 <= 1.")
     ], mode)
+
+  def _parameter_control_dependencies(self, is_init):
+    return self.bijector._parameter_control_dependencies(is_init)  # pylint: disable=protected-access
+

@@ -21,12 +21,10 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
-    "MultivariateNormalDiag",
-    "MultivariateNormalDiagWithSoftplusScale",
+    'MultivariateNormalDiag',
 ]
 
 
@@ -35,7 +33,7 @@ class MultivariateNormalDiag(
   """The multivariate normal distribution on `R^k`.
 
   The Multivariate Normal distribution is defined over `R^k` and parameterized
-  by a (batch of) length-`k` `loc` vector (aka "mu") and a (batch of) `k x k`
+  by a (batch of) length-`k` `loc` vector (aka 'mu') and a (batch of) `k x k`
   `scale` matrix; `covariance = scale @ scale.T` where `@` denotes
   matrix-multiplication.
 
@@ -140,7 +138,7 @@ class MultivariateNormalDiag(
                scale_identity_multiplier=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="MultivariateNormalDiag"):
+               name='MultivariateNormalDiag'):
     """Construct Multivariate Normal distribution on `R^k`.
 
     The `batch_shape` is the broadcast shape between `loc` and `scale`
@@ -185,7 +183,7 @@ class MultivariateNormalDiag(
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`,
-        statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+        statistics (e.g., mean, mode, variance) use the value '`NaN`' to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -195,54 +193,23 @@ class MultivariateNormalDiag(
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      with tf.name_scope("init"):
-        # No need to validate_args while making diag_scale.  The returned
-        # LinearOperatorDiag has an assert_non_singular method that is called by
-        # the Bijector.
-        scale = distribution_util.make_diag_scale(
-            loc=loc,
-            scale_diag=scale_diag,
-            scale_identity_multiplier=scale_identity_multiplier,
-            validate_args=False,
-            assert_positive=False)
-    super(MultivariateNormalDiag, self).__init__(
-        loc=loc,
-        scale=scale,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        name=name)
-    self._parameters = parameters
+      # No need to validate_args while making diag_scale.  The returned
+      # LinearOperatorDiag has an assert_non_singular method that is called by
+      # the Bijector.
+      scale = distribution_util.make_diag_scale(
+          loc=loc,
+          scale_diag=scale_diag,
+          scale_identity_multiplier=scale_identity_multiplier,
+          validate_args=False,
+          assert_positive=False)
+      super(MultivariateNormalDiag, self).__init__(
+          loc=loc,
+          scale=scale,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          name=name)
+      self._parameters = parameters
 
   @classmethod
   def _params_event_ndims(cls):
     return dict(loc=1, scale_diag=1, scale_identity_multiplier=0)
-
-
-class MultivariateNormalDiagWithSoftplusScale(MultivariateNormalDiag):
-  """MultivariateNormalDiag with `diag_stddev = softplus(diag_stddev)`."""
-
-  @deprecation.deprecated(
-      "2019-06-05",
-      "MultivariateNormalDiagWithSoftplusScale is deprecated, use "
-      "MultivariateNormalDiag(loc=loc, scale_diag=tf.math.softplus(scale_diag)) "
-      "instead.",
-      warn_once=True)
-  def __init__(self,
-               loc,
-               scale_diag,
-               validate_args=False,
-               allow_nan_stats=True,
-               name="MultivariateNormalDiagWithSoftplusScale"):
-    parameters = dict(locals())
-    with tf.name_scope(name) as name:
-      super(MultivariateNormalDiagWithSoftplusScale, self).__init__(
-          loc=loc,
-          scale_diag=tf.math.softplus(scale_diag),
-          validate_args=validate_args,
-          allow_nan_stats=allow_nan_stats,
-          name=name)
-    self._parameters = parameters
-
-  @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=1, scale_diag=1)

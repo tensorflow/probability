@@ -18,7 +18,8 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
@@ -49,7 +50,7 @@ class AutoregressiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
   ```python
   level[t+1] = (sum(coefficients * levels[t:t-order:-1]) +
                 Normal(0., level_scale))
-   ```
+  ```
 
   The process is characterized by a vector `coefficients` whose size determines
   the order of the process (how many previous values it looks at), and by
@@ -165,7 +166,7 @@ class AutoregressiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       name: Python `str` name prefixed to ops created by this class.
         Default value: "AutoregressiveStateSpaceModel".
     """
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'AutoregressiveStateSpaceModel',
         values=[coefficients, level_scale, observation_noise_scale]) as name:
 
@@ -266,7 +267,7 @@ class Autoregressive(StructuralTimeSeries):
   ```python
   level[t+1] = (sum(coefficients * levels[t:t-order:-1]) +
                 Normal(0., level_scale))
-   ```
+  ```
 
   The latent state is `levels[t:t-order:-1]`. We observe a noisy realization of
   the current level: `f[t] = level[t] + Normal(0., observation_noise_scale)` at
@@ -329,7 +330,7 @@ class Autoregressive(StructuralTimeSeries):
       name: the name of this model component.
         Default value: 'Autoregressive'.
     """
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'Autoregressive', values=[observed_time_series]) as name:
 
       masked_time_series = None

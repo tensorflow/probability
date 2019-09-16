@@ -22,14 +22,15 @@ import collections
 # Dependency imports
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -104,7 +105,7 @@ def make_simple_step_size_update_policy(num_adaptation_steps,
       `step_size_var, kernel_results` and returns updated step size(s).
   """
   if step_counter is None and num_adaptation_steps is not None:
-    step_counter = tf.compat.v1.get_variable(
+    step_counter = tf1.get_variable(
         name='step_size_adaptation_step_counter',
         initializer=np.array(-1, dtype=np.int32),
         # Specify the dtype for variable sharing to work correctly
@@ -137,7 +138,7 @@ def make_simple_step_size_update_policy(num_adaptation_steps,
             kernel_results.log_accept_ratio.dtype))
     log_mean_accept_ratio = tf.reduce_logsumexp(
         input_tensor=tf.minimum(kernel_results.log_accept_ratio, 0.)) - log_n
-    adjustment = tf.compat.v1.where(
+    adjustment = tf1.where(
         log_mean_accept_ratio < tf.cast(
             tf.math.log(target_rate), log_mean_accept_ratio.dtype),
         -decrement_multiplier / (1. + decrement_multiplier),
@@ -297,10 +298,10 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   y, x, _ = make_training_data(
       num_samples, dims, weights_prior_true_scale)
 
-  log_sigma = tf.compat.v2.Variable(
+  log_sigma = tf.Variable(
       name='log_sigma', initial_value=np.array(0, dtype))
 
-  optimizer = tf.compat.v2.optimizers.SGD(learning_rate=0.01)
+  optimizer = tf.optimizers.SGD(learning_rate=0.01)
 
   @tf.function
   def mcem_iter(weights_chain_start, step_size):
@@ -618,7 +619,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       raise NotImplementedError('Specifying a `seed` when running eagerly is '
                                 'not currently supported. To run in Eager '
                                 'mode with a seed, use `tf.set_random_seed`.')
-    self._seed_stream = distributions.SeedStream(seed, 'hmc_one_step')
+    self._seed_stream = SeedStream(seed, 'hmc_one_step')
     if not store_parameters_in_results:
       mcmc_util.warn_if_parameters_are_not_simple_tensors(
           dict(step_size=step_size, num_leapfrog_steps=num_leapfrog_steps))
@@ -694,7 +695,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(HamiltonianMonteCarlo.one_step.__doc__)
   def one_step(self, current_state, previous_kernel_results):
-    with tf.compat.v2.name_scope(
+    with tf.name_scope(
         mcmc_util.make_name(self.name, 'hmc', 'one_step')):
       if self._store_parameters_in_results:
         step_size = previous_kernel_results.step_size
@@ -758,7 +759,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(HamiltonianMonteCarlo.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
-    with tf.compat.v2.name_scope(
+    with tf.name_scope(
         mcmc_util.make_name(self.name, 'hmc', 'bootstrap_results')):
       if not mcmc_util.is_list_like(init_state):
         init_state = [init_state]
@@ -873,7 +874,7 @@ def _compute_log_acceptance_correction(current_momentums,
     log_acceptance_correction: `Tensor` representing the `log`
       acceptance-correction.  (See docstring for mathematical definition.)
   """
-  with tf.compat.v2.name_scope(name or 'compute_log_acceptance_correction'):
+  with tf.name_scope(name or 'compute_log_acceptance_correction'):
     log_current_kinetic, log_proposed_kinetic = [], []
     for current_momentum, proposed_momentum in zip(
         current_momentums, proposed_momentums):

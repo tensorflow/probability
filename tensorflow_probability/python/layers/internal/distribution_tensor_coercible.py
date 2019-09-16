@@ -21,7 +21,7 @@ from __future__ import print_function
 import copy
 import six
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as tfd
 from tensorflow_probability.python.util.deferred_tensor import TensorMetaClass
@@ -41,6 +41,8 @@ class _DistributionAndTensorCoercibleMeta(type(tfd.Distribution),
 class _TensorCoercible(tfd.Distribution):
   """Docstring."""
 
+  registered_class_list = {}
+
   def __new__(cls, distribution, convert_to_tensor_fn=tfd.Distribution.sample):
     if isinstance(distribution, cls):
       return distribution
@@ -51,15 +53,23 @@ class _TensorCoercible(tfd.Distribution):
                           distribution, type(distribution)))
     self = copy.copy(distribution)
     distcls = distribution.__class__
-    self.__class__ = type(distcls.__name__, (cls, distcls), {})
-    self._concrete_value = None  # pylint: disable=protected-access
-    self._convert_to_tensor_fn = convert_to_tensor_fn  # pylint: disable=protected-access
+    self_class = _TensorCoercible.registered_class_list.get(distcls)
+    if not self_class:
+      self_class = type(distcls.__name__, (cls, distcls), {})
+      _TensorCoercible.registered_class_list[distcls] = self_class
+    self.__class__ = self_class
     return self
 
   def __init__(self,
                distribution,
                convert_to_tensor_fn=tfd.Distribution.sample):
-    pass
+    self._concrete_value = None  # pylint: disable=protected-access
+    self._convert_to_tensor_fn = convert_to_tensor_fn  # pylint: disable=protected-access
+
+  @property
+  def shape(self):
+    return (tf.TensorShape(None) if self._concrete_value is None
+            else self._concrete_value.shape)
 
   def _value(self, dtype=None, name=None, as_ref=False):
     """Get the value returned by `tf.convert_to_tensor(distribution)`.
@@ -115,7 +125,7 @@ class _TensorCoercible(tfd.Distribution):
             not isinstance(self._concrete_value,
                            composite_tensor.CompositeTensor)):
           self._concrete_value = tfd._convert_to_tensor(  # pylint: disable=protected-access
-              value=self._concrete_value,
+              self._concrete_value,
               name=name or 'concrete_value',
               dtype=dtype,
               dtype_hint=self.dtype)

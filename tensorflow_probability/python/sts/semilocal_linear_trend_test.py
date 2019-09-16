@@ -19,13 +19,15 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
-import tensorflow as tf
-import tensorflow_probability as tfp
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
 from tensorflow_probability.python.sts import SemiLocalLinearTrendStateSpaceModel
 
-tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -180,27 +182,27 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class SemiLocalLinearTrendStateSpaceModelTestStaticShape32(
-    tf.test.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
+    test_case.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class SemiLocalLinearTrendStateSpaceModelTestDynamicShape32(
-    tf.test.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
+    test_case.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class SemiLocalLinearTrendStateSpaceModelTestStaticShape64(
-    tf.test.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
+    test_case.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
   dtype = np.float64
   use_static_shape = True
 

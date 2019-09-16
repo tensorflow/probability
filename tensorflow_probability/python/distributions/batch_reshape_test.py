@@ -19,16 +19,15 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 
+import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -474,15 +473,15 @@ class _BatchReshapeTest(object):
 
     if self.is_static_shape or tf.executing_eagerly():
       with self.assertRaisesRegexp(
-          ValueError, (r"`batch_shape` size \(6\) must match "
-                       r"`distribution\.batch_shape` size \(2\)")):
+          ValueError, (r'`batch_shape` size \(6\) must match '
+                       r'`distribution\.batch_shape` size \(2\)')):
         tfd.BatchReshape(
             distribution=mvn,
             batch_shape=new_batch_shape_ph,
             validate_args=True)
 
     else:
-      with self.assertRaisesOpError(r"Shape sizes do not match."):
+      with self.assertRaisesOpError(r'Shape sizes do not match.'):
         self.evaluate(
             tfd.BatchReshape(
                 distribution=mvn,
@@ -509,14 +508,14 @@ class _BatchReshapeTest(object):
     mvn = tfd.MultivariateNormalDiag(scale_diag=scale_ph)
 
     if self.is_static_shape or tf.executing_eagerly():
-      with self.assertRaisesRegexp(ValueError, r".*must be >=(-1| 0).*"):
+      with self.assertRaisesRegexp(ValueError, r'.*must be >=(-1| 0).*'):
         tfd.BatchReshape(
             distribution=mvn,
             batch_shape=new_batch_shape_ph,
             validate_args=True)
 
     else:
-      with self.assertRaisesOpError(r".*must be >=(-1| 0).*"):
+      with self.assertRaisesOpError(r'.*must be >=(-1| 0).*'):
         self.evaluate(
             tfd.BatchReshape(
                 distribution=mvn,
@@ -543,14 +542,14 @@ class _BatchReshapeTest(object):
     mvn = tfd.MultivariateNormalDiag(scale_diag=scale_ph)
 
     if self.is_static_shape:
-      with self.assertRaisesRegexp(ValueError, r".*must be a vector.*"):
+      with self.assertRaisesRegexp(ValueError, r'.*must be a vector.*'):
         tfd.BatchReshape(
             distribution=mvn,
             batch_shape=new_batch_shape_ph,
             validate_args=True)
 
     else:
-      with self.assertRaisesOpError(r".*must be a vector.*"):
+      with self.assertRaisesOpError(r'.*must be a vector.*'):
         self.evaluate(
             tfd.BatchReshape(
                 distribution=mvn,
@@ -576,33 +575,33 @@ class _BatchReshapeTest(object):
 
     if self.is_static_shape or tf.executing_eagerly():
       with self.assertRaisesRegexp(NotImplementedError,
-                                   "too few batch and event dims"):
+                                   'too few batch and event dims'):
         poisson_141_reshaped.log_prob(x_4)
       with self.assertRaisesRegexp(NotImplementedError,
-                                   "unexpected batch and event shape"):
+                                   'unexpected batch and event shape'):
         poisson_141_reshaped.log_prob(x_114)
       return
 
-    with self.assertRaisesOpError("too few batch and event dims"):
+    with self.assertRaisesOpError('too few batch and event dims'):
       self.evaluate(poisson_141_reshaped.log_prob(x_4))
 
-    with self.assertRaisesOpError("unexpected batch and event shape"):
+    with self.assertRaisesOpError('unexpected batch and event shape'):
       self.evaluate(poisson_141_reshaped.log_prob(x_114))
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BatchReshapeStaticTest(_BatchReshapeTest, tf.test.TestCase):
+class BatchReshapeStaticTest(_BatchReshapeTest, test_case.TestCase):
 
   dtype = np.float32
   is_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BatchReshapeDynamicTest(_BatchReshapeTest, tf.test.TestCase):
+class BatchReshapeDynamicTest(_BatchReshapeTest, test_case.TestCase):
 
   dtype = np.float64
   is_static_shape = False
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

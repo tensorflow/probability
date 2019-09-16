@@ -20,10 +20,10 @@ from __future__ import print_function
 
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.math.ode import bdf_util
-
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -33,11 +33,11 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
     ('float64', tf.float64),
     ('complex128', tf.complex128),
 ])
-class BDFUtilTest(parameterized.TestCase, tf.test.TestCase):
+class BDFUtilTest(parameterized.TestCase, test_case.TestCase):
 
   def test_first_step_size_is_large_when_ode_fn_is_constant(self, dtype):
-    initial_state = tf.constant(1., dtype=dtype)
-    real_dtype = abs(initial_state).dtype
+    initial_state_vec = tf.constant([1.], dtype=dtype)
+    real_dtype = abs(initial_state_vec).dtype
     atol = tf.constant(1e-12, dtype=real_dtype)
     first_order_bdf_coefficient = -0.1850
     first_order_error_coefficient = first_order_bdf_coefficient + 0.5
@@ -49,7 +49,7 @@ class BDFUtilTest(parameterized.TestCase, tf.test.TestCase):
     step_size = bdf_util.first_step_size(
         atol,
         first_order_error_coefficient,
-        initial_state,
+        initial_state_vec,
         initial_time,
         ode_fn_vec,
         rtol,
@@ -87,12 +87,12 @@ class BDFUtilTest(parameterized.TestCase, tf.test.TestCase):
         self.evaluate(interpolated_backward_differences[0]))
 
   def test_newton_order_one(self, dtype):
-    jacobian_evaluation = tf.constant([[-1.]], dtype=dtype)
-    real_dtype = abs(jacobian_evaluation).dtype
+    jacobian_mat = tf.constant([[-1.]], dtype=dtype)
+    real_dtype = abs(jacobian_mat).dtype
     bdf_coefficient = tf.constant(-0.1850, dtype=dtype)
     first_order_newton_coefficient = 1. / (1. - bdf_coefficient)
     step_size = tf.constant(0.01, dtype=real_dtype)
-    unitary, upper = bdf_util.newton_qr(jacobian_evaluation,
+    unitary, upper = bdf_util.newton_qr(jacobian_mat,
                                         first_order_newton_coefficient,
                                         step_size)
 

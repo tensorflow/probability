@@ -126,12 +126,12 @@ class RealNVP(bijector_lib.Bijector):
        Autoregressive Flow for Density Estimation. In _Neural Information
        Processing Systems_, 2017. https://arxiv.org/abs/1705.07057
 
-  [5]: Kingma, D. P., Salimans, T., & Welling, M. Improving Variational
+  [5]: Diederik P Kingma, Tim Salimans, Max Welling. Improving Variational
        Inference with Inverse Autoregressive Flow. In _Neural Information
        Processing Systems_, 2016. https://arxiv.org/abs/1606.04934
 
-  [6]: Durkan, C., Bekasov, A., Murray, I., & Papamakarios, G. Neural
-       Spline Flows, 2019. Retrieved from http://arxiv.org/abs/1906.04032
+  [6]: Conor Durkan, Artur Bekasov, Iain Murray, George Papamakarios. Neural
+       Spline Flows, 2019. http://arxiv.org/abs/1906.04032
   """
 
   def __init__(self,
@@ -145,7 +145,7 @@ class RealNVP(bijector_lib.Bijector):
 
     Args:
       num_masked: Python `int` indicating that the first `d` units of the event
-        should be masked. Must be in the closed interval `[1, D-1]`, where `D`
+        should be masked. Must be in the closed interval `[0, D-1]`, where `D`
         is the event size of the base distribution.
       shift_and_log_scale_fn: Python `callable` which computes `shift` and
         `log_scale` from both the forward domain (`x`) and the inverse domain
@@ -157,8 +157,9 @@ class RealNVP(bijector_lib.Bijector):
         `log_scale` is equivalent to (but more efficient than) returning zero.
       bijector_fn: Python `callable` which returns a `tfb.Bijector` which
         transforms the last `D-d` unit with the signature `(masked_units_tensor,
-        output_units, **condition_kwargs)`. The bijector must operate on scalar
-        or vector events and must not alter the rank of its imput.
+        output_units, **condition_kwargs) -> bijector`. The bijector must
+        operate on scalar or vector events and must not alter the rank of its
+        input.
       is_constant_jacobian: Python `bool`. Default: `False`. When `True` the
         implementation assumes `log_scale` does not depend on the forward domain
         (`x`) or inverse domain (`y`) values. (No validation is made;
@@ -169,13 +170,13 @@ class RealNVP(bijector_lib.Bijector):
       name: Python `str`, name given to ops managed by this object.
 
     Raises:
-      ValueError: If num_masked < 1.
+      ValueError: If num_masked < 0.
       ValueError: If both or none of `shift_and_log_scale_fn` and `bijector_fn`
           are specified.
     """
     name = name or 'real_nvp'
-    if num_masked <= 0:
-      raise ValueError('num_masked must be a positive integer.')
+    if num_masked < 0:
+      raise ValueError('num_masked must be a non-negative integer.')
     self._num_masked = num_masked
     # At construction time, we don't know input_depth.
     self._input_depth = None

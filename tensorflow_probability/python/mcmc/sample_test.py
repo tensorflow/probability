@@ -24,12 +24,12 @@ import warnings
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
 
 TestTransitionKernelResults = collections.namedtuple(
     'TestTransitionKernelResults', 'counter_1, counter_2')
@@ -50,13 +50,13 @@ class TestTransitionKernel(tfp.mcmc.TransitionKernel):
     return True
 
 
-class SampleChainTest(tf.test.TestCase):
+class SampleChainTest(test_case.TestCase):
 
   def setUp(self):
     self._shape_param = 5.
     self._rate_param = 10.
 
-    tf.compat.v1.random.set_random_seed(10003)
+    tf1.random.set_random_seed(10003)
     np.random.seed(10003)
 
   def testChainWorksCorrelatedMultivariate(self):
@@ -79,7 +79,7 @@ class SampleChainTest(tf.test.TestCase):
       return -0.5 * tf.reduce_sum(input_tensor=z**2., axis=-1)
 
     if tf.executing_eagerly():
-      tf.compat.v1.set_random_seed(54)
+      tf1.set_random_seed(54)
     states, _ = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=[dtype(-2), dtype(2)],

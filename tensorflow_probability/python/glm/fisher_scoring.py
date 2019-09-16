@@ -20,7 +20,8 @@ from __future__ import print_function
 
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
@@ -46,6 +47,7 @@ def fit(
     learning_rate=None,
     fast_unsafe_numerics=True,
     maximum_iterations=None,
+    l2_regularization_penalty_factor=None,
     name=None):
   """Runs multiple Fisher scoring steps.
 
@@ -99,6 +101,15 @@ def fit(
     maximum_iterations: Optional maximum number of iterations of Fisher scoring
       to run; "and-ed" with result of `convergence_criteria_fn`.
       Default value: `None` (i.e., `infinity`).
+    l2_regularization_penalty_factor: Optional (batch of) vector-shaped
+      `Tensor`, representing a separate penalty factor to apply to each model
+      coefficient, length equal to columns in `model_matrix`. Each penalty
+      factor multiplies l2_regularizer to allow differential regularization. Can
+      be 0 for some coefficients, which implies no regularization. Default is 1
+      for all coefficients.
+      `loss(w) = sum{-log p(y[i]|x[i],w) : i=1..n} + l2_regularizer ||w *
+        l2_regularization_penalty_factor||_2^2`
+      Default value: `None` (i.e., no per coefficient regularization).
     name: Python `str` used as name prefix to ops created by this function.
       Default value: `"fit"`.
 
@@ -179,7 +190,7 @@ def fit(
   graph_deps = [model_matrix, response, model_coefficients_start,
                 predicted_linear_response_start, dispersion, offset,
                 learning_rate, maximum_iterations]
-  with tf.compat.v1.name_scope(name, 'fit', graph_deps):
+  with tf1.name_scope(name, 'fit', graph_deps):
     [
         model_matrix,
         response,
@@ -212,7 +223,9 @@ def fit(
           dispersion,
           offset,
           learning_rate,
-          fast_unsafe_numerics)
+          fast_unsafe_numerics,
+          l2_regularization_penalty_factor,
+          name)
       is_converged_next = convergence_criteria_fn(
           is_converged_previous=is_converged_previous,
           iter_=iter_,
@@ -267,6 +280,7 @@ def fit_one_step(
     offset=None,
     learning_rate=None,
     fast_unsafe_numerics=True,
+    l2_regularization_penalty_factor=None,
     name=None):
   """Runs one step of Fisher scoring.
 
@@ -307,6 +321,14 @@ def fit_one_step(
     fast_unsafe_numerics: Optional Python `bool` indicating if solve should be
       based on Cholesky or QR decomposition.
       Default value: `True` (i.e., "prefer speed via Cholesky decomposition").
+    l2_regularization_penalty_factor: Optional (batch of) vector-shaped
+      `Tensor`, representing a separate penalty factor to apply to each model
+      coefficient, length equal to columns in `model_matrix`. Each penalty
+      factor multiplies l2_regularizer to allow differential regularization. Can
+      be 0 for some coefficients, which implies no regularization. Default is 1
+      for all coefficients.
+      `loss(w) = sum{-log p(y[i]|x[i],w) : i=1..n} + l2_regularizer ||w *
+        l2_regularization_penalty_factor||_2^2`
     name: Python `str` used as name prefix to ops created by this function.
       Default value: `"fit_one_step"`.
 
@@ -320,7 +342,7 @@ def fit_one_step(
   """
   graph_deps = [model_matrix, response, model_coefficients_start,
                 predicted_linear_response_start, dispersion, learning_rate]
-  with tf.compat.v1.name_scope(name, 'fit_one_step', graph_deps):
+  with tf1.name_scope(name, 'fit_one_step', graph_deps):
 
     [
         model_matrix,
@@ -349,7 +371,7 @@ def fit_one_step(
     def mask_if_invalid(x, mask):
       mask = tf.fill(
           tf.shape(input=x), value=np.array(mask, x.dtype.as_numpy_dtype))
-      return tf.compat.v1.where(is_valid, x, mask)
+      return tf1.where(is_valid, x, mask)
 
     # Run one step of iteratively reweighted least-squares.
     # Compute "`z`", the adjusted predicted linear response.
@@ -395,8 +417,16 @@ def fit_one_step(
       # `-l2_regularizer ||coefficients||_2**2` to the log-likelihood.
       num_model_coefficients = num_cols(model_matrix)
       batch_shape = tf.shape(input=model_matrix)[:-2]
-      eye = tf.eye(
-          num_model_coefficients, batch_shape=batch_shape, dtype=a.dtype)
+      if l2_regularization_penalty_factor is None:
+        eye = tf.eye(
+            num_model_coefficients, batch_shape=batch_shape, dtype=a.dtype)
+      else:
+        eye = tf.linalg.tensor_diag(
+            tf.cast(l2_regularization_penalty_factor, dtype=a.dtype))
+        broadcasted_shape = prefer_static.concat(
+            [batch_shape, [num_model_coefficients, num_model_coefficients]],
+            axis=0)
+        eye = tf.broadcast_to(eye, broadcasted_shape)
       a_ = tf.concat([a, tf.sqrt(l2_regularizer) * eye], axis=-2)
       b_ = distribution_util.pad(
           b, count=num_model_coefficients, axis=-1, back=True)
@@ -405,8 +435,12 @@ def fit_one_step(
       return a_, b_, l2_regularizer_
 
     a, b, l2_regularizer = prefer_static.cond(
-        prefer_static.reduce_all([not(fast_unsafe_numerics),
-                                  l2_regularizer > 0.]),
+        prefer_static.reduce_all([
+            prefer_static.logical_or(
+                not(fast_unsafe_numerics),
+                l2_regularization_penalty_factor is not None),
+            l2_regularizer > 0.
+        ]),
         _embed_l2_regularization,
         lambda: (a, b, l2_regularizer))
 
@@ -562,7 +596,7 @@ def prepare_args(model_matrix,
   """
   graph_deps = [model_matrix, response, model_coefficients,
                 predicted_linear_response, offset]
-  with tf.compat.v1.name_scope(name, 'prepare_args', graph_deps):
+  with tf1.name_scope(name, 'prepare_args', graph_deps):
     dtype = dtype_util.common_dtype(graph_deps, np.float32)
 
     model_matrix = tf.convert_to_tensor(
@@ -623,7 +657,7 @@ def prepare_args(model_matrix,
 def calculate_linear_predictor(model_matrix, model_coefficients, offset=None,
                                name=None):
   """Computes `model_matrix @ model_coefficients + offset`."""
-  with tf.compat.v1.name_scope(name, 'calculate_linear_predictor',
+  with tf1.name_scope(name, 'calculate_linear_predictor',
                                [model_matrix, model_coefficients, offset]):
     predicted_linear_response = tf.linalg.matvec(model_matrix,
                                                  model_coefficients)

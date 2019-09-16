@@ -1,13 +1,13 @@
 # Copyright 2018 The TensorFlow Probability Authors.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Apache License, Version 2.0 (the 'License');
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
+# distributed under the License is distributed on an 'AS IS' BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
@@ -19,20 +19,21 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import scipy.special
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class RelaxedBernoulliTest(tf.test.TestCase):
+class RelaxedBernoulliTest(test_case.TestCase):
 
   def testP(self):
     """Tests that parameter P is set correctly. Note that dist.p != dist.pdf."""
@@ -57,13 +58,15 @@ class RelaxedBernoulliTest(tf.test.TestCase):
     temperature = 1.0
     invalid_ps = [1.01, 2.]
     for p in invalid_ps:
-      with self.assertRaisesOpError("probs has components greater than 1"):
+      with self.assertRaisesOpError(
+          'Argument `probs` has components greater than 1.'):
         dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
         self.evaluate(dist.probs)
 
     invalid_ps = [-0.01, -3.]
     for p in invalid_ps:
-      with self.assertRaisesOpError("Condition x >= 0"):
+      with self.assertRaisesOpError(
+          'Argument `probs` has components less than 0.'):
         dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
         self.evaluate(dist.probs)
 
@@ -135,8 +138,7 @@ class RelaxedBernoulliTest(tf.test.TestCase):
     samples = dist.sample(n, seed=tfp_test_util.test_seed())
     self.assertEqual(samples.dtype, tf.float32)
     sample_values = self.evaluate(samples)
-    self.assertTrue(np.all(sample_values >= 0))
-    self.assertTrue(np.all(sample_values <= 1))
+    self.assertAllInRange(sample_values, 0., 1.)
 
     frac_ones_like = np.sum(sample_values >= 0.5, axis=0) / n
     self.assertAllClose(p, frac_ones_like, atol=1e-2)
@@ -164,6 +166,76 @@ class RelaxedBernoulliTest(tf.test.TestCase):
         *self.evaluate([x, d.probs_parameter()]),
         atol=0, rtol=1e-4)
 
+  def testUnknownShape(self):
+    logits = tf.Variable(np.zeros((1, 5)), shape=tf.TensorShape((1, None)))
+    d = tfd.RelaxedBernoulli(0.5, logits)
+    self.evaluate(logits.initializer)
+    d.sample()
 
-if __name__ == "__main__":
+    if not tf.executing_eagerly():
+      logits = tf1.placeholder(tf.float32, shape=(1, None))
+      d = tfd.RelaxedBernoulli(0.5, logits=logits)
+      d.sample()
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class RelaxedBernoulliFromVariableTest(test_case.TestCase):
+
+  def testGradientLogits(self):
+    x = tf.Variable([-1., 1])
+    self.evaluate(x.initializer)
+    d = tfd.RelaxedBernoulli(0.5, logits=x, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([0, 1])
+    g = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(g, 1)
+    self.assertAllNotNone(g)
+
+  def testGradientProbs(self):
+    x = tf.Variable([0.1, 0.7])
+    self.evaluate(x.initializer)
+    d = tfd.RelaxedBernoulli(0.5, probs=x, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -d.sample()
+    g = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(g, 1)
+    self.assertAllNotNone(g)
+
+  def testGradientTemperature(self):
+    x = tf.Variable([0.2, 2.])
+    self.evaluate(x.initializer)
+    d = tfd.RelaxedBernoulli(x, probs=[0.8, 0.5], validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -d.sample()
+    g = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(g, 1)
+    self.assertAllNotNone(g)
+
+  def testAssertionsProbs(self):
+    x = tf.Variable([0.1, 0.7, 0.0])
+    d = tfd.RelaxedBernoulli(0.5, probs=x, validate_args=True)
+    self.evaluate(x.initializer)
+    self.evaluate(d.sample())
+    with tf.control_dependencies([x.assign([0.1, -0.7, 0.0])]):
+      with self.assertRaisesOpError(
+          'Argument `probs` has components less than 0.'):
+        self.evaluate(d.sample())
+
+    with tf.control_dependencies([x.assign([0.1, 1.7, 0.0])]):
+      with self.assertRaisesOpError(
+          'Argument `probs` has components greater than 1.'):
+        self.evaluate(d.sample())
+
+  def testAssertionsTemperature(self):
+    x = tf.Variable(.8)
+    probs = [0.1, .35, 0.7]
+    d = tfd.RelaxedBernoulli(x, probs=probs, validate_args=True)
+    self.evaluate(x.initializer)
+    self.evaluate(d.sample())
+    with tf.control_dependencies([x.assign(-1.2)]):
+      with self.assertRaisesOpError(
+          'Argument `temperature` must be positive.'):
+        self.evaluate(d.sample())
+
+if __name__ == '__main__':
   tf.test.main()

@@ -207,5 +207,22 @@ class ExponentialTest(test_case.TestCase):
       with tf.control_dependencies([rate.assign([1., 2., -3.])]):
         self.evaluate(d.sample())
 
+  def testExpontentialQuantile(self):
+    exponential = exponential_lib.Exponential(rate=[1., 2.])
+
+    # Corner cases.
+    result = self.evaluate(exponential.quantile([0., 1.]))
+    self.assertAllClose(result, [0., np.inf])
+
+    # Two sample values calculated by hand.
+    result = self.evaluate(exponential.quantile(0.5))
+    self.assertAllClose(result, [0.693147, 0.346574])
+
+  def testExponentialQuantileIsInverseOfCdf(self):
+    exponential = exponential_lib.Exponential(rate=[1., 2.])
+    values = [2 * [t / 10.] for t in range(0, 11)]
+    result = self.evaluate(exponential.cdf(exponential.quantile(values)))
+    self.assertAllClose(result, values)
+
 if __name__ == "__main__":
   tf.test.main()

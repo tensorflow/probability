@@ -22,7 +22,8 @@ import collections
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
@@ -189,7 +190,7 @@ def sample_annealed_importance_chain(
   ```
 
   """
-  with tf.compat.v1.name_scope(name, "sample_annealed_importance_chain",
+  with tf1.name_scope(name, "sample_annealed_importance_chain",
                                [num_steps, current_state]):
     num_steps = tf.convert_to_tensor(
         value=num_steps, dtype=tf.int32, name="num_steps")

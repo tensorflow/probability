@@ -51,9 +51,26 @@ install_bazel() {
   sudo apt-get install bazel
 }
 
+find_version_str() {
+  PKG_NAME=$1
+  # These are nightly builds we'd like to avoid for some reason; separated by
+  # regex OR operator.
+  BAD_NIGHTLY_DATES="20190709\|20190716\|20190731\|20190802"
+  # This will fail to find version 'X" and log available version strings to
+  # stderr. We then sort, remove bad versions and take the last entry. This
+  # allows us to avoid hardcoding the main version number, which would then need
+  # to be updated on every new TF release.
+  pip install $PKG_NAME==X 2>&1 \
+    | grep -o "[0-9.]\+dev[0-9]\{8\}" \
+    | sort \
+    | grep -v "$BAD_NIGHTLY_DATES" \
+    | tail -n1
+}
+
 install_python_packages() {
   # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
-  pip install tf-nightly
+  TF_VERSION_STR=$(find_version_str tf-nightly)
+  pip install tf-nightly==$TF_VERSION_STR gast==0.2.2
 
   # The following unofficial dependencies are used only by tests.
   pip install scipy hypothesis matplotlib mock
@@ -90,10 +107,11 @@ fi
 #     See https://github.com/bazelbuild/bazel/issues/6648 and b/121259040.
 echo "${shard_tests}" \
   | xargs bazel test \
+    --compilation_mode=opt \
     --copt=-O3 \
     --copt=-march=native \
     --notest_keep_going \
-    --test_tag_filters=-gpu,-requires-gpu-sm35,-no-oss-ci \
+    --test_tag_filters=-gpu,-requires-gpu-sm35,-notap,-no-oss-ci,-tfp_jax \
     --test_timeout 300,450,1200,3600 \
     --action_env=PATH \
     --action_env=LD_LIBRARY_PATH \

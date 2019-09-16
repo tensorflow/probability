@@ -23,6 +23,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -30,7 +31,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DirichletMultinomialTest(tf.test.TestCase):
+class DirichletMultinomialTest(test_case.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -72,10 +73,10 @@ class DirichletMultinomialTest(tf.test.TestCase):
     dist = tfd.DirichletMultinomial(n, alpha, validate_args=True)
     self.evaluate(dist.prob([2., 3, 0]))
     self.evaluate(dist.prob([3., 0, 2]))
-    with self.assertRaisesOpError("must be non-negative"):
+    with self.assertRaisesOpError('must be non-negative'):
       self.evaluate(dist.prob([-1., 4, 2]))
     with self.assertRaisesOpError(
-        "last-dimension must sum to `self.total_count`"):
+        'last-dimension must sum to `self.total_count`'):
       self.evaluate(dist.prob([3., 3, 0]))
 
   def testPmfNonIntegerCounts(self):
@@ -88,7 +89,7 @@ class DirichletMultinomialTest(tf.test.TestCase):
     # Both equality and integer checking fail.
     placeholder = tf1.placeholder_with_default([1.0, 2.5, 1.5], shape=None)
     with self.assertRaisesOpError(
-        "cannot contain fractional components"):
+        'cannot contain fractional components'):
       self.evaluate(dist.prob(placeholder))
     dist = tfd.DirichletMultinomial(n, alpha, validate_args=False)
     self.evaluate(dist.prob([1., 2., 3.]))
@@ -451,6 +452,8 @@ class DirichletMultinomialTest(tf.test.TestCase):
         actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
 
   def testNotReparameterized(self):
+    if tf1.control_flow_v2_enabled():
+      self.skipTest('b/138796859')
     total_count = tf.constant(5.0)
     concentration = tf.constant([0.1, 0.1, 0.1])
     _, [grad_total_count, grad_concentration] = tfp.math.value_and_gradient(
@@ -460,5 +463,97 @@ class DirichletMultinomialTest(tf.test.TestCase):
     self.assertIsNone(grad_concentration)
 
 
-if __name__ == "__main__":
+@test_util.run_all_in_graph_and_eager_modes
+class DirichletMultinomialFromVariableTest(test_case.TestCase):
+
+  def testAssertionCategoricalEventShape(self):
+    total_count = tf.constant(10.0, dtype=tf.float16)
+    too_many_classes = 2**11 + 1
+    concentration = tf.Variable(tf.ones(too_many_classes, tf.float16))
+    with self.assertRaisesRegexp(
+        ValueError, 'Number of classes exceeds `dtype` precision'):
+      tfd.DirichletMultinomial(
+          total_count, concentration, validate_args=True)
+
+  def testAssertionNonNegativeTotalCount(self):
+    total_count = tf.Variable(-1.0)
+    concentration = tf.constant([1., 1., 1.])
+
+    with self.assertRaisesRegexp(
+        tf.errors.InvalidArgumentError,
+        'must be non-negative'):
+      d = tfd.DirichletMultinomial(total_count, concentration,
+                                   validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.mean())
+
+  def testAssertionNonNegativeTotalCountAfterMutation(self):
+    total_count = tf.Variable(0.0)
+    concentration = tf.constant([1., 1., 1.])
+    d = tfd.DirichletMultinomial(total_count, concentration,
+                                 validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
+    self.evaluate(d.mean())
+    self.evaluate(total_count.assign(-1.0))
+
+    with self.assertRaisesRegexp(
+        tf.errors.InvalidArgumentError,
+        'must be non-negative'):
+      self.evaluate(d.mean())
+
+  def testAssertionIntegerFormTotalCount(self):
+    total_count = tf.Variable(0.5)
+    concentration = tf.constant([1., 1., 1.])
+
+    with self.assertRaisesRegexp(
+        tf.errors.InvalidArgumentError,
+        'cannot contain fractional components'):
+      d = tfd.DirichletMultinomial(total_count, concentration,
+                                   validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.mean())
+
+  def testAssertionIntegerFormTotalCountAfterMutation(self):
+    total_count = tf.Variable(0.0)
+    concentration = tf.constant([1., 1., 1.])
+    d = tfd.DirichletMultinomial(total_count, concentration,
+                                 validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
+    self.evaluate(d.mean())
+    self.evaluate(total_count.assign(0.5))
+
+    with self.assertRaisesRegexp(
+        tf.errors.InvalidArgumentError,
+        'cannot contain fractional components'):
+      self.evaluate(d.mean())
+
+  def testAssertionPositiveConcentration(self):
+    total_count = tf.constant(10.0)
+    concentration = tf.Variable([1., 1., -1.])
+
+    with self.assertRaisesRegexp(
+        tf.errors.InvalidArgumentError,
+        'Concentration parameter must be positive.'):
+      d = tfd.DirichletMultinomial(total_count, concentration,
+                                   validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.mean())
+
+  def testAssertionPositiveConcentrationAfterMutation(self):
+    total_count = tf.constant(10.0)
+    concentration = tf.Variable([1., 1., 1.])
+
+    d = tfd.DirichletMultinomial(total_count, concentration,
+                                 validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
+    self.evaluate(d.mean())
+    self.evaluate(concentration.assign([1., 1., -1.]))
+
+    with self.assertRaisesRegexp(
+        tf.errors.InvalidArgumentError,
+        'Concentration parameter must be positive.'):
+      self.evaluate(d.mean())
+
+
+if __name__ == '__main__':
   tf.test.main()

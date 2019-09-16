@@ -185,9 +185,9 @@ class Categorical(distribution.Distribution):
     if (probs is None) == (logits is None):
       raise ValueError('Must pass probs or logits, but not both.')
     with tf.name_scope(name) as name:
-      self._probs = tensor_util.convert_immutable_to_tensor(
+      self._probs = tensor_util.convert_nonref_to_tensor(
           probs, dtype_hint=tf.float32, name='probs')
-      self._logits = tensor_util.convert_immutable_to_tensor(
+      self._logits = tensor_util.convert_nonref_to_tensor(
           logits, dtype_hint=tf.float32, name='logits')
       super(Categorical, self).__init__(
           dtype=dtype,
@@ -325,7 +325,7 @@ class Categorical(distribution.Distribution):
     sum_exp_x = tf.reduce_sum(tf.math.exp(x), axis=-1)
     lse_logits = m[..., 0] + tf.math.log(sum_exp_x)
     return lse_logits - tf.reduce_sum(
-        logits * tf.math.exp(x), axis=-1) / sum_exp_x
+        tf.math.multiply_no_nan(logits, tf.math.exp(x)), axis=-1) / sum_exp_x
 
   def _mode(self):
     x = self._probs if self._logits is None else self._logits
@@ -413,13 +413,13 @@ def maybe_assert_categorical_param_correctness(
     return []
 
   if logits is not None:
-    if is_init != tensor_util.is_mutable(logits):
+    if is_init != tensor_util.is_ref(logits):
       logits = tf.convert_to_tensor(logits)
       assertions.extend(
           distribution_util.assert_categorical_event_shape(logits))
 
   if probs is not None:
-    if is_init != tensor_util.is_mutable(probs):
+    if is_init != tensor_util.is_ref(probs):
       probs = tf.convert_to_tensor(probs)
       assertions.extend([
           assert_util.assert_non_negative(probs),

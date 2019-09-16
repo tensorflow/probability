@@ -26,11 +26,12 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
-    "MultivariateNormalLinearOperator",
+    'MultivariateNormalLinearOperator',
 ]
 
 
@@ -137,7 +138,7 @@ class MultivariateNormalLinearOperator(
                scale=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="MultivariateNormalLinearOperator"):
+               name='MultivariateNormalLinearOperator'):
     """Construct Multivariate Normal distribution on `R^k`.
 
     The `batch_shape` is the broadcast shape between `loc` and `scale`
@@ -171,22 +172,23 @@ class MultivariateNormalLinearOperator(
     """
     parameters = dict(locals())
     if scale is None:
-      raise ValueError("Missing required `scale` parameter.")
+      raise ValueError('Missing required `scale` parameter.')
     if not dtype_util.is_floating(scale.dtype):
-      raise TypeError("`scale` parameter must have floating-point dtype.")
+      raise TypeError('`scale` parameter must have floating-point dtype.')
 
     with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([loc, scale], dtype_hint=tf.float32)
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
-      loc = loc if loc is None else tf.convert_to_tensor(
-          loc, name="loc", dtype=scale.dtype)
+      loc = tensor_util.convert_nonref_to_tensor(
+          loc, dtype=dtype, name='loc')
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale)
 
     super(MultivariateNormalLinearOperator, self).__init__(
         distribution=normal.Normal(
-            loc=tf.zeros([], dtype=scale.dtype),
-            scale=tf.ones([], dtype=scale.dtype)),
+            loc=tf.zeros([], dtype=dtype),
+            scale=tf.ones([], dtype=dtype)),
         bijector=affine_linear_operator_bijector.AffineLinearOperator(
             shift=loc, scale=scale, validate_args=validate_args),
         batch_shape=batch_shape,
@@ -243,10 +245,14 @@ class MultivariateNormalLinearOperator(
       return tf.square(self.scale.diag_part())
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
-      return tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense()))
+      return self.scale.matmul(self.scale.adjoint()).diag_part()
+    elif isinstance(self.scale, tf.linalg.LinearOperatorKronecker):
+      factors_sq_operators = [
+          factor.matmul(factor.adjoint()) for factor in self.scale.operators
+      ]
+      return tf.linalg.LinearOperatorKronecker(factors_sq_operators).diag_part()
     else:
-      return tf.linalg.diag_part(
-          self.scale.matmul(self.scale.to_dense(), adjoint_arg=True))
+      return self.scale.matmul(self.scale.adjoint()).diag_part()
 
   def _stddev(self):
     if distribution_util.is_diagonal_scale(self.scale):
@@ -262,6 +268,10 @@ class MultivariateNormalLinearOperator(
 
   def _mode(self):
     return self._mean()
+
+  def _parameter_control_dependencies(self, is_init):
+    # Nothing to do here.
+    return []
 
 
 @kullback_leibler.RegisterKL(MultivariateNormalLinearOperator,
@@ -311,7 +321,7 @@ def _kl_brute_force(a, b, name=None):
             isinstance(x, tf.linalg.LinearOperatorScaledIdentity) or
             isinstance(x, tf.linalg.LinearOperatorDiag))
 
-  with tf.name_scope(name or "kl_mvn"):
+  with tf.name_scope(name or 'kl_mvn'):
     # Calculation is based on:
     # http://stats.stackexchange.com/questions/60680/kl-divergence-between-two-multivariate-gaussians
     # and,

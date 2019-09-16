@@ -19,22 +19,23 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_case
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
+class MultivariateNormalLinearOperatorTest(test_case.TestCase):
 
   def setUp(self):
     self.rng = np.random.RandomState(42)
+    super(MultivariateNormalLinearOperatorTest, self).setUp()
 
   def _random_tril_matrix(self, shape):
     mat = self.rng.rand(*shape)
@@ -54,8 +55,8 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
   def testNamePropertyIsSetByInitArg(self):
     loc = [1., 2.]
     scale = tf.linalg.LinearOperatorIdentity(2)
-    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, name="Billy")
-    self.assertStartsWith(mvn.name, "Billy")
+    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, name='Billy')
+    self.assertStartsWith(mvn.name, 'Billy')
 
   def testLogPDFScalarBatch(self):
     loc = self.rng.rand(2)
@@ -109,6 +110,32 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
         np.matmul(
             self.evaluate(scale.to_dense()),
             np.transpose(self.evaluate(scale.to_dense()), [0, 1, 3, 2])))
+
+  def testVariableLocation(self):
+    loc = tf.Variable([1., 1.])
+    scale = tf.linalg.LinearOperatorLowerTriangular(
+        tf.eye(2), is_non_singular=True)
+    d = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
+    self.evaluate(loc.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, loc))
+
+  def testVariableScaleAssertions(self):
+    # We test that changing the scale to be non-invertible raises an exception
+    # when validate_args is True. This is really just testing the underlying
+    # AffineLinearOperator instance, but we include it to demonstrate that it
+    # works as expected.
+    loc = tf.constant([1., 1.])
+    scale_tensor = tf.Variable(np.eye(2, dtype=np.float32))
+    scale = tf.linalg.LinearOperatorLowerTriangular(
+        scale_tensor,
+        is_non_singular=True)
+    d = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
+    self.evaluate(scale_tensor.initializer)
+    with self.assertRaises(Exception):
+      with tf.control_dependencies([scale_tensor.assign([[1., 0.], [1., 0.]])]):
+        self.evaluate(d.sample())
 
   def testKLBatch(self):
     batch_shape = [2]
@@ -178,5 +205,5 @@ class MultivariateNormalLinearOperatorTest(tf.test.TestCase):
     return 0.5 * (t + q - k + l)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

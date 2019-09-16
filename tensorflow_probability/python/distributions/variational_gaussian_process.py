@@ -610,7 +610,7 @@ class VariationalGaussianProcess(
       self._variational_inducing_observations_posterior = (
           mvn_linear_operator.MultivariateNormalLinearOperator(
               loc=variational_inducing_observations_loc,
-              scale=tf.linalg.LinearOperatorFullMatrix(
+              scale=tf.linalg.LinearOperatorLowerTriangular(
                   variational_inducing_observations_scale),
               name='variational_inducing_observations_posterior'))
 
@@ -648,13 +648,6 @@ class VariationalGaussianProcess(
             allow_nan_stats=allow_nan_stats,
             name=name)
         self._parameters = parameters
-        self._graph_parents = [
-            index_points,
-            inducing_index_points,
-            variational_inducing_observations_loc,
-            variational_inducing_observations_scale,
-            observation_noise_variance,
-            jitter]
 
   def _compute_posterior_predictive_params(self):
     ktt = _add_diagonal_shift(
@@ -725,6 +718,34 @@ class VariationalGaussianProcess(
 
   def _covariance(self):
     return self._covariance_matrix
+
+  def surrogate_posterior_kl_divergence_prior(self, name=None):
+    """Compute `KL(surrogate inducing point posterior || prior)`.
+
+    See [Hensman, 2013][1].
+
+    Args:
+      name: Python `str` name prefixed to Ops created by this class.
+        Default value: 'surrogate_posterior_kl_divergence_prior'.
+    Returns:
+      kl: Scalar tensor representing the KL between the (surrogate/variational)
+        posterior over inducing point function values, and the GP prior over
+        the inducing point function values.
+
+    #### References
+
+    [1]: Hensman, J., Lawrence, N. "Gaussian Processes for Big Data", 2013
+         https://arxiv.org/abs/1309.6835
+    """
+    with tf.name_scope(name or 'surrogate_posterior_kl_divergence_prior'):
+      inducing_prior = gaussian_process.GaussianProcess(
+          kernel=self._kernel,
+          mean_fn=self._mean_fn,
+          index_points=self._inducing_index_points)
+
+      return kullback_leibler.kl_divergence(
+          self._variational_inducing_observations_posterior,
+          inducing_prior)
 
   def variational_loss(self,
                        observations,
@@ -826,15 +847,7 @@ class VariationalGaussianProcess(
       trace_term = (.5 * (ktilde_trace_term + other_trace_term) /
                     self._observation_noise_variance)
 
-      inducing_prior = gaussian_process.GaussianProcess(
-          kernel=self._kernel,
-          mean_fn=self._mean_fn,
-          index_points=self._inducing_index_points,
-          observation_noise_variance=self._observation_noise_variance)
-
-      kl_term = kl_weight * kullback_leibler.kl_divergence(
-          self._variational_inducing_observations_posterior,
-          inducing_prior)
+      kl_term = kl_weight * self.surrogate_posterior_kl_divergence_prior()
 
       lower_bound = (obs_ll - trace_term - kl_term)
 

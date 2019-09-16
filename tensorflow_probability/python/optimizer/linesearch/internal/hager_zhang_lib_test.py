@@ -20,11 +20,11 @@ from __future__ import print_function
 
 import collections
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.optimizer.linesearch.internal import hager_zhang_lib as hzl
-
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -86,7 +86,7 @@ def test_function_x_y_dy(x, y, dy, eps=0.01):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HagerZhangLibTest(tf.test.TestCase):
+class HagerZhangLibTest(test_case.TestCase):
 
   def test_secant2_batching_vs_mapping(self):
     # We build a simple example function with 2 batches, one where the wolfe

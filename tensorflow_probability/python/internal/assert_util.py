@@ -21,25 +21,26 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
+# Note: These assertions raise tf.errors.InvalidArgumentError when they fail.
+assert_equal = tf1.assert_equal
+assert_greater = tf1.assert_greater
+assert_less = tf1.assert_less
+assert_rank = tf1.assert_rank
 
-assert_equal = tf.compat.v1.assert_equal
-assert_greater = tf.compat.v1.assert_greater
-assert_less = tf.compat.v1.assert_less
-assert_rank = tf.compat.v1.assert_rank
-
-assert_greater_equal = tf.compat.v1.assert_greater_equal
-assert_integer = tf.compat.v1.assert_integer
-assert_less_equal = tf.compat.v1.assert_less_equal
-assert_near = tf.compat.v1.assert_near
-assert_negative = tf.compat.v1.assert_negative
-assert_non_negative = tf.compat.v1.assert_non_negative
-assert_non_positive = tf.compat.v1.assert_non_positive
-assert_none_equal = tf.compat.v1.assert_none_equal
-assert_positive = tf.compat.v1.assert_positive
-assert_rank_at_least = tf.compat.v1.assert_rank_at_least
-assert_rank_in = tf.compat.v1.assert_rank_in
+assert_greater_equal = tf1.assert_greater_equal
+assert_integer = tf1.assert_integer
+assert_less_equal = tf1.assert_less_equal
+assert_near = tf1.assert_near
+assert_negative = tf1.assert_negative
+assert_non_negative = tf1.assert_non_negative
+assert_non_positive = tf1.assert_non_positive
+assert_none_equal = tf1.assert_none_equal
+assert_positive = tf1.assert_positive
+assert_rank_at_least = tf1.assert_rank_at_least
+assert_rank_in = tf1.assert_rank_in
 
 
 def assert_finite(x, data=None, summarize=None, message=None, name=None):
@@ -61,13 +62,13 @@ def assert_finite(x, data=None, summarize=None, message=None, name=None):
   Raises:
     ValueError:  If static checks determine `x` has wrong rank.
   """
-  with tf.compat.v2.name_scope(name or 'assert_finite'):
+  with tf.name_scope(name or 'assert_finite'):
     x_ = tf.get_static_value(x)
     if x_ is not None:
       if ~np.all(np.isfinite(x_)):
         raise ValueError(message)
       return x
-    assertion = tf.compat.v1.assert_equal(
+    assertion = tf1.assert_equal(
         tf.math.is_finite(x), tf.ones_like(x, tf.bool),
         data=data, summarize=summarize, message=message)
     with tf.control_dependencies([assertion]):
@@ -102,6 +103,6 @@ def assert_rank_at_most(x, rank, data=None, summarize=None, message=None,
   Raises:
     ValueError:  If static checks determine `x` has wrong rank.
   """
-  with tf.compat.v2.name_scope(name or 'assert_rank_at_most'):
-    return tf.compat.v1.assert_less_equal(
+  with tf.name_scope(name or 'assert_rank_at_most'):
+    return tf1.assert_less_equal(
         tf.rank(x), rank, data=data, summarize=summarize, message=message)

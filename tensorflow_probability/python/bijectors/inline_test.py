@@ -25,11 +25,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class InlineBijectorTest(tf.test.TestCase):
+class InlineBijectorTest(test_case.TestCase):
   """Tests correctness of the inline constructed bijector."""
 
   def testBijector(self):
@@ -37,11 +38,10 @@ class InlineBijectorTest(tf.test.TestCase):
         forward_fn=tf.exp,
         inverse_fn=tf.math.log,
         inverse_log_det_jacobian_fn=lambda y: -tf.math.log(y),
-        forward_log_det_jacobian_fn=lambda x: x,
         forward_min_event_ndims=0,
-        name="exp")
+        name='exp')
 
-    self.assertStartsWith(inline.name, "exp")
+    self.assertStartsWith(inline.name, 'exp')
     x = [[[1., 2.], [3., 4.], [5., 6.]]]
     y = np.exp(x)
     self.assertAllClose(y, self.evaluate(inline.forward(x)))
@@ -60,7 +60,7 @@ class InlineBijectorTest(tf.test.TestCase):
         inverse_event_shape_tensor_fn=lambda x: x[:-1],
         inverse_event_shape_fn=lambda x: x[:-1],
         forward_min_event_ndims=0,
-        name="shape_only")
+        name='shape_only')
     x = tf.TensorShape([1, 2, 3])
     y = tf.TensorShape([1, 2, 3, 1])
     self.assertAllEqual(y, bijector.forward_event_shape(x))
@@ -75,5 +75,5 @@ class InlineBijectorTest(tf.test.TestCase):
             bijector.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

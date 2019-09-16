@@ -30,8 +30,10 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.ops.linalg import linear_operator_util  # pylint: disable=g-direct-tensorflow-import
-
+# pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops.linalg import linear_operator_util
+from tensorflow.python.util import deprecation
+# pylint: enable=g-direct-tensorflow-import
 
 __all__ = [
     'cholesky_concat',
@@ -39,6 +41,7 @@ __all__ = [
     'fill_triangular_inverse',
     'lu_matrix_inverse',
     'lu_reconstruct',
+    'lu_reconstruct_assertions',  # Internally visible for MatvecLU.
     'lu_solve',
     'matrix_rank',
     'pinv',
@@ -82,6 +85,18 @@ def matrix_rank(a, tol=None, validate_args=False, name=None):
       tol = (
           eps * tf.cast(m, a.dtype) * tf.reduce_max(s, axis=-1, keepdims=True))
     return tf.reduce_sum(tf.cast(s > tol, tf.int32), axis=-1)
+
+
+try:
+  matrix_rank = tf.linalg.matrix_rank
+except AttributeError:
+  pass
+
+
+matrix_rank = deprecation.deprecated(
+    '2019-10-01',
+    'tfp.math.matrix_rank is deprecated. Use tf.linalg.matrix_rank instead',
+    warn_once=True)(matrix_rank)
 
 
 def cholesky_concat(chol, cols, name=None):
@@ -448,6 +463,18 @@ def pinv(a, rcond=None, validate_args=False, name=None):
     return a_pinv
 
 
+try:
+  pinv = tf.linalg.pinv
+except AttributeError:
+  pass
+
+
+pinv = deprecation.deprecated(
+    '2019-10-01',
+    'tfp.math.pinv is deprecated. Use tf.linalg.pinv instead',
+    warn_once=True)(pinv)
+
+
 def lu_solve(lower_upper, perm, rhs,
              validate_args=False,
              name=None):
@@ -597,7 +624,7 @@ def lu_matrix_inverse(lower_upper, perm, validate_args=False, name=None):
     lower_upper = tf.convert_to_tensor(
         lower_upper, dtype_hint=tf.float32, name='lower_upper')
     perm = tf.convert_to_tensor(perm, dtype_hint=tf.int32, name='perm')
-    assertions = _lu_reconstruct_assertions(lower_upper, perm, validate_args)
+    assertions = lu_reconstruct_assertions(lower_upper, perm, validate_args)
     if assertions:
       with tf.control_dependencies(assertions):
         lower_upper = tf.identity(lower_upper)
@@ -647,7 +674,7 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
         lower_upper, dtype_hint=tf.float32, name='lower_upper')
     perm = tf.convert_to_tensor(perm, dtype_hint=tf.int32, name='perm')
 
-    assertions = _lu_reconstruct_assertions(lower_upper, perm, validate_args)
+    assertions = lu_reconstruct_assertions(lower_upper, perm, validate_args)
     if assertions:
       with tf.control_dependencies(assertions):
         lower_upper = tf.identity(lower_upper)
@@ -681,7 +708,7 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
     return x
 
 
-def _lu_reconstruct_assertions(lower_upper, perm, validate_args):
+def lu_reconstruct_assertions(lower_upper, perm, validate_args):
   """Returns list of assertions related to `lu_reconstruct` assumptions."""
   assertions = []
 
@@ -717,7 +744,7 @@ def _lu_reconstruct_assertions(lower_upper, perm, validate_args):
 
 def _lu_solve_assertions(lower_upper, perm, rhs, validate_args):
   """Returns list of assertions related to `lu_solve` assumptions."""
-  assertions = _lu_reconstruct_assertions(lower_upper, perm, validate_args)
+  assertions = lu_reconstruct_assertions(lower_upper, perm, validate_args)
 
   message = 'Input `rhs` must have at least 2 dimensions.'
   if rhs.shape.ndims is not None:

@@ -32,6 +32,7 @@ REQUIRED_PACKAGES = [
     'numpy >= 1.13.3',
     'decorator',
     'cloudpickle == 1.1.1',
+    'gast >= 0.2, < 0.3'  # For autobatching
 ]
 
 if '--release' in sys.argv:

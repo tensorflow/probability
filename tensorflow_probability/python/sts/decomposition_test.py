@@ -15,23 +15,27 @@
 """Tests for STS decomposition methods."""
 
 # Dependency imports
+
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfl = tf.linalg
-tfd = tfp.distributions
 
 
-class _DecompositionTest(tf.test.TestCase):
+class _DecompositionTest(test_case.TestCase):
 
   def _build_model_and_params(self,
                               num_timesteps,
                               param_batch_shape,
                               num_posterior_draws=10):
-
+    seed = tfp_test_util.test_seed_stream()
+    np.random.seed(seed() % (2**32))
     observed_time_series = self._build_tensor(
         np.random.randn(*(param_batch_shape +
                           [num_timesteps])))
@@ -48,7 +52,7 @@ class _DecompositionTest(tf.test.TestCase):
                         observed_time_series=observed_time_series)
 
     # Sample test params from the prior (faster than posterior samples).
-    param_samples = [p.prior.sample([num_posterior_draws])
+    param_samples = [p.prior.sample([num_posterior_draws], seed=seed())
                      for p in model.parameters]
 
     return model, observed_time_series, param_samples
@@ -143,7 +147,7 @@ class _DecompositionTest(tf.test.TestCase):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 

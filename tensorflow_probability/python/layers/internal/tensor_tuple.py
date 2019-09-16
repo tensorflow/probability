@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow.python.framework import composite_tensor  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import type_spec  # pylint: disable=g-direct-tensorflow-import

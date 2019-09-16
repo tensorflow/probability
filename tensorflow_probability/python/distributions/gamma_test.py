@@ -223,6 +223,7 @@ class GammaTest(test_case.TestCase):
         sp_stats.gamma.var(alpha_v, scale=1 / beta_v),
         atol=.15)
 
+  @tfp_test_util.numpy_disable_gradient_test
   def testGammaFullyReparameterized(self):
     alpha = tf.constant(4.0)
     beta = tf.constant(3.0)
@@ -345,6 +346,8 @@ class GammaTest(test_case.TestCase):
     self.assertAllClose(kl_expected, kl_actual_, atol=0., rtol=1e-6)
     self.assertAllClose(kl_sample_, kl_actual_, atol=0., rtol=1e-1)
 
+  @tfp_test_util.numpy_disable_gradient_test
+  @tfp_test_util.jax_disable_variable_test
   def testGradientThroughConcentration(self):
     concentration = tf.Variable(3.)
     d = tfd.Gamma(concentration=concentration, rate=5.)
@@ -354,6 +357,7 @@ class GammaTest(test_case.TestCase):
     self.assertLen(grad, 1)
     self.assertAllNotNone(grad)
 
+  @tfp_test_util.jax_disable_variable_test
   def testAssertsPositiveConcentration(self):
     concentration = tf.Variable([1., 2., -3.])
     self.evaluate(concentration.initializer)

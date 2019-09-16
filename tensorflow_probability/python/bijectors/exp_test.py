@@ -19,21 +19,24 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ExpBijectorTest(tf.test.TestCase):
+class ExpBijectorTest(test_case.TestCase):
   """Tests correctness of the Y = g(X) = exp(X) transformation."""
 
   def testBijector(self):
     bijector = tfb.Exp()
-    self.assertStartsWith(bijector.name, "exp")
+    self.assertStartsWith(bijector.name, 'exp')
     x = [[[1.], [2.]]]
     y = np.exp(x)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
@@ -61,6 +64,7 @@ class ExpBijectorTest(tf.test.TestCase):
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=0)
 
+  @tfp_test_util.numpy_disable_gradient_test
   def testJacobian(self):
     bijector = tfb.Exp()
     x = tf.constant([22.])
@@ -78,5 +82,5 @@ class ExpBijectorTest(tf.test.TestCase):
     self.assertAllClose(fldj_, fldj_theoretical_)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

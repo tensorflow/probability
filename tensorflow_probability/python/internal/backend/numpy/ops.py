@@ -18,12 +18,18 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 import numpy as np
+import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
+import six
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal.backend.numpy.internal import utils
+from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+import wrapt
 from tensorflow.python.ops.unconnected_gradients import UnconnectedGradients  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -36,6 +42,8 @@ __all__ = [
     'control_dependencies',
     'convert_to_tensor',
     'custom_gradient',
+    'dimension_value',
+    'enable_v2_behavior',
     'executing_eagerly',
     'get_static_value',
     'group',
@@ -46,10 +54,14 @@ __all__ = [
     'stop_gradient',
     'GradientTape',
     'Module',
+    'Tensor',
     'TensorShape',
     'Variable',
     # 'gradients',
 ]
+
+
+JAX_MODE = False
 
 
 class _NullContext(object):
@@ -64,11 +76,13 @@ class _NullContext(object):
     return False  # False values do not suppress exceptions.
 
 
-def _broadcast_static_shape(shape_x, shape_y):
-  shape_x = tf.TensorShape(shape_x)
-  shape_y = tf.TensorShape(shape_y)
+def _broadcast_static_shape(shape_x, shape_y, as_tensorshape=False):
+  shape_x = TensorShape(shape_x)
+  shape_y = TensorShape(shape_y)
   shape_xy = tf.broadcast_static_shape(shape_x, shape_y)
-  return np.array(shape_xy, dtype=np.int32)
+  if as_tensorshape:
+    return shape_xy
+  return np.array(shape_xy.as_list(), dtype=np.int32)
 
 
 def _constant(value, dtype=None, shape=None, name='Const'):  # pylint: disable=unused-argument
@@ -87,11 +101,47 @@ def _control_dependencies(control_inputs):
 
 
 def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint: disable=unused-argument
+  """Emulates tf.convert_to_tensor."""
   assert not tf.is_tensor(value), value
+  if isinstance(value, np.ndarray):
+    if dtype is not None:
+      dtype = utils.numpy_dtype(dtype)
+      # if np.result_type(value, dtype) != dtype:
+      #   raise ValueError('Expected dtype {} but got {} with dtype {}.'.format(
+      #       dtype, value, value.dtype))
+      return value.astype(dtype)
+    return value
+  if isinstance(value, TensorShape):
+    value = [int(d) for d in value.as_list()]
+  if dtype is None and dtype_hint is not None:
+    dtype_hint = utils.numpy_dtype(dtype_hint)
+    value = np.array(value)
+    if np.size(value):
+      # Match TF behavior, which won't downcast e.g. float to int.
+      if np.issubdtype(value.dtype, np.complexfloating):
+        if not np.issubdtype(dtype_hint, np.complexfloating):
+          return value
+      if np.issubdtype(value.dtype, np.floating):
+        if not np.issubdtype(dtype_hint, np.floating):
+          return value
+      if np.issubdtype(value.dtype, np.integer):
+        if not np.issubdtype(dtype_hint, np.integer):
+          return value
+    return value.astype(dtype_hint)
   return np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
 
 
+def _dimension_value(dimension):
+  if dimension is None:
+    return None
+  return int(dimension)
+
+
 # --- Begin Public Functions --------------------------------------------------
+
+dimension_value = utils.copy_docstring(
+    tf.compat.dimension_value,
+    _dimension_value)
 
 
 class GradientTape(object):
@@ -127,13 +177,17 @@ broadcast_static_shape = utils.copy_docstring(
     tf.broadcast_static_shape,
     _broadcast_static_shape)
 
+broadcast_static_shape_as_tensorshape = utils.copy_docstring(
+    tf.broadcast_static_shape,
+    functools.partial(_broadcast_static_shape, as_tensorshape=True))
+
 broadcast_to = utils.copy_docstring(
     tf.broadcast_to,
     lambda input, shape, name=None: np.broadcast_to(input, shape))
 
 cast = utils.copy_docstring(
     tf.cast,
-    lambda x, dtype, name=None: np.array(x).astype(utils.numpy_dtype(dtype)))
+    lambda x, dtype, name=None: np.array(x, dtype=utils.numpy_dtype(dtype)))
 
 clip_by_value = utils.copy_docstring(
     tf.clip_by_value,
@@ -174,7 +228,7 @@ identity = utils.copy_docstring(
 
 is_tensor = utils.copy_docstring(
     tf.is_tensor,
-    lambda x: isinstance(x, (np.ndarray, np.generic)))
+    lambda x: isinstance(x, Tensor))
 
 
 class name_scope(object):  # pylint: disable=invalid-name
@@ -227,13 +281,68 @@ stop_gradient = utils.copy_docstring(
     lambda input, name=None: np.array(input))
 
 TensorShape = tf.TensorShape
+Dimension = tf1.Dimension
 
 
-def Variable(initial_value=None, trainable=True, validate_shape=True,  # pylint: disable=unused-argument,invalid-name
-             caching_device=None, name=None, variable_def=None, dtype=None,  # pylint: disable=unused-argument
-             import_scope=None, constraint=None):  # pylint: disable=unused-argument
-  assert constraint is None
-  return np.array(initial_value, dtype=dtype or np.float32)
+def dimension_at_index(shape, index):
+  if isinstance(shape, TensorShape):
+    return shape.dims[index]
+  return Dimension(int(shape[index]))
+
+
+class NumpyVariable(wrapt.ObjectProxy):
+  """Stand-in for tf.Variable."""
+
+  __slots__ = ('initializer',)
+
+  # pylint: disable=unused-argument
+  def __init__(
+      self,
+      initial_value=None,
+      trainable=True,
+      validate_shape=True,
+      caching_device=None,
+      name=None,
+      variable_def=None,
+      dtype=None,
+      import_scope=None,
+      constraint=None):
+    assert constraint is None
+    super(NumpyVariable, self).__init__(
+        onp.array(initial_value, dtype=dtype or onp.float32))
+    self.initializer = None
+  # pylint: enable=unused-argument
+
+  def __array__(self, dtype=None):
+    if dtype is not None:
+      return self.astype(dtype)
+    return self
+
+  def assign(self, value):
+    super(NumpyVariable, self).__init__(onp.array(value, dtype=self.dtype))
+    return self
+
+
+if JAX_MODE:
+  from jax.interpreters.xla import canonicalize_dtype_handlers  # pylint: disable=g-import-not-at-top
+  from jax.interpreters.xla import pytype_aval_mappings  # pylint: disable=g-import-not-at-top
+  canonicalize_dtype_handlers[NumpyVariable] = (
+      canonicalize_dtype_handlers[onp.ndarray])
+  pytype_aval_mappings[NumpyVariable] = pytype_aval_mappings[onp.ndarray]
+
+
+Variable = NumpyVariable
+
+
+class _TensorMeta(type(np.ndarray)):
+
+  @classmethod
+  def __instancecheck__(cls, instance):
+    return isinstance(instance, (np.ndarray, np.generic))
+
+
+class Tensor(six.with_metaclass(_TensorMeta)):
+  pass
 
 
 class Module(object):
@@ -247,8 +356,13 @@ class Module(object):
   def _no_dependency(self, x):
     return x
 
+  @property
   def trainable_variables(self):
     return []
 
+  @property
   def variables(self):
     return []
+
+
+enable_v2_behavior = lambda: None

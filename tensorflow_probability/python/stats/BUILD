@@ -32,6 +32,7 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":calibration",
         ":leave_one_out",
         ":quantiles",
         ":sample_stats",
@@ -72,8 +73,11 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math:generic",
     ],
 )
 
@@ -85,6 +89,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -110,5 +115,32 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_library(
+    name = "calibration",
+    srcs = ["calibration.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+py_test(
+    name = "calibration_test",
+    size = "small",
+    srcs = ["calibration_test.py"],
+    deps = [
+        # absl/logging dep,
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )

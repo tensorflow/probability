@@ -19,11 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 import contextlib
+import re
 
 # Dependency imports
-import numpy as np
+from absl import logging
+import numpy as np  # May be rewritten for JAX.
+import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 __all__ = [
     'Benchmark',
@@ -45,9 +48,7 @@ class TestCase(tf.test.TestCase):
     return x
 
   def _GetNdArray(self, a):
-    if isinstance(a, (np.generic, np.ndarray)):
-      return a
-    return np.array(a)
+    return onp.array(a)
 
   @contextlib.contextmanager
   def assertRaisesOpError(self, msg):
@@ -56,14 +57,23 @@ class TestCase(tf.test.TestCase):
       yield
       self.fail('No exception raised. Expected exception similar to '
                 'tf.errors.OpError with message: %s' % msg)
-    except Exception:  # pylint: disable=broad-except
-      pass
+    except Exception as e:  # pylint: disable=broad-except
+      err_str = str(e)
+      if re.search(msg, err_str):
+        return
+      logging.error('Expected exception to match `%s`!', msg)
+      raise
 
   def assertEqual(self, first, second, msg=None):
     if isinstance(first, list) and isinstance(second, tuple):
       first = tuple(first)
     if isinstance(first, tuple) and isinstance(second, list):
       second = tuple(second)
+
+    if isinstance(first, np.ndarray):
+      second = onp.array(second)
+    if isinstance(second, np.ndarray):
+      first = onp.array(first)
 
     return super(TestCase, self).assertEqual(first, second, msg)
 

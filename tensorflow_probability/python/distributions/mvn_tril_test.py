@@ -19,23 +19,22 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 from absl.testing import parameterized
 import numpy as np
 from scipy import stats
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalTriLTest(tf.test.TestCase, parameterized.TestCase):
+class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -428,7 +427,7 @@ make_slicer = _MakeSlicer()
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalTriLSlicingTest(tf.test.TestCase,
+class MultivariateNormalTriLSlicingTest(test_case.TestCase,
                                         parameterized.TestCase):
 
   def setUp(self):
@@ -547,6 +546,37 @@ class MultivariateNormalTriLSlicingTest(tf.test.TestCase,
     mvn2 = mvn[:, 3:, ..., ::-1, tf.newaxis]
     self.assertAllEqual((4, 2, 3, 1), mvn2.batch_shape)
     self.assertAllEqual((2,), mvn2.event_shape)
+
+  def testVariableLocation(self):
+    loc = tf.Variable([1., 1.])
+    scale = tf.eye(2)
+    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
+    self.evaluate(loc.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, loc))
+
+  def testVariableScale(self):
+    loc = tf.constant([1., 1.])
+    scale = tf.Variable([[1., 0.], [0., 1.]])
+    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
+    self.evaluate(scale.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, scale))
+
+  def testVariableScaleAssertions(self):
+    # We test that changing the scale to be non-invertible raises an exception
+    # when validate_args is True. This is really just testing the underlying
+    # LinearOperator instance, but we include it to demonstrate that it works as
+    # expected.
+    loc = tf.constant([1., 1.])
+    scale = tf.Variable(np.eye(2, dtype=np.float32))
+    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
+    self.evaluate(scale.initializer)
+    with self.assertRaises(Exception):
+      with tf.control_dependencies([scale.assign([[1., 0.], [1., 0.]])]):
+        self.evaluate(d.sample())
 
 
 if __name__ == "__main__":

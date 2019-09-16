@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Local Linear Trend model."""
+"""Seasonal model."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
@@ -208,7 +209,7 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     {seasonal_init_args}
     """
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'SeasonalStateSpaceModel',
         values=[drift_scale, observation_noise_scale]) as name:
 
@@ -423,7 +424,7 @@ class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     {seasonal_init_args}
     """
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'ConstrainedSeasonalStateSpaceModel',
         values=[drift_scale, observation_noise_scale]) as name:
 
@@ -575,7 +576,7 @@ def build_seasonal_transition_matrix(
     basis_change_matrix=None, basis_change_matrix_inv=None):
   """Build a function computing transitions for a seasonal effect model."""
 
-  with tf.compat.v1.name_scope('build_seasonal_transition_matrix'):
+  with tf1.name_scope('build_seasonal_transition_matrix'):
     # If the season is changing, the transition matrix permutes the latent
     # state to shift all seasons up by a dimension, and sends the current
     # season's effect to the bottom.
@@ -774,6 +775,7 @@ class Seasonal(StructuralTimeSeries):
   def __init__(self,
                num_seasons,
                num_steps_per_season=1,
+               allow_drift=True,
                drift_scale_prior=None,
                initial_effect_prior=None,
                constrain_mean_effect_to_zero=True,
@@ -791,6 +793,13 @@ class Seasonal(StructuralTimeSeries):
         in which num_steps_per_season for each season also varies in different
         cycle (e.g., a 4 years cycle with leap day).
         Default value: 1.
+      allow_drift: optional Python `bool` specifying whether the seasonal
+        effects can drift over time.  Setting this to `False`
+        removes the `drift_scale` parameter from the model. This is
+        mathematically equivalent to
+        `drift_scale_prior = tfd.Deterministic(0.)`, but removing drift
+        directly is preferred because it avoids the use of a degenerate prior.
+        Default value: `True`.
       drift_scale_prior: optional `tfd.Distribution` instance specifying a prior
         on the `drift_scale` parameter. If `None`, a heuristic default prior is
         constructed based on the provided `observed_time_series`.
@@ -823,7 +832,7 @@ class Seasonal(StructuralTimeSeries):
         Default value: 'Seasonal'.
     """
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'Seasonal', values=[observed_time_series]) as name:
 
       _, observed_stddev, observed_initial = (
@@ -874,15 +883,24 @@ class Seasonal(StructuralTimeSeries):
       self._num_seasons = num_seasons
       self._num_steps_per_season = num_steps_per_season
 
+      parameters = []
+      if allow_drift:
+        parameters.append(Parameter(
+            'drift_scale', drift_scale_prior,
+            tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
+                       tfb.Softplus()])))
+      self._allow_drift = allow_drift
+
       super(Seasonal, self).__init__(
-          parameters=[
-              Parameter('drift_scale', drift_scale_prior,
-                        tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
-                                   tfb.Softplus()])),
-          ],
+          parameters,
           latent_size=(num_seasons - 1
                        if self.constrain_mean_effect_to_zero else num_seasons),
           name=name)
+
+  @property
+  def allow_drift(self):
+    """Whether the seasonal effects are allowed to drift over time."""
+    return self._allow_drift
 
   @property
   def constrain_mean_effect_to_zero(self):
@@ -912,6 +930,9 @@ class Seasonal(StructuralTimeSeries):
 
     if initial_state_prior is None:
       initial_state_prior = self.initial_state_prior
+
+    if not self.allow_drift:
+      param_map['drift_scale'] = 0.
 
     if self.constrain_mean_effect_to_zero:
       return ConstrainedSeasonalStateSpaceModel(

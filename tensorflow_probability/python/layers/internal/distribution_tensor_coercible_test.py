@@ -16,19 +16,22 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import gc
 import operator
 
 # Dependency imports
+
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.layers.internal import distribution_tensor_coercible
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
 dtc = distribution_tensor_coercible
 
 
@@ -43,7 +46,7 @@ class FakeBoolDistribution(tfd.Distribution):
         allow_nan_stats=True)
 
   def _mean(self):
-    return tf.convert_to_tensor(value=[True, False], dtype=tf.bool)
+    return tf.convert_to_tensor([True, False], dtype=tf.bool)
 
 
 class Normal(tfd.Normal):
@@ -62,31 +65,31 @@ class Normal(tfd.Normal):
 
 @test_util.run_all_in_graph_and_eager_modes
 class DistributionTensorConversionTest(
-    tf.test.TestCase, parameterized.TestCase):
+    test_case.TestCase, parameterized.TestCase):
 
   def testErrorsByDefault(self):
     x = tfd.Normal(loc=0., scale=1.)
     if tf.executing_eagerly():
       with self.assertRaises(ValueError):
-        tf.convert_to_tensor(value=x)
+        tf.convert_to_tensor(x)
     else:
       with self.assertRaises(TypeError):
-        tf.convert_to_tensor(value=x)
+        tf.convert_to_tensor(x)
 
   def testConvertToTensor(self):
     x = dtc._TensorCoercible(tfd.Normal(loc=1.5, scale=1),
                              tfd.Distribution.mean)
-    y = tf.convert_to_tensor(value=x)
+    y = tf.convert_to_tensor(x)
     y1 = x._value()
-    self.assertEqual(hash(y), hash(y1))
+    self.assertIs(y, y1)
     self.assertEqual([1.5, 1.5], self.evaluate([y, y1]))
 
   def testConvertFromExplicit(self):
     x = dtc._TensorCoercible(tfd.Normal(loc=1.25, scale=1),
                              lambda self: 42.)
-    y = tf.convert_to_tensor(value=x)
+    y = tf.convert_to_tensor(x)
     y1 = x._value()
-    self.assertEqual(hash(y), hash(y1))
+    self.assertIs(y, y1)
     self.assertEqual([42., 42.], self.evaluate([y, y1]))
 
   def testReproducible(self):
@@ -94,7 +97,8 @@ class DistributionTensorConversionTest(
                              tfd.Distribution.sample)
     # Small scale means only the mean really matters.
     x = tfd.Normal(loc=u, scale=0.0001)
-    [u_, x1_, x2_] = self.evaluate([x.loc, x.sample(), x.sample()])
+    [u_, x1_, x2_] = self.evaluate([
+        tf.convert_to_tensor(x.loc), x.sample(), x.sample()])
     self.assertNear(u_, x1_, err=0.01)
     self.assertNear(u_, x2_, err=0.01)
 
@@ -159,7 +163,7 @@ class DistributionTensorConversionTest(
   def testOperatorUnaryLogical(self):
     loc = np.array([True, False])
     x = dtc._TensorCoercible(FakeBoolDistribution(), tfd.Distribution.mean)
-    self.assertAllEqual(*self.evaluate([~tf.convert_to_tensor(value=loc), ~x]))
+    self.assertAllEqual(*self.evaluate([~tf.convert_to_tensor(loc), ~x]))
 
   def testOperatorBoolNonzero(self):
     loc = np.array([-0.25, 0.5], dtype=np.float32)
@@ -198,7 +202,7 @@ class DistributionTensorConversionTest(
     # Now we show that adding two distributions has random variable semantics.
     y_coerce = dtc._TensorCoercible(y, tfd.Distribution.variance)
     self.assertIsInstance(y_coerce, Normal)
-    var = tf.convert_to_tensor(value=y_coerce)
+    var = tf.convert_to_tensor(y_coerce)
 
     # Note: it is not possible to have user-defined operators and also use the
     # _TensorCoercible class.
@@ -209,7 +213,7 @@ class DistributionTensorConversionTest(
     self.assertAllClose([3., 2.], self.evaluate([var_plus_2, var]),
                         atol=0, rtol=1e-3)
 
-  def testWhileLoop(self):
+  def _testWhileLoop(self):
     """Shows misuse of `dtc._TensorCoercible(distribution)` in `tf.while_loop`.
 
     Since `dtc._TensorCoercible(distribution)` only creates the `Tensor` on an
@@ -243,7 +247,11 @@ class DistributionTensorConversionTest(
       # `tf.convert_to_tensor(x)` prior to the `tf.while_loop`.  Doing so will
       # cause the value of `x` to exist both outside and inside the
       # `tf.while_loop`.
-      with self.assertRaisesRegexp(ValueError, 'Cannot use.*in a while loop'):
+      if tf1.control_flow_v2_enabled():
+        error_regex = r'Tensor.*must be from the same graph as Tensor.*'
+      else:
+        error_regex = 'Cannot use.*in a while loop'
+      with self.assertRaisesRegexp(ValueError, error_regex):
         _ = x + tf.constant(3.)
       return
 
@@ -256,6 +264,35 @@ class DistributionTensorConversionTest(
         x + tf.constant(3.),
         mean_plus_numiter_times_stddev,
     ]))
+
+  def testWhileLoop(self):
+    self._testWhileLoop()
+
+  @test_util.enable_control_flow_v2
+  def testWhileLoopWithControlFlowV2(self):
+    self._testWhileLoop()
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class MemoryLeakTest(test_case.TestCase):
+
+  def testTypeObjectLeakage(self):
+    if not tf.executing_eagerly():
+      self.skipTest('only relevant to eager')
+
+    layer = tfp.layers.DistributionLambda(tfp.distributions.Categorical)
+    x = tf.constant([-.23, 1.23, 1.42])
+    dist = layer(x)
+    gc.collect()
+    before_objs = len(gc.get_objects())
+    for _ in range(int(1e2)):
+      dist = layer(x)
+    gc.collect()
+    after_objs = len(gc.get_objects())
+    del dist
+
+    # This was 43150(py2)/43750(py3) before PR#532.
+    self.assertLess(after_objs - before_objs, 1)
 
 
 if __name__ == '__main__':

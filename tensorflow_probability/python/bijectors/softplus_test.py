@@ -19,18 +19,20 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_case
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 rng = np.random.RandomState(42)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SoftplusBijectorTest(tf.test.TestCase):
+class SoftplusBijectorTest(test_case.TestCase):
   """Tests the correctness of the Y = g(X) = Log[1 + exp(X)] transformation."""
 
   def _softplus(self, x):
@@ -44,13 +46,14 @@ class SoftplusBijectorTest(tf.test.TestCase):
     return -np.log(1 - np.exp(-y))
 
   def testHingeSoftnessZeroRaises(self):
-    with self.assertRaisesOpError("must be non-zero"):
-      bijector = tfb.Softplus(hinge_softness=0., validate_args=True)
-      self.evaluate(bijector.forward([1., 1.]))
+    with self.assertRaisesOpError(
+        'Argument `hinge_softness` must be non-zero.'):
+      self.evaluate(
+          tfb.Softplus(hinge_softness=0., validate_args=True).forward(1.))
 
   def testBijectorForwardInverseEventDimsZero(self):
     bijector = tfb.Softplus()
-    self.assertStartsWith(bijector.name, "softplus")
+    self.assertStartsWith(bijector.name, 'softplus')
     x = 2 * rng.randn(2, 10)
     y = self._softplus(x)
 
@@ -58,7 +61,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorForwardInverseWithHingeSoftnessEventDimsZero(self):
-    bijector = tfb.Softplus(hinge_softness=1.5)
+    bijector = tfb.Softplus(hinge_softness=np.float64(1.5))
     x = 2 * rng.randn(2, 10)
     y = 1.5 * self._softplus(x / 1.5)
 
@@ -78,7 +81,7 @@ class SoftplusBijectorTest(tf.test.TestCase):
 
   def testBijectorForwardInverseEventDimsOne(self):
     bijector = tfb.Softplus()
-    self.assertStartsWith(bijector.name, "softplus")
+    self.assertStartsWith(bijector.name, 'softplus')
     x = 2 * rng.randn(2, 10)
     y = self._softplus(x)
 
@@ -100,17 +103,17 @@ class SoftplusBijectorTest(tf.test.TestCase):
   def testScalarCongruency(self):
     bijector = tfb.Softplus()
     bijector_test_util.assert_scalar_congruency(
-        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
+        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
 
   def testScalarCongruencyWithPositiveHingeSoftness(self):
     bijector = tfb.Softplus(hinge_softness=1.3)
     bijector_test_util.assert_scalar_congruency(
-        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
+        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
 
   def testScalarCongruencyWithNegativeHingeSoftness(self):
     bijector = tfb.Softplus(hinge_softness=-1.3)
     bijector_test_util.assert_scalar_congruency(
-        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate)
+        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
 
   def testBijectiveAndFinite32bit(self):
     bijector = tfb.Softplus()
@@ -148,6 +151,17 @@ class SoftplusBijectorTest(tf.test.TestCase):
         bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-1,
         atol=1e-3)
 
+  def testVariableHingeSoftness(self):
+    hinge_softness = tf.Variable(1.)
+    b = tfb.Softplus(hinge_softness=hinge_softness, validate_args=True)
+    self.evaluate(hinge_softness.initializer)
+    self.assertIs(hinge_softness, b.hinge_softness)
+    self.assertEqual((), self.evaluate(b.forward(0.5)).shape)
+    with self.assertRaisesOpError(
+        'Argument `hinge_softness` must be non-zero.'):
+      with tf.control_dependencies([hinge_softness.assign(0.)]):
+        self.evaluate(b.forward(0.5))
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
   tf.test.main()

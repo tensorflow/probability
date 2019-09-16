@@ -26,6 +26,7 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
     "SinhArcsinh",
@@ -52,8 +53,8 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
   `(loc, scale, skewness, tailweight)`, via the relation:
 
   ```
-  Y := loc + scale * F(Z) * (2 / F_0(2))
-  F(Z) := Sinh( (Arcsinh(Z) + skewness) * tailweight )
+  Y := loc + scale * F(Z)
+  F(Z) := Sinh( (Arcsinh(Z) + skewness) * tailweight ) * (2 / F_0(2))
   F_0(Z) := Sinh( Arcsinh(Z) * tailweight )
   ```
 
@@ -138,49 +139,47 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale, skewness, tailweight],
                                       tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
+      self._loc = tensor_util.convert_nonref_to_tensor(
+          loc, name="loc", dtype=dtype)
+      self._scale = tensor_util.convert_nonref_to_tensor(
+          scale, name="scale", dtype=dtype)
       tailweight = 1. if tailweight is None else tailweight
       has_default_skewness = skewness is None
-      skewness = 0. if skewness is None else skewness
-      tailweight = tf.convert_to_tensor(
+      skewness = 0. if has_default_skewness else skewness
+      self._tailweight = tensor_util.convert_nonref_to_tensor(
           tailweight, name="tailweight", dtype=dtype)
-      skewness = tf.convert_to_tensor(skewness, name="skewness", dtype=dtype)
+      self._skewness = tensor_util.convert_nonref_to_tensor(
+          skewness, name="skewness", dtype=dtype)
 
       batch_shape = distribution_util.get_broadcast_shape(
-          loc, scale, tailweight, skewness)
+          self._loc, self._scale, self._tailweight, self._skewness)
 
       # Recall, with Z a random variable,
-      #   Y := loc + C * F(Z),
-      #   F(Z) := Sinh( (Arcsinh(Z) + skewness) * tailweight )
+      #   Y := loc + scale * F(Z),
+      #   F(Z) := Sinh( (Arcsinh(Z) + skewness) * tailweight ) * C
+      #   C := 2 / F_0(2)
       #   F_0(Z) := Sinh( Arcsinh(Z) * tailweight )
-      #   C := 2 * scale / F_0(2)
       if distribution is None:
         distribution = normal.Normal(
             loc=tf.zeros([], dtype=dtype),
             scale=tf.ones([], dtype=dtype),
-            allow_nan_stats=allow_nan_stats)
+            allow_nan_stats=allow_nan_stats,
+            validate_args=validate_args)
       else:
         asserts = distribution_util.maybe_check_scalar_distribution(
             distribution, dtype, validate_args)
         if asserts:
-          loc = distribution_util.with_dependencies(asserts, loc)
+          self._loc = distribution_util.with_dependencies(asserts, self._loc)
 
       # Make the SAS bijector, 'F'.
       f = sinh_arcsinh_bijector.SinhArcsinh(
-          skewness=skewness, tailweight=tailweight)
-      if has_default_skewness:
-        f_noskew = f
-      else:
-        f_noskew = sinh_arcsinh_bijector.SinhArcsinh(
-            skewness=dtype_util.as_numpy_dtype(skewness.dtype)(0),
-            tailweight=tailweight)
+          skewness=self._skewness, tailweight=self._tailweight,
+          validate_args=validate_args)
 
       # Make the AffineScalar bijector, Z --> loc + scale * Z (2 / F_0(2))
-      c = 2 * scale / f_noskew.forward(tf.convert_to_tensor(2, dtype=dtype))
       affine = affine_scalar_bijector.AffineScalar(
-          shift=loc,
-          scale=c,
+          shift=self._loc,
+          scale=self._scale,
           validate_args=validate_args)
 
       bijector = chain_bijector.Chain([affine, f])
@@ -191,20 +190,16 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
           batch_shape=batch_shape,
           validate_args=validate_args,
           name=name)
-    self._parameters = parameters
-    self._loc = loc
-    self._scale = scale
-    self._tailweight = tailweight
-    self._skewness = skewness
+      self._parameters = parameters
 
   @property
   def loc(self):
-    """The `loc` in `Y := loc + scale @ F(Z) * (2 / F(2))."""
+    """The `loc` in `Y := loc + scale @ F(Z)`."""
     return self._loc
 
   @property
   def scale(self):
-    """The `LinearOperator` `scale` in `Y := loc + scale @ F(Z) * (2 / F(2))."""
+    """The `LinearOperator` `scale` in `Y := loc + scale @ F(Z)`."""
     return self._scale
 
   @property

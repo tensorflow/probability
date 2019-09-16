@@ -21,15 +21,15 @@ from __future__ import print_function
 import collections
 # Dependency imports
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.math import diag_jacobian
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
-
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -427,8 +427,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
         `current_state`.
       TypeError: if `volatility_fn` is not callable.
     """
-    self._seed_stream = distributions.SeedStream(
-        seed, salt='UncalibratedLangevin')
+    self._seed_stream = SeedStream(seed, salt='UncalibratedLangevin')
     # Default value of `volatility_fn` is the identity function.
     if volatility_fn is None:
       volatility_fn = lambda *args: 1.
@@ -483,7 +482,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(MetropolisAdjustedLangevinAlgorithm.one_step.__doc__)
   def one_step(self, current_state, previous_kernel_results):
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name=mcmc_util.make_name(self.name, 'mala', 'one_step'),
         values=[
             self.step_size, current_state,
@@ -492,7 +491,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
             previous_kernel_results.volatility,
             previous_kernel_results.diffusion_drift
         ]):
-      with tf.compat.v1.name_scope('initialize'):
+      with tf1.name_scope('initialize'):
         # Prepare input arguments to be passed to `_euler_method`.
         [
             current_state_parts,
@@ -586,7 +585,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
   @mcmc_util.set_doc(
       MetropolisAdjustedLangevinAlgorithm.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name=mcmc_util.make_name(self.name, 'mala', 'bootstrap_results'),
         values=[init_state]):
       init_state_parts = (list(init_state)
@@ -671,7 +670,7 @@ def _euler_method(random_draw_parts,
       state(s) of the Markov chain(s) at each result step. Has same shape as
       input `current_state_parts`.
   """
-  with tf.compat.v1.name_scope(name, 'mala_euler_method', [
+  with tf1.name_scope(name, 'mala_euler_method', [
       random_draw_parts, state_parts, drift_parts, step_size_parts,
       volatility_parts
   ]):
@@ -726,7 +725,7 @@ def _get_drift(step_size_parts, volatility_parts, grads_volatility,
       input `current_state_parts`.
   """
 
-  with tf.compat.v1.name_scope(name, 'mala_get_drift', [
+  with tf1.name_scope(name, 'mala_get_drift', [
       step_size_parts, volatility_parts, grads_volatility, grads_target_log_prob
   ]):
 
@@ -805,7 +804,7 @@ def _compute_log_acceptance_correction(current_state_parts,
       acceptance-correction.  (See docstring for mathematical definition.)
   """
 
-  with tf.compat.v1.name_scope(name, 'compute_log_acceptance_correction', [
+  with tf1.name_scope(name, 'compute_log_acceptance_correction', [
       current_state_parts, proposed_state_parts, current_volatility_parts,
       proposed_volatility_parts, current_drift_parts, proposed_drift_parts,
       step_size_parts, independent_chain_ndims

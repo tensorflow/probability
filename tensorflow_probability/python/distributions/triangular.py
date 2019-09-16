@@ -24,10 +24,11 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 class Triangular(distribution.Distribution):
@@ -94,7 +95,7 @@ class Triangular(distribution.Distribution):
                peak=0.5,
                validate_args=False,
                allow_nan_stats=True,
-               name="Triangular"):
+               name='Triangular'):
     """Initialize a batch of Triangular distributions.
 
     Args:
@@ -130,31 +131,19 @@ class Triangular(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([low, high, peak], tf.float32)
-      low = tf.convert_to_tensor(low, name="low", dtype=dtype)
-      high = tf.convert_to_tensor(high, name="high", dtype=dtype)
-      peak = tf.convert_to_tensor(peak, name="peak", dtype=dtype)
-
-      with tf.control_dependencies([
-          assert_util.assert_less(
-              low, high, message="triangular not defined when low >= high."),
-          assert_util.assert_less_equal(
-              low, peak, message="triangular not defined when low > peak."),
-          assert_util.assert_less_equal(
-              peak, high, message="triangular not defined when peak > high."),
-      ] if validate_args else []):
-        self._low = tf.identity(low, name="low")
-        self._high = tf.identity(high, name="high")
-        self._peak = tf.identity(peak, name="peak")
-        dtype_util.assert_same_float_dtype(
-            [self._low, self._high, self._peak])
-    super(Triangular, self).__init__(
-        dtype=self._low.dtype,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._low, self._high, self._peak],
-        name=name)
+      self._low = tensor_util.convert_nonref_to_tensor(
+          low, name='low', dtype=dtype)
+      self._high = tensor_util.convert_nonref_to_tensor(
+          high, name='high', dtype=dtype)
+      self._peak = tensor_util.convert_nonref_to_tensor(
+          peak, name='peak', dtype=dtype)
+      super(Triangular, self).__init__(
+          dtype=self._low.dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -179,10 +168,12 @@ class Triangular(distribution.Distribution):
     """Pdf evaluated at the peak."""
     return (self.peak - self.low) / (self.high - self.low)
 
-  def _batch_shape_tensor(self):
+  def _batch_shape_tensor(self, low=None, peak=None, high=None):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.peak),
-        tf.broadcast_dynamic_shape(tf.shape(self.low), tf.shape(self.high)))
+        tf.shape(self.peak if peak is None else peak),
+        tf.broadcast_dynamic_shape(
+            tf.shape(self.low if low is None else low),
+            tf.shape(self.high if high is None else high)))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -194,12 +185,17 @@ class Triangular(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    stream = seed_stream.SeedStream(seed, salt="triangular")
-    shape = tf.concat([[n], self.batch_shape_tensor()], axis=0)
+    low = tf.convert_to_tensor(self.low)
+    high = tf.convert_to_tensor(self.high)
+    peak = tf.convert_to_tensor(self.peak)
+
+    stream = SeedStream(seed, salt='triangular')
+    shape = tf.concat([[n], self._batch_shape_tensor(
+        low=low, high=high, peak=peak)], axis=0)
     samples = tf.random.uniform(shape=shape, dtype=self.dtype, seed=stream())
     # We use Inverse CDF sampling here. Because the CDF is a quadratic function,
     # we must use sqrts here.
-    interval_length = self.high - self.low
+    interval_length = high - low
     return tf.where(
         # Note the CDF on the left side of the peak is
         # (x - low) ** 2 / ((high - low) * (peak - low)).
@@ -207,56 +203,60 @@ class Triangular(distribution.Distribution):
         # is (peak - low) / (high - low). Because of this we decide
         # which part of the piecewise CDF we should use based on the cdf samples
         # we drew.
-        samples < (self.peak - self.low) / interval_length,
+        samples < (peak - low) / interval_length,
         # Inverse of (x - low) ** 2 / ((high - low) * (peak - low)).
-        self.low + tf.sqrt(samples * interval_length * (self.peak - self.low)),
+        low + tf.sqrt(samples * interval_length * (peak - low)),
         # Inverse of 1 - (high - x) ** 2 / ((high - low) * (high - peak))
-        self.high - tf.sqrt(
-            (1. - samples) * interval_length * (self.high - self.peak)))
+        high - tf.sqrt((1. - samples) * interval_length * (high - peak)))
 
   def _prob(self, x):
+    low = tf.convert_to_tensor(self.low)
+    high = tf.convert_to_tensor(self.high)
+    peak = tf.convert_to_tensor(self.peak)
+
     if self.validate_args:
       with tf.control_dependencies([
-          assert_util.assert_greater_equal(x, self.low),
-          assert_util.assert_less_equal(x, self.high)
+          assert_util.assert_greater_equal(x, low),
+          assert_util.assert_less_equal(x, high)
       ]):
         x = tf.identity(x)
 
-    interval_length = self.high - self.low
+    interval_length = high - low
     # This is the pdf function when a low <= high <= x. This looks like
     # a triangle, so we have to treat each line segment separately.
     result_inside_interval = tf.where(
-        (x >= self.low) & (x <= self.peak),
-        # Line segment from (self.low, 0) to (self.peak, 2 / (self.high -
-        # self.low).
-        2. * (x - self.low) / (interval_length * (self.peak - self.low)),
-        # Line segment from (self.peak, 2 / (self.high - self.low)) to
-        # (self.high, 0).
-        2. * (self.high - x) / (interval_length * (self.high - self.peak)))
+        (x >= low) & (x <= peak),
+        # Line segment from (low, 0) to (peak, 2 / (high - low)).
+        2. * (x - low) / (interval_length * (peak - low)),
+        # Line segment from (peak, 2 / (high - low)) to (high, 0).
+        2. * (high - x) / (interval_length * (high - peak)))
 
-    return tf.where((x < self.low) | (x > self.high),
+    return tf.where((x < low) | (x > high),
                     tf.zeros_like(x),
                     result_inside_interval)
 
   def _cdf(self, x):
-    interval_length = self.high - self.low
+    low = tf.convert_to_tensor(self.low)
+    high = tf.convert_to_tensor(self.high)
+    peak = tf.convert_to_tensor(self.peak)
+
+    interval_length = high - low
     # Due to the PDF being not smooth at the peak, we have to treat each side
     # somewhat differently. The PDF is two line segments, and thus we get
     # quadratics here for the CDF.
     result_inside_interval = tf.where(
-        (x >= self.low) & (x <= self.peak),
+        (x >= low) & (x <= peak),
         # (x - low) ** 2 / ((high - low) * (peak - low))
-        tf.math.squared_difference(x, self.low) / (interval_length *
-                                                   (self.peak - self.low)),
+        tf.math.squared_difference(x, low) / (interval_length * (peak - low)),
         # 1 - (high - x) ** 2 / ((high - low) * (high - peak))
-        1. - tf.math.squared_difference(self.high, x) /
-        (interval_length * (self.high - self.peak)))
+        1. - tf.math.squared_difference(high, x) / (
+            interval_length * (high - peak)))
 
     # We now add that the left tail is 0 and the right tail is 1.
     result_if_not_big = tf.where(
-        x < self.low, tf.zeros_like(x), result_inside_interval)
+        x < low, tf.zeros_like(x), result_inside_interval)
 
-    return tf.where(x >= self.high, tf.ones_like(x), result_if_not_big)
+    return tf.where(x >= high, tf.ones_like(x), result_if_not_big)
 
   def _entropy(self):
     return 0.5 - np.log(2.) + tf.math.log(self.high - self.low)
@@ -266,6 +266,31 @@ class Triangular(distribution.Distribution):
 
   def _variance(self):
     # ((high - low) ** 2 + (peak - low) ** 2 + (peak - high) ** 2) / 36
-    return (tf.math.squared_difference(self.high, self.low) +
-            tf.math.squared_difference(self.high, self.peak) +
-            tf.math.squared_difference(self.peak, self.low)) / 36.
+    low = tf.convert_to_tensor(self.low)
+    high = tf.convert_to_tensor(self.high)
+    peak = tf.convert_to_tensor(self.peak)
+    return (tf.math.squared_difference(high, low) +
+            tf.math.squared_difference(high, peak) +
+            tf.math.squared_difference(peak, low)) / 36.
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    low = tf.convert_to_tensor(self.low)
+    high = tf.convert_to_tensor(self.high)
+    peak = tf.convert_to_tensor(self.peak)
+    assertions = []
+    if (is_init != tensor_util.is_ref(self.low) and
+        is_init != tensor_util.is_ref(self.high)):
+      assertions.append(assert_util.assert_less(
+          low, high, message='triangular not defined when low >= high.'))
+    if (is_init != tensor_util.is_ref(self.low) and
+        is_init != tensor_util.is_ref(self.peak)):
+      assertions.append(assert_util.assert_less(
+          low, peak, message='triangular not defined when low > peak.'))
+    if (is_init != tensor_util.is_ref(self.high) and
+        is_init != tensor_util.is_ref(self.peak)):
+      assertions.append(assert_util.assert_less(
+          peak, high, message='triangular not defined when peak > high.'))
+
+    return assertions

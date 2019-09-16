@@ -25,10 +25,13 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
+
 
 __all__ = [
-    "Cauchy",
+    'Cauchy',
 ]
 
 
@@ -94,7 +97,7 @@ class Cauchy(distribution.Distribution):
                scale,
                validate_args=False,
                allow_nan_stats=True,
-               name="Cauchy"):
+               name='Cauchy'):
     """Construct Cauchy distributions.
 
     The parameters `loc` and `scale` must be shaped in a way that supports
@@ -109,7 +112,7 @@ class Cauchy(distribution.Distribution):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`,
-        statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+        statistics (e.g., mean, mode, variance) use the value '`NaN`' to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -120,26 +123,23 @@ class Cauchy(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      with tf.control_dependencies(
-          [assert_util.assert_positive(scale)] if validate_args else []):
-        self._loc = tf.identity(loc)
-        self._scale = tf.identity(scale)
-        dtype_util.assert_same_float_dtype([self._loc, self._scale])
-    super(Cauchy, self).__init__(
-        dtype=self._scale.dtype,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._loc, self._scale],
-        name=name)
+      self._loc = tensor_util.convert_nonref_to_tensor(
+          loc, name='loc', dtype=dtype)
+      self._scale = tensor_util.convert_nonref_to_tensor(
+          scale, name='scale', dtype=dtype)
+      dtype_util.assert_same_float_dtype([self._loc, self._scale])
+      super(Cauchy, self).__init__(
+          dtype=self._scale.dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("loc", "scale"),
+        zip(('loc', 'scale'),
             ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
@@ -156,8 +156,10 @@ class Cauchy(distribution.Distribution):
     """Distribution parameter for the scale."""
     return self._scale
 
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(tf.shape(self.loc), tf.shape(self.scale))
+  def _batch_shape_tensor(self, loc=None, scale=None):
+    return prefer_static.broadcast_shape(
+        prefer_static.shape(self.loc if loc is None else loc),
+        prefer_static.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
@@ -169,13 +171,19 @@ class Cauchy(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    shape = tf.concat([[n], self.batch_shape_tensor()], 0)
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    batch_shape = self._batch_shape_tensor(loc=loc, scale=scale)
+    shape = tf.concat([[n], batch_shape], 0)
     probs = tf.random.uniform(
         shape=shape, minval=0., maxval=1., dtype=self.dtype, seed=seed)
-    return self._quantile(probs)
+    return self._quantile(probs, loc=loc, scale=scale)
 
   def _log_prob(self, x):
-    return self._log_unnormalized_prob(x) - self._log_normalization()
+    scale = tf.convert_to_tensor(self.scale)
+    log_unnormalized_prob = -tf.math.log1p(tf.square(self._z(x, scale=scale)))
+    log_normalization = np.log(np.pi) + tf.math.log(scale)
+    return log_unnormalized_prob - log_normalization
 
   def _cdf(self, x):
     return tf.atan(self._z(x)) / np.pi + 0.5
@@ -183,30 +191,28 @@ class Cauchy(distribution.Distribution):
   def _log_cdf(self, x):
     return tf.math.log1p(2 / np.pi * tf.atan(self._z(x))) - np.log(2)
 
-  def _log_unnormalized_prob(self, x):
-    return -tf.math.log1p(tf.square(self._z(x)))
-
-  def _log_normalization(self):
-    return np.log(np.pi) + tf.math.log(self.scale)
-
   def _entropy(self):
     h = np.log(4 * np.pi) + tf.math.log(self.scale)
     return h * tf.ones_like(self.loc)
 
-  def _quantile(self, p):
-    return self.loc + self.scale * tf.tan(np.pi * (p - 0.5))
+  def _quantile(self, p, loc=None, scale=None):
+    loc = tf.convert_to_tensor(self.loc if loc is None else loc)
+    scale = tf.convert_to_tensor(self.scale if scale is None else scale)
+    return loc + scale * tf.tan(np.pi * (p - 0.5))
 
   def _mode(self):
     return self.loc * tf.ones_like(self.scale)
 
-  def _z(self, x):
+  def _z(self, x, loc=None, scale=None):
     """Standardize input `x`."""
-    with tf.name_scope("standardize"):
-      return (x - self.loc) / self.scale
+    loc = tf.convert_to_tensor(self.loc if loc is None else loc)
+    scale = tf.convert_to_tensor(self.scale if scale is None else scale)
+    with tf.name_scope('standardize'):
+      return (x - loc) / scale
 
   def _inv_z(self, z):
     """Reconstruct input `x` from a its normalized version."""
-    with tf.name_scope("reconstruct"):
+    with tf.name_scope('reconstruct'):
       return z * self.scale + self.loc
 
   def _mean(self):
@@ -214,11 +220,20 @@ class Cauchy(distribution.Distribution):
       return tf.fill(self.batch_shape_tensor(),
                      dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
-      raise ValueError("`mean` is undefined for Cauchy distribution.")
+      raise ValueError('`mean` is undefined for Cauchy distribution.')
 
   def _stddev(self):
     if self.allow_nan_stats:
       return tf.fill(self.batch_shape_tensor(),
                      dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     else:
-      raise ValueError("`stddev` is undefined for Cauchy distribution.")
+      raise ValueError('`stddev` is undefined for Cauchy distribution.')
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_ref(self.scale):
+      assertions.append(assert_util.assert_positive(
+          self.scale, message='Argument `scale` must be positive.'))
+    return assertions

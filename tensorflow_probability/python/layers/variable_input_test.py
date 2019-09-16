@@ -18,16 +18,16 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
-
 
 @test_util.run_all_in_graph_and_eager_modes
-class VariableInputLayerTest(tf.test.TestCase):
+class VariableInputLayerTest(test_case.TestCase):
 
   def test_sequential_api(self):
     # Create a trainable distribution using the Sequential API.
@@ -37,10 +37,11 @@ class VariableInputLayerTest(tf.test.TestCase):
             dtype=tf.float64,
             trainable=False),  # You'd probably never want this in IRL.
         # The Dense serves no real purpose; it will change the event_shape.
-        tf.keras.layers.Dense(5, use_bias=False),
+        tf.keras.layers.Dense(5, use_bias=False, dtype=tf.float64),
         tfp.layers.DistributionLambda(
             lambda t: tfd.Independent(tfd.Normal(loc=t[0], scale=t[1]),  # pylint: disable=g-long-lambda
-                                      reinterpreted_batch_ndims=1)),
+                                      reinterpreted_batch_ndims=1),
+            dtype=tf.float64),
 
     ])
 
@@ -77,10 +78,11 @@ class VariableInputLayerTest(tf.test.TestCase):
         trainable=False,  # You'd probably never want this in IRL.
     )(dummy_input)
     # The Dense serves no real purpose; it will change the event_shape.
-    x = tf.keras.layers.Dense(5, use_bias=False)(x)
+    x = tf.keras.layers.Dense(5, use_bias=False, dtype=tf.float64)(x)
     x = tfp.layers.DistributionLambda(
         lambda t: tfd.Independent(tfd.Normal(loc=t[0], scale=t[1]),  # pylint: disable=g-long-lambda
-                                  reinterpreted_batch_ndims=1))(x)
+                                  reinterpreted_batch_ndims=1),
+        dtype=tf.float64)(x)
     model = tf.keras.Model(dummy_input, x)
 
     # Instantiate the model (as a TFP distribution).

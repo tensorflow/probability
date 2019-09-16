@@ -19,19 +19,21 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
-tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
 rng = np.random.RandomState(123)
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
-                                tf.test.TestCase):
+                                test_case.TestCase):
 
   def test_default_is_same_as_normal(self):
     d = 10

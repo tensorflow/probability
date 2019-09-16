@@ -15,28 +15,32 @@
 """Tests for STS forecasting methods."""
 
 # Dependency imports
+
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util
 from tensorflow.python.platform import test
 
 tfl = tf.linalg
-tfd = tfp.distributions
 
 
 class _ForecastTest(object):
 
   def _build_model(self, observed_time_series,
                    prior_batch_shape=(),
+                   initial_effect_prior_scale=1.,
                    constant_offset=None):
     seasonal = tfp.sts.Seasonal(
         num_seasons=4,
         observed_time_series=observed_time_series,
         initial_effect_prior=tfd.Normal(
             loc=self._build_tensor(np.zeros(prior_batch_shape)),
-            scale=self._build_tensor(1.)),
+            scale=self._build_tensor(initial_effect_prior_scale)),
         constrain_mean_effect_to_zero=False,  # Simplifies analysis.
         name='seasonal')
     return tfp.sts.Sum(components=[seasonal],
@@ -98,7 +102,7 @@ class _ForecastTest(object):
     onestep_dist = tfp.sts.one_step_predictive(model, observed_time_series,
                                                parameter_samples=prior_samples)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     if self.use_static_shape:
       self.assertAllEqual(onestep_dist.batch_shape.as_list(), batch_shape)
     else:
@@ -172,7 +176,7 @@ class _ForecastTest(object):
     sample_shape = [10]
     forecast_samples = forecast_dist.sample(sample_shape)[..., 0]
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     forecast_mean_, forecast_scale_, forecast_samples_ = self.evaluate(
         (forecast_mean, forecast_scale, forecast_samples))
     self.assertAllEqual(forecast_mean_.shape,
@@ -202,7 +206,7 @@ class _ForecastTest(object):
                                      parameter_samples=prior_samples,
                                      num_steps_forecast=num_steps_forecast)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     if self.use_static_shape:
       self.assertAllEqual(forecast_dist.batch_shape.as_list(), batch_shape)
     else:
@@ -250,6 +254,54 @@ class _ForecastTest(object):
     self.assertTrue(np.all(np.isfinite(onestep_mean_)))
     self.assertTrue(np.all(np.isfinite(onestep_stddev_)))
 
+  def test_impute_missing(self):
+    time_series_with_nans = self._build_tensor(
+        [-1., 1., np.nan, 2.4, np.nan, np.nan, 2.])
+    observed_time_series = tfp.sts.MaskedTimeSeries(
+        time_series=time_series_with_nans,
+        is_missing=tf.math.is_nan(time_series_with_nans))
+
+    # Build model with a near-uniform prior on the initial effect. In principle
+    # we should use a large scale like 1e8 here, but we use 1e2 because
+    # increasing the scale triggers numerical issues with Kalman smoothing
+    # described in b/138414045.
+    model = self._build_model(observed_time_series,
+                              initial_effect_prior_scale=1e2)
+
+    # Impute values using manually-set parameters, which will allow us to
+    # compute the expected results analytically.
+    drift_scale = 1.0
+    noise_scale = 0.1
+    parameter_samples = {'observation_noise_scale': [noise_scale],
+                         'seasonal/_drift_scale': [drift_scale]}
+    imputed_series_dist = tfp.sts.impute_missing_values(
+        model, observed_time_series, parameter_samples)
+    imputed_noisy_series_dist = tfp.sts.impute_missing_values(
+        model, observed_time_series, parameter_samples,
+        include_observation_noise=True)
+
+    # Compare imputed mean to expected mean.
+    mean_, stddev_ = self.evaluate([imputed_series_dist.mean(),
+                                    imputed_series_dist.stddev()])
+    noisy_mean_, noisy_stddev_ = self.evaluate([
+        imputed_noisy_series_dist.mean(),
+        imputed_noisy_series_dist.stddev()])
+    self.assertAllClose(mean_, [-1., 1., 2., 2.4, -1., 1., 2.], atol=1e-2)
+    self.assertAllClose(mean_, noisy_mean_, atol=1e-2)
+
+    # Compare imputed stddevs to expected stddevs.
+    drift_plus_noise_scale = np.sqrt(noise_scale**2 + drift_scale**2)
+    expected_stddev = np.array([noise_scale,
+                                noise_scale,
+                                drift_plus_noise_scale,
+                                noise_scale,
+                                drift_plus_noise_scale,
+                                drift_plus_noise_scale,
+                                noise_scale])
+    self.assertAllClose(stddev_, expected_stddev, atol=1e-2)
+    self.assertAllClose(noisy_stddev_,
+                        np.sqrt(stddev_**2 + noise_scale**2), atol=1e-2)
+
   def _build_tensor(self, ndarray, dtype=None):
     """Convert a numpy array to a TF placeholder.
 
@@ -264,24 +316,24 @@ class _ForecastTest(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype if dtype is None else dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ForecastTestStatic32(tf.test.TestCase, _ForecastTest):
+class ForecastTestStatic32(test_case.TestCase, _ForecastTest):
   dtype = np.float32
   use_static_shape = True
 
 
 # Run in graph mode only to reduce test weight.
-class ForecastTestDynamic32(tf.test.TestCase, _ForecastTest):
+class ForecastTestDynamic32(test_case.TestCase, _ForecastTest):
   dtype = np.float32
   use_static_shape = False
 
 
 # Run in graph mode only to reduce test weight.
-class ForecastTestStatic64(tf.test.TestCase, _ForecastTest):
+class ForecastTestStatic64(test_case.TestCase, _ForecastTest):
   dtype = np.float64
   use_static_shape = True
 

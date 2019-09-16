@@ -19,23 +19,25 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-from absl.testing import parameterized
 
-import tensorflow as tf
+from absl.testing import parameterized
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BlockwiseBijectorTest(tf.test.TestCase, parameterized.TestCase):
+class BlockwiseBijectorTest(test_case.TestCase, parameterized.TestCase):
 
   @parameterized.parameters((False, []), (True, []), (False, [2]), (True, [2]))
   def testExplicitBlocks(self, dynamic_shape, batch_shape):
     block_sizes = tf.convert_to_tensor(value=[2, 1, 3])
-    block_sizes = tf.compat.v1.placeholder_with_default(
+    block_sizes = tf1.placeholder_with_default(
         block_sizes, shape=None if dynamic_shape else block_sizes.shape)
     exp = tfb.Exp()
     sp = tfb.Softplus()
@@ -46,7 +48,7 @@ class BlockwiseBijectorTest(tf.test.TestCase, parameterized.TestCase):
     for s in batch_shape:
       x = tf.expand_dims(x, 0)
       x = tf.tile(x, [s] + [1] * (tensorshape_util.rank(x.shape) - 1))
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         x, shape=None if dynamic_shape else x.shape)
 
     # Identity to break the caching.
@@ -105,7 +107,7 @@ class BlockwiseBijectorTest(tf.test.TestCase, parameterized.TestCase):
     blockwise = tfb.Blockwise(bijectors=[exp, sp, aff], block_sizes=[2, 1, 3])
 
     x = tf.cast([0.1, 0.2, 0.3, 0.4, 0.5, 0.6], dtype=tf.float32)
-    x = tf.compat.v1.placeholder_with_default(x, shape=x.shape)
+    x = tf1.placeholder_with_default(x, shape=x.shape)
     # Identity to break the caching.
     blockwise_y = tf.identity(blockwise.forward(x))
 
@@ -154,20 +156,20 @@ class BlockwiseBijectorTest(tf.test.TestCase, parameterized.TestCase):
     with self.assertRaisesRegexp(
         ValueError,
         r'`block_sizes` must be `None`, or a vector of the same length as '
-        r'`bijectors`. Got a `Tensor` with shape \(2,\) and `bijectors` of '
+        r'`bijectors`. Got a `Tensor` with shape \(2L?,\) and `bijectors` of '
         r'length 1'):
       tfb.Blockwise(bijectors=[tfb.Exp()], block_sizes=[1, 2])
 
   def testRaisesBadBlocksDynamic(self):
     if tf.executing_eagerly(): return
     with self.assertRaises(tf.errors.InvalidArgumentError):
-      block_sizes = tf.compat.v1.placeholder_with_default([1, 2], shape=None)
+      block_sizes = tf1.placeholder_with_default([1, 2], shape=None)
       blockwise = tfb.Blockwise(
           bijectors=[tfb.Exp()], block_sizes=block_sizes, validate_args=True)
       self.evaluate(blockwise.block_sizes)
 
     with self.assertRaises(tf.errors.InvalidArgumentError):
-      block_sizes = tf.compat.v1.placeholder_with_default([[1]], shape=None)
+      block_sizes = tf1.placeholder_with_default([[1]], shape=None)
       blockwise = tfb.Blockwise(
           bijectors=[tfb.Exp()], block_sizes=block_sizes, validate_args=True)
       self.evaluate(blockwise.block_sizes)
