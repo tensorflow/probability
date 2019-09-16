@@ -11,7 +11,6 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
 from tensorflow.python.framework import tensor_shape
 from tensorflow_probability.python.distributions.distribution import Distribution
-from tensorflow_probability.python.distributions.normal import Normal
 
 __all__ = [
     "SkewGeneralizedNormal",
