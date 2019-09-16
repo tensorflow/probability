@@ -43,6 +43,7 @@ FILENAMES = [
     "dirichlet_multinomial",
     "dirichlet",
     "distribution",
+    "doublesided_maxwell",
     "empirical",
     "exponential",
     "finite_discrete",

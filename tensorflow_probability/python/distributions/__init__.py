@@ -36,6 +36,7 @@ from tensorflow_probability.python.distributions.deterministic import VectorDete
 from tensorflow_probability.python.distributions.dirichlet import Dirichlet
 from tensorflow_probability.python.distributions.dirichlet_multinomial import DirichletMultinomial
 from tensorflow_probability.python.distributions.distribution import Distribution
+from tensorflow_probability.python.distributions.doublesided_maxwell import DoublesidedMaxwell
 from tensorflow_probability.python.distributions.empirical import Empirical
 from tensorflow_probability.python.distributions.exponential import Exponential
 from tensorflow_probability.python.distributions.finite_discrete import FiniteDiscrete

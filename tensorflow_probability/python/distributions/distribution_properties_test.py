@@ -63,6 +63,7 @@ TF2_FRIENDLY_DISTS = (
     'Deterministic',
     'Dirichlet',
     'DirichletMultinomial',
+    'DoublesidedMaxwell',
     'Empirical',
     'Exponential',
     'FiniteDiscrete',

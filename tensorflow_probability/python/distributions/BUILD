@@ -48,6 +48,7 @@ py_library(
         ":dirichlet",
         ":dirichlet_multinomial",
         ":distribution",
+        ":doublesided_maxwell",
         ":empirical",
         ":exponential",
         ":finite_discrete",
@@ -364,6 +365,18 @@ py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:name_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+py_library(
+    name = "doublesided_maxwell",
+    srcs = ["doublesided_maxwell.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
@@ -1596,6 +1609,20 @@ py_test(
     srcs = ["distribution_test.py"],
     deps = [
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_test(
+    name = "doublesided_maxwell_test",
+    size = "small",
+    srcs = ["doublesided_maxwell_test.py"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:tensorshape_util",
