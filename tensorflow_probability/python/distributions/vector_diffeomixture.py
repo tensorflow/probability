@@ -568,7 +568,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
 
     # Stride `components * quadrature_size` for `batch_size` number of times.
     stride = tensorshape_util.num_elements(
-        tensorshape_util.with_rank_at_least(self.grid.shape, 2)[-2:])
+        tensorshape_util.with_rank(self.grid.shape[-2:], rank=2))
     if stride is None:
       stride = tf.reduce_prod(tf.shape(self.grid)[-2:])
     offset = tf.range(

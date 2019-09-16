@@ -243,8 +243,7 @@ class VonMisesFisher(distribution.Distribution):
     return tf.shape(self.mean_direction)[-1:]
 
   def _event_shape(self):
-    s = tensorshape_util.with_rank_at_least(self.mean_direction.shape, 1)
-    return s[-1:]
+    return tensorshape_util.with_rank(self.mean_direction.shape[-1:], rank=1)
 
   def _log_prob(self, x):
     x = self._maybe_assert_valid_sample(x)

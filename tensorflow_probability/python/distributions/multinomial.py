@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -240,7 +241,9 @@ class Multinomial(distribution.Distribution):
 
   def _event_shape(self):
     # We will never broadcast the num_categories with total_count.
-    return (self._probs if self._logits is None else self._logits).shape[-1:]
+    return tensorshape_util.with_rank(
+        (self._probs if self._logits is None else self._logits).shape[-1:],
+        rank=1)
 
   def _sample_n(self, n, seed=None):
     n_draws = tf.cast(self.total_count, dtype=tf.int32)

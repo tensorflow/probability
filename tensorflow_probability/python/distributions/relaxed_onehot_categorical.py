@@ -243,7 +243,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
 
   def _event_shape(self):
     param = self._logits if self._logits is not None else self._probs
-    return tensorshape_util.with_rank_at_least(param.shape, 1)[-1:]
+    return tensorshape_util.with_rank(param.shape[-1:], rank=1)
 
   def _sample_n(self, n, seed=None):
     temperature = tf.convert_to_tensor(self.temperature)
