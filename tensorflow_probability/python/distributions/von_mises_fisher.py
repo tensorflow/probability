@@ -320,7 +320,8 @@ class VonMisesFisher(distribution.Distribution):
       raise ValueError('event shape must be statically known for _bessel_ive')
     # TODO(bjp): Enable this; numerically unstable.
     if event_dim > 2:
-      raise ValueError('vMF covariance is numerically unstable for dim>2')
+      raise NotImplementedError(
+          'vMF covariance is numerically unstable for dim>2')
     concentration = self.concentration[..., tf.newaxis]
     safe_conc = tf.where(concentration > 0, concentration,
                          tf.ones_like(concentration))
