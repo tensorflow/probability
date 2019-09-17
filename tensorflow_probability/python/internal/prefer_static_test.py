@@ -412,5 +412,85 @@ class PadTest(test_case.TestCase):
     self.assertAllEqual([2, 3, 1, 1], x)
 
 
+@test_util.run_all_in_graph_and_eager_modes
+class SmartWhereTest(test_case.TestCase):
+
+  def test_static_scalar_condition(self):
+    fn_calls = [0, 0]
+    ones = tf.ones([10])
+    zeros = tf.zeros([10])
+    def fn1():
+      fn_calls[0] += 1
+      return ones
+    def fn2():
+      fn_calls[1] += 1
+      return zeros
+
+    self.assertAllEqual(zeros, prefer_static.smart_where(False, fn1, fn2))
+    self.assertEqual([0, 1], fn_calls)
+    self.assertAllEqual(ones, prefer_static.smart_where(True, fn1, fn2))
+    self.assertEqual([1, 1], fn_calls)
+    self.assertAllEqual(
+        zeros, prefer_static.smart_where(tf.constant(False), fn1, fn2))
+    self.assertEqual([1, 2], fn_calls)
+    self.assertAllEqual(
+        ones, prefer_static.smart_where(tf.constant(True), fn1, fn2))
+    self.assertEqual([2, 2], fn_calls)
+    self.assertAllEqual(
+        zeros, prefer_static.smart_where(np.array(False), fn1, fn2))
+    self.assertEqual([2, 3], fn_calls)
+    self.assertAllEqual(
+        ones, prefer_static.smart_where(np.array(True), fn1, fn2))
+    self.assertEqual([3, 3], fn_calls)
+
+    self.assertAllEqual(
+        zeros, prefer_static.smart_where(0, fn1, fn2))
+    self.assertEqual([3, 4], fn_calls)
+    self.assertAllEqual(
+        ones, prefer_static.smart_where(1, fn1, fn2))
+    self.assertEqual([4, 4], fn_calls)
+    self.assertAllEqual(
+        zeros, prefer_static.smart_where(tf.constant(0), fn1, fn2))
+    self.assertEqual([4, 5], fn_calls)
+    self.assertAllEqual(
+        ones, prefer_static.smart_where(tf.constant(1), fn1, fn2))
+    self.assertEqual([5, 5], fn_calls)
+    self.assertAllEqual(
+        zeros, prefer_static.smart_where(np.array(0), fn1, fn2))
+    self.assertEqual([5, 6], fn_calls)
+    self.assertAllEqual(
+        ones, prefer_static.smart_where(np.array(1), fn1, fn2))
+    self.assertEqual([6, 6], fn_calls)
+
+  def test_cond_x_broadcast_error(self):
+    with self.assertRaisesOpError('Incompatible shapes'):
+      self.evaluate(
+          prefer_static.smart_where(
+              tf.constant([True, True]), lambda: tf.zeros([3]), lambda: None))
+
+  def test_cond_y_broadcast_error(self):
+    with self.assertRaisesOpError('Incompatible shapes'):
+      self.evaluate(
+          prefer_static.smart_where(
+              tf.constant([False, False]), lambda: None, lambda: tf.zeros([3])))
+
+  def test_broadcast_success(self):
+    self.assertAllEqual(
+        tf.zeros([10, 2]),
+        prefer_static.smart_where(
+            tf.constant([True, True]), lambda: tf.zeros([10, 1]), lambda: None))
+    self.assertAllEqual(
+        tf.ones([2, 10]),
+        prefer_static.smart_where(
+            tf.constant([[False], [False]]),
+            lambda: None, lambda: tf.ones([10])))
+
+  def test_where_fallback(self):
+    self.assertAllEqual(
+        [1., 0.],
+        prefer_static.smart_where(tf.constant([True, False]),
+                                  lambda: tf.ones([]), lambda: tf.zeros([])))
+
+
 if __name__ == '__main__':
   tf.test.main()

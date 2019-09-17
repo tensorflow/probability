@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -221,6 +222,14 @@ class Chain(bijector.Bijector):
   def _inverse_event_shape_tensor(self, output_shape):
     return self._shape_helper("inverse_event_shape_tensor", output_shape,
                               reverse=False)
+
+  def _is_increasing(self, **kwargs):
+    # desc(desc)=>asc, asc(asc)=>asc, other cases=>desc.
+    is_increasing = True
+    for b in self.bijectors:
+      is_increasing = prefer_static.equal(
+          is_increasing, b.is_increasing(**kwargs.get(b.name, {})))
+    return is_increasing
 
   def _inverse(self, y, **kwargs):
     for b in self.bijectors:

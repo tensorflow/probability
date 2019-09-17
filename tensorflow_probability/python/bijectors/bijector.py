@@ -25,6 +25,7 @@ import weakref
 
 # Dependency imports
 import numpy as np
+import numpy as onp  # JAX rewrites numpy import  # pylint: disable=reimported
 import six
 import tensorflow.compat.v2 as tf
 
@@ -109,7 +110,7 @@ class _Mapping(
     def generic_to_array(x):
       if isinstance(x, np.generic):
         x = np.array(x)
-      if isinstance(x, np.ndarray):
+      if isinstance(x, onp.ndarray):
         x.flags.writeable = False
       return x
     if old is None:
@@ -180,7 +181,7 @@ class HashableWeakRef(weakref.ref):
 
   def __hash__(self):
     x = self()
-    if not isinstance(x, np.ndarray):
+    if not isinstance(x, onp.ndarray):
       return id(x)
     if isinstance(x, np.generic):
       raise ValueError('Unable to weakref np.generic')
@@ -202,8 +203,8 @@ class HashableWeakRef(weakref.ref):
       raise ValueError('Unable to weakref np.generic')
     y = other()
     ids_are_equal = id(x) == id(y)
-    if isinstance(x, np.ndarray):
-      return (isinstance(y, np.ndarray) and
+    if isinstance(x, onp.ndarray):
+      return (isinstance(y, onp.ndarray) and
               x.__array_interface__ == y.__array_interface__ and
               ids_are_equal)
     return ids_are_equal
@@ -480,7 +481,8 @@ class Bijector(tf.Module):
       - `_forward`,
       - `_inverse`,
       - `_inverse_log_det_jacobian`,
-      - `_forward_log_det_jacobian` (optional).
+      - `_forward_log_det_jacobian` (optional),
+      - `_is_increasing` (scalar bijectors only)
 
     The `_forward_log_det_jacobian` is called when the bijector is inverted via
     the `Invert` bijector. If undefined, a slightly less efficiently
@@ -960,6 +962,27 @@ class Bijector(tf.Module):
       NotImplementedError: if `_forward` is not implemented.
     """
     return self._call_forward(x, name, **kwargs)
+
+  def _is_increasing(self, **kwargs):
+    """Subclass implementation for `is_increasing` public function."""
+    raise NotImplementedError('is_increasing not implemented.')
+
+  def _call_is_increasing(self, name, **kwargs):
+    """Wraps call to _is_increasing, allowing extra shared logic."""
+    with self._name_and_control_scope(name):
+      return self._is_increasing(**kwargs)
+
+  def is_increasing(self, name='is_increasing', **kwargs):
+    """For scalar bijectors, returns True where `d forward(x) / d x > 0`.
+
+    Args:
+      name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
+
+    Returns:
+      A python `bool` or a `tf.bool` `Tensor`.
+    """
+    return self._call_is_increasing(name, **kwargs)
 
   def _inverse(self, y):
     """Subclass implementation for `inverse` public function."""

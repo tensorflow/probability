@@ -37,6 +37,9 @@ class Sigmoid(bijector.Bijector):
           validate_args=validate_args,
           name=name)
 
+  def _is_increasing(self):
+    return True
+
   def _forward(self, x):
     return tf.sigmoid(x)
 

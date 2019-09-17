@@ -70,6 +70,9 @@ class PowerTransform(bijector.Bijector):
     """The `c` in: `Y = g(X) = (1 + X * c)**(1 / c)`."""
     return self._power
 
+  def _is_increasing(self):
+    return True
+
   def _forward(self, x):
     with tf.control_dependencies(self._maybe_assert_valid_x(x)):
       if self.power == 0.:

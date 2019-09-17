@@ -126,6 +126,11 @@ class AffineScalar(bijector.Bijector):
     """The `log_scale` term in `Y = exp(log_scale) * X + shift`."""
     return self._log_scale
 
+  def _is_increasing(self):
+    if self.scale is None:
+      return True
+    return self.scale > 0
+
   def _forward(self, x):
     y = tf.identity(x)
     if self.scale is not None:

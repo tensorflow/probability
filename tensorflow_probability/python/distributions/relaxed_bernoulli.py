@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import logistic
@@ -177,29 +176,6 @@ class RelaxedBernoulli(distribution.Distribution):
       self._logits = tensor_util.convert_nonref_to_tensor(
           logits, name='logits', dtype=dtype)
 
-      if logits is None:
-        logits_parameter = tfp_util.DeferredTensor(
-            lambda x: tf.math.log(x) - tf.math.log1p(-x), self._probs)
-      else:
-        logits_parameter = self._logits
-
-      shape = tf.broadcast_static_shape(logits_parameter.shape,
-                                        self._temperature.shape)
-
-      logistic_scale = tfp_util.DeferredTensor(
-          tf.math.reciprocal, self._temperature)
-      logistic_loc = tfp_util.DeferredTensor(
-          lambda x: x * logistic_scale, logits_parameter, shape=shape)
-
-      self._transformed_logistic = (
-          transformed_distribution.TransformedDistribution(
-              distribution=logistic.Logistic(
-                  logistic_loc,
-                  logistic_scale,
-                  allow_nan_stats=allow_nan_stats,
-                  name=name + '/Logistic'),
-              bijector=sigmoid_bijector.Sigmoid()))
-
       super(RelaxedBernoulli, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -207,6 +183,17 @@ class RelaxedBernoulli(distribution.Distribution):
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
           name=name)
+
+  def _transformed_logistic(self):
+    logistic_scale = tf.math.reciprocal(self._temperature)
+    logits_parameter = self._logits_parameter_no_checks()
+    logistic_loc = logits_parameter * logistic_scale
+    return transformed_distribution.TransformedDistribution(
+        distribution=logistic.Logistic(
+            logistic_loc,
+            logistic_scale,
+            allow_nan_stats=self.allow_nan_stats),
+        bijector=sigmoid_bijector.Sigmoid())
 
   @staticmethod
   def _param_shapes(sample_shape):
@@ -263,28 +250,30 @@ class RelaxedBernoulli(distribution.Distribution):
     return tf.TensorShape([])
 
   def _batch_shape_tensor(self):
-    return self._transformed_logistic.batch_shape_tensor()
+    return self._transformed_logistic().batch_shape_tensor()
 
   def _batch_shape(self):
-    return self._transformed_logistic.batch_shape
+    return tf.broadcast_static_shape(
+        (self._logits if self._probs is None else self._probs).shape,
+        self._temperature.shape)
 
   def _sample_n(self, n, seed=None, **kwargs):
-    return self._transformed_logistic.sample(n, seed=seed, **kwargs)
+    return self._transformed_logistic().sample(n, seed=seed, **kwargs)
 
   def _log_prob(self, y, **kwargs):
-    return self._transformed_logistic.log_prob(y, **kwargs)
+    return self._transformed_logistic().log_prob(y, **kwargs)
 
   def _prob(self, y, **kwargs):
-    return self._transformed_logistic.prob(y, **kwargs)
+    return self._transformed_logistic().prob(y, **kwargs)
 
   def _log_survival_function(self, y, **kwargs):
-    return self._transformed_logistic.log_survival_function(y, **kwargs)
+    return self._transformed_logistic().log_survival_function(y, **kwargs)
 
   def _cdf(self, y, **kwargs):
-    return self._transformed_logistic.cdf(y, **kwargs)
+    return self._transformed_logistic().cdf(y, **kwargs)
 
   def _log_cdf(self, y, **kwargs):
-    return self._transformed_logistic.log_cdf(y, **kwargs)
+    return self._transformed_logistic().log_cdf(y, **kwargs)
 
   @deprecation.deprecated(
       '2019-10-01',
