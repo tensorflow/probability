@@ -108,7 +108,7 @@ def is_floating(dtype):
   dtype = tf.as_dtype(dtype)
   if hasattr(dtype, 'is_floating'):
     return dtype.is_floating
-  return np.issubdtype(np.dtype(dtype), np.float)
+  return np.issubdtype(np.dtype(dtype), np.floating)
 
 
 def is_integer(dtype):
