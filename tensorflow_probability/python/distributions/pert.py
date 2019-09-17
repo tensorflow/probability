@@ -43,6 +43,8 @@ class PERT(transformed_distribution.TransformedDistribution):
   ```
 
   PERT distribution is obtained when g = 4.
+
+  For general reference: https://en.wikipedia.org/wiki/PERT_distribution
   """
   def __init__(self,
                mini,
