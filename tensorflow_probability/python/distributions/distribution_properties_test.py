@@ -98,6 +98,7 @@ TF2_FRIENDLY_DISTS = (
     'Triangular',
     'Uniform',
     'VonMises',
+    'VonMisesFisher',
     'Zipf',
 )
 
@@ -1048,7 +1049,6 @@ def fix_wishart(d):
   scale = d.get('scale', d.get('scale_tril'))
   return dict(d, df=tf.maximum(df, tf.cast(scale.shape[-1], df.dtype)))
 
-
 CONSTRAINTS = {
     'atol':
         tf.math.softplus,
@@ -1068,8 +1068,8 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'InverseGaussian.loc':
         tfp_hps.softplus_plus_eps(),
-    'VonMisesFisher.mean_direction':  # max ndims is 5
-        lambda x: tf.math.l2_normalize(tf.math.sigmoid(x[..., :5]) + 1e-6, -1),
+    'VonMisesFisher.mean_direction':  # max ndims is 3 to avoid instability.
+        lambda x: tf.math.l2_normalize(tf.math.sigmoid(x[..., :3]) + 1e-6, -1),
     'Categorical.probs':
         tf.math.softmax,
     'ExpRelaxedOneHotCategorical.probs':
