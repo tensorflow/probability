@@ -24,6 +24,7 @@ import contextlib
 import weakref
 
 # Dependency imports
+from absl import logging
 import numpy as np
 import numpy as onp  # JAX rewrites numpy import  # pylint: disable=reimported
 import six
@@ -34,6 +35,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'Bijector',
@@ -963,9 +965,18 @@ class Bijector(tf.Module):
     """
     return self._call_forward(x, name, **kwargs)
 
+  @deprecation.deprecated(
+      '2019-12-14', '`is_increasing` must be implemented by subclasses.')
   def _is_increasing(self, **kwargs):
     """Subclass implementation for `is_increasing` public function."""
-    raise NotImplementedError('is_increasing not implemented.')
+    logging.warning('Bijector %s does not implement `is_increasing`. '
+                    'After 12/14/2019, this call will fail.', self)
+    return True
+
+  # TODO(b/70513335): Enable this version.
+  # def _is_increasing(self, **kwargs):
+  #   """Subclass implementation for `is_increasing` public function."""
+  #   raise NotImplementedError('`is_increasing not` implemented.')
 
   def _call_is_increasing(self, name, **kwargs):
     """Wraps call to _is_increasing, allowing extra shared logic."""
