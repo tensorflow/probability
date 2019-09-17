@@ -213,9 +213,6 @@ class RationalQuadraticSpline(bijector.Bijector):
   def range_min(self):
     return self._range_min
 
-  def _is_increasing(self):
-    return True
-
   def _compute_shared(self, x=None, y=None):
     """Captures shared computations across forward/inverse/logdet.
 

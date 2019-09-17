@@ -62,7 +62,6 @@ TF2_FRIENDLY_BIJECTORS = (
     'Reciprocal',
     'Sigmoid',
     'SinhArcsinh',
-    # 'Softfloor',  # TODO(b/141051113): Enable testing Softfloor.
     'Softplus',
     'Softsign',
     'Square',
@@ -76,7 +75,6 @@ BIJECTOR_PARAMS_NDIMS = {
     'Kumaraswamy': dict(concentration1=0, concentration0=0),
     'MatvecLU': dict(lower_upper=2, permutation=1),
     'SinhArcsinh': dict(skewness=0, tailweight=0),
-    'Softfloor': dict(temperature=0),
     'Softplus': dict(hinge_softness=0),
     'RationalQuadraticSpline': dict(bin_widths=1, bin_heights=1, knot_slopes=1),
     'Weibull': dict(concentration=0, scale=0),
@@ -130,17 +128,6 @@ def broadcasting_params(draw,
           mutex_params=MUTEX_PARAMS))
 
 
-class CallableModule(tf.Module):  # TODO(b/141098791): Eliminate this.
-  """Convenience object for capturing variables closed over by Inline."""
-
-  def __init__(self, fn, varobj):
-    self._fn = fn
-    self._vars = varobj
-
-  def __call__(self, *args, **kwargs):
-    return self._fn(*args, **kwargs)
-
-
 @hps.composite
 def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
               enable_vars=False):
@@ -183,30 +170,35 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
             batch_shape=batch_shape,
             event_dim=event_dim,
             enable_vars=enable_vars))
-    bijector_params = {'bijector': underlying}
-  elif bijector_name == 'Inline':
-    scale = draw(hps.sampled_from([-2., 1., 2.]))
-    scale = tf.Variable(scale, name='scale') if enable_vars else scale
+    return tfb.Invert(underlying, validate_args=True)
+  if bijector_name == 'Inline':
+    if enable_vars:
+      scale = tf.Variable(1., name='scale')
+    else:
+      scale = 2.
     b = tfb.AffineScalar(scale=scale)
 
-    bijector_params = dict(
-        forward_fn=CallableModule(b.forward, b),
+    inline = tfb.Inline(
+        forward_fn=b.forward,
         inverse_fn=b.inverse,
         forward_log_det_jacobian_fn=lambda x: b.forward_log_det_jacobian(  # pylint: disable=g-long-lambda
             x, event_ndims=b.forward_min_event_ndims),
         forward_min_event_ndims=b.forward_min_event_ndims,
         is_constant_jacobian=b.is_constant_jacobian,
-        is_increasing=b.is_increasing,
     )
-  elif bijector_name == 'DiscreteCosineTransform':
-    bijector_params = {'dct_type': draw(hps.integers(min_value=2, max_value=3))}
-  elif bijector_name == 'PowerTransform':
-    bijector_params = {'power': draw(hps.floats(min_value=1e-6, max_value=10.))}
-  else:
-    bijector_params = draw(
-        broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,
-                            enable_vars=enable_vars))
-  hp.note('bijector params: {}'.format(bijector_params))
+    inline.b = b
+    return inline
+  if bijector_name == 'DiscreteCosineTransform':
+    dct_type = draw(hps.integers(min_value=2, max_value=3))
+    return tfb.DiscreteCosineTransform(
+        validate_args=True, dct_type=dct_type)
+  if bijector_name == 'PowerTransform':
+    power = draw(hps.floats(min_value=0., max_value=10.))
+    return tfb.PowerTransform(validate_args=True, power=power)
+
+  bijector_params = draw(
+      broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,
+                          enable_vars=enable_vars))
   ctor = getattr(tfb, bijector_name)
   return ctor(validate_args=True, **bijector_params)
 
@@ -330,7 +322,6 @@ class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
     bijector = data.draw(
         bijectors(bijector_name=bijector_name, event_dim=event_dim,
                   enable_vars=True))
-    self.evaluate(tf.group(*[v.initializer for v in bijector.variables]))
 
     # Forward mapping: Check differentiation through forward mapping with
     # respect to the input and parameter variables.  Also check that any
@@ -360,17 +351,6 @@ class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
         ys = bijector.forward(xs + 0)
     grads = tape.gradient(ys, wrt_vars)
     assert_no_none_grad(bijector, 'forward', wrt_vars, grads)
-
-    # For scalar bijectors, verify correctness of the is_increasing method.
-    if (bijector.forward_min_event_ndims == 0 and
-        bijector.inverse_min_event_ndims == 0):
-      dydx = grads[0]
-      hp.note('dydx: {}'.format(dydx))
-      isfinite = tf.math.is_finite(dydx)
-      incr_or_slope_eq0 = bijector.is_increasing() | tf.equal(dydx, 0)
-      self.assertAllEqual(
-          isfinite & incr_or_slope_eq0,
-          isfinite & (dydx >= 0) | tf.zeros_like(incr_or_slope_eq0))
 
     # FLDJ: Check differentiation through forward log det jacobian with
     # respect to the input and parameter variables.  Also check that any
@@ -434,8 +414,8 @@ class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
           max_permissible=max_permitted):
         tape.watch(wrt_vars)
         # TODO(b/73073515): Fix graph mode gradients with bijector caching.
-        ldj = bijector.inverse_log_det_jacobian(ys + 0, event_ndims=event_ndims)
-    grads = tape.gradient(ldj, wrt_vars)
+        xs = bijector.inverse_log_det_jacobian(ys + 0, event_ndims=event_ndims)
+    grads = tape.gradient(xs, wrt_vars)
     assert_no_none_grad(bijector, 'inverse_log_det_jacobian', wrt_vars, grads)
 
 
@@ -458,8 +438,6 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'AffineScalar.scale':
         tfp_hps.softplus_plus_eps(),
-    'Softfloor.temperature':
-        tfp_hps.softplus_plus_eps(.05),
     'bin_widths':
         bijector_hps.spline_bin_size_constraint,
     'bin_heights':

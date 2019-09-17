@@ -89,9 +89,6 @@ class Invert(bijector_lib.Bijector):
   def bijector(self):
     return self._bijector
 
-  def is_increasing(self, **kwargs):
-    return self.bijector.is_increasing(**kwargs)
-
   def forward(self, x, **kwargs):
     return self.bijector.inverse(x, **kwargs)
 

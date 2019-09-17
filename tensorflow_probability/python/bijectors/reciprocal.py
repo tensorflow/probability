@@ -61,9 +61,6 @@ class Reciprocal(bijector.Bijector):
           validate_args=validate_args,
           name=name)
 
-  def _is_increasing(self):
-    return False
-
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):
       return 1. / x

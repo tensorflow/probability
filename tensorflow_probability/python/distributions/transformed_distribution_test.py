@@ -175,47 +175,6 @@ class TransformedDistributionTest(test_case.TestCase):
     cdf_ = self.evaluate(cdf)
     self.assertAllClose(grid, cdf_, rtol=1e-6, atol=0.)
 
-  def testCdfDescending(self):
-    td = self._cls()(
-        distribution=tfd.Normal(loc=0., scale=[1., 1.]),
-        bijector=tfb.AffineScalar(shift=1., scale=[2., -2.]),
-        validate_args=True)
-    nd = tfd.Normal(loc=1., scale=2., validate_args=True)
-    self.assertAllEqual(tf.ones(td.batch_shape, dtype=tf.bool),
-                        td.cdf(nd.quantile(.8)) < td.cdf(nd.quantile(.9)))
-
-  def testCdfDescendingChained(self):
-    bij1 = tfb.AffineScalar(shift=1., scale=[1., -2.])
-    bij2 = tfb.AffineScalar(shift=1., scale=[[3.], [-5.]])
-    bij3 = tfb.AffineScalar(shift=1., scale=[[[7.]], [[-11.]]])
-    for chain in bij2(bij1), bij3(bij2(bij1)):
-      td = self._cls()(
-          distribution=tfd.Normal(loc=0., scale=tf.ones([2, 2, 2])),
-          bijector=chain,
-          validate_args=True)
-      nd = tfd.Normal(loc=1., scale=3., validate_args=True)
-      self.assertAllEqual(tf.ones(td.batch_shape, dtype=tf.bool),
-                          td.cdf(nd.quantile(.4)) < td.cdf(nd.quantile(.6)),
-                          msg=chain.name)
-
-  def testSfDescending(self):
-    td = self._cls()(
-        distribution=tfd.Normal(loc=0., scale=[1., 1.]),
-        bijector=tfb.AffineScalar(shift=1., scale=[2., -2.]),
-        validate_args=True)
-    nd = tfd.Normal(loc=1., scale=2., validate_args=True)
-    self.assertAllEqual(tf.ones(td.batch_shape, dtype=tf.bool),
-                        td.survival_function(nd.quantile(.8)) >
-                        td.survival_function(nd.quantile(.9)))
-
-  def testQuantileDescending(self):
-    td = self._cls()(
-        distribution=tfd.Normal(loc=0., scale=[1., 1.]),
-        bijector=tfb.AffineScalar(shift=1., scale=[2., -2.]),
-        validate_args=True)
-    self.assertAllEqual(tf.ones(td.batch_shape, dtype=tf.bool),
-                        td.quantile(.8) < td.quantile(.9))
-
   def testCachedSamples(self):
     class ExpForwardOnly(tfb.Bijector):
 

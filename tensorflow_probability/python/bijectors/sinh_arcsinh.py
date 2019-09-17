@@ -138,9 +138,6 @@ class SinhArcsinh(bijector.Bijector):
     return self._scale_number / tf.sinh(
         tf.asinh(self._scale_number) * tailweight)
 
-  def _is_increasing(self):
-    return True
-
   def _forward(self, x):
     tailweight = tf.convert_to_tensor(self.tailweight)
     multiplier = self._output_multiplier(tailweight)

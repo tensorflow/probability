@@ -93,9 +93,6 @@ class Softplus(bijector.Bijector):
           validate_args=validate_args,
           name=name)
 
-  def _is_increasing(self):
-    return True
-
   def _forward(self, x):
     if self.hinge_softness is None:
       return tf.math.softplus(x)

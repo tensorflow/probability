@@ -75,7 +75,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import numpy as onp  # JAX rewrites numpy import  # pylint: disable=reimported
 
 import tensorflow.compat.v2 as tf
 
@@ -97,15 +96,15 @@ __all__ = [
 # then made more conservative just to be safe. (Conservative means use the
 # expansion more than we probably need to.) See `NdtrTest` in
 # special_math_test.py.
-LOGNDTR_FLOAT64_LOWER = onp.array(-20, np.float64)
-LOGNDTR_FLOAT32_LOWER = onp.array(-10, np.float32)
+LOGNDTR_FLOAT64_LOWER = np.array(-20, np.float64)
+LOGNDTR_FLOAT32_LOWER = np.array(-10, np.float32)
 
 # Upper bound values were chosen by examining for which values of 'x'
 # Log[cdf(x)] is 0, after which point we need to use the approximation
 # Log[cdf(x)] = Log[1 - cdf(-x)] approx -cdf(-x). We chose a value slightly
 # conservative, meaning we use the approximation earlier than needed.
-LOGNDTR_FLOAT64_UPPER = onp.array(8, np.float64)
-LOGNDTR_FLOAT32_UPPER = onp.array(5, np.float32)
+LOGNDTR_FLOAT64_UPPER = np.array(8, np.float64)
+LOGNDTR_FLOAT32_UPPER = np.array(5, np.float32)
 
 
 def ndtr(x, name="ndtr"):

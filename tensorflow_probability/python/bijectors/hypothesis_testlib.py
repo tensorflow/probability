@@ -191,9 +191,6 @@ def bijector_supports():
       'SinhArcsinh':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
-      'Softfloor':
-          BijectorSupport(Support.SCALAR_UNCONSTRAINED,
-                          Support.SCALAR_UNCONSTRAINED),
       'Softplus':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_POSITIVE),

@@ -466,12 +466,7 @@ class TransformedDistribution(distribution_lib.Distribution):
                                 "bijector is not injective.")
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     x = self.bijector.inverse(y, **bijector_kwargs)
-    dist = self.distribution
-    # TODO(b/141130733): Check/fix any gradient numerics issues.
-    return prefer_static.smart_where(
-        self.bijector.is_increasing(**bijector_kwargs),
-        lambda: dist.log_cdf(x, **distribution_kwargs),
-        lambda: dist.log_survival_function(x, **distribution_kwargs))
+    return self.distribution.log_cdf(x, **distribution_kwargs)
 
   def _cdf(self, y, **kwargs):
     if self._is_maybe_event_override:
@@ -482,11 +477,7 @@ class TransformedDistribution(distribution_lib.Distribution):
                                 "bijector is not injective.")
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     x = self.bijector.inverse(y, **bijector_kwargs)
-    # TODO(b/141130733): Check/fix any gradient numerics issues.
-    return prefer_static.smart_where(
-        self.bijector.is_increasing(**bijector_kwargs),
-        lambda: self.distribution.cdf(x, **distribution_kwargs),
-        lambda: self.distribution.survival_function(x, **distribution_kwargs))
+    return self.distribution.cdf(x, **distribution_kwargs)
 
   def _log_survival_function(self, y, **kwargs):
     if self._is_maybe_event_override:
@@ -497,12 +488,7 @@ class TransformedDistribution(distribution_lib.Distribution):
                                 "bijector is not injective.")
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     x = self.bijector.inverse(y, **bijector_kwargs)
-    dist = self.distribution
-    # TODO(b/141130733): Check/fix any gradient numerics issues.
-    return prefer_static.smart_where(
-        self.bijector.is_increasing(**bijector_kwargs),
-        lambda: dist.log_survival_function(x, **distribution_kwargs),
-        lambda: dist.log_cdf(x, **distribution_kwargs))
+    return self.distribution.log_survival_function(x, **distribution_kwargs)
 
   def _survival_function(self, y, **kwargs):
     if self._is_maybe_event_override:
@@ -513,11 +499,7 @@ class TransformedDistribution(distribution_lib.Distribution):
                                 "bijector is not injective.")
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     x = self.bijector.inverse(y, **bijector_kwargs)
-    # TODO(b/141130733): Check/fix any gradient numerics issues.
-    return prefer_static.smart_where(
-        self.bijector.is_increasing(**bijector_kwargs),
-        lambda: self.distribution.survival_function(x, **distribution_kwargs),
-        lambda: self.distribution.cdf(x, **distribution_kwargs))
+    return self.distribution.survival_function(x, **distribution_kwargs)
 
   def _quantile(self, value, **kwargs):
     if self._is_maybe_event_override:
@@ -527,10 +509,6 @@ class TransformedDistribution(distribution_lib.Distribution):
       raise NotImplementedError("quantile is not implemented when "
                                 "bijector is not injective.")
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
-    value = prefer_static.smart_where(
-        self.bijector.is_increasing(**bijector_kwargs),
-        lambda: value,
-        lambda: 1 - value)
     # x_q is the "qth quantile" of X iff q = P[X <= x_q].  Now, since X =
     # g^{-1}(Y), q = P[X <= x_q] = P[g^{-1}(Y) <= x_q] = P[Y <= g(x_q)],
     # implies the qth quantile of Y is g(x_q).

@@ -21,7 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import decorator
 import numpy as np
-import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 
 import tensorflow.compat.v2 as tf
 
@@ -80,8 +79,8 @@ def _numpy_dtype(dtype):
   return dtype_util.as_numpy_dtype(dtype)
 
 
-def _get_static_value(pred):
-  """Helper function for getting static values from maybe-tensor objects."""
+def _get_static_predicate(pred):
+  """Helper function for statically evaluating predicates in `cond`."""
   if tf.is_tensor(pred):
     pred_value = tf.get_static_value(tf.convert_to_tensor(pred))
 
@@ -91,54 +90,16 @@ def _get_static_value(pred):
       pred_value = c_api.TF_TryEvaluateConstant_wrapper(pred.graph._c_graph,
                                                         pred._as_tf_output())
     # pylint: enable=protected-access
-    return pred_value
-  return pred
+    if pred_value in (0, 1, True, False):
+      pred_value = bool(pred_value)
 
-
-def _get_static_predicate(pred):
-  """Helper function for statically evaluating predicates in `cond`."""
-  pred_value = _get_static_value(pred)
-  if pred_value in (0, 1, True, False):  # Accept 1/0 as valid boolean values.
+  elif pred in (0, 1, True, False):  # Accept 1/0 as valid boolean values
     # This branch also casts np.array(False), tf.EagerTensor(True), etc.
-    pred_value = bool(pred_value)
-  elif pred_value is not None:
+    pred_value = bool(pred)
+  else:
     raise TypeError('`pred` must be a Tensor, or a Python bool, or 1 or 0. '
                     'Found instead: {}'.format(pred))
   return pred_value
-
-
-def smart_where(condition, x_fn, y_fn):
-  """As tf.where, but only calls x_fn/y_fn when condition not statically known.
-
-  IMPORTANT: Since this avoids executing the inoperative branch when possible,
-  it will not necessarily broadcast `x_fn()` with `y_fn()`, so it is imperative
-  that they return `Tensor`s which broadcast with `condition` to the same final
-  shape.
-
-  Args:
-    condition: A `bool` Tensor.
-    x_fn: A callable returning a `Tensor`, for locations where `condition` is
-      `True`.
-    y_fn: A callable returning a `Tensor`, for locations where `condition` is
-      `False`.
-
-  Returns:
-    A `Tensor` equivalent to `tf.where(condition, x_fn(), y_fn())`.
-  """
-  cond_static = _get_static_value(condition)
-  if cond_static is not None:
-    if np.size(cond_static) == 1 and cond_static in (0, 1, False, True):
-      return x_fn() if bool(cond_static) else y_fn()
-    elif isinstance(cond_static, (np.ndarray, np.generic)):
-      if np.all(cond_static):
-        x = x_fn()
-        return tf.broadcast_to(
-            x, tf.broadcast_dynamic_shape(tf.shape(x), tf.shape(condition)))
-      elif not np.any(cond_static):
-        y = y_fn()
-        return tf.broadcast_to(
-            y, tf.broadcast_dynamic_shape(tf.shape(y), tf.shape(condition)))
-  return tf.where(condition, x_fn(), y_fn())
 
 
 def rank_from_shape(shape_tensor_fn, tensorshape=None):
@@ -311,7 +272,7 @@ def _setdiff1d(a, b, aminusb=True, validate_indices=True):
           a[tf.newaxis], b[tf.newaxis]))[0]
     a_ = np.array(a_, dtype=dtype)
     b_ = np.array(b_, dtype=dtype)
-    return onp.setdiff1d(a_, b_)
+    return np.setdiff1d(a_, b_)
 setdiff1d = _copy_docstring(
     tf.sets.difference,
     _setdiff1d)

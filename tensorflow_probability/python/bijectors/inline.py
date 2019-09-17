@@ -39,7 +39,6 @@ class Inline(bijector.Bijector):
       inverse_fn=tf.math.log,
       inverse_log_det_jacobian_fn=lambda y: -tf.math.log(y),
       forward_min_event_ndims=0,
-      is_increasing=True,
       name='exp')
   ```
 
@@ -56,7 +55,6 @@ class Inline(bijector.Bijector):
                inverse_event_shape_fn=None,
                inverse_event_shape_tensor_fn=None,
                is_constant_jacobian=False,
-               is_increasing=None,
                validate_args=False,
                forward_min_event_ndims=None,
                inverse_min_event_ndims=None,
@@ -85,9 +83,6 @@ class Inline(bijector.Bijector):
         event shape changes. Default: shape is assumed unchanged.
       is_constant_jacobian: Python `bool` indicating that the Jacobian is
         constant for all input arguments.
-      is_increasing: `bool` `Tensor` indicating a scalar bijector function is
-        increasing for all input arguments, or a callable returning a `bool`
-        `Tensor` specifying such truth values.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
       forward_min_event_ndims: Python `int` indicating the minimal
@@ -108,9 +103,6 @@ class Inline(bijector.Bijector):
       self._maybe_implement(forward_log_det_jacobian_fn,
                             '_forward_log_det_jacobian',
                             'forward_log_det_jacobian_fn')
-      if is_increasing is not None and not callable(is_increasing):
-        is_increasing = lambda: is_increasing
-      self._maybe_implement(is_increasing, '_is_increasing', 'is_increasing')
 
       # By default assume shape doesn't change.
       self._forward_event_shape = _maybe_impute_as_identity(

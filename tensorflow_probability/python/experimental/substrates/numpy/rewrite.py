@@ -107,23 +107,13 @@ def main(argv):
                                 'substrates import jax')
     contents = contents.replace('backend.numpy', 'backend.jax')
     contents = contents.replace('backend import numpy', 'backend import jax')
+    contents = contents.replace(
+        'tf.test.main()',
+        'from jax.config import config; '
+        'config.update("jax_enable_x64", True); '
+        'tf.test.main()')
     contents = contents.replace('def _call_jax', 'def __call__')
     contents = contents.replace('JAX_MODE = False', 'JAX_MODE = True')
-    is_test = lambda x: x.endswith('_test.py') or x.endswith('_test_util.py')
-    if not is_test(argv[1]):  # We leave tests with original np.
-      contents = contents.replace(
-          '\nimport numpy as np',
-          '\nimport numpy as onp\nimport jax.numpy as np')
-      contents = contents.replace('np.generic', 'onp.generic')
-      contents = contents.replace('np.bool', 'onp.bool')
-      contents = contents.replace('np.dtype', 'onp.dtype')
-      contents = contents.replace('np.unique', 'onp.unique')
-    if is_test(argv[1]):  # Test-only rewrites.
-      contents = contents.replace(
-          'tf.test.main()',
-          'from jax.config import config; '
-          'config.update("jax_enable_x64", True); '
-          'tf.test.main()')
 
   print(contents)
 

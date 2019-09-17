@@ -61,9 +61,6 @@ class Expm1(bijector.Bijector):
           validate_args=validate_args,
           name=name)
 
-  def _is_increasing(self):
-    return True
-
   def _forward(self, x):
     """Returns the forward `Bijector` evaluation, i.e., X = g(Y)."""
     return tf.math.expm1(x)

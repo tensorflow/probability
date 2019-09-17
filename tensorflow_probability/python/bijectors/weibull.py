@@ -87,9 +87,6 @@ class Weibull(bijector.Bijector):
     """The `k` in `Y = g(X) = 1 - exp((-x / l) ** k)`."""
     return self._concentration
 
-  def _is_increasing(self):
-    return True
-
   def _forward(self, x):
     with tf.control_dependencies(self._maybe_assert_valid_x(x)):
       return -tf.math.expm1(-((x / self.scale) ** self.concentration))

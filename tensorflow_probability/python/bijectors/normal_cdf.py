@@ -63,9 +63,6 @@ class NormalCDF(bijector.Bijector):
           forward_min_event_ndims=0,
           name=name)
 
-  def _is_increasing(self):
-    return True
-
   def _forward(self, x):
     return special_math.ndtr(x)
 
