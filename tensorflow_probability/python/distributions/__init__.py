@@ -179,6 +179,7 @@ __all__ = [
     'Chi2',
     'CholeskyLKJ',
     'Deterministic',
+    'DoublesidedMaxwell',
     'VectorDeterministic',
     'Empirical',
     'Exponential',
