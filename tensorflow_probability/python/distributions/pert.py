@@ -84,7 +84,7 @@ class PERT(transformed_distribution.TransformedDistribution):
               scale=tf.broadcast_to(
                   input=self._scale,
                   shape=self._batch_shape_tensor(
-                      concentration1=self._concentration1, 
+                      concentration1=self._concentration1,
                       concentration0=self._concentration0))),
           validate_args=validate_args,
           parameters=parameters,

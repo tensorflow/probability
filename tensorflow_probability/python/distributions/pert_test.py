@@ -78,16 +78,16 @@ class PERTTest(test_case.TestCase):
     self.assertEqual(1., self.evaluate(dist.cdf(11.)))
     self.assertEqual(0., self.evaluate(dist.cdf(3.)))
     self.assertEqual(
-        1., 
+        1.,
         self.evaluate(dist.cdf(3.) + dist.survival_function(3.)))
     self.assertEqual(
-        1., 
+        1.,
         self.evaluate(dist.cdf(11.) + dist.survival_function(11.)))
     self.assertEqual(
-        1., 
+        1.,
         self.evaluate(dist.cdf(3.) + dist.survival_function(3.)))
     self.assertEqual(
-        1., 
+        1.,
         self.evaluate(dist.cdf(5.) + dist.survival_function(5.)))
     self.assertEqual(-float("inf"), self.evaluate(dist.log_cdf(3.)))
     self.assertEqual(0., self.evaluate(dist.log_cdf(11.)))
