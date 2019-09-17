@@ -300,8 +300,7 @@ NUMPY_TEST_CASES = [
     #         keywords=None,
     #         defaults=(False, False, False, False, False, False, None))
     TestCase('linalg.matmul', [matmul_compatible_pairs()]),
-    TestCase('linalg.det', [nonsingular_matrices()],
-             jax_disabled='https://github.com/google/jax/issues/1213'),
+    TestCase('linalg.det', [nonsingular_matrices()]),
 
     # ArgSpec(args=['a', 'name', 'conjugate'], varargs=None, keywords=None)
     TestCase('linalg.matrix_transpose',
@@ -473,8 +472,7 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('linalg.adjoint',
              [single_arrays(shape=shapes(min_dims=2),
                             dtype=np.complex64, elements=complex_numbers())]),
-    TestCase('linalg.slogdet', [nonsingular_matrices()],
-             jax_disabled='https://github.com/google/jax/issues/1213'),
+    TestCase('linalg.slogdet', [nonsingular_matrices()]),
     # ArgSpec(args=['x', 'name'], varargs=None, keywords=None, defaults=(None,))
     TestCase('math.abs', [single_arrays()]),
     TestCase('math.acos', [single_arrays(elements=floats(-1., 1.))]),
