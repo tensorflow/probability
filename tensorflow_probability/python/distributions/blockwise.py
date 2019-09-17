@@ -282,10 +282,7 @@ class Blockwise(distribution_lib.Distribution):
                                 self._distribution.event_shape_tensor())
     return tf.concat(tf.nest.flatten(x), axis=-1)
 
-  def _sample_n(self, n, seed=None):
-    return self._flatten_and_concat_event(self._distribution.sample(n))
-
-  def _log_prob(self, x):
+  def _split_and_reshape_event(self, x):
     assertions = []
     message = 'Input must have at least one dimension.'
     if tensorshape_util.rank(x.shape) is not None:
@@ -317,8 +314,16 @@ class Blockwise(distribution_lib.Distribution):
       else:
         x = tf.nest.map_structure(_reshape_part, x, self._distribution.dtype,
                                   self._distribution.event_shape_tensor())
+    return x
 
-      return self._distribution.log_prob(x)
+  def _sample_n(self, n, seed=None):
+    return self._flatten_and_concat_event(self._distribution.sample(n))
+
+  def _log_prob(self, x):
+    return self._distribution.log_prob(self._split_and_reshape_event(x))
+
+  def _prob(self, x):
+    return self._distribution.prob(self._split_and_reshape_event(x))
 
   def _mean(self):
     return self._flatten_and_concat_event(self._distribution.mean())
