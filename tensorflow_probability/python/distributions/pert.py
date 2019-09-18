@@ -21,10 +21,14 @@ class PERT(transformed_distribution.TransformedDistribution):
   """Modified PERT distribution for modeling expert predictions.
 
   PERT distribution is a loc-scale family of Beta distribution
-  fit onto an arbitrary real interval set between MAX and MIN
-  values set by the user, along with MODE to indicate the expert's
+  fit onto an arbitrary real interval set between LOW and HIGH
+  values set by the user, along with PEAK to indicate the expert's
   most frequent prediction.
-  [1](https://en.wikipedia.org/wiki/PERT_distribution)
+  [1](https://en.wikipedia.org/wiki/PERT_distribution).
+
+  It's like a [Triangle distribution]
+  (https://en.wikipedia.org/wiki/Triangular_distribution)
+  but with a smooth peak.
 
   #### Mathematical Details
 
@@ -36,19 +40,19 @@ class PERT(transformed_distribution.TransformedDistribution):
   where
 
   ```none
-  loc = MIN
-  scale = MAX - MIN
-                            MODE - MIN
+  loc = LOW
+  scale = HIGH - LOW
+                            PEAK - LOW
   concentration1 = 1 + g * ------------
-                            MAX - MIN
+                            HIGH - LOW
 
-                            MAX - MODE
+                            HIGH - PEAK
   concentration1 = 1 + g * ------------
-                            MAX - MIN
+                            HIGH - LOW
   g > 0
   ```
-  over support [MIN, MAX]. And some MODE such that
-  MIN < MODE < MAX. `g` is a positive parameter that controls
+  over support [LOW, HIGH]. And some PEAK such that
+  LOW < PEAK < HIGH. `g` is a positive parameter that controls
   the shape of the the distribution. Higher value forms a sharper
   peak.
 
@@ -60,48 +64,48 @@ class PERT(transformed_distribution.TransformedDistribution):
   tfd = tfp.distributions
 
   # Single PERT distribution
-  dist = tfd.PERT(mini=1., mode=7., maxi=11., smoothness=4.)
+  dist = tfd.PERT(low=1., peak=7., high=11., smoothness=4.)
   dist.sample(10)
   dist.prob(7.)
   dist.prob(0.) # Throws nan when input out of support.
 
   # Multiple PERT distributions with varying smoothness (broadcasted)
-  dist = tfd.PERT(mini=1., mode=7., maxi=11., smoothness=[1., 2., 3., 4.])
+  dist = tfd.PERT(low=1., peak=7., high=11., smoothness=[1., 2., 3., 4.])
   dist.sample(10)
   dist.prob(7.)
   dist.prob([[7.],[5.]])
 
-  # Multiple PERT distributions with varying mode
-  dist = tfd.PERT(mini=1., mode=[2., 5., 8.], maxi=11., smoothness=4.)
+  # Multiple PERT distributions with varying peak
+  dist = tfd.PERT(low=1., peak=[2., 5., 8.], high=11., smoothness=4.)
   dist.sample(10)
   dist.sample([10,5])
   ```
   """
   def __init__(self,
-               mini,
-               mode,
-               maxi,
+               low,
+               peak,
+               high,
                smoothness=4.,
                validate_args=False,
                allow_nan_stats=False,
                name="PERT"):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([mini, maxi, mode], tf.float32)
-      self._min = tensor_util.convert_nonref_to_tensor(
-          mini, name='mini', dtype=dtype)
-      self._mod = tensor_util.convert_nonref_to_tensor(
-          mode, name='mode', dtype=dtype)
-      self._max = tensor_util.convert_nonref_to_tensor(
-          maxi, name='maxi', dtype=dtype)
+      dtype = dtype_util.common_dtype([low, high, peak], tf.float32)
+      self._low = tensor_util.convert_nonref_to_tensor(
+          low, name='low', dtype=dtype)
+      self._peak = tensor_util.convert_nonref_to_tensor(
+          peak, name='peak', dtype=dtype)
+      self._high = tensor_util.convert_nonref_to_tensor(
+          high, name='high', dtype=dtype)
       self._smoothness = tensor_util.convert_nonref_to_tensor(
           smoothness, name='smoothness', dtype=dtype)
       self._concentration1 = 1. + self._smoothness \
-        * (self._mod - self._min) / (self._max - self._min)
+        * (self._peak - self._low) / (self._high - self._low)
       self._concentration0 = 1. + self._smoothness \
-        * (self._max - self._mod) / (self._max - self._min)
+        * (self._high - self._peak) / (self._high - self._low)
 
-      self._scale = self._max - self._min
+      self._scale = self._high - self._low
 
       # Broadcasting scale on affine bijector to match batch dimension.
       # This prevents dimension mismatch for operations like cdf.
@@ -111,7 +115,7 @@ class PERT(transformed_distribution.TransformedDistribution):
               concentration0=self._concentration0,
               allow_nan_stats=allow_nan_stats),
           bijector=AffineScalar(
-              shift=self._min,
+              shift=self._low,
               scale=tf.broadcast_to(
                   input=self._scale,
                   shape=self._batch_shape_tensor(
@@ -132,47 +136,48 @@ class PERT(transformed_distribution.TransformedDistribution):
     if not self.validate_args:
       return []
     assertions = []
-    if is_init != tensor_util.is_ref(self._mod):
-      if is_init != tensor_util.is_ref(self._min):
+    if is_init != tensor_util.is_ref(self._peak):
+      if is_init != tensor_util.is_ref(self._low):
         assertions.append(assert_util.assert_greater(
-            self._mod,
-            self._min,
-            message="Mode must be greater than minimum."
+            self._peak,
+            self._low,
+            message="`peak` must be greater than `low`."
         ))
-      if is_init != tensor_util.is_ref(self._max):
+      if is_init != tensor_util.is_ref(self._high):
         assertions.append(assert_util.assert_greater(
-            self._max,
-            self._mod,
-            message="Maximum must be greater than mode."
+            self._high,
+            self._peak,
+            message="`high` must be greater than `peak`."
         ))
     if is_init != tensor_util.is_ref(self._smoothness):
       assertions.append(assert_util.assert_positive(
           self._smoothness,
-          message="Smoothness parameter must be positive."
+          message="`smoothness` must be positive."
       ))
     return assertions
 
-  def _survivial_function(self, value, **kwargs):
-    return 1. - self.cdf(value, kwargs)
-
   def _variance(self, **kwargs):
     mean = self.mean()
-    return (mean - self._min) * (self._max - mean) / (self._smoothness + 3.)
+    return (mean - self._low) * (self._high - mean) / (self._smoothness + 3.)
 
   def _stddev(self, **kwargs):
     return tf.sqrt(self.variance(kwargs))
 
   def _mode(self, **kwargs):
-    return self._mod
+    return self._peak
 
   # Distribution properties
   @property
-  def minimum(self):
-    return self._min
+  def low(self):
+    return self._low
 
   @property
-  def maximum(self):
-    return self._max
+  def peak(self):
+    return self._peak
+
+  @property
+  def high(self):
+    return self._high
 
   @property
   def smoothness(self):
@@ -180,7 +185,7 @@ class PERT(transformed_distribution.TransformedDistribution):
 
   @property
   def loc(self):
-    return self._min
+    return self._low
 
   @property
   def scale(self):

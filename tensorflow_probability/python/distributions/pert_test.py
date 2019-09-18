@@ -22,16 +22,16 @@ tfd = tfp.distributions
 class PERTTest(test_case.TestCase):
   def _generate_boilerplate_param(self):
     smoothness = np.array([1., 2., 4., 10.])
-    mini = np.array(len(smoothness)*[1.])
-    mode = np.array(len(smoothness)*[7.])
-    maxi = np.array(len(smoothness)*[10.])
-    a = 1. + smoothness * (mode - mini) / (maxi - mini)
-    b = 1. + smoothness * (maxi - mode) / (maxi - mini)
-    return smoothness, mini, mode, maxi, a, b
+    low = np.array(len(smoothness)*[1.])
+    peak = np.array(len(smoothness)*[7.])
+    high = np.array(len(smoothness)*[10.])
+    a = 1. + smoothness * (peak - low) / (high - low)
+    b = 1. + smoothness * (high - peak) / (high - low)
+    return smoothness, low, peak, high, a, b
 
   # Shape and broadcast testing
   def testPertShape(self):
-    dist = tfd.PERT(mini=[3.0], mode=[10.0], maxi=[11.0], smoothness=[4.0])
+    dist = tfd.PERT(low=[3.0], peak=[10.0], high=[11.0], smoothness=[4.0])
     self.assertEqual(([1]), self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([1]), dist.batch_shape)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
@@ -39,9 +39,9 @@ class PERTTest(test_case.TestCase):
 
   def testBroadcastingSmoothness(self):
     dist = tfd.PERT(
-        mini=1.,
-        mode=2.,
-        maxi=3.,
+        low=1.,
+        peak=2.,
+        high=3.,
         smoothness=[1., 4., 10.])
     self.assertEqual([3], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([3]), dist.batch_shape)
@@ -50,9 +50,9 @@ class PERTTest(test_case.TestCase):
 
   def testBroadcastingParam(self):
     dist = tfd.PERT(
-        mini=1.,
-        mode=[2., 3., 4., 5., 6., 7., 8., 9.],
-        maxi=10.,
+        low=1.,
+        peak=[2., 3., 4., 5., 6., 7., 8., 9.],
+        high=10.,
         smoothness=4.)
     self.assertEqual([8], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([8]), dist.batch_shape)
@@ -61,9 +61,9 @@ class PERTTest(test_case.TestCase):
 
   def testBroadcastingHigherDimParam(self):
     dist = tfd.PERT(
-        mini=[1., 2.],
-        mode=[[2., 3.], [4., 5.]],
-        maxi=10.,
+        low=[1., 2.],
+        peak=[[2., 3.], [4., 5.]],
+        high=10.,
         smoothness=4.,
         validate_args=True)
     self.assertAllEqual([2, 2], self.evaluate(dist.batch_shape_tensor()))
@@ -72,7 +72,7 @@ class PERTTest(test_case.TestCase):
     self.assertEqual(tf.TensorShape([]), dist.event_shape)
 
   def testEdgeRangeOutput(self):
-    dist = tfd.PERT(mini=3.0, mode=10.0, maxi=11.0, smoothness=4.0)
+    dist = tfd.PERT(low=3.0, peak=10.0, high=11.0, smoothness=4.0)
     self.assertEqual(True, self.evaluate(tf.math.is_nan(dist.prob(1.))))
     self.assertEqual(True, self.evaluate(tf.math.is_nan(dist.log_prob(1.))))
     self.assertEqual(1., self.evaluate(dist.cdf(11.)))
@@ -92,26 +92,26 @@ class PERTTest(test_case.TestCase):
 
   # Statistical property testing
   def testMean(self):
-    smoothness, mini, mode, maxi, a, b = self._generate_boilerplate_param()
-    dist = tfd.PERT(mini, mode, maxi, smoothness)
-    expected_mean = sp_stats.beta.mean(a, b, mini, maxi-mini)
+    smoothness, low, peak, high, a, b = self._generate_boilerplate_param()
+    dist = tfd.PERT(low, peak, high, smoothness)
+    expected_mean = sp_stats.beta.mean(a, b, low, high-low)
     self.assertAllClose(expected_mean, self.evaluate(dist.mean()))
 
   def testVariance(self):
-    smoothness, mini, mode, maxi, a, b = self._generate_boilerplate_param()
-    dist = tfd.PERT(mini, mode, maxi, smoothness)
-    expected_var = sp_stats.beta.var(a, b, mini, maxi-mini)
+    smoothness, low, peak, high, a, b = self._generate_boilerplate_param()
+    dist = tfd.PERT(low, peak, high, smoothness)
+    expected_var = sp_stats.beta.var(a, b, low, high-low)
     self.assertAllClose(expected_var, self.evaluate(dist.variance()))
 
   # Sample testing
   def testSampleStatistics(self):
     n = 1 << 19
-    smoothness, mini, mode, maxi, a, b = self._generate_boilerplate_param()
-    dist = tfd.PERT(mini, mode, maxi, smoothness)\
+    smoothness, low, peak, high, a, b = self._generate_boilerplate_param()
+    dist = tfd.PERT(low, peak, high, smoothness)\
               .sample(n, seed=tfp_test_util.test_seed())
     samples = self.evaluate(dist)
-    expected_mean = sp_stats.beta.mean(a, b, mini, maxi-mini)
-    expected_var = sp_stats.beta.var(a, b, mini, maxi-mini)
+    expected_mean = sp_stats.beta.mean(a, b, low, high-low)
+    expected_var = sp_stats.beta.var(a, b, low, high-low)
     self.assertAllClose(
         samples.mean(axis=0),
         expected_mean,
@@ -128,77 +128,77 @@ class PERTTest(test_case.TestCase):
   # Parameter restriction testing
   def testSmoothnessPositive(self):
     smoothness = tf.Variable(0.)
-    mini = [1., 2., 3.]
-    mode = [2., 3., 4.]
-    maxi = [3., 4., 5.]
+    low = [1., 2., 3.]
+    peak = [2., 3., 4.]
+    high = [3., 4., 5.]
     self.evaluate(smoothness.initializer)
     with self.assertRaisesRegex(
         tf.errors.InvalidArgumentError,
-        "Smoothness parameter must be positive."):
-      dist = tfd.PERT(mini, mode, maxi, smoothness, validate_args=True)
+        "`smoothness` must be positive."):
+      dist = tfd.PERT(low, peak, high, smoothness, validate_args=True)
       self.evaluate(dist.sample(1))
 
   def testSmoothnessPositiveAfterMutation(self):
     smoothness = tf.Variable(4.)
-    mini = [1., 2., 3.]
-    mode = [2., 3., 4.]
-    maxi = [3., 4., 5.]
+    low = [1., 2., 3.]
+    peak = [2., 3., 4.]
+    high = [3., 4., 5.]
     self.evaluate(smoothness.initializer)
-    dist = tfd.PERT(mini, mode, maxi, smoothness, validate_args=True)
+    dist = tfd.PERT(low, peak, high, smoothness, validate_args=True)
     with self.assertRaisesRegex(
         tf.errors.InvalidArgumentError,
-        "Smoothness parameter must be positive."):
+        "`smoothness` must be positive."):
       with tf.control_dependencies([smoothness.assign(-1.)]):
         self.evaluate(dist.sample(1))
 
-  def testModeMinInequality(self):
-    mini = tf.Variable([1., 2., 3.])
-    mode = tf.Variable([1., 2., 3.])
-    maxi = [5., 5., 5.]
-    self.evaluate(mini.initializer)
-    self.evaluate(mode.initializer)
+  def testpeaklownequality(self):
+    low = tf.Variable([1., 2., 3.])
+    peak = tf.Variable([1., 2., 3.])
+    high = [5., 5., 5.]
+    self.evaluate(low.initializer)
+    self.evaluate(peak.initializer)
     with self.assertRaisesRegex(
         tf.errors.InvalidArgumentError,
-        "Mode must be greater than minimum."):
-      dist = tfd.PERT(mini, mode, maxi, validate_args=True)
+        "`peak` must be greater than `low`."):
+      dist = tfd.PERT(low, peak, high, validate_args=True)
       self.evaluate(dist.sample(1))
 
-  def testModeMinInequalityAfterMutation(self):
-    mini = tf.Variable([1., 2., 3.])
-    mode = tf.Variable([2., 3., 4.])
-    maxi = [5., 5., 5.]
-    self.evaluate(mini.initializer)
-    self.evaluate(mode.initializer)
-    dist = tfd.PERT(mini, mode, maxi, validate_args=True)
+  def testpeaklownequalityAfterMutation(self):
+    low = tf.Variable([1., 2., 3.])
+    peak = tf.Variable([2., 3., 4.])
+    high = [5., 5., 5.]
+    self.evaluate(low.initializer)
+    self.evaluate(peak.initializer)
+    dist = tfd.PERT(low, peak, high, validate_args=True)
     with self.assertRaisesRegex(
         tf.errors.InvalidArgumentError,
-        "Mode must be greater than minimum."):
-      with tf.control_dependencies([mode.assign([0., 0., 0.])]):
+        "`peak` must be greater than `low`."):
+      with tf.control_dependencies([peak.assign([0., 0., 0.])]):
         self.evaluate(dist.sample(1))
 
-  def testMaxModeInequality(self):
-    mini = [1., 2., 3.]
-    mode = tf.Variable([2., 3., 4.])
-    maxi = tf.Variable([5., 5., 4.])
-    self.evaluate(maxi.initializer)
-    self.evaluate(mode.initializer)
+  def testMaxpeakInequality(self):
+    low = [1., 2., 3.]
+    peak = tf.Variable([2., 3., 4.])
+    high = tf.Variable([5., 5., 4.])
+    self.evaluate(high.initializer)
+    self.evaluate(peak.initializer)
     with self.assertRaisesRegex(
         tf.errors.InvalidArgumentError,
-        "Maximum must be greater than mode."):
-      dist = tfd.PERT(mini, mode, maxi, validate_args=True)
+        "`high` must be greater than `peak`."):
+      dist = tfd.PERT(low, peak, high, validate_args=True)
       self.evaluate(dist.sample(1))
 
-  def testMaxModeInequalityAfterMutation(self):
-    mini = [1., 2., 3.]
-    mode = tf.Variable([2., 3., 4.])
-    maxi = tf.Variable([5., 5., 5.])
-    self.evaluate(maxi.initializer)
-    self.evaluate(mode.initializer)
-    dist = tfd.PERT(mini, mode, maxi, validate_args=True)
+  def testMaxpeakInequalityAfterMutation(self):
+    low = [1., 2., 3.]
+    peak = tf.Variable([2., 3., 4.])
+    high = tf.Variable([5., 5., 5.])
+    self.evaluate(high.initializer)
+    self.evaluate(peak.initializer)
+    dist = tfd.PERT(low, peak, high, validate_args=True)
     with self.assertRaisesRegex(
         tf.errors.InvalidArgumentError,
-        "Maximum must be greater than mode."):
-      with tf.control_dependencies([maxi.assign([0., 0., 0.])]):
+        "`high` must be greater than `peak`."):
+      with tf.control_dependencies([high.assign([0., 0., 0.])]):
         self.evaluate(dist.sample(1))
 
 if __name__ == "__main__":
