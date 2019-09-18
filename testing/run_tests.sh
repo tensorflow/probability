@@ -70,7 +70,8 @@ find_version_str() {
 install_python_packages() {
   # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
   TF_VERSION_STR=$(find_version_str tf-nightly)
-  pip install tf-nightly==$TF_VERSION_STR gast==0.2.2
+  pip install tf-nightly==$TF_VERSION_STR gast==0.2.2 \
+    tf-estimator-nightly==1.14.0.dev2019091701
 
   # The following unofficial dependencies are used only by tests.
   # TODO(b/141170087): Unpin Hypothesis version.
