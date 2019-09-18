@@ -107,8 +107,8 @@ class PERTTest(test_case.TestCase):
   def testSampleStatistics(self):
     n = 1 << 19
     temperature, low, peak, high, a, b = self._generate_boilerplate_param()
-    dist = tfd.PERT(low, peak, high, temperature)\
-              .sample(n, seed=tfp_test_util.test_seed())
+    dist = (tfd.PERT(low, peak, high, temperature)
+                  .sample(n, seed=tfp_test_util.test_seed()))
     samples = self.evaluate(dist)
     expected_mean = sp_stats.beta.mean(a, b, low, high-low)
     expected_var = sp_stats.beta.var(a, b, low, high-low)
