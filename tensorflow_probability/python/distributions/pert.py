@@ -123,6 +123,10 @@ class PERT(transformed_distribution.TransformedDistribution):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(low=0, high=0, peak=0, temperature=0)
+
   def _batch_shape(self):
     return tf.broadcast_static_shape(
         self.concentration1.shape, self.concentration0.shape)
