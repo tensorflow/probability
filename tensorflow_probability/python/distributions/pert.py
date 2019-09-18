@@ -18,33 +18,64 @@ __all__ = [
 ]
 
 class PERT(transformed_distribution.TransformedDistribution):
-  """Modified PERT distribution:
-  PERT distribution is a loc-scale family of Beta distribution intended to
-  model expert prediction on arbitrary real interval bounded by MAX and MIN
+  """Modified PERT distribution for modeling expert predictions.
+
+  PERT distribution is a loc-scale family of Beta distribution
+  fit onto an arbitrary real interval set between MAX and MIN
   values set by the user, along with MODE to indicate the expert's
   most frequent prediction.
+  [1](https://en.wikipedia.org/wiki/PERT_distribution)
 
-  The shift and scale factor is given by:
+  #### Mathematical Details
 
+  In terms of a Beta distribution, PERT can be expressed as
+
+  ```none
+  PERT ~ loc + scale * Beta(concentration1, concentration0)
   ```
-  shift = MIN
+  where
+
+  ```none
+  loc = MIN
   scale = MAX - MIN
+                            MODE - MIN
+  concentration1 = 1 + g * ------------
+                            MAX - MIN
+
+                            MAX - MODE
+  concentration1 = 1 + g * ------------
+                            MAX - MIN
+  g > 0
   ```
+  over support [MIN, MAX]. And some MODE such that
+  MIN < MODE < MAX. `g` is a positive parameter that controls
+  the shape of the the distribution. Higher value forms a sharper
+  peak.
 
-  Modified PERT is a generalized version of PERT that has an additional
-  parameter, smoothness (g).
+  Standard PERT distribution is obtained when g = 4.
 
-  Smoothness determines the properties of Beta distribution:
+  #### Examples
+  ```python
+  import tensorflow_probability as tfp
+  tfd = tfp.distributions
 
+  # Single PERT distribution
+  dist = tfd.PERT(mini=1., mode=7., maxi=11., smoothness=4.)
+  dist.sample(10)
+  dist.prob(7.)
+  dist.prob(0.) # Throws nan when input out of support.
+
+  # Multiple PERT distributions with varying smoothness (broadcasted)
+  dist = tfd.PERT(mini=1., mode=7., maxi=11., smoothness=[1., 2., 3., 4.])
+  dist.sample(10)
+  dist.prob(7.)
+  dist.prob([[7.],[5.]])
+
+  # Multiple PERT distributions with varying mode
+  dist = tfd.PERT(mini=1., mode=[2., 5., 8.], maxi=11., smoothness=4.)
+  dist.sample(10)
+  dist.sample([10,5])
   ```
-  concentration1 = 1 + g * (MODE - MIN)/(MAX - MIN)
-  concentration0 = 1 + g * (MAX - MODE)/(MAX - MIN)
-  mean = (MIN + g * MODE + MAX)/(g + 2)
-  ```
-
-  PERT distribution is obtained when g = 4.
-
-  For general reference: https://en.wikipedia.org/wiki/PERT_distribution
   """
   def __init__(self,
                mini,
@@ -59,6 +90,7 @@ class PERT(transformed_distribution.TransformedDistribution):
       dtype = dtype_util.common_dtype([mini, maxi, mode], tf.float32)
       self._min = tensor_util.convert_nonref_to_tensor(
           mini, name='mini', dtype=dtype)
+      self._mode
       self._mod = tensor_util.convert_nonref_to_tensor(
           mode, name='mode', dtype=dtype)
       self._max = tensor_util.convert_nonref_to_tensor(
