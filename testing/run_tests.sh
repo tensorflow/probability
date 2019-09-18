@@ -90,6 +90,7 @@ call_with_log_folding install_python_packages
 
 # Print out all versions, as an FYI in the logs.
 pip freeze
+python --version
 
 # Get a shard of tests.
 shard_tests=$(bazel query 'tests(//tensorflow_probability/...)' |
