@@ -90,7 +90,6 @@ class PERT(transformed_distribution.TransformedDistribution):
       dtype = dtype_util.common_dtype([mini, maxi, mode], tf.float32)
       self._min = tensor_util.convert_nonref_to_tensor(
           mini, name='mini', dtype=dtype)
-      self._mode
       self._mod = tensor_util.convert_nonref_to_tensor(
           mode, name='mode', dtype=dtype)
       self._max = tensor_util.convert_nonref_to_tensor(
