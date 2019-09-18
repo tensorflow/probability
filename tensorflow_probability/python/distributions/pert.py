@@ -100,10 +100,10 @@ class PERT(transformed_distribution.TransformedDistribution):
           high, name='high', dtype=dtype)
       self._smoothness = tensor_util.convert_nonref_to_tensor(
           smoothness, name='smoothness', dtype=dtype)
-      self._concentration1 = 1. + self._smoothness \
-        * (self._peak - self._low) / (self._high - self._low)
-      self._concentration0 = 1. + self._smoothness \
-        * (self._high - self._peak) / (self._high - self._low)
+      self._concentration1 = (1. + self._smoothness
+              * (self._peak - self._low) / (self._high - self._low))
+      self._concentration0 = (1. + self._smoothness
+              * (self._high - self._peak) / (self._high - self._low))
 
       self._scale = self._high - self._low
 
