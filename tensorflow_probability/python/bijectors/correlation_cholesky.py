@@ -44,8 +44,7 @@ class CorrelationCholesky(bijector.Bijector):
   the set of correlation matrices which are positive definite. A [correlation
   matrix](https://en.wikipedia.org/wiki/Correlation_and_dependence#Correlation_matrices)
   can be characterized as a symmetric positive semidefinite matrix with 1s on
-  the main diagonal. However, the correlation matrix is positive definite if no
-  component can be expressed as a linear combination of the other components.
+  the main diagonal.
 
   For a lower triangular matrix `L` to be a valid Cholesky-factor of a positive
   definite correlation matrix, it is necessary and sufficient that each row of
@@ -66,11 +65,10 @@ class CorrelationCholesky(bijector.Bijector):
   This is a consequence of the fact that `R` is symmetric positive definite with
   1s on the main diagonal.
 
-  The LKJ distribution with `input_output_cholesky=True` generates samples from
-  (and computes log-densities on) the set of Cholesky factors of positive
-  definite correlation matrices. [2] The `CorrelationCholesky` bijector provides
-  a bijective mapping from unconstrained reals to the support of the LKJ
-  distribution.
+  The CholeskyLKJ distribution [2] is a distribution on the set of Cholesky
+  factors of positive definite correlation matrices. The `CorrelationCholesky`
+  bijector provides a bijective mapping from unconstrained reals to the support
+  of the CholeskyLKJ distribution.
 
   #### Examples
 
@@ -80,10 +78,10 @@ class CorrelationCholesky(bijector.Bijector):
              [ 0.70710678,  0.70710678,  0.        ],
              [ 0.66666667,  0.66666667,  0.33333333]]
 
-  # bijector.CorrelationCholesky().inverse(
-        [[ 1.        ,  0.        ,  0. ],
-         [ 0.70710678,  0.70710678,  0.        ],
-         [ 0.66666667,  0.66666667,  0.33333333]])
+  bijector.CorrelationCholesky().inverse(
+      [[ 1.        ,  0.        ,  0. ],
+       [ 0.70710678,  0.70710678,  0.        ],
+       [ 0.66666667,  0.66666667,  0.33333333]])
   # Result: [2., 2., 1.]
   ```
 
