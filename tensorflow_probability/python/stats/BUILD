@@ -35,6 +35,7 @@ py_library(
         ":calibration",
         ":leave_one_out",
         ":quantiles",
+        ":ranking",
         ":sample_stats",
     ],
 )
@@ -62,6 +63,31 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_library(
+    name = "ranking",
+    srcs = ["ranking.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+py_test(
+    name = "ranking_test",
+    size = "medium",
+    srcs = ["ranking_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
