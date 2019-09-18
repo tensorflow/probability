@@ -21,28 +21,28 @@ tfd = tfp.distributions
 @test_util.run_all_in_graph_and_eager_modes
 class PERTTest(test_case.TestCase):
   def _generate_boilerplate_param(self):
-    smoothness = np.array([1., 2., 4., 10.])
-    low = np.array(len(smoothness)*[1.])
-    peak = np.array(len(smoothness)*[7.])
-    high = np.array(len(smoothness)*[10.])
-    a = 1. + smoothness * (peak - low) / (high - low)
-    b = 1. + smoothness * (high - peak) / (high - low)
-    return smoothness, low, peak, high, a, b
+    temperature = np.array([1., 2., 4., 10.])
+    low = np.array(len(temperature)*[1.])
+    peak = np.array(len(temperature)*[7.])
+    high = np.array(len(temperature)*[10.])
+    a = 1. + temperature * (peak - low) / (high - low)
+    b = 1. + temperature * (high - peak) / (high - low)
+    return temperature, low, peak, high, a, b
 
   # Shape and broadcast testing
   def testPertShape(self):
-    dist = tfd.PERT(low=[3.0], peak=[10.0], high=[11.0], smoothness=[4.0])
+    dist = tfd.PERT(low=[3.0], peak=[10.0], high=[11.0], temperature=[4.0])
     self.assertEqual(([1]), self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([1]), dist.batch_shape)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), dist.event_shape)
 
-  def testBroadcastingSmoothness(self):
+  def testBroadcastingtemperature(self):
     dist = tfd.PERT(
         low=1.,
         peak=2.,
         high=3.,
-        smoothness=[1., 4., 10.])
+        temperature=[1., 4., 10.])
     self.assertEqual([3], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([3]), dist.batch_shape)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
@@ -53,7 +53,7 @@ class PERTTest(test_case.TestCase):
         low=1.,
         peak=[2., 3., 4., 5., 6., 7., 8., 9.],
         high=10.,
-        smoothness=4.)
+        temperature=4.)
     self.assertEqual([8], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([8]), dist.batch_shape)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
@@ -64,7 +64,7 @@ class PERTTest(test_case.TestCase):
         low=[1., 2.],
         peak=[[2., 3.], [4., 5.]],
         high=10.,
-        smoothness=4.,
+        temperature=4.,
         validate_args=True)
     self.assertAllEqual([2, 2], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([2, 2]), dist.batch_shape)
@@ -72,7 +72,7 @@ class PERTTest(test_case.TestCase):
     self.assertEqual(tf.TensorShape([]), dist.event_shape)
 
   def testEdgeRangeOutput(self):
-    dist = tfd.PERT(low=3.0, peak=10.0, high=11.0, smoothness=4.0)
+    dist = tfd.PERT(low=3.0, peak=10.0, high=11.0, temperature=4.0)
     self.assertEqual(True, self.evaluate(tf.math.is_nan(dist.prob(1.))))
     self.assertEqual(True, self.evaluate(tf.math.is_nan(dist.log_prob(1.))))
     self.assertEqual(1., self.evaluate(dist.cdf(11.)))
@@ -92,22 +92,22 @@ class PERTTest(test_case.TestCase):
 
   # Statistical property testing
   def testMean(self):
-    smoothness, low, peak, high, a, b = self._generate_boilerplate_param()
-    dist = tfd.PERT(low, peak, high, smoothness)
+    temperature, low, peak, high, a, b = self._generate_boilerplate_param()
+    dist = tfd.PERT(low, peak, high, temperature)
     expected_mean = sp_stats.beta.mean(a, b, low, high-low)
     self.assertAllClose(expected_mean, self.evaluate(dist.mean()))
 
   def testVariance(self):
-    smoothness, low, peak, high, a, b = self._generate_boilerplate_param()
-    dist = tfd.PERT(low, peak, high, smoothness)
+    temperature, low, peak, high, a, b = self._generate_boilerplate_param()
+    dist = tfd.PERT(low, peak, high, temperature)
     expected_var = sp_stats.beta.var(a, b, low, high-low)
     self.assertAllClose(expected_var, self.evaluate(dist.variance()))
 
   # Sample testing
   def testSampleStatistics(self):
     n = 1 << 19
-    smoothness, low, peak, high, a, b = self._generate_boilerplate_param()
-    dist = tfd.PERT(low, peak, high, smoothness)\
+    temperature, low, peak, high, a, b = self._generate_boilerplate_param()
+    dist = tfd.PERT(low, peak, high, temperature)\
               .sample(n, seed=tfp_test_util.test_seed())
     samples = self.evaluate(dist)
     expected_mean = sp_stats.beta.mean(a, b, low, high-low)
@@ -126,29 +126,29 @@ class PERTTest(test_case.TestCase):
         msg="Sample variance is highly off of expected.")
 
   # Parameter restriction testing
-  def testSmoothnessPositive(self):
-    smoothness = tf.Variable(0.)
+  def testtemperaturePositive(self):
+    temperature = tf.Variable(0.)
     low = [1., 2., 3.]
     peak = [2., 3., 4.]
     high = [3., 4., 5.]
-    self.evaluate(smoothness.initializer)
+    self.evaluate(temperature.initializer)
     with self.assertRaisesRegex(
         tf.errors.InvalidArgumentError,
-        "`smoothness` must be positive."):
-      dist = tfd.PERT(low, peak, high, smoothness, validate_args=True)
+        "`temperature` must be positive."):
+      dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
       self.evaluate(dist.sample(1))
 
-  def testSmoothnessPositiveAfterMutation(self):
-    smoothness = tf.Variable(4.)
+  def testtemperaturePositiveAfterMutation(self):
+    temperature = tf.Variable(4.)
     low = [1., 2., 3.]
     peak = [2., 3., 4.]
     high = [3., 4., 5.]
-    self.evaluate(smoothness.initializer)
-    dist = tfd.PERT(low, peak, high, smoothness, validate_args=True)
+    self.evaluate(temperature.initializer)
+    dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
     with self.assertRaisesRegex(
         tf.errors.InvalidArgumentError,
-        "`smoothness` must be positive."):
-      with tf.control_dependencies([smoothness.assign(-1.)]):
+        "`temperature` must be positive."):
+      with tf.control_dependencies([temperature.assign(-1.)]):
         self.evaluate(dist.sample(1))
 
   def testpeaklownequality(self):

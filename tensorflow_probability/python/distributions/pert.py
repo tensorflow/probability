@@ -64,19 +64,19 @@ class PERT(transformed_distribution.TransformedDistribution):
   tfd = tfp.distributions
 
   # Single PERT distribution
-  dist = tfd.PERT(low=1., peak=7., high=11., smoothness=4.)
+  dist = tfd.PERT(low=1., peak=7., high=11., temperature=4.)
   dist.sample(10)
   dist.prob(7.)
   dist.prob(0.) # Throws nan when input out of support.
 
-  # Multiple PERT distributions with varying smoothness (broadcasted)
-  dist = tfd.PERT(low=1., peak=7., high=11., smoothness=[1., 2., 3., 4.])
+  # Multiple PERT distributions with varying temperature (broadcasted)
+  dist = tfd.PERT(low=1., peak=7., high=11., temperature=[1., 2., 3., 4.])
   dist.sample(10)
   dist.prob(7.)
   dist.prob([[7.],[5.]])
 
   # Multiple PERT distributions with varying peak
-  dist = tfd.PERT(low=1., peak=[2., 5., 8.], high=11., smoothness=4.)
+  dist = tfd.PERT(low=1., peak=[2., 5., 8.], high=11., temperature=4.)
   dist.sample(10)
   dist.sample([10,5])
   ```
@@ -85,7 +85,7 @@ class PERT(transformed_distribution.TransformedDistribution):
                low,
                peak,
                high,
-               smoothness=4.,
+               temperature=4.,
                validate_args=False,
                allow_nan_stats=False,
                name="PERT"):
@@ -98,11 +98,11 @@ class PERT(transformed_distribution.TransformedDistribution):
           peak, name='peak', dtype=dtype)
       self._high = tensor_util.convert_nonref_to_tensor(
           high, name='high', dtype=dtype)
-      self._smoothness = tensor_util.convert_nonref_to_tensor(
-          smoothness, name='smoothness', dtype=dtype)
-      self._concentration1 = (1. + self._smoothness
+      self._temperature = tensor_util.convert_nonref_to_tensor(
+          temperature, name='temperature', dtype=dtype)
+      self._concentration1 = (1. + self._temperature
               * (self._peak - self._low) / (self._high - self._low))
-      self._concentration0 = (1. + self._smoothness
+      self._concentration0 = (1. + self._temperature
               * (self._high - self._peak) / (self._high - self._low))
 
       self._scale = self._high - self._low
@@ -118,12 +118,14 @@ class PERT(transformed_distribution.TransformedDistribution):
               shift=self._low,
               scale=tf.broadcast_to(
                   input=self._scale,
-                  shape=self._batch_shape_tensor(
-                      concentration1=self._concentration1,
-                      concentration0=self._concentration0))),
+                  shape=self._batch_shape())),
           validate_args=validate_args,
           parameters=parameters,
           name=name)
+
+  def _batch_shape(self):
+    return tf.broadcast_static_shape(
+        self.concentration1.shape, self.concentration0.shape)
 
   def _batch_shape_tensor(self, concentration1=None, concentration0=None):
     return prefer_static.broadcast_shape(
@@ -132,33 +134,9 @@ class PERT(transformed_distribution.TransformedDistribution):
         prefer_static.shape(
             self.concentration0 if concentration0 is None else concentration0))
 
-  def _parameter_control_dependencies(self, is_init):
-    if not self.validate_args:
-      return []
-    assertions = []
-    if is_init != tensor_util.is_ref(self._peak):
-      if is_init != tensor_util.is_ref(self._low):
-        assertions.append(assert_util.assert_greater(
-            self._peak,
-            self._low,
-            message="`peak` must be greater than `low`."
-        ))
-      if is_init != tensor_util.is_ref(self._high):
-        assertions.append(assert_util.assert_greater(
-            self._high,
-            self._peak,
-            message="`high` must be greater than `peak`."
-        ))
-    if is_init != tensor_util.is_ref(self._smoothness):
-      assertions.append(assert_util.assert_positive(
-          self._smoothness,
-          message="`smoothness` must be positive."
-      ))
-    return assertions
-
   def _variance(self, **kwargs):
     mean = self.mean()
-    return (mean - self._low) * (self._high - mean) / (self._smoothness + 3.)
+    return (mean - self._low) * (self._high - mean) / (self._temperature + 3.)
 
   def _stddev(self, **kwargs):
     return tf.sqrt(self.variance(kwargs))
@@ -180,8 +158,8 @@ class PERT(transformed_distribution.TransformedDistribution):
     return self._high
 
   @property
-  def smoothness(self):
-    return self._smoothness
+  def temperature(self):
+    return self._temperature
 
   @property
   def loc(self):
@@ -198,3 +176,27 @@ class PERT(transformed_distribution.TransformedDistribution):
   @property
   def concentration1(self):
     return self._concentration1
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_ref(self._peak):
+      if is_init != tensor_util.is_ref(self._low):
+        assertions.append(assert_util.assert_greater(
+            self._peak,
+            self._low,
+            message="`peak` must be greater than `low`."
+        ))
+      if is_init != tensor_util.is_ref(self._high):
+        assertions.append(assert_util.assert_greater(
+            self._high,
+            self._peak,
+            message="`high` must be greater than `peak`."
+        ))
+    if is_init != tensor_util.is_ref(self._temperature):
+      assertions.append(assert_util.assert_positive(
+          self._temperature,
+          message="`temperature` must be positive."
+      ))
+    return assertions
