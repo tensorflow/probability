@@ -91,6 +91,7 @@ py_library(
         ":normal_conjugate_posteriors",
         ":onehot_categorical",
         ":pareto",
+        ":pert",
         ":plackett_luce",
         ":poisson",
         ":poisson_lognormal",
@@ -997,6 +998,20 @@ py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+py_library(
+    name = "pert",
+    srcs = ["pert.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:prefer_static"
     ],
 )
 
@@ -2206,6 +2221,20 @@ py_test(
     name = "pareto_test",
     size = "small",
     srcs = ["pareto_test.py"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "pert_test",
+    size = "small",
+    srcs = ["pert_test.py"],
     deps = [
         # numpy dep,
         # scipy dep,
