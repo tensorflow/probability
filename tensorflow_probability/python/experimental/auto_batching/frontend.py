@@ -130,12 +130,31 @@ def _parse_and_analyze(f, autobatch_functions):
   return node, ctx
 
 
-_LITERALS = (gast.Num, gast.Str, gast.Bytes, gast.Ellipsis, gast.NameConstant)
-
-
 def _is_literal(node):
-  if isinstance(node, _LITERALS):
-    return True
+  """Detects whether the given node is a literal.
+
+  This is surprisingly difficult to do robustly across versions of Python and
+  gast, as the parsing of constants has changed, if I may, constantly.
+
+  Args:
+    node: The node whose status to check.
+
+  Returns:
+    literal: A Python `bool` giving whether the node is constant or not.
+  """
+  try:
+    # TODO(b/140808434): Once we or TF decide to roll forward to gast 0.3, we
+    # won't need this clause.
+    # gast pre-0.3
+    literals = (gast.Num, gast.Str, gast.Bytes, gast.Ellipsis,
+                gast.NameConstant)
+    if isinstance(node, literals):
+      return True
+  except AttributeError:
+    # gast 0.3+
+    if isinstance(node, gast.Constant):
+      return True
+  # Python 2
   if isinstance(node, gast.Name) and node.id in ['True', 'False', 'None']:
     return True
   return False
