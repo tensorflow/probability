@@ -246,6 +246,7 @@ __all__ = [
     'ExpRelaxedOneHotCategorical',
     'OneHotCategorical',
     'Pareto',
+    'PERT',
     'PlackettLuce',
     'RelaxedBernoulli',
     'RelaxedOneHotCategorical',
