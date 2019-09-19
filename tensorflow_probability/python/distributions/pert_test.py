@@ -126,7 +126,7 @@ class PERTTest(test_case.TestCase):
         msg="Sample variance is highly off of expected.")
 
   # Parameter restriction testing
-  def testtemperaturePositive(self):
+  def testTemperaturePositive(self):
     temperature = tf.Variable(0.)
     low = [1., 2., 3.]
     peak = [2., 3., 4.]
@@ -138,7 +138,7 @@ class PERTTest(test_case.TestCase):
       dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
       self.evaluate(dist.sample(1))
 
-  def testtemperaturePositiveAfterMutation(self):
+  def testTemperaturePositiveAfterMutation(self):
     temperature = tf.Variable(4.)
     low = [1., 2., 3.]
     peak = [2., 3., 4.]
@@ -151,7 +151,7 @@ class PERTTest(test_case.TestCase):
       with tf.control_dependencies([temperature.assign(-1.)]):
         self.evaluate(dist.sample(1))
 
-  def testpeaklownequality(self):
+  def testPeakLowInequality(self):
     low = tf.Variable([1., 2., 3.])
     peak = tf.Variable([1., 2., 3.])
     high = [5., 5., 5.]
@@ -163,7 +163,7 @@ class PERTTest(test_case.TestCase):
       dist = tfd.PERT(low, peak, high, validate_args=True)
       self.evaluate(dist.sample(1))
 
-  def testpeaklownequalityAfterMutation(self):
+  def testPeakLowInequalityAfterMutation(self):
     low = tf.Variable([1., 2., 3.])
     peak = tf.Variable([2., 3., 4.])
     high = [5., 5., 5.]
@@ -176,7 +176,7 @@ class PERTTest(test_case.TestCase):
       with tf.control_dependencies([peak.assign([0., 0., 0.])]):
         self.evaluate(dist.sample(1))
 
-  def testMaxpeakInequality(self):
+  def testHighPeakInequality(self):
     low = [1., 2., 3.]
     peak = tf.Variable([2., 3., 4.])
     high = tf.Variable([5., 5., 4.])
@@ -188,7 +188,7 @@ class PERTTest(test_case.TestCase):
       dist = tfd.PERT(low, peak, high, validate_args=True)
       self.evaluate(dist.sample(1))
 
-  def testMaxpeakInequalityAfterMutation(self):
+  def testHighPeakInequalityAfterMutation(self):
     low = [1., 2., 3.]
     peak = tf.Variable([2., 3., 4.])
     high = tf.Variable([5., 5., 5.])
