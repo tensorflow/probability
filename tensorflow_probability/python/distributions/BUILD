@@ -2040,9 +2040,11 @@ py_test(
     name = "mixture_same_family_test",
     srcs = ["mixture_same_family_test.py"],
     deps = [
+        # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",

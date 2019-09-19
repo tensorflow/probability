@@ -213,13 +213,19 @@ class Dirichlet(distribution.Distribution):
       return tf.reduce_sum(self.concentration, axis=-1)
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.concentration)[:-1]
+    # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
+    # so we pre-emptively convert-to-tensor.
+    concentration = tf.convert_to_tensor(self.concentration)
+    return tf.shape(concentration)[:-1]
 
   def _batch_shape(self):
     return self.concentration.shape[:-1]
 
   def _event_shape_tensor(self):
-    return tf.shape(self.concentration)[-1:]
+    # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
+    # so we pre-emptively convert-to-tensor.
+    concentration = tf.convert_to_tensor(self.concentration)
+    return tf.shape(concentration)[-1:]
 
   def _event_shape(self):
     return tensorshape_util.with_rank(self.concentration.shape[-1:], rank=1)
