@@ -138,14 +138,14 @@ class PERT(transformed_distribution.TransformedDistribution):
         prefer_static.shape(
             self.concentration0 if concentration0 is None else concentration0))
 
-  def _variance(self, **kwargs):
+  def _variance(self):
     mean = self.mean()
     return (mean - self._low) * (self._high - mean) / (self._temperature + 3.)
 
-  def _stddev(self, **kwargs):
-    return tf.sqrt(self.variance(kwargs))
+  def _stddev(self):
+    return tf.sqrt(self._variance())
 
-  def _mode(self, **kwargs):
+  def _mode(self):
     return self._peak
 
   # Distribution properties
