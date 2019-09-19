@@ -86,7 +86,6 @@ FILENAMES = [
     "normal",
     "onehot_categorical",
     "pareto",
-    "plackett_luce",
     "poisson_lognormal",
     "poisson",
     "probit_bernoulli",

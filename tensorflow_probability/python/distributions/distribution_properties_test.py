@@ -87,7 +87,6 @@ TF2_FRIENDLY_DISTS = (
     'NegativeBinomial',
     'OneHotCategorical',
     'Pareto',
-    'PlackettLuce',
     'Poisson',
     # 'PoissonLogNormalQuadratureCompound' TODO(b/137956955): Add support
     # for hypothesis testing
@@ -1097,8 +1096,6 @@ CONSTRAINTS = {
         tf.sigmoid,
     'Bernoulli.probs':
         tf.sigmoid,
-    'PlackettLuce.scores':
-        tfp_hps.softplus_plus_eps(),
     'ProbitBernoulli.probs':
         tf.sigmoid,
     'RelaxedBernoulli.probs':
