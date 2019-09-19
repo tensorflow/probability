@@ -21,7 +21,7 @@ class PERT(transformed_distribution.TransformedDistribution):
   """Modified PERT distribution for modeling expert predictions.
 
   PERT distribution is a loc-scale family of Beta distribution
-  fit onto an arbitrary real interval set between LOW and HIGH
+  fit onto an arbitrary real interval between LOW and HIGH
   values set by the user, along with PEAK to indicate the expert's
   most frequent prediction.
   [1](https://en.wikipedia.org/wiki/PERT_distribution).
