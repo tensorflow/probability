@@ -6,7 +6,7 @@ probabilistic programs and manipulate a model's computation for flexible
 training, latent variable inference, and predictions.
 
 Are you upgrading from Edward? Check out the guide
-[`Upgrading_from_Edward_to_Edward2.md`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/Upgrading_From_Edward_To_Edward2.md).
+[`Upgrading_from_Edward_to_Edward2.md`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/Upgrading_From_Edward_To_Edward2.md).
 
 ## 1. Models as Probabilistic Programs
 

@@ -36,6 +36,7 @@ from tensorflow_probability.python.distributions.deterministic import VectorDete
 from tensorflow_probability.python.distributions.dirichlet import Dirichlet
 from tensorflow_probability.python.distributions.dirichlet_multinomial import DirichletMultinomial
 from tensorflow_probability.python.distributions.distribution import Distribution
+from tensorflow_probability.python.distributions.doublesided_maxwell import DoublesidedMaxwell
 from tensorflow_probability.python.distributions.empirical import Empirical
 from tensorflow_probability.python.distributions.exponential import Exponential
 from tensorflow_probability.python.distributions.finite_discrete import FiniteDiscrete
@@ -76,6 +77,7 @@ from tensorflow_probability.python.distributions.negative_binomial import Negati
 from tensorflow_probability.python.distributions.normal import Normal
 from tensorflow_probability.python.distributions.onehot_categorical import OneHotCategorical
 from tensorflow_probability.python.distributions.pareto import Pareto
+from tensorflow_probability.python.distributions.plackett_luce import PlackettLuce
 from tensorflow_probability.python.distributions.poisson import Poisson
 from tensorflow_probability.python.distributions.poisson_lognormal import PoissonLogNormalQuadratureCompound
 from tensorflow_probability.python.distributions.probit_bernoulli import ProbitBernoulli
@@ -177,6 +179,7 @@ __all__ = [
     'Chi2',
     'CholeskyLKJ',
     'Deterministic',
+    'DoublesidedMaxwell',
     'VectorDeterministic',
     'Empirical',
     'Exponential',
@@ -242,6 +245,7 @@ __all__ = [
     'ExpRelaxedOneHotCategorical',
     'OneHotCategorical',
     'Pareto',
+    'PlackettLuce',
     'RelaxedBernoulli',
     'RelaxedOneHotCategorical',
     'Zipf',

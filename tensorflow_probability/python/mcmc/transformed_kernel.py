@@ -79,10 +79,8 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
   """TransformedTransitionKernel applies a bijector to the MCMC's state space.
 
   The `TransformedTransitionKernel` `TransitionKernel` enables fitting
-  a [Bijector](
-  https://www.tensorflow.org/api_docs/python/tf/distributions/bijectors/Bijector)
-  which serves to decorrelate the Markov chain Monte Carlo (MCMC)
-  event dimensions thus making the chain mix faster. This is
+  a `tfp.bijectors.Bijector` which serves to decorrelate the Markov chain Monte
+  Carlo (MCMC) event dimensions thus making the chain mix faster. This is
   particularly useful when the geometry of the target distribution is
   unfavorable. In such cases it may take many evaluations of the
   `target_log_prob_fn` for the chain to mix between faraway states.
@@ -95,8 +93,7 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
 
   The `TransformedTransitionKernel` enables arbitrary bijective transformations
   of arbitrary `TransitionKernel`s, e.g., one could use bijectors
-  `tfp.distributions.bijectors.Affine`,
-  `tfp.distributions.bijectors.RealNVP`, etc. with transition kernels
+  `tfp.bijectors.Affine`, `tfp.bijectors.RealNVP`, etc. with transition kernels
   `tfp.mcmc.HamiltonianMonteCarlo`, `tfp.mcmc.RandomWalkMetropolis`,
   etc.
 

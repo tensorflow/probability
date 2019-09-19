@@ -35,6 +35,7 @@ __all__ = [
     'num_elements',
     'rank',
     'set_shape',
+    'with_rank',
     'with_rank_at_least',
 ]
 
@@ -280,6 +281,27 @@ def set_shape(tensor, shape):
   """
   if hasattr(tensor, 'set_shape'):
     tensor.set_shape(shape)
+
+
+def with_rank(x, rank):  # pylint: disable=redefined-outer-name
+  """Returns a shape based on `x` with the given `rank`.
+
+  This method promotes a completely unknown shape to one with a known rank.
+
+  For more details, see `help(tf.TensorShape.with_rank)`.
+
+  Args:
+    x: object representing a shape; convertible to `tf.TensorShape`.
+    rank: An `int` representing the rank of `x`, or else an assertion is raised.
+
+  Returns:
+    shape: a shape having `type(x)` but guaranteed to have given rank (or else
+           an assertion was raised).
+
+  Raises:
+    ValueError: If `x` does not represent a shape with the given `rank`.
+  """
+  return type(x)(tf.TensorShape(x).with_rank(rank))
 
 
 def with_rank_at_least(x, rank):  # pylint: disable=redefined-outer-name

@@ -31,6 +31,7 @@ from tensorflow_probability.python.stats.quantiles import find_bins
 from tensorflow_probability.python.stats.quantiles import histogram
 from tensorflow_probability.python.stats.quantiles import percentile
 from tensorflow_probability.python.stats.quantiles import quantiles
+from tensorflow_probability.python.stats.ranking import quantile_auc
 from tensorflow_probability.python.stats.sample_stats import auto_correlation
 from tensorflow_probability.python.stats.sample_stats import cholesky_covariance
 from tensorflow_probability.python.stats.sample_stats import correlation
@@ -60,6 +61,7 @@ __all__ = [
     'log_soomean_exp',
     'log_soosum_exp',
     'percentile',
+    'quantile_auc',
     'quantiles',
     'stddev',
     'variance',

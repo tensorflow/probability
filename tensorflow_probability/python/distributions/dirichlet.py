@@ -222,7 +222,7 @@ class Dirichlet(distribution.Distribution):
     return tf.shape(self.concentration)[-1:]
 
   def _event_shape(self):
-    return self.concentration.shape[-1:]
+    return tensorshape_util.with_rank(self.concentration.shape[-1:], rank=1)
 
   def _sample_n(self, n, seed=None):
     gamma_sample = tf.random.gamma(

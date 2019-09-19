@@ -308,6 +308,62 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
         validate_args=True, allow_nan_stats=False)
     self.evaluate(vmf.sample(sample_shape))
 
+  def testAssertsValidImmutableParams(self):
+    with self.assertRaisesOpError('`concentration` must be non-negative'):
+      vmf = tfp.distributions.VonMisesFisher(
+          mean_direction=tf.math.l2_normalize([1., 2, 3], axis=-1),
+          concentration=-1.,
+          validate_args=True,
+          allow_nan_stats=False)
+      self.evaluate(vmf.mean())
+
+    with self.assertRaisesOpError(
+        '`mean_direction` may not have scalar event shape'):
+      vmf = tfp.distributions.VonMisesFisher(
+          mean_direction=[1.],
+          concentration=0.,
+          validate_args=True,
+          allow_nan_stats=False)
+      self.evaluate(vmf.mean())
+
+    with self.assertRaisesOpError('`mean_direction` must be unit-length'):
+      vmf = tfp.distributions.VonMisesFisher(
+          mean_direction=tf.convert_to_tensor([1., 2, 3]),
+          concentration=1.,
+          validate_args=True,
+          allow_nan_stats=False)
+      self.evaluate(vmf.mean())
+
+  def testAssertsValidMutableParams(self):
+    mean_direction = tf.Variable(tf.math.l2_normalize([1., 2, 3], axis=-1))
+    concentration = tf.Variable(1.)
+    vmf = tfp.distributions.VonMisesFisher(
+        mean_direction=mean_direction,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
+
+    self.evaluate([mean_direction.initializer, concentration.initializer])
+    self.evaluate(concentration.assign(-1.))
+    with self.assertRaisesOpError('`concentration` must be non-negative'):
+      self.evaluate(vmf.mean())
+
+    self.evaluate((concentration.assign(1.),
+                   mean_direction.assign([1., 2., 3.])))
+    with self.assertRaisesOpError('`mean_direction` must be unit-length'):
+      self.evaluate(vmf.mean())
+
+    mean_direction = tf.Variable([1.])
+    vmf = tfp.distributions.VonMisesFisher(
+        mean_direction=mean_direction,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
+    self.evaluate(mean_direction.initializer)
+    with self.assertRaisesOpError(
+        '`mean_direction` may not have scalar event shape'):
+      self.evaluate(vmf.mean())
+
 
 if __name__ == '__main__':
   tf.test.main()

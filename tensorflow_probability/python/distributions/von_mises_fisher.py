@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
@@ -170,38 +171,18 @@ class VonMisesFisher(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([mean_direction, concentration],
                                       tf.float32)
-      mean_direction = tf.convert_to_tensor(
+      self._mean_direction = tensor_util.convert_nonref_to_tensor(
           mean_direction, name='mean_direction', dtype=dtype)
-      concentration = tf.convert_to_tensor(
+      self._concentration = tensor_util.convert_nonref_to_tensor(
           concentration, name='concentration', dtype=dtype)
-      assertions = [
-          assert_util.assert_non_negative(
-              concentration, message='`concentration` must be non-negative'),
-          assert_util.assert_greater(
-              tf.shape(mean_direction)[-1],
-              1,
-              message='`mean_direction` may not have scalar event shape'),
-          assert_util.assert_near(
-              1.,
-              tf.linalg.norm(mean_direction, axis=-1),
-              message='`mean_direction` must be unit-length')
-      ] if validate_args else []
+
       static_event_dim = tf.compat.dimension_value(
-          tensorshape_util.with_rank_at_least(mean_direction.shape, 1)[-1])
+          tensorshape_util.with_rank_at_least(
+              self._mean_direction.shape, 1)[-1])
       if static_event_dim is not None and static_event_dim > 5:
-        raise ValueError('vMF ndims > 5 is not currently supported')
-      elif validate_args:
-        assertions += [
-            assert_util.assert_less_equal(
-                tf.shape(mean_direction)[-1],
-                5,
-                message='vMF ndims > 5 is not currently supported')
-        ]
-      with tf.control_dependencies(assertions):
-        self._mean_direction = tf.identity(mean_direction)
-        self._concentration = tf.identity(concentration)
-      dtype_util.assert_same_float_dtype(
-          [self._mean_direction, self._concentration])
+        raise ValueError('von Mises-Fisher ndims > 5 is not currently '
+                         'supported')
+
       # mean_direction is always reparameterized.
       # concentration is only for event_dim==3, via an inversion sampler.
       reparameterization_type = (
@@ -230,41 +211,53 @@ class VonMisesFisher(distribution.Distribution):
     """Concentration parameter."""
     return self._concentration
 
-  def _batch_shape_tensor(self):
+  def _batch_shape_tensor(self, mean_direction=None, concentration=None):
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.mean_direction)[:-1], tf.shape(self.concentration))
+        tf.shape(self.mean_direction if mean_direction is None
+                 else mean_direction)[:-1],
+        tf.shape(self.concentration if concentration is None
+                 else concentration))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
         tensorshape_util.with_rank_at_least(self.mean_direction.shape, 1)[:-1],
         self.concentration.shape)
 
-  def _event_shape_tensor(self):
-    return tf.shape(self.mean_direction)[-1:]
+  def _event_shape_tensor(self, mean_direction=None):
+    return tf.shape(self.mean_direction if mean_direction is None
+                    else mean_direction)[-1:]
 
   def _event_shape(self):
-    s = tensorshape_util.with_rank_at_least(self.mean_direction.shape, 1)
-    return s[-1:]
+    return tensorshape_util.with_rank(self.mean_direction.shape[-1:], rank=1)
 
   def _log_prob(self, x):
     x = self._maybe_assert_valid_sample(x)
-    return self._log_unnormalized_prob(x) - self._log_normalization()
+    concentration = tf.convert_to_tensor(self.concentration)
+    return (self._log_unnormalized_prob(x, concentration=concentration) -
+            self._log_normalization(concentration=concentration))
 
-  def _log_unnormalized_prob(self, samples):
+  def _log_unnormalized_prob(self, samples,
+                             concentration=None):
+    if concentration is None:
+      concentration = tf.convert_to_tensor(self.concentration)
+
     samples = self._maybe_assert_valid_sample(samples)
     bcast_mean_dir = (self.mean_direction +
-                      tf.zeros_like(self.concentration)[..., tf.newaxis])
+                      tf.zeros_like(concentration)[..., tf.newaxis])
     inner_product = tf.reduce_sum(samples * bcast_mean_dir, axis=-1)
-    return self.concentration * inner_product
+    return concentration * inner_product
 
-  def _log_normalization(self):
+  def _log_normalization(self, concentration=None):
     """Computes the log-normalizer of the distribution."""
+    if concentration is None:
+      concentration = tf.convert_to_tensor(self.concentration)
+
     event_dim = tf.compat.dimension_value(self.event_shape[0])
     if event_dim is None:
-      raise ValueError('vMF _log_normalizer currently only supports '
-                       'statically known event shape')
-    safe_conc = tf.where(self.concentration > 0, self.concentration,
-                         tf.ones_like(self.concentration))
+      raise ValueError('von Mises-Fisher _log_normalizer currently only '
+                       'supports statically known event shape')
+    safe_conc = tf.where(concentration > 0, concentration,
+                         tf.ones_like(concentration))
     safe_lognorm = ((event_dim / 2 - 1) * tf.math.log(safe_conc) -
                     (event_dim / 2) * np.log(2 * np.pi) -
                     tf.math.log(_bessel_ive(event_dim / 2 - 1, safe_conc)) -
@@ -272,7 +265,7 @@ class VonMisesFisher(distribution.Distribution):
     log_nsphere_surface_area = (
         np.log(2.) + (event_dim / 2) * np.log(np.pi) -
         tf.math.lgamma(tf.cast(event_dim / 2, self.dtype)))
-    return tf.where(self.concentration > 0, -safe_lognorm,
+    return tf.where(concentration > 0, -safe_lognorm,
                     log_nsphere_surface_area)
 
   # TODO(bjp): Odd dimension analytic CDFs are provided in [1]
@@ -302,16 +295,19 @@ class VonMisesFisher(distribution.Distribution):
 
   def _mean(self):
     # Derivation: https://sachinruk.github.io/blog/von-Mises-Fisher/
+    concentration = tf.convert_to_tensor(self.concentration)
+    mean_direction = tf.convert_to_tensor(self.mean_direction)
+
     event_dim = tf.compat.dimension_value(self.event_shape[0])
     if event_dim is None:
       raise ValueError('event shape must be statically known for _bessel_ive')
-    safe_conc = tf.where(self.concentration > 0, self.concentration,
-                         tf.ones_like(self.concentration))
-    safe_mean = self.mean_direction * (
+    safe_conc = tf.where(concentration > 0, concentration,
+                         tf.ones_like(concentration))
+    safe_mean = mean_direction * (
         _bessel_ive(event_dim / 2, safe_conc) /
         _bessel_ive(event_dim / 2 - 1, safe_conc))[..., tf.newaxis]
     return tf.where(
-        self.concentration[..., tf.newaxis] > tf.zeros_like(safe_mean),
+        concentration[..., tf.newaxis] > 0.,
         safe_mean, tf.zeros_like(safe_mean))
 
   def _covariance(self):
@@ -319,54 +315,59 @@ class VonMisesFisher(distribution.Distribution):
     event_dim = tf.compat.dimension_value(self.event_shape[0])
     if event_dim is None:
       raise ValueError('event shape must be statically known for _bessel_ive')
-    # TODO(bjp): Enable this; numerically unstable.
+    # TODO(b/141142878): Enable this; numerically unstable.
     if event_dim > 2:
-      raise ValueError('vMF covariance is numerically unstable for dim>2')
-    concentration = self.concentration[..., tf.newaxis]
+      raise NotImplementedError(
+          'vMF covariance is numerically unstable for dim>2')
+    mean_direction = tf.convert_to_tensor(self.mean_direction)
+    concentration = tf.convert_to_tensor(self.concentration)
     safe_conc = tf.where(concentration > 0, concentration,
-                         tf.ones_like(concentration))
+                         tf.ones_like(concentration))[..., tf.newaxis]
     h = (_bessel_ive(event_dim / 2, safe_conc) /
          _bessel_ive(event_dim / 2 - 1, safe_conc))
     intermediate = (
-        tf.matmul(self.mean_direction[..., :, tf.newaxis],
-                  self.mean_direction[..., tf.newaxis, :]) *
+        tf.matmul(mean_direction[..., :, tf.newaxis],
+                  mean_direction[..., tf.newaxis, :]) *
         (1 - event_dim * h / safe_conc - h**2)[..., tf.newaxis])
     cov = tf.linalg.set_diag(
         intermediate,
         tf.linalg.diag_part(intermediate) + (h / safe_conc))
     return tf.where(
-        concentration[..., tf.newaxis] > tf.zeros_like(cov), cov,
-        tf.linalg.eye(event_dim, batch_shape=self.batch_shape_tensor()) /
-        event_dim)
+        concentration[..., tf.newaxis, tf.newaxis] > 0., cov,
+        tf.linalg.eye(event_dim,
+                      batch_shape=self._batch_shape_tensor(
+                          mean_direction=mean_direction,
+                          concentration=concentration)) / event_dim)
 
-  def _rotate(self, samples):
+  def _rotate(self, samples, mean_direction):
     """Applies a Householder rotation to `samples`."""
     event_dim = (
         tf.compat.dimension_value(self.event_shape[0]) or
-        self._event_shape_tensor()[0])
+        self._event_shape_tensor(mean_direction=mean_direction)[0])
     basis = tf.concat([[1.], tf.zeros([event_dim - 1], dtype=self.dtype)],
                       axis=0),
-    u = tf.math.l2_normalize(basis - self.mean_direction, axis=-1)
+    u = tf.math.l2_normalize(basis - mean_direction, axis=-1)
     return samples - 2 * tf.reduce_sum(samples * u, axis=-1, keepdims=True) * u
 
-  def _sample_3d(self, n, seed=None):
+  def _sample_3d(self, n, mean_direction, concentration, seed=None):
     """Specialized inversion sampler for 3D."""
     seed = SeedStream(seed, salt='von_mises_fisher_3d')
-    u_shape = tf.concat([[n], self._batch_shape_tensor()], axis=0)
+    u_shape = tf.concat([[n], self._batch_shape_tensor(
+        mean_direction=mean_direction, concentration=concentration)], axis=0)
     z = tf.random.uniform(u_shape, seed=seed(), dtype=self.dtype)
     # TODO(bjp): Higher-order odd dim analytic CDFs are available in [1], could
     # be bisected for bounded sampling runtime (i.e. not rejection sampling).
     # [1]: Inversion sampler via: https://ieeexplore.ieee.org/document/7347705/
     # The inversion is: u = 1 + log(z + (1-z)*exp(-2*kappa)) / kappa
     # We must protect against both kappa and z being zero.
-    safe_conc = tf.where(self.concentration > 0, self.concentration,
-                         tf.ones_like(self.concentration))
+    safe_conc = tf.where(concentration > 0, concentration,
+                         tf.ones_like(concentration))
     safe_z = tf.where(z > 0, z, tf.ones_like(z))
     safe_u = 1 + tf.reduce_logsumexp(
         [tf.math.log(safe_z),
          tf.math.log1p(-safe_z) - 2 * safe_conc], axis=0) / safe_conc
     # Limit of the above expression as kappa->0 is 2*z-1
-    u = tf.where(self.concentration > tf.zeros_like(safe_u), safe_u, 2 * z - 1)
+    u = tf.where(concentration > 0., safe_u, 2 * z - 1)
     # Limit of the expression as z->0 is -1.
     u = tf.where(tf.equal(z, 0), -tf.ones_like(u), u)
     if not self._allow_nan_stats:
@@ -392,25 +393,31 @@ class VonMisesFisher(distribution.Distribution):
     # circle where x = \hat{x} intersects the unit sphere. We pick a point on
     # that circle, then rotate to the desired mean direction from a basis of
     # (1, 0, 0).
+    mean_direction = tf.convert_to_tensor(self.mean_direction)
+    concentration = tf.convert_to_tensor(self.concentration)
     event_dim = (
         tf.compat.dimension_value(self.event_shape[0]) or
-        self._event_shape_tensor()[0])
+        self._event_shape_tensor(mean_direction=mean_direction)[0])
 
-    sample_batch_shape = tf.concat([[n], self._batch_shape_tensor()], axis=0)
+    sample_batch_shape = tf.concat([[n], self._batch_shape_tensor(
+        mean_direction=mean_direction, concentration=concentration)], axis=0)
     dim = tf.cast(event_dim - 1, self.dtype)
     if event_dim == 3:
-      samples_dim0 = self._sample_3d(n, seed=seed)
+      samples_dim0 = self._sample_3d(n,
+                                     mean_direction=mean_direction,
+                                     concentration=concentration,
+                                     seed=seed)
     else:
       # Wood'94 provides a rejection algorithm to sample the x coordinate.
       # Wood'94 definition of b:
       # b = (-2 * kappa + tf.sqrt(4 * kappa**2 + dim**2)) / dim
       # https://stats.stackexchange.com/questions/156729 suggests:
-      b = dim / (2 * self.concentration +
-                 tf.sqrt(4 * self.concentration**2 + dim**2))
+      b = dim / (2 * concentration +
+                 tf.sqrt(4 * concentration**2 + dim**2))
       # TODO(bjp): Integrate any useful numerical tricks from hyperspherical VAE
       #     https://github.com/nicola-decao/s-vae-tf/
       x = (1 - b) / (1 + b)
-      c = self.concentration * x + dim * tf.math.log1p(-x**2)
+      c = concentration * x + dim * tf.math.log1p(-x**2)
       beta = beta_lib.Beta(dim / 2, dim / 2)
 
       def cond_fn(w, should_continue):
@@ -421,16 +428,19 @@ class VonMisesFisher(distribution.Distribution):
         z = beta.sample(sample_shape=sample_batch_shape, seed=seed())
         # set_shape needed here because of b/139013403
         z.set_shape(w.shape)
-        w = tf.where(should_continue, (1 - (1 + b) * z) / (1 - (1 - b) * z), w)
+        w = tf.where(should_continue,
+                     (1. - (1. + b) * z) / (1. - (1. - b) * z),
+                     w)
         w = tf.debugging.check_numerics(w, 'w')
         unif = tf.random.uniform(
             sample_batch_shape, seed=seed(), dtype=self.dtype)
         # set_shape needed here because of b/139013403
         unif.set_shape(w.shape)
-        should_continue = tf.logical_and(
-            should_continue,
-            self.concentration * w + dim * tf.math.log1p(-x * w) - c <
-            tf.math.log(unif))
+        should_continue = should_continue & (
+            concentration * w + dim * tf.math.log1p(-x * w) - c <
+            # Use log1p(-unif) to prevent log(0) and ensure that log(1) is
+            # possible.
+            tf.math.log1p(-unif))
         return w, should_continue
 
       w = tf.zeros(sample_batch_shape, dtype=self.dtype)
@@ -491,8 +501,38 @@ class VonMisesFisher(distribution.Distribution):
       with tf.control_dependencies([
           assert_util.assert_less(
               tf.linalg.norm(
-                  self._rotate(basis) - self.mean_direction, axis=-1),
+                  self._rotate(basis, mean_direction=mean_direction) -
+                  mean_direction, axis=-1),
               dtype_util.as_numpy_dtype(self.dtype)(1e-5))
       ]):
-        return self._rotate(samples)
-    return self._rotate(samples)
+        return self._rotate(samples, mean_direction=mean_direction)
+    return self._rotate(samples, mean_direction=mean_direction)
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    mean_direction = tf.convert_to_tensor(self.mean_direction)
+    concentration = tf.convert_to_tensor(self.concentration)
+
+    assertions = []
+    if is_init != tensor_util.is_ref(self._mean_direction):
+      assertions.append(
+          assert_util.assert_greater(
+              tf.shape(mean_direction)[-1],
+              1,
+              message='`mean_direction` may not have scalar event shape'))
+      assertions.append(
+          assert_util.assert_less_equal(
+              tf.shape(mean_direction)[-1],
+              5,
+              message='von Mises-Fisher ndims > 5 is not currently supported'))
+      assertions.append(
+          assert_util.assert_near(
+              1.,
+              tf.linalg.norm(mean_direction, axis=-1),
+              message='`mean_direction` must be unit-length'))
+    if is_init != tensor_util.is_ref(self._concentration):
+      assertions.append(
+          assert_util.assert_non_negative(
+              concentration, message='`concentration` must be non-negative'))
+    return assertions

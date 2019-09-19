@@ -270,7 +270,7 @@ class DirichletMultinomial(distribution.Distribution):
 
   def _event_shape(self):
     # Event shape depends only on concentration, not total_count.
-    return tensorshape_util.with_rank_at_least(self.concentration.shape, 1)[-1:]
+    return tensorshape_util.with_rank(self.concentration.shape[-1:], rank=1)
 
   def _sample_n(self, n, seed=None):
     seed = SeedStream(seed, 'dirichlet_multinomial')

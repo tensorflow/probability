@@ -55,7 +55,7 @@ find_version_str() {
   PKG_NAME=$1
   # These are nightly builds we'd like to avoid for some reason; separated by
   # regex OR operator.
-  BAD_NIGHTLY_DATES="20190709\|20190716\|20190731\|20190802"
+  BAD_NIGHTLY_DATES="20190915\|20190916"
   # This will fail to find version 'X" and log available version strings to
   # stderr. We then sort, remove bad versions and take the last entry. This
   # allows us to avoid hardcoding the main version number, which would then need
@@ -70,10 +70,12 @@ find_version_str() {
 install_python_packages() {
   # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
   TF_VERSION_STR=$(find_version_str tf-nightly)
-  pip install tf-nightly==$TF_VERSION_STR gast==0.2.2
+  pip install tf-nightly==$TF_VERSION_STR gast==0.2.2 \
+    tf-estimator-nightly==1.14.0.dev2019091701
 
   # The following unofficial dependencies are used only by tests.
-  pip install scipy hypothesis matplotlib mock
+  # TODO(b/141170087): Unpin Hypothesis version.
+  pip install scipy hypothesis==4.36.0 matplotlib mock
 
   # Install additional TFP dependencies.
   pip install decorator cloudpickle
@@ -85,6 +87,10 @@ install_python_packages() {
 
 call_with_log_folding install_bazel
 call_with_log_folding install_python_packages
+
+# Print out all versions, as an FYI in the logs.
+pip freeze
+python --version
 
 # Get a shard of tests.
 shard_tests=$(bazel query 'tests(//tensorflow_probability/...)' |
