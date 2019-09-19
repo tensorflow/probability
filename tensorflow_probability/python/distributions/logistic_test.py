@@ -143,14 +143,19 @@ class LogisticTest(test_case.TestCase):
     self.assertAllClose(self.evaluate(dist.entropy()), expected_entropy)
 
   def testLogisticSample(self):
-    loc = [3.0, 4.0, 2.0]
-    scale = 1.0
-    dist = tfd.Logistic(loc, scale)
-    sample = dist.sample(
-        seed=tfp_test_util.test_seed(hardcoded_seed=100, set_eager_seed=False))
-    self.assertEqual(sample.shape, (3,))
-    self.assertAllClose(
-        self.evaluate(sample), [6.22460556, 3.79602098, 2.05084133])
+    loc_ = [3.0, 4.0, 2.0]
+    scale_ = 1.0
+    dist = tfd.Logistic(loc_, scale_)
+    n = int(15e3)
+    samples = dist.sample(n, seed=tfp_test_util.test_seed())
+    self.assertEqual(samples.shape, (n, 3))
+    samples_ = self.evaluate(samples)
+    for i in range(3):
+      self.assertLess(
+          stats.kstest(
+              samples_[:, i],
+              stats.logistic(loc=loc_[i], scale=scale_).cdf)[0],
+          0.01)
 
   def testLogisticQuantile(self):
     loc = [3.0, 4.0, 2.0]
