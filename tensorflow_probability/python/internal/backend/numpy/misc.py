@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 # Dependency imports
 import numpy as np
 
@@ -34,6 +36,7 @@ __all__ = [
     'tensor_scatter_nd_add',
     'tensor_scatter_nd_sub',
     'tensor_scatter_nd_update',
+    'unique',
     # 'clip_by_norm',
     # 'floormod',
     # 'meshgrid',
@@ -46,7 +49,6 @@ __all__ = [
     # 'truediv',
     # 'truncatediv',
     # 'truncatemod',
-    # 'unique',
     # 'unique_with_counts',
 ]
 
@@ -65,7 +67,7 @@ def _argsort(values, axis=-1, direction='ASCENDING', stable=False, name=None):  
   return np.argsort(values, axis, kind='stable' if stable else 'quicksort')
 
 
-def _sort(values, axis=-1, direction='ASCENDING', stable=False, name=None):  # pylint: disable=unused-argument
+def _sort(values, axis=-1, direction='ASCENDING', name=None):  # pylint: disable=unused-argument
   """Numpy implementation of `tf.sort`."""
   if direction == 'ASCENDING':
     pass
@@ -73,7 +75,7 @@ def _sort(values, axis=-1, direction='ASCENDING', stable=False, name=None):  # p
     values = np.negative(values)
   else:
     raise ValueError('Unrecognized direction: {}.'.format(direction))
-  result = np.sort(values, axis, kind='stable' if stable else 'quicksort')
+  result = np.sort(values, axis, kind='stable')
   if direction == 'DESCENDING':
     return np.negative(result)
   return result
@@ -112,6 +114,24 @@ def _tensor_scatter_nd_update(tensor, indices, updates, name=None):  # pylint: d
   return tensor
 
 
+_UniqueOutput = collections.namedtuple('UniqueOutput', ['y', 'idx'])
+
+
+# TODO(b/140685491): Add unit-test.
+def _unique(x, out_idx=tf.int32, name=None):  # pylint: disable=unused-argument
+  """Numpy implementation of `tf.unique`."""
+  x = np.array(x)
+  if len(x.shape) != 1:
+    raise tf.errors.InvalidArgumentError('unique expects a 1D vector.')
+  y, idx = np.unique(x,
+                     return_index=True,
+                     return_inverse=False,
+                     return_counts=False,
+                     axis=None)
+  idx = idx.astype(utils.numpy_dtype(out_idx))
+  return _UniqueOutput(y=y, idx=idx)
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 argsort = utils.copy_docstring(
@@ -133,3 +153,7 @@ tensor_scatter_nd_sub = utils.copy_docstring(
 tensor_scatter_nd_update = utils.copy_docstring(
     tf.tensor_scatter_nd_update,
     _tensor_scatter_nd_update)
+
+unique = utils.copy_docstring(
+    tf.unique,
+    _unique)

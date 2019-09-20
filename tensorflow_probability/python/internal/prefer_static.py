@@ -361,12 +361,14 @@ reduce_any = _prefer_static(tf.reduce_any, nptf.reduce_any)
 reduce_prod = _prefer_static(tf.reduce_prod, nptf.reduce_prod)
 reduce_sum = _prefer_static(tf.reduce_sum, nptf.reduce_sum)
 reshape = _prefer_static(tf.reshape, nptf.reshape)
+sort = _prefer_static(tf.sort, nptf.sort)
 tensor_scatter_nd_add = _prefer_static(
     tf.tensor_scatter_nd_add, nptf.tensor_scatter_nd_add)
 tensor_scatter_nd_sub = _prefer_static(
     tf.tensor_scatter_nd_sub, nptf.tensor_scatter_nd_sub)
 tensor_scatter_nd_update = _prefer_static(
     tf.tensor_scatter_nd_update, nptf.tensor_scatter_nd_update)
+unique = _prefer_static(tf.unique, nptf.unique)
 unstack = _prefer_static(tf.unstack, nptf.unstack)
 where = _prefer_static(tf.where, nptf.where)
 zeros = _prefer_static(tf.zeros, nptf.zeros)
