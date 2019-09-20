@@ -43,9 +43,9 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:name_util",
+        "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
