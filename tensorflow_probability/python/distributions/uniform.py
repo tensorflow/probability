@@ -193,26 +193,33 @@ class Uniform(distribution.Distribution):
     return (1. - value) * self.low + value * self.high
 
   def _entropy(self):
-    return tf.math.log(self.range())
+    return tf.math.log(self._range())
 
   def _mean(self):
     return (self.low + self.high) / 2.
 
   def _variance(self):
-    return tf.square(self.range()) / 12.
+    return tf.square(self._range()) / 12.
 
   def _stddev(self):
-    return self.range() / np.sqrt(12.)
+    return self._range() / np.sqrt(12.)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
     assertions = []
-    if (is_init != tensor_util.is_ref(self.low) and
-        is_init != tensor_util.is_ref(self.high)):
+    low = None
+    high = None
+    if is_init != tensor_util.is_ref(self.low):
+      low = tf.convert_to_tensor(self.low)
+      high = tf.convert_to_tensor(self.high)
       assertions.append(assert_util.assert_less(
-          self.low, self.high,
-          message='uniform not defined when low >= high.'))
+          low, high, message='uniform not defined when `low` >= `high`.'))
+    if is_init != tensor_util.is_ref(self.high):
+      low = tf.convert_to_tensor(self.low) if low is None else low
+      high = tf.convert_to_tensor(self.high) if high is None else high
+      assertions.append(assert_util.assert_less(
+          low, high, message='uniform not defined when `low` >= `high`.'))
     return assertions
 
 

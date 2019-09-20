@@ -131,7 +131,7 @@ class UniformTest(test_case.TestCase):
     a_v = np.array([1.0, 1.0, 1.0], dtype=np.float32)
     b_v = np.array([1.0, 2.0, 3.0], dtype=np.float32)
 
-    with self.assertRaisesOpError('not defined when low >= high'):
+    with self.assertRaisesOpError('not defined when `low` >= `high`'):
       uniform = tfd.Uniform(low=a_v, high=b_v, validate_args=True)
       self.evaluate(uniform.mean())
 
@@ -337,7 +337,16 @@ class UniformTest(test_case.TestCase):
     high = tf.Variable(1.)
     self.evaluate([low.initializer, high.initializer])
     uniform = tfd.Uniform(low=low, high=high, validate_args=True)
-    with self.assertRaisesOpError('not defined when low >= high'):
+    with self.assertRaisesOpError('not defined when `low` >= `high`'):
+      with tf.control_dependencies([low.assign(2.)]):
+        self.evaluate(uniform.mean())
+
+  def testModifiedVariableAssertionSingleVar(self):
+    low = tf.Variable(0.)
+    high = 1.
+    self.evaluate(low.initializer)
+    uniform = tfd.Uniform(low=low, high=high, validate_args=True)
+    with self.assertRaisesOpError('not defined when `low` >= `high`'):
       with tf.control_dependencies([low.assign(2.)]):
         self.evaluate(uniform.mean())
 

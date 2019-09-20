@@ -35,6 +35,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
@@ -87,6 +88,7 @@ TF2_FRIENDLY_DISTS = (
     'NegativeBinomial',
     'OneHotCategorical',
     'Pareto',
+    'PERT',
     'PlackettLuce',
     'Poisson',
     # 'PoissonLogNormalQuadratureCompound' TODO(b/137956955): Add support
@@ -601,6 +603,23 @@ def base_distributions(draw,
       broadcasting_params(
           dist_name, batch_shape, event_dim=event_dim, enable_vars=enable_vars))
   params_constrained = constraint_for(dist_name)(params_kwargs)
+
+  # Sometimes the "distribution constraint" fn may replace c2t-tracking
+  # DeferredTensor params with Tensor params (e.g. fix_triangular). In such
+  # cases, we preserve the c2t-tracking DeferredTensors by wrapping them but
+  # ignoring the value.
+  for k in params_constrained:
+    if (k in params_kwargs and
+        isinstance(params_kwargs[k], tfp_util.DeferredTensor) and
+        params_kwargs[k] is not params_constrained[k]):
+
+      def constrained_value(v, val=params_constrained[k]):
+        # While the gradient to v will be 0, we only care about the c2t counts.
+        return v * 0 + val
+
+      params_constrained[k] = tfp_util.DeferredTensor(constrained_value,
+                                                      params_kwargs[k])
+
   hp.note('Forming dist {} with constrained parameters {}'.format(
       dist_name, params_constrained))
   assert_shapes_unchanged(params_kwargs, params_constrained)
@@ -1039,6 +1058,14 @@ def fix_lkj(d):
   return dict(d, concentration=d['concentration'] + 1, dimension=3)
 
 
+def fix_pert(d):
+  peak = ensure_high_gt_low(d['low'], d['peak'])
+  high = ensure_high_gt_low(peak, d['high'])
+  temperature = ensure_high_gt_low(
+      np.zeros(d['temperature'].shape, dtype=np.float32), d['temperature'])
+  return dict(d, peak=peak, high=high, temperature=temperature)
+
+
 def fix_triangular(d):
   peak = ensure_high_gt_low(d['low'], d['peak'])
   high = ensure_high_gt_low(peak, d['high'])
@@ -1049,6 +1076,7 @@ def fix_wishart(d):
   df = d['df']
   scale = d.get('scale', d.get('scale_tril'))
   return dict(d, df=tf.maximum(df, tf.cast(scale.shape[-1], df.dtype)))
+
 
 CONSTRAINTS = {
     'atol':
@@ -1131,6 +1159,8 @@ CONSTRAINTS = {
         fix_lkj,
     'LKJ':
         fix_lkj,
+    'PERT':
+        fix_pert,
     'Triangular':
         fix_triangular,
     'TruncatedNormal':

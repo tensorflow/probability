@@ -86,6 +86,7 @@ FILENAMES = [
     "normal",
     "onehot_categorical",
     "pareto",
+    "pert",
     "plackett_luce",
     "poisson_lognormal",
     "poisson",

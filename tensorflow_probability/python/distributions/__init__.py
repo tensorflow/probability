@@ -77,6 +77,7 @@ from tensorflow_probability.python.distributions.negative_binomial import Negati
 from tensorflow_probability.python.distributions.normal import Normal
 from tensorflow_probability.python.distributions.onehot_categorical import OneHotCategorical
 from tensorflow_probability.python.distributions.pareto import Pareto
+from tensorflow_probability.python.distributions.pert import PERT
 from tensorflow_probability.python.distributions.plackett_luce import PlackettLuce
 from tensorflow_probability.python.distributions.poisson import Poisson
 from tensorflow_probability.python.distributions.poisson_lognormal import PoissonLogNormalQuadratureCompound
@@ -245,6 +246,7 @@ __all__ = [
     'ExpRelaxedOneHotCategorical',
     'OneHotCategorical',
     'Pareto',
+    'PERT',
     'PlackettLuce',
     'RelaxedBernoulli',
     'RelaxedOneHotCategorical',
