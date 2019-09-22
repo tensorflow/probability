@@ -14,8 +14,6 @@
 # ============================================================================
 # TFP with a numpy backend.
 
-# [internal] load python3.bzl
-
 licenses(["notice"])  # Apache 2.0
 
 package(
@@ -44,15 +42,5 @@ py_binary(
     python_version = "PY3",
     deps = [
         # absl:app dep,
-    ],
-)
-
-py_test(
-    name = "numpy_integration_test",
-    srcs = ["numpy_integration_test.py"],
-    tags = ["tfp_numpy"],
-    deps = [
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/experimental/substrates/numpy/internal:test_case",
     ],
 )
