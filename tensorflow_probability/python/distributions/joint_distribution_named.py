@@ -91,7 +91,8 @@ class JointDistributionNamed(
   # necessary to use dummy arguments to skip dependencies.
 
   x = joint.sample()
-  # ==> A 5-element `dict` of tfd.Distribution instances.
+  # ==> A 5-element `dict` of Tensors representing a draw/realization from each
+  #     distribution.
   joint.log_prob(x)
   # ==> A scalar `Tensor` representing the total log prob under all five
   #     distributions.

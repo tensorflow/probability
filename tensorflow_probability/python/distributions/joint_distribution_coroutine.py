@@ -95,7 +95,8 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
   joint = tfd.JointDistributionCoroutine(model)
 
   x = joint.sample()
-  # ==> A length-4 list of tfd.Distribution instances
+  # ==> x is A length-4 tuple of Tensors representing a draw/realization from
+  #     each distribution.
   joint.log_prob(x)
   # ==> A scalar `Tensor` representing the total log prob under all four
   #     distributions.

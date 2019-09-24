@@ -112,7 +112,8 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
   # (Notice the 1:1 correspondence between "math" and "code".)
 
   x = joint.sample()
-  # ==> A length-5 list of Tensors
+  # ==> A length-5 list of Tensors representing a draw/realization from each
+  #     distribution.
   joint.log_prob(x)
   # ==> A scalar `Tensor` representing the total log prob under all five
   #     distributions.
