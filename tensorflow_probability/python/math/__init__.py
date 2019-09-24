@@ -26,6 +26,7 @@ from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import log_combinations
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
+from tensorflow_probability.python.math.generic import smootherstep
 from tensorflow_probability.python.math.generic import soft_threshold
 from tensorflow_probability.python.math.generic import softplus_inverse
 from tensorflow_probability.python.math.gradient import value_and_gradient
@@ -74,13 +75,14 @@ _allowed_symbols = [
     'minimize',
     'ode',
     'pinv',
-    'psd_kernels',
     'pivoted_cholesky',
+    'psd_kernels',
     'random_rademacher',
     'random_rayleigh',
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
     'secant_root',
+    'smootherstep',
     'soft_threshold',
     'softplus_inverse',
     'sparse_or_dense_matmul',

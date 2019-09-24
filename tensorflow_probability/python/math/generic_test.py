@@ -340,17 +340,22 @@ class LogAddExp(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ReduceLogMeanExp(test_case.TestCase):
+class Smootherstep(test_case.TestCase):
 
-  def test_vector_axis_and_keepdims(self):
-    log_probs = tf.math.log(tf.random.uniform([10, 3, 4], seed=41))
-    expected = tf.math.log(
-        tf.reduce_mean(
-            tf.math.exp(log_probs),
-            axis=[1, 2],
-            keepdims=True))
-    actual = tfp.math.reduce_logmeanexp(log_probs, axis=[1, 2], keepdims=True)
-    self.assertAllClose(*self.evaluate([expected, actual]), rtol=1e-5, atol=0.)
+  def test_value_vector(self):
+    x = tf.constant([-np.inf, -20., 0., 0.5, 1., 20., np.inf])
+    y, _ = tfp.math.value_and_gradient(tfp.math.smootherstep, x)
+    self.assertAllEqual([7], y.shape)
+    y_ = self.evaluate(y)
+    self.assertAllClose([0., 0., 0., 0.5, 1., 1., 1.], y_, atol=1e-5, rtol=1e-5)
+
+  def test_gradient_matrix(self):
+    x = tf.constant([[-np.inf, -20., 0., 0.5],
+                     [np.inf, 20., 1., 0.5]])
+    _, g = tfp.math.value_and_gradient(tfp.math.smootherstep, x)
+    self.assertAllEqual([2, 4], g.shape)
+    g_ = self.evaluate(g)
+    self.assertAllClose([[0., 0., 0., 1.875]] * 2, g_, atol=1e-5, rtol=1e-5)
 
 
 if __name__ == '__main__':

@@ -33,6 +33,7 @@ __all__ = [
     'log_combinations',
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
+    'smootherstep',
     'soft_threshold',
     'softplus_inverse',
 ]
@@ -368,3 +369,42 @@ def log_add_exp(x, y, name=None):
     x = tf.convert_to_tensor(x, dtype=dtype, name='x')
     y = tf.convert_to_tensor(y, dtype=dtype, name='y')
     return tf.maximum(x, y) + tf.math.softplus(-abs(x - y))
+
+
+def smootherstep(x, name=None):
+  """Computes a sigmoid-like interpolation function on the unit-interval.
+
+  Equivalent to:
+
+  ```python
+  x = tf.clip_by_value(x, clip_value_min=0., clip_value_max=1.)
+  y = x**3. * (6. * x**2. - 15. * x + 10.)
+  ```
+
+  For more details see [Wikipedia][1].
+
+  Args:
+    x: `float` `Tensor`.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'smootherstep'`).
+
+  Returns:
+    smootherstep: `float` `Tensor` with the same shape and dtype as `x`,
+      representing the value of the smootherstep function.
+
+  #### References
+
+  [1]: "Smoothstep." Wikipedia.
+       https://en.wikipedia.org/wiki/Smoothstep#Variations
+  """
+  with tf.name_scope(name or 'smootherstep'):
+    x = tf.clip_by_value(x, clip_value_min=0., clip_value_max=1.)
+    # Note: Grappler will rewrite:
+    #   x**2, x**3
+    # as:
+    #   x2 = tf.square(x)
+    #   x3 = tf.square(x) * x
+    # and common subexpression elimination (CSE) will produce:
+    #   x2 = tf.square(x)
+    #   x3 = x2 * x
+    return x**3. * (6. * x**2. - 15. * x + 10.)
