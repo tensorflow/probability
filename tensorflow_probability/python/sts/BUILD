@@ -126,7 +126,13 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:joint_distribution_named",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/sts/internal",
+        "//tensorflow_probability/python/util",
     ],
 )
 

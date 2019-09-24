@@ -149,7 +149,8 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
       scale Tensors, etc. If omitted, Hypothesis will choose one.
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
       initialization in slicing_test.  If `False`, the returned parameters are
-      all Tensors, never Variables or DeferredTensor.
+      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}
 
   Returns:
     bijectors: A strategy for drawing bijectors with the specified `batch_shape`

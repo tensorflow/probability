@@ -90,7 +90,7 @@ class ConvertNonrefToTensorTest(test_case.TestCase):
 
   def test_end_to_end(self):
     x = tf.constant(-0.5)
-    d = tfd.Normal(loc=0., scale=tfp.util.DeferredTensor(tf.math.exp, x))
+    d = tfd.Normal(loc=0., scale=tfp.util.DeferredTensor(x, tf.math.exp))
     with tf.GradientTape(watch_accessed_variables=False) as tape:
       tape.watch(x)
       negloglik = -d.log_prob(0.)

@@ -24,8 +24,8 @@ import functools
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python import util as tfp_util
+from tensorflow_probability.python.bijectors import softplus as softplus_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 
@@ -65,11 +65,8 @@ def build_trainable_location_scale_distribution(initial_loc,
     initial_scale = tf.convert_to_tensor(initial_scale, dtype=dtype)
 
     loc = tf.Variable(initial_value=initial_loc, name='loc')
-    scale = tfp_util.DeferredTensor(
-        tf.nn.softplus, tf.Variable(initial_value=tf.broadcast_to(
-            tfp_math.softplus_inverse(initial_scale),
-            shape=prefer_static.shape(initial_loc)),
-                                    name='inverse_softplus_scale'))
+    scale = tfp_util.TransformedVariable(
+        initial_scale, softplus_lib.Softplus(), name='scale')
     posterior_dist = distribution_fn(loc=loc, scale=scale,
                                      validate_args=validate_args)
 
@@ -235,7 +232,7 @@ def build_factored_surrogate_posterior(
   """
 
   with tf.name_scope(name or 'build_factored_surrogate_posterior'):
-    seed = tfd.SeedStream(seed, salt='build_factored_surrogate_posterior')
+    seed = tfp_util.SeedStream(seed, salt='build_factored_surrogate_posterior')
 
     # Convert event shapes to Tensors.
     shallow_structure = _get_event_shape_shallow_structure(event_shape)

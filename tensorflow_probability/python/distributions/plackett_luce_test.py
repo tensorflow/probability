@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -155,7 +156,7 @@ class PlackettLuceFromVariableTest(test_case.TestCase):
         self.evaluate(d.scores_parameter())
 
   def testAssertionsScores(self):
-    x = tfp.util.DeferredTensor(tf.identity, tf.Variable(0.), shape=None)
+    x = tfp.util.TransformedVariable(0., tfb.Identity(), shape=None)
     with self.assertRaisesRegexp(
         ValueError, 'Argument `scores` must have rank at least 1.'):
       d = tfd.PlackettLuce(scores=x, validate_args=True)

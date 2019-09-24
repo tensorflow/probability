@@ -78,9 +78,10 @@ def fit_surrogate_posterior(target_log_prob_fn,
       `tfd.JointDistribution`). Crucially, the distribution's `log_prob` and
       (if reparameterized) `sample` methods must directly invoke all ops
       that generate gradients to the underlying variables. One way to ensure
-      this is to use `tfp.util.DeferredTensor` to represent any parameters
-      defined as transformations of unconstrained variables, so that the
-      transformations execute at runtime instead of at distribution creation.
+      this is to use `tfp.util.TransformedVariable` and/or
+      `tfp.util.DeferredTensor` to represent any parameters defined as
+      transformations of unconstrained variables, so that the transformations
+      execute at runtime instead of at distribution creation.
     optimizer: Optimizer instance to use. This may be a TF1-style
       `tf.train.Optimizer`, TF2-style `tf.optimizers.Optimizer`, or any Python
       object that implements `optimizer.apply_gradients(grads_and_vars)`.
@@ -146,9 +147,9 @@ def fit_surrogate_posterior(target_log_prob_fn,
 
   ```python
   q_z = tfd.Normal(loc=tf.Variable(0., name='q_z_loc'),
-                   scale=tfp.util.DeferredTensor(
-                     tf.nn.softplus,
-                     tf.Variable(0., name='q_z_scale')), name='q_z')
+                   scale=tfp.util.TransformedVariable(1., tfb.Softplus(),
+                                                      name='q_z_scale'),
+                   name='q_z')
   losses = tfp.vi.fit_surrogate_posterior(
       conditioned_log_prob,
       surrogate_posterior=q,
@@ -158,15 +159,15 @@ def fit_surrogate_posterior(target_log_prob_fn,
   ```
 
   Note that we ensure positive scale by using a softplus transformation of
-  the underlying variable, invoked via `DeferredTensor`. Deferring the
-  transformation causes it to be performed at runtime of the distribution's
+  the underlying variable, invoked via `TransformedVariable`. Deferring the
+  transformation causes it to be applied upon evaluation of the distribution's
   methods, creating a gradient to the underlying variable. If we
   had simply specified `scale=tf.nn.softplus(scale_var)` directly,
-  without the `DeferredTensor`, fitting would fail because calls to
+  without the `TransformedVariable`, fitting would fail because calls to
   `q.log_prob` and `q.sample` would never access the underlying variable. In
   general, transformations of trainable parameters must be deferred to runtime,
-  using either `DeferredTensor` or by the callable mechanisms available in
-  joint distribution classes (demonstrated below).
+  using either `TransformedVariable` or `DeferredTensor` or by the callable
+  mechanisms available in joint distribution classes (demonstrated below).
 
   **Custom loss function**. Suppose we prefer to fit the same model using
     the forward KL divergence `KL[p||q]`. We can pass a custom loss function:
@@ -245,8 +246,10 @@ def fit_surrogate_posterior(target_log_prob_fn,
   ```
 
   Note that here we could apply transforms to variables without using
-  `DeferredTensor` because `JointDistributionCoroutine` inherently defers
-  execution of its callable argument. As long as variables are transformed
+  `DeferredTensor` because the `JointDistributionCoroutine` argument is a
+  function, i.e., executed "on demand." (The same is true when
+  distribution-making functions are supplied to `JointDistributionSequential`
+  and `JointDistributionNamed`. That is, as long as variables are transformed
   *within* the callable, they will appear on the gradient tape when
   `q.log_prob()` or `q.sample()` are invoked.
 

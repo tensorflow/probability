@@ -31,6 +31,7 @@ from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -530,7 +531,7 @@ class CategoricalFromVariableTest(test_case.TestCase):
       self.evaluate(d.entropy())
 
   def testAssertionsLogits(self):
-    x = tfp.util.DeferredTensor(tf.identity, tf.Variable(0.), shape=None)
+    x = tfp.util.TransformedVariable(0., tfb.Identity(), shape=None)
     with self.assertRaisesRegexp(
         ValueError, 'Argument `logits` must have rank at least 1.'):
       d = tfd.Categorical(logits=x, validate_args=True)

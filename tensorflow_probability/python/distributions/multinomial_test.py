@@ -26,6 +26,7 @@ from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint:disable=g-direct-tensorflow-import
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -34,6 +35,7 @@ class MultinomialTest(test_case.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
+    super(MultinomialTest, self).setUp()
 
   def testSimpleShapes(self):
     p = [.1, .3, .6]
@@ -390,7 +392,7 @@ class MultinomialFromVariableTest(test_case.TestCase):
       self.evaluate(d.mean())
 
   def testAssertionsLogits(self):
-    x = tfp.util.DeferredTensor(tf.identity, tf.Variable(0.), shape=None)
+    x = tfp.util.TransformedVariable(0., tfb.Identity(), shape=None)
     with self.assertRaisesRegexp(
         ValueError, 'Argument `logits` must have rank at least 1.'):
       d = tfd.Multinomial(total_count=2., logits=x, validate_args=True)

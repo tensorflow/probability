@@ -39,7 +39,7 @@ class DeferredTensorTest(test_case.TestCase):
     trainable_normal = tfd.Normal(
         loc=tf.Variable(0.),
         scale=tfp.util.DeferredTensor(
-            tf.math.exp, tf.Variable(0., name='raw_scale')))
+            tf.Variable(0., name='raw_scale'), tf.math.exp))
     with tf.GradientTape() as tape:
       negloglik = -trainable_normal.log_prob(0.5)
     g = tape.gradient(negloglik, trainable_normal.trainable_variables)
@@ -50,7 +50,7 @@ class DeferredTensorTest(test_case.TestCase):
     # For speed, we don't bother testing the optimization part of the example.
 
   def test_properties(self):
-    x = tfp.util.DeferredTensor(tf.math.exp, tf.Variable(0.))
+    x = tfp.util.DeferredTensor(tf.Variable(0.), tf.math.exp)
     self.evaluate([v.initializer for v in x.trainable_variables])
     self.assertEqual((), x.shape)
     self.assertEqual(tf.float32, x.dtype)
@@ -67,7 +67,7 @@ class DeferredTensorTest(test_case.TestCase):
   def test_variable_shape_changes(self):
     v = tf.Variable(np.zeros((3, 2, 3)), shape=tf.TensorShape((None, 2, None)))
     self.evaluate(v.initializer)
-    x = tfp.util.DeferredTensor(tf.math.softmax, v)
+    x = tfp.util.DeferredTensor(v, tf.math.softmax)
 
     self.assertAllEqual((None, 2, None), x.shape.as_list())
     self.assertAllEqual((3, 2, 3), self.evaluate(tf.shape(x)))
@@ -84,7 +84,7 @@ class DeferredTensorTest(test_case.TestCase):
 
     v = tf.Variable(np.zeros((3, 4, 3)), shape=tf.TensorShape(None))
     self.evaluate(v.initializer)
-    x = tfp.util.DeferredTensor(f, v)
+    x = tfp.util.DeferredTensor(v, f)
 
     self.assertIsNone(x.shape.rank)
     self.assertAllEqual((2, 6, 3), self.evaluate(tf.shape(x)))
@@ -94,8 +94,8 @@ class DeferredTensorTest(test_case.TestCase):
       self.assertIsNone(x.shape.rank)
 
   def test_from_bijector_with_inverted_assignment(self):
-    x = tfp.util.DeferredTensor(tfb.Pad(validate_args=True),
-                                tf.Variable([[1.], [2.], [3.]]))
+    x = tfp.util.DeferredTensor(tf.Variable([[1.], [2.], [3.]]),
+                                tfb.Pad(validate_args=True))
     self.assertIs(tf.float32, x.dtype)
     self.assertAllEqual([3, 1], x.pretransformed_input.shape)
     self.assertAllEqual([3, 2], x.shape)
@@ -216,7 +216,7 @@ class DeferredTensorBehavesLikeTensorTest(test_case.TestCase,
                                           parameterized.TestCase):
 
   def testArrayPriority(self):
-    x = tfp.util.DeferredTensor(tf.math.exp, tf.Variable(0.))
+    x = tfp.util.DeferredTensor(tf.Variable(0.), tf.math.exp)
     y = np.array(3., dtype=np.float32)
     self.evaluate([v.initializer for v in x.trainable_variables])
     self.assertEqual(3., self.evaluate(y / x))
@@ -235,7 +235,7 @@ class DeferredTensorBehavesLikeTensorTest(test_case.TestCase,
       operator.le,
   )
   def testOperatorBinary(self, op):
-    x = tfp.util.DeferredTensor(tf.math.exp, tf.Variable(0.))
+    x = tfp.util.DeferredTensor(tf.Variable(0.), tf.math.exp)
     # Left operand does not support corresponding op and the operands are of
     # different types. Eg: `__radd__`.
     y1 = op(2., x)
@@ -252,7 +252,7 @@ class DeferredTensorBehavesLikeTensorTest(test_case.TestCase,
       operator.neg,
   )
   def testOperatorUnary(self, op):
-    x = tfp.util.DeferredTensor(tf.identity, tf.Variable(-1.))
+    x = tfp.util.DeferredTensor(tf.Variable(-1.), tf.identity)
     self.evaluate([v.initializer for v in x.trainable_variables])
     self.assertAllEqual(op(x), self.evaluate(op(x)))
 
@@ -264,7 +264,7 @@ class DeferredTensorBehavesLikeTensorTest(test_case.TestCase,
   def testOperatorBinaryLogical(self, op):
     x_ = False
     x = tfp.util.DeferredTensor(
-        lambda x: tf.cast(x, tf.bool), tf.Variable(0.), dtype=tf.bool)
+        tf.Variable(0.), lambda x: tf.cast(x, tf.bool), dtype=tf.bool)
     y1 = op(True, x)
     y2 = op(x, False)
     self.evaluate([v.initializer for v in x.trainable_variables])
@@ -276,25 +276,25 @@ class DeferredTensorBehavesLikeTensorTest(test_case.TestCase,
   # generally being not overrideable.)
   def testOperatorUnaryLogical(self):
     x = tfp.util.DeferredTensor(
-        lambda x: tf.cast(x, tf.bool), tf.Variable(0), dtype=tf.bool)
+        tf.Variable(0), lambda x: tf.cast(x, tf.bool), dtype=tf.bool)
     self.evaluate([v.initializer for v in x.trainable_variables])
     self.assertAllEqual(*self.evaluate([~tf.convert_to_tensor(x), ~x]))
 
   def testOperatorBoolNonzero(self):
     x = tfp.util.DeferredTensor(
-        lambda x: tf.cast(x, tf.bool), tf.Variable(0.), dtype=tf.bool)
+        tf.Variable(0.), lambda x: tf.cast(x, tf.bool), dtype=tf.bool)
     self.evaluate([v.initializer for v in x.trainable_variables])
     with self.assertRaises(TypeError):
       _ = not x
 
   def testOperatorGetitem(self):
-    x = tfp.util.DeferredTensor(tf.math.exp, tf.Variable([1., 2.]))
+    x = tfp.util.DeferredTensor(tf.Variable([1., 2.]), tf.math.exp)
     self.evaluate([v.initializer for v in x.trainable_variables])
     self.assertAllClose([np.exp(1.)], self.evaluate(x[:1]), atol=0., rtol=1e-5)
 
   def testOperatorIter(self):
     x_ = [0., 1.]
-    x = tfp.util.DeferredTensor(tf.math.exp, tf.Variable(x_))
+    x = tfp.util.DeferredTensor(tf.Variable(x_), tf.math.exp)
     self.evaluate([v.initializer for v in x.trainable_variables])
     if tf.executing_eagerly():
       for expected_, actual_ in zip(x_, iter(x)):

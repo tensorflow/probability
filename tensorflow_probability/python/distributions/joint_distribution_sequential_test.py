@@ -34,6 +34,7 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -345,8 +346,8 @@ class JointDistributionSequentialTest(
     num_words = 10
     avg_doc_length = 5
     u = tfd.Uniform(low=-1., high=1.)
-    alpha = tfp.util.DeferredTensor(
-        tf.math.softplus, tf.Variable(u.sample([num_topics]), name='raw_alpha'))
+    alpha = tfp.util.TransformedVariable(
+        u.sample([num_topics]), tfb.Softplus(), name='alpha')
     beta = tf.Variable(u.sample([num_topics, num_words]), name='beta')
 
     # LDA Model.

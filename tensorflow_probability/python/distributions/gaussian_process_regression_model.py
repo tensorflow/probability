@@ -478,7 +478,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
       if index_points is not None:
         index_points = tf.convert_to_tensor(
             index_points, dtype=dtype, name='index_points')
-      observation_index_points = (None if observation_index_points is None else
+      observation_index_points = (None if observation_index_points is None else  # pylint: disable=g-long-ternary
                                   tf.convert_to_tensor(
                                       observation_index_points,
                                       dtype=dtype,
@@ -490,7 +490,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
           dtype=dtype,
           name='observation_noise_variance')
       predictive_noise_variance = (
-          observation_noise_variance
+          observation_noise_variance  # pylint: disable=g-long-ternary
           if predictive_noise_variance is None else tf.convert_to_tensor(
               predictive_noise_variance,
               dtype=dtype,
@@ -523,7 +523,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
             base_kernel=kernel,
             fixed_inputs=observation_index_points,
             diag_shift=tfp_util.DeferredTensor(
-                lambda x: jitter + x, observation_noise_variance))
+                observation_noise_variance, lambda x: jitter + x))
         # Special logic for mean_fn only; SchurComplement already handles the
         # case of empty observations (ie, falls back to base_kernel).
         if _is_empty_observation_data(

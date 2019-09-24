@@ -358,7 +358,8 @@ def independents(
       scale Tensors, etc. If omitted, Hypothesis will choose one.
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
       initialization in slicing_test.  If `False`, the returned parameters are
-      all Tensors, never Variables or DeferredTensor.
+      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
 
   Returns:
@@ -429,7 +430,8 @@ def transformed_distributions(draw,
       scale Tensors, etc. If omitted, Hypothesis will choose one.
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
       initialization in slicing_test.  If `False`, the returned parameters are
-      all Tensors, never Variables or DeferredTensor.
+      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
 
   Returns:
@@ -499,7 +501,8 @@ def mixtures_same_family(draw,
       scale Tensors, etc. If omitted, Hypothesis will choose one.
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
       initialization in slicing_test.  If `False`, the returned parameters are
-      all Tensors, never Variables or DeferredTensor.
+      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
 
   Returns:
@@ -579,7 +582,8 @@ def base_distributions(draw,
       scale Tensors, etc. If omitted, Hypothesis will choose one.
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
       initialization in slicing_test.  If `False`, the returned parameters are
-      all Tensors, never Variables or DeferredTensor.
+      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}.
     eligibility_filter: Optional Python callable.  Blacklists some Distribution
       class names so they will not be drawn at the top level.
 
@@ -617,8 +621,8 @@ def base_distributions(draw,
         # While the gradient to v will be 0, we only care about the c2t counts.
         return v * 0 + val
 
-      params_constrained[k] = tfp_util.DeferredTensor(constrained_value,
-                                                      params_kwargs[k])
+      params_constrained[k] = tfp_util.DeferredTensor(
+          params_kwargs[k], constrained_value)
 
   hp.note('Forming dist {} with constrained parameters {}'.format(
       dist_name, params_constrained))
@@ -659,7 +663,8 @@ def distributions(draw,
       scale Tensors, etc. If omitted, Hypothesis will choose one.
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
       initialization in slicing_test.  If `False`, the returned parameters are
-      all Tensors, never Variables or DeferredTensor.
+      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}.
     depth: Python `int` giving maximum nesting depth of compound Distributions.
       If `None`, Hypothesis will bias choose one, with a bias towards shallow
       nests.

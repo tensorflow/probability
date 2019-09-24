@@ -32,6 +32,7 @@ from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -413,16 +414,16 @@ class MultivariateStudentTTestFloat32StaticShape(
         self.evaluate(d.sample())
 
   def testVariableScaleWithDeferredTensor(self):
-    pretransformed_scale = tf.Variable([0.69, 0.69])
     scale = tf.linalg.LinearOperatorDiag(
-        tfp.util.DeferredTensor(tf.exp, pretransformed_scale),
+        tfp.util.TransformedVariable([2., 2.], tfb.Exp()),
         is_positive_definite=True)
-    self.evaluate(pretransformed_scale.initializer)
+    self.evaluate([v.initializer for v in scale.trainable_variables])
     d = tfd.MultivariateStudentTLinearOperator(
         loc=1., df=3., scale=scale, validate_args=True)
     with tf.GradientTape() as tape:
-      lp = d.sample()
-    self.assertIsNotNone(tape.gradient(lp, pretransformed_scale))
+      lp = d.log_prob(d.sample())
+    self.assertLen(d.trainable_variables, 1)
+    self.assertIsNotNone(tape.gradient(lp, d.trainable_variables))
 
 
 class MultivariateStudentTTestFloat64StaticShape(

@@ -828,9 +828,10 @@ def monte_carlo_variational_loss(target_log_prob_fn,
       `tfd.JointDistribution`). Crucially, the distribution's `log_prob` and
       (if reparameterizeable) `sample` methods must directly invoke all ops
       that generate gradients to the underlying variables. One way to ensure
-      this is to use `tfp.util.DeferredTensor` to represent any parameters
-      defined as transformations of unconstrained variables, so that the
-      transformations execute at runtime instead of at distribution creation.
+      this is to use `tfp.util.TransformedVariable` and/or
+      `tfp.util.DeferredTensor` to represent any parameters defined as
+      transformations of unconstrained variables, so that the transformations
+      execute at runtime instead of at distribution creation.
     sample_size: Integer scalar number of Monte Carlo samples used to
       approximate the variational divergence. Larger values may stabilize
       the optimization, but at higher cost per step in time and memory.

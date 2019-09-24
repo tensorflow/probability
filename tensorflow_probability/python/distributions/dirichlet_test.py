@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -300,10 +301,7 @@ class DirichletFromVariableTest(test_case.TestCase):
     self.assertAllNotNone(g)
 
   def testAssertions(self):
-    x = tfp.util.DeferredTensor(
-        tf.exp,
-        tf.Variable(-1.),
-        shape=None)
+    x = tfp.util.TransformedVariable(0.3679, tfb.Exp(), shape=None)
     with self.assertRaisesRegexp(
         ValueError, 'Argument `concentration` must have rank at least 1.'):
       d = tfd.Dirichlet(concentration=x, validate_args=True)

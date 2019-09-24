@@ -81,7 +81,7 @@ def usage_counting_identity(var):
 
 
 def defer_and_count_usage(var):
-  return DeferredTensor(usage_counting_identity, var)
+  return DeferredTensor(var, usage_counting_identity)
 
 
 @contextlib.contextmanager
@@ -353,8 +353,9 @@ def broadcasting_params(draw,
       matrices, compatible location and scale Tensors, etc. If omitted,
       Hypothesis will choose one.
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
-      initialization in slicing_test.  If `False`, the returned parameters are
-      all Tensors, never Variables or DeferredTensor.
+      initialization in slicing_test. If `False`, the returned parameters are
+      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}.
     constraint_fn_for: Python callable mapping parameter name to constraint
       function.  The latter is itself a Python callable which converts an
       unconstrained Tensor (currently with float32 values from -200 to +200)
@@ -366,10 +367,11 @@ def broadcasting_params(draw,
 
   Returns:
     params: A Hypothesis strategy for drawing Python `dict`s mapping parameter
-      name to a Tensor, Variable, or DeferredTensor.  The batch shapes of the
-      returned parameters broadcast together to the supplied `batch_shape`.
-      Only parameters whose names appear as keys in `params_event_ndims` will
-      appear (but possibly not all of them, depending on `mutex_params`).
+      name to a `tf.Tensor`, `tf.Variable`, `tfp.util.DeferredTensor`, or
+      `tfp.util.TransformedVariable`.  The batch shapes of the returned
+      parameters broadcast together to the supplied `batch_shape`.  Only
+      parameters whose names appear as keys in `params_event_ndims` will appear
+      (but possibly not all of them, depending on `mutex_params`).
   """
   if event_dim is None:
     event_dim = draw(hps.integers(min_value=2, max_value=6))

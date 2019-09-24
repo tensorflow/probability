@@ -127,10 +127,10 @@ class MultivariateNormalTriL(
   dims = 4
   mvn = tfd.MultivariateNormalTriL(
       loc=tf.Variable(tf.zeros([dims], dtype=tf.float32), name="mu"),
-      scale_tril=tfp.utils.DeferredTensor(
-          tfp.bijectors.ScaleTriL().forward,
-          tf.Variable(tf.zeros([dims * (dims + 1) // 2], dtype=tf.float32),
-                      name="raw_scale_tril")))
+      scale_tril=tfp.util.TransformedVariable(
+          tf.eye(dims, dtype=tf.float32),
+          tfp.bijectors.ScaleTriL(),
+          name="raw_scale_tril")
   ```
 
   """

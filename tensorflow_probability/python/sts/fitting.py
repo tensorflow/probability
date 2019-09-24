@@ -22,10 +22,14 @@ import collections
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import mcmc
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python import vi
+from tensorflow_probability.python.bijectors import softplus as softplus_lib
+from tensorflow_probability.python.distributions import independent as independent_lib
+from tensorflow_probability.python.distributions import joint_distribution_named as joint_distribution_named_lib
+from tensorflow_probability.python.distributions import normal as normal_lib
+from tensorflow_probability.python.distributions import transformed_distribution as transformed_distribution_lib
 from tensorflow_probability.python.sts.internal import util as sts_util
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -75,22 +79,22 @@ def _build_posterior_for_one_parameter(param, batch_shape, seed):
       return_constrained=False, seed=seed)
   loc = tf.Variable(initial_value=initial_loc,
                     name=param.name + '_loc')
-  scale = tfp_util.DeferredTensor(
-      tf.nn.softplus, tf.Variable(
-          initial_value=tf.fill(tf.shape(initial_loc),
-                                value=tf.constant(-4, initial_loc.dtype)),
-          name=param.name + '_scale'))
-  posterior_dist = tfd.Normal(loc=loc, scale=scale)
+  scale = tfp_util.TransformedVariable(
+      tf.fill(tf.shape(initial_loc),
+              value=tf.constant(0.02, initial_loc.dtype),
+              name=param.name + '_scale'),
+      softplus_lib.Softplus())
+  posterior_dist = normal_lib.Normal(loc=loc, scale=scale)
 
   # Ensure the `event_shape` of the variational distribution matches the
   # parameter.
   if (param.prior.event_shape.ndims is None
       or param.prior.event_shape.ndims > 0):
-    posterior_dist = tfd.Independent(
+    posterior_dist = independent_lib.Independent(
         posterior_dist, reinterpreted_batch_ndims=param.prior.event_shape.ndims)
 
   # Transform to constrained parameter space.
-  posterior_dist = tfd.TransformedDistribution(
+  posterior_dist = transformed_distribution_lib.TransformedDistribution(
       posterior_dist, param.bijector, name='{}_posterior'.format(param.name))
   return posterior_dist
 
@@ -181,13 +185,14 @@ def build_factored_surrogate_posterior(
 
   """
   with tf.name_scope(name or 'build_factored_surrogate_posterior'):
-    seed = tfd.SeedStream(
+    seed = tfp_util.SeedStream(
         seed, salt='StructuralTimeSeries_build_factored_surrogate_posterior')
     variational_posterior = collections.OrderedDict()
     for param in model.parameters:
       variational_posterior[param.name] = _build_posterior_for_one_parameter(
           param, batch_shape=batch_shape, seed=seed())
-    return tfd.JointDistributionNamed(variational_posterior)
+    return joint_distribution_named_lib.JointDistributionNamed(
+        variational_posterior)
 
 
 @deprecation.deprecated(
@@ -335,7 +340,7 @@ def build_factored_variational_loss(model,
   """
 
   with tf.name_scope(name or 'build_factored_variational_loss') as name:
-    seed = tfd.SeedStream(
+    seed = tfp_util.SeedStream(
         seed, salt='StructuralTimeSeries_build_factored_variational_loss')
 
     variational_posterior = build_factored_surrogate_posterior(
@@ -526,9 +531,9 @@ def fit_with_hmc(model,
   incorporate constraints on the parameter space.
 
   ```python
-  transformed_hmc_kernel = mcmc.TransformedTransitionKernel(
-      inner_kernel=mcmc.DualAveragingStepSizeAdaptation(
-          inner_kernel=mcmc.HamiltonianMonteCarlo(
+  transformed_hmc_kernel = tfp.mcmc.TransformedTransitionKernel(
+      inner_kernel=tfp.mcmc.DualAveragingStepSizeAdaptation(
+          inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
               target_log_prob_fn=model.joint_log_prob(observed_time_series),
               step_size=step_size,
               num_leapfrog_steps=num_leapfrog_steps,
@@ -558,7 +563,7 @@ def fit_with_hmc(model,
 
   """
   with tf.name_scope(name or 'fit_with_hmc') as name:
-    seed = tfd.SeedStream(seed, salt='StructuralTimeSeries_fit_with_hmc')
+    seed = tfp_util.SeedStream(seed, salt='StructuralTimeSeries_fit_with_hmc')
 
     observed_time_series = sts_util.pad_batch_dimension_for_multiple_chains(
         observed_time_series, model, chain_batch_shape=chain_batch_shape)

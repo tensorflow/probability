@@ -49,8 +49,8 @@ class OptimizationTests(test_case.TestCase):
     # Test that the tape automatically picks up any trainable variables in
     # the model, even though it's just a function with no explicit
     # `.trainable_variables`
-    likelihood_scale = tfp.util.DeferredTensor(
-        tf.nn.softplus, tf.Variable(0., name='scale'))
+    likelihood_scale = tfp.util.TransformedVariable(
+        1., tfb.Softplus(), name='scale')
     def trainable_log_prob(z):
       lp = tfd.Normal(0., 1.).log_prob(z)
       lp += tf.reduce_sum(input_tensor=tfd.Normal(
@@ -63,8 +63,7 @@ class OptimizationTests(test_case.TestCase):
     z_posterior_mean = (1./sigma**2 * num_samples * mu) / z_posterior_precision
 
     q_loc = tf.Variable(0., name='mu')
-    q_scale = tfp.util.DeferredTensor(
-        tf.nn.softplus, tf.Variable(0., name='q_scale'))
+    q_scale = tfp.util.TransformedVariable(1., tfb.Softplus(), name='q_scale')
     q = tfd.Normal(q_loc, q_scale)
     loss_curve = tfp.vi.fit_surrogate_posterior(
         trainable_log_prob, q,
@@ -95,10 +94,7 @@ class OptimizationTests(test_case.TestCase):
 
     # The Q family is a joint distribution that can express any 2D MVN.
     b = tf.Variable([0., 0.])
-    l = tfp.util.DeferredTensor(
-        tfb.ScaleTriL().forward,
-        tf.Variable([0., 0., 0.]),
-        shape=tf.TensorShape([2, 2]))
+    l = tfp.util.TransformedVariable(tf.eye(2), tfb.ScaleTriL())
     def trainable_q_fn():
       z = yield tfd.JointDistributionCoroutine.Root(
           tfd.Normal(b[0], l[0, 0], name='z'))

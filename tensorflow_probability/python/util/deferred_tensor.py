@@ -113,9 +113,11 @@ class DeferredTensor(tf.Module):
   tfb = tfp.bijectors
   tfd = tfp.distributions
 
+  # Note: it'd be better to use `tfp.util.TransformedVariable`;
+  #       this example is for illustration only.
   trainable_normal = tfd.Normal(
       loc=tf.Variable(0.),
-      scale=tfp.util.DeferredTensor(tf.math.exp, tf.Variable(0.)))
+      scale=tfp.util.DeferredTensor(tf.Variable(0.), tf.math.exp))
 
   trainable_normal.loc
   # ==> <tf.Variable 'Variable:0' shape=() dtype=float32, numpy=0.0>
@@ -149,26 +151,31 @@ class DeferredTensor(tf.Module):
   It is also possible to parameterize a `DeferredTensor` with a bijector, e.g.:
 
   ```python
-  d = tfd.Normal(loc=0., scale=tfp.utils.DeferredTensor(
-      tfb.Softplus(), tf.Variable([0.54, 1.85])))
-  tf.convert_to_tensor(d.stddev())
+  # Note: it'd be better to use `tfp.util.TransformedVariable`;
+  #       this example is for illustration only.
+  d = tfd.Normal(loc=0.,
+                 scale=tfp.util.DeferredTensor(tf.Variable([0.54, 1.85]),
+                                               tfb.Softplus()))
+  d.stddev()
+  # ==> [1., 2.]
+  tf.convert_to_tensor(d.scale)
   # ==> [1., 2.]
   ```
 
   """
 
-  def __init__(self, transform_fn, pretransformed_input, dtype=None,
+  def __init__(self, pretransformed_input, transform_fn, dtype=None,
                shape=NONE_SPECIFIED, name=None):
     """Creates the `DeferredTensor` object.
 
     Args:
-      transform_fn: Python `callable` or `tfp.bijectors.Bijector`-like instance.
-        When `callable`, should take `pretransformed_input` and
-        return a `Tensor` (representing by this object).
       pretransformed_input: object with `shape`, `dtype` properties (typically a
         `tf.Variable`) passed into `transform_fn` when this object is acted upon
         in a `Tensor` context, eg, `tf.convert_to_tensor`, `+`, `tf.math.exp`,
         etc.
+      transform_fn: Python `callable` or `tfp.bijectors.Bijector`-like instance.
+        When `callable`, should take `pretransformed_input` and
+        return a `Tensor` (representing by this object).
       dtype: Equivalent to what would otherwise be
       `transform_fn(pretransformed_input).dtype`.
          Default value: `None` (i.e.,
@@ -232,8 +239,8 @@ class DeferredTensor(tf.Module):
       raise TypeError('Argument `transform_fn` must be `callable`.')
 
     super(DeferredTensor, self).__init__(name=name)
-    self._transform_fn = transform_fn
     self._pretransformed_input = pretransformed_input
+    self._transform_fn = transform_fn
     self._dtype = dtype
     self._shape = shape
     self._name = name
@@ -424,13 +431,13 @@ class TransformedVariable(DeferredTensor):
     if callable(initial_value):
       initial_value = initial_value()
     super(TransformedVariable, self).__init__(
-        transform_fn=bijector,
         pretransformed_input=tf.Variable(
             initial_value=bijector.inverse(tf.convert_to_tensor(
                 initial_value, dtype_hint=bijector.dtype, dtype=dtype)),
             name=name,
             dtype=dtype,
             **kwargs),
+        transform_fn=bijector,
         name=bijector.name)
     self._bijector = bijector
 

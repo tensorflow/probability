@@ -25,11 +25,15 @@ from scipy.special import gamma
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
+
+tfb = tfp.bijectors
+tfd = tfp.distributions
 
 
 def make_relaxed_categorical(batch_shape, num_classes, dtype=tf.float32):
@@ -279,7 +283,7 @@ class ExpRelaxedOneHotCategoricalFromVariableTest(test_case.TestCase):
         self.evaluate(d.logits_parameter())
 
   def testAssertionsLogits(self):
-    logits = tfp.util.DeferredTensor(tf.identity, tf.Variable(0.), shape=None)
+    logits = tfp.util.TransformedVariable(0., tfb.Identity(), shape=None)
     with self.assertRaisesRegexp(
         ValueError, 'Argument `logits` must have rank at least 1.'):
       d = tfd.ExpRelaxedOneHotCategorical(
