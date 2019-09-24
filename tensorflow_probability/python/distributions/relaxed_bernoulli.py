@@ -20,9 +20,6 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import util as tfp_util
-from tensorflow_probability.python.bijectors import affine_scalar as affine_scalar_bijector
-from tensorflow_probability.python.bijectors import invert as invert_bijector
-from tensorflow_probability.python.bijectors import reciprocal as reciprocal_bijector
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import logistic
@@ -182,7 +179,8 @@ class RelaxedBernoulli(distribution.Distribution):
 
       if logits is None:
         logits_parameter = tfp_util.DeferredTensor(
-            self._probs, invert_bijector.Invert(sigmoid_bijector.Sigmoid()))
+            self._probs,
+            lambda x: tf.math.log(x) - tf.math.log1p(-x))
       else:
         logits_parameter = self._logits
 
@@ -190,11 +188,11 @@ class RelaxedBernoulli(distribution.Distribution):
                                         self._temperature.shape)
 
       logistic_scale = tfp_util.DeferredTensor(
-          self._temperature, reciprocal_bijector.Reciprocal())
+          self._temperature,
+          tf.math.reciprocal)
       logistic_loc = tfp_util.DeferredTensor(
           logits_parameter,
-          affine_scalar_bijector.AffineScalar(scale=logistic_scale),
-          shape=shape)
+          lambda x: x * logistic_scale, shape=shape)
 
       self._transformed_logistic = (
           transformed_distribution.TransformedDistribution(
