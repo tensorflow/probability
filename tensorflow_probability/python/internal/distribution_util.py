@@ -123,21 +123,6 @@ def make_tril_scale(loc=None,
       `shape_hint` are both None.
   """
 
-  def _maybe_attach_assertion(x):
-    if not validate_args:
-      return x
-    if assert_positive:
-      return with_dependencies([
-          assert_util.assert_positive(
-              tf.linalg.diag_part(x), message='diagonal part must be positive'),
-      ], x)
-    return with_dependencies([
-        assert_util.assert_none_equal(
-            tf.linalg.diag_part(x),
-            tf.zeros([], x.dtype),
-            message='diagonal part must be non-zero'),
-    ], x)
-
   with tf.name_scope(name or 'make_tril_scale'):
 
     dtype = dtype_util.common_dtype(
@@ -162,7 +147,7 @@ def make_tril_scale(loc=None,
     scale_tril = tf.linalg.set_diag(scale_tril, tril_diag)
 
     return tf.linalg.LinearOperatorLowerTriangular(
-        tril=_maybe_attach_assertion(scale_tril),
+        tril=scale_tril,
         is_non_singular=True,
         is_self_adjoint=False,
         is_positive_definite=assert_positive)
@@ -216,19 +201,6 @@ def make_diag_scale(loc=None,
       `shape_hint` are both None.
   """
 
-  def _maybe_attach_assertion(x):
-    if not validate_args:
-      return x
-    if assert_positive:
-      return with_dependencies([
-          assert_util.assert_positive(
-              x, message='diagonal part must be positive'),
-      ], x)
-    return with_dependencies([
-        assert_util.assert_none_equal(
-            x, tf.zeros([], x.dtype), message='diagonal part must be non-zero')
-    ], x)
-
   with tf.name_scope(name or 'make_diag_scale'):
     if dtype is None:
       dtype = dtype_util.common_dtype(
@@ -246,7 +218,7 @@ def make_diag_scale(loc=None,
       if scale_identity_multiplier is not None:
         scale_diag = scale_diag + scale_identity_multiplier[..., tf.newaxis]
       return tf.linalg.LinearOperatorDiag(
-          diag=_maybe_attach_assertion(scale_diag),
+          diag=scale_diag,
           is_non_singular=True,
           is_self_adjoint=True,
           is_positive_definite=assert_positive)
@@ -272,7 +244,7 @@ def make_diag_scale(loc=None,
 
     return tf.linalg.LinearOperatorScaledIdentity(
         num_rows=num_rows,
-        multiplier=_maybe_attach_assertion(scale_identity_multiplier),
+        multiplier=scale_identity_multiplier,
         is_non_singular=True,
         is_self_adjoint=True,
         is_positive_definite=assert_positive,

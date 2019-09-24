@@ -412,7 +412,9 @@ class AffineBijectorTest(test_case.TestCase):
 
   def testNoBatchMultivariateRaisesWhenSingular(self):
     mu = [1., -1]
-    with self.assertRaisesOpError("diagonal part must be non-zero"):
+    with self.assertRaisesRegexp(
+        Exception,
+        ".*Singular operator:  Diagonal contained zero values.*"):
       bijector = tfb.Affine(
           shift=mu,
           # Has zero on the diagonal.

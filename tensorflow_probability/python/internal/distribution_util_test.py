@@ -149,20 +149,6 @@ class MakeTrilScaleTest(test_case.TestCase):
     scale = distribution_util.make_tril_scale(scale_tril=[[1., 1], [1., 1.]])
     self.assertAllClose([[1., 0], [1., 1.]], self.evaluate(scale.to_dense()))
 
-  def testValidateArgs(self):
-    with self.assertRaisesOpError('diagonal part must be non-zero'):
-      scale = distribution_util.make_tril_scale(
-          scale_tril=[[0., 1], [1., 1.]], validate_args=True)
-      self.evaluate(scale.to_dense())
-
-  def testAssertPositive(self):
-    with self.assertRaisesOpError('diagonal part must be positive'):
-      scale = distribution_util.make_tril_scale(
-          scale_tril=[[-1., 1], [1., 1.]],
-          validate_args=True,
-          assert_positive=True)
-      self.evaluate(scale.to_dense())
-
 
 @test_util.run_all_in_graph_and_eager_modes
 class MakeDiagScaleTest(test_case.TestCase):
@@ -202,20 +188,6 @@ class MakeDiagScaleTest(test_case.TestCase):
             'scale_identity_multiplier': 2.,
             'scale_diag': [[[2., 3., 4.], [3., 4., 5.]]]
         })
-
-  def testValidateArgs(self):
-    with self.assertRaisesOpError('diagonal part must be non-zero'):
-      scale = distribution_util.make_diag_scale(
-          scale_diag=[[0., 1], [1., 1.]], validate_args=True)
-      self.evaluate(scale.to_dense())
-
-  def testAssertPositive(self):
-    with self.assertRaisesOpError('diagonal part must be positive'):
-      scale = distribution_util.make_diag_scale(
-          scale_diag=[[-1., 1], [1., 1.]],
-          validate_args=True,
-          assert_positive=True)
-      self.evaluate(scale.to_dense())
 
 
 @test_util.run_all_in_graph_and_eager_modes
