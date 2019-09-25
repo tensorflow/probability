@@ -82,21 +82,21 @@ class CustomConvertToCompositeTensorTest(test_util.TensorFlowTestCase):
     self.assertIsInstance(z, tensor_tuple.TensorTuple)
     self.assertEqual(y._sequence, z._sequence)
 
-  def test_str_repr(self):
+  def disabled_test_str_repr(self):
+    # TODO(b/141554140): Temporarily disabled as tf.Tensor.__repr__() is
+    # changing. Re-enable once cl/270975275 lands.
     x = MyTuple((1, [2., 3.], [[4, 5], [6, 7]]))
     y = ops.convert_to_tensor_or_composite(value=x)
 
     if tf.executing_eagerly():
-      expected = ('(<tf.Tensor: id=, shape=(), dtype=int32, numpy=1>,'
-                  ' <tf.Tensor: id=, shape=(2,), dtype=float32,'
+      expected = ('(<tf.Tensor: shape=(), dtype=int32, numpy=1>,'
+                  ' <tf.Tensor: shape=(2,), dtype=float32,'
                   ' numpy=array([2.,3.], dtype=float32)>,'
-                  ' <tf.Tensor: id=, shape=(2,2), dtype=int32,'
+                  ' <tf.Tensor: shape=(2,2), dtype=int32,'
                   ' numpy=array([[4,5],[6,7]], dtype=int32)>)')
-      regexp1 = re.compile(r'id=\d+')
       regexp2 = re.compile(r'\s+([\d\[\]])')
       def _strip(s):
         s = s.replace('\n', '')
-        s = re.sub(regexp1, r'id=', s)
         s = re.sub(regexp2, r'\1', s)
         return s
       self.assertEqual(expected, _strip(str(y)))
