@@ -186,6 +186,9 @@ def bijector_supports():
                           Support.SCALAR_UNCONSTRAINED),
       'Reciprocal':
           BijectorSupport(Support.SCALAR_NON_ZERO, Support.SCALAR_NON_ZERO),
+      'ScaleTriL':
+          BijectorSupport(Support.VECTOR_SIZE_TRIANGULAR,
+                          Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
       'Sigmoid':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'SinhArcsinh':

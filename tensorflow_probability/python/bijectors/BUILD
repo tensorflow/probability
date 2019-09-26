@@ -553,6 +553,8 @@ py_library(
         ":softplus",
         ":transform_diagonal",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 

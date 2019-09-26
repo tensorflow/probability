@@ -24,9 +24,11 @@ from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import fill_triangular
 from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.bijectors import transform_diagonal
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
-    "ScaleTriL",
+    'ScaleTriL',
 ]
 
 
@@ -82,7 +84,7 @@ class ScaleTriL(chain.Chain):
                diag_bijector=None,
                diag_shift=1e-5,
                validate_args=False,
-               name="scale_tril"):
+               name='scale_tril'):
     """Instantiates the `ScaleTriL` bijector.
 
     Args:
@@ -106,8 +108,10 @@ class ScaleTriL(chain.Chain):
         diag_bijector = softplus.Softplus(validate_args=validate_args)
 
       if diag_shift is not None:
-        diag_shift = tf.convert_to_tensor(
-            diag_shift, dtype=diag_bijector.dtype, name="diag_shift")
+        dtype = dtype_util.common_dtype([diag_shift], tf.float32)
+        diag_shift = tensor_util.convert_nonref_to_tensor(diag_shift,
+                                                          name='diag_shift',
+                                                          dtype=dtype)
         diag_bijector = chain.Chain([
             affine_scalar.AffineScalar(shift=diag_shift),
             diag_bijector

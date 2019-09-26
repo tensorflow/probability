@@ -60,6 +60,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'PowerTransform',
     'RationalQuadraticSpline',
     'Reciprocal',
+    'ScaleTriL',
     'Sigmoid',
     'SinhArcsinh',
     'Softplus',
