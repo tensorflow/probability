@@ -158,6 +158,13 @@ class HalfNormal(distribution.Distribution):
     truncated_x = tf.nn.relu(x)
     return tf.math.erf(truncated_x / self.scale / np.sqrt(2.0))
 
+  def _survival_function(self, x):
+    truncated_x = tf.nn.relu(x)
+    return tf.math.erfc(truncated_x / self.scale / np.sqrt(2.0))
+
+  def _log_survival_function(self, x):
+    return tf.math.log(self._survival_function(x))
+
   def _entropy(self):
     return 0.5 * tf.math.log(np.pi * self.scale**2.0 / 2.0) + 0.5
 
