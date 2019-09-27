@@ -99,6 +99,7 @@ TF2_FRIENDLY_DISTS = (
     # 'SinhArcsinh' TODO(b/137956955): Add support for hypothesis testing
     'StudentT',
     'Triangular',
+    'TruncatedNormal',
     'Uniform',
     'VonMises',
     'VonMisesFisher',

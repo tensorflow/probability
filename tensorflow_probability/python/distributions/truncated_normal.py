@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 import numpy as np
 
@@ -25,29 +27,39 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math.generic import log_sub_exp as _log_sub_exp
 from tensorflow.python.ops import random_ops  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
-    "TruncatedNormal",
+    'TruncatedNormal',
 ]
+
+
+def _normal_pdf(x):
+  two_pi = tf.convert_to_tensor(2 * np.pi, dtype=x.dtype)
+  return tf.math.rsqrt(two_pi) * tf.exp(-0.5 * tf.square(x))
+
+
+def _normal_log_pdf(x):
+  two_pi = tf.convert_to_tensor(2 * np.pi, dtype=x.dtype)
+  return -0.5 * (tf.math.log(two_pi) + tf.square(x))
 
 
 class TruncatedNormal(distribution.Distribution):
   """The Truncated Normal distribution.
-
-  #### Mathematical details
 
   The truncated normal is a normal distribution bounded between `low`
   and `high` (the pdf is 0 outside these bounds and renormalized).
 
   Samples from this distribution are differentiable with respect to `loc`,
   `scale` as well as the bounds, `low` and `high`, i.e., this
-  implementation is fully reparameterizeable.
+  implementation is fully reparameterized.
 
   For more details, see [here](
   https://en.wikipedia.org/wiki/Truncated_normal_distribution).
@@ -69,7 +81,7 @@ class TruncatedNormal(distribution.Distribution):
     with 0 mean and unit variance.
 
   This is a scalar distribution so the event shape is always scalar and the
-  dimensions of the parameters defined the batch_shape.
+  dimensions of the parameters define the batch_shape.
 
   #### Examples
   ```python
@@ -96,7 +108,7 @@ class TruncatedNormal(distribution.Distribution):
                high,
                validate_args=False,
                allow_nan_stats=True,
-               name="TruncatedNormal"):
+               name='TruncatedNormal'):
     """Construct TruncatedNormal.
 
     All parameters of the distribution will be broadcast to the same shape,
@@ -116,7 +128,7 @@ class TruncatedNormal(distribution.Distribution):
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked at run-time.
       allow_nan_stats: Python `bool`, default `True`. When `True`,
-        statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+        statistics (e.g., mean, mode, variance) use the value '`NaN`' to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -124,76 +136,78 @@ class TruncatedNormal(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale, low, high], tf.float32)
-      loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-      low = tf.convert_to_tensor(low, name="low", dtype=dtype)
-      high = tf.convert_to_tensor(high, name="high", dtype=dtype)
-      dtype_util.assert_same_float_dtype([loc, scale, low, high])
+      self._loc = tensor_util.convert_nonref_to_tensor(
+          loc, name='loc', dtype=dtype)
+      self._scale = tensor_util.convert_nonref_to_tensor(
+          scale, name='scale', dtype=dtype)
+      self._low = tensor_util.convert_nonref_to_tensor(
+          low, name='low', dtype=dtype)
+      self._high = tensor_util.convert_nonref_to_tensor(
+          high, name='high', dtype=dtype)
+      dtype_util.assert_same_float_dtype(
+          [self._loc, self._scale, self._low, self._high])
 
-      self._broadcast_batch_shape = distribution_util.get_broadcast_shape(
-          loc, scale, low, high)
+      super(TruncatedNormal, self).__init__(
+          dtype=dtype,
+          # This distribution is fully reparameterized. loc, scale have straight
+          # through gradients. The gradients for the bounds are implemented
+          # using custom derived expressions based on implicit gradients.
+          # For the special case of lower bound zero and a positive upper bound
+          # an equivalent expression can also be found in Sec 9.1.1.
+          # of https://arxiv.org/pdf/1806.01851.pdf. The implementation here
+          # handles arbitrary bounds.
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
-      # Broadcast all parameters to the same shape
-      broadcast_ones = tf.ones(shape=self._broadcast_batch_shape,
-                               dtype=scale.dtype)
-      self._scale = scale * broadcast_ones
-      self._loc = loc * broadcast_ones
-      self._low = low * broadcast_ones
-      self._high = high * broadcast_ones
+  def _loc_scale_low_high(self, loc=None, scale=None, low=None, high=None):
+    loc = tf.convert_to_tensor(self.loc if loc is None else loc)
+    scale = tf.convert_to_tensor(self.scale if scale is None else scale)
+    low = tf.convert_to_tensor(self.low if low is None else low)
+    high = tf.convert_to_tensor(self.high if high is None else high)
+    return loc, scale, low, high
 
-      with tf.control_dependencies([self._validate()] if validate_args else []):
-        self._loc = tf.identity(self._loc)
+  def _standardized_low_and_high(self,
+                                 loc=None,
+                                 scale=None,
+                                 low=None,
+                                 high=None):
+    loc, scale, low, high = self._loc_scale_low_high(
+        loc=loc, scale=scale, low=low, high=high)
+    return (low - loc) / scale, (high - loc) / scale
 
-    super(TruncatedNormal, self).__init__(
-        dtype=dtype,
-        # This distribution is fully reparameterized. loc, scale have straight
-        # through gradients. The gradients for the bounds are implemented using
-        # custom derived expressions based on implicit gradients.
-        # For the special case of lower bound zero and a positive upper bound
-        # an equivalent expression can also be found in Sec 9.1.1.
-        # of https://arxiv.org/pdf/1806.01851.pdf. The implementation here
-        # handles arbitrary bounds.
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        name=name)
+  def _normalizer(self,
+                  loc=None,
+                  scale=None,
+                  low=None,
+                  high=None,
+                  std_low=None,
+                  std_high=None):
+    if std_low is None or std_high is None:
+      std_low, std_high = self._standardized_low_and_high(
+          loc=loc, scale=scale, low=low, high=high)
+    return special_math.ndtr(std_high) - special_math.ndtr(std_low)
 
-  def _validate(self):
-    vops = [
-        assert_util.assert_positive(self._scale),
-        assert_util.assert_positive(self._high - self._low),
-        assert_util.assert_finite(self._low, message="Lower bound not finite"),
-        assert_util.assert_finite(self._high, message="Upper bound not finite"),
-        assert_util.assert_finite(self._loc, message="Loc not finite"),
-        assert_util.assert_finite(self._scale, message="scale not finite"),
-    ]
-    return tf.group(*vops, name="ValidationOps")
-
-  @property
-  def _standardized_low(self):
-    return (self._low - self._loc) / self._scale
-
-  @property
-  def _standardized_high(self):
-    return (self._high - self._loc) / self._scale
-
-  @property
-  def _normalizer(self):
-    return (special_math.ndtr(self._standardized_high) -
-            special_math.ndtr(self._standardized_low))
-
-  def _normal_pdf(self, x):
-    return 1. / np.sqrt(2 * np.pi) * tf.exp(-0.5 * tf.square(x))
+  def _log_normalizer(self,
+                      loc=None,
+                      scale=None,
+                      low=None,
+                      high=None,
+                      std_low=None,
+                      std_high=None):
+    if std_low is None or std_high is None:
+      std_low, std_high = self._standardized_low_and_high(
+          loc=loc, scale=scale, low=low, high=high)
+    return _log_sub_exp(
+        special_math.log_ndtr(std_high), special_math.log_ndtr(std_low))
 
   @staticmethod
   def _param_shapes(sample_shape):
     # All parameters are of the same shape
     shape = tf.convert_to_tensor(sample_shape, dtype=tf.int32)
-    return {"loc": shape,
-            "scale": shape,
-            "high": shape,
-            "low": shape}
+    return {'loc': shape, 'scale': shape, 'high': shape, 'low': shape}
 
   @classmethod
   def _params_event_ndims(cls):
@@ -216,24 +230,28 @@ class TruncatedNormal(distribution.Distribution):
   def high(self):
     return self._high
 
-  def _batch_shape_tensor(self):
-    # All the parameters are broadcast the same shape during construction.
-    return tf.shape(self.loc)
-
   def _batch_shape(self):
-    # All the parameters are broadcast the same shape during construction.
-    return self.loc.shape
+    return functools.reduce(
+        tf.broadcast_static_shape,
+        (self.loc.shape, self.scale.shape, self.low.shape, self.high.shape))
 
-  def _event_shape_tensor(self):
-    return tf.constant([], dtype=tf.int32)
+  def _batch_shape_tensor(self, loc=None, scale=None, low=None, high=None):
+    return functools.reduce(
+        prefer_static.broadcast_shape,
+        (prefer_static.shape(self.loc if loc is None else loc),
+         prefer_static.shape(self.scale if scale is None else scale),
+         prefer_static.shape(self.low if low is None else low),
+         prefer_static.shape(self.high if high is None else high)))
 
   def _event_shape(self):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    sample_and_batch_shape = tf.concat([[n], self.batch_shape_tensor()], 0)
-    flat_batch_and_sample_shape = tf.stack(
-        [tf.reduce_prod(self.batch_shape_tensor()), n])
+    loc, scale, low, high = self._loc_scale_low_high()
+    batch_shape = self._batch_shape_tensor(
+        loc=loc, scale=scale, low=low, high=high)
+    sample_and_batch_shape = tf.concat([[n], batch_shape], 0)
+    flat_batch_and_sample_shape = tf.stack([tf.reduce_prod(batch_shape), n])
 
     # In order to be reparameterizable we sample on the truncated_normal of
     # unit variance and mean and scale (but with the standardized
@@ -242,9 +260,8 @@ class TruncatedNormal(distribution.Distribution):
     @tf.custom_gradient
     def _std_samples_with_gradients(lower, upper):
       """Standard truncated Normal with gradient support for low, high."""
-      # Note: Unlike the convention in tf_probability,
-      # parameterized_truncated_normal returns a tensor with the final dimension
-      # being the sample dimension.
+      # Note: Unlike the convention in TFP, parameterized_truncated_normal
+      # returns a tensor with the final dimension being the sample dimension.
       std_samples = random_ops.parameterized_truncated_normal(
           shape=flat_batch_and_sample_shape,
           means=0.0,
@@ -278,8 +295,8 @@ class TruncatedNormal(distribution.Distribution):
 
         cdf_samples = ((special_math.ndtr(std_samples) -
                         special_math.ndtr(lower_broadcast)) /
-                       (special_math.ndtr(upper_broadcast)
-                        - special_math.ndtr(lower_broadcast)))
+                       (special_math.ndtr(upper_broadcast) -
+                        special_math.ndtr(lower_broadcast)))
 
         # tiny, eps are tolerance parameters to ensure we stay away from giving
         # a zero arg to the log CDF expression.
@@ -300,64 +317,134 @@ class TruncatedNormal(distribution.Distribution):
 
       return std_samples, grad
 
+    std_low, std_high = self._standardized_low_and_high(
+        low=low, high=high, loc=loc, scale=scale)
+    low_high_shp = tf.broadcast_dynamic_shape(
+        tf.shape(std_low), tf.shape(std_high))
+    std_low = tf.broadcast_to(std_low, low_high_shp)
+    std_high = tf.broadcast_to(std_high, low_high_shp)
+
     std_samples = _std_samples_with_gradients(
-        tf.reshape(self._standardized_low, [-1]),
-        tf.reshape(self._standardized_high, [-1]))
+        tf.reshape(std_low, [-1]), tf.reshape(std_high, [-1]))
 
     # The returned shape is [flat_batch x n]
-    std_samples = tf.transpose(a=std_samples, perm=[1, 0])
+    std_samples = tf.transpose(std_samples, perm=[1, 0])
 
     std_samples = tf.reshape(std_samples, sample_and_batch_shape)
-    samples = (std_samples * tf.expand_dims(self._scale, axis=0) +
-               tf.expand_dims(self._loc, axis=0))
-
-    return samples
+    return std_samples * scale[tf.newaxis] + loc[tf.newaxis]
 
   def _log_prob(self, x):
-    log_prob = -(0.5 *
-                 ((x - self.loc) / self.scale)**2 + 0.5 * np.log(2. * np.pi) +
-                 tf.math.log(self.scale * self._normalizer))
+    loc, scale, low, high = self._loc_scale_low_high()
+    log_prob = -(0.5 * tf.square(
+        (x - loc) / scale) + 0.5 * np.log(2. * np.pi) + tf.math.log(scale) +
+                 self._log_normalizer(loc=loc, scale=scale, low=low, high=high))
     # p(x) is 0 outside the bounds.
-    bounded_log_prob = tf.where(
-        (x > self._high) | (x < self._low),
-        dtype_util.as_numpy_dtype(x.dtype)(-np.inf),
-        log_prob)
+    bounded_log_prob = tf.where((x > high) | (x < low),
+                                dtype_util.as_numpy_dtype(x.dtype)(-np.inf),
+                                log_prob)
     return bounded_log_prob
 
   def _cdf(self, x):
-    cdf_in_support = ((special_math.ndtr((x - self.loc) / self.scale)
-                       -  special_math.ndtr(self._standardized_low))
-                      / self._normalizer)
+    loc, scale, low, high = self._loc_scale_low_high()
+    std_low, std_high = self._standardized_low_and_high(
+        low=low, high=high, loc=loc, scale=scale)
+    cdf_in_support = ((special_math.ndtr(
+        (x - loc) / scale) - special_math.ndtr(std_low)) /
+                      self._normalizer(std_low=std_low, std_high=std_high))
     return tf.clip_by_value(cdf_in_support, 0., 1.)
 
+  def _log_cdf(self, x):
+    loc, scale, low, high = self._loc_scale_low_high()
+    std_low, std_high = self._standardized_low_and_high(
+        low=low, high=high, loc=loc, scale=scale)
+    return (_log_sub_exp(
+        special_math.log_ndtr(
+            (x - loc) / scale), special_math.log_ndtr(std_low)) -
+            self._log_normalizer(std_low=std_low, std_high=std_high))
+
   def _entropy(self):
+    loc, scale, low, high = self._loc_scale_low_high()
+    std_low, std_high = self._standardized_low_and_high(
+        loc=loc, scale=scale, low=low, high=high)
+    log_normalizer = self._log_normalizer(std_low=std_low, std_high=std_high)
     return (
-        tf.math.log(
-            np.sqrt(2. * np.pi * np.e) * self.scale * self._normalizer) +
-        (self._standardized_low * self._normal_pdf(self._standardized_low) -
-         self._standardized_high * self._normal_pdf(self._standardized_high)) /
-        (2. * self._normalizer))
+        0.5 * (1 + np.log(2.) + np.log(np.pi)) + tf.math.log(scale) +
+        log_normalizer + 0.5 *
+        (std_low * _normal_pdf(std_low) - std_high * _normal_pdf(std_high)) /
+        tf.exp(log_normalizer))
 
   def _mean(self):
-    return (self.loc +
-            self._scale * ((self._normal_pdf(self._standardized_low) -
-                            self._normal_pdf(self._standardized_high))
-                           / self._normalizer))
+    loc, scale, low, high = self._loc_scale_low_high()
+    std_low, std_high = self._standardized_low_and_high(
+        loc=loc, scale=scale, low=low, high=high)
+    lse, sign = _log_sub_exp(_normal_log_pdf(std_low),
+                             _normal_log_pdf(std_high),
+                             return_sign=True)
+    return loc + scale * sign * tf.math.exp(
+        lse - self._log_normalizer(std_low=std_low, std_high=std_high))
 
   def _mode(self):
-    # mode = { loc:         for low <= loc <= high
+    # mode = { loc: for low <= loc <= high
     #          low: for loc < low
     #          high: for loc > high
     #        }
-    return tf.clip_by_value(self.loc, self.low, self.high)
+    loc = tf.convert_to_tensor(self.loc)
+    low = tf.convert_to_tensor(self.low)
+    high = tf.convert_to_tensor(self.high)
+    shp = self._batch_shape_tensor(loc=loc, low=low, high=high)
+    # We *must* broadcast with scale to get a correctly shaped output, but
+    # TODO(b/141460015): we should not have to explicitly broadcast the first
+    # parameter to clip_by_value to align with the second and third parameters.
+    bc_loc = tf.broadcast_to(loc, shp)
+    return tf.clip_by_value(bc_loc, low, high)
 
   def _variance(self):
-    var = (tf.square(self.scale) *
-           (1. + (self._standardized_low * self._normal_pdf(
-               self._standardized_low) -
-                  self._standardized_high * self._normal_pdf(
-                      self._standardized_high)) / self._normalizer -
-            tf.square((self._normal_pdf(self._standardized_low) -
-                       self._normal_pdf(self._standardized_high))
-                      / self._normalizer)))
+    loc, scale, low, high = self._loc_scale_low_high()
+    std_low, std_high = self._standardized_low_and_high(
+        loc=loc, scale=scale, low=low, high=high)
+    log_normalizer = self._log_normalizer(std_low=std_low, std_high=std_high)
+    var = (
+        tf.square(scale) *
+        (1. +
+         (std_low * _normal_pdf(std_low) - std_high * _normal_pdf(std_high)) /
+         tf.exp(log_normalizer) -
+         tf.exp(2. * (
+             _log_sub_exp(  # ignore sign because result gets squared
+                 _normal_log_pdf(std_low), _normal_log_pdf(std_high))
+             - log_normalizer))))
     return var
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    low = None
+    high = None
+    if is_init != tensor_util.is_ref(self.low):
+      low = tf.convert_to_tensor(self.low)
+      assertions.append(
+          assert_util.assert_finite(low, message='`low` is not finite'))
+    if is_init != tensor_util.is_ref(self.high):
+      high = tf.convert_to_tensor(self.high)
+      assertions.append(
+          assert_util.assert_finite(high, message='`high` is not finite'))
+    if is_init != tensor_util.is_ref(self.loc):
+      assertions.append(
+          assert_util.assert_finite(self.loc, message='`loc` is not finite'))
+    if is_init != tensor_util.is_ref(self.scale):
+      scale = tf.convert_to_tensor(self.scale)
+      assertions.extend([
+          assert_util.assert_positive(
+              scale, message='`scale` must be positive'),
+          assert_util.assert_finite(scale, message='`scale` is not finite'),
+      ])
+    if (is_init != tensor_util.is_ref(self.low) or
+        is_init != tensor_util.is_ref(self.high)):
+      low = tf.convert_to_tensor(self.low) if low is None else low
+      high = tf.convert_to_tensor(self.high) if high is None else high
+      assertions.append(
+          assert_util.assert_greater(
+              high,
+              low,
+              message='TruncatedNormal not defined when `low >= high`.'))
+    return assertions

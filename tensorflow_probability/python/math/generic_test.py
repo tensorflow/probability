@@ -340,6 +340,50 @@ class LogAddExp(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
+class LogSubExpTest(test_case.TestCase):
+
+  def testLogSubExp(self):
+    self.assertAllClose(-np.inf, self.evaluate(tfp.math.log_sub_exp(1., 1.)))
+
+    # Try log(exp(-1000) - (exp(-1000) + 2)
+    # log(e^-k / 2) = log(e^-k) - log(2), or
+    # = log(e^-k - .5*e^-k)
+    # = log(e^-k - e^(-k + log(.5)))
+    self.assertAllClose(
+        -1000. - np.log(2.),
+        self.evaluate(tfp.math.log_sub_exp(-1000., -1000. + np.log(.5))))
+
+  def test_small(self):
+    x = [-2]
+    y = [-1000]
+    z, g = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.log_sub_exp, [x, y]))
+    self.assertAllClose([-2.], z, atol=0., rtol=1e-5)
+    self.assertAllClose([[1.], [0.]], g)
+
+  def test_medium(self):
+    x = [-2, -3, -5, -3]
+    y = [-3, -5, -3, -2]
+    z, g = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.log_sub_exp, [x, y]))
+    self.assertAllClose(np.log(np.abs(np.exp(x) - np.exp(y))), z,
+                        atol=0., rtol=1e-5)
+    self.assertAllEqual([1., 1, -1, -1],
+                        tfp.math.log_sub_exp(x, y, return_sign=True)[1])
+    self.assertAllNotNone(g)
+
+  def test_big(self):
+    x = [1000, -3]
+    y = [2, 1000]
+    z, g = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.log_sub_exp, [x, y]))
+    self.assertAllClose([1000., 1000.], z, atol=0., rtol=1e-5)
+    self.assertAllEqual([[1., 0.], [0., 1.]], g)
+    self.assertAllEqual([1., -1.],
+                        tfp.math.log_sub_exp(x, y, return_sign=True)[1])
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class Smootherstep(test_case.TestCase):
 
   def test_value_vector(self):

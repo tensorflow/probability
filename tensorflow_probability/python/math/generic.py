@@ -408,3 +408,34 @@ def smootherstep(x, name=None):
     #   x2 = tf.square(x)
     #   x3 = x2 * x
     return x**3. * (6. * x**2. - 15. * x + 10.)
+
+
+def log_sub_exp(x, y, return_sign=False, name=None):
+  """Compute `log(exp(max(x, y)) - exp(min(x, y)))` in a numerically stable way.
+
+  Use `return_sign=True` unless `x >= y`, since we can't represent a negative in
+  log-space.
+
+  Args:
+    x: Float `Tensor` broadcastable with `y`.
+    y: Float `Tensor` broadcastable with `x`.
+    return_sign: Whether or not to return the second output value `sign`. If
+      it is known that `x >= y`, this is unnecessary.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'log_sub_exp'`).
+
+  Returns:
+    logsubexp: Float `Tensor` of `log(exp(max(x, y)) - exp(min(x, y)))`.
+    sign: Float `Tensor` +/-1 indicating the sign of `exp(x) - exp(y)`.
+  """
+  with tf.name_scope(name or 'log_sub_exp'):
+    dtype = dtype_util.common_dtype([x, y], dtype_hint=tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype, name='x')
+    y = tf.convert_to_tensor(y, dtype=dtype, name='y')
+    larger = tf.maximum(x, y)
+    smaller = tf.minimum(x, y)
+    result = larger + tf.math.log1p(-tf.exp(tf.minimum(smaller - larger, 0)))
+    if return_sign:
+      ones = tf.ones([], result.dtype)
+      return result, tf.where(x < y, -ones, ones)
+    return result

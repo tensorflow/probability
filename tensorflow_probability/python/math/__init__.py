@@ -24,6 +24,7 @@ from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import log_combinations
+from tensorflow_probability.python.math.generic import log_sub_exp
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
 from tensorflow_probability.python.math.generic import smootherstep
@@ -68,6 +69,7 @@ _allowed_symbols = [
     'log1psquare',
     'log_add_exp',
     'log_combinations',
+    'log_sub_exp',
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_solve',

@@ -60,9 +60,10 @@ def assert_finite(x, data=None, summarize=None, message=None, name=None):
     If static checks determine `x` has correct rank, a `no_op` is returned.
 
   Raises:
-    ValueError:  If static checks determine `x` has wrong rank.
+    ValueError: If static checks determine `x` is not finite.
   """
   with tf.name_scope(name or 'assert_finite'):
+    x = tf.convert_to_tensor(x)
     x_ = tf.get_static_value(x)
     if x_ is not None:
       if ~np.all(np.isfinite(x_)):
