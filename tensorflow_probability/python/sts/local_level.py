@@ -48,7 +48,7 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
   ```python
   level[t] = level[t-1] + Normal(0., level_scale)
-   ```
+  ```
 
   The latent state is `[level]` and `[level]` is observed (with noise) at each
   timestep.
