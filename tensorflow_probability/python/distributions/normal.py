@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
@@ -165,9 +166,9 @@ class Normal(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self, loc=None, scale=None):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc if loc is None else loc),
-        tf.shape(self.scale if scale is None else scale))
+    return prefer_static.broadcast_shape(
+        prefer_static.shape(self.loc if loc is None else loc),
+        prefer_static.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.loc.shape, self.scale.shape)

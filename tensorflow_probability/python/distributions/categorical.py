@@ -234,7 +234,8 @@ class Categorical(distribution.Distribution):
 
   def _batch_shape_tensor(self, x=None):
     if x is None:
-      x = self._probs if self._logits is None else self._logits
+      x = tf.convert_to_tensor(
+          self._probs if self._logits is None else self._logits)
     return tf.shape(x)[:-1]
 
   def _batch_shape(self):
@@ -361,7 +362,9 @@ class Categorical(distribution.Distribution):
       num_categories = tf.compat.dimension_value(x.shape[-1])
       if num_categories is not None:
         return num_categories
-      return tf.shape(x)[-1]
+      # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
+      # so we pre-emptively convert-to-tensor.
+      return tf.shape(tf.convert_to_tensor(x))[-1]
 
   @deprecation.deprecated(
       '2019-10-01',
