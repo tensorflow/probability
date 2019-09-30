@@ -68,12 +68,6 @@ class PermuteBijectorTest(test_case.TestCase):
     self.assertAllClose(0., fldj, rtol=1e-6, atol=0)
     self.assertAllClose(0., ildj, rtol=1e-6, atol=0)
 
-  def testRaisesOpError(self):
-    with self.assertRaisesError("Permutation over `d` must contain"):
-      permutation = tf1.placeholder_with_default([1, 2], shape=None)
-      bijector = tfb.Permute(permutation=permutation, validate_args=True)
-      self.evaluate(bijector.inverse([1.]))
-
   def testBijectiveAndFinite(self):
     permutation = np.int32([2, 0, 1])
     x = np.random.randn(4, 2, 3)
@@ -107,6 +101,41 @@ class PermuteBijectorTest(test_case.TestCase):
 
     inverse_y = bijector.inverse(x)
     self.assertAllEqual(inverse_y.shape.as_list(), [None, 3])
+
+  def testNonPermutationAssertion(self):
+    message = "must contain exactly one of each of"
+    with self.assertRaisesRegexp(Exception, message):
+      permutation = np.int32([1, 0, 1])
+      bijector = tfb.Permute(permutation=permutation, validate_args=True)
+      x = np.random.randn(4, 2, 3)
+      _ = self.evaluate(bijector.forward(x))
+
+  def testVariableNonPermutationAssertion(self):
+    message = "must contain exactly one of each of"
+    permutation = tf.Variable(np.int32([1, 0, 1]))
+    self.evaluate(permutation.initializer)
+    with self.assertRaisesRegexp(Exception, message):
+      bijector = tfb.Permute(permutation=permutation, validate_args=True)
+      x = np.random.randn(4, 2, 3)
+      _ = self.evaluate(bijector.forward(x))
+
+  def testModifiedVariableNonPermutationAssertion(self):
+    message = "must contain exactly one of each of"
+    permutation = tf.Variable(np.int32([1, 0, 2]))
+    self.evaluate(permutation.initializer)
+    bijector = tfb.Permute(permutation=permutation, validate_args=True)
+    with self.assertRaisesRegexp(Exception, message):
+      with tf.control_dependencies([permutation.assign([1, 0, 1])]):
+        x = np.random.randn(4, 2, 3)
+        _ = self.evaluate(bijector.forward(x))
+
+  def testPermutationTypeAssertion(self):
+    message = "should be `int`-like"
+    with self.assertRaisesRegexp(Exception, message):
+      permutation = np.float32([2, 0, 1])
+      bijector = tfb.Permute(permutation=permutation, validate_args=True)
+      x = np.random.randn(4, 2, 3)
+      _ = self.evaluate(bijector.forward(x))
 
 
 if __name__ == "__main__":

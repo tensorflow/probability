@@ -22,6 +22,7 @@ from absl import flags
 from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
+import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
@@ -57,6 +58,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'MatvecLU',
     'NormalCDF',
     'Ordered',
+    'Permute',
     'PowerTransform',
     'RationalQuadraticSpline',
     'Reciprocal',
@@ -197,6 +199,11 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
   if bijector_name == 'PowerTransform':
     power = draw(hps.floats(min_value=0., max_value=10.))
     return tfb.PowerTransform(validate_args=True, power=power)
+  if bijector_name == 'Permute':
+    event_ndims = draw(hps.integers(min_value=1, max_value=2))
+    axis = draw(hps.integers(min_value=-event_ndims, max_value=-1))
+    permutation = draw(hps.permutations(np.arange(event_dim)))
+    return tfb.Permute(permutation, axis=axis)
 
   bijector_params = draw(
       broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,

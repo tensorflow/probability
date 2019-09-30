@@ -177,6 +177,9 @@ def bijector_supports():
       'Ordered':
           BijectorSupport(Support.VECTOR_STRICTLY_INCREASING,
                           Support.VECTOR_UNCONSTRAINED),
+      'Permute':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_UNCONSTRAINED),
       'PowerTransform':
           # The domain is dependent on the `power` parameter of PowerTransform,
           # hence is handled in the test harness.
