@@ -672,7 +672,8 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       (latents, observations) = tf.scan(
           sample_step,
           elems=tf.range(self.initial_step+1, self.final_step),
-          initializer=(initial_latent, initial_observation))
+          initializer=(initial_latent, initial_observation),
+          parallel_iterations=1 if seed is not None else 10)
 
       # Combine the initial sampled timestep with the remaining timesteps.
       latents = _safe_concat([initial_latent[tf.newaxis, ...],
@@ -1277,6 +1278,9 @@ def backward_smoothing_update(filtered_mean,
     posterior_cov: `Tensor` with event shape `[latent_size, latent_size]` and
       batch shape `B`, containing sigma(t | 1:T).
   """
+
+  latent_size_is_static_and_scalar = (filtered_cov.shape[-2] == 1)
+
   # Compute backward Kalman gain:
   # J = F * T' * P^{-1}
   # Since both F(iltered) and P(redictive) are cov matrices,
@@ -1286,8 +1290,11 @@ def backward_smoothing_update(filtered_mean,
   #      = (P^{-1} * tmp_gain_cov) '
   #      = (P \ tmp_gain_cov)'
   tmp_gain_cov = transition_matrix.matmul(filtered_cov)
-  predicted_cov_chol = tf.linalg.cholesky(predicted_cov)
-  gain_transpose = tf.linalg.cholesky_solve(predicted_cov_chol, tmp_gain_cov)
+  if latent_size_is_static_and_scalar:
+    gain_transpose = tmp_gain_cov / predicted_cov
+  else:
+    gain_transpose = tf.linalg.cholesky_solve(
+        tf.linalg.cholesky(predicted_cov), tmp_gain_cov)
 
   posterior_mean = (filtered_mean +
                     tf.linalg.matmul(gain_transpose,
@@ -1464,8 +1471,7 @@ def linear_gaussian_update(
   """
 
   # If observations are scalar, we can avoid some matrix ops.
-  observation_size_is_static_and_scalar = (
-      tf.compat.dimension_value(observation_matrix.shape[-2]) == 1)
+  observation_size_is_static_and_scalar = (observation_matrix.shape[-2] == 1)
 
   # Push the predicted mean for the latent state through the
   # observation model
