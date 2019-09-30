@@ -380,10 +380,7 @@ class NoUTurnSampler(TransitionKernel):
               new_step_metastate.energy_diff_sum /
               tf.cast(new_step_metastate.leapfrog_count,
                       dtype=new_step_metastate.energy_diff_sum.dtype)),
-          # TODO(junpenglao): return non-cumulated leapfrogs_taken once
-          # benchmarking is done.
           leapfrogs_taken=(
-              previous_kernel_results.leapfrogs_taken +
               new_step_metastate.leapfrog_count * self.unrolled_leapfrog_steps
           ),
           is_accepted=new_step_metastate.is_accepted,

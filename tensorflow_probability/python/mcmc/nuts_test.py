@@ -312,14 +312,12 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
           trace_fn=trace_fn,
           parallel_iterations=1)
 
-      leapfrogs_taken_ = leapfrogs_taken[1:] - leapfrogs_taken[:-1]
-
       return (
           tf.shape(x),
           # We'll average over samples (dim=0) and chains (dim=1).
           tf.reduce_mean(x, axis=[0, 1]),
           tfp.stats.covariance(x, sample_axis=[0, 1]),
-          leapfrogs_taken_[is_accepted[1:]])
+          leapfrogs_taken[is_accepted])
 
     sample_shape, sample_mean, sample_cov, leapfrogs_taken = self.evaluate(
         run_chain_and_get_summary(
