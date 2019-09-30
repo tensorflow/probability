@@ -209,6 +209,9 @@ def bijector_supports():
       'Square':
           BijectorSupport(Support.SCALAR_NON_NEGATIVE,
                           Support.SCALAR_NON_NEGATIVE),
+      'TransformDiagonal':
+          BijectorSupport(Support.MATRIX_UNCONSTRAINED,
+                          Support.OTHER),
       'Tanh':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_IN_NEG1_1),

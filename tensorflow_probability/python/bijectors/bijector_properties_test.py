@@ -69,6 +69,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'Softsign',
     'Square',
     'Tanh',
+    'TransformDiagonal',
     'Weibull',
 )
 
@@ -98,9 +99,35 @@ NO_LDJ_GRADS_EXPECTED = {
     'Gumbel': dict(loc={ILDJ}),
 }
 
+TRANSFORM_DIAGONAL_WHITELIST = {
+    'AffineScalar',
+    'BatchNormalization',
+    'DiscreteCosineTransform',
+    'Exp',
+    'Expm1',
+    'Gumbel',
+    'Identity',
+    'Inline',
+    'Kumaraswamy',
+    'NormalCDF',
+    'PowerTransform',
+    'Reciprocal',
+    'Sigmoid',
+    'SinhArcsinh',
+    'Softplus',
+    'Softsign',
+    'Square',
+    'Tanh',
+    'Weibull',
+}
+
 
 def is_invert(bijector):
   return isinstance(bijector, tfb.Invert)
+
+
+def is_transform_diagonal(bijector):
+  return isinstance(bijector, tfb.TransformDiagonal)
 
 
 # pylint is unable to handle @hps.composite (e.g. complains "No value for
@@ -175,6 +202,16 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
             event_dim=event_dim,
             enable_vars=enable_vars))
     return tfb.Invert(underlying, validate_args=True)
+  if bijector_name == 'TransformDiagonal':
+    underlying_name = draw(
+        hps.sampled_from(sorted(TRANSFORM_DIAGONAL_WHITELIST)))
+    underlying = draw(
+        bijectors(
+            bijector_name=underlying_name,
+            batch_shape=(),
+            event_dim=event_dim,
+            enable_vars=enable_vars))
+    return tfb.TransformDiagonal(underlying, validate_args=True)
   if bijector_name == 'Inline':
     if enable_vars:
       scale = tf.Variable(1., name='scale')
@@ -255,6 +292,8 @@ def domain_tensors(draw, bijector, shape=None):
   """
   if is_invert(bijector):
     return draw(codomain_tensors(bijector.bijector, shape))
+  elif is_transform_diagonal(bijector):
+    return draw(domain_tensors(bijector.diag_bijector, shape))
   if shape is None:
     shape = draw(tfp_hps.shapes())
   bijector_name = type(bijector).__name__
@@ -286,6 +325,8 @@ def codomain_tensors(draw, bijector, shape=None):
   """
   if is_invert(bijector):
     return draw(domain_tensors(bijector.bijector, shape))
+  elif is_transform_diagonal(bijector):
+    return draw(codomain_tensors(bijector.diag_bijector, shape))
   if shape is None:
     shape = draw(tfp_hps.shapes())
   bijector_name = type(bijector).__name__
@@ -303,7 +344,11 @@ def assert_no_none_grad(bijector, method, wrt_vars, grads):
         var_name = var.name.rstrip('_0123456789:').split('/')[-1]
       else:
         var_name = '[arg]'
-      to_check = bijector.bijector if is_invert(bijector) else bijector
+      to_check = bijector
+      while is_invert(to_check) or is_transform_diagonal(to_check):
+        to_check = to_check.bijector if is_invert(to_check) else to_check
+        to_check = (to_check.diag_bijector
+                    if is_transform_diagonal(to_check) else to_check)
       to_check_method = INVERT_LDJ[method] if is_invert(bijector) else method
       if var_name == '[arg]' and bijector.is_constant_jacobian:
         expect_grad = False
@@ -373,6 +418,9 @@ class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
       if is_invert(bijector):
         max_permitted = (2 if hasattr(bijector.bijector,
                                       '_inverse_log_det_jacobian') else 4)
+      elif is_transform_diagonal(bijector):
+        max_permitted = (2 if hasattr(bijector.diag_bijector,
+                                      '_forward_log_det_jacobian') else 4)
       with tfp_hps.assert_no_excessive_var_usage(
           'method `forward_log_det_jacobian` of {}'.format(bijector),
           max_permissible=max_permitted):
@@ -418,6 +466,9 @@ class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
       if is_invert(bijector):
         max_permitted = (2 if hasattr(bijector.bijector,
                                       '_forward_log_det_jacobian') else 4)
+      elif is_transform_diagonal(bijector):
+        max_permitted = (2 if hasattr(bijector.diag_bijector,
+                                      '_inverse_log_det_jacobian') else 4)
       with tfp_hps.assert_no_excessive_var_usage(
           'method `inverse_log_det_jacobian` of {}'.format(bijector),
           max_permissible=max_permitted):
