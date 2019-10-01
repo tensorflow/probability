@@ -1,6 +1,7 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.experimental.auto_batching.instructions.ControlFlowGraph" />
 <meta itemprop="path" content="Stable" />
+<meta itemprop="property" content="blocks"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="block"/>
 <meta itemprop="property" content="block_index"/>
@@ -9,6 +10,18 @@
 </div>
 
 # tfp.experimental.auto_batching.instructions.ControlFlowGraph
+
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
 
 ## Class `ControlFlowGraph`
 
@@ -21,18 +34,16 @@ A control flow graph (CFG).
 * Class `tfp.experimental.auto_batching.frontend.instructions.ControlFlowGraph`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.ControlFlowGraph`
 * Class `tfp.experimental.auto_batching.frontend.stack.inst.ControlFlowGraph`
-* Class `tfp.experimental.auto_batching.instructions.ControlFlowGraph`
 * Class `tfp.experimental.auto_batching.stack_optimization.inst.ControlFlowGraph`
 * Class `tfp.experimental.auto_batching.stackless.inst.ControlFlowGraph`
 
-
-
-Defined in [`python/internal/auto_batching/instructions.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/instructions.py).
 
 <!-- Placeholder for "Used in" -->
 
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
 
 ``` python
 __init__(blocks)
@@ -55,9 +66,20 @@ instruction selection, so the CFG also keeps the reverse map from
 
 
 
+## Properties
+
+<h3 id="blocks"><code>blocks</code></h3>
+
+
+
+
+
+
 ## Methods
 
 <h3 id="block"><code>block</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
 
 ``` python
 block(index)
@@ -79,6 +101,8 @@ Returns the `Block` given by the input `index`.
 
 <h3 id="block_index"><code>block_index</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
+
 ``` python
 block_index(block)
 ```
@@ -99,6 +123,8 @@ Returns the `int` index of the given `Block`.
 
 <h3 id="enter_block"><code>enter_block</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
+
 ``` python
 enter_block()
 ```
@@ -107,6 +133,8 @@ Returns the entry `Block`.
 
 
 <h3 id="exit_index"><code>exit_index</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
 
 ``` python
 exit_index()

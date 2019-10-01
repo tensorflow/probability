@@ -17,15 +17,23 @@
 
 # tfp.sts.SparseLinearRegression
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/regression.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `SparseLinearRegression`
 
 Formal representation of a sparse linear regression.
 
 Inherits From: [`StructuralTimeSeries`](../../tfp/sts/StructuralTimeSeries.md)
-
-
-
-Defined in [`python/sts/regression.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/regression.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -154,6 +162,8 @@ weights[i] ~ Normal(loc=0., scale=local_scales[i] * global_scale)
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/regression.py">View source</a>
+
 ``` python
 __init__(
     design_matrix,
@@ -232,6 +242,8 @@ List of Parameter(name, prior, bijector) namedtuples for this model.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/structural_time_series.py">View source</a>
+
 ``` python
 batch_shape_tensor()
 ```
@@ -248,6 +260,8 @@ Runtime batch shape of models represented by this component.
   `self.make_state_space_model(...).batch_shape_tensor()`.
 
 <h3 id="joint_log_prob"><code>joint_log_prob</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/structural_time_series.py">View source</a>
 
 ``` python
 joint_log_prob(observed_time_series)
@@ -283,6 +297,8 @@ Build the joint density `log p(params) + log p(y|params)` as a callable.
 
 <h3 id="make_state_space_model"><code>make_state_space_model</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/structural_time_series.py">View source</a>
+
 ``` python
 make_state_space_model(
     num_timesteps,
@@ -316,6 +332,8 @@ Instantiate this model as a Distribution over specified `num_timesteps`.
 
 <h3 id="params_to_weights"><code>params_to_weights</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/regression.py">View source</a>
+
 ``` python
 params_to_weights(
     global_scale_variance,
@@ -330,6 +348,8 @@ Build regression weights from model parameters.
 
 
 <h3 id="prior_sample"><code>prior_sample</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/structural_time_series.py">View source</a>
 
 ``` python
 prior_sample(

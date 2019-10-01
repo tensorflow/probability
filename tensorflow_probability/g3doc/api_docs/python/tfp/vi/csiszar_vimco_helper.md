@@ -5,20 +5,28 @@
 
 # tfp.vi.csiszar_vimco_helper
 
-Helper to `csiszar_vimco`; computes `log_avg_u`, `log_sooavg_u`.
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
+Helper to `csiszar_vimco`; computes `log_avg_u`, `log_sooavg_u`. (deprecated)
 
 ``` python
 tfp.vi.csiszar_vimco_helper(
-    logu,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
 
 
-Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
-
 <!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+`csiszar_vimco_helper` is deprecated. Instead use: `log_avg_u, log_sooavg_u = tfp.math.log_soomean_exp(logu, axis=0)[::-1]`. (Note: `tfp.math.log_soomean_exp` reverses the order of return values.)
 
 `axis = 0` of `logu` is presumed to correspond to iid samples from `q`, i.e.,
 

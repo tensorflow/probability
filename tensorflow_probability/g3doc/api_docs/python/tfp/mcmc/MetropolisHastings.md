@@ -13,15 +13,23 @@
 
 # tfp.mcmc.MetropolisHastings
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/metropolis_hastings.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `MetropolisHastings`
 
 Runs one step of the Metropolis-Hastings algorithm.
 
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
-
-
-
-Defined in [`python/mcmc/metropolis_hastings.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/metropolis_hastings.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -84,6 +92,8 @@ hmc = tfp.mcmc.MetropolisHastings(
 ```
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/metropolis_hastings.py">View source</a>
 
 ``` python
 __init__(
@@ -151,6 +161,8 @@ Return `dict` of ``__init__`` arguments and their values.
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/metropolis_hastings.py">View source</a>
+
 ``` python
 bootstrap_results(init_state)
 ```
@@ -179,6 +191,8 @@ Returns an object with the same type as returned by `one_step`.
   "target_log_prob".
 
 <h3 id="one_step"><code>one_step</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/metropolis_hastings.py">View source</a>
 
 ``` python
 one_step(

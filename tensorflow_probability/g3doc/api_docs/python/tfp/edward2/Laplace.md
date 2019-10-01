@@ -5,7 +5,24 @@
 
 # tfp.edward2.Laplace
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for Laplace.
+
+### Aliases:
+
+* `tfp.experimental.edward2.Laplace`
+
 
 ``` python
 tfp.edward2.Laplace(
@@ -15,8 +32,6 @@ tfp.edward2.Laplace(
 ```
 
 
-
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -46,7 +61,7 @@ broadcasting (e.g., `loc / scale` is a valid operation).
   performance. When `False` invalid inputs may silently render incorrect
   outputs.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`,
-  statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+  statistics (e.g., mean, mode, variance) use the value '`NaN`' to
   indicate the result is undefined. When `False`, an exception is raised
   if one or more of the statistic's batch members are undefined.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.

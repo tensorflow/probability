@@ -28,6 +28,7 @@
 <meta itemprop="property" content="weights"/>
 <meta itemprop="property" content="__call__"/>
 <meta itemprop="property" content="__init__"/>
+<meta itemprop="property" content="__new__"/>
 <meta itemprop="property" content="build"/>
 <meta itemprop="property" content="compute_mask"/>
 <meta itemprop="property" content="compute_output_shape"/>
@@ -49,20 +50,30 @@
 
 # tfp.bijectors.AutoregressiveLayer
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/masked_autoregressive.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `AutoregressiveLayer`
 
 Masked Autoencoder for Distribution Estimation [Germain et al. (2015)].
 
 Inherits From: [`AutoregressiveNetwork`](../../tfp/bijectors/AutoregressiveNetwork.md)
 
-
-
-Defined in [`python/bijectors/masked_autoregressive.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/masked_autoregressive.py).
-
 <!-- Placeholder for "Used in" -->
 
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/masked_autoregressive.py">View source</a>
 
 ``` python
 __init__(
@@ -129,6 +140,22 @@ Constructs the MADE layer.
   outputs.
 * <b>`**kwargs`</b>: Additional keyword arguments passed to this layer (but not to
   the `tf.keras.layer.Dense` layers constructed by this layer).
+
+<h2 id="__new__"><code>__new__</code></h2>
+
+``` python
+@staticmethod
+__new__(
+    *args,
+    **kwargs
+)
+```
+
+DEPRECATED FUNCTION
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-08-01.
+Instructions for updating:
+`AutoregressiveLayer` has been renamed `AutoregressiveNetwork`.
 
 
 
@@ -354,7 +381,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -450,6 +477,8 @@ Output tensor(s).
 
 <h3 id="build"><code>build</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/masked_autoregressive.py">View source</a>
+
 ``` python
 build(input_shape)
 ```
@@ -483,6 +512,8 @@ None or a tensor (or list of tensors,
 
 
 <h3 id="compute_output_shape"><code>compute_output_shape</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/masked_autoregressive.py">View source</a>
 
 ``` python
 compute_output_shape(input_shape)

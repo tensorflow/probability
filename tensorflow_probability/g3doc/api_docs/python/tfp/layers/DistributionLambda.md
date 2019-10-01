@@ -47,6 +47,18 @@
 
 # tfp.layers.DistributionLambda
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `DistributionLambda`
 
 Keras layer enabling plumbing TFP distributions through Keras models.
@@ -55,12 +67,8 @@ Keras layer enabling plumbing TFP distributions through Keras models.
 
 ### Aliases:
 
-* Class `tfp.layers.DistributionLambda`
 * Class `tfp.layers.distribution_layer.DistributionLambda`
 
-
-
-Defined in [`python/layers/distribution_layer.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/distribution_layer.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -94,6 +102,8 @@ model = tfk.Sequential([
 ```
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">View source</a>
 
 ``` python
 __init__(
@@ -331,7 +341,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -380,6 +390,8 @@ A list of variables.
 ## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">View source</a>
 
 ``` python
 __call__(
@@ -535,6 +547,8 @@ A layer instance.
 
 <h3 id="get_config"><code>get_config</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">View source</a>
+
 ``` python
 get_config()
 ```
@@ -557,18 +571,18 @@ convenience, but:
      be serialized when the tensor value is statically known.  (Such Tensors
      are serialized as numpy arrays.)
 
-Instead of relying on `DistributionLambda.get_config`, consider subclassing
+Instead of relying on <a href="../../tfp/layers/DistributionLambda.md#get_config"><code>DistributionLambda.get_config</code></a>, consider subclassing
 `DistributionLambda` and directly implementing Keras serialization via
 `get_config` / `from_config`.
 
 NOTE: At the moment, `DistributionLambda` can only be serialized if the
 `convert_to_tensor_fn` is a serializable Keras object (i.e., implements
 `get_config`) or one of the standard values:
- - `Distribution.sample` (or `"sample"`)
- - `Distribution.mean` (or `"mean"`)
- - `Distribution.mode` (or `"mode"`)
- - `Distribution.stddev` (or `"stddev"`)
- - `Distribution.variance` (or `"variance"`)
+ - <a href="../../tfp/distributions/Distribution.md#sample"><code>Distribution.sample</code></a> (or `"sample"`)
+ - <a href="../../tfp/distributions/Distribution.md#mean"><code>Distribution.mean</code></a> (or `"mean"`)
+ - <a href="../../tfp/distributions/Distribution.md#mode"><code>Distribution.mode</code></a> (or `"mode"`)
+ - <a href="../../tfp/distributions/Distribution.md#stddev"><code>Distribution.stddev</code></a> (or `"stddev"`)
+ - <a href="../../tfp/distributions/Distribution.md#variance"><code>Distribution.variance</code></a> (or `"variance"`)
 
 <h3 id="get_input_at"><code>get_input_at</code></h3>
 

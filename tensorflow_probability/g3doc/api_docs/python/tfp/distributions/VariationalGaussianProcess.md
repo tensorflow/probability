@@ -51,6 +51,7 @@
 <meta itemprop="property" content="quantile"/>
 <meta itemprop="property" content="sample"/>
 <meta itemprop="property" content="stddev"/>
+<meta itemprop="property" content="surrogate_posterior_kl_divergence_prior"/>
 <meta itemprop="property" content="survival_function"/>
 <meta itemprop="property" content="variance"/>
 <meta itemprop="property" content="variational_loss"/>
@@ -59,15 +60,23 @@
 
 # tfp.distributions.VariationalGaussianProcess
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/variational_gaussian_process.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `VariationalGaussianProcess`
 
 Posterior predictive of a variational Gaussian process.
 
 Inherits From: [`MultivariateNormalLinearOperator`](../../tfp/distributions/MultivariateNormalLinearOperator.md)
-
-
-
-Defined in [`python/distributions/variational_gaussian_process.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/variational_gaussian_process.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -215,7 +224,7 @@ lower bound takes the following form (see [Titsias, 2009][1] and
 where in the final KL term, `p(f(Z))` is the GP prior on inducing point
 function values. This variational lower bound can be computed on minibatches
 of the full data set `(X, Y)`. A method to compute the *negative* variational
-lower bound is implemented as `VariationalGaussianProcess.variational_loss`.
+lower bound is implemented as <a href="../../tfp/distributions/VariationalGaussianProcess.md#variational_loss"><code>VariationalGaussianProcess.variational_loss</code></a>.
 
 ##### Optimal variational parameters
 
@@ -261,15 +270,15 @@ y_train_ = (f(x_train_) +
 
 # Create kernel with trainable parameters, and trainable observation noise
 # variance variable. Each of these is constrained to be positive.
-amplitude = (tf.nn.softplus(tf.Variable(-1., dtype=dtype, name='amplitude')))
+amplitude = tf.math.softplus(tf.Variable(-1., dtype=dtype, name='amplitude'))
 length_scale = (1e-5 +
-                tf.nn.softplus(
+                tf.math.softplus(
                     tf.Variable(-3., dtype=dtype, name='length_scale')))
 kernel = tfk.ExponentiatedQuadratic(
     amplitude=amplitude,
     length_scale=length_scale)
 
-observation_noise_variance = tf.nn.softplus(
+observation_noise_variance = tf.math.softplus(
     tf.Variable(0, dtype=dtype, name='observation_noise_variance'))
 
 # Create trainable inducing point locations and variational parameters.
@@ -378,17 +387,17 @@ y_train_ = (f(x_train_) +
 
 # Create kernel with trainable parameters, and trainable observation noise
 # variance variable. Each of these is constrained to be positive.
-amplitude = (tf.nn.softplus(
+amplitude = (tf.math.softplus(
   tf.Variable(.54, dtype=dtype, name='amplitude', use_resource=True)))
 length_scale = (
   1e-5 +
-  tf.nn.softplus(
+  tf.math.softplus(
     tf.Variable(.54, dtype=dtype, name='length_scale', use_resource=True)))
 kernel = tfk.ExponentiatedQuadratic(
     amplitude=amplitude,
     length_scale=length_scale)
 
-observation_noise_variance = tf.nn.softplus(
+observation_noise_variance = tf.math.softplus(
     tf.Variable(
       .54, dtype=dtype, name='observation_noise_variance', use_resource=True))
 
@@ -742,7 +751,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -762,7 +771,7 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 <h3 id="variables"><code>variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -790,6 +799,8 @@ first).
 ## Methods
 
 <h3 id="__getitem__"><code>__getitem__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/transformed_distribution.py">View source</a>
 
 ``` python
 __getitem__(slices)
@@ -828,6 +839,8 @@ mvn2.event_shape  # => [2]
 
 <h3 id="__iter__"><code>__iter__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 __iter__()
 ```
@@ -836,6 +849,8 @@ __iter__()
 
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 batch_shape_tensor(name='batch_shape_tensor')
@@ -858,6 +873,8 @@ parameterizations of this distribution.
 * <b>`batch_shape`</b>: `Tensor`.
 
 <h3 id="cdf"><code>cdf</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 cdf(
@@ -891,6 +908,8 @@ cdf(x) := P[X <= x]
 
 <h3 id="copy"><code>copy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 copy(**override_parameters_kwargs)
 ```
@@ -915,6 +934,8 @@ initialization arguments.
   `dict(self.parameters, **override_parameters_kwargs)`.
 
 <h3 id="covariance"><code>covariance</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 covariance(
@@ -966,6 +987,8 @@ length-`k'` vector.
 
 <h3 id="cross_entropy"><code>cross_entropy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 cross_entropy(
     other,
@@ -986,7 +1009,7 @@ H[P, Q] = E_p[-log q(X)] = -int_F p(x) log q(x) dr(x)
 
 where `F` denotes the support of the random variable `X ~ P`.
 
-`other` types with built-in registrations: `GaussianProcess`, `GaussianProcessRegressionModel`, `MultivariateNormalDiag`, `MultivariateNormalDiagPlusLowRank`, `MultivariateNormalDiagWithSoftplusScale`, `MultivariateNormalFullCovariance`, `MultivariateNormalLinearOperator`, `MultivariateNormalTriL`, `VariationalGaussianProcess`
+`other` types with built-in registrations: `GaussianProcess`, `GaussianProcessRegressionModel`, `MultivariateNormalDiag`, `MultivariateNormalDiagPlusLowRank`, `MultivariateNormalFullCovariance`, `MultivariateNormalLinearOperator`, `MultivariateNormalTriL`, `VariationalGaussianProcess`
 
 #### Args:
 
@@ -1003,6 +1026,8 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 <h3 id="entropy"><code>entropy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 entropy(
     name='entropy',
@@ -1014,6 +1039,8 @@ Shannon entropy in nats.
 
 
 <h3 id="event_shape_tensor"><code>event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 event_shape_tensor(name='event_shape_tensor')
@@ -1035,6 +1062,8 @@ Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
 
 <h3 id="is_scalar_batch"><code>is_scalar_batch</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 is_scalar_batch(name='is_scalar_batch')
 ```
@@ -1055,6 +1084,8 @@ Indicates that `batch_shape == []`.
 
 <h3 id="is_scalar_event"><code>is_scalar_event</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 is_scalar_event(name='is_scalar_event')
 ```
@@ -1074,6 +1105,8 @@ Indicates that `event_shape == []`.
 * <b>`is_scalar_event`</b>: `bool` scalar `Tensor`.
 
 <h3 id="kl_divergence"><code>kl_divergence</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 kl_divergence(
@@ -1097,7 +1130,7 @@ KL[p, q] = E_p[log(p(X)/q(X))]
 where `F` denotes the support of the random variable `X ~ p`, `H[., .]`
 denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 
-`other` types with built-in registrations: `GaussianProcess`, `GaussianProcessRegressionModel`, `MultivariateNormalDiag`, `MultivariateNormalDiagPlusLowRank`, `MultivariateNormalDiagWithSoftplusScale`, `MultivariateNormalFullCovariance`, `MultivariateNormalLinearOperator`, `MultivariateNormalTriL`, `VariationalGaussianProcess`
+`other` types with built-in registrations: `GaussianProcess`, `GaussianProcessRegressionModel`, `MultivariateNormalDiag`, `MultivariateNormalDiagPlusLowRank`, `MultivariateNormalFullCovariance`, `MultivariateNormalLinearOperator`, `MultivariateNormalTriL`, `VariationalGaussianProcess`
 
 #### Args:
 
@@ -1114,6 +1147,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
   divergence.
 
 <h3 id="log_cdf"><code>log_cdf</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 log_cdf(
@@ -1150,6 +1185,8 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
   values of type `self.dtype`.
 
 <h3 id="log_prob"><code>log_prob</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 log_prob(
@@ -1193,6 +1230,8 @@ or
 
 <h3 id="log_survival_function"><code>log_survival_function</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 log_survival_function(
     value,
@@ -1230,6 +1269,8 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 <h3 id="mean"><code>mean</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 mean(
     name='mean',
@@ -1242,6 +1283,8 @@ Mean.
 
 <h3 id="mode"><code>mode</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 mode(
     name='mode',
@@ -1253,6 +1296,8 @@ Mode.
 
 
 <h3 id="optimal_variational_posterior"><code>optimal_variational_posterior</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/variational_gaussian_process.py">View source</a>
 
 ``` python
 @staticmethod
@@ -1333,6 +1378,8 @@ loc, scale: Tuple representing the variational location and scale.
 
 <h3 id="param_shapes"><code>param_shapes</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 param_shapes(
     cls,
@@ -1363,6 +1410,8 @@ Subclasses should override class method `_param_shapes`.
 
 
 <h3 id="param_static_shapes"><code>param_static_shapes</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 param_static_shapes(
@@ -1400,6 +1449,8 @@ constant-valued tensors when constant values are fed.
 * <b>`ValueError`</b>: if `sample_shape` is a `TensorShape` and is not fully defined.
 
 <h3 id="prob"><code>prob</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 prob(
@@ -1443,6 +1494,8 @@ or
 
 <h3 id="quantile"><code>quantile</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 quantile(
     value,
@@ -1475,6 +1528,8 @@ quantile(p) := x such that P[X <= x] == p
 
 <h3 id="sample"><code>sample</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 sample(
     sample_shape=(),
@@ -1504,6 +1559,8 @@ sample.
 * <b>`samples`</b>: a `Tensor` with prepended dimensions `sample_shape`.
 
 <h3 id="stddev"><code>stddev</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 stddev(
@@ -1536,7 +1593,39 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 * <b>`stddev`</b>: Floating-point `Tensor` with shape identical to
   `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
+<h3 id="surrogate_posterior_kl_divergence_prior"><code>surrogate_posterior_kl_divergence_prior</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/variational_gaussian_process.py">View source</a>
+
+``` python
+surrogate_posterior_kl_divergence_prior(name=None)
+```
+
+Compute `KL(surrogate inducing point posterior || prior)`.
+
+See [Hensman, 2013][1].
+
+#### Args:
+
+
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
+  Default value: 'surrogate_posterior_kl_divergence_prior'.
+
+#### Returns:
+
+
+* <b>`kl`</b>: Scalar tensor representing the KL between the (surrogate/variational)
+  posterior over inducing point function values, and the GP prior over
+  the inducing point function values.
+
+#### References
+
+[1]: Hensman, J., Lawrence, N. "Gaussian Processes for Big Data", 2013
+     https://arxiv.org/abs/1309.6835
+
 <h3 id="survival_function"><code>survival_function</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 survival_function(
@@ -1572,6 +1661,8 @@ survival_function(x) = P[X > x]
 
 <h3 id="variance"><code>variance</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 variance(
     name='variance',
@@ -1604,6 +1695,8 @@ denotes expectation, and `Var.shape = batch_shape + event_shape`.
   `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 <h3 id="variational_loss"><code>variational_loss</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/variational_gaussian_process.py">View source</a>
 
 ``` python
 variational_loss(

@@ -5,6 +5,18 @@
 
 # tfp.bijectors.masked_dense
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/masked_autoregressive.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 A autoregressively masked dense layer. Analogous to `tf.layers.dense`.
 
 ``` python
@@ -22,8 +34,6 @@ tfp.bijectors.masked_dense(
 ```
 
 
-
-Defined in [`python/bijectors/masked_autoregressive.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/masked_autoregressive.py).
 
 <!-- Placeholder for "Used in" -->
 

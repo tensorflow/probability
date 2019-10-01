@@ -5,23 +5,28 @@
 
 # tfp.sts.build_factored_variational_loss
 
-Build a loss function for variational inference in STS models.
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
+Build a loss function for variational inference in STS models. (deprecated)
 
 ``` python
 tfp.sts.build_factored_variational_loss(
-    model,
-    observed_time_series,
-    init_batch_shape=(),
-    seed=None,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
 
 
-Defined in [`python/sts/fitting.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/fitting.py).
-
 <!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+<a href="../../tfp/sts/build_factored_variational_loss.md"><code>tfp.sts.build_factored_variational_loss</code></a> is deprecated. Use<a href="../../tfp/sts/build_factored_surrogate_posterior.md"><code>tfp.sts.build_factored_surrogate_posterior</code></a> and <a href="../../tfp/vi/monte_carlo_variational_loss.md"><code>tfp.vi.monte_carlo_variational_loss</code></a> (or <a href="../../tfp/vi/fit_surrogate_posterior.md"><code>tfp.vi.fit_surrogate_posterior</code></a> to automate the optimization loop) instead.
 
 Variational inference searches for the distribution within some family of
 approximate posteriors that minimizes a divergence between the approximate

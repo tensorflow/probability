@@ -5,18 +5,30 @@
 
 # tfp.layers.default_loc_scale_fn
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/util.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Makes closure which creates `loc`, `scale` params from `tf.get_variable`.
 
 ### Aliases:
 
-* `tfp.layers.default_loc_scale_fn`
 * `tfp.layers.util.default_loc_scale_fn`
+
 
 ``` python
 tfp.layers.default_loc_scale_fn(
     is_singular=False,
-    loc_initializer=tf.compat.v1.initializers.random_normal(stddev=0.1),
-    untransformed_scale_initializer=tf.compat.v1.initializers.random_normal(mean=-3.0, stddev=0.1),
+    loc_initializer=tf1.initializers.random_normal(stddev=0.1),
+    untransformed_scale_initializer=tf1.initializers.random_normal(mean=-3.0, stddev=0.1),
     loc_regularizer=None,
     untransformed_scale_regularizer=None,
     loc_constraint=None,
@@ -25,8 +37,6 @@ tfp.layers.default_loc_scale_fn(
 ```
 
 
-
-Defined in [`python/layers/util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/util.py).
 
 <!-- Placeholder for "Used in" -->
 

@@ -1,15 +1,24 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp" />
 <meta itemprop="path" content="Stable" />
+<meta itemprop="property" content="__version__"/>
 </div>
 
 # Module: tfp
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Tools for probabilistic reasoning in TensorFlow.
-
-
-
-Defined in [`__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/__init__.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -50,3 +59,6 @@ Defined in [`__init__.py`](https://github.com/tensorflow/probability/tree/master
 
 [`vi`](./tfp/vi.md) module: Methods and objectives for variational inference.
 
+## Other Members
+
+* `__version__ = '0.9.0-dev'` <a id="__version__"></a>

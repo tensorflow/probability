@@ -52,15 +52,28 @@
 
 # tfp.edward2.RandomVariable
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `RandomVariable`
 
 Class for random variables.
 
 
 
+### Aliases:
 
+* Class `tfp.experimental.edward2.RandomVariable`
 
-Defined in [`python/edward2/random_variable.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/random_variable.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -103,6 +116,8 @@ assert x.distribution.event_shape.as_list() == []
 ```
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __init__(
@@ -168,6 +183,8 @@ Get tensor that the random variable corresponds to.
 
 <h3 id="__abs__"><code>__abs__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __abs__(
     a,
@@ -211,6 +228,8 @@ If `x` is a `SparseTensor`, returns
 
 <h3 id="__add__"><code>__add__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __add__(
     a,
@@ -222,6 +241,8 @@ Dispatches to add for strings and add_v2 for all other types.
 
 
 <h3 id="__and__"><code>__and__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __and__(
@@ -250,6 +271,8 @@ A `Tensor` of type `bool`.
 
 <h3 id="__bool__"><code>__bool__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __bool__(
     a,
@@ -260,8 +283,8 @@ __bool__(
 Dummy method to prevent a tensor from being used as a Python `bool`.
 
 This overload raises a `TypeError` when the user inadvertently
-treats a `Tensor` as a boolean (e.g. in an `if` statement). For
-example:
+treats a `Tensor` as a boolean (most commonly in an `if` or `while`
+statement), in code that was not converted by AutoGraph. For example:
 
 ```python
 if tf.constant(True):  # Will raise.
@@ -271,15 +294,14 @@ if tf.constant(5) < tf.constant(7):  # Will raise.
   # ...
 ```
 
-This disallows ambiguities between testing the Python value vs testing the
-dynamic condition of the `Tensor`.
-
 #### Raises:
 
 `TypeError`.
 
 
 <h3 id="__div__"><code>__div__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __div__(
@@ -307,6 +329,8 @@ Used for Tensor.__div__.
 
 <h3 id="__eq__"><code>__eq__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __eq__(other)
 ```
@@ -315,6 +339,8 @@ Return self==value.
 
 
 <h3 id="__floordiv__"><code>__floordiv__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __floordiv__(
@@ -356,6 +382,8 @@ as well.
 
 <h3 id="__ge__"><code>__ge__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __ge__(
     a,
@@ -367,6 +395,20 @@ Returns the truth value of (x >= y) element-wise.
 
 *NOTE*: `math.greater_equal` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
+
+#### Example:
+
+
+
+```python
+x = tf.constant([5, 4, 6, 7])
+y = tf.constant([5, 2, 5, 10])
+tf.math.greater_equal(x, y) ==> [True, True, True, False]
+
+x = tf.constant([5, 4, 6, 7])
+y = tf.constant([5])
+tf.math.greater_equal(x, y) ==> [True, False, True, True]
+```
 
 #### Args:
 
@@ -382,6 +424,8 @@ A `Tensor` of type `bool`.
 
 
 <h3 id="__getitem__"><code>__getitem__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __getitem__(
@@ -463,6 +507,8 @@ The appropriate slice of "tensor", based on "slice_spec".
 
 <h3 id="__gt__"><code>__gt__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __gt__(
     a,
@@ -474,6 +520,20 @@ Returns the truth value of (x > y) element-wise.
 
 *NOTE*: `math.greater` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
+
+#### Example:
+
+
+
+```python
+x = tf.constant([5, 4, 6])
+y = tf.constant([5, 2, 5])
+tf.math.greater(x, y) ==> [False, True, True]
+
+x = tf.constant([5, 4, 6])
+y = tf.constant([5])
+tf.math.greater(x, y) ==> [False, False, True]
+```
 
 #### Args:
 
@@ -489,6 +549,8 @@ A `Tensor` of type `bool`.
 
 
 <h3 id="__invert__"><code>__invert__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __invert__(
@@ -514,6 +576,8 @@ A `Tensor` of type `bool`.
 
 <h3 id="__iter__"><code>__iter__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __iter__(
     a,
@@ -526,6 +590,8 @@ __iter__(
 
 <h3 id="__le__"><code>__le__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __le__(
     a,
@@ -537,6 +603,20 @@ Returns the truth value of (x <= y) element-wise.
 
 *NOTE*: `math.less_equal` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
+
+#### Example:
+
+
+
+```python
+x = tf.constant([5, 4, 6])
+y = tf.constant([5])
+tf.math.less_equal(x, y) ==> [True, True, False]
+
+x = tf.constant([5, 4, 6])
+y = tf.constant([5, 6, 6])
+tf.math.less_equal(x, y) ==> [True, True, True]
+```
 
 #### Args:
 
@@ -553,6 +633,8 @@ A `Tensor` of type `bool`.
 
 <h3 id="__lt__"><code>__lt__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __lt__(
     a,
@@ -564,6 +646,20 @@ Returns the truth value of (x < y) element-wise.
 
 *NOTE*: `math.less` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
+
+#### Example:
+
+
+
+```python
+x = tf.constant([5, 4, 6])
+y = tf.constant([5])
+tf.math.less(x, y) ==> [False, True, False]
+
+x = tf.constant([5, 4, 6])
+y = tf.constant([5, 6, 7])
+tf.math.less(x, y) ==> [False, True, True]
+```
 
 #### Args:
 
@@ -579,6 +675,8 @@ A `Tensor` of type `bool`.
 
 
 <h3 id="__matmul__"><code>__matmul__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __matmul__(
@@ -699,6 +797,8 @@ for all indices i, j.
 
 <h3 id="__mod__"><code>__mod__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __mod__(
     a,
@@ -729,6 +829,8 @@ A `Tensor`. Has the same type as `x`.
 
 <h3 id="__mul__"><code>__mul__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __mul__(
     a,
@@ -741,6 +843,8 @@ Dispatches cwise mul for "Dense*Dense" and "Dense*Sparse".
 
 <h3 id="__ne__"><code>__ne__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __ne__(other)
 ```
@@ -749,6 +853,8 @@ Return self!=value.
 
 
 <h3 id="__neg__"><code>__neg__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __neg__(
@@ -778,6 +884,8 @@ If `x` is a `SparseTensor`, returns
 
 <h3 id="__nonzero__"><code>__nonzero__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __nonzero__(
     a,
@@ -795,6 +903,8 @@ This is the Python 2.x counterpart to `__bool__()` above.
 
 
 <h3 id="__or__"><code>__or__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __or__(
@@ -822,6 +932,8 @@ A `Tensor` of type `bool`.
 
 
 <h3 id="__pow__"><code>__pow__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __pow__(
@@ -858,6 +970,8 @@ A `Tensor`.
 
 <h3 id="__radd__"><code>__radd__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __radd__(
     a,
@@ -869,6 +983,8 @@ Dispatches to add for strings and add_v2 for all other types.
 
 
 <h3 id="__rand__"><code>__rand__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __rand__(
@@ -897,6 +1013,8 @@ A `Tensor` of type `bool`.
 
 <h3 id="__rdiv__"><code>__rdiv__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __rdiv__(
     a,
@@ -922,6 +1040,8 @@ Used for Tensor.__div__.
 
 
 <h3 id="__rfloordiv__"><code>__rfloordiv__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __rfloordiv__(
@@ -962,6 +1082,8 @@ as well.
 * <b>`TypeError`</b>: If the inputs are complex.
 
 <h3 id="__rmatmul__"><code>__rmatmul__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __rmatmul__(
@@ -1082,6 +1204,8 @@ for all indices i, j.
 
 <h3 id="__rmod__"><code>__rmod__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __rmod__(
     a,
@@ -1112,6 +1236,8 @@ A `Tensor`. Has the same type as `x`.
 
 <h3 id="__rmul__"><code>__rmul__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __rmul__(
     a,
@@ -1123,6 +1249,8 @@ Dispatches cwise mul for "Dense*Dense" and "Dense*Sparse".
 
 
 <h3 id="__ror__"><code>__ror__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __ror__(
@@ -1150,6 +1278,8 @@ A `Tensor` of type `bool`.
 
 
 <h3 id="__rpow__"><code>__rpow__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __rpow__(
@@ -1186,6 +1316,8 @@ A `Tensor`.
 
 <h3 id="__rsub__"><code>__rsub__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __rsub__(
     a,
@@ -1213,6 +1345,8 @@ A `Tensor`. Has the same type as `x`.
 
 <h3 id="__rtruediv__"><code>__rtruediv__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __rtruediv__(
     a,
@@ -1224,6 +1358,8 @@ __rtruediv__(
 
 
 <h3 id="__rxor__"><code>__rxor__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __rxor__(
@@ -1264,6 +1400,8 @@ A `Tensor` of type bool with the same size as that of x or y.
 
 <h3 id="__sub__"><code>__sub__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __sub__(
     a,
@@ -1291,6 +1429,8 @@ A `Tensor`. Has the same type as `x`.
 
 <h3 id="__truediv__"><code>__truediv__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 __truediv__(
     a,
@@ -1302,6 +1442,8 @@ __truediv__(
 
 
 <h3 id="__xor__"><code>__xor__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 __xor__(
@@ -1341,6 +1483,8 @@ A `Tensor` of type bool with the same size as that of x or y.
 
 
 <h3 id="eval"><code>eval</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 eval(
@@ -1387,6 +1531,8 @@ with tf.Session() as sess:
 
 <h3 id="get_shape"><code>get_shape</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 get_shape()
 ```
@@ -1396,6 +1542,8 @@ Get shape of random variable.
 
 <h3 id="numpy"><code>numpy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
+
 ``` python
 numpy()
 ```
@@ -1404,6 +1552,8 @@ Value as NumPy array, only available for TF Eager.
 
 
 <h3 id="sample_shape_tensor"><code>sample_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/random_variable.py">View source</a>
 
 ``` python
 sample_shape_tensor(name='sample_shape_tensor')

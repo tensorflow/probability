@@ -5,12 +5,24 @@
 
 # tfp.distributions.kl_divergence
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/kullback_leibler.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Get the KL-divergence KL(distribution_a || distribution_b).
 
 ### Aliases:
 
-* `tfp.distributions.kl_divergence`
 * `tfp.layers.dense_variational_v2.kullback_leibler.kl_divergence`
+
 
 ``` python
 tfp.distributions.kl_divergence(
@@ -22,8 +34,6 @@ tfp.distributions.kl_divergence(
 ```
 
 
-
-Defined in [`python/distributions/kullback_leibler.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/kullback_leibler.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -69,61 +79,63 @@ and `distribution_b`.
 Built-in KL(distribution_a || distribution_b) registrations:
 
 ```text
-                           distribution_a || distribution_b
-======================================================================================
-                                Bernoulli || Bernoulli
-                                     Beta || Beta
-                                Blockwise || Blockwise
-                              Categorical || Categorical
-                                      Chi || Chi
-                                Dirichlet || Dirichlet
-                                    Gamma || Gamma
-                                   Chi2 +    + Chi2
-                          Chi2WithAbsDf +    + Chi2WithAbsDf
-                            Exponential +    + Exponential
-                          GaussianProcess || MultivariateNormalLinearOperator
-         GaussianProcessRegressionModel +    + MultivariateNormalDiag
-                                             + MultivariateNormalDiagPlusLowRank
-                                             + MultivariateNormalDiagWithSoftplusScale
-                                             + MultivariateNormalFullCovariance
-                                             + MultivariateNormalTriL
-                                             + VariationalGaussianProcess
-                          GaussianProcess || Normal
-         GaussianProcessRegressionModel +    
-                                   Gumbel || Gumbel
-                               HalfNormal || HalfNormal
-                              Independent || Independent
-              JointDistributionSequential || JointDistributionSequential
-                 JointDistributionNamed +    + JointDistributionNamed
-                                  Laplace || Laplace
-         MultivariateNormalLinearOperator || GaussianProcess
-                 MultivariateNormalDiag +    + GaussianProcessRegressionModel
-      MultivariateNormalDiagPlusLowRank +    
-MultivariateNormalDiagWithSoftplusScale +    
-       MultivariateNormalFullCovariance +    
-                 MultivariateNormalTriL +    
-             VariationalGaussianProcess +    
-         MultivariateNormalLinearOperator || MultivariateNormalLinearOperator
-                 MultivariateNormalDiag +    + MultivariateNormalDiag
-      MultivariateNormalDiagPlusLowRank +    + MultivariateNormalDiagPlusLowRank
-MultivariateNormalDiagWithSoftplusScale +    + MultivariateNormalDiagWithSoftplusScale
-       MultivariateNormalFullCovariance +    + MultivariateNormalFullCovariance
-                 MultivariateNormalTriL +    + MultivariateNormalTriL
-             VariationalGaussianProcess +    + VariationalGaussianProcess
-                                   Normal || GaussianProcess
-                                             + GaussianProcessRegressionModel
-                                   Normal || Normal
-                        OneHotCategorical || OneHotCategorical
-                                   Pareto || Pareto
-                                   Sample || Sample
-                                  Uniform || Uniform
-                                 VonMises || VonMises
-                       _BaseDeterministic || Distribution
-                          Deterministic +    + Autoregressive
-                    VectorDeterministic +    + BatchReshape
-                                             + Bernoulli
-                                             + Beta
-                                             + Binomial
-                                             + Blockwise
-                                             + 74 more
+                     distribution_a || distribution_b
+==========================================================================
+                          Bernoulli || Bernoulli
+                               Beta || Beta
+                          Blockwise || Blockwise
+                        Categorical || Categorical
+                                Chi || Chi
+                               Chi2 || Chi2
+                               Chi2 || Gamma
+                                       + Exponential
+                          Dirichlet || Dirichlet
+                              Gamma || Chi2
+                      Exponential +    
+                              Gamma || Gamma
+                      Exponential +    + Exponential
+                    GaussianProcess || MultivariateNormalLinearOperator
+   GaussianProcessRegressionModel +    + MultivariateNormalDiag
+                                       + MultivariateNormalDiagPlusLowRank
+                                       + MultivariateNormalFullCovariance
+                                       + MultivariateNormalTriL
+                                       + VariationalGaussianProcess
+                    GaussianProcess || Normal
+   GaussianProcessRegressionModel +    
+                             Gumbel || Gumbel
+                         HalfNormal || HalfNormal
+                        Independent || Independent
+        JointDistributionSequential || JointDistributionSequential
+           JointDistributionNamed +    + JointDistributionNamed
+                            Laplace || Laplace
+   MultivariateNormalLinearOperator || GaussianProcess
+           MultivariateNormalDiag +    + GaussianProcessRegressionModel
+MultivariateNormalDiagPlusLowRank +    
+ MultivariateNormalFullCovariance +    
+           MultivariateNormalTriL +    
+       VariationalGaussianProcess +    
+   MultivariateNormalLinearOperator || MultivariateNormalLinearOperator
+           MultivariateNormalDiag +    + MultivariateNormalDiag
+MultivariateNormalDiagPlusLowRank +    + MultivariateNormalDiagPlusLowRank
+ MultivariateNormalFullCovariance +    + MultivariateNormalFullCovariance
+           MultivariateNormalTriL +    + MultivariateNormalTriL
+       VariationalGaussianProcess +    + VariationalGaussianProcess
+                             Normal || GaussianProcess
+                                       + GaussianProcessRegressionModel
+                             Normal || Normal
+                  OneHotCategorical || OneHotCategorical
+                             Pareto || Pareto
+                    ProbitBernoulli || ProbitBernoulli
+                             Sample || Sample
+                            Uniform || Uniform
+                           VonMises || VonMises
+                 _BaseDeterministic || Distribution
+                    Deterministic +    + Autoregressive
+              VectorDeterministic +    + BatchReshape
+                                       + Bernoulli
+                                       + Beta
+                                       + Binomial
+                                       + Blockwise
+                                       + 76 more
+                              _Cast || _Cast
 ```

@@ -8,6 +8,18 @@
 
 # tfp.experimental.auto_batching.stackless.ExecutionQueue
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/stackless.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `ExecutionQueue`
 
 A priority queue of resumption points.
@@ -17,11 +29,7 @@ A priority queue of resumption points.
 ### Aliases:
 
 * Class `tfp.experimental.auto_batching.frontend.st.ExecutionQueue`
-* Class `tfp.experimental.auto_batching.stackless.ExecutionQueue`
 
-
-
-Defined in [`python/internal/auto_batching/stackless.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/stackless.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -38,6 +46,8 @@ of priority queues.  There are just two subtleties:
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/stackless.py">View source</a>
+
 ``` python
 __init__(backend)
 ```
@@ -51,6 +61,8 @@ Initialize self.  See help(type(self)) for accurate signature.
 
 <h3 id="dequeue"><code>dequeue</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/stackless.py">View source</a>
+
 ``` python
 dequeue()
 ```
@@ -59,6 +71,8 @@ dequeue()
 
 
 <h3 id="enqueue"><code>enqueue</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/stackless.py">View source</a>
 
 ``` python
 enqueue(

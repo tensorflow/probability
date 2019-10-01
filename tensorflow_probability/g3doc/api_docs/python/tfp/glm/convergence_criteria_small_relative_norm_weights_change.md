@@ -5,6 +5,18 @@
 
 # tfp.glm.convergence_criteria_small_relative_norm_weights_change
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/glm/fisher_scoring.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Returns Python `callable` which indicates fitting procedure has converged.
 
 ``` python
@@ -15,8 +27,6 @@ tfp.glm.convergence_criteria_small_relative_norm_weights_change(
 ```
 
 
-
-Defined in [`python/glm/fisher_scoring.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/fisher_scoring.py).
 
 <!-- Placeholder for "Used in" -->
 

@@ -5,16 +5,24 @@
 
 # Module: tfp.experimental.auto_batching.stackless
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/stackless.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 A stackless auto-batching VM.
 
 ### Aliases:
 
 * Module `tfp.experimental.auto_batching.frontend.st`
-* Module `tfp.experimental.auto_batching.stackless`
 
-
-
-Defined in [`python/internal/auto_batching/stackless.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/stackless.py).
 
 <!-- Placeholder for "Used in" -->
 

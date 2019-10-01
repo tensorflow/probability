@@ -8,6 +8,18 @@
 
 # tfp.experimental.auto_batching.instructions.Program
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `Program`
 
 An auto-batchable program.
@@ -19,13 +31,9 @@ An auto-batchable program.
 * Class `tfp.experimental.auto_batching.frontend.instructions.Program`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.Program`
 * Class `tfp.experimental.auto_batching.frontend.stack.inst.Program`
-* Class `tfp.experimental.auto_batching.instructions.Program`
 * Class `tfp.experimental.auto_batching.stack_optimization.inst.Program`
 * Class `tfp.experimental.auto_batching.stackless.inst.Program`
 
-
-
-Defined in [`python/internal/auto_batching/instructions.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/instructions.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -77,6 +85,8 @@ of internal control flow).
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
+
 ``` python
 __init__(
     graph,
@@ -117,6 +127,8 @@ Initialize a new `Program`.
 
 <h3 id="main_function"><code>main_function</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
+
 ``` python
 main_function()
 ```
@@ -125,6 +137,8 @@ Return a representation of the main program as a `Function`.
 
 
 <h3 id="replace"><code>replace</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
 
 ``` python
 replace(

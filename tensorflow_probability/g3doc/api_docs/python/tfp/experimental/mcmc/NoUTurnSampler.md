@@ -10,20 +10,23 @@
 
 # tfp.experimental.mcmc.NoUTurnSampler
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/mcmc/nuts.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `NoUTurnSampler`
 
 Runs one step of the No U-Turn Sampler.
 
 Inherits From: [`TransitionKernel`](../../../tfp/mcmc/TransitionKernel.md)
-
-### Aliases:
-
-* Class `tfp.experimental.mcmc.NoUTurnSampler`
-* Class `tfp.experimental.mcmc.nuts.NoUTurnSampler`
-
-
-
-Defined in [`python/experimental/mcmc/nuts.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/mcmc/nuts.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -57,12 +60,15 @@ https://arxiv.org/pdf/1111.4246.pdf.
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/mcmc/nuts.py">View source</a>
+
 ``` python
 __init__(
     target_log_prob_fn,
     step_size,
     max_tree_depth=10,
     unrolled_leapfrog_steps=1,
+    num_trajectories_per_step=1,
     use_auto_batching=True,
     stackless=False,
     backend=None,
@@ -99,6 +105,12 @@ Initializes this transition kernel.
   trajectory length implied by max_tree_depth. Defaults to 1. This
   parameter can be useful for amortizing the auto-batching control flow
   overhead.
+* <b>`num_trajectories_per_step`</b>: Python `int` giving the number of NUTS
+  trajectories to run as "one" step.  Setting this higher than 1 may be
+  favorable for performance by giving the autobatching system the
+  opportunity to batch gradients across consecutive trajectories.  The
+  intermediate samples are thinned: only the last sample from the run (in
+  each batch member) is returned.
 * <b>`use_auto_batching`</b>: Boolean.  If `False`, do not invoke the auto-batching
   system; operate on batch size 1 only.
 * <b>`stackless`</b>: Boolean.  If `True`, invoke the stackless version of
@@ -131,6 +143,8 @@ composing them with the <a href="../../../tfp/mcmc/MetropolisHastings.md"><code>
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/mcmc/nuts.py">View source</a>
+
 ``` python
 bootstrap_results(init_state)
 ```
@@ -139,6 +153,8 @@ Creates initial `previous_kernel_results` using a supplied `state`.
 
 
 <h3 id="one_step"><code>one_step</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/mcmc/nuts.py">View source</a>
 
 ``` python
 one_step(
@@ -165,8 +181,8 @@ Runs one iteration of the No U-Turn Sampler.
 
 
 * <b>`next_state`</b>: `Tensor` or Python list of `Tensor`s representing the state(s)
-  of the Markov chain(s) after taking exactly one step. Has same type and
-  shape as `current_state`.
+  of the Markov chain(s) after taking `self.num_trajectories_per_step`
+  steps. Has same type and shape as `current_state`.
 * <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
   advance the chain.
 

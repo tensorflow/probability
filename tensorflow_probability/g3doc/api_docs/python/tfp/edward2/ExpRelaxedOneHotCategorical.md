@@ -5,7 +5,24 @@
 
 # tfp.edward2.ExpRelaxedOneHotCategorical
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for ExpRelaxedOneHotCategorical.
+
+### Aliases:
+
+* `tfp.experimental.edward2.ExpRelaxedOneHotCategorical`
+
 
 ``` python
 tfp.edward2.ExpRelaxedOneHotCategorical(
@@ -15,8 +32,6 @@ tfp.edward2.ExpRelaxedOneHotCategorical(
 ```
 
 
-
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -34,19 +49,19 @@ Initialize ExpRelaxedOneHotCategorical using class log-probabilities.
 #### Args:
 
 
-* <b>`temperature`</b>: An 0-D `Tensor`, representing the temperature
-  of a set of ExpRelaxedCategorical distributions. The temperature should
-  be positive.
+* <b>`temperature`</b>: A `Tensor`, representing the temperature of one or more
+  distributions. The temperature values must be positive, and the shape
+  must broadcast against `(logits or probs)[..., 0]`.
 * <b>`logits`</b>: An N-D `Tensor`, `N >= 1`, representing the log probabilities
-  of a set of ExpRelaxedCategorical distributions. The first
-  `N - 1` dimensions index into a batch of independent distributions and
-  the last dimension represents a vector of logits for each class. Only
-  one of `logits` or `probs` should be passed in.
+  of one or many distributions. The first `N - 1` dimensions index into a
+  batch of independent distributions and the last dimension represents a
+  vector of logits for each class. Only one of `logits` or `probs` should
+  be passed in.
 * <b>`probs`</b>: An N-D `Tensor`, `N >= 1`, representing the probabilities
-  of a set of ExpRelaxedCategorical distributions. The first
-  `N - 1` dimensions index into a batch of independent distributions and
-  the last dimension represents a vector of probabilities for each
-  class. Only one of `logits` or `probs` should be passed in.
+  of one or many distributions. The first `N - 1` dimensions index into a
+  batch of independent distributions and the last dimension represents a
+  vector of probabilities for each class. Only one of `logits` or `probs`
+  should be passed in.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
   parameters are checked for validity despite possibly degrading runtime
   performance. When `False` invalid inputs may silently render incorrect

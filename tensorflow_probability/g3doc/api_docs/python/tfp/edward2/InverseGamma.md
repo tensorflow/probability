@@ -5,7 +5,24 @@
 
 # tfp.edward2.InverseGamma
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for InverseGamma.
+
+### Aliases:
+
+* `tfp.experimental.edward2.InverseGamma`
+
 
 ``` python
 tfp.edward2.InverseGamma(
@@ -15,8 +32,6 @@ tfp.edward2.InverseGamma(
 ```
 
 
-
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -29,11 +44,7 @@ RandomVariable.
 
 #### Original Docstring for Distribution
 
-Construct InverseGamma with `concentration` and `scale` parameters. (deprecated arguments)
-
-Warning: SOME ARGUMENTS ARE DEPRECATED: `(rate)`. They will be removed after 2019-05-08.
-Instructions for updating:
-The `rate` parameter is deprecated. Use `scale` instead.The `rate` parameter was always interpreted as a `scale` parameter, but erroneously misnamed.
+Construct InverseGamma with `concentration` and `scale` parameters.
 
 The parameters `concentration` and `scale` must be shaped in a way that
 supports broadcasting (e.g. `concentration + scale` is a valid operation).
@@ -53,7 +64,6 @@ supports broadcasting (e.g. `concentration + scale` is a valid operation).
   (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
   result is undefined. When `False`, an exception is raised if one or
   more of the statistic's batch members are undefined.
-* <b>`rate`</b>: Deprecated (mis-named) alias for `scale`.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.
 
 

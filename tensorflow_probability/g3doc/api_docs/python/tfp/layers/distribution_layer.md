@@ -5,11 +5,19 @@
 
 # Module: tfp.layers.distribution_layer
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Layers for combining <a href="../../tfp/distributions.md"><code>tfp.distributions</code></a> and `tf.keras`.
-
-
-
-Defined in [`python/layers/distribution_layer.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/distribution_layer.py).
 
 <!-- Placeholder for "Used in" -->
 

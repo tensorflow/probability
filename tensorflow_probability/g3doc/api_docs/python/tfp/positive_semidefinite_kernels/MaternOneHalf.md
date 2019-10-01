@@ -10,6 +10,7 @@
 <meta itemprop="property" content="name_scope"/>
 <meta itemprop="property" content="submodules"/>
 <meta itemprop="property" content="trainable_variables"/>
+<meta itemprop="property" content="validate_args"/>
 <meta itemprop="property" content="variables"/>
 <meta itemprop="property" content="__add__"/>
 <meta itemprop="property" content="__init__"/>
@@ -23,15 +24,28 @@
 
 # tfp.positive_semidefinite_kernels.MaternOneHalf
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/matern.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `MaternOneHalf`
 
 Matern Kernel with parameter 1/2.
 
 Inherits From: [`PositiveSemidefiniteKernel`](../../tfp/positive_semidefinite_kernels/PositiveSemidefiniteKernel.md)
 
+### Aliases:
 
+* Class `tfp.math.psd_kernels.MaternOneHalf`
 
-Defined in [`python/positive_semidefinite_kernels/matern.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/positive_semidefinite_kernels/matern.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -50,6 +64,8 @@ where the double-bars represent vector length (i.e. Euclidean, or L2 Norm).
 This kernel, acts over the space `S = R^(D1 x D2 .. x Dd)`.
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/matern.py">View source</a>
 
 ``` python
 __init__(
@@ -187,7 +203,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -200,9 +216,14 @@ name) followed by variables from all submodules recursively (breadth
 first).
 
 
+<h3 id="validate_args"><code>validate_args</code></h3>
+
+Python `bool` indicating possibly expensive checks are enabled.
+
+
 <h3 id="variables"><code>variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -221,6 +242,8 @@ first).
 
 <h3 id="__add__"><code>__add__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/positive_semidefinite_kernel.py">View source</a>
+
 ``` python
 __add__(k)
 ```
@@ -230,6 +253,8 @@ __add__(k)
 
 <h3 id="__mul__"><code>__mul__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/positive_semidefinite_kernel.py">View source</a>
+
 ``` python
 __mul__(k)
 ```
@@ -238,6 +263,8 @@ __mul__(k)
 
 
 <h3 id="apply"><code>apply</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/positive_semidefinite_kernel.py">View source</a>
 
 ``` python
 apply(
@@ -304,7 +331,7 @@ single scalar value.
 import tensorflow_probability as tfp
 
 # Suppose `SomeKernel` acts on vectors (rank-1 tensors)
-scalar_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=.5)
+scalar_kernel = tfp.math.psd_kernels.SomeKernel(param=.5)
 scalar_kernel.batch_shape
 # ==> []
 
@@ -324,7 +351,7 @@ The above output is the result of vectorized computation of the five values
 Now we can consider a kernel with batched parameters:
 
 ```python
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[.2, .5])
+batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[.2, .5])
 batch_kernel.batch_shape
 # ==> [2]
 batch_kernel.apply(x, y).shape
@@ -338,7 +365,7 @@ be broadcast together. We can fix this in either of two ways:
 broadcast with `[5]` to yield `[2, 5]`:
 
 ```python
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+batch_kernel = tfp.math.psd_kernels.SomeKernel(
     param=[[.2], [.5]])
 batch_kernel.batch_shape
 # ==> [2, 1]
@@ -351,13 +378,15 @@ in the input shape as part of the "example shape", and "pushing" the
 kernel batch shape to the left:
 
 ```python
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[.2, .5])
+batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[.2, .5])
 batch_kernel.batch_shape
 # ==> [2]
 batch_kernel.apply(x, y, example_ndims=1).shape
 # ==> [2, 5]
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/positive_semidefinite_kernel.py">View source</a>
 
 ``` python
 batch_shape_tensor()
@@ -373,6 +402,8 @@ fully-broadcast shapes of the kernel parameters.
 
 
 <h3 id="matrix"><code>matrix</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/positive_semidefinite_kernel.py">View source</a>
 
 ``` python
 matrix(
@@ -442,7 +473,7 @@ First, consider a kernel with a single scalar parameter.
 ```python
 import tensorflow_probability as tfp
 
-scalar_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=.5)
+scalar_kernel = tfp.math.psd_kernels.SomeKernel(param=.5)
 scalar_kernel.batch_shape
 # ==> []
 
@@ -466,7 +497,7 @@ pairwise, across all pairs:
 Now consider a kernel with batched parameters with the same inputs
 
 ```python
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[1., .5])
+batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[1., .5])
 batch_kernel.batch_shape
 # ==> [2]
 
@@ -510,7 +541,7 @@ the kernel parameter batch shapes, otherwise we get an error:
 x = np.ones([10, 5, 3], np.float32)
 y = np.ones([10, 4, 3], np.float32)
 
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(params=[1., .5])
+batch_kernel = tfp.math.psd_kernels.SomeKernel(params=[1., .5])
 batch_kernel.batch_shape
 # ==> [2]
 batch_kernel.matrix(x, y).shape
@@ -524,7 +555,7 @@ reshape the inputs to be broadcastable!):
 x = np.ones([10, 5, 3], np.float32)
 y = np.ones([10, 4, 3], np.float32)
 
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+batch_kernel = tfp.math.psd_kernels.SomeKernel(
     params=[[1.], [.5]])
 batch_kernel.batch_shape
 # ==> [2, 1]
@@ -535,7 +566,7 @@ batch_kernel.matrix(x, y).shape
 x = np.ones([10, 1, 5, 3], np.float32)
 y = np.ones([10, 1, 4, 3], np.float32)
 
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+batch_kernel = tfp.math.psd_kernels.SomeKernel(
     params=[1., .5])
 batch_kernel.batch_shape
 # ==> [2]
@@ -547,6 +578,8 @@ Here, we have the result of applying the kernel, with 2 different
 parameters, to each of a batch of 10 pairs of input lists.
 
 <h3 id="tensor"><code>tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/positive_semidefinite_kernel.py">View source</a>
 
 ``` python
 tensor(
@@ -606,7 +639,7 @@ First, consider a kernel with a single scalar parameter.
 ```python
 import tensorflow_probability as tfp
 
-scalar_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=.5)
+scalar_kernel = tfp.math.psd_kernels.SomeKernel(param=.5)
 scalar_kernel.batch_shape
 # ==> []
 
@@ -636,7 +669,7 @@ pairwise, across all pairs:
 Now consider a kernel with batched parameters.
 
 ```python
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[1., .5])
+batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[1., .5])
 batch_kernel.batch_shape
 # ==> [2]
 
@@ -680,7 +713,7 @@ the kernel parameter batch shapes, otherwise we get an error:
 x = np.ones([10, 5, 6, 3], np.float32)
 y = np.ones([10, 7, 8, 3], np.float32)
 
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(params=[1., .5])
+batch_kernel = tfp.math.psd_kernels.SomeKernel(params=[1., .5])
 batch_kernel.batch_shape
 # ==> [2]
 batch_kernel.tensor(x, y, x1_example_ndims=2, x2_example_ndims=2).shape
@@ -694,7 +727,7 @@ reshape the inputs to be broadcastable!):
 x = np.ones([10, 5, 6, 3], np.float32)
 y = np.ones([10, 7, 8, 3], np.float32)
 
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+batch_kernel = tfp.math.psd_kernels.SomeKernel(
     params=[[1.], [.5]])
 batch_kernel.batch_shape
 # ==> [2, 1]
@@ -705,7 +738,7 @@ batch_kernel.tensor(x, y, x1_example_ndims=2, x2_example_ndims=2).shape
 x = np.ones([10, 1, 5, 6, 3], np.float32)
 y = np.ones([10, 1, 7, 8, 3], np.float32)
 
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+batch_kernel = tfp.math.psd_kernels.SomeKernel(
     params=[1., .5])
 batch_kernel.batch_shape
 # ==> [2]

@@ -5,7 +5,24 @@
 
 # tfp.edward2.as_random_variable
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/generated_random_variables.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Wrap an existing distribution as a traceable random variable.
+
+### Aliases:
+
+* `tfp.experimental.edward2.as_random_variable`
+
 
 ``` python
 tfp.edward2.as_random_variable(
@@ -16,8 +33,6 @@ tfp.edward2.as_random_variable(
 ```
 
 
-
-Defined in [`python/edward2/generated_random_variables.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/generated_random_variables.py).
 
 <!-- Placeholder for "Used in" -->
 

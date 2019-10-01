@@ -5,6 +5,18 @@
 
 # tfp.experimental.auto_batching.xla.compile_nested_output
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/xla.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Wraps f with a `tpu.rewrite` or `xla.compile`, propagates output structure.
 
 ``` python
@@ -15,8 +27,6 @@ tfp.experimental.auto_batching.xla.compile_nested_output(
 ```
 
 
-
-Defined in [`python/internal/auto_batching/xla.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/xla.py).
 
 <!-- Placeholder for "Used in" -->
 

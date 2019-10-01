@@ -27,15 +27,23 @@
 
 # tfp.bijectors.RealNVP
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/real_nvp.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `RealNVP`
 
-RealNVP "affine coupling layer" for vector-valued events.
+RealNVP 'affine coupling layer' for vector-valued events.
 
 Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
-
-
-
-Defined in [`python/bijectors/real_nvp.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/real_nvp.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -66,8 +74,8 @@ can sample in parallel. In contrast, Real NVP can compute both forward and
 inverse computations in parallel. However, the lack of an autoregressive
 transformations makes it less expressive on a per-bijector basis.
 
-A "valid" `shift_and_log_scale_fn` must compute each `shift` (aka `loc` or
-"mu" in [Papamakarios et al. (2016)][4]) and `log(scale)` (aka "alpha" in
+A 'valid' `shift_and_log_scale_fn` must compute each `shift` (aka `loc` or
+'mu' in [Papamakarios et al. (2016)][4]) and `log(scale)` (aka 'alpha' in
 [Papamakarios et al. (2016)][4]) such that each are broadcastable with the
 arguments to `forward` and `inverse`, i.e., such that the calculations in
 `forward`, `inverse` [below] are possible. For convenience,
@@ -82,13 +90,16 @@ NVP, `shift_and_log_scale_fn` should return `(shift, None)`, and
 Calling `real_nvp_default_template` with `shift_only=True` returns one such
 NICE-compatible `shift_and_log_scale_fn`.
 
+The `bijector_fn` argument allows specifying a more general coupling relation,
+such as the LSTM-inspired activation from [5], or Neural Spline Flow [6].
+
 Caching: the scalar input depth `D` of the base distribution is not known at
 construction time. The first call to any of `forward(x)`, `inverse(x)`,
 `inverse_log_det_jacobian(x)`, or `forward_log_det_jacobian(x)` memoizes
 `D`, which is re-used in subsequent calls. This shape must be known prior to
 graph execution (which is the case if using tf.layers).
 
-#### Example Use
+#### Examples
 
 ```python
 tfd = tfp.distributions
@@ -127,12 +138,22 @@ For more examples, see [Jang (2018)][3].
      Autoregressive Flow for Density Estimation. In _Neural Information
      Processing Systems_, 2017. https://arxiv.org/abs/1705.07057
 
+[5]: Diederik P Kingma, Tim Salimans, Max Welling. Improving Variational
+     Inference with Inverse Autoregressive Flow. In _Neural Information
+     Processing Systems_, 2016. https://arxiv.org/abs/1606.04934
+
+[6]: Conor Durkan, Artur Bekasov, Iain Murray, George Papamakarios. Neural
+     Spline Flows, 2019. http://arxiv.org/abs/1906.04032
+
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/real_nvp.py">View source</a>
 
 ``` python
 __init__(
     num_masked,
-    shift_and_log_scale_fn,
+    shift_and_log_scale_fn=None,
+    bijector_fn=None,
     is_constant_jacobian=False,
     validate_args=False,
     name=None
@@ -146,16 +167,21 @@ Creates the Real NVP or NICE bijector.
 
 
 * <b>`num_masked`</b>: Python `int` indicating that the first `d` units of the event
-  should be masked. Must be in the closed interval `[1, D-1]`, where `D`
+  should be masked. Must be in the closed interval `[0, D-1]`, where `D`
   is the event size of the base distribution.
 * <b>`shift_and_log_scale_fn`</b>: Python `callable` which computes `shift` and
   `log_scale` from both the forward domain (`x`) and the inverse domain
-  (`y`). Calculation must respect the "autoregressive property" (see class
+  (`y`). Calculation must respect the 'autoregressive property' (see class
   docstring). Suggested default
   `masked_autoregressive_default_template(hidden_layers=...)`.
   Typically the function contains `tf.Variables` and is wrapped using
   `tf.make_template`. Returning `None` for either (both) `shift`,
   `log_scale` is equivalent to (but more efficient than) returning zero.
+* <b>`bijector_fn`</b>: Python `callable` which returns a `tfb.Bijector` which
+  transforms the last `D-d` unit with the signature `(masked_units_tensor,
+  output_units, **condition_kwargs) -> bijector`. The bijector must
+  operate on scalar or vector events and must not alter the rank of its
+  input.
 * <b>`is_constant_jacobian`</b>: Python `bool`. Default: `False`. When `True` the
   implementation assumes `log_scale` does not depend on the forward domain
   (`x`) or inverse domain (`y`) values. (No validation is made;
@@ -169,7 +195,9 @@ Creates the Real NVP or NICE bijector.
 #### Raises:
 
 
-* <b>`ValueError`</b>: If num_masked < 1.
+* <b>`ValueError`</b>: If num_masked < 0.
+* <b>`ValueError`</b>: If both or none of `shift_and_log_scale_fn` and `bijector_fn`
+    are specified.
 
 
 
@@ -242,7 +270,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -262,7 +290,7 @@ Returns True if Tensor arguments will be validated.
 
 <h3 id="variables"><code>variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -280,6 +308,8 @@ first).
 ## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 __call__(
@@ -339,6 +369,8 @@ tfb.Exp()([-1., 0., 1.])
 
 <h3 id="forward"><code>forward</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 forward(
     x,
@@ -373,6 +405,8 @@ Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
 <h3 id="forward_event_shape"><code>forward_event_shape</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 forward_event_shape(input_shape)
 ```
@@ -395,6 +429,8 @@ Same meaning as `forward_event_shape_tensor`. May be only partially defined.
   after applying `forward`. Possibly unknown.
 
 <h3 id="forward_event_shape_tensor"><code>forward_event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 forward_event_shape_tensor(
@@ -421,6 +457,8 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
   event-portion shape after applying `forward`.
 
 <h3 id="forward_log_det_jacobian"><code>forward_log_det_jacobian</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 forward_log_det_jacobian(
@@ -465,6 +503,8 @@ Returns both the forward_log_det_jacobian.
 
 <h3 id="inverse"><code>inverse</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 inverse(
     y,
@@ -501,6 +541,8 @@ Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
 <h3 id="inverse_event_shape"><code>inverse_event_shape</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 inverse_event_shape(output_shape)
 ```
@@ -523,6 +565,8 @@ Same meaning as `inverse_event_shape_tensor`. May be only partially defined.
   after applying `inverse`. Possibly unknown.
 
 <h3 id="inverse_event_shape_tensor"><code>inverse_event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 inverse_event_shape_tensor(
@@ -549,6 +593,8 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
   event-portion shape after applying `inverse`.
 
 <h3 id="inverse_log_det_jacobian"><code>inverse_log_det_jacobian</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 inverse_log_det_jacobian(

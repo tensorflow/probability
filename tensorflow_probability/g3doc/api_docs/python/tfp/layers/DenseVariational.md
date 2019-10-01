@@ -47,6 +47,18 @@
 
 # tfp.layers.DenseVariational
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/dense_variational_v2.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `DenseVariational`
 
 Dense layer with random `kernel` and `bias`.
@@ -55,12 +67,8 @@ Dense layer with random `kernel` and `bias`.
 
 ### Aliases:
 
-* Class `tfp.layers.DenseVariational`
 * Class `tfp.layers.dense_variational_v2.DenseVariational`
 
-
-
-Defined in [`python/layers/dense_variational_v2.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/dense_variational_v2.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -78,6 +86,8 @@ Y ~ Likelihood(M)
 ```
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/dense_variational_v2.py">View source</a>
 
 ``` python
 __init__(
@@ -332,7 +342,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -427,6 +437,8 @@ Output tensor(s).
 * <b>`ValueError`</b>: if the layer's `call` method returns None (an invalid value).
 
 <h3 id="build"><code>build</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/dense_variational_v2.py">View source</a>
 
 ``` python
 build(input_shape)

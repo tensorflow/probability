@@ -5,23 +5,28 @@
 
 # tfp.distributions.tridiag
 
-Creates a matrix with values set above, below, and on the diagonal.
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
+Creates a matrix with values set above, below, and on the diagonal. (deprecated)
 
 ``` python
 tfp.distributions.tridiag(
-    below=None,
-    diag=None,
-    above=None,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
 
 
-Defined in [`python/internal/distribution_util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/distribution_util.py).
-
 <!-- Placeholder for "Used in" -->
 
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+This function is deprecated.
 
 #### Example:
 

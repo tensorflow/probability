@@ -10,20 +10,30 @@
 
 # tfp.glm.Bernoulli
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/glm/family.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `Bernoulli`
 
 `Bernoulli(probs=mean)` where `mean = sigmoid(matmul(X, weights))`.
 
 Inherits From: [`ExponentialFamily`](../../tfp/glm/ExponentialFamily.md)
 
-
-
-Defined in [`python/glm/family.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/family.py).
-
 <!-- Placeholder for "Used in" -->
 
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/glm/family.py">View source</a>
 
 ``` python
 __init__(name=None)
@@ -57,6 +67,8 @@ Returns TF namescope prefixed to ops created by member functions.
 ## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/glm/family.py">View source</a>
 
 ``` python
 __call__(
@@ -103,6 +115,8 @@ often `T(Y) := Y` and in that case the distinction doesn't matter.
   mapping.
 
 <h3 id="log_prob"><code>log_prob</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/glm/family.py">View source</a>
 
 ``` python
 log_prob(

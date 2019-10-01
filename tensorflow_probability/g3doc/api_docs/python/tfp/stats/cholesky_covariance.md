@@ -5,6 +5,18 @@
 
 # tfp.stats.cholesky_covariance
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/stats/sample_stats.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Cholesky factor of the covariance matrix of vector-variate random samples.
 
 ``` python
@@ -17,8 +29,6 @@ tfp.stats.cholesky_covariance(
 ```
 
 
-
-Defined in [`python/stats/sample_stats.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/stats/sample_stats.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -52,7 +62,7 @@ plt.clabel(CS, inline=1, fontsize=10)
 
 Why does this work?
 Given vector-variate random variables `X = (X1, ..., Xd)`, one may obtain the
-sample covariance matrix in `R^{d x d}` (see <a href="../../tfp/stats/covariance.md"><code>tfp.stats.covariance</code></a>).
+sample covariance matrix in `R^{d x d}` (see `tfp.stats.covariance`).
 
 The [Cholesky factor](https://en.wikipedia.org/wiki/Cholesky_decomposition)
 of this matrix is analogous to standard deviation for scalar random variables:

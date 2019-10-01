@@ -5,20 +5,30 @@
 
 # tfp.experimental.auto_batching.lowering.lower_function_calls
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/lowering.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Lowers a `Program` that may have (recursive) FunctionCallOp instructions.
 
 ### Aliases:
 
 * `tfp.experimental.auto_batching.frontend.lowering.lower_function_calls`
-* `tfp.experimental.auto_batching.lowering.lower_function_calls`
+
 
 ``` python
 tfp.experimental.auto_batching.lowering.lower_function_calls(program)
 ```
 
 
-
-Defined in [`python/internal/auto_batching/lowering.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/lowering.py).
 
 <!-- Placeholder for "Used in" -->
 

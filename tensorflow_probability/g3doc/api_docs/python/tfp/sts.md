@@ -5,11 +5,19 @@
 
 # Module: tfp.sts
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Framework for Bayesian structural time series models.
-
-
-
-Defined in [`python/sts/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/__init__.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -48,6 +56,10 @@ Defined in [`python/sts/__init__.py`](https://github.com/tensorflow/probability/
 
 [`class SemiLocalLinearTrendStateSpaceModel`](../tfp/sts/SemiLocalLinearTrendStateSpaceModel.md): State space model for a semi-local linear trend.
 
+[`class SmoothSeasonal`](../tfp/sts/SmoothSeasonal.md): Formal representation of a smooth seasonal effect model.
+
+[`class SmoothSeasonalStateSpaceModel`](../tfp/sts/SmoothSeasonalStateSpaceModel.md): State space model for a smooth seasonal effect.
+
 [`class SparseLinearRegression`](../tfp/sts/SparseLinearRegression.md): Formal representation of a sparse linear regression.
 
 [`class StructuralTimeSeries`](../tfp/sts/StructuralTimeSeries.md): Base class for structural time series models.
@@ -56,7 +68,9 @@ Defined in [`python/sts/__init__.py`](https://github.com/tensorflow/probability/
 
 ## Functions
 
-[`build_factored_variational_loss(...)`](../tfp/sts/build_factored_variational_loss.md): Build a loss function for variational inference in STS models.
+[`build_factored_surrogate_posterior(...)`](../tfp/sts/build_factored_surrogate_posterior.md): Build a variational posterior that factors over model parameters.
+
+[`build_factored_variational_loss(...)`](../tfp/sts/build_factored_variational_loss.md): Build a loss function for variational inference in STS models. (deprecated)
 
 [`decompose_by_component(...)`](../tfp/sts/decompose_by_component.md): Decompose an observed time series into contributions from each component.
 
@@ -65,6 +79,8 @@ Defined in [`python/sts/__init__.py`](https://github.com/tensorflow/probability/
 [`fit_with_hmc(...)`](../tfp/sts/fit_with_hmc.md): Draw posterior samples using Hamiltonian Monte Carlo (HMC).
 
 [`forecast(...)`](../tfp/sts/forecast.md): Construct predictive distribution over future observations.
+
+[`impute_missing_values(...)`](../tfp/sts/impute_missing_values.md): Runs posterior inference to impute the missing values in a time series.
 
 [`one_step_predictive(...)`](../tfp/sts/one_step_predictive.md): Compute one-step-ahead predictive distributions for all timesteps.
 

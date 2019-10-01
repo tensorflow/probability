@@ -5,12 +5,24 @@
 
 # tfp.experimental.auto_batching.virtual_machine.is_staging
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/virtual_machine.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Returns whether the virtual machine is staging a computation.
 
 ### Aliases:
 
 * `tfp.experimental.auto_batching.frontend.vm.is_staging`
-* `tfp.experimental.auto_batching.virtual_machine.is_staging`
+
 
 ``` python
 tfp.experimental.auto_batching.virtual_machine.is_staging()
@@ -18,14 +30,12 @@ tfp.experimental.auto_batching.virtual_machine.is_staging()
 
 
 
-Defined in [`python/internal/auto_batching/virtual_machine.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/virtual_machine.py).
-
 <!-- Placeholder for "Used in" -->
 
 This can be useful for writing special primitives that change their behavior
 depending on whether they are being staged, run stackless, inferred (see
-`type_inference.is_inferring`), or none of the above (i.e., dry-run execution,
-see `frontend.Context.batch`).
+<a href="../../../../tfp/experimental/auto_batching/type_inference/is_inferring.md"><code>type_inference.is_inferring</code></a>), or none of the above (i.e., dry-run execution,
+see <a href="../../../../tfp/experimental/auto_batching/Context.md#batch"><code>frontend.Context.batch</code></a>).
 
 #### Returns:
 

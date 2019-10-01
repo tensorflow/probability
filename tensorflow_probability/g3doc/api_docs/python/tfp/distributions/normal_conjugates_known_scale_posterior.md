@@ -5,6 +5,18 @@
 
 # tfp.distributions.normal_conjugates_known_scale_posterior
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/normal_conjugate_posteriors.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Posterior Normal distribution with conjugate prior on the mean.
 
 ``` python
@@ -17,8 +29,6 @@ tfp.distributions.normal_conjugates_known_scale_posterior(
 ```
 
 
-
-Defined in [`python/distributions/normal_conjugate_posteriors.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/normal_conjugate_posteriors.py).
 
 <!-- Placeholder for "Used in" -->
 

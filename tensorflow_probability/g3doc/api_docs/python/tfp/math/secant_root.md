@@ -5,6 +5,18 @@
 
 # tfp.math.secant_root
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/root_search.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Finds root(s) of a function of single variable using the secant method.
 
 ``` python
@@ -23,8 +35,6 @@ tfp.math.secant_root(
 ```
 
 
-
-Defined in [`python/math/root_search.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/root_search.py).
 
 <!-- Placeholder for "Used in" -->
 

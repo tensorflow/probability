@@ -22,6 +22,18 @@
 
 # tfp.experimental.auto_batching.dsl.ProgramBuilder
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `ProgramBuilder`
 
 An auto-batching DSL context.
@@ -30,12 +42,8 @@ An auto-batching DSL context.
 
 ### Aliases:
 
-* Class `tfp.experimental.auto_batching.dsl.ProgramBuilder`
 * Class `tfp.experimental.auto_batching.frontend.dsl.ProgramBuilder`
 
-
-
-Defined in [`python/internal/auto_batching/dsl.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/dsl.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -74,6 +82,8 @@ function call instructions (and primitive operations) are just recorded, not
 entered recursively.
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">View source</a>
 
 ``` python
 __init__()
@@ -121,6 +131,8 @@ ab.var.seven = ab.const(7)
 
 <h3 id="__call__"><code>__call__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">View source</a>
+
 ``` python
 __call__(pattern)
 ```
@@ -164,6 +176,8 @@ beginning.
 
 <h3 id="call"><code>call</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">View source</a>
+
 ``` python
 call(
     function,
@@ -192,7 +206,7 @@ with ab.function(...) as func:
 #### Args:
 
 
-* <b>`function`</b>: The `instructions.Function` object representing the function to
+* <b>`function`</b>: The <a href="../../../../tfp/experimental/auto_batching/instructions/Function.md"><code>instructions.Function</code></a> object representing the function to
   call.
 * <b>`vars_in`</b>: Python strings giving the variables to pass in as inputs.
 * <b>`vars_out`</b>: A pattern of Python strings, giving the auto-batched variable(s)
@@ -208,11 +222,13 @@ with ab.function(...) as func:
 #### Returns:
 
 
-* <b>`op`</b>: An `instructions.FunctionCallOp` representing the call.  If one
+* <b>`op`</b>: An <a href="../../../../tfp/experimental/auto_batching/instructions/FunctionCallOp.md"><code>instructions.FunctionCallOp</code></a> representing the call.  If one
   subsequently assigns this to a local, via `ProgramBuilder.var.foo = op`,
   that local gets added to the list of output variables.
 
 <h3 id="const"><code>const</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">View source</a>
 
 ``` python
 const(
@@ -239,11 +255,13 @@ some `ProgramBuilder.var.foo`.
 #### Returns:
 
 
-* <b>`op`</b>: An `instructions.PrimOp` instance representing this operation.  If one
+* <b>`op`</b>: An <a href="../../../../tfp/experimental/auto_batching/instructions/PrimOp.md"><code>instructions.PrimOp</code></a> instance representing this operation.  If one
   subsequently assigns this to a local, via `ProgramBuilder.var.foo = op`,
   that local gets added to the list of output variables.
 
 <h3 id="declare_function"><code>declare_function</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">View source</a>
 
 ``` python
 declare_function(
@@ -282,7 +300,7 @@ It is an error to call but never define a declared function.
 #### Returns:
 
 
-* <b>`function`</b>: An `instructions.Function` object representing the function
+* <b>`function`</b>: An <a href="../../../../tfp/experimental/auto_batching/instructions/Function.md"><code>instructions.Function</code></a> object representing the function
   being declared.  It can be passed to `call` to call it, and to
   `define_function` to define it.
 
@@ -319,7 +337,7 @@ with ab.define_function(foo):
   ab.call(bar)
 ```
 
-Function bodies appear in the compiled `instructions.Program` in order of
+Function bodies appear in the compiled <a href="../../../../tfp/experimental/auto_batching/instructions/Program.md"><code>instructions.Program</code></a> in order of
 definition, not declaration.
 
 #### Note:
@@ -428,7 +446,7 @@ with ab.function(...) as f:
 #### Note:
 
 
-- The `as` clause (here `f`) binds an `instructions.Function` object
+- The `as` clause (here `f`) binds an <a href="../../../../tfp/experimental/auto_batching/instructions/Function.md"><code>instructions.Function</code></a> object
   representing the function being defined (see Yields).
 - The formal parameters are given by calling `param` inside the
   `with` block.
@@ -472,7 +490,7 @@ with ab.define_function(f):
 #### Yields:
 
 
-* <b>`function`</b>: An `instructions.Function` object representing the function
+* <b>`function`</b>: An <a href="../../../../tfp/experimental/auto_batching/instructions/Function.md"><code>instructions.Function</code></a> object representing the function
   being defined.  It can be passed to `call` to call it (including
   recursively).  Note that Python scopes `as` bindings to the definition
   enclosing the `with`, so a function thus bound can be referred to after
@@ -531,6 +549,8 @@ Nothing.
 
 <h3 id="local"><code>local</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">View source</a>
+
 ``` python
 local(
     name=None,
@@ -566,6 +586,8 @@ bind variables; however, may be helpful for a multivalue return (see
 
 <h3 id="locals_"><code>locals_</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">View source</a>
+
 ``` python
 locals_(
     count,
@@ -592,6 +614,8 @@ This is a convenience method standing for several invocations of `local`.
   Suitable for passing to `primop`, `call`, `if_`, and `return_`.
 
 <h3 id="module"><code>module</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">View source</a>
 
 ``` python
 module()
@@ -626,6 +650,8 @@ module = ab.module()
 
 <h3 id="param"><code>param</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">View source</a>
+
 ``` python
 param(name=None)
 ```
@@ -652,6 +678,8 @@ parameters, and there is no way to convince the `with` syntax to do that.
   to `primop`, `call`, `if_`, and `return_`.
 
 <h3 id="primop"><code>primop</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">View source</a>
 
 ``` python
 primop(
@@ -704,17 +732,19 @@ ab.primop(lambda: (5, 10), vars_out=[ab.var.five, ab.var.ten])
 #### Returns:
 
 
-* <b>`op`</b>: An `instructions.PrimOp` instance representing this operation.  If one
+* <b>`op`</b>: An <a href="../../../../tfp/experimental/auto_batching/instructions/PrimOp.md"><code>instructions.PrimOp</code></a> instance representing this operation.  If one
   subsequently assigns this to a local, via `ProgramBuilder.var.foo = op`,
   that local becomes the output pattern.
 
 <h3 id="program"><code>program</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">View source</a>
+
 ``` python
 program(main)
 ```
 
-Returns the registered program as an `instructions.Program`.
+Returns the registered program as an <a href="../../../../tfp/experimental/auto_batching/instructions/Program.md"><code>instructions.Program</code></a>.
 
 This is a helper method, equivalent to `self.module().program(main)`.
 
@@ -733,7 +763,7 @@ program = ab.program(main)
 #### Args:
 
 
-* <b>`main`</b>: An `instructions.Function` object representing the main entry point.
+* <b>`main`</b>: An <a href="../../../../tfp/experimental/auto_batching/instructions/Function.md"><code>instructions.Function</code></a> object representing the main entry point.
 
 
 #### Raises:
@@ -746,10 +776,12 @@ program = ab.program(main)
 #### Returns:
 
 
-* <b>`program`</b>: The `instructions.Program` corresponding to all the definitions
+* <b>`program`</b>: The <a href="../../../../tfp/experimental/auto_batching/instructions/Program.md"><code>instructions.Program</code></a> corresponding to all the definitions
   accumulated in this `ProgramBuilder`.
 
 <h3 id="return_"><code>return_</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">View source</a>
 
 ``` python
 return_(vars_out)

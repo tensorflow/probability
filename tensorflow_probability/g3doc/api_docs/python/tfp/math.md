@@ -5,11 +5,19 @@
 
 # Module: tfp.math
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 TensorFlow Probability math functions.
-
-
-
-Defined in [`python/math/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/__init__.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -17,6 +25,8 @@ Defined in [`python/math/__init__.py`](https://github.com/tensorflow/probability
 ## Modules
 
 [`ode`](../tfp/math/ode.md) module: TensorFlow Probability ODE solvers.
+
+[`psd_kernels`](../tfp/math/psd_kernels.md) module: Positive-semidefinite kernels package.
 
 ## Functions
 
@@ -42,7 +52,11 @@ Defined in [`python/math/__init__.py`](https://github.com/tensorflow/probability
 
 [`log1psquare(...)`](../tfp/math/log1psquare.md): Numerically stable calculation of `log(1 + x**2)` for small or large `|x|`.
 
+[`log_add_exp(...)`](../tfp/math/log_add_exp.md): Computes `log(exp(x) + exp(y))` in a numerically stable way.
+
 [`log_combinations(...)`](../tfp/math/log_combinations.md): Multinomial coefficient.
+
+[`log_sub_exp(...)`](../tfp/math/log_sub_exp.md): Compute `log(exp(max(x, y)) - exp(min(x, y)))` in a numerically stable way.
 
 [`lu_matrix_inverse(...)`](../tfp/math/lu_matrix_inverse.md): Computes a matrix inverse given the matrix's LU decomposition.
 
@@ -50,9 +64,11 @@ Defined in [`python/math/__init__.py`](https://github.com/tensorflow/probability
 
 [`lu_solve(...)`](../tfp/math/lu_solve.md): Solves systems of linear eqns `A X = RHS`, given LU factorizations.
 
-[`matrix_rank(...)`](../tfp/math/matrix_rank.md): Compute the matrix rank; the number of non-zero SVD singular values.
+[`matrix_rank(...)`](../tfp/math/matrix_rank.md): Compute the matrix rank of one or more matrices. (deprecated)
 
-[`pinv(...)`](../tfp/math/pinv.md): Compute the Moore-Penrose pseudo-inverse of a matrix.
+[`minimize(...)`](../tfp/math/minimize.md): Minimize a loss function using a provided optimizer.
+
+[`pinv(...)`](../tfp/math/pinv.md): Compute the Moore-Penrose pseudo-inverse of one or more matrices. (deprecated)
 
 [`pivoted_cholesky(...)`](../tfp/math/pivoted_cholesky.md): Computes the (partial) pivoted cholesky decomposition of `matrix`.
 
@@ -60,9 +76,13 @@ Defined in [`python/math/__init__.py`](https://github.com/tensorflow/probability
 
 [`random_rayleigh(...)`](../tfp/math/random_rayleigh.md): Generates `Tensor` of positive reals drawn from a Rayleigh distributions.
 
+[`reduce_logmeanexp(...)`](../tfp/math/reduce_logmeanexp.md): Computes `log(mean(exp(input_tensor)))`.
+
 [`reduce_weighted_logsumexp(...)`](../tfp/math/reduce_weighted_logsumexp.md): Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`.
 
 [`secant_root(...)`](../tfp/math/secant_root.md): Finds root(s) of a function of single variable using the secant method.
+
+[`smootherstep(...)`](../tfp/math/smootherstep.md): Computes a sigmoid-like interpolation function on the unit-interval.
 
 [`soft_threshold(...)`](../tfp/math/soft_threshold.md): Soft Thresholding operator.
 

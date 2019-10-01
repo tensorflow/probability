@@ -5,21 +5,28 @@
 
 # tfp.distributions.matrix_diag_transform
 
-Transform diagonal of [batch-]matrix, leave rest of matrix unchanged.
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
+Transform diagonal of [batch-]matrix, leave rest of matrix unchanged. (deprecated)
 
 ``` python
 tfp.distributions.matrix_diag_transform(
-    matrix,
-    transform=None,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
 
 
-Defined in [`python/internal/distribution_util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/distribution_util.py).
-
 <!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+This function has been deprecated; use tf.linalg.set_diag.
 
 Create a trainable covariance defined by a Cholesky factor:
 

@@ -5,6 +5,12 @@
 
 # tfp.trainable_distributions.poisson
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Constructs a trainable `tfd.Poisson` distribution. (deprecated)
 
 ``` python
@@ -13,6 +19,8 @@ tfp.trainable_distributions.poisson(
     **kwargs
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

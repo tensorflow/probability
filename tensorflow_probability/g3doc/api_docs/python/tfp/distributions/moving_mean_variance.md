@@ -5,6 +5,12 @@
 
 # tfp.distributions.moving_mean_variance
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Compute exponentially weighted moving {mean,variance} of a streaming value. (deprecated)
 
 ``` python
@@ -13,6 +19,8 @@ tfp.distributions.moving_mean_variance(
     **kwargs
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

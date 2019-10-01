@@ -8,6 +8,18 @@
 
 # tfp.experimental.auto_batching.instructions.Block
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `Block`
 
 A basic block.
@@ -19,18 +31,16 @@ A basic block.
 * Class `tfp.experimental.auto_batching.frontend.instructions.Block`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.Block`
 * Class `tfp.experimental.auto_batching.frontend.stack.inst.Block`
-* Class `tfp.experimental.auto_batching.instructions.Block`
 * Class `tfp.experimental.auto_batching.stack_optimization.inst.Block`
 * Class `tfp.experimental.auto_batching.stackless.inst.Block`
 
-
-
-Defined in [`python/internal/auto_batching/instructions.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/instructions.py).
 
 <!-- Placeholder for "Used in" -->
 
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
 
 ``` python
 __init__(
@@ -76,6 +86,8 @@ A string suitable for referring to this `Block` in printed output.
 ## Methods
 
 <h3 id="assign_instructions"><code>assign_instructions</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
 
 ``` python
 assign_instructions(instructions)

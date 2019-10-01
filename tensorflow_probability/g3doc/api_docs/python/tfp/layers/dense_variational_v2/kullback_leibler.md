@@ -5,11 +5,19 @@
 
 # Module: tfp.layers.dense_variational_v2.kullback_leibler
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/kullback_leibler.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Registration and usage mechanisms for KL-divergences.
-
-
-
-Defined in [`python/distributions/kullback_leibler.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/kullback_leibler.py).
 
 <!-- Placeholder for "Used in" -->
 

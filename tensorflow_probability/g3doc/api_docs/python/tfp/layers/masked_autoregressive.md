@@ -5,11 +5,19 @@
 
 # Module: tfp.layers.masked_autoregressive
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/masked_autoregressive.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Layers for normalizing flows and masked autoregressive density estimation.
-
-
-
-Defined in [`python/layers/masked_autoregressive.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/masked_autoregressive.py).
 
 <!-- Placeholder for "Used in" -->
 

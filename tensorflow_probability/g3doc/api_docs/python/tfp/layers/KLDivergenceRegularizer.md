@@ -4,9 +4,22 @@
 <meta itemprop="property" content="__call__"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="from_config"/>
+<meta itemprop="property" content="get_config"/>
 </div>
 
 # tfp.layers.KLDivergenceRegularizer
+
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
 
 ## Class `KLDivergenceRegularizer`
 
@@ -16,12 +29,8 @@ Regularizer that adds a KL divergence penalty to the model loss.
 
 ### Aliases:
 
-* Class `tfp.layers.KLDivergenceRegularizer`
 * Class `tfp.layers.distribution_layer.KLDivergenceRegularizer`
 
-
-
-Defined in [`python/layers/distribution_layer.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/distribution_layer.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -57,6 +66,8 @@ variational_encoder = tfk.Sequential([
 ```
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">View source</a>
 
 ``` python
 __init__(
@@ -101,11 +112,13 @@ Initialize the `KLDivergenceRegularizer` regularizer.
 
 <h3 id="__call__"><code>__call__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">View source</a>
+
 ``` python
 __call__(distribution_a)
 ```
 
-Call self as a function.
+Compute a regularization penalty from an input tensor.
 
 
 <h3 id="from_config"><code>from_config</code></h3>
@@ -117,7 +130,50 @@ from_config(
 )
 ```
 
+Creates a regularizer from its config.
 
+This method is the reverse of `get_config`,
+capable of instantiating the same regularizer from the config
+dictionary.
+
+This method is used by Keras `model_to_estimator`, saving and
+loading models to HDF5 formats, Keras model cloning, some visualization
+utilities, and exporting models to and from JSON.
+
+#### Arguments:
+
+
+* <b>`config`</b>: A Python dictionary, typically the output of get_config.
+
+
+#### Returns:
+
+A regularizer instance.
+
+
+<h3 id="get_config"><code>get_config</code></h3>
+
+``` python
+get_config()
+```
+
+Returns the config of the regularizer.
+
+An regularizer config is a Python dictionary (serializable)
+containing all configuration parameters of the regularizer.
+The same regularizer can be reinstantiated later
+(without any saved state) from this configuration.
+
+This method is optional if you are just training and executing models,
+exporting to and from SavedModels, or using weight checkpoints.
+
+This method is required for Keras `model_to_estimator`, saving and
+loading models to HDF5 formats, Keras model cloning, some visualization
+utilities, and exporting models to and from JSON.
+
+#### Returns:
+
+Python dictionary.
 
 
 

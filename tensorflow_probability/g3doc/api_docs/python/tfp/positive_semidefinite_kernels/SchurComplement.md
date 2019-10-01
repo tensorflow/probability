@@ -4,8 +4,7 @@
 <meta itemprop="property" content="base_kernel"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="cholesky_bijector"/>
-<meta itemprop="property" content="divisor_matrix"/>
-<meta itemprop="property" content="divisor_matrix_cholesky"/>
+<meta itemprop="property" content="diag_shift"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="feature_ndims"/>
 <meta itemprop="property" content="fixed_inputs"/>
@@ -13,12 +12,15 @@
 <meta itemprop="property" content="name_scope"/>
 <meta itemprop="property" content="submodules"/>
 <meta itemprop="property" content="trainable_variables"/>
+<meta itemprop="property" content="validate_args"/>
 <meta itemprop="property" content="variables"/>
 <meta itemprop="property" content="__add__"/>
 <meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="__mul__"/>
 <meta itemprop="property" content="apply"/>
 <meta itemprop="property" content="batch_shape_tensor"/>
+<meta itemprop="property" content="divisor_matrix"/>
+<meta itemprop="property" content="divisor_matrix_cholesky"/>
 <meta itemprop="property" content="matrix"/>
 <meta itemprop="property" content="tensor"/>
 <meta itemprop="property" content="with_name_scope"/>
@@ -26,15 +28,28 @@
 
 # tfp.positive_semidefinite_kernels.SchurComplement
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/schur_complement.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `SchurComplement`
 
 The SchurComplement kernel.
 
 Inherits From: [`PositiveSemidefiniteKernel`](../../tfp/positive_semidefinite_kernels/PositiveSemidefiniteKernel.md)
 
+### Aliases:
 
+* Class `tfp.math.psd_kernels.SchurComplement`
 
-Defined in [`python/positive_semidefinite_kernels/schur_complement.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/positive_semidefinite_kernels/schur_complement.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -96,13 +111,13 @@ and `Y`, it will yield another (equal size!) collection of scalar outputs.
 Here's a simple example usage, with no particular motivation.
 
 ```python
-from tensorflow_probability import positive_semidefinite_kernels as psd_kernel
+from tensorflow_probability.math import psd_kernels
 
-base_kernel = psd_kernel.ExponentiatedQuadratic(amplitude=np.float64(1.))
+base_kernel = psd_kernels.ExponentiatedQuadratic(amplitude=np.float64(1.))
 # 3 points in 1-dimensional space (shape [3, 1]).
 z = [[0.], [3.], [4.]]
 
-schur_kernel = psd_kernel.SchurComplement(
+schur_kernel = psd_kernels.SchurComplement(
     base_kernel=base_kernel,
     fixed_inputs=z)
 
@@ -118,13 +133,13 @@ process that is conditioned on some observed data.
 
 ```python
 from tensorflow_probability import distributions as tfd
-from tensorflow_probability import positive_semidefinite_kernels as psd_kernel
+from tensorflow_probability.math import psd_kernels
 
-base_kernel = psd_kernel.ExponentiatedQuadratic(amplitude=np.float64(1.))
+base_kernel = psd_kernels.ExponentiatedQuadratic(amplitude=np.float64(1.))
 observation_index_points = np.random.uniform(-1., 1., [50, 1])
 observations = np.sin(2 * np.pi * observation_index_points[..., 0])
 
-posterior_kernel = psd_kernel.SchurComplement(
+posterior_kernel = psd_kernels.SchurComplement(
     base_kernel=base_kernel,
     fixed_inputs=observation_index_points)
 
@@ -133,7 +148,7 @@ def posterior_mean_fn(x):
   k_x_obs_linop = tf.linalg.LinearOperatorFullMatrix(
       base_kernel.matrix(x, observation_index_points))
   chol_linop = tf.linalg.LinearOperatorLowerTriangular(
-      posterior_kernel.divisor_matrix_cholesky)
+      posterior_kernel.divisor_matrix_cholesky())
 
   return k_x_obs_linop.matvec(
       chol_linop.solvevec(
@@ -152,6 +167,8 @@ samples = gp_posterior.sample(5)
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/schur_complement.py">View source</a>
+
 ``` python
 __init__(
     base_kernel,
@@ -169,7 +186,7 @@ Construct a SchurComplement kernel instance.
 
 
 * <b>`base_kernel`</b>: A `PositiveSemidefiniteKernel` instance, the kernel used to
-  build the block matrices of which this kernel computes the  Schur
+  build the block matrices of which this kernel computes the Schur
   complement.
 * <b>`fixed_inputs`</b>: A Tensor, representing a collection of inputs. The Schur
   complement that this kernel computes comes from a block matrix, whose
@@ -241,12 +258,7 @@ kernel parameters.
 
 
 
-<h3 id="divisor_matrix"><code>divisor_matrix</code></h3>
-
-
-
-
-<h3 id="divisor_matrix_cholesky"><code>divisor_matrix_cholesky</code></h3>
+<h3 id="diag_shift"><code>diag_shift</code></h3>
 
 
 
@@ -316,7 +328,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -329,9 +341,14 @@ name) followed by variables from all submodules recursively (breadth
 first).
 
 
+<h3 id="validate_args"><code>validate_args</code></h3>
+
+Python `bool` indicating possibly expensive checks are enabled.
+
+
 <h3 id="variables"><code>variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -350,6 +367,8 @@ first).
 
 <h3 id="__add__"><code>__add__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/positive_semidefinite_kernel.py">View source</a>
+
 ``` python
 __add__(k)
 ```
@@ -359,6 +378,8 @@ __add__(k)
 
 <h3 id="__mul__"><code>__mul__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/positive_semidefinite_kernel.py">View source</a>
+
 ``` python
 __mul__(k)
 ```
@@ -367,6 +388,8 @@ __mul__(k)
 
 
 <h3 id="apply"><code>apply</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/positive_semidefinite_kernel.py">View source</a>
 
 ``` python
 apply(
@@ -433,7 +456,7 @@ single scalar value.
 import tensorflow_probability as tfp
 
 # Suppose `SomeKernel` acts on vectors (rank-1 tensors)
-scalar_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=.5)
+scalar_kernel = tfp.math.psd_kernels.SomeKernel(param=.5)
 scalar_kernel.batch_shape
 # ==> []
 
@@ -453,7 +476,7 @@ The above output is the result of vectorized computation of the five values
 Now we can consider a kernel with batched parameters:
 
 ```python
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[.2, .5])
+batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[.2, .5])
 batch_kernel.batch_shape
 # ==> [2]
 batch_kernel.apply(x, y).shape
@@ -467,7 +490,7 @@ be broadcast together. We can fix this in either of two ways:
 broadcast with `[5]` to yield `[2, 5]`:
 
 ```python
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+batch_kernel = tfp.math.psd_kernels.SomeKernel(
     param=[[.2], [.5]])
 batch_kernel.batch_shape
 # ==> [2, 1]
@@ -480,13 +503,15 @@ in the input shape as part of the "example shape", and "pushing" the
 kernel batch shape to the left:
 
 ```python
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[.2, .5])
+batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[.2, .5])
 batch_kernel.batch_shape
 # ==> [2]
 batch_kernel.apply(x, y, example_ndims=1).shape
 # ==> [2, 5]
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/positive_semidefinite_kernel.py">View source</a>
 
 ``` python
 batch_shape_tensor()
@@ -501,7 +526,31 @@ The batch_shape property of a PositiveSemidefiniteKernel as a `Tensor`.
 fully-broadcast shapes of the kernel parameters.
 
 
+<h3 id="divisor_matrix"><code>divisor_matrix</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/schur_complement.py">View source</a>
+
+``` python
+divisor_matrix()
+```
+
+
+
+
+<h3 id="divisor_matrix_cholesky"><code>divisor_matrix_cholesky</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/schur_complement.py">View source</a>
+
+``` python
+divisor_matrix_cholesky()
+```
+
+
+
+
 <h3 id="matrix"><code>matrix</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/positive_semidefinite_kernel.py">View source</a>
 
 ``` python
 matrix(
@@ -571,7 +620,7 @@ First, consider a kernel with a single scalar parameter.
 ```python
 import tensorflow_probability as tfp
 
-scalar_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=.5)
+scalar_kernel = tfp.math.psd_kernels.SomeKernel(param=.5)
 scalar_kernel.batch_shape
 # ==> []
 
@@ -595,7 +644,7 @@ pairwise, across all pairs:
 Now consider a kernel with batched parameters with the same inputs
 
 ```python
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[1., .5])
+batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[1., .5])
 batch_kernel.batch_shape
 # ==> [2]
 
@@ -639,7 +688,7 @@ the kernel parameter batch shapes, otherwise we get an error:
 x = np.ones([10, 5, 3], np.float32)
 y = np.ones([10, 4, 3], np.float32)
 
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(params=[1., .5])
+batch_kernel = tfp.math.psd_kernels.SomeKernel(params=[1., .5])
 batch_kernel.batch_shape
 # ==> [2]
 batch_kernel.matrix(x, y).shape
@@ -653,7 +702,7 @@ reshape the inputs to be broadcastable!):
 x = np.ones([10, 5, 3], np.float32)
 y = np.ones([10, 4, 3], np.float32)
 
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+batch_kernel = tfp.math.psd_kernels.SomeKernel(
     params=[[1.], [.5]])
 batch_kernel.batch_shape
 # ==> [2, 1]
@@ -664,7 +713,7 @@ batch_kernel.matrix(x, y).shape
 x = np.ones([10, 1, 5, 3], np.float32)
 y = np.ones([10, 1, 4, 3], np.float32)
 
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+batch_kernel = tfp.math.psd_kernels.SomeKernel(
     params=[1., .5])
 batch_kernel.batch_shape
 # ==> [2]
@@ -676,6 +725,8 @@ Here, we have the result of applying the kernel, with 2 different
 parameters, to each of a batch of 10 pairs of input lists.
 
 <h3 id="tensor"><code>tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/psd_kernels/positive_semidefinite_kernel.py">View source</a>
 
 ``` python
 tensor(
@@ -735,7 +786,7 @@ First, consider a kernel with a single scalar parameter.
 ```python
 import tensorflow_probability as tfp
 
-scalar_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=.5)
+scalar_kernel = tfp.math.psd_kernels.SomeKernel(param=.5)
 scalar_kernel.batch_shape
 # ==> []
 
@@ -765,7 +816,7 @@ pairwise, across all pairs:
 Now consider a kernel with batched parameters.
 
 ```python
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(param=[1., .5])
+batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[1., .5])
 batch_kernel.batch_shape
 # ==> [2]
 
@@ -809,7 +860,7 @@ the kernel parameter batch shapes, otherwise we get an error:
 x = np.ones([10, 5, 6, 3], np.float32)
 y = np.ones([10, 7, 8, 3], np.float32)
 
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(params=[1., .5])
+batch_kernel = tfp.math.psd_kernels.SomeKernel(params=[1., .5])
 batch_kernel.batch_shape
 # ==> [2]
 batch_kernel.tensor(x, y, x1_example_ndims=2, x2_example_ndims=2).shape
@@ -823,7 +874,7 @@ reshape the inputs to be broadcastable!):
 x = np.ones([10, 5, 6, 3], np.float32)
 y = np.ones([10, 7, 8, 3], np.float32)
 
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+batch_kernel = tfp.math.psd_kernels.SomeKernel(
     params=[[1.], [.5]])
 batch_kernel.batch_shape
 # ==> [2, 1]
@@ -834,7 +885,7 @@ batch_kernel.tensor(x, y, x1_example_ndims=2, x2_example_ndims=2).shape
 x = np.ones([10, 1, 5, 6, 3], np.float32)
 y = np.ones([10, 1, 7, 8, 3], np.float32)
 
-batch_kernel = tfp.positive_semidefinite_kernels.SomeKernel(
+batch_kernel = tfp.math.psd_kernels.SomeKernel(
     params=[1., .5])
 batch_kernel.batch_shape
 # ==> [2]

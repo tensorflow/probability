@@ -5,16 +5,24 @@
 
 # Module: tfp.experimental.auto_batching.dsl
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/dsl.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Python-embedded DSL frontend for authoring autobatchable IR programs.
 
 ### Aliases:
 
-* Module `tfp.experimental.auto_batching.dsl`
 * Module `tfp.experimental.auto_batching.frontend.dsl`
 
-
-
-Defined in [`python/internal/auto_batching/dsl.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/dsl.py).
 
 <!-- Placeholder for "Used in" -->
 

@@ -5,6 +5,18 @@
 
 # tfp.optimizer.differential_evolution_one_step
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/optimizer/differential_evolution.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Performs one step of the differential evolution algorithm.
 
 ``` python
@@ -20,8 +32,6 @@ tfp.optimizer.differential_evolution_one_step(
 ```
 
 
-
-Defined in [`python/optimizer/differential_evolution.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/differential_evolution.py).
 
 <!-- Placeholder for "Used in" -->
 

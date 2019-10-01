@@ -5,6 +5,18 @@
 
 # tfp.experimental.auto_batching.instructions.push_op
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Returns an `Op` that pushes values from `vars_in` into `vars_out`.
 
 ### Aliases:
@@ -12,9 +24,9 @@ Returns an `Op` that pushes values from `vars_in` into `vars_out`.
 * `tfp.experimental.auto_batching.frontend.instructions.push_op`
 * `tfp.experimental.auto_batching.frontend.st.inst.push_op`
 * `tfp.experimental.auto_batching.frontend.stack.inst.push_op`
-* `tfp.experimental.auto_batching.instructions.push_op`
 * `tfp.experimental.auto_batching.stack_optimization.inst.push_op`
 * `tfp.experimental.auto_batching.stackless.inst.push_op`
+
 
 ``` python
 tfp.experimental.auto_batching.instructions.push_op(
@@ -24,8 +36,6 @@ tfp.experimental.auto_batching.instructions.push_op(
 ```
 
 
-
-Defined in [`python/internal/auto_batching/instructions.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/instructions.py).
 
 <!-- Placeholder for "Used in" -->
 

@@ -5,25 +5,28 @@
 
 # tfp.vi.monte_carlo_csiszar_f_divergence
 
-Monte-Carlo approximation of the Csiszar f-Divergence.
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
+Monte-Carlo approximation of the Csiszar f-Divergence. (deprecated)
 
 ``` python
 tfp.vi.monte_carlo_csiszar_f_divergence(
-    f,
-    p_log_prob,
-    q,
-    num_draws,
-    use_reparametrization=None,
-    seed=None,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
 
 
-Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
-
 <!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+`monte_carlo_csiszar_f_divergence` is deprecated. Use `monte_carlo_variational_loss` instead.
 
 A Csiszar-function is a member of,
 

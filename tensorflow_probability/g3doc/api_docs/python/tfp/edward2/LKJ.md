@@ -5,7 +5,24 @@
 
 # tfp.edward2.LKJ
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for LKJ.
+
+### Aliases:
+
+* `tfp.experimental.edward2.LKJ`
+
 
 ``` python
 tfp.edward2.LKJ(
@@ -15,8 +32,6 @@ tfp.edward2.LKJ(
 ```
 
 
-
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -48,7 +63,9 @@ Construct LKJ distributions.
   distribution. Additionally, validation checks which are only defined on
   the multiplied-out form are omitted, even if `validate_args` is `True`.
   Default value: `False` (i.e., input/output does not have Cholesky
-  semantics).
+  semantics). WARNING: Do not set this boolean to true, when using
+  <a href="../../tfp/mcmc.md"><code>tfp.mcmc</code></a>. The density is not the density of Cholesky factors of
+  correlation matrices drawn via LKJ.
 * <b>`validate_args`</b>: Python `bool`, default `False`. When `True` distribution
   parameters are checked for validity despite possibly degrading runtime
   performance. When `False` invalid inputs may silently render incorrect

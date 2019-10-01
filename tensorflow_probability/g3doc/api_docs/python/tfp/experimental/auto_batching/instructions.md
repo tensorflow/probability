@@ -6,6 +6,18 @@
 
 # Module: tfp.experimental.auto_batching.instructions
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Instruction language for auto-batching virtual machine.
 
 ### Aliases:
@@ -13,13 +25,9 @@ Instruction language for auto-batching virtual machine.
 * Module `tfp.experimental.auto_batching.frontend.instructions`
 * Module `tfp.experimental.auto_batching.frontend.st.inst`
 * Module `tfp.experimental.auto_batching.frontend.stack.inst`
-* Module `tfp.experimental.auto_batching.instructions`
 * Module `tfp.experimental.auto_batching.stack_optimization.inst`
 * Module `tfp.experimental.auto_batching.stackless.inst`
 
-
-
-Defined in [`python/internal/auto_batching/instructions.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/instructions.py).
 
 <!-- Placeholder for "Used in" -->
 

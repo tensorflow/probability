@@ -49,15 +49,23 @@
 
 # tfp.bijectors.AutoregressiveNetwork
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/masked_autoregressive.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `AutoregressiveNetwork`
 
 Masked Autoencoder for Distribution Estimation [Germain et al. (2015)][1].
 
 
-
-
-
-Defined in [`python/bijectors/masked_autoregressive.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/masked_autoregressive.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -100,7 +108,7 @@ x_ = tfkl.Input(shape=(2,), dtype=tf.float32)
 log_prob_ = distribution.log_prob(x_)
 model = tfk.Model(x_, log_prob_)
 
-model.compile(optimizer=tf.compat.v2.optimizers.Adam(),
+model.compile(optimizer=tf.optimizers.Adam(),
               loss=lambda _, log_prob: -log_prob)
 
 batch_size = 25
@@ -124,7 +132,7 @@ autoregressive structures over rank-2+ tensors.  For example, suppose we want
 to build an autoregressive distribution over images with dimension `[weight,
 height, channels]` with `channels = 3`:
 
- 1. We can parameterize a "fully autoregressive" distribution, with
+ 1. We can parameterize a 'fully autoregressive' distribution, with
     cross-channel and within-pixel autoregressivity:
     ```
         r0    g0   b0     r0    g0   b0       r0   g0    b0
@@ -146,9 +154,9 @@ height, channels]` with `channels = 3`:
     event_shape = [height * width * channels]
     reshaped_images = tf.reshape(images, [n, event_shape])
 
-    # Density estimatino with MADE.
+    # Density estimation with MADE.
     made = tfb.AutoregressiveNetwork(params=2, event_shape=event_shape,
-                                     hidden_units=[20, 20], activation="relu")
+                                     hidden_units=[20, 20], activation='relu')
     distribution = tfd.TransformedDistribution(
         distribution=tfd.Normal(loc=0., scale=1.),
         bijector=tfb.MaskedAutoregressiveFlow(
@@ -160,7 +168,7 @@ height, channels]` with `channels = 3`:
     log_prob_ = distribution.log_prob(x_)
     model = tfk.Model(x_, log_prob_)
 
-    model.compile(optimizer=tf.compat.v2.optimizers.Adam(),
+    model.compile(optimizer=tf.optimizers.Adam(),
                   loss=lambda _, log_prob: -log_prob)
 
     batch_size = 10
@@ -199,7 +207,7 @@ height, channels]` with `channels = 3`:
         axes=[0, 2, 1])
 
     made = tfb.AutoregressiveNetwork(params=1, event_shape=[width * height],
-                                     hidden_units=[20, 20], activation="relu")
+                                     hidden_units=[20, 20], activation='relu')
 
     # Density estimation with MADE.
     #
@@ -218,7 +226,7 @@ height, channels]` with `channels = 3`:
     log_prob_ = distribution.log_prob(x_)
     model = tfk.Model(x_, log_prob_)
 
-    model.compile(optimizer=tf.compat.v2.optimizers.Adam(),
+    model.compile(optimizer=tf.optimizers.Adam(),
                   loss=lambda _, log_prob: -log_prob)
 
     batch_size = 10
@@ -253,6 +261,8 @@ height, channels]` with `channels = 3`:
      2017. https://arxiv.org/abs/1705.07057
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/masked_autoregressive.py">View source</a>
 
 ``` python
 __init__(
@@ -544,7 +554,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -640,6 +650,8 @@ Output tensor(s).
 
 <h3 id="build"><code>build</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/masked_autoregressive.py">View source</a>
+
 ``` python
 build(input_shape)
 ```
@@ -673,6 +685,8 @@ None or a tensor (or list of tensors,
 
 
 <h3 id="compute_output_shape"><code>compute_output_shape</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/masked_autoregressive.py">View source</a>
 
 ``` python
 compute_output_shape(input_shape)

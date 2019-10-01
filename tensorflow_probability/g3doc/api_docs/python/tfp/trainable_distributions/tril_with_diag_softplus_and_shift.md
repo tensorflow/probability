@@ -5,6 +5,12 @@
 
 # tfp.trainable_distributions.tril_with_diag_softplus_and_shift
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Converts (batch of) vectors to (batch of) lower-triangular scale matrices. (deprecated)
 
 ``` python
@@ -13,6 +19,8 @@ tfp.trainable_distributions.tril_with_diag_softplus_and_shift(
     **kwargs
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

@@ -49,15 +49,23 @@
 
 # tfp.distributions.JointDistributionCoroutine
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/joint_distribution_coroutine.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `JointDistributionCoroutine`
 
 Joint distribution parameterized by a distribution-making generator.
 
 Inherits From: [`JointDistribution`](../../tfp/distributions/JointDistribution.md)
-
-
-
-Defined in [`python/distributions/joint_distribution_coroutine.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/joint_distribution_coroutine.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -90,7 +98,7 @@ When the `sample` method for a `JointDistributionCoroutine` is called with
 a `sample_shape`, the `sample` method for each of the yielded
 distributions is called.
 The distributions that have been wrapped in the
-`JointDistributionCoroutine.Root` class will be called with `sample_shape` as
+<a href="../../tfp/distributions/JointDistributionCoroutine/Root.md"><code>JointDistributionCoroutine.Root</code></a> class will be called with `sample_shape` as
 the `sample_shape` argument, and the unwrapped distributions
 will be called with `()` as the `sample_shape` argument.
 
@@ -120,7 +128,8 @@ def model():
 joint = tfd.JointDistributionCoroutine(model)
 
 x = joint.sample()
-# ==> A length-4 list of tfd.Distribution instances
+# ==> x is A length-4 tuple of Tensors representing a draw/realization from
+#     each distribution.
 joint.log_prob(x)
 # ==> A scalar `Tensor` representing the total log prob under all four
 #     distributions.
@@ -131,7 +140,7 @@ joint.log_prob(x)
 Each element yielded by the generator must be a `tfd.Distribution`-like
 instance.
 
-An object is deemed "`tfd.Distribution`-like" if it has a
+An object is deemed '`tfd.Distribution`-like' if it has a
 `sample`, `log_prob`, and distribution properties, e.g., `batch_shape`,
 `event_shape`, `dtype`.
 
@@ -150,7 +159,7 @@ the `sample_shape` and there is no need to pass `m`'s distribution a
 `sample_size`. So `Root` is not used to wrap `m`'s distribution.
 
 **Note**: unlike most other distributions in <a href="../../tfp/distributions.md"><code>tfp.distributions</code></a>,
-`JointDistributionCoroutine.sample` returns a `tuple` of `Tensor`s
+<a href="../../tfp/distributions/Distribution.md#sample"><code>JointDistributionCoroutine.sample</code></a> returns a `tuple` of `Tensor`s
 rather than a `Tensor`.  Accordingly `joint.batch_shape` returns a
 `tuple` of `TensorShape`s for each of the distributions' batch shapes
 and `joint.batch_shape_tensor()` returns a `tuple` of `Tensor`s for
@@ -185,7 +194,7 @@ Construct the `JointDistributionCoroutine` distribution.
   correct behavior is not guaranteed.
   Default value: `False`.
 * <b>`name`</b>: The name for ops managed by the distribution.
-  Default value: `None` (i.e., `"JointDistributionCoroutine"`).
+  Default value: `None` (i.e., `JointDistributionCoroutine`).
 
 
 
@@ -301,7 +310,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -321,7 +330,7 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 <h3 id="variables"><code>variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -339,6 +348,8 @@ first).
 ## Methods
 
 <h3 id="__getitem__"><code>__getitem__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 __getitem__(slices)
@@ -377,6 +388,8 @@ mvn2.event_shape  # => [2]
 
 <h3 id="__iter__"><code>__iter__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 __iter__()
 ```
@@ -385,6 +398,8 @@ __iter__()
 
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/joint_distribution.py">View source</a>
 
 ``` python
 batch_shape_tensor(name='batch_shape_tensor')
@@ -408,6 +423,8 @@ parameterizations of this distribution.
   `model`.
 
 <h3 id="cdf"><code>cdf</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 cdf(
@@ -441,6 +458,8 @@ cdf(x) := P[X <= x]
 
 <h3 id="copy"><code>copy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 copy(**override_parameters_kwargs)
 ```
@@ -465,6 +484,8 @@ initialization arguments.
   `dict(self.parameters, **override_parameters_kwargs)`.
 
 <h3 id="covariance"><code>covariance</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 covariance(
@@ -516,6 +537,8 @@ length-`k'` vector.
 
 <h3 id="cross_entropy"><code>cross_entropy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 cross_entropy(
     other,
@@ -551,6 +574,8 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 <h3 id="entropy"><code>entropy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 entropy(
     name='entropy',
@@ -562,6 +587,8 @@ Shannon entropy in nats.
 
 
 <h3 id="event_shape_tensor"><code>event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/joint_distribution.py">View source</a>
 
 ``` python
 event_shape_tensor(name='event_shape_tensor')
@@ -584,6 +611,8 @@ Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
 
 <h3 id="is_scalar_batch"><code>is_scalar_batch</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/joint_distribution.py">View source</a>
+
 ``` python
 is_scalar_batch(name='is_scalar_batch')
 ```
@@ -604,6 +633,8 @@ Indicates that `batch_shape == []`.
 
 <h3 id="is_scalar_event"><code>is_scalar_event</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/joint_distribution.py">View source</a>
+
 ``` python
 is_scalar_event(name='is_scalar_event')
 ```
@@ -623,6 +654,8 @@ Indicates that `event_shape == []`.
 * <b>`is_scalar_event`</b>: `bool` scalar `Tensor` for each distribution in `model`.
 
 <h3 id="kl_divergence"><code>kl_divergence</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 kl_divergence(
@@ -662,6 +695,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 
 <h3 id="log_cdf"><code>log_cdf</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 log_cdf(
     value,
@@ -698,6 +733,8 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 
 <h3 id="log_prob"><code>log_prob</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 log_prob(
     value,
@@ -724,6 +761,8 @@ Log probability density/mass function.
   values of type `self.dtype`.
 
 <h3 id="log_prob_parts"><code>log_prob_parts</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/joint_distribution.py">View source</a>
 
 ``` python
 log_prob_parts(
@@ -752,6 +791,8 @@ Log probability density/mass function.
   each `distribution_fn` evaluated at each corresponding `value`.
 
 <h3 id="log_survival_function"><code>log_survival_function</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 log_survival_function(
@@ -790,6 +831,8 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 <h3 id="mean"><code>mean</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 mean(
     name='mean',
@@ -802,6 +845,8 @@ Mean.
 
 <h3 id="mode"><code>mode</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 mode(
     name='mode',
@@ -813,6 +858,8 @@ Mode.
 
 
 <h3 id="param_shapes"><code>param_shapes</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 param_shapes(
@@ -844,6 +891,8 @@ Subclasses should override class method `_param_shapes`.
 
 
 <h3 id="param_static_shapes"><code>param_static_shapes</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 param_static_shapes(
@@ -882,6 +931,8 @@ constant-valued tensors when constant values are fed.
 
 <h3 id="prob"><code>prob</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 prob(
     value,
@@ -909,6 +960,8 @@ Probability density/mass function.
 
 <h3 id="prob_parts"><code>prob_parts</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/joint_distribution.py">View source</a>
+
 ``` python
 prob_parts(
     value,
@@ -935,6 +988,8 @@ Log probability density/mass function.
   each `distribution_fn` evaluated at each corresponding `value`.
 
 <h3 id="quantile"><code>quantile</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 quantile(
@@ -968,6 +1023,8 @@ quantile(p) := x such that P[X <= x] == p
 
 <h3 id="sample"><code>sample</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 sample(
     sample_shape=(),
@@ -997,6 +1054,8 @@ sample.
 * <b>`samples`</b>: a `Tensor` with prepended dimensions `sample_shape`.
 
 <h3 id="sample_distributions"><code>sample_distributions</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/joint_distribution.py">View source</a>
 
 ``` python
 sample_distributions(
@@ -1034,6 +1093,8 @@ sample.
 
 <h3 id="stddev"><code>stddev</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 stddev(
     name='stddev',
@@ -1066,6 +1127,8 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
   `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 <h3 id="survival_function"><code>survival_function</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 survival_function(
@@ -1100,6 +1163,8 @@ survival_function(x) = P[X > x]
 
 
 <h3 id="variance"><code>variance</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 variance(

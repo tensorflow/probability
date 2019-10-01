@@ -5,6 +5,18 @@
 
 # tfp.experimental.auto_batching.instructions.extract_referenced_variables
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Extracts a set of the variable names referenced by the node in question.
 
 ### Aliases:
@@ -12,17 +24,15 @@ Extracts a set of the variable names referenced by the node in question.
 * `tfp.experimental.auto_batching.frontend.instructions.extract_referenced_variables`
 * `tfp.experimental.auto_batching.frontend.st.inst.extract_referenced_variables`
 * `tfp.experimental.auto_batching.frontend.stack.inst.extract_referenced_variables`
-* `tfp.experimental.auto_batching.instructions.extract_referenced_variables`
 * `tfp.experimental.auto_batching.stack_optimization.inst.extract_referenced_variables`
 * `tfp.experimental.auto_batching.stackless.inst.extract_referenced_variables`
+
 
 ``` python
 tfp.experimental.auto_batching.instructions.extract_referenced_variables(node)
 ```
 
 
-
-Defined in [`python/internal/auto_batching/instructions.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/instructions.py).
 
 <!-- Placeholder for "Used in" -->
 

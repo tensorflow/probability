@@ -47,6 +47,18 @@
 
 # tfp.layers.Convolution3DReparameterization
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/conv_variational.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `Convolution3DReparameterization`
 
 3D convolution layer (e.g. spatial convolution over volumes).
@@ -55,12 +67,8 @@
 
 ### Aliases:
 
-* Class `tfp.layers.Convolution3DReparameterization`
 * Class `tfp.layers.conv_variational.Convolution3DReparameterization`
 
-
-
-Defined in [`python/layers/conv_variational.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/conv_variational.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -134,6 +142,8 @@ terms which are arguments to the layer.
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/conv_variational.py">View source</a>
+
 ``` python
 __init__(
     filters,
@@ -147,11 +157,11 @@ __init__(
     kernel_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(),
     kernel_posterior_tensor_fn=(lambda d: d.sample()),
     kernel_prior_fn=tfp.layers.default_multivariate_normal_fn,
-    kernel_divergence_fn=(lambda q, p, ignore: tfd.kl_divergence(q, p)),
+    kernel_divergence_fn=(lambda q, p, ignore: kl_lib.kl_divergence(q, p)),
     bias_posterior_fn=tfp_layers_util.default_mean_field_normal_fn(is_singular=True),
     bias_posterior_tensor_fn=(lambda d: d.sample()),
     bias_prior_fn=None,
-    bias_divergence_fn=(lambda q, p, ignore: tfd.kl_divergence(q, p)),
+    bias_divergence_fn=(lambda q, p, ignore: kl_lib.kl_divergence(q, p)),
     **kwargs
 )
 ```
@@ -437,7 +447,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -533,6 +543,8 @@ Output tensor(s).
 
 <h3 id="build"><code>build</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/conv_variational.py">View source</a>
+
 ``` python
 build(input_shape)
 ```
@@ -579,6 +591,8 @@ None or a tensor (or list of tensors,
 
 <h3 id="compute_output_shape"><code>compute_output_shape</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/conv_variational.py">View source</a>
+
 ``` python
 compute_output_shape(input_shape)
 ```
@@ -622,6 +636,8 @@ An integer count.
 
 <h3 id="from_config"><code>from_config</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/conv_variational.py">View source</a>
+
 ``` python
 from_config(
     cls,
@@ -646,6 +662,8 @@ same layer from the config dictionary.
 * <b>`layer`</b>: A layer instance.
 
 <h3 id="get_config"><code>get_config</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/conv_variational.py">View source</a>
 
 ``` python
 get_config()

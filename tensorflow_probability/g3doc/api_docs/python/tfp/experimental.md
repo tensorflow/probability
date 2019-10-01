@@ -5,11 +5,19 @@
 
 # Module: tfp.experimental
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 TensorFlow Probability API-unstable package.
-
-
-
-Defined in [`python/experimental/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/__init__.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -29,5 +37,11 @@ You are welcome to try any of this out (and tell us how well it works for you!).
 
 [`auto_batching`](../tfp/experimental/auto_batching.md) module: TensorFlow Probability auto-batching package.
 
-[`mcmc`](../tfp/experimental/mcmc.md) module: TensorFlow Probability Google-internal NUTS package.
+[`edward2`](../tfp/experimental/edward2.md) module: Edward2 probabilistic programming language.
+
+[`mcmc`](../tfp/experimental/mcmc.md) module: TensorFlow Probability experimental NUTS package.
+
+[`substrates`](../tfp/experimental/substrates.md) module: TensorFlow Probability alternative substrates.
+
+[`vi`](../tfp/experimental/vi.md) module: Experimental methods and objectives for variational inference.
 

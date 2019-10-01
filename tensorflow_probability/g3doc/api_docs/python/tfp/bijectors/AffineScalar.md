@@ -6,6 +6,7 @@
 <meta itemprop="property" content="graph_parents"/>
 <meta itemprop="property" content="inverse_min_event_ndims"/>
 <meta itemprop="property" content="is_constant_jacobian"/>
+<meta itemprop="property" content="log_scale"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="name_scope"/>
 <meta itemprop="property" content="scale"/>
@@ -29,15 +30,23 @@
 
 # tfp.bijectors.AffineScalar
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/affine_scalar.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `AffineScalar`
 
 Compute `Y = g(X; shift, scale) = scale * X + shift`.
 
 Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
-
-
-
-Defined in [`python/bijectors/affine_scalar.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/affine_scalar.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -61,10 +70,13 @@ b = AffineScalar(
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/affine_scalar.py">View source</a>
+
 ``` python
 __init__(
     shift=None,
     scale=None,
+    log_scale=None,
     validate_args=False,
     name='affine_scalar'
 )
@@ -79,9 +91,13 @@ giving the forward operation:
 Y = g(X) = scale * X + shift
 ```
 
-if `scale` is not specified, then the bijector has the semantics of
-`scale = 1.`. Similarly, if `shift` is not specified, then the bijector
-has the semantics of `shift = 0.`.
+Alternatively, you can specify `log_scale` instead of `scale` for slighly
+better numerics with tiny scales. Note that when using `log_scale` it is
+currently impossible to specify a negative scale.
+
+If `scale` or `log_scale` are not specified, then the bijector has the
+semantics of `scale = 1.`. Similarly, if `shift` is not specified, then the
+bijector has the semantics of `shift = 0.`.
 
 #### Args:
 
@@ -89,10 +105,19 @@ has the semantics of `shift = 0.`.
 * <b>`shift`</b>: Floating-point `Tensor`. If this is set to `None`, no shift is
   applied.
 * <b>`scale`</b>: Floating-point `Tensor`. If this is set to `None`, no scale is
-  applied.
+  applied. This should not be set if `log_scale` is set.
+* <b>`log_scale`</b>: Floating-point `Tensor`. Logarithm of the scale. If this is set
+  to `None`, no scale is applied. This should not be set if `scale` is
+  set.
 * <b>`validate_args`</b>: Python `bool` indicating whether arguments should be
   checked for correctness.
 * <b>`name`</b>: Python `str` name given to ops managed by this object.
+
+
+#### Raises:
+
+
+* <b>`ValueError`</b>: If both `scale` and `log_scale` are specified.
 
 
 
@@ -130,6 +155,11 @@ neither.
 
 * <b>`is_constant_jacobian`</b>: Python `bool`.
 
+<h3 id="log_scale"><code>log_scale</code></h3>
+
+The `log_scale` term in `Y = exp(log_scale) * X + shift`.
+
+
 <h3 id="name"><code>name</code></h3>
 
 Returns the string name of this `Bijector`.
@@ -142,12 +172,12 @@ Returns a `tf.name_scope` instance for this class.
 
 <h3 id="scale"><code>scale</code></h3>
 
-The `scale` `LinearOperator` in `Y = scale @ X + shift`.
+The `scale` term in `Y = scale * X + shift`.
 
 
 <h3 id="shift"><code>shift</code></h3>
 
-The `shift` `Tensor` in `Y = scale @ X + shift`.
+The `shift` term in `Y = scale * X + shift`.
 
 
 <h3 id="submodules"><code>submodules</code></h3>
@@ -175,7 +205,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -195,7 +225,7 @@ Returns True if Tensor arguments will be validated.
 
 <h3 id="variables"><code>variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -213,6 +243,8 @@ first).
 ## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 __call__(
@@ -272,6 +304,8 @@ tfb.Exp()([-1., 0., 1.])
 
 <h3 id="forward"><code>forward</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 forward(
     x,
@@ -306,6 +340,8 @@ Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
 <h3 id="forward_event_shape"><code>forward_event_shape</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 forward_event_shape(input_shape)
 ```
@@ -328,6 +364,8 @@ Same meaning as `forward_event_shape_tensor`. May be only partially defined.
   after applying `forward`. Possibly unknown.
 
 <h3 id="forward_event_shape_tensor"><code>forward_event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 forward_event_shape_tensor(
@@ -354,6 +392,8 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
   event-portion shape after applying `forward`.
 
 <h3 id="forward_log_det_jacobian"><code>forward_log_det_jacobian</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 forward_log_det_jacobian(
@@ -398,6 +438,8 @@ Returns both the forward_log_det_jacobian.
 
 <h3 id="inverse"><code>inverse</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 inverse(
     y,
@@ -434,6 +476,8 @@ Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
 <h3 id="inverse_event_shape"><code>inverse_event_shape</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 inverse_event_shape(output_shape)
 ```
@@ -456,6 +500,8 @@ Same meaning as `inverse_event_shape_tensor`. May be only partially defined.
   after applying `inverse`. Possibly unknown.
 
 <h3 id="inverse_event_shape_tensor"><code>inverse_event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 inverse_event_shape_tensor(
@@ -482,6 +528,8 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
   event-portion shape after applying `inverse`.
 
 <h3 id="inverse_log_det_jacobian"><code>inverse_log_det_jacobian</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 inverse_log_det_jacobian(

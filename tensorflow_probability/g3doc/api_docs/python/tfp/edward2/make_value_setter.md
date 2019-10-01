@@ -5,15 +5,30 @@
 
 # tfp.edward2.make_value_setter
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/program_transformations.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Creates a value-setting interceptor.
+
+### Aliases:
+
+* `tfp.experimental.edward2.make_value_setter`
+
 
 ``` python
 tfp.edward2.make_value_setter(**model_kwargs)
 ```
 
 
-
-Defined in [`python/edward2/program_transformations.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/program_transformations.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -65,7 +80,7 @@ variables, passed into additional transformations, etc.
 ```python
 x_observed = np.array([6, 3, 1, 8, 7, 0, 6, 4, 7, 5])
 def observed_model():
-  with ed.interception(make_value_setter(x=x_observed)):
+  with ed.interception(ed.make_value_setter(x=x_observed)):
     model()
 observed_log_joint_fn = ed.make_log_joint_fn(observed_model)
 

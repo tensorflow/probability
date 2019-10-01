@@ -5,10 +5,23 @@
 <meta itemprop="property" content="vars_out"/>
 <meta itemprop="property" content="function"/>
 <meta itemprop="property" content="skip_push_mask"/>
+<meta itemprop="property" content="__new__"/>
 <meta itemprop="property" content="replace"/>
 </div>
 
 # tfp.experimental.auto_batching.instructions.PrimOp
+
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
 
 ## Class `PrimOp`
 
@@ -21,13 +34,9 @@ An arbitrary already-batched computation, a 'primitive operation'.
 * Class `tfp.experimental.auto_batching.frontend.instructions.PrimOp`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.PrimOp`
 * Class `tfp.experimental.auto_batching.frontend.stack.inst.PrimOp`
-* Class `tfp.experimental.auto_batching.instructions.PrimOp`
 * Class `tfp.experimental.auto_batching.stack_optimization.inst.PrimOp`
 * Class `tfp.experimental.auto_batching.stackless.inst.PrimOp`
 
-
-
-Defined in [`python/internal/auto_batching/instructions.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/instructions.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -87,6 +96,23 @@ The exact contract for `function` is as follows:
 * <b>`skip_push_mask`</b>: Set of strings, a subset of `vars_out`.  These VM variables
   will be updated in place rather than pushed.
 
+<h2 id="__new__"><code>__new__</code></h2>
+
+``` python
+__new__(
+    _cls,
+    vars_in,
+    vars_out,
+    function,
+    skip_push_mask
+)
+```
+
+Create new instance of PrimOp(vars_in, vars_out, function, skip_push_mask)
+
+
+
+
 ## Properties
 
 <h3 id="vars_in"><code>vars_in</code></h3>
@@ -114,6 +140,8 @@ The exact contract for `function` is as follows:
 ## Methods
 
 <h3 id="replace"><code>replace</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
 
 ``` python
 replace(vars_out=None)

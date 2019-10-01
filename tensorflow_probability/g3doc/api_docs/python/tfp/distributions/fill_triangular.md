@@ -5,6 +5,12 @@
 
 # tfp.distributions.fill_triangular
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Creates a (batch of) triangular matrix from a vector of inputs. (deprecated)
 
 ``` python
@@ -13,6 +19,8 @@ tfp.distributions.fill_triangular(
     **kwargs
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

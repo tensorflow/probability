@@ -5,6 +5,18 @@
 
 # tfp.distributions.assign_moving_mean_variance
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/internal/moving_stats.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Compute exponentially weighted moving {mean,variance} of a streaming value.
 
 ``` python
@@ -18,8 +30,6 @@ tfp.distributions.assign_moving_mean_variance(
 ```
 
 
-
-Defined in [`python/distributions/internal/moving_stats.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/internal/moving_stats.py).
 
 <!-- Placeholder for "Used in" -->
 

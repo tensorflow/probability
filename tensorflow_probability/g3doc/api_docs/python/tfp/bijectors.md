@@ -5,11 +5,19 @@
 
 # Module: tfp.bijectors
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Bijective transformations.
-
-
-
-Defined in [`python/bijectors/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/__init__.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -40,7 +48,7 @@ Defined in [`python/bijectors/__init__.py`](https://github.com/tensorflow/probab
 
 [`class CholeskyToInvCholesky`](../tfp/bijectors/CholeskyToInvCholesky.md): Maps the Cholesky factor of `M` to the Cholesky factor of `M^{-1}`.
 
-[`class ConditionalBijector`](../tfp/bijectors/ConditionalBijector.md): Conditional Bijector is a Bijector that allows intrinsic conditioning.
+[`class CorrelationCholesky`](../tfp/bijectors/CorrelationCholesky.md): Maps unconstrained reals to Cholesky-space correlation matrices.
 
 [`class Cumsum`](../tfp/bijectors/Cumsum.md): Computes the cumulative sum of a tensor along a specified axis.
 
@@ -74,11 +82,15 @@ Defined in [`python/bijectors/__init__.py`](https://github.com/tensorflow/probab
 
 [`class Ordered`](../tfp/bijectors/Ordered.md): Maps a vector of increasing elements to an unconstrained vector.
 
+[`class Pad`](../tfp/bijectors/Pad.md): Pads a value to the `event_shape` of a `Tensor`.
+
 [`class Permute`](../tfp/bijectors/Permute.md): Permutes the rightmost dimension of a `Tensor`.
 
 [`class PowerTransform`](../tfp/bijectors/PowerTransform.md): Compute `Y = g(X) = (1 + X * c)**(1 / c), X >= -1 / c`.
 
-[`class RealNVP`](../tfp/bijectors/RealNVP.md): RealNVP "affine coupling layer" for vector-valued events.
+[`class RationalQuadraticSpline`](../tfp/bijectors/RationalQuadraticSpline.md): A piecewise rational quadratic spline, as developed in [1].
+
+[`class RealNVP`](../tfp/bijectors/RealNVP.md): RealNVP 'affine coupling layer' for vector-valued events.
 
 [`class Reciprocal`](../tfp/bijectors/Reciprocal.md): A `Bijector` that computes the reciprocal `b(x) = 1. / x` entrywise.
 
@@ -88,7 +100,7 @@ Defined in [`python/bijectors/__init__.py`](https://github.com/tensorflow/probab
 
 [`class Sigmoid`](../tfp/bijectors/Sigmoid.md): Bijector which computes `Y = g(X) = 1 / (1 + exp(-X))`.
 
-[`class SinhArcsinh`](../tfp/bijectors/SinhArcsinh.md): Compute `Y = g(X) = Sinh( (Arcsinh(X) + skewness) * tailweight )`.
+[`class SinhArcsinh`](../tfp/bijectors/SinhArcsinh.md): `Y = g(X) = Sinh( (Arcsinh(X) + skewness) * tailweight ) * multiplier`.
 
 [`class Softfloor`](../tfp/bijectors/Softfloor.md): Compute a differentiable approximation to `tf.math.floor`.
 

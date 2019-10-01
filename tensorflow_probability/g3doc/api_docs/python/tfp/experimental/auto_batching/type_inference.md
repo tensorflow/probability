@@ -5,16 +5,24 @@
 
 # Module: tfp.experimental.auto_batching.type_inference
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/type_inference.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Type inference pass on functional control flow graph.
 
 ### Aliases:
 
 * Module `tfp.experimental.auto_batching.frontend.ab_type_inference`
-* Module `tfp.experimental.auto_batching.type_inference`
 
-
-
-Defined in [`python/internal/auto_batching/type_inference.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/type_inference.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -31,5 +39,5 @@ toward outputs.
 
 [`signature(...)`](../../../tfp/experimental/auto_batching/type_inference/signature.md): Computes a type signature for the given `inputs`.
 
-[`type_of_pattern(...)`](../../../tfp/experimental/auto_batching/type_inference/type_of_pattern.md): Returns the `instructions.Type` of `val`.
+[`type_of_pattern(...)`](../../../tfp/experimental/auto_batching/type_inference/type_of_pattern.md): Returns the <a href="../../../tfp/experimental/auto_batching/Type.md"><code>instructions.Type</code></a> of `val`.
 

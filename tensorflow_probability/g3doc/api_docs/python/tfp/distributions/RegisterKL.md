@@ -7,6 +7,18 @@
 
 # tfp.distributions.RegisterKL
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/kullback_leibler.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `RegisterKL`
 
 Decorator to register a KL divergence implementation function.
@@ -15,12 +27,8 @@ Decorator to register a KL divergence implementation function.
 
 ### Aliases:
 
-* Class `tfp.distributions.RegisterKL`
 * Class `tfp.layers.dense_variational_v2.kullback_leibler.RegisterKL`
 
-
-
-Defined in [`python/distributions/kullback_leibler.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/kullback_leibler.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -34,6 +42,8 @@ def _kl_normal_mvn(norm_a, norm_b):
   # Return KL(norm_a || norm_b)
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/kullback_leibler.py">View source</a>
 
 ``` python
 __init__(
@@ -56,6 +66,8 @@ Initialize the KL registrar.
 ## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/kullback_leibler.py">View source</a>
 
 ``` python
 __call__(kl_fn)

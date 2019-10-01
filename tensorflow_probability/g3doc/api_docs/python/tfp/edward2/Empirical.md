@@ -5,7 +5,24 @@
 
 # tfp.edward2.Empirical
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for Empirical.
+
+### Aliases:
+
+* `tfp.experimental.edward2.Empirical`
+
 
 ``` python
 tfp.edward2.Empirical(
@@ -15,8 +32,6 @@ tfp.edward2.Empirical(
 ```
 
 
-
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -57,4 +72,5 @@ Initialize `Empirical` distributions.
 #### Raises:
 
 
-* <b>`ValueError`</b>: if the rank of `samples` < event_ndims + 1.
+* <b>`ValueError`</b>: if the rank of `samples` is statically known and less than
+  event_ndims + 1.

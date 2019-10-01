@@ -5,6 +5,12 @@
 
 # tfp.distributions.reduce_weighted_logsumexp
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`. (deprecated)
 
 ``` python
@@ -13,6 +19,8 @@ tfp.distributions.reduce_weighted_logsumexp(
     **kwargs
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

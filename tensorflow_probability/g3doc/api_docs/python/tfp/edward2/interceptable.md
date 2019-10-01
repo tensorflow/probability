@@ -5,15 +5,30 @@
 
 # tfp.edward2.interceptable
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Decorator that wraps `func` so that its execution is intercepted.
+
+### Aliases:
+
+* `tfp.experimental.edward2.interceptable`
+
 
 ``` python
 tfp.edward2.interceptable(func)
 ```
 
 
-
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
 
 <!-- Placeholder for "Used in" -->
 

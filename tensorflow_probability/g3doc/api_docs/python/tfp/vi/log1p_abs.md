@@ -5,6 +5,18 @@
 
 # tfp.vi.log1p_abs
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/vi/csiszar_divergence.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 The log1p-abs Csiszar-function in log-space.
 
 ``` python
@@ -15,8 +27,6 @@ tfp.vi.log1p_abs(
 ```
 
 
-
-Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
 
 <!-- Placeholder for "Used in" -->
 

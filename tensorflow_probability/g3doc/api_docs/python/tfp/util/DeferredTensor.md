@@ -46,11 +46,24 @@
 <meta itemprop="property" content="__sub__"/>
 <meta itemprop="property" content="__truediv__"/>
 <meta itemprop="property" content="__xor__"/>
+<meta itemprop="property" content="get_shape"/>
 <meta itemprop="property" content="set_shape"/>
 <meta itemprop="property" content="with_name_scope"/>
 </div>
 
 # tfp.util.DeferredTensor
+
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
 
 ## Class `DeferredTensor`
 
@@ -58,20 +71,21 @@ Variable tracking object which applies function upon `convert_to_tensor`.
 
 
 
-
-
-Defined in [`python/util/deferred_tensor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/util/deferred_tensor.py).
-
 <!-- Placeholder for "Used in" -->
 
 #### Example
 
 ```python
 import tensorflow.compat.v2 as tf
+import tensorflow_probability as tfp
+tfb = tfp.bijectors
+tfd = tfp.distributions
 
+# Note: it'd be better to use `tfp.util.TransformedVariable`;
+#       this example is for illustration only.
 trainable_normal = tfd.Normal(
     loc=tf.Variable(0.),
-    scale=tfp.util.DeferredTensor(tf.math.exp, tf.Variable(0.)))
+    scale=tfp.util.DeferredTensor(tf.Variable(0.), tf.math.exp))
 
 trainable_normal.loc
 # ==> <tf.Variable 'Variable:0' shape=() dtype=float32, numpy=0.0>
@@ -102,12 +116,28 @@ trainable_normal.stddev()
 # ==> (approximately) 0.0075
 ```
 
+It is also possible to parameterize a `DeferredTensor` with a bijector, e.g.:
+
+```python
+# Note: it'd be better to use `tfp.util.TransformedVariable`;
+#       this example is for illustration only.
+d = tfd.Normal(loc=0.,
+               scale=tfp.util.DeferredTensor(tf.Variable([0.54, 1.85]),
+                                             tfb.Softplus()))
+d.stddev()
+# ==> [1., 2.]
+tf.convert_to_tensor(d.scale)
+# ==> [1., 2.]
+```
+
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __init__(
-    transform_fn,
     pretransformed_input,
+    transform_fn,
     dtype=None,
     shape=NONE_SPECIFIED,
     name=None
@@ -120,22 +150,27 @@ Creates the `DeferredTensor` object.
 #### Args:
 
 
-* <b>`transform_fn`</b>: Python `callable` taking `pretransformed_input` and
-  returning a `Tensor` (representing by this object).
 * <b>`pretransformed_input`</b>: object with `shape`, `dtype` properties (typically a
   `tf.Variable`) passed into `transform_fn` when this object is acted upon
   in a `Tensor` context, eg, `tf.convert_to_tensor`, `+`, `tf.math.exp`,
   etc.
+* <b>`transform_fn`</b>: Python `callable` or <a href="../../tfp/bijectors/Bijector.md"><code>tfp.bijectors.Bijector</code></a>-like instance.
+  When `callable`, should take `pretransformed_input` and
+  return a `Tensor` (representing by this object).
 * <b>`dtype`</b>: Equivalent to what would otherwise be
-  `transform_fn(pretransformed_input).dtype`.
-   Default value: `None` (i.e., `pretransformed_input.dtype`).
+`transform_fn(pretransformed_input).dtype`.
+   Default value: `None` (i.e.,
+   `getattr(transform_fn, 'dtype', None) or pretransformed_input.dtype`).
 * <b>`shape`</b>: Equivalent to what would otherwise be
   `transform_fn(pretransformed_input).shape`.
-   Default value: `'None'` (i.e., `pretransformed_input.shape`).
+   Default value: `'None'` (i.e.,
+   `getattr(transform_fn, 'forward_event_shape', lambda x: x)(
+        pretransformed_input.shape)`).
 * <b>`name`</b>: Python `str` representing this object's `name`; used only in graph
   mode.
   Default value: `None` (i.e.,
-  `transform_fn.__name__ + '_' + pretransformed_input.name`).
+  `(getattr(transform_fn, 'name', None) or
+    transform_fn.__name__ + '_' + pretransformed_input.name)`).
 
 
 #### Raises:
@@ -199,7 +234,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -219,7 +254,7 @@ Function which characterizes the `Tensor`ization of this object.
 
 <h3 id="variables"><code>variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -237,6 +272,8 @@ first).
 ## Methods
 
 <h3 id="__abs__"><code>__abs__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __abs__(
@@ -281,6 +318,8 @@ If `x` is a `SparseTensor`, returns
 
 <h3 id="__add__"><code>__add__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __add__(
     *args,
@@ -292,6 +331,8 @@ Dispatches to add for strings and add_v2 for all other types.
 
 
 <h3 id="__and__"><code>__and__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __and__(
@@ -327,8 +368,8 @@ __bool__()
 Dummy method to prevent a tensor from being used as a Python `bool`.
 
 This overload raises a `TypeError` when the user inadvertently
-treats a `Tensor` as a boolean (e.g. in an `if` statement). For
-example:
+treats a `Tensor` as a boolean (most commonly in an `if` or `while`
+statement), in code that was not converted by AutoGraph. For example:
 
 ```python
 if tf.constant(True):  # Will raise.
@@ -338,15 +379,14 @@ if tf.constant(5) < tf.constant(7):  # Will raise.
   # ...
 ```
 
-This disallows ambiguities between testing the Python value vs testing the
-dynamic condition of the `Tensor`.
-
 #### Raises:
 
 `TypeError`.
 
 
 <h3 id="__div__"><code>__div__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __div__(
@@ -373,6 +413,8 @@ Used for Tensor.__div__.
 
 
 <h3 id="__floordiv__"><code>__floordiv__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __floordiv__(
@@ -414,6 +456,8 @@ as well.
 
 <h3 id="__ge__"><code>__ge__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __ge__(
     *args,
@@ -425,6 +469,20 @@ Returns the truth value of (x >= y) element-wise.
 
 *NOTE*: `math.greater_equal` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
+
+#### Example:
+
+
+
+```python
+x = tf.constant([5, 4, 6, 7])
+y = tf.constant([5, 2, 5, 10])
+tf.math.greater_equal(x, y) ==> [True, True, True, False]
+
+x = tf.constant([5, 4, 6, 7])
+y = tf.constant([5])
+tf.math.greater_equal(x, y) ==> [True, False, True, True]
+```
 
 #### Args:
 
@@ -440,6 +498,8 @@ A `Tensor` of type `bool`.
 
 
 <h3 id="__getitem__"><code>__getitem__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __getitem__(
@@ -521,6 +581,8 @@ The appropriate slice of "tensor", based on "slice_spec".
 
 <h3 id="__gt__"><code>__gt__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __gt__(
     *args,
@@ -532,6 +594,20 @@ Returns the truth value of (x > y) element-wise.
 
 *NOTE*: `math.greater` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
+
+#### Example:
+
+
+
+```python
+x = tf.constant([5, 4, 6])
+y = tf.constant([5, 2, 5])
+tf.math.greater(x, y) ==> [False, True, True]
+
+x = tf.constant([5, 4, 6])
+y = tf.constant([5])
+tf.math.greater(x, y) ==> [False, False, True]
+```
 
 #### Args:
 
@@ -547,6 +623,8 @@ A `Tensor` of type `bool`.
 
 
 <h3 id="__invert__"><code>__invert__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __invert__(
@@ -572,6 +650,8 @@ A `Tensor` of type `bool`.
 
 <h3 id="__iter__"><code>__iter__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __iter__(
     *args,
@@ -584,6 +664,8 @@ __iter__(
 
 <h3 id="__le__"><code>__le__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __le__(
     *args,
@@ -595,6 +677,20 @@ Returns the truth value of (x <= y) element-wise.
 
 *NOTE*: `math.less_equal` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
+
+#### Example:
+
+
+
+```python
+x = tf.constant([5, 4, 6])
+y = tf.constant([5])
+tf.math.less_equal(x, y) ==> [True, True, False]
+
+x = tf.constant([5, 4, 6])
+y = tf.constant([5, 6, 6])
+tf.math.less_equal(x, y) ==> [True, True, True]
+```
 
 #### Args:
 
@@ -611,6 +707,8 @@ A `Tensor` of type `bool`.
 
 <h3 id="__lt__"><code>__lt__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __lt__(
     *args,
@@ -622,6 +720,20 @@ Returns the truth value of (x < y) element-wise.
 
 *NOTE*: `math.less` supports broadcasting. More about broadcasting
 [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
+
+#### Example:
+
+
+
+```python
+x = tf.constant([5, 4, 6])
+y = tf.constant([5])
+tf.math.less(x, y) ==> [False, True, False]
+
+x = tf.constant([5, 4, 6])
+y = tf.constant([5, 6, 7])
+tf.math.less(x, y) ==> [False, True, True]
+```
 
 #### Args:
 
@@ -637,6 +749,8 @@ A `Tensor` of type `bool`.
 
 
 <h3 id="__matmul__"><code>__matmul__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __matmul__(
@@ -757,6 +871,8 @@ for all indices i, j.
 
 <h3 id="__mod__"><code>__mod__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __mod__(
     *args,
@@ -787,6 +903,8 @@ A `Tensor`. Has the same type as `x`.
 
 <h3 id="__mul__"><code>__mul__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __mul__(
     *args,
@@ -798,6 +916,8 @@ Dispatches cwise mul for "Dense*Dense" and "Dense*Sparse".
 
 
 <h3 id="__neg__"><code>__neg__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __neg__(
@@ -842,6 +962,8 @@ This is the Python 2.x counterpart to `__bool__()` above.
 
 <h3 id="__or__"><code>__or__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __or__(
     *args,
@@ -868,6 +990,8 @@ A `Tensor` of type `bool`.
 
 
 <h3 id="__pow__"><code>__pow__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __pow__(
@@ -904,6 +1028,8 @@ A `Tensor`.
 
 <h3 id="__radd__"><code>__radd__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __radd__(
     *args,
@@ -915,6 +1041,8 @@ Dispatches to add for strings and add_v2 for all other types.
 
 
 <h3 id="__rand__"><code>__rand__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __rand__(
@@ -943,6 +1071,8 @@ A `Tensor` of type `bool`.
 
 <h3 id="__rdiv__"><code>__rdiv__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __rdiv__(
     *args,
@@ -968,6 +1098,8 @@ Used for Tensor.__div__.
 
 
 <h3 id="__rfloordiv__"><code>__rfloordiv__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __rfloordiv__(
@@ -1008,6 +1140,8 @@ as well.
 * <b>`TypeError`</b>: If the inputs are complex.
 
 <h3 id="__rmatmul__"><code>__rmatmul__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __rmatmul__(
@@ -1128,6 +1262,8 @@ for all indices i, j.
 
 <h3 id="__rmod__"><code>__rmod__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __rmod__(
     *args,
@@ -1158,6 +1294,8 @@ A `Tensor`. Has the same type as `x`.
 
 <h3 id="__rmul__"><code>__rmul__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __rmul__(
     *args,
@@ -1169,6 +1307,8 @@ Dispatches cwise mul for "Dense*Dense" and "Dense*Sparse".
 
 
 <h3 id="__ror__"><code>__ror__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __ror__(
@@ -1196,6 +1336,8 @@ A `Tensor` of type `bool`.
 
 
 <h3 id="__rpow__"><code>__rpow__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __rpow__(
@@ -1232,6 +1374,8 @@ A `Tensor`.
 
 <h3 id="__rsub__"><code>__rsub__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __rsub__(
     *args,
@@ -1259,6 +1403,8 @@ A `Tensor`. Has the same type as `x`.
 
 <h3 id="__rtruediv__"><code>__rtruediv__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __rtruediv__(
     *args,
@@ -1270,6 +1416,8 @@ __rtruediv__(
 
 
 <h3 id="__rxor__"><code>__rxor__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __rxor__(
@@ -1310,6 +1458,8 @@ A `Tensor` of type bool with the same size as that of x or y.
 
 <h3 id="__sub__"><code>__sub__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __sub__(
     *args,
@@ -1337,6 +1487,8 @@ A `Tensor`. Has the same type as `x`.
 
 <h3 id="__truediv__"><code>__truediv__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
 ``` python
 __truediv__(
     *args,
@@ -1348,6 +1500,8 @@ __truediv__(
 
 
 <h3 id="__xor__"><code>__xor__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 __xor__(
@@ -1386,7 +1540,20 @@ z = tf.logical_xor(x, y, name="LogicalXor")
 A `Tensor` of type bool with the same size as that of x or y.
 
 
+<h3 id="get_shape"><code>get_shape</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
+
+``` python
+get_shape()
+```
+
+Legacy means of getting Tensor shape, for compat with 2.0.0 LinOp.
+
+
 <h3 id="set_shape"><code>set_shape</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/deferred_tensor.py">View source</a>
 
 ``` python
 set_shape(shape)

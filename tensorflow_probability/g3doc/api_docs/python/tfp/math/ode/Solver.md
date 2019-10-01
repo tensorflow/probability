@@ -1,10 +1,23 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.math.ode.Solver" />
 <meta itemprop="path" content="Stable" />
+<meta itemprop="property" content="__init__"/>
 <meta itemprop="property" content="solve"/>
 </div>
 
 # tfp.math.ode.Solver
+
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/ode/base.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
 
 ## Class `Solver`
 
@@ -12,16 +25,31 @@ Base class for an ODE solver.
 
 
 
-
-
-Defined in [`python/math/ode/base.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/ode/base.py).
-
 <!-- Placeholder for "Used in" -->
+
+
+<h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/ode/base.py">View source</a>
+
+``` python
+__init__(
+    use_pfor_to_compute_jacobian,
+    validate_args,
+    name
+)
+```
+
+Initialize self.  See help(type(self)) for accurate signature.
+
+
 
 
 ## Methods
 
 <h3 id="solve"><code>solve</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/ode/base.py">View source</a>
 
 ``` python
 solve(
@@ -49,6 +77,45 @@ y(initial_time) = initial_state
 Here, `t` (also called time) is a scalar float `Tensor` and `y(t)` (also
 called the state at time `t`) is an N-D float or complex `Tensor`.
 
+### Example
+
+The ODE `dy/dt(t) = dot(A, y(t))` is solved below.
+
+```python
+t_init, t0, t1 = 0., 0.5, 1.
+y_init = tf.constant([1., 1.], dtype=tf.float64)
+A = [[-1., -2.], [-3., -4.]]
+
+def ode_fn(t, y):
+  return tf.linalg.matvec(A, y)
+
+results = tfp.math.ode.BDF.solve(ode_fn, t_init, y_init,
+                                 solution_times=[t0, t1])
+y0 = results.states[0]  # == dot(matrix_exp(A * t0), y_init)
+y1 = results.states[1]  # == dot(matrix_exp(A * t1), y_init)
+```
+
+Using instead `solution_times=tfp.math.ode.ChosenBySolver(final_time=1.)`
+yields the state at various times between `t_init` and `final_time` chosen
+automatically by the solver. In this case, `results.states[i]` is the state
+at time `results.times[i]`.
+
+#### Gradient
+
+The gradient of the result is computed using the adjoint sensitivity method
+described in [Chen et al. (2018)][1].
+
+```python
+grad = tf.gradients(y1, y0) # == dot(e, J)
+# J is the Jacobian of y1 with respect to y0. In this case, J = exp(A * t1).
+# e = [1, ..., 1] is the row vector of ones.
+```
+
+#### References
+
+[1]: Chen, Tian Qi, et al. "Neural ordinary differential equations."
+     Advances in Neural Information Processing Systems. 2018.
+
 #### Args:
 
 
@@ -63,7 +130,7 @@ called the state at time `t`) is an N-D float or complex `Tensor`.
   stores the computed state at each of these times in the returned
   `Results` object. Must satisfy `initial_time <= solution_times[0]` and
   `solution_times[i] < solution_times[i+1]`. Alternatively, the user can
-  pass `tfp.math.ode.ChosenBySolver(final_time)` where `final_time` is a
+  pass <a href="../../../tfp/math/ode/ChosenBySolver.md"><code>tfp.math.ode.ChosenBySolver(final_time)</code></a> where `final_time` is a
   scalar float `Tensor` satisfying `initial_time < final_time`. Doing so
   requests that the solver automatically choose suitable times up to and
   including `final_time` at which to store the computed state.

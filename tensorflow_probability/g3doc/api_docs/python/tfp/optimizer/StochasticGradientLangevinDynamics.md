@@ -22,15 +22,23 @@
 
 # tfp.optimizer.StochasticGradientLangevinDynamics
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/optimizer/sgld.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `StochasticGradientLangevinDynamics`
 
 An optimizer module for stochastic gradient Langevin dynamics.
 
 
-
-
-
-Defined in [`python/optimizer/sgld.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/sgld.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -67,8 +75,8 @@ with tf.Session(graph=tf.Graph()) as sess:
   # Loss is defined through the Cholesky decomposition
   chol = tf.linalg.cholesky(true_cov)
 
-  var_1 = tf.compat.v2.Variable(name='var_1', initial_value=[1., 1.])
-  var_2 = tf.compat.v2.Variable(name='var_2', initial_value=[1.])
+  var_1 = tf.Variable(name='var_1', initial_value=[1., 1.])
+  var_2 = tf.Variable(name='var_2', initial_value=[1.])
 
   def loss_fn():
     var = tf.concat([var_1, var_2], axis=-1)
@@ -76,7 +84,7 @@ with tf.Session(graph=tf.Graph()) as sess:
     return tf.linalg.matvec(loss_part, var, transpose_a=True)
 
   # Set up the learning rate with a polynomial decay
-  step = tf.compat.v2.Variable(0, dtype=tf.int64)
+  step = tf.Variable(0, dtype=tf.int64)
   starter_learning_rate = .3
   end_learning_rate = 1e-4
   decay_steps = 1e4
@@ -147,6 +155,8 @@ Args:
      Intelligence_, 2016. https://arxiv.org/abs/1512.07666
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/optimizer/sgld.py">View source</a>
 
 ``` python
 __init__(
@@ -266,8 +276,8 @@ applies gradients.
 
 #### Returns:
 
-An `Operation` that applies the specified gradients. If `global_step`
-was not None, that operation also increments `global_step`.
+An `Operation` that applies the specified gradients. The `iterations`
+will be automatically increased by 1.
 
 
 
@@ -308,6 +318,8 @@ An optimizer instance.
 
 
 <h3 id="get_config"><code>get_config</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/optimizer/sgld.py">View source</a>
 
 ``` python
 get_config()
@@ -431,8 +443,8 @@ of using this function.
 
 #### Returns:
 
-An Operation that updates the variables in `var_list`.  If `global_step`
-was not `None`, that operation also increments `global_step`.
+An `Operation` that updates the variables in `var_list`. The `iterations`
+will be automatically increased by 1.
 
 
 

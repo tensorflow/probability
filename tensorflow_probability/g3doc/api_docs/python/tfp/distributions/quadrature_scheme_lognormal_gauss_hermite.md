@@ -5,6 +5,18 @@
 
 # tfp.distributions.quadrature_scheme_lognormal_gauss_hermite
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/poisson_lognormal.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Use Gauss-Hermite quadrature to form quadrature on positive-reals.
 
 ``` python
@@ -18,8 +30,6 @@ tfp.distributions.quadrature_scheme_lognormal_gauss_hermite(
 ```
 
 
-
-Defined in [`python/distributions/poisson_lognormal.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/poisson_lognormal.py).
 
 <!-- Placeholder for "Used in" -->
 

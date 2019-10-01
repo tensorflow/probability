@@ -47,6 +47,18 @@
 
 # tfp.layers.VariableLayer
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/variable_input.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `VariableLayer`
 
 Simply returns a (trainable) variable, regardless of input.
@@ -55,12 +67,8 @@ Simply returns a (trainable) variable, regardless of input.
 
 ### Aliases:
 
-* Class `tfp.layers.VariableLayer`
 * Class `tfp.layers.variable_input.VariableLayer`
 
-
-
-Defined in [`python/layers/variable_input.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/variable_input.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -109,6 +117,8 @@ x.variance()
 ```
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/variable_input.py">View source</a>
 
 ``` python
 __init__(
@@ -365,7 +375,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result

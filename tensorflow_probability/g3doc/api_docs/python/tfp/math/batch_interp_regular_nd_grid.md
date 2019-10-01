@@ -5,6 +5,18 @@
 
 # tfp.math.batch_interp_regular_nd_grid
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/interpolation.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Multi-linear interpolation on a regular (constant spacing) grid.
 
 ``` python
@@ -20,8 +32,6 @@ tfp.math.batch_interp_regular_nd_grid(
 ```
 
 
-
-Defined in [`python/math/interpolation.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/interpolation.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -63,10 +73,10 @@ with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
   requires `axis=-5`.
 * <b>`fill_value`</b>:  Determines what values output should take for `x` values that
   are below `x_ref_min` or above `x_ref_max`. Scalar `Tensor` or
-  "constant_extension" ==> Extend as constant function.
-  Default value: `"constant_extension"`
+  'constant_extension' ==> Extend as constant function.
+  Default value: `'constant_extension'`
 * <b>`name`</b>:  A name to prepend to created ops.
-  Default value: `"batch_interp_regular_nd_grid"`.
+  Default value: `'batch_interp_regular_nd_grid'`.
 
 
 #### Returns:

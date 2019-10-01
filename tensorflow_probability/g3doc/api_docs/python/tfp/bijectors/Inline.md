@@ -27,15 +27,23 @@
 
 # tfp.bijectors.Inline
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/inline.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `Inline`
 
 Bijector constructed from custom callables.
 
 Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
-
-
-
-Defined in [`python/bijectors/inline.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/inline.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -46,16 +54,18 @@ Defined in [`python/bijectors/inline.py`](https://github.com/tensorflow/probabil
 
 ```python
 exp = Inline(
-  forward_fn=tf.exp,
-  inverse_fn=tf.log,
-  inverse_log_det_jacobian_fn=(
-    lambda y: -tf.reduce_sum(tf.log(y), axis=-1)),
-  name="exp")
+    forward_fn=tf.exp,
+    inverse_fn=tf.math.log,
+    inverse_log_det_jacobian_fn=lambda y: -tf.math.log(y),
+    forward_min_event_ndims=0,
+    name='exp')
 ```
 
 The above example is equivalent to the `Bijector` `Exp()`.
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/inline.py">View source</a>
 
 ``` python
 __init__(
@@ -77,6 +87,10 @@ __init__(
 
 Creates a `Bijector` from callables.
 
+At the minimum, you must supply one of `forward_min_event_ndims` or
+`inverse_min_event_ndims`. To be fully functional, a typical bijector will
+also require `forward_fn`, `inverse_fn` and at least one of
+`inverse_log_det_jacobian_fn` or `forward_log_det_jacobian_fn`.
 
 #### Args:
 
@@ -84,9 +98,9 @@ Creates a `Bijector` from callables.
 * <b>`forward_fn`</b>: Python callable implementing the forward transformation.
 * <b>`inverse_fn`</b>: Python callable implementing the inverse transformation.
 * <b>`inverse_log_det_jacobian_fn`</b>: Python callable implementing the
-  log o det o jacobian of the inverse transformation.
+  `log o det o jacobian` of the inverse transformation.
 * <b>`forward_log_det_jacobian_fn`</b>: Python callable implementing the
-  log o det o jacobian of the forward transformation.
+  `log o det o jacobian` of the forward transformation.
 * <b>`forward_event_shape_fn`</b>: Python callable implementing non-identical
   static event shape changes. Default: shape is assumed unchanged.
 * <b>`forward_event_shape_tensor_fn`</b>: Python callable implementing non-identical
@@ -104,6 +118,12 @@ Creates a `Bijector` from callables.
 * <b>`inverse_min_event_ndims`</b>: Python `int` indicating the minimal
   dimensionality this bijector acts on.
 * <b>`name`</b>: Python `str`, name given to ops managed by this object.
+
+
+#### Raises:
+
+
+* <b>`TypeError`</b>: If any of the non-`None` `*_fn` arguments are not callable.
 
 
 
@@ -176,7 +196,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -196,7 +216,7 @@ Returns True if Tensor arguments will be validated.
 
 <h3 id="variables"><code>variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -214,6 +234,8 @@ first).
 ## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 __call__(
@@ -273,6 +295,8 @@ tfb.Exp()([-1., 0., 1.])
 
 <h3 id="forward"><code>forward</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 forward(
     x,
@@ -307,6 +331,8 @@ Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
 <h3 id="forward_event_shape"><code>forward_event_shape</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 forward_event_shape(input_shape)
 ```
@@ -329,6 +355,8 @@ Same meaning as `forward_event_shape_tensor`. May be only partially defined.
   after applying `forward`. Possibly unknown.
 
 <h3 id="forward_event_shape_tensor"><code>forward_event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 forward_event_shape_tensor(
@@ -355,6 +383,8 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
   event-portion shape after applying `forward`.
 
 <h3 id="forward_log_det_jacobian"><code>forward_log_det_jacobian</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 forward_log_det_jacobian(
@@ -399,6 +429,8 @@ Returns both the forward_log_det_jacobian.
 
 <h3 id="inverse"><code>inverse</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 inverse(
     y,
@@ -435,6 +467,8 @@ Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
 <h3 id="inverse_event_shape"><code>inverse_event_shape</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 inverse_event_shape(output_shape)
 ```
@@ -457,6 +491,8 @@ Same meaning as `inverse_event_shape_tensor`. May be only partially defined.
   after applying `inverse`. Possibly unknown.
 
 <h3 id="inverse_event_shape_tensor"><code>inverse_event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 inverse_event_shape_tensor(
@@ -483,6 +519,8 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
   event-portion shape after applying `inverse`.
 
 <h3 id="inverse_log_det_jacobian"><code>inverse_log_det_jacobian</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 inverse_log_det_jacobian(

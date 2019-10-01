@@ -5,6 +5,18 @@
 
 # tfp.stats.correlation
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/stats/sample_stats.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Sample correlation (Pearson) between observations indexed by `event_axis`.
 
 ``` python
@@ -19,8 +31,6 @@ tfp.stats.correlation(
 ```
 
 
-
-Defined in [`python/stats/sample_stats.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/stats/sample_stats.py).
 
 <!-- Placeholder for "Used in" -->
 

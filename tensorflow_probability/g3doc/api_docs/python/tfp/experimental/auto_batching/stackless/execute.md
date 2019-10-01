@@ -5,12 +5,24 @@
 
 # tfp.experimental.auto_batching.stackless.execute
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/stackless.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Executes a given program in stackless auto-batching mode.
 
 ### Aliases:
 
 * `tfp.experimental.auto_batching.frontend.st.execute`
-* `tfp.experimental.auto_batching.stackless.execute`
+
 
 ``` python
 tfp.experimental.auto_batching.stackless.execute(
@@ -23,11 +35,9 @@ tfp.experimental.auto_batching.stackless.execute(
 
 
 
-Defined in [`python/internal/auto_batching/stackless.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/stackless.py).
-
 <!-- Placeholder for "Used in" -->
 
-Compare `auto_batching.virtual_machine.execute`, which executes the program in
+Compare <a href="../../../../tfp/experimental/auto_batching/virtual_machine/execute.md"><code>auto_batching.virtual_machine.execute</code></a>, which executes the program in
 full auto-batching mode.
 
 #### Advantages:
@@ -99,7 +109,7 @@ PyTorch", Workshop on Systems for ML and Open Source Software at NeurIPS 2018.
 #### Args:
 
 
-* <b>`program`</b>: A `instructions.Program` to execute.
+* <b>`program`</b>: A <a href="../../../../tfp/experimental/auto_batching/instructions/Program.md"><code>instructions.Program</code></a> to execute.
 * <b>`backend`</b>: Object implementing required backend operations.
 * <b>`block_code_cache`</b>: Dict used to enable caching of defun+XLA across multiple
   calls to `execute`. If `None` is provided, we use a new dict per call to

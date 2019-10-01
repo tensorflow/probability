@@ -5,11 +5,19 @@
 
 # Module: tfp.layers
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Probabilistic Layers.
-
-
-
-Defined in [`python/layers/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/__init__.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -25,8 +33,6 @@ Defined in [`python/layers/__init__.py`](https://github.com/tensorflow/probabili
 [`distribution_layer`](../tfp/layers/distribution_layer.md) module: Layers for combining <a href="../tfp/distributions.md"><code>tfp.distributions</code></a> and `tf.keras`.
 
 [`initializers`](../tfp/layers/initializers.md) module: Keras initializers useful for TFP Keras layers.
-
-[`internal`](../tfp/layers/internal.md) module
 
 [`masked_autoregressive`](../tfp/layers/masked_autoregressive.md) module: Layers for normalizing flows and masked autoregressive density estimation.
 

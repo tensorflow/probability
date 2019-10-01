@@ -5,12 +5,24 @@
 
 # tfp.experimental.auto_batching.type_inference.infer_types
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/type_inference.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Infers the variable types of a given program.
 
 ### Aliases:
 
 * `tfp.experimental.auto_batching.frontend.ab_type_inference.infer_types`
-* `tfp.experimental.auto_batching.type_inference.infer_types`
+
 
 ``` python
 tfp.experimental.auto_batching.type_inference.infer_types(
@@ -22,15 +34,13 @@ tfp.experimental.auto_batching.type_inference.infer_types(
 
 
 
-Defined in [`python/internal/auto_batching/type_inference.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/type_inference.py).
-
 <!-- Placeholder for "Used in" -->
 
 
 #### Args:
 
 
-* <b>`program`</b>: `instructions.Program` whose types to infer.
+* <b>`program`</b>: <a href="../../../../tfp/experimental/auto_batching/instructions/Program.md"><code>instructions.Program</code></a> whose types to infer.
 * <b>`inputs`</b>: A `list` of backend-compatible tensors aligned with
   `program.vars_in`.
 * <b>`backend`</b>: Backend implementation.
@@ -39,7 +49,7 @@ Defined in [`python/internal/auto_batching/type_inference.py`](https://github.co
 #### Returns:
 
 
-* <b>`typed`</b>: `instructions.Program` with types inferred.
+* <b>`typed`</b>: <a href="../../../../tfp/experimental/auto_batching/instructions/Program.md"><code>instructions.Program</code></a> with types inferred.
 
 
 #### Raises:

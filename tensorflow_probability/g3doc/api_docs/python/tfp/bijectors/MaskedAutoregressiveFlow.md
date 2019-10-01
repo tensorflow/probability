@@ -27,15 +27,23 @@
 
 # tfp.bijectors.MaskedAutoregressiveFlow
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/masked_autoregressive.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `MaskedAutoregressiveFlow`
 
 Affine MaskedAutoregressiveFlow bijector.
 
 Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
-
-
-
-Defined in [`python/bijectors/masked_autoregressive.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/masked_autoregressive.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -43,13 +51,13 @@ The affine autoregressive flow [(Papamakarios et al., 2016)][3] provides a
 relatively simple framework for user-specified (deep) architectures to learn a
 distribution over continuous events. Regarding terminology,
 
-  "Autoregressive models decompose the joint density as a product of
+  'Autoregressive models decompose the joint density as a product of
   conditionals, and model each conditional in turn. Normalizing flows
   transform a base density (e.g. a standard Gaussian) into the target density
-  by an invertible transformation with tractable Jacobian."
+  by an invertible transformation with tractable Jacobian.'
   [(Papamakarios et al., 2016)][3]
 
-In other words, the "autoregressive property" is equivalent to the
+In other words, the 'autoregressive property' is equivalent to the
 decomposition, `p(x) = prod{ p(x[perm[i]] | x[perm[0:i]]) : i=0, ..., d }`
 where `perm` is some permutation of `{0, ..., d}`. In the simple case where
 the permutation is identity this reduces to:
@@ -57,8 +65,8 @@ the permutation is identity this reduces to:
 `shift_and_log_scale_fn`, `masked_autoregressive_default_template`, achieves
 this property by zeroing out weights in its `masked_dense` layers.
 
-In TensorFlow Probability, "normalizing flows" are implemented as
-<a href="../../tfp/bijectors/Bijector.md"><code>tfp.bijectors.Bijector</code></a>s. The `forward` "autoregression" is implemented
+In TensorFlow Probability, 'normalizing flows' are implemented as
+<a href="../../tfp/bijectors/Bijector.md"><code>tfp.bijectors.Bijector</code></a>s. The `forward` 'autoregression' is implemented
 using a `tf.while_loop` and a deep neural network (DNN) with masked weights
 such that the autoregressive property is automatically met in the `inverse`.
 
@@ -67,13 +75,13 @@ A `TransformedDistribution` using `MaskedAutoregressiveFlow(...)` uses the
 reverse-mode calculation to compute log-probabilities. Conversely, a
 `TransformedDistribution` using `Invert(MaskedAutoregressiveFlow(...))` uses
 the (expensive) forward-mode calculation to compute log-probabilities and the
-(cheap) reverse-mode calculation to compute samples.  See "Example Use"
+(cheap) reverse-mode calculation to compute samples.  See 'Example Use'
 [below] for more details.
 
 Given a `shift_and_log_scale_fn`, the forward and inverse transformations are
-(a sequence of) affine transformations. A "valid" `shift_and_log_scale_fn`
-must compute each `shift` (aka `loc` or "mu" in [Germain et al. (2015)][1])
-and `log(scale)` (aka "alpha" in [Germain et al. (2015)][1]) such that each
+(a sequence of) affine transformations. A 'valid' `shift_and_log_scale_fn`
+must compute each `shift` (aka `loc` or 'mu' in [Germain et al. (2015)][1])
+and `log(scale)` (aka 'alpha' in [Germain et al. (2015)][1]) such that each
 are broadcastable with the arguments to `forward` and `inverse`, i.e., such
 that the calculations in `forward`, `inverse` [below] are possible.
 
@@ -88,7 +96,7 @@ alternative networks, either change the arguments to
 roll-out your own, or use some other architecture, e.g., using `tf.layers`.
 
 Warning: no attempt is made to validate that the `shift_and_log_scale_fn`
-enforces the "autoregressive property".
+enforces the 'autoregressive property'.
 
 Assuming `shift_and_log_scale_fn` has valid shape and autoregressive
 semantics, the forward transformation is
@@ -115,8 +123,32 @@ Notice that the `inverse` does not need a for-loop. This is because in the
 forward pass each calculation of `shift` and `log_scale` is based on the `y`
 calculated so far (not `x`). In the `inverse`, the `y` is fully known, thus is
 equivalent to the scaling used in `forward` after `event_size` passes, i.e.,
-the "last" `y` used to compute `shift`, `log_scale`. (Roughly speaking, this
+the 'last' `y` used to compute `shift`, `log_scale`. (Roughly speaking, this
 also proves the transform is bijective.)
+
+The `bijector_fn` argument allows specifying a more general coupling relation,
+such as the LSTM-inspired activation from [4], or Neural Spline Flow [5]. It
+must logically operate on each element of the input individually, and still
+obey the 'autoregressive property' described above. The forward transformation
+is
+
+```python
+def forward(x):
+  y = zeros_like(x)
+  event_size = x.shape[-event_dims:].num_elements()
+  for _ in range(event_size):
+    bijector = bijector_fn(y)
+    y = bijector.forward(x)
+  return y
+```
+
+and inverse transformation is
+
+```python
+def inverse(y):
+    bijector = bijector_fn(y)
+    return bijector.inverse(y)
+```
 
 #### Examples
 
@@ -153,7 +185,7 @@ iaf.log_prob(x)   # Almost free; uses Bijector caching.
 iaf.log_prob(0.)  # Expensive; uses `tf.while_loop`, no Bijector caching.
 
 # In many (if not most) cases the default `shift_and_log_scale_fn` will be a
-# poor choice. Here's an example of using a "shift only" version and with a
+# poor choice. Here's an example of using a 'shift only' version and with a
 # different number/depth of hidden layers.
 shift_only = True
 maf_no_scale_hidden2 = tfd.TransformedDistribution(
@@ -181,11 +213,21 @@ maf_no_scale_hidden2 = tfd.TransformedDistribution(
      Autoregressive Flow for Density Estimation. In _Neural Information
      Processing Systems_, 2017. https://arxiv.org/abs/1705.07057
 
+[4]: Diederik P Kingma, Tim Salimans, Max Welling. Improving Variational
+     Inference with Inverse Autoregressive Flow. In _Neural Information
+     Processing Systems_, 2016. https://arxiv.org/abs/1606.04934
+
+[5]: Conor Durkan, Artur Bekasov, Iain Murray, George Papamakarios. Neural
+     Spline Flows, 2019. http://arxiv.org/abs/1906.04032
+
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/masked_autoregressive.py">View source</a>
 
 ``` python
 __init__(
-    shift_and_log_scale_fn,
+    shift_and_log_scale_fn=None,
+    bijector_fn=None,
     is_constant_jacobian=False,
     validate_args=False,
     unroll_loop=False,
@@ -202,12 +244,19 @@ Creates the MaskedAutoregressiveFlow bijector.
 
 * <b>`shift_and_log_scale_fn`</b>: Python `callable` which computes `shift` and
   `log_scale` from both the forward domain (`x`) and the inverse domain
-  (`y`). Calculation must respect the "autoregressive property" (see class
+  (`y`). Calculation must respect the 'autoregressive property' (see class
   docstring). Suggested default
   `masked_autoregressive_default_template(hidden_layers=...)`.
   Typically the function contains `tf.Variables` and is wrapped using
   `tf.make_template`. Returning `None` for either (both) `shift`,
   `log_scale` is equivalent to (but more efficient than) returning zero.
+* <b>`bijector_fn`</b>: Python `callable` which returns a `tfb.Bijector` which
+  transforms event tensor with the signature
+  `(input, **condition_kwargs) -> bijector`. The bijector must operate on
+  scalar events and must not alter the rank of its input. The
+  `bijector_fn` will be called with `Tensors` from both the forward domain
+  (`x`) and the inverse domain (`y`). Calculation must respect the
+  'autoregressive property' (see class docstring).
 * <b>`is_constant_jacobian`</b>: Python `bool`. Default: `False`. When `True` the
   implementation assumes `log_scale` does not depend on the forward domain
   (`x`) or inverse domain (`y`) values. (No validation is made;
@@ -224,6 +273,13 @@ Creates the MaskedAutoregressiveFlow bijector.
   implemented by the `masked_autoregressive_default_template`, 2 might be
   useful for a 2D convolutional `shift_and_log_scale_fn` and so on.
 * <b>`name`</b>: Python `str`, name given to ops managed by this object.
+
+
+#### Raises:
+
+
+* <b>`ValueError`</b>: If both or none of `shift_and_log_scale_fn` and `bijector_fn`
+    are specified.
 
 
 
@@ -296,7 +352,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -316,7 +372,7 @@ Returns True if Tensor arguments will be validated.
 
 <h3 id="variables"><code>variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -334,6 +390,8 @@ first).
 ## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 __call__(
@@ -393,6 +451,8 @@ tfb.Exp()([-1., 0., 1.])
 
 <h3 id="forward"><code>forward</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 forward(
     x,
@@ -427,6 +487,8 @@ Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
 <h3 id="forward_event_shape"><code>forward_event_shape</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 forward_event_shape(input_shape)
 ```
@@ -449,6 +511,8 @@ Same meaning as `forward_event_shape_tensor`. May be only partially defined.
   after applying `forward`. Possibly unknown.
 
 <h3 id="forward_event_shape_tensor"><code>forward_event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 forward_event_shape_tensor(
@@ -475,6 +539,8 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
   event-portion shape after applying `forward`.
 
 <h3 id="forward_log_det_jacobian"><code>forward_log_det_jacobian</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 forward_log_det_jacobian(
@@ -519,6 +585,8 @@ Returns both the forward_log_det_jacobian.
 
 <h3 id="inverse"><code>inverse</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 inverse(
     y,
@@ -555,6 +623,8 @@ Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
 <h3 id="inverse_event_shape"><code>inverse_event_shape</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 inverse_event_shape(output_shape)
 ```
@@ -577,6 +647,8 @@ Same meaning as `inverse_event_shape_tensor`. May be only partially defined.
   after applying `inverse`. Possibly unknown.
 
 <h3 id="inverse_event_shape_tensor"><code>inverse_event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 inverse_event_shape_tensor(
@@ -603,6 +675,8 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
   event-portion shape after applying `inverse`.
 
 <h3 id="inverse_log_det_jacobian"><code>inverse_log_det_jacobian</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 inverse_log_det_jacobian(

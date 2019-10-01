@@ -5,12 +5,24 @@
 
 # tfp.experimental.auto_batching.virtual_machine.execute
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/virtual_machine.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Executes or stages a complete auto-batching VM program.
 
 ### Aliases:
 
 * `tfp.experimental.auto_batching.frontend.vm.execute`
-* `tfp.experimental.auto_batching.virtual_machine.execute`
+
 
 ``` python
 tfp.experimental.auto_batching.virtual_machine.execute(
@@ -23,8 +35,6 @@ tfp.experimental.auto_batching.virtual_machine.execute(
 ```
 
 
-
-Defined in [`python/internal/auto_batching/virtual_machine.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/virtual_machine.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -39,7 +49,7 @@ outputs, and internal variables.
 #### Args:
 
 
-* <b>`program`</b>: A `instructions.Program` to execute or stage.
+* <b>`program`</b>: A <a href="../../../../tfp/experimental/auto_batching/instructions/Program.md"><code>instructions.Program</code></a> to execute or stage.
 * <b>`args`</b>: Input values, a list of arrays, each of shape `[batch_size,
   e1, ..., eE]`.  The batch size must be the same for all inputs.
   The other dimensions must agree with the declared shapes of the
@@ -47,7 +57,7 @@ outputs, and internal variables.
   same as one another.
 * <b>`max_stack_depth`</b>: Python `int`. Maximum depth of stack to allocate.
 * <b>`backend`</b>: Object implementing required backend operations.
-* <b>`block_code_cache`</b>: Dict (allows cache to live across calls to `vm.execute`,
+* <b>`block_code_cache`</b>: Dict (allows cache to live across calls to <a href="../../../../tfp/experimental/auto_batching/virtual_machine/execute.md"><code>vm.execute</code></a>,
   or `None` (in which case a dict is created and used per call).
 
 

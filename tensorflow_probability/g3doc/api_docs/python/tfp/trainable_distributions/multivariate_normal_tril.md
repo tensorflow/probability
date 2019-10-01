@@ -5,6 +5,12 @@
 
 # tfp.trainable_distributions.multivariate_normal_tril
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Constructs a trainable `tfd.MultivariateNormalTriL` distribution. (deprecated)
 
 ``` python
@@ -13,6 +19,8 @@ tfp.trainable_distributions.multivariate_normal_tril(
     **kwargs
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

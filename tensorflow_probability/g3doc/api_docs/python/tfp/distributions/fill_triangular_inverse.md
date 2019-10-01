@@ -5,6 +5,12 @@
 
 # tfp.distributions.fill_triangular_inverse
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Creates a vector from a (batch of) triangular matrix. (deprecated)
 
 ``` python
@@ -13,6 +19,8 @@ tfp.distributions.fill_triangular_inverse(
     **kwargs
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

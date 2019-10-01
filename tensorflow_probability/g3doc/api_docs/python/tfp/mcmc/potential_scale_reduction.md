@@ -5,6 +5,18 @@
 
 # tfp.mcmc.potential_scale_reduction
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/diagnostic.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Gelman and Rubin (1992)'s potential scale reduction for chain convergence.
 
 ``` python
@@ -18,8 +30,6 @@ tfp.mcmc.potential_scale_reduction(
 ```
 
 
-
-Defined in [`python/mcmc/diagnostic.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/diagnostic.py).
 
 <!-- Placeholder for "Used in" -->
 

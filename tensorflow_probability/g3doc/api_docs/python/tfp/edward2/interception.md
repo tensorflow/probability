@@ -5,7 +5,18 @@
 
 # tfp.edward2.interception
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Python context manager for interception.
+
+### Aliases:
+
+* `tfp.experimental.edward2.interception`
+
 
 ``` python
 tfp.edward2.interception(
@@ -13,6 +24,8 @@ tfp.edward2.interception(
     **kwds
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

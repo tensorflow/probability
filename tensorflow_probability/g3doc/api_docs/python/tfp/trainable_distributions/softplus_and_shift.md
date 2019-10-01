@@ -5,6 +5,12 @@
 
 # tfp.trainable_distributions.softplus_and_shift
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Converts (batch of) scalars to (batch of) positive valued scalars. (deprecated)
 
 ``` python
@@ -13,6 +19,8 @@ tfp.trainable_distributions.softplus_and_shift(
     **kwargs
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

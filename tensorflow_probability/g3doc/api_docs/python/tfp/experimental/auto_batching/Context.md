@@ -14,6 +14,18 @@
 
 # tfp.experimental.auto_batching.Context
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/frontend.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `Context`
 
 Context object for auto-batching multiple Python functions together.
@@ -22,12 +34,8 @@ Context object for auto-batching multiple Python functions together.
 
 ### Aliases:
 
-* Class `tfp.experimental.auto_batching.Context`
 * Class `tfp.experimental.auto_batching.frontend.Context`
 
-
-
-Defined in [`python/internal/auto_batching/frontend.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/frontend.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -66,6 +74,8 @@ See also the `batch` method.
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/frontend.py">View source</a>
+
 ``` python
 __init__()
 ```
@@ -78,6 +88,8 @@ Initializes a `Context` object.
 ## Methods
 
 <h3 id="batch"><code>batch</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/frontend.py">View source</a>
 
 ``` python
 batch(type_inference)
@@ -108,8 +120,8 @@ arguments, except:
   Ignored in stackless execution.
 - The batched function accepts an additional keyword argument `backend`
   specifying the backend to use.  Must be an instance of
-  `auto_batching.TensorFlowBackend` (default) or
-  `auto_batching.NumpyBackend`.
+  <a href="../../../tfp/experimental/auto_batching/TensorFlowBackend.md"><code>auto_batching.TensorFlowBackend</code></a> (default) or
+  <a href="../../../tfp/experimental/auto_batching/NumpyBackend.md"><code>auto_batching.NumpyBackend</code></a>.
 - The batched function accepts an additional keyword argument
   `block_code_cache`, a dict which allows the caching of basic block
   rewrites (i.e. `tf.function` + XLA) to live across calls to the
@@ -125,9 +137,9 @@ must be decorated in the same `Context` before invoking any of them.
 
 * <b>`type_inference`</b>: A Python callable giving the type signature of the
   function being auto-batched.  The callable will be invoked with a single
-  argument giving the list of `instructions.Type` objects describing the
+  argument giving the list of <a href="../../../tfp/experimental/auto_batching/Type.md"><code>instructions.Type</code></a> objects describing the
   arguments at a particular call site, and must return a list of
-  `instructions.Type` objects describing the values that call site will
+  <a href="../../../tfp/experimental/auto_batching/Type.md"><code>instructions.Type</code></a> objects describing the values that call site will
   return.
 
 
@@ -147,6 +159,8 @@ must be decorated in the same `Context` before invoking any of them.
 
 <h3 id="batch_uncurried"><code>batch_uncurried</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/frontend.py">View source</a>
+
 ``` python
 batch_uncurried(
     function,
@@ -159,6 +173,8 @@ A non-decorator version of `batch`, which see.
 
 <h3 id="function_names"><code>function_names</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/frontend.py">View source</a>
+
 ``` python
 function_names()
 ```
@@ -167,6 +183,8 @@ function_names()
 
 
 <h3 id="lowered_for_args"><code>lowered_for_args</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/frontend.py">View source</a>
 
 ``` python
 lowered_for_args(
@@ -180,6 +198,8 @@ Helper for calling program_lowered that computes the type signature.
 
 
 <h3 id="module"><code>module</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/frontend.py">View source</a>
 
 ``` python
 module()
@@ -197,11 +217,13 @@ Constructs an `instructions.Module` for this `Context`.
 
 <h3 id="program"><code>program</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/frontend.py">View source</a>
+
 ``` python
 program(main)
 ```
 
-Constructs an `instructions.Program` for this `Context`.
+Constructs an <a href="../../../tfp/experimental/auto_batching/instructions/Program.md"><code>instructions.Program</code></a> for this `Context`.
 
 This is a helper method, equivalent to `self.module().program(main)`.
 
@@ -214,7 +236,7 @@ This is a helper method, equivalent to `self.module().program(main)`.
 #### Returns:
 
 
-* <b>`prog`</b>: An `instructions.Program` representing the batched computation
+* <b>`prog`</b>: An <a href="../../../tfp/experimental/auto_batching/instructions/Program.md"><code>instructions.Program</code></a> representing the batched computation
   defined by all the functions decorated with `batch` in this `Context` so
   far.  Suitable for downstream compilation with other passes in
   `auto_batching`.
@@ -228,28 +250,34 @@ This is a helper method, equivalent to `self.module().program(main)`.
 
 <h3 id="program_compiled"><code>program_compiled</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/frontend.py">View source</a>
+
 ``` python
 program_compiled(
     main,
-    sig,
-    backend
+    sig=None,
+    backend=None
 )
 ```
 
-Constructs a compiled `instructions.Program` for this `Context`.
+Constructs a compiled <a href="../../../tfp/experimental/auto_batching/instructions/Program.md"><code>instructions.Program</code></a> for this `Context`.
 
 This constructs the program with `self.program(main)`, and the performs type
-inference, optimization, and lowering, to emit a result that can be executed
-(or staged) by the auto-batching VM.
+inference and optimization, to emit a result that can be executed by the
+stackless auto-batching VM.
 
 The point of having this as a method in its own right is that it caches the
 compilation on the types of the arguments.
+
+If either `sig` or `backend` are omitted or `None`, type inference is
+skipped.  The result is not executable, but it can be enlightening to
+inspect.
 
 #### Args:
 
 
 * <b>`main`</b>: Python string name of the function that should be the entry point.
-* <b>`sig`</b>: A `list` of (patterns of) `instructions.TensorType` aligned with
+* <b>`sig`</b>: A `list` of (patterns of) <a href="../../../tfp/experimental/auto_batching/TensorType.md"><code>instructions.TensorType</code></a> aligned with
   the formal parameters to `main`.
 * <b>`backend`</b>: Backend implementation.
 
@@ -257,22 +285,24 @@ compilation on the types of the arguments.
 #### Returns:
 
 
-* <b>`prog`</b>: An `instructions.Program` representing the batched computation
+* <b>`prog`</b>: An <a href="../../../tfp/experimental/auto_batching/instructions/Program.md"><code>instructions.Program</code></a> representing the batched computation
   defined by all the functions decorated with `batch` in this `Context` so
   far.  Suitable for execution or staging on real data by the
   auto-batching VM.
 
 <h3 id="program_lowered"><code>program_lowered</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/frontend.py">View source</a>
+
 ``` python
 program_lowered(
     main,
-    sig,
-    backend
+    sig=None,
+    backend=None
 )
 ```
 
-Constructs a lowered `instructions.Program` for this `Context`.
+Constructs a lowered <a href="../../../tfp/experimental/auto_batching/instructions/Program.md"><code>instructions.Program</code></a> for this `Context`.
 
 This constructs the program with `self.program(main)`, and the performs type
 inference, optimization, and lowering, to emit a result that can be executed
@@ -281,11 +311,15 @@ inference, optimization, and lowering, to emit a result that can be executed
 The point of having this as a method in its own right is that it caches the
 compilation on the types of the arguments.
 
+If either `sig` or `backend` are omitted or `None`, type inference is
+skipped.  The result is not executable, but it can be enlightening to
+inspect.
+
 #### Args:
 
 
 * <b>`main`</b>: Python string name of the function that should be the entry point.
-* <b>`sig`</b>: A `list` of (patterns of) `instructions.TensorType` aligned with
+* <b>`sig`</b>: A `list` of (patterns of) <a href="../../../tfp/experimental/auto_batching/TensorType.md"><code>instructions.TensorType</code></a> aligned with
   the formal parameters to `main`.
 * <b>`backend`</b>: Backend implementation.
 
@@ -293,7 +327,7 @@ compilation on the types of the arguments.
 #### Returns:
 
 
-* <b>`prog`</b>: An `instructions.Program` representing the batched computation
+* <b>`prog`</b>: An <a href="../../../tfp/experimental/auto_batching/instructions/Program.md"><code>instructions.Program</code></a> representing the batched computation
   defined by all the functions decorated with `batch` in this `Context` so
   far.  Suitable for execution or staging on real data by the
   auto-batching VM.

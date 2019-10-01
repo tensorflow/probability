@@ -29,24 +29,28 @@
 
 # tfp.bijectors.MatvecLU
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/matveclu.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `MatvecLU`
 
 Matrix-vector multiply using LU decomposition.
 
 Inherits From: [`Bijector`](../../tfp/bijectors/Bijector.md)
 
-
-
-Defined in [`python/bijectors/matveclu.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/matveclu.py).
-
 <!-- Placeholder for "Used in" -->
 
 This bijector is identical to the "Convolution1x1" used in Glow
 [(Kingma and Dhariwal, 2018)[1].
-
-Warning: this bijector never verifies the scale matrix (as parameterized by LU
-decomposition) is invertible. Ensuring this is the case is the caller's
-responsibility.
 
 #### Examples
 
@@ -55,29 +59,33 @@ Here's an example of initialization via random weights matrix:
 ```python
 def trainable_lu_factorization(
     event_size, batch_shape=(), seed=None, dtype=tf.float32, name=None):
-  with tf.name_scope(name, 'trainable_lu_factorization',
-                     [event_size, batch_shape]):
+  with tf.name_scope(name or 'trainable_lu_factorization'):
     event_size = tf.convert_to_tensor(
         event_size, dtype_hint=tf.int32, name='event_size')
     batch_shape = tf.convert_to_tensor(
         batch_shape, dtype_hint=event_size.dtype, name='batch_shape')
-    random_matrix = tf.random_uniform(
+    random_matrix = tf.random.uniform(
         shape=tf.concat([batch_shape, [event_size, event_size]], axis=0),
         dtype=dtype,
         seed=seed)
     random_orthonormal = tf.linalg.qr(random_matrix)[0]
     lower_upper, permutation = tf.linalg.lu(random_orthonormal)
     lower_upper = tf.Variable(
-        initial_lower_upper,
+        initial_value=lower_upper,
         trainable=True,
-        use_resource=True,
         name='lower_upper')
+    # Initialize a non-trainable variable for the permutation indices so
+    # that its value isn't re-sampled from run-to-run.
+    permutation = tf.Variable(
+        initial_value=permutation,
+        trainable=False,
+        name='permutation')
     return lower_upper, permutation
 
 channels = 3
 conv1x1 = tfb.MatvecLU(*trainable_lu_factorization(channels),
                        validate_args=True)
-x = tf.random_uniform(shape=[2, 28, 28, channels])
+x = tf.random.uniform(shape=[2, 28, 28, channels])
 fwd = conv1x1.forward(x)
 rev_fwd = conv1x1.inverse(fwd)
 # ==> x
@@ -102,6 +110,8 @@ def lu_factorized_random_orthonormal_matrix(channels, dtype=np.float32):
      https://arxiv.org/abs/1807.03039
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/matveclu.py">View source</a>
 
 ``` python
 __init__(
@@ -215,7 +225,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -235,7 +245,7 @@ Returns True if Tensor arguments will be validated.
 
 <h3 id="variables"><code>variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -253,6 +263,8 @@ first).
 ## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 __call__(
@@ -312,6 +324,8 @@ tfb.Exp()([-1., 0., 1.])
 
 <h3 id="forward"><code>forward</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 forward(
     x,
@@ -346,6 +360,8 @@ Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
 <h3 id="forward_event_shape"><code>forward_event_shape</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 forward_event_shape(input_shape)
 ```
@@ -368,6 +384,8 @@ Same meaning as `forward_event_shape_tensor`. May be only partially defined.
   after applying `forward`. Possibly unknown.
 
 <h3 id="forward_event_shape_tensor"><code>forward_event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 forward_event_shape_tensor(
@@ -394,6 +412,8 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
   event-portion shape after applying `forward`.
 
 <h3 id="forward_log_det_jacobian"><code>forward_log_det_jacobian</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 forward_log_det_jacobian(
@@ -438,6 +458,8 @@ Returns both the forward_log_det_jacobian.
 
 <h3 id="inverse"><code>inverse</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 inverse(
     y,
@@ -474,6 +496,8 @@ Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
 <h3 id="inverse_event_shape"><code>inverse_event_shape</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
+
 ``` python
 inverse_event_shape(output_shape)
 ```
@@ -496,6 +520,8 @@ Same meaning as `inverse_event_shape_tensor`. May be only partially defined.
   after applying `inverse`. Possibly unknown.
 
 <h3 id="inverse_event_shape_tensor"><code>inverse_event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 inverse_event_shape_tensor(
@@ -522,6 +548,8 @@ Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
   event-portion shape after applying `inverse`.
 
 <h3 id="inverse_log_det_jacobian"><code>inverse_log_det_jacobian</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/bijector.py">View source</a>
 
 ``` python
 inverse_log_det_jacobian(

@@ -10,6 +10,18 @@
 
 # tfp.experimental.auto_batching.instructions.VariableAllocation
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `VariableAllocation`
 
 A token indicating how to allocate memory for an autobatched variable.
@@ -21,13 +33,9 @@ A token indicating how to allocate memory for an autobatched variable.
 * Class `tfp.experimental.auto_batching.frontend.instructions.VariableAllocation`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.VariableAllocation`
 * Class `tfp.experimental.auto_batching.frontend.stack.inst.VariableAllocation`
-* Class `tfp.experimental.auto_batching.instructions.VariableAllocation`
 * Class `tfp.experimental.auto_batching.stack_optimization.inst.VariableAllocation`
 * Class `tfp.experimental.auto_batching.stackless.inst.VariableAllocation`
 
-
-
-Defined in [`python/internal/auto_batching/instructions.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/instructions.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -61,6 +69,8 @@ will automatically only hold data for the live threads, whereas reading and
 writing a `register` will still require the gathers and scatters.
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
 
 ``` python
 __init__(name)

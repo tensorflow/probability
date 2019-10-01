@@ -9,15 +9,23 @@
 
 # tfp.distributions.SeedStream
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `SeedStream`
 
 Local PRNG for amplifying seed entropy into seeds for base operations.
 
-
-
-
-
-Defined in [`python/distributions/seed_stream.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/seed_stream.py).
+Inherits From: [`SeedStream`](../../tfp/util/SeedStream.md)
 
 <!-- Placeholder for "Used in" -->
 
@@ -156,13 +164,16 @@ seed.
 
 ``` python
 __init__(
-    seed,
-    salt
+    *args,
+    **kwargs
 )
 ```
 
-Initializes a `SeedStream`.
+Initializes a `SeedStream`. (deprecated)
 
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+SeedStream has moved to <a href="../../tfp/util/SeedStream.md"><code>tfp.util.SeedStream</code></a>.
 
 #### Args:
 
@@ -195,6 +206,8 @@ Initializes a `SeedStream`.
 ## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/seed_stream.py">View source</a>
 
 ``` python
 __call__()

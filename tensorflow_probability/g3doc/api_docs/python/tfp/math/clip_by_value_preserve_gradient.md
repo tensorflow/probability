@@ -5,6 +5,18 @@
 
 # tfp.math.clip_by_value_preserve_gradient
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/numeric.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Clips values to a specified min and max while leaving gradient unaltered.
 
 ``` python
@@ -17,8 +29,6 @@ tfp.math.clip_by_value_preserve_gradient(
 ```
 
 
-
-Defined in [`python/math/numeric.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/numeric.py).
 
 <!-- Placeholder for "Used in" -->
 

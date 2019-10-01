@@ -5,7 +5,18 @@
 
 # tfp.edward2.get_next_interceptor
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Yields the top-most interceptor on the thread-local interceptor stack.
+
+### Aliases:
+
+* `tfp.experimental.edward2.get_next_interceptor`
+
 
 ``` python
 tfp.edward2.get_next_interceptor(
@@ -13,6 +24,8 @@ tfp.edward2.get_next_interceptor(
     **kwds
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

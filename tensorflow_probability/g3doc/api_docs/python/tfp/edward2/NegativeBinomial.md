@@ -5,7 +5,24 @@
 
 # tfp.edward2.NegativeBinomial
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for NegativeBinomial.
+
+### Aliases:
+
+* `tfp.experimental.edward2.NegativeBinomial`
+
 
 ``` python
 tfp.edward2.NegativeBinomial(
@@ -15,8 +32,6 @@ tfp.edward2.NegativeBinomial(
 ```
 
 
-
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -39,8 +54,7 @@ Construct NegativeBinomial distributions.
   `probs` or `logits`. Defines this as a batch of `N1 x ... x Nm`
   different Negative Binomial distributions. In practice, this represents
   the number of negative Bernoulli trials to stop at (the `total_count`
-  of failures), but this is still a valid distribution when
-  `total_count` is a non-integer.
+  of failures). Its components should be equal to integer values.
 * <b>`logits`</b>: Floating-point `Tensor` with shape broadcastable to
   `[B1, ..., Bb]` where `b >= 0` indicates the number of batch dimensions.
   Each entry represents logits for the probability of success for

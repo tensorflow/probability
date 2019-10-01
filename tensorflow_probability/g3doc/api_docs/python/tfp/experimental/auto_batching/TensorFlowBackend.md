@@ -28,6 +28,18 @@
 
 # tfp.experimental.auto_batching.TensorFlowBackend
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `TensorFlowBackend`
 
 Implements the TF backend ops for a PC auto-batching VM.
@@ -36,18 +48,16 @@ Implements the TF backend ops for a PC auto-batching VM.
 
 ### Aliases:
 
-* Class `tfp.experimental.auto_batching.TensorFlowBackend`
 * Class `tfp.experimental.auto_batching.frontend.tf_backend.TensorFlowBackend`
 * Class `tfp.experimental.auto_batching.tf_backend.TensorFlowBackend`
 
-
-
-Defined in [`python/internal/auto_batching/tf_backend.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/tf_backend.py).
 
 <!-- Placeholder for "Used in" -->
 
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
 
 ``` python
 __init__(
@@ -88,6 +98,8 @@ Construct a new backend instance.
 
 <h3 id="any"><code>any</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
+
 ``` python
 any(
     t,
@@ -99,6 +111,8 @@ any(
 
 
 <h3 id="assert_matching_dtype"><code>assert_matching_dtype</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
 
 ``` python
 assert_matching_dtype(
@@ -126,6 +140,8 @@ Asserts that the dtype of `value` matches `expected_dtype`.
 
 <h3 id="batch_size"><code>batch_size</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
+
 ``` python
 batch_size(
     value,
@@ -137,6 +153,8 @@ Returns the first (batch) dimension of `value`.
 
 
 <h3 id="broadcast_to_shape_of"><code>broadcast_to_shape_of</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
 
 ``` python
 broadcast_to_shape_of(
@@ -169,6 +187,8 @@ Attempts to match the dtype of `broadcast_val` to the dtype of `target`, if
 
 <h3 id="cond"><code>cond</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
+
 ``` python
 cond(
     pred,
@@ -199,6 +219,8 @@ Implements a conditional operation for the backend.
 
 <h3 id="create_variable"><code>create_variable</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
+
 ``` python
 create_variable(
     name,
@@ -217,7 +239,7 @@ Returns an intialized Variable.
 
 * <b>`name`</b>: Name for the variable.
 * <b>`alloc`</b>: `VariableAllocation` for the variable.
-* <b>`type_`</b>: `instructions.TensorType` describing the sub-batch shape and dtype
+* <b>`type_`</b>: <a href="../../../tfp/experimental/auto_batching/TensorType.md"><code>instructions.TensorType</code></a> describing the sub-batch shape and dtype
   of the variable being created.
 * <b>`max_stack_depth`</b>: Scalar `int` `Tensor`, the maximum stack depth allocated.
 * <b>`batch_size`</b>: Scalar `int` `Tensor`, the number of parallel threads being
@@ -231,6 +253,8 @@ Returns an intialized Variable.
 
 <h3 id="equal"><code>equal</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
+
 ``` python
 equal(
     t1,
@@ -243,6 +267,8 @@ Implements equality comparison for TF backend.
 
 
 <h3 id="fill"><code>fill</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
 
 ``` python
 fill(
@@ -274,6 +300,8 @@ Fill a fresh batched Tensor of the given shape and dtype with `value`.
 
 <h3 id="full_mask"><code>full_mask</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
+
 ``` python
 full_mask(
     size,
@@ -285,6 +313,8 @@ Returns an all-True mask `Tensor` with shape `[size]`.
 
 
 <h3 id="merge_dtypes"><code>merge_dtypes</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
 
 ``` python
 merge_dtypes(
@@ -317,6 +347,8 @@ In practice, TF implementation asserts that the two dtypes are identical.
 
 <h3 id="merge_shapes"><code>merge_shapes</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
+
 ``` python
 merge_shapes(
     s1,
@@ -347,6 +379,8 @@ Merges two shapes, returning a broadcasted shape.
 
 <h3 id="not_equal"><code>not_equal</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
+
 ``` python
 not_equal(
     t1,
@@ -359,6 +393,8 @@ Implements inequality comparison for TF backend.
 
 
 <h3 id="prepare_for_cond"><code>prepare_for_cond</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
 
 ``` python
 prepare_for_cond(state)
@@ -385,6 +421,8 @@ tree rather than once per cond.
 
 <h3 id="reduce_min"><code>reduce_min</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
+
 ``` python
 reduce_min(
     t,
@@ -396,6 +434,8 @@ Implements reduce_min for TF backend.
 
 
 <h3 id="run_on_dummies"><code>run_on_dummies</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
 
 ``` python
 run_on_dummies(
@@ -412,7 +452,7 @@ This is useful for examining the outputs for the purpose of type inference.
 
 
 * <b>`primitive_callable`</b>: A python callable.
-* <b>`input_types`</b>: `list` of `instructions.Type` type of each argument to the
+* <b>`input_types`</b>: `list` of <a href="../../../tfp/experimental/auto_batching/Type.md"><code>instructions.Type</code></a> type of each argument to the
   callable.  Note that the contained `TensorType` objects must match the
   dimensions with which the primitive is to be invoked at runtime, even
   though type inference conventionally does not store the batch dimension
@@ -427,6 +467,8 @@ This is useful for examining the outputs for the purpose of type inference.
 
 <h3 id="static_value"><code>static_value</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
+
 ``` python
 static_value(t)
 ```
@@ -435,6 +477,8 @@ Gets the eager/immediate value of `t`, or `None` if `t` is a Tensor.
 
 
 <h3 id="switch_case"><code>switch_case</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
 
 ``` python
 switch_case(
@@ -449,6 +493,8 @@ Implements a switch (branch_selector) { case ... } construct.
 
 <h3 id="type_of"><code>type_of</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
+
 ``` python
 type_of(
     t,
@@ -456,7 +502,7 @@ type_of(
 )
 ```
 
-Returns the `instructions.Type` of `t`.
+Returns the <a href="../../../tfp/experimental/auto_batching/Type.md"><code>instructions.Type</code></a> of `t`.
 
 
 #### Args:
@@ -469,9 +515,11 @@ Returns the `instructions.Type` of `t`.
 #### Returns:
 
 
-* <b>`vm_type`</b>: `instructions.TensorType` describing `t`.
+* <b>`vm_type`</b>: <a href="../../../tfp/experimental/auto_batching/TensorType.md"><code>instructions.TensorType</code></a> describing `t`.
 
 <h3 id="where"><code>where</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
 
 ``` python
 where(
@@ -507,6 +555,8 @@ Attempts to match the dtypes of the value operands, if they are not yet both
 
 <h3 id="while_loop"><code>while_loop</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
+
 ``` python
 while_loop(
     cond,
@@ -520,6 +570,8 @@ Implements while loops for TF backend.
 
 
 <h3 id="wrap_straightline_callable"><code>wrap_straightline_callable</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/tf_backend.py">View source</a>
 
 ``` python
 wrap_straightline_callable(f)

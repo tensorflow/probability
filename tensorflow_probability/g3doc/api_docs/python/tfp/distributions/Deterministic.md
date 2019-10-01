@@ -47,15 +47,23 @@
 
 # tfp.distributions.Deterministic
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/deterministic.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `Deterministic`
 
 Scalar `Deterministic` distribution on the real line.
 
 
-
-
-
-Defined in [`python/distributions/deterministic.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/deterministic.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -256,7 +264,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -276,7 +284,7 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 <h3 id="variables"><code>variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -294,6 +302,8 @@ first).
 ## Methods
 
 <h3 id="__getitem__"><code>__getitem__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 __getitem__(slices)
@@ -332,6 +342,8 @@ mvn2.event_shape  # => [2]
 
 <h3 id="__iter__"><code>__iter__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 __iter__()
 ```
@@ -340,6 +352,8 @@ __iter__()
 
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 batch_shape_tensor(name='batch_shape_tensor')
@@ -362,6 +376,8 @@ parameterizations of this distribution.
 * <b>`batch_shape`</b>: `Tensor`.
 
 <h3 id="cdf"><code>cdf</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 cdf(
@@ -395,6 +411,8 @@ cdf(x) := P[X <= x]
 
 <h3 id="copy"><code>copy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 copy(**override_parameters_kwargs)
 ```
@@ -419,6 +437,8 @@ initialization arguments.
   `dict(self.parameters, **override_parameters_kwargs)`.
 
 <h3 id="covariance"><code>covariance</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 covariance(
@@ -470,6 +490,8 @@ length-`k'` vector.
 
 <h3 id="cross_entropy"><code>cross_entropy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 cross_entropy(
     other,
@@ -490,7 +512,7 @@ H[P, Q] = E_p[-log q(X)] = -int_F p(x) log q(x) dr(x)
 
 where `F` denotes the support of the random variable `X ~ P`.
 
-`other` types with built-in registrations: `Autoregressive`, `BatchReshape`, `Bernoulli`, `Beta`, `Binomial`, `Blockwise`, `Categorical`, `Cauchy`, `Chi`, `Chi2`, `Chi2WithAbsDf`, `ConditionalDistribution`, `ConditionalTransformedDistribution`, `Deterministic`, `Dirichlet`, `DirichletMultinomial`, `Distribution`, `Empirical`, `ExpRelaxedOneHotCategorical`, `Exponential`, `FiniteDiscrete`, `Gamma`, `GammaGamma`, `GaussianProcess`, `GaussianProcessRegressionModel`, `Geometric`, `Gumbel`, `HalfCauchy`, `HalfNormal`, `HiddenMarkovModel`, `Horseshoe`, `Independent`, `InverseGamma`, `InverseGaussian`, `JointDistribution`, `JointDistributionCoroutine`, `JointDistributionNamed`, `JointDistributionSequential`, `Kumaraswamy`, `LKJ`, `Laplace`, `LinearGaussianStateSpaceModel`, `LogNormal`, `Logistic`, `Mixture`, `MixtureSameFamily`, `Multinomial`, `MultivariateNormalDiag`, `MultivariateNormalDiagPlusLowRank`, `MultivariateNormalDiagWithSoftplusScale`, `MultivariateNormalFullCovariance`, `MultivariateNormalLinearOperator`, `MultivariateNormalTriL`, `MultivariateStudentTLinearOperator`, `NegativeBinomial`, `Normal`, `OneHotCategorical`, `Pareto`, `Poisson`, `PoissonLogNormalQuadratureCompound`, `QuantizedDistribution`, `RelaxedBernoulli`, `RelaxedOneHotCategorical`, `Sample`, `SinhArcsinh`, `StudentT`, `StudentTProcess`, `TransformedDistribution`, `Triangular`, `TruncatedNormal`, `Uniform`, `VariationalGaussianProcess`, `VectorDeterministic`, `VectorDiffeomixture`, `VectorExponentialDiag`, `VectorLaplaceDiag`, `VectorSinhArcsinhDiag`, `VonMises`, `VonMisesFisher`, `Wishart`, `Zipf`
+`other` types with built-in registrations: `Autoregressive`, `BatchReshape`, `Bernoulli`, `Beta`, `Binomial`, `Blockwise`, `Categorical`, `Cauchy`, `Chi`, `Chi2`, `CholeskyLKJ`, `Deterministic`, `Dirichlet`, `DirichletMultinomial`, `Distribution`, `DoublesidedMaxwell`, `Empirical`, `ExpRelaxedOneHotCategorical`, `Exponential`, `FiniteDiscrete`, `Gamma`, `GammaGamma`, `GaussianProcess`, `GaussianProcessRegressionModel`, `GeneralizedPareto`, `Geometric`, `Gumbel`, `HalfCauchy`, `HalfNormal`, `HiddenMarkovModel`, `Horseshoe`, `Independent`, `InverseGamma`, `InverseGaussian`, `JointDistribution`, `JointDistributionCoroutine`, `JointDistributionNamed`, `JointDistributionSequential`, `Kumaraswamy`, `LKJ`, `Laplace`, `LinearGaussianStateSpaceModel`, `LogNormal`, `Logistic`, `Mixture`, `MixtureSameFamily`, `Multinomial`, `MultivariateNormalDiag`, `MultivariateNormalDiagPlusLowRank`, `MultivariateNormalFullCovariance`, `MultivariateNormalLinearOperator`, `MultivariateNormalTriL`, `MultivariateStudentTLinearOperator`, `NegativeBinomial`, `Normal`, `OneHotCategorical`, `PERT`, `Pareto`, `PlackettLuce`, `Poisson`, `PoissonLogNormalQuadratureCompound`, `ProbitBernoulli`, `QuantizedDistribution`, `RelaxedBernoulli`, `RelaxedOneHotCategorical`, `Sample`, `SinhArcsinh`, `StudentT`, `StudentTProcess`, `TransformedDistribution`, `Triangular`, `TruncatedNormal`, `Uniform`, `VariationalGaussianProcess`, `VectorDeterministic`, `VectorDiffeomixture`, `VectorExponentialDiag`, `VectorLaplaceDiag`, `VectorSinhArcsinhDiag`, `VonMises`, `VonMisesFisher`, `Wishart`, `Zipf`
 
 #### Args:
 
@@ -507,6 +529,8 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 <h3 id="entropy"><code>entropy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 entropy(
     name='entropy',
@@ -518,6 +542,8 @@ Shannon entropy in nats.
 
 
 <h3 id="event_shape_tensor"><code>event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 event_shape_tensor(name='event_shape_tensor')
@@ -539,6 +565,8 @@ Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
 
 <h3 id="is_scalar_batch"><code>is_scalar_batch</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 is_scalar_batch(name='is_scalar_batch')
 ```
@@ -559,6 +587,8 @@ Indicates that `batch_shape == []`.
 
 <h3 id="is_scalar_event"><code>is_scalar_event</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 is_scalar_event(name='is_scalar_event')
 ```
@@ -578,6 +608,8 @@ Indicates that `event_shape == []`.
 * <b>`is_scalar_event`</b>: `bool` scalar `Tensor`.
 
 <h3 id="kl_divergence"><code>kl_divergence</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 kl_divergence(
@@ -601,7 +633,7 @@ KL[p, q] = E_p[log(p(X)/q(X))]
 where `F` denotes the support of the random variable `X ~ p`, `H[., .]`
 denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 
-`other` types with built-in registrations: `Autoregressive`, `BatchReshape`, `Bernoulli`, `Beta`, `Binomial`, `Blockwise`, `Categorical`, `Cauchy`, `Chi`, `Chi2`, `Chi2WithAbsDf`, `ConditionalDistribution`, `ConditionalTransformedDistribution`, `Deterministic`, `Dirichlet`, `DirichletMultinomial`, `Distribution`, `Empirical`, `ExpRelaxedOneHotCategorical`, `Exponential`, `FiniteDiscrete`, `Gamma`, `GammaGamma`, `GaussianProcess`, `GaussianProcessRegressionModel`, `Geometric`, `Gumbel`, `HalfCauchy`, `HalfNormal`, `HiddenMarkovModel`, `Horseshoe`, `Independent`, `InverseGamma`, `InverseGaussian`, `JointDistribution`, `JointDistributionCoroutine`, `JointDistributionNamed`, `JointDistributionSequential`, `Kumaraswamy`, `LKJ`, `Laplace`, `LinearGaussianStateSpaceModel`, `LogNormal`, `Logistic`, `Mixture`, `MixtureSameFamily`, `Multinomial`, `MultivariateNormalDiag`, `MultivariateNormalDiagPlusLowRank`, `MultivariateNormalDiagWithSoftplusScale`, `MultivariateNormalFullCovariance`, `MultivariateNormalLinearOperator`, `MultivariateNormalTriL`, `MultivariateStudentTLinearOperator`, `NegativeBinomial`, `Normal`, `OneHotCategorical`, `Pareto`, `Poisson`, `PoissonLogNormalQuadratureCompound`, `QuantizedDistribution`, `RelaxedBernoulli`, `RelaxedOneHotCategorical`, `Sample`, `SinhArcsinh`, `StudentT`, `StudentTProcess`, `TransformedDistribution`, `Triangular`, `TruncatedNormal`, `Uniform`, `VariationalGaussianProcess`, `VectorDeterministic`, `VectorDiffeomixture`, `VectorExponentialDiag`, `VectorLaplaceDiag`, `VectorSinhArcsinhDiag`, `VonMises`, `VonMisesFisher`, `Wishart`, `Zipf`
+`other` types with built-in registrations: `Autoregressive`, `BatchReshape`, `Bernoulli`, `Beta`, `Binomial`, `Blockwise`, `Categorical`, `Cauchy`, `Chi`, `Chi2`, `CholeskyLKJ`, `Deterministic`, `Dirichlet`, `DirichletMultinomial`, `Distribution`, `DoublesidedMaxwell`, `Empirical`, `ExpRelaxedOneHotCategorical`, `Exponential`, `FiniteDiscrete`, `Gamma`, `GammaGamma`, `GaussianProcess`, `GaussianProcessRegressionModel`, `GeneralizedPareto`, `Geometric`, `Gumbel`, `HalfCauchy`, `HalfNormal`, `HiddenMarkovModel`, `Horseshoe`, `Independent`, `InverseGamma`, `InverseGaussian`, `JointDistribution`, `JointDistributionCoroutine`, `JointDistributionNamed`, `JointDistributionSequential`, `Kumaraswamy`, `LKJ`, `Laplace`, `LinearGaussianStateSpaceModel`, `LogNormal`, `Logistic`, `Mixture`, `MixtureSameFamily`, `Multinomial`, `MultivariateNormalDiag`, `MultivariateNormalDiagPlusLowRank`, `MultivariateNormalFullCovariance`, `MultivariateNormalLinearOperator`, `MultivariateNormalTriL`, `MultivariateStudentTLinearOperator`, `NegativeBinomial`, `Normal`, `OneHotCategorical`, `PERT`, `Pareto`, `PlackettLuce`, `Poisson`, `PoissonLogNormalQuadratureCompound`, `ProbitBernoulli`, `QuantizedDistribution`, `RelaxedBernoulli`, `RelaxedOneHotCategorical`, `Sample`, `SinhArcsinh`, `StudentT`, `StudentTProcess`, `TransformedDistribution`, `Triangular`, `TruncatedNormal`, `Uniform`, `VariationalGaussianProcess`, `VectorDeterministic`, `VectorDiffeomixture`, `VectorExponentialDiag`, `VectorLaplaceDiag`, `VectorSinhArcsinhDiag`, `VonMises`, `VonMisesFisher`, `Wishart`, `Zipf`
 
 #### Args:
 
@@ -618,6 +650,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
   divergence.
 
 <h3 id="log_cdf"><code>log_cdf</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 log_cdf(
@@ -655,6 +689,8 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 
 <h3 id="log_prob"><code>log_prob</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 log_prob(
     value,
@@ -681,6 +717,8 @@ Log probability density/mass function.
   values of type `self.dtype`.
 
 <h3 id="log_survival_function"><code>log_survival_function</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 log_survival_function(
@@ -719,6 +757,8 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 <h3 id="mean"><code>mean</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 mean(
     name='mean',
@@ -731,6 +771,8 @@ Mean.
 
 <h3 id="mode"><code>mode</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 mode(
     name='mode',
@@ -742,6 +784,8 @@ Mode.
 
 
 <h3 id="param_shapes"><code>param_shapes</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 param_shapes(
@@ -773,6 +817,8 @@ Subclasses should override class method `_param_shapes`.
 
 
 <h3 id="param_static_shapes"><code>param_static_shapes</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 param_static_shapes(
@@ -811,6 +857,8 @@ constant-valued tensors when constant values are fed.
 
 <h3 id="prob"><code>prob</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 prob(
     value,
@@ -837,6 +885,8 @@ Probability density/mass function.
   values of type `self.dtype`.
 
 <h3 id="quantile"><code>quantile</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 quantile(
@@ -870,6 +920,8 @@ quantile(p) := x such that P[X <= x] == p
 
 <h3 id="sample"><code>sample</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 sample(
     sample_shape=(),
@@ -899,6 +951,8 @@ sample.
 * <b>`samples`</b>: a `Tensor` with prepended dimensions `sample_shape`.
 
 <h3 id="stddev"><code>stddev</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 stddev(
@@ -933,6 +987,8 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 
 <h3 id="survival_function"><code>survival_function</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 survival_function(
     value,
@@ -966,6 +1022,8 @@ survival_function(x) = P[X > x]
 
 
 <h3 id="variance"><code>variance</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 variance(

@@ -5,6 +5,18 @@
 
 # tfp.layers.util.deserialize_function
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/util.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Deserializes the Keras-serialized function.
 
 ``` python
@@ -15,8 +27,6 @@ tfp.layers.util.deserialize_function(
 ```
 
 
-
-Defined in [`python/layers/util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/util.py).
 
 <!-- Placeholder for "Used in" -->
 

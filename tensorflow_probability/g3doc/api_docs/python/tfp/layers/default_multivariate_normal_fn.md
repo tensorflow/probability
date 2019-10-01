@@ -5,12 +5,24 @@
 
 # tfp.layers.default_multivariate_normal_fn
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/util.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Creates multivariate standard `Normal` distribution.
 
 ### Aliases:
 
-* `tfp.layers.default_multivariate_normal_fn`
 * `tfp.layers.util.default_multivariate_normal_fn`
+
 
 ``` python
 tfp.layers.default_multivariate_normal_fn(
@@ -23,8 +35,6 @@ tfp.layers.default_multivariate_normal_fn(
 ```
 
 
-
-Defined in [`python/layers/util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/util.py).
 
 <!-- Placeholder for "Used in" -->
 

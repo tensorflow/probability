@@ -5,6 +5,18 @@
 
 # tfp.mcmc.effective_sample_size
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/diagnostic.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Estimate a lower bound on effective sample size for each independent chain.
 
 ``` python
@@ -18,8 +30,6 @@ tfp.mcmc.effective_sample_size(
 ```
 
 
-
-Defined in [`python/mcmc/diagnostic.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/diagnostic.py).
 
 <!-- Placeholder for "Used in" -->
 

@@ -5,6 +5,18 @@
 
 # tfp.sts.sample_uniform_initial_state
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/fitting.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Initialize from a uniform [-2, 2] distribution in unconstrained space.
 
 ``` python
@@ -17,8 +29,6 @@ tfp.sts.sample_uniform_initial_state(
 ```
 
 
-
-Defined in [`python/sts/fitting.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/fitting.py).
 
 <!-- Placeholder for "Used in" -->
 

@@ -5,22 +5,28 @@
 
 # tfp.math.pinv
 
-Compute the Moore-Penrose pseudo-inverse of a matrix.
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
+Compute the Moore-Penrose pseudo-inverse of one or more matrices. (deprecated)
 
 ``` python
 tfp.math.pinv(
-    a,
-    rcond=None,
-    validate_args=False,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
 
 
-Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/linalg.py).
-
 <!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+tfp.math.pinv is deprecated. Use tf.linalg.pinv instead
 
 Calculate the [generalized inverse of a matrix](
 https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse) using its
@@ -57,7 +63,7 @@ default `rcond` is `1e-15`. Here the default is
 #### Returns:
 
 
-* <b>`a_pinv`</b>: The pseudo-inverse of input `a`. Has same shape as `a` except
+* <b>`a_pinv`</b>: (Batch of) pseudo-inverse of input `a`. Has same shape as `a` except
   rightmost two dimensions are transposed.
 
 
@@ -76,7 +82,7 @@ import tensorflow_probability as tfp
 a = tf.constant([[1.,  0.4,  0.5],
                  [0.4, 0.2,  0.25],
                  [0.5, 0.25, 0.35]])
-tf.matmul(tfp.math.pinv(a), a)
+tf.matmul(tf.linalg..pinv(a), a)
 # ==> array([[1., 0., 0.],
              [0., 1., 0.],
              [0., 0., 1.]], dtype=float32)
@@ -84,7 +90,7 @@ tf.matmul(tfp.math.pinv(a), a)
 a = tf.constant([[1.,  0.4,  0.5,  1.],
                  [0.4, 0.2,  0.25, 2.],
                  [0.5, 0.25, 0.35, 3.]])
-tf.matmul(tfp.math.pinv(a), a)
+tf.matmul(tf.linalg..pinv(a), a)
 # ==> array([[ 0.76,  0.37,  0.21, -0.02],
              [ 0.37,  0.43, -0.33,  0.02],
              [ 0.21, -0.33,  0.81,  0.01],

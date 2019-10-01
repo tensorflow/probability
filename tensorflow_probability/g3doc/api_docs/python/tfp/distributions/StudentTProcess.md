@@ -9,13 +9,11 @@
 <meta itemprop="property" content="index_points"/>
 <meta itemprop="property" content="jitter"/>
 <meta itemprop="property" content="kernel"/>
-<meta itemprop="property" content="loc"/>
 <meta itemprop="property" content="mean_fn"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="name_scope"/>
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="reparameterization_type"/>
-<meta itemprop="property" content="scale"/>
 <meta itemprop="property" content="submodules"/>
 <meta itemprop="property" content="trainable_variables"/>
 <meta itemprop="property" content="validate_args"/>
@@ -30,6 +28,7 @@
 <meta itemprop="property" content="cross_entropy"/>
 <meta itemprop="property" content="entropy"/>
 <meta itemprop="property" content="event_shape_tensor"/>
+<meta itemprop="property" content="get_marginal_distribution"/>
 <meta itemprop="property" content="is_scalar_batch"/>
 <meta itemprop="property" content="is_scalar_event"/>
 <meta itemprop="property" content="kl_divergence"/>
@@ -51,15 +50,23 @@
 
 # tfp.distributions.StudentTProcess
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/student_t_process.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `StudentTProcess`
 
 Marginal distribution of a Student's T process at finitely many points.
 
-Inherits From: [`MultivariateStudentTLinearOperator`](../../tfp/distributions/MultivariateStudentTLinearOperator.md)
-
-
-
-Defined in [`python/distributions/student_t_process.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/student_t_process.py).
+Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
 
 <!-- Placeholder for "Used in" -->
 
@@ -179,8 +186,8 @@ length_scale=tf.get_variable('length_scale', np.float32)
 
 # Define a kernel with trainable parameters.
 kernel = psd_kernels.ExponentiatedQuadratic(
-    amplitude=tf.nn.softplus(amplitude),
-    length_scale=tf.nn.softplus(length_scale))
+    amplitude=tf.math.softplus(amplitude),
+    length_scale=tf.math.softplus(length_scale))
 
 tp = tfp.StudentTProcess(df=3., kernel, observed_index_points)
 neg_log_likelihood = -tp.log_prob(observed_values)
@@ -210,7 +217,7 @@ with tf.Session() as sess:
 __init__(
     df,
     kernel,
-    index_points,
+    index_points=None,
     mean_fn=None,
     jitter=1e-06,
     validate_args=False,
@@ -301,16 +308,7 @@ parameterizations of this distribution.
 
 <h3 id="df"><code>df</code></h3>
 
-The degrees of freedom of the distribution.
 
-This controls the degrees of freedom of the distribution. The tails of the
-distribution get more heavier the smaller `df` is. As `df` goes to
-infinitiy, the distribution approaches the Multivariate Normal with the same
-`loc` and `scale`.
-
-#### Returns:
-
-The `df` `Tensor`.
 
 
 <h3 id="dtype"><code>dtype</code></h3>
@@ -342,22 +340,6 @@ May be partially defined or unknown.
 <h3 id="kernel"><code>kernel</code></h3>
 
 
-
-
-<h3 id="loc"><code>loc</code></h3>
-
-The location parameter of the distribution.
-
-`loc` applies an elementwise shift to the distribution.
-
-```none
-X ~ MultivariateT(loc=0, scale=1)   # Identity scale, zero shift.
-Y = scale @ X + loc
-```
-
-#### Returns:
-
-The `loc` `Tensor`.
 
 
 <h3 id="mean_fn"><code>mean_fn</code></h3>
@@ -392,22 +374,6 @@ Currently this is one of the static instances
 An instance of `ReparameterizationType`.
 
 
-<h3 id="scale"><code>scale</code></h3>
-
-The scale parameter of the distribution.
-
-`scale` applies an affine scale to the distribution.
-
-```none
-X ~ MultivariateT(loc=0, scale=1)   # Identity scale, zero shift.
-Y = scale @ X + loc
-```
-
-#### Returns:
-
-The `scale` `LinearOperator`.
-
-
 <h3 id="submodules"><code>submodules</code></h3>
 
 Sequence of all sub-modules.
@@ -433,7 +399,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -453,7 +419,7 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 <h3 id="variables"><code>variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -471,6 +437,8 @@ first).
 ## Methods
 
 <h3 id="__getitem__"><code>__getitem__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 __getitem__(slices)
@@ -509,6 +477,8 @@ mvn2.event_shape  # => [2]
 
 <h3 id="__iter__"><code>__iter__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 __iter__()
 ```
@@ -517,6 +487,8 @@ __iter__()
 
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 batch_shape_tensor(name='batch_shape_tensor')
@@ -539,6 +511,8 @@ parameterizations of this distribution.
 * <b>`batch_shape`</b>: `Tensor`.
 
 <h3 id="cdf"><code>cdf</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 cdf(
@@ -572,6 +546,8 @@ cdf(x) := P[X <= x]
 
 <h3 id="copy"><code>copy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 copy(**override_parameters_kwargs)
 ```
@@ -596,6 +572,8 @@ initialization arguments.
   `dict(self.parameters, **override_parameters_kwargs)`.
 
 <h3 id="covariance"><code>covariance</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 covariance(
@@ -631,20 +609,6 @@ where `Cov` is a (batch of) `k' x k'` matrices,
 mapping indices of this distribution's event dimensions to indices of a
 length-`k'` vector.
 
-
-Additional documentation from `MultivariateStudentTLinearOperator`:
-
-The covariance for Multivariate Student's t equals
-
-```
-scale @ scale.T * df / (df - 2), when df > 2
-infinity, when 1 < df <= 2
-NaN, when df <= 1
-```
-
-If `self.allow_nan_stats=False`, then an exception will be raised
-rather than returning `NaN`.
-
 #### Args:
 
 
@@ -660,6 +624,8 @@ rather than returning `NaN`.
   `k' = reduce_prod(self.event_shape)`.
 
 <h3 id="cross_entropy"><code>cross_entropy</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 cross_entropy(
@@ -696,6 +662,8 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 <h3 id="entropy"><code>entropy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 entropy(
     name='entropy',
@@ -707,6 +675,8 @@ Shannon entropy in nats.
 
 
 <h3 id="event_shape_tensor"><code>event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 event_shape_tensor(name='event_shape_tensor')
@@ -726,7 +696,40 @@ Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
 
 * <b>`event_shape`</b>: `Tensor`.
 
+<h3 id="get_marginal_distribution"><code>get_marginal_distribution</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/student_t_process.py">View source</a>
+
+``` python
+get_marginal_distribution(index_points=None)
+```
+
+Compute the marginal over function values at `index_points`.
+
+
+#### Args:
+
+
+* <b>`index_points`</b>: `float` `Tensor` representing finite (batch of) vector(s) of
+  points in the index set over which the TP is defined. Shape has the form
+  `[b1, ..., bB, e, f1, ..., fF]` where `F` is the number of feature
+  dimensions and must equal `kernel.feature_ndims` and `e` is the number
+  (size) of index points in each batch. Ultimately this distribution
+  corresponds to a `e`-dimensional multivariate student t. The batch shape
+  must be broadcastable with `kernel.batch_shape` and any batch dims
+  yielded by `mean_fn`.
+
+
+#### Returns:
+
+
+* <b>`marginal`</b>: a `StudentT` or `MultivariateStudentT` distribution,
+  according to whether `index_points` consists of one or many index
+  points, respectively.
+
 <h3 id="is_scalar_batch"><code>is_scalar_batch</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 is_scalar_batch(name='is_scalar_batch')
@@ -748,6 +751,8 @@ Indicates that `batch_shape == []`.
 
 <h3 id="is_scalar_event"><code>is_scalar_event</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 is_scalar_event(name='is_scalar_event')
 ```
@@ -767,6 +772,8 @@ Indicates that `event_shape == []`.
 * <b>`is_scalar_event`</b>: `bool` scalar `Tensor`.
 
 <h3 id="kl_divergence"><code>kl_divergence</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 kl_divergence(
@@ -806,6 +813,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 
 <h3 id="log_cdf"><code>log_cdf</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 log_cdf(
     value,
@@ -842,6 +851,8 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 
 <h3 id="log_prob"><code>log_prob</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 log_prob(
     value,
@@ -868,6 +879,8 @@ Log probability density/mass function.
   values of type `self.dtype`.
 
 <h3 id="log_survival_function"><code>log_survival_function</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 log_survival_function(
@@ -906,6 +919,8 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 <h3 id="mean"><code>mean</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 mean(
     name='mean',
@@ -915,13 +930,10 @@ mean(
 
 Mean.
 
-Additional documentation from `MultivariateStudentTLinearOperator`:
-
-The mean of Student's T equals `loc` if `df > 1`, otherwise it is
-`NaN`. If `self.allow_nan_stats=False`, then an exception will be raised
-rather than returning `NaN`.
 
 <h3 id="mode"><code>mode</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 mode(
@@ -934,6 +946,8 @@ Mode.
 
 
 <h3 id="param_shapes"><code>param_shapes</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 param_shapes(
@@ -965,6 +979,8 @@ Subclasses should override class method `_param_shapes`.
 
 
 <h3 id="param_static_shapes"><code>param_static_shapes</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 param_static_shapes(
@@ -1003,6 +1019,8 @@ constant-valued tensors when constant values are fed.
 
 <h3 id="prob"><code>prob</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 prob(
     value,
@@ -1029,6 +1047,8 @@ Probability density/mass function.
   values of type `self.dtype`.
 
 <h3 id="quantile"><code>quantile</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 quantile(
@@ -1062,6 +1082,8 @@ quantile(p) := x such that P[X <= x] == p
 
 <h3 id="sample"><code>sample</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 sample(
     sample_shape=(),
@@ -1092,6 +1114,8 @@ sample.
 
 <h3 id="stddev"><code>stddev</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 stddev(
     name='stddev',
@@ -1110,17 +1134,6 @@ stddev = E[(X - E[X])**2]**0.5
 where `X` is the random variable associated with this distribution, `E`
 denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 
-
-Additional documentation from `MultivariateStudentTLinearOperator`:
-
-The standard deviation for Student's T equals
-
-```none
-sqrt(diag(scale @ scale.T)) * df / (df - 2), when df > 2
-infinity, when 1 < df <= 2
-NaN, when df <= 1
-```
-
 #### Args:
 
 
@@ -1135,6 +1148,8 @@ NaN, when df <= 1
   `batch_shape + event_shape`, i.e., the same shape as `self.mean()`.
 
 <h3 id="survival_function"><code>survival_function</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 survival_function(
@@ -1170,6 +1185,8 @@ survival_function(x) = P[X > x]
 
 <h3 id="variance"><code>variance</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 variance(
     name='variance',
@@ -1187,20 +1204,6 @@ Var = E[(X - E[X])**2]
 
 where `X` is the random variable associated with this distribution, `E`
 denotes expectation, and `Var.shape = batch_shape + event_shape`.
-
-
-Additional documentation from `MultivariateStudentTLinearOperator`:
-
-The variance for Student's T equals
-
-```none
-diag(scale @ scale.T) * df / (df - 2), when df > 2
-infinity, when 1 < df <= 2
-NaN, when df <= 1
-```
-
-If `self.allow_nan_stats=False`, then an exception will be raised
-rather than returning `NaN`.
 
 #### Args:
 

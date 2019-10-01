@@ -5,7 +5,18 @@
 
 # tfp.edward2.tape
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Context manager for recording interceptable executions onto a tape.
+
+### Aliases:
+
+* `tfp.experimental.edward2.tape`
+
 
 ``` python
 tfp.edward2.tape(
@@ -13,6 +24,8 @@ tfp.edward2.tape(
     **kwds
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

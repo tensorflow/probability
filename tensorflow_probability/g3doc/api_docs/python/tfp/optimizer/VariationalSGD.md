@@ -21,15 +21,23 @@
 
 # tfp.optimizer.VariationalSGD
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/optimizer/variational_sgd.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `VariationalSGD`
 
 An optimizer module for constant stochastic gradient descent.
 
 
-
-
-
-Defined in [`python/optimizer/variational_sgd.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/variational_sgd.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -84,6 +92,8 @@ described below.
      arXiv:1704.04289_, 2017. https://arxiv.org/abs/1704.04289
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/optimizer/variational_sgd.py">View source</a>
 
 ``` python
 __init__(
@@ -199,8 +209,8 @@ applies gradients.
 
 #### Returns:
 
-An `Operation` that applies the specified gradients. If `global_step`
-was not None, that operation also increments `global_step`.
+An `Operation` that applies the specified gradients. The `iterations`
+will be automatically increased by 1.
 
 
 
@@ -241,6 +251,8 @@ An optimizer instance.
 
 
 <h3 id="get_config"><code>get_config</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/optimizer/variational_sgd.py">View source</a>
 
 ``` python
 get_config()
@@ -364,8 +376,8 @@ of using this function.
 
 #### Returns:
 
-An Operation that updates the variables in `var_list`.  If `global_step`
-was not `None`, that operation also increments `global_step`.
+An `Operation` that updates the variables in `var_list`. The `iterations`
+will be automatically increased by 1.
 
 
 

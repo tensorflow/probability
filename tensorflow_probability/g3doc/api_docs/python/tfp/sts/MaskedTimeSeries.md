@@ -3,19 +3,28 @@
 <meta itemprop="path" content="Stable" />
 <meta itemprop="property" content="time_series"/>
 <meta itemprop="property" content="is_missing"/>
+<meta itemprop="property" content="__new__"/>
 </div>
 
 # tfp.sts.MaskedTimeSeries
+
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/internal/missing_values_util.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
 
 ## Class `MaskedTimeSeries`
 
 Named tuple encoding a time series `Tensor` and optional missingness mask.
 
 
-
-
-
-Defined in [`python/sts/internal/missing_values_util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/internal/missing_values_util.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -85,7 +94,28 @@ parameter_samples, _ = tfp.sts.fit_with_hmc(model, observed_time_series)
 # Forecast
 forecast_dist = tfp.sts.forecast(
   model, observed_time_series, num_steps_forecast=5)
+
+# Impute missing values
+observations_dist = tfp.sts.impute_missing_values(model, observed_time_series)
+print('imputed means and stddevs: ',
+      observations_dist.mean(),
+      observations_dist.stddev())
 ```
+
+<h2 id="__new__"><code>__new__</code></h2>
+
+``` python
+__new__(
+    _cls,
+    time_series,
+    is_missing
+)
+```
+
+Create new instance of MaskedTimeSeries(time_series, is_missing)
+
+
+
 
 ## Properties
 

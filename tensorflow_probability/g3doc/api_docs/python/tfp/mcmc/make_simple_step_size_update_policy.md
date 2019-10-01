@@ -5,6 +5,12 @@
 
 # tfp.mcmc.make_simple_step_size_update_policy
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Create a function implementing a step-size update policy. (deprecated)
 
 ``` python
@@ -13,6 +19,8 @@ tfp.mcmc.make_simple_step_size_update_policy(
     **kwargs
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

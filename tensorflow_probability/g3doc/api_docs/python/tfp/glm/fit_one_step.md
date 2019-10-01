@@ -5,6 +5,18 @@
 
 # tfp.glm.fit_one_step
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/glm/fisher_scoring.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Runs one step of Fisher scoring.
 
 ``` python
@@ -19,13 +31,12 @@ tfp.glm.fit_one_step(
     offset=None,
     learning_rate=None,
     fast_unsafe_numerics=True,
+    l2_regularization_penalty_factor=None,
     name=None
 )
 ```
 
 
-
-Defined in [`python/glm/fisher_scoring.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/fisher_scoring.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -69,6 +80,14 @@ Defined in [`python/glm/fisher_scoring.py`](https://github.com/tensorflow/probab
 * <b>`fast_unsafe_numerics`</b>: Optional Python `bool` indicating if solve should be
   based on Cholesky or QR decomposition.
   Default value: `True` (i.e., "prefer speed via Cholesky decomposition").
+* <b>`l2_regularization_penalty_factor`</b>: Optional (batch of) vector-shaped
+  `Tensor`, representing a separate penalty factor to apply to each model
+  coefficient, length equal to columns in `model_matrix`. Each penalty
+  factor multiplies l2_regularizer to allow differential regularization. Can
+  be 0 for some coefficients, which implies no regularization. Default is 1
+  for all coefficients.
+  `loss(w) = sum{-log p(y[i]|x[i],w) : i=1..n} + l2_regularizer ||w *
+    l2_regularization_penalty_factor||_2^2`
 * <b>`name`</b>: Python `str` used as name prefix to ops created by this function.
   Default value: `"fit_one_step"`.
 

@@ -5,11 +5,19 @@
 
 # Module: tfp.util
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/util/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 TensorFlow Probability python utilities.
-
-
-
-Defined in [`python/util/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/util/__init__.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -17,4 +25,8 @@ Defined in [`python/util/__init__.py`](https://github.com/tensorflow/probability
 ## Classes
 
 [`class DeferredTensor`](../tfp/util/DeferredTensor.md): Variable tracking object which applies function upon `convert_to_tensor`.
+
+[`class SeedStream`](../tfp/util/SeedStream.md): Local PRNG for amplifying seed entropy into seeds for base operations.
+
+[`class TransformedVariable`](../tfp/util/TransformedVariable.md): Variable tracking object which applies function upon `convert_to_tensor`.
 

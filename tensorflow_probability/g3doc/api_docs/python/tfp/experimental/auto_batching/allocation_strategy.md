@@ -5,16 +5,24 @@
 
 # Module: tfp.experimental.auto_batching.allocation_strategy
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/allocation_strategy.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Live variable analysis.
 
 ### Aliases:
 
-* Module `tfp.experimental.auto_batching.allocation_strategy`
 * Module `tfp.experimental.auto_batching.frontend.allocation_strategy`
 
-
-
-Defined in [`python/internal/auto_batching/allocation_strategy.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/allocation_strategy.py).
 
 <!-- Placeholder for "Used in" -->
 

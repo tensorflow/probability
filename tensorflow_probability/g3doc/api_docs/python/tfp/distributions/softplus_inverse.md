@@ -5,6 +5,12 @@
 
 # tfp.distributions.softplus_inverse
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Computes the inverse softplus, i.e., x = softplus_inverse(softplus(x)). (deprecated)
 
 ``` python
@@ -13,6 +19,8 @@ tfp.distributions.softplus_inverse(
     **kwargs
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

@@ -7,6 +7,18 @@
 
 # tfp.experimental.auto_batching.instructions.Function
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `Function`
 
 A function subject to auto-batching, callable with `FunctionCallOp`.
@@ -18,18 +30,16 @@ A function subject to auto-batching, callable with `FunctionCallOp`.
 * Class `tfp.experimental.auto_batching.frontend.instructions.Function`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.Function`
 * Class `tfp.experimental.auto_batching.frontend.stack.inst.Function`
-* Class `tfp.experimental.auto_batching.instructions.Function`
 * Class `tfp.experimental.auto_batching.stack_optimization.inst.Function`
 * Class `tfp.experimental.auto_batching.stackless.inst.Function`
 
-
-
-Defined in [`python/internal/auto_batching/instructions.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/instructions.py).
 
 <!-- Placeholder for "Used in" -->
 
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
 
 ``` python
 __init__(

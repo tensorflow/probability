@@ -16,15 +16,23 @@
 
 # tfp.mcmc.UncalibratedHamiltonianMonteCarlo
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/hmc.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `UncalibratedHamiltonianMonteCarlo`
 
 Runs one step of Uncalibrated Hamiltonian Monte Carlo.
 
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
-
-
-
-Defined in [`python/mcmc/hmc.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/hmc.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -36,6 +44,8 @@ For more details on `UncalibratedHamiltonianMonteCarlo`, see
 `HamiltonianMonteCarlo`.
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/hmc.py">View source</a>
 
 ``` python
 __init__(
@@ -152,6 +162,8 @@ situation is governed by the `previous_kernel_results` argument to
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/hmc.py">View source</a>
+
 ``` python
 bootstrap_results(init_state)
 ```
@@ -160,6 +172,8 @@ Creates initial `previous_kernel_results` using a supplied `state`.
 
 
 <h3 id="one_step"><code>one_step</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/hmc.py">View source</a>
 
 ``` python
 one_step(

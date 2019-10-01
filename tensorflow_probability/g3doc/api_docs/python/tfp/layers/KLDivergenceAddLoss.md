@@ -47,6 +47,18 @@
 
 # tfp.layers.KLDivergenceAddLoss
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `KLDivergenceAddLoss`
 
 Pass-through layer that adds a KL divergence penalty to the model loss.
@@ -55,12 +67,8 @@ Pass-through layer that adds a KL divergence penalty to the model loss.
 
 ### Aliases:
 
-* Class `tfp.layers.KLDivergenceAddLoss`
 * Class `tfp.layers.distribution_layer.KLDivergenceAddLoss`
 
-
-
-Defined in [`python/layers/distribution_layer.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/distribution_layer.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -94,6 +102,8 @@ variational_encoder = tfk.Sequential([
 ```
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">View source</a>
 
 ``` python
 __init__(
@@ -348,7 +358,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result

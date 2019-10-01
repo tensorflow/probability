@@ -7,11 +7,19 @@
 
 # Module: tfp.distributions
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Statistical distributions.
-
-
-
-Defined in [`python/distributions/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/__init__.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -38,11 +46,7 @@ Defined in [`python/distributions/__init__.py`](https://github.com/tensorflow/pr
 
 [`class Chi2`](../tfp/distributions/Chi2.md): Chi2 distribution.
 
-[`class Chi2WithAbsDf`](../tfp/distributions/Chi2WithAbsDf.md): Chi2 with parameter transform `df = floor(abs(df))`.
-
-[`class ConditionalDistribution`](../tfp/distributions/ConditionalDistribution.md): Distribution that supports intrinsic parameters (local latents).
-
-[`class ConditionalTransformedDistribution`](../tfp/distributions/ConditionalTransformedDistribution.md): A TransformedDistribution that allows intrinsic conditioning.
+[`class CholeskyLKJ`](../tfp/distributions/CholeskyLKJ.md): The CholeskyLKJ distribution on cholesky factors of correlation matrices.
 
 [`class Deterministic`](../tfp/distributions/Deterministic.md): Scalar `Deterministic` distribution on the real line.
 
@@ -51,6 +55,8 @@ Defined in [`python/distributions/__init__.py`](https://github.com/tensorflow/pr
 [`class DirichletMultinomial`](../tfp/distributions/DirichletMultinomial.md): Dirichlet-Multinomial compound distribution.
 
 [`class Distribution`](../tfp/distributions/Distribution.md): A generic probability distribution base class.
+
+[`class DoublesidedMaxwell`](../tfp/distributions/DoublesidedMaxwell.md): Double-sided Maxwell distribution.
 
 [`class Empirical`](../tfp/distributions/Empirical.md): Empirical distribution.
 
@@ -65,6 +71,8 @@ Defined in [`python/distributions/__init__.py`](https://github.com/tensorflow/pr
 [`class GaussianProcess`](../tfp/distributions/GaussianProcess.md): Marginal distribution of a Gaussian process at finitely many points.
 
 [`class GaussianProcessRegressionModel`](../tfp/distributions/GaussianProcessRegressionModel.md): Posterior predictive distribution in a conjugate GP regression model.
+
+[`class GeneralizedPareto`](../tfp/distributions/GeneralizedPareto.md): The Generalized Pareto distribution.
 
 [`class Geometric`](../tfp/distributions/Geometric.md): Geometric distribution.
 
@@ -114,8 +122,6 @@ Defined in [`python/distributions/__init__.py`](https://github.com/tensorflow/pr
 
 [`class MultivariateNormalDiagPlusLowRank`](../tfp/distributions/MultivariateNormalDiagPlusLowRank.md): The multivariate normal distribution on `R^k`.
 
-[`class MultivariateNormalDiagWithSoftplusScale`](../tfp/distributions/MultivariateNormalDiagWithSoftplusScale.md): MultivariateNormalDiag with `diag_stddev = softplus(diag_stddev)`.
-
 [`class MultivariateNormalFullCovariance`](../tfp/distributions/MultivariateNormalFullCovariance.md): The multivariate normal distribution on `R^k`.
 
 [`class MultivariateNormalLinearOperator`](../tfp/distributions/MultivariateNormalLinearOperator.md): The multivariate normal distribution on `R^k`.
@@ -130,11 +136,17 @@ Defined in [`python/distributions/__init__.py`](https://github.com/tensorflow/pr
 
 [`class OneHotCategorical`](../tfp/distributions/OneHotCategorical.md): OneHotCategorical distribution.
 
+[`class PERT`](../tfp/distributions/PERT.md): Modified PERT distribution for modeling expert predictions.
+
 [`class Pareto`](../tfp/distributions/Pareto.md): Pareto distribution.
+
+[`class PlackettLuce`](../tfp/distributions/PlackettLuce.md): Plackett-Luce distribution over permutations.
 
 [`class Poisson`](../tfp/distributions/Poisson.md): Poisson distribution.
 
 [`class PoissonLogNormalQuadratureCompound`](../tfp/distributions/PoissonLogNormalQuadratureCompound.md): `PoissonLogNormalQuadratureCompound` distribution.
+
+[`class ProbitBernoulli`](../tfp/distributions/ProbitBernoulli.md): ProbitBernoulli distribution.
 
 [`class QuantizedDistribution`](../tfp/distributions/QuantizedDistribution.md): Distribution representing the quantization `Y = ceiling(X)`.
 
@@ -186,10 +198,6 @@ Defined in [`python/distributions/__init__.py`](https://github.com/tensorflow/pr
 
 ## Functions
 
-[`InverseGammaWithSoftplusConcentrationRate(...)`](../tfp/distributions/InverseGammaWithSoftplusConcentrationRate.md): `InverseGamma` with softplus of `concentration` and `scale`. (deprecated)
-
-[`InverseGammaWithSoftplusConcentrationScale(...)`](../tfp/distributions/InverseGammaWithSoftplusConcentrationScale.md): `InverseGamma` with softplus of `concentration` and `scale`. (deprecated)
-
 [`assign_log_moving_mean_exp(...)`](../tfp/distributions/assign_log_moving_mean_exp.md): Compute the log of the exponentially weighted moving mean of the exp.
 
 [`assign_moving_mean_variance(...)`](../tfp/distributions/assign_moving_mean_variance.md): Compute exponentially weighted moving {mean,variance} of a streaming value.
@@ -200,7 +208,7 @@ Defined in [`python/distributions/__init__.py`](https://github.com/tensorflow/pr
 
 [`kl_divergence(...)`](../tfp/distributions/kl_divergence.md): Get the KL-divergence KL(distribution_a || distribution_b).
 
-[`matrix_diag_transform(...)`](../tfp/distributions/matrix_diag_transform.md): Transform diagonal of [batch-]matrix, leave rest of matrix unchanged.
+[`matrix_diag_transform(...)`](../tfp/distributions/matrix_diag_transform.md): Transform diagonal of [batch-]matrix, leave rest of matrix unchanged. (deprecated)
 
 [`moving_mean_variance(...)`](../tfp/distributions/moving_mean_variance.md): Compute exponentially weighted moving {mean,variance} of a streaming value. (deprecated)
 
@@ -220,7 +228,7 @@ Defined in [`python/distributions/__init__.py`](https://github.com/tensorflow/pr
 
 [`softplus_inverse(...)`](../tfp/distributions/softplus_inverse.md): Computes the inverse softplus, i.e., x = softplus_inverse(softplus(x)). (deprecated)
 
-[`tridiag(...)`](../tfp/distributions/tridiag.md): Creates a matrix with values set above, below, and on the diagonal.
+[`tridiag(...)`](../tfp/distributions/tridiag.md): Creates a matrix with values set above, below, and on the diagonal. (deprecated)
 
 ## Other Members
 

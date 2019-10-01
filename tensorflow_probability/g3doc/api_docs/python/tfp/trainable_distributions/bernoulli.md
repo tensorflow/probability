@@ -5,6 +5,12 @@
 
 # tfp.trainable_distributions.bernoulli
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Constructs a trainable `tfd.Bernoulli` distribution. (deprecated)
 
 ``` python
@@ -13,6 +19,8 @@ tfp.trainable_distributions.bernoulli(
     **kwargs
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 

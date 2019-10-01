@@ -5,8 +5,10 @@
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="dtype"/>
 <meta itemprop="property" content="event_shape"/>
+<meta itemprop="property" content="latent_size"/>
 <meta itemprop="property" content="name"/>
 <meta itemprop="property" content="name_scope"/>
+<meta itemprop="property" content="observation_size"/>
 <meta itemprop="property" content="parameters"/>
 <meta itemprop="property" content="reparameterization_type"/>
 <meta itemprop="property" content="submodules"/>
@@ -48,31 +50,43 @@
 
 # tfp.distributions.LinearGaussianStateSpaceModel
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/linear_gaussian_ssm.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `LinearGaussianStateSpaceModel`
 
 Observation distribution from a linear Gaussian state space model.
 
 Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
 
-
-
-Defined in [`python/distributions/linear_gaussian_ssm.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/linear_gaussian_ssm.py).
-
 <!-- Placeholder for "Used in" -->
 
-The state space model, sometimes called a Kalman filter, posits a
-latent state vector `z_t` of dimension `latent_size` that evolves
+A linear Gaussian state space model, sometimes called a Kalman filter, posits
+a latent state vector `z[t]` of dimension `latent_size` that evolves
 over time following linear Gaussian transitions,
 
-```z_{t+1} = F * z_t + N(b; Q)```
+```
+z[t+1] = F * z[t] + N(b; Q)  # latent state
+x[t] = H * z[t] + N(c; R)    # observed series
+```
 
-for transition matrix `F`, bias `b` and covariance matrix
-`Q`. At each timestep, we observe a noisy projection of the
-latent state `x_t = H * z_t + N(c; R)`. The transition and
-observation models may be fixed or may vary between timesteps.
+for transition matrix `F`, transition bias `b` and covariance matrix
+`Q`, and observation matrix `H`, bias `c` and covariance matrix `R`. At each
+timestep, the model generates an observable vector `x[t]`, a noisy projection
+of the latent state. The transition and observation models may be fixed or
+may vary between timesteps.
 
 This Distribution represents the marginal distribution on
-observations, `p(x)`. The marginal `log_prob` is computed by
+observations, `p(x)`. The marginal `log_prob` is implemented by
 Kalman filtering [1], and `sample` by an efficient forward
 recursion. Both operations require time linear in `T`, the total
 number of timesteps.
@@ -80,7 +94,7 @@ number of timesteps.
 #### Shapes
 
 The event shape is `[num_timesteps, observation_size]`, where
-`observation_size` is the dimension of each observation `x_t`.
+`observation_size` is the dimension of each observation `x[t]`.
 The observation and transition models must return consistent
 shapes.
 
@@ -126,12 +140,12 @@ runtime.
 
 #### Examples
 
-Consider a simple tracking model. The two-dimensional latent state
-represents the true position of a vehicle, and at each timestep we
+Consider a simple tracking model, in which a two-dimensional latent state
+represents the position of a vehicle, and at each timestep we
 see a noisy observation of this position (e.g., a GPS reading). The
 vehicle is assumed to move by a random walk with standard deviation
 `step_std` at each step, and observation noise level `std`. We build
-the distribution over noisy observations by
+the marginal distribution over noisy observations as a state space model:
 
 ```python
 ndims = 2
@@ -162,12 +176,17 @@ lp = model.log_prob(x) # Marginal likelihood of a (batch of) observations.
 # Compute the filtered posterior on latent states given observations,
 # and extract the mean and covariance for the current (final) timestep.
 _, filtered_means, filtered_covs, _, _ = model.forward_filter(x)
-final_step = tfd.MultivariateNormalFullCovariance(
+current_location_posterior = tfd.MultivariateNormalFullCovariance(
               loc=filtered_means[..., -1, :],
               scale=filtered_covs[..., -1, :])
-```
 
-* TODO(davmre): implement and describe full posterior inference / smoothing.
+# Run a smoothing recursion to extract posterior marginals for locations
+# at previous timesteps.
+posterior_means, posterior_covs = model.posterior_marginals(x)
+initial_location_posterior = tfd.MultivariateNormalFullCovariance(
+              loc=posterior_means[..., 0, :],
+              scale=posterior_covs[..., 0, :])
+```
 
 * TODO(davmre): show example of fitting parameters.
 
@@ -188,7 +207,7 @@ __init__(
 )
 ```
 
-Initialize a `LinearGaussianStateSpaceModel.
+Initialize a `LinearGaussianStateSpaceModel`.
 
 
 #### Args:
@@ -284,6 +303,11 @@ May be partially defined or unknown.
 
 * <b>`event_shape`</b>: `TensorShape`, possibly unknown.
 
+<h3 id="latent_size"><code>latent_size</code></h3>
+
+
+
+
 <h3 id="name"><code>name</code></h3>
 
 Name prepended to all ops created by this `Distribution`.
@@ -292,6 +316,11 @@ Name prepended to all ops created by this `Distribution`.
 <h3 id="name_scope"><code>name_scope</code></h3>
 
 Returns a `tf.name_scope` instance for this class.
+
+
+<h3 id="observation_size"><code>observation_size</code></h3>
+
+
 
 
 <h3 id="parameters"><code>parameters</code></h3>
@@ -336,7 +365,7 @@ A sequence of all submodules.
 
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -356,7 +385,7 @@ Python `bool` indicating possibly expensive checks are enabled.
 
 <h3 id="variables"><code>variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -374,6 +403,8 @@ first).
 ## Methods
 
 <h3 id="__getitem__"><code>__getitem__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 __getitem__(slices)
@@ -412,6 +443,8 @@ mvn2.event_shape  # => [2]
 
 <h3 id="__iter__"><code>__iter__</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 __iter__()
 ```
@@ -420,6 +453,8 @@ __iter__()
 
 
 <h3 id="backward_smoothing_pass"><code>backward_smoothing_pass</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/linear_gaussian_ssm.py">View source</a>
 
 ``` python
 backward_smoothing_pass(
@@ -441,17 +476,17 @@ A Probabilistic Perspective, The MIT Press. The inputs are returned by
 
 
 * <b>`filtered_means`</b>: Means of the per-timestep filtered marginal
-  distributions p(z_t | x_{:t}), as a Tensor of shape
+  distributions p(z[t] | x[:t]), as a Tensor of shape
   `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
 * <b>`filtered_covs`</b>: Covariances of the per-timestep filtered marginal
-  distributions p(z_t | x_{:t}), as a Tensor of shape
+  distributions p(z[t] | x[:t]), as a Tensor of shape
   `batch_shape + [num_timesteps, latent_size, latent_size]`.
 * <b>`predicted_means`</b>: Means of the per-timestep predictive
-   distributions over latent states, p(z_{t+1} | x_{:t}), as a
+   distributions over latent states, p(z[t+1] | x[:t]), as a
    Tensor of shape `sample_shape(x) + batch_shape +
    [num_timesteps, latent_size]`.
 * <b>`predicted_covs`</b>: Covariances of the per-timestep predictive
-   distributions over latent states, p(z_{t+1} | x_{:t}), as a
+   distributions over latent states, p(z[t+1] | x[:t]), as a
    Tensor of shape `batch_shape + [num_timesteps, latent_size,
    latent_size]`.
 
@@ -460,15 +495,17 @@ A Probabilistic Perspective, The MIT Press. The inputs are returned by
 
 
 * <b>`posterior_means`</b>: Means of the smoothed marginal distributions
-  p(z_t | x_{1:T}), as a Tensor of shape
+  p(z[t] | x[1:T]), as a Tensor of shape
   `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`,
   which is of the same shape as filtered_means.
 * <b>`posterior_covs`</b>: Covariances of the smoothed marginal distributions
-  p(z_t | x_{1:T}), as a Tensor of shape
+  p(z[t] | x[1:T]), as a Tensor of shape
   `batch_shape + [num_timesteps, latent_size, latent_size]`.
   which is of the same shape as filtered_covs.
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 batch_shape_tensor(name='batch_shape_tensor')
@@ -491,6 +528,8 @@ parameterizations of this distribution.
 * <b>`batch_shape`</b>: `Tensor`.
 
 <h3 id="cdf"><code>cdf</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 cdf(
@@ -524,6 +563,8 @@ cdf(x) := P[X <= x]
 
 <h3 id="copy"><code>copy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 copy(**override_parameters_kwargs)
 ```
@@ -548,6 +589,8 @@ initialization arguments.
   `dict(self.parameters, **override_parameters_kwargs)`.
 
 <h3 id="covariance"><code>covariance</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 covariance(
@@ -599,6 +642,8 @@ length-`k'` vector.
 
 <h3 id="cross_entropy"><code>cross_entropy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 cross_entropy(
     other,
@@ -634,6 +679,8 @@ where `F` denotes the support of the random variable `X ~ P`.
 
 <h3 id="entropy"><code>entropy</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 entropy(
     name='entropy',
@@ -645,6 +692,8 @@ Shannon entropy in nats.
 
 
 <h3 id="event_shape_tensor"><code>event_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 event_shape_tensor(name='event_shape_tensor')
@@ -665,6 +714,8 @@ Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
 * <b>`event_shape`</b>: `Tensor`.
 
 <h3 id="forward_filter"><code>forward_filter</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/linear_gaussian_ssm.py">View source</a>
 
 ``` python
 forward_filter(
@@ -705,39 +756,41 @@ depend only on the model itself. This means that the mean values have shape
 
 
 * <b>`log_likelihoods`</b>: Per-timestep log marginal likelihoods `log
-  p(x_t | x_{:t-1})` evaluated at the input `x`, as a `Tensor`
+  p(x[t] | x[:t-1])` evaluated at the input `x`, as a `Tensor`
   of shape `sample_shape(x) + batch_shape + [num_timesteps].`
 * <b>`filtered_means`</b>: Means of the per-timestep filtered marginal
-   distributions p(z_t | x_{:t}), as a Tensor of shape
+   distributions p(z[t] | x[:t]), as a Tensor of shape
   `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
 * <b>`filtered_covs`</b>: Covariances of the per-timestep filtered marginal
-   distributions p(z_t | x_{:t}), as a Tensor of shape
+   distributions p(z[t] | x[:t]), as a Tensor of shape
   `sample_shape(mask) + batch_shape + [num_timesteps, latent_size,
   latent_size]`. Note that the covariances depend only on the model and
   the mask, not on the data, so this may have fewer dimensions than
   `filtered_means`.
 * <b>`predicted_means`</b>: Means of the per-timestep predictive
-   distributions over latent states, p(z_{t+1} | x_{:t}), as a
+   distributions over latent states, p(z[t+1] | x[:t]), as a
    Tensor of shape `sample_shape(x) + batch_shape +
    [num_timesteps, latent_size]`.
 * <b>`predicted_covs`</b>: Covariances of the per-timestep predictive
-   distributions over latent states, p(z_{t+1} | x_{:t}), as a
+   distributions over latent states, p(z[t+1] | x[:t]), as a
    Tensor of shape `sample_shape(mask) + batch_shape +
    [num_timesteps, latent_size, latent_size]`. Note that the covariances
    depend only on the model and the mask, not on the data, so this may
    have fewer dimensions than `predicted_means`.
 * <b>`observation_means`</b>: Means of the per-timestep predictive
-   distributions over observations, p(x_{t} | x_{:t-1}), as a
+   distributions over observations, p(x[t] | x[:t-1]), as a
    Tensor of shape `sample_shape(x) + batch_shape +
    [num_timesteps, observation_size]`.
 * <b>`observation_covs`</b>: Covariances of the per-timestep predictive
-   distributions over observations, p(x_{t} | x_{:t-1}), as a
+   distributions over observations, p(x[t] | x[:t-1]), as a
    Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
    observation_size, observation_size]`. Note that the covariances depend
    only on the model and the mask, not on the data, so this may have fewer
    dimensions than `observation_means`.
 
 <h3 id="is_scalar_batch"><code>is_scalar_batch</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 is_scalar_batch(name='is_scalar_batch')
@@ -759,6 +812,8 @@ Indicates that `batch_shape == []`.
 
 <h3 id="is_scalar_event"><code>is_scalar_event</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 is_scalar_event(name='is_scalar_event')
 ```
@@ -778,6 +833,8 @@ Indicates that `event_shape == []`.
 * <b>`is_scalar_event`</b>: `bool` scalar `Tensor`.
 
 <h3 id="kl_divergence"><code>kl_divergence</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 kl_divergence(
@@ -817,6 +874,8 @@ denotes (Shannon) cross entropy, and `H[.]` denotes (Shannon) entropy.
 
 <h3 id="latents_to_observations"><code>latents_to_observations</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/linear_gaussian_ssm.py">View source</a>
+
 ``` python
 latents_to_observations(
     latent_means,
@@ -844,6 +903,8 @@ Push latent means and covariances forward through the observation model.
   `[..., num_timesteps, observation_size, observation_size]`
 
 <h3 id="log_cdf"><code>log_cdf</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 log_cdf(
@@ -881,6 +942,8 @@ a more accurate answer than simply taking the logarithm of the `cdf` when
 
 <h3 id="log_prob"><code>log_prob</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 log_prob(
     value,
@@ -913,6 +976,8 @@ Additional documentation from `LinearGaussianStateSpaceModel`:
   values of type `self.dtype`.
 
 <h3 id="log_survival_function"><code>log_survival_function</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 log_survival_function(
@@ -951,6 +1016,8 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 <h3 id="mean"><code>mean</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 mean(
     name='mean',
@@ -963,6 +1030,8 @@ Mean.
 
 <h3 id="mode"><code>mode</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 mode(
     name='mode',
@@ -974,6 +1043,8 @@ Mode.
 
 
 <h3 id="param_shapes"><code>param_shapes</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 param_shapes(
@@ -1005,6 +1076,8 @@ Subclasses should override class method `_param_shapes`.
 
 
 <h3 id="param_static_shapes"><code>param_static_shapes</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 param_static_shapes(
@@ -1042,6 +1115,8 @@ constant-valued tensors when constant values are fed.
 * <b>`ValueError`</b>: if `sample_shape` is a `TensorShape` and is not fully defined.
 
 <h3 id="posterior_marginals"><code>posterior_marginals</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/linear_gaussian_ssm.py">View source</a>
 
 ``` python
 posterior_marginals(
@@ -1094,17 +1169,19 @@ where `x` is an observation sequence.
 
 
 * <b>`smoothed_means`</b>: Means of the per-timestep smoothed
-   distributions over latent states, p(x_{t} | x_{:T}), as a
+   distributions over latent states, p(z[t] | x[:T]), as a
    Tensor of shape `sample_shape(x) + batch_shape +
    [num_timesteps, observation_size]`.
 * <b>`smoothed_covs`</b>: Covariances of the per-timestep smoothed
-   distributions over latent states, p(x_{t} | x_{:T}), as a
+   distributions over latent states, p(z[t] | x[:T]), as a
    Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
    observation_size, observation_size]`. Note that the covariances depend
    only on the model and the mask, not on the data, so this may have fewer
    dimensions than `filtered_means`.
 
 <h3 id="prob"><code>prob</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 prob(
@@ -1139,6 +1216,8 @@ Additional documentation from `LinearGaussianStateSpaceModel`:
 
 <h3 id="quantile"><code>quantile</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 quantile(
     value,
@@ -1171,6 +1250,8 @@ quantile(p) := x such that P[X <= x] == p
 
 <h3 id="sample"><code>sample</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 sample(
     sample_shape=(),
@@ -1200,6 +1281,8 @@ sample.
 * <b>`samples`</b>: a `Tensor` with prepended dimensions `sample_shape`.
 
 <h3 id="stddev"><code>stddev</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 stddev(
@@ -1234,6 +1317,8 @@ denotes expectation, and `stddev.shape = batch_shape + event_shape`.
 
 <h3 id="survival_function"><code>survival_function</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
+
 ``` python
 survival_function(
     value,
@@ -1267,6 +1352,8 @@ survival_function(x) = P[X > x]
 
 
 <h3 id="variance"><code>variance</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/distribution.py">View source</a>
 
 ``` python
 variance(

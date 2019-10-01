@@ -4,10 +4,23 @@
 <meta itemprop="property" content="function"/>
 <meta itemprop="property" content="vars_in"/>
 <meta itemprop="property" content="vars_out"/>
+<meta itemprop="property" content="__new__"/>
 <meta itemprop="property" content="replace"/>
 </div>
 
 # tfp.experimental.auto_batching.instructions.FunctionCallOp
+
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
 
 ## Class `FunctionCallOp`
 
@@ -20,13 +33,9 @@ Call a `Function`.
 * Class `tfp.experimental.auto_batching.frontend.instructions.FunctionCallOp`
 * Class `tfp.experimental.auto_batching.frontend.st.inst.FunctionCallOp`
 * Class `tfp.experimental.auto_batching.frontend.stack.inst.FunctionCallOp`
-* Class `tfp.experimental.auto_batching.instructions.FunctionCallOp`
 * Class `tfp.experimental.auto_batching.stack_optimization.inst.FunctionCallOp`
 * Class `tfp.experimental.auto_batching.stackless.inst.FunctionCallOp`
 
-
-
-Defined in [`python/internal/auto_batching/instructions.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/auto_batching/instructions.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -61,6 +70,22 @@ function, even if from different points.
 * <b>`vars_out`</b>: pattern of strings.  The names of the VM variables
   where to save the results returned from `function`.
 
+<h2 id="__new__"><code>__new__</code></h2>
+
+``` python
+__new__(
+    _cls,
+    function,
+    vars_in,
+    vars_out
+)
+```
+
+Create new instance of FunctionCallOp(function, vars_in, vars_out)
+
+
+
+
 ## Properties
 
 <h3 id="function"><code>function</code></h3>
@@ -83,6 +108,8 @@ function, even if from different points.
 ## Methods
 
 <h3 id="replace"><code>replace</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/auto_batching/instructions.py">View source</a>
 
 ``` python
 replace(vars_out=None)
