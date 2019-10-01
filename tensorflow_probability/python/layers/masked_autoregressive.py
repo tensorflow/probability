@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 # By importing `distributions` as `tfd`, docstrings will show
 # `tfd.Distribution`. We import `bijectors` the same way, for consistency.

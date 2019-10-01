@@ -21,17 +21,18 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-tfd = tfp.distributions
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class _ProximalHessianTest(object):
 
   def _make_placeholder(self, x):
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=x, shape=(x.shape if self.use_static_shape else None))
 
   def _adjust_dtype_and_shape_hints(self, x):
@@ -212,28 +213,28 @@ class _ProximalHessianTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ProximalHessianTestStaticShapeFloat32(tf.test.TestCase,
+class ProximalHessianTestStaticShapeFloat32(test_case.TestCase,
                                             _ProximalHessianTest):
   dtype = tf.float32
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ProximalHessianTestDynamicShapeFloat32(tf.test.TestCase,
+class ProximalHessianTestDynamicShapeFloat32(test_case.TestCase,
                                              _ProximalHessianTest):
   dtype = tf.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ProximalHessianTestStaticShapeFloat64(tf.test.TestCase,
+class ProximalHessianTestStaticShapeFloat64(test_case.TestCase,
                                             _ProximalHessianTest):
   dtype = tf.float64
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ProximalHessianTestDynamicShapeFloat64(tf.test.TestCase,
+class ProximalHessianTestDynamicShapeFloat64(test_case.TestCase,
                                              _ProximalHessianTest):
   dtype = tf.float64
   use_static_shape = False

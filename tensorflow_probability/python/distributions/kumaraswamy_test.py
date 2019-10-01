@@ -17,19 +17,17 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 from scipy import special as sp_special
 from scipy import stats as sp_stats
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-
-
-tfd = tfp.distributions
 
 
 def _kumaraswamy_mode(a, b):
@@ -64,7 +62,7 @@ def _kumaraswamy_pdf(a, b, x):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class KumaraswamyTest(tf.test.TestCase):
+class KumaraswamyTest(test_case.TestCase):
 
   def testSimpleShapes(self):
     a = np.random.rand(3)

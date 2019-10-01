@@ -428,7 +428,7 @@ class _ConditionalBijector(tfb.Bijector):
 # Test that ensures kwargs from public methods are passed in to
 # private methods.
 @test_util.run_all_in_graph_and_eager_modes
-class ConditionalBijectorTest(tf.test.TestCase):
+class ConditionalBijectorTest(test_case.TestCase):
 
   def testConditionalBijector(self):
     b = _ConditionalBijector()

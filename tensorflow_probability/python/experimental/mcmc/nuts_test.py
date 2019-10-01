@@ -21,26 +21,27 @@ from __future__ import print_function
 import itertools
 
 # Dependency imports
+
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 
 def run_nuts_chain(
     event_size, batch_size, num_steps,
     initial_state=None, dry_run=False, stackless=False):
   def target_log_prob_fn(event):
-    with tf.compat.v1.name_scope('nuts_test_target_log_prob', values=[event]):
+    with tf1.name_scope('nuts_test_target_log_prob', values=[event]):
       return tfd.MultivariateNormalDiag(
           tf.zeros(event_size),
           scale_identity_multiplier=1.).log_prob(event)
@@ -111,21 +112,21 @@ def assert_univariate_target_conservation(
   answer = result[0]
   check_cdf_agrees = st.assert_true_cdf_equal_by_dkwm(
       answer, target_d.cdf, false_fail_rate=1e-6)
-  check_enough_power = tf.compat.v1.assert_less(
+  check_enough_power = tf1.assert_less(
       st.min_discrepancy_of_true_cdfs_detectable_by_dkwm(
           num_samples, false_fail_rate=1e-6, false_pass_rate=1e-6), 0.025)
   test.assertAllEqual([num_samples], extra.leapfrogs_taken[0].shape)
   unique, _ = tf.unique(extra.leapfrogs_taken[0])
-  check_leapfrogs_vary = tf.compat.v1.assert_greater_equal(
+  check_leapfrogs_vary = tf1.assert_greater_equal(
       tf.shape(input=unique)[0], 3)
   avg_leapfrogs = tf.math.reduce_mean(input_tensor=extra.leapfrogs_taken[0])
-  check_leapfrogs = tf.compat.v1.assert_greater_equal(
+  check_leapfrogs = tf1.assert_greater_equal(
       avg_leapfrogs, tf.constant(4, dtype=avg_leapfrogs.dtype))
   movement = tf.abs(answer - initialization)
   test.assertAllEqual([num_samples], movement.shape)
   # This movement distance (1 * step_size) was selected by reducing until 100
   # runs with independent seeds all passed.
-  check_movement = tf.compat.v1.assert_greater_equal(
+  check_movement = tf1.assert_greater_equal(
       tf.reduce_mean(input_tensor=movement), 1 * step_size)
   return (check_cdf_agrees, check_enough_power, check_leapfrogs_vary,
           check_leapfrogs, check_movement)
@@ -143,19 +144,19 @@ def assert_mvn_target_conservation(event_size, batch_size, **kwargs):
   check_cdf_agrees = (
       st.assert_multivariate_true_cdf_equal_on_projections_two_sample(
           answer, initialization, num_projections=100, false_fail_rate=1e-6))
-  check_sample_shape = tf.compat.v1.assert_equal(
+  check_sample_shape = tf1.assert_equal(
       tf.shape(input=answer)[0], batch_size)
   unique, _ = tf.unique(leapfrogs[0])
-  check_leapfrogs_vary = tf.compat.v1.assert_greater_equal(
+  check_leapfrogs_vary = tf1.assert_greater_equal(
       tf.shape(input=unique)[0], 3)
   avg_leapfrogs = tf.math.reduce_mean(input_tensor=leapfrogs[0])
-  check_leapfrogs = tf.compat.v1.assert_greater_equal(
+  check_leapfrogs = tf1.assert_greater_equal(
       avg_leapfrogs, tf.constant(4, dtype=avg_leapfrogs.dtype))
   movement = tf.linalg.norm(tensor=answer - initialization, axis=-1)
   # This movement distance (0.3) was copied from the univariate case.
-  check_movement = tf.compat.v1.assert_greater_equal(
+  check_movement = tf1.assert_greater_equal(
       tf.reduce_mean(input_tensor=movement), 0.3)
-  check_enough_power = tf.compat.v1.assert_less(
+  check_enough_power = tf1.assert_less(
       st.min_discrepancy_of_true_cdfs_detectable_by_dkwm_two_sample(
           batch_size, batch_size, false_fail_rate=1e-8, false_pass_rate=1e-6),
       0.055)
@@ -164,7 +165,7 @@ def assert_mvn_target_conservation(event_size, batch_size, **kwargs):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NutsTest(parameterized.TestCase, tf.test.TestCase):
+class NutsTest(parameterized.TestCase, test_case.TestCase):
 
   @parameterized.parameters(itertools.product([2, 3], [1, 2, 3]))
   def testLeapfrogStepCounter(self, tree_depth, unrolled_leapfrog_steps):

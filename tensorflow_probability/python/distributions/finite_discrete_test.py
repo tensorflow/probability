@@ -21,12 +21,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -387,32 +385,32 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
 
 
 class FiniteDiscreteValidateArgsStaticShapeTest(FiniteDiscreteValidateArgsTest,
-                                                tf.test.TestCase):
+                                                test_case.TestCase):
   use_static_shape = True
 
 
 class FiniteDiscreteValidateArgsDynamicShapeTest(FiniteDiscreteValidateArgsTest,
-                                                 tf.test.TestCase):
+                                                 test_case.TestCase):
   use_static_shape = False
 
 
 class FiniteDiscreteScalarStaticShapeTest(FiniteDiscreteScalarTest,
-                                          tf.test.TestCase):
+                                          test_case.TestCase):
   use_static_shape = True
 
 
 class FiniteDiscreteScalarDynamicShapeTest(FiniteDiscreteScalarTest,
-                                           tf.test.TestCase):
+                                           test_case.TestCase):
   use_static_shape = False
 
 
 class FiniteDiscreteVectorStaticShapeTest(FiniteDiscreteVectorTest,
-                                          tf.test.TestCase):
+                                          test_case.TestCase):
   use_static_shape = True
 
 
 class FiniteDiscreteVectorDynamicShapeTest(FiniteDiscreteVectorTest,
-                                           tf.test.TestCase):
+                                           test_case.TestCase):
   use_static_shape = False
 
 

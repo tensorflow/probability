@@ -17,7 +17,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -74,10 +75,10 @@ def assign_moving_mean_variance(
        _Technical Report_, 2009.
        http://people.ds.cam.ac.uk/fanf2/hermes/doc/antiforgery/stats.pdf
   """
-  with tf.compat.v1.name_scope(name, "assign_moving_mean_variance",
+  with tf1.name_scope(name, "assign_moving_mean_variance",
                                [variance_var, mean_var, value, decay]):
-    with tf.compat.v1.colocate_with(variance_var):
-      with tf.compat.v1.colocate_with(mean_var):
+    with tf1.colocate_with(variance_var):
+      with tf1.colocate_with(mean_var):
         base_dtype = mean_var.dtype.base_dtype
         if not base_dtype.is_floating:
           raise TypeError(
@@ -153,7 +154,7 @@ def assign_log_moving_mean_exp(
     TypeError: if `log_mean_exp_var`, `log_value`, `decay` have different
       `base_dtype`.
   """
-  with tf.compat.v1.name_scope(name, "assign_log_moving_mean_exp",
+  with tf1.name_scope(name, "assign_log_moving_mean_exp",
                                [log_mean_exp_var, log_value, decay]):
     # We want to update the variable in a numerically stable and lock-free way.
     # To do this, observe that variable `x` updated by `v` is:
@@ -161,7 +162,7 @@ def assign_log_moving_mean_exp(
     #   = log(exp(x + log(w)) + exp(v + log1p(-w)))
     #   = x + log(exp(x - x + log(w)) + exp(v - x + log1p(-w)))
     #   = x + lse([log(w), v - x + log1p(-w)])
-    with tf.compat.v1.colocate_with(log_mean_exp_var):
+    with tf1.colocate_with(log_mean_exp_var):
       base_dtype = log_mean_exp_var.dtype.base_dtype
       if not base_dtype.is_floating:
         raise TypeError(
@@ -224,7 +225,7 @@ def moving_mean_variance(value, decay, name=None):
        _Technical Report_, 2009.
        http://people.ds.cam.ac.uk/fanf2/hermes/doc/antiforgery/stats.pdf
   """
-  with tf.compat.v1.variable_scope(name, "moving_mean_variance",
+  with tf1.variable_scope(name, "moving_mean_variance",
                                    [value, decay]):
     value = tf.convert_to_tensor(value=value, name="value")
     base_dtype = value.dtype.base_dtype
@@ -233,11 +234,11 @@ def moving_mean_variance(value, decay, name=None):
           "value.base_dtype({}) does not have float type `dtype`.".format(
               base_dtype.name))
     decay = tf.convert_to_tensor(value=decay, dtype=base_dtype, name="decay")
-    variance_var = tf.compat.v2.Variable(
+    variance_var = tf.Variable(
         name="moving_variance",
         initial_value=tf.zeros(shape=value.shape, dtype=value.dtype),
         trainable=False)
-    mean_var = tf.compat.v2.Variable(
+    mean_var = tf.Variable(
         name="moving_mean",
         initial_value=tf.zeros(shape=value.shape, dtype=value.dtype),
         trainable=False)

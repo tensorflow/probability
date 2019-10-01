@@ -18,7 +18,8 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
@@ -174,7 +175,7 @@ class SemiLocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         Default value: "SemiLocalLinearTrendStateSpaceModel".
     """
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name,
         'SemiLocalLinearTrendStateSpaceModel',
         values=[level_scale, slope_mean, slope_scale,
@@ -385,7 +386,7 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
         Default value: 'SemiLocalLinearTrend'.
     """
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'SemiLocalLinearTrend', values=[observed_time_series]) as name:
 
       if observed_time_series is not None:

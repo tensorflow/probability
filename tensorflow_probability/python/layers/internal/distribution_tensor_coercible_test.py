@@ -20,17 +20,18 @@ import gc
 import operator
 
 # Dependency imports
+
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.layers.internal import distribution_tensor_coercible
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
 dtc = distribution_tensor_coercible
 
 
@@ -64,7 +65,7 @@ class Normal(tfd.Normal):
 
 @test_util.run_all_in_graph_and_eager_modes
 class DistributionTensorConversionTest(
-    tf.test.TestCase, parameterized.TestCase):
+    test_case.TestCase, parameterized.TestCase):
 
   def testErrorsByDefault(self):
     x = tfd.Normal(loc=0., scale=1.)
@@ -273,7 +274,7 @@ class DistributionTensorConversionTest(
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MemoryLeakTest(tf.test.TestCase):
+class MemoryLeakTest(test_case.TestCase):
 
   def testTypeObjectLeakage(self):
     if not tf.executing_eagerly():

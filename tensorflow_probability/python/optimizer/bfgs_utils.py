@@ -20,7 +20,8 @@ from __future__ import print_function
 
 import collections
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static
@@ -163,7 +164,7 @@ def line_search_step(state, value_and_gradients_function, search_direction,
     # For inactive batch members `left.x` is zero. However, their
     # `search_direction` might also be undefined, so we can't rely on
     # multiplication by zero to produce a `position_delta` of zero.
-    position_delta = tf.compat.v1.where(
+    position_delta = tf1.where(
         inactive, tf.zeros_like(search_direction),
         search_direction * tf.expand_dims(ls_result.left.x, axis=-1))
     return _update_position(

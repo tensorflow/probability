@@ -30,7 +30,8 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static
@@ -190,7 +191,7 @@ def minimize(value_and_gradients_function,
       inverse_hessian_estimate: A tensor of shape `[..., n, n]` containing the
         inverse of the estimated Hessian.
   """
-  with tf.compat.v1.name_scope(
+  with tf1.name_scope(
       name, 'minimize',
       [initial_position, tolerance, initial_inverse_hessian_estimate]):
     initial_position = tf.convert_to_tensor(
@@ -255,10 +256,10 @@ def minimize(value_and_gradients_function,
       search_direction_reset = _get_search_direction(
           initial_inv_hessian, state.objective_gradient)
 
-      actual_serch_direction = tf.compat.v1.where(needs_reset,
+      actual_serch_direction = tf1.where(needs_reset,
                                                   search_direction_reset,
                                                   search_direction)
-      actual_inv_hessian = tf.compat.v1.where(needs_reset, initial_inv_hessian,
+      actual_inv_hessian = tf1.where(needs_reset, initial_inv_hessian,
                                               state.inverse_hessian_estimate)
 
       # Replace the hessian estimate in the state, in case it had to be reset.
@@ -343,7 +344,7 @@ def _update_inv_hessian(prev_state, next_state):
         prev_state.inverse_hessian_estimate)
     return bfgs_utils.update_fields(
         next_state,
-        inverse_hessian_estimate=tf.compat.v1.where(
+        inverse_hessian_estimate=tf1.where(
             should_update, next_inv_hessian,
             prev_state.inverse_hessian_estimate))
 

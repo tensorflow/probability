@@ -34,10 +34,10 @@ __Layer 1: Statistical Building Blocks__
 
 __Layer 2: Model Building__
 
-* Edward2 ([`tfp.edward2`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2)):
+* Edward2 ([`tfp.edward2`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/edward2)):
   A probabilistic programming language for specifying flexible probabilistic
   models as programs. See the
-  [Edward2 `README.md`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/README.md).
+  [Edward2 `README.md`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/README.md).
 * Probabilistic Layers ([`tfp.layers`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers)):
   Neural network layers with uncertainty over the functions they represent,
   extending TensorFlow Layers.

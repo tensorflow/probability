@@ -15,15 +15,18 @@
 """Tests for STS forecasting methods."""
 
 # Dependency imports
+
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util
 from tensorflow.python.platform import test
 
 tfl = tf.linalg
-tfd = tfp.distributions
 
 
 class _ForecastTest(object):
@@ -99,7 +102,7 @@ class _ForecastTest(object):
     onestep_dist = tfp.sts.one_step_predictive(model, observed_time_series,
                                                parameter_samples=prior_samples)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     if self.use_static_shape:
       self.assertAllEqual(onestep_dist.batch_shape.as_list(), batch_shape)
     else:
@@ -173,7 +176,7 @@ class _ForecastTest(object):
     sample_shape = [10]
     forecast_samples = forecast_dist.sample(sample_shape)[..., 0]
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     forecast_mean_, forecast_scale_, forecast_samples_ = self.evaluate(
         (forecast_mean, forecast_scale, forecast_samples))
     self.assertAllEqual(forecast_mean_.shape,
@@ -203,7 +206,7 @@ class _ForecastTest(object):
                                      parameter_samples=prior_samples,
                                      num_steps_forecast=num_steps_forecast)
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate(tf1.global_variables_initializer())
     if self.use_static_shape:
       self.assertAllEqual(forecast_dist.batch_shape.as_list(), batch_shape)
     else:
@@ -313,24 +316,24 @@ class _ForecastTest(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype if dtype is None else dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ForecastTestStatic32(tf.test.TestCase, _ForecastTest):
+class ForecastTestStatic32(test_case.TestCase, _ForecastTest):
   dtype = np.float32
   use_static_shape = True
 
 
 # Run in graph mode only to reduce test weight.
-class ForecastTestDynamic32(tf.test.TestCase, _ForecastTest):
+class ForecastTestDynamic32(test_case.TestCase, _ForecastTest):
   dtype = np.float32
   use_static_shape = False
 
 
 # Run in graph mode only to reduce test weight.
-class ForecastTestStatic64(tf.test.TestCase, _ForecastTest):
+class ForecastTestStatic64(test_case.TestCase, _ForecastTest):
   dtype = np.float64
   use_static_shape = True
 

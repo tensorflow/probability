@@ -20,18 +20,20 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability import distributions as tfd
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.sts import AdditiveStateSpaceModel
 from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
-
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
+
 tfl = tf.linalg
 
 
-class _AdditiveStateSpaceModelTest(tf.test.TestCase):
+class _AdditiveStateSpaceModelTest(test_case.TestCase):
 
   def test_identity(self):
 
@@ -384,7 +386,7 @@ class _AdditiveStateSpaceModelTest(tf.test.TestCase):
     """
     dtype = dtype if dtype is not None else self.dtype
     ndarray = np.asarray(ndarray).astype(dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _dummy_model(self,
@@ -434,7 +436,7 @@ class AdditiveStateSpaceModelTestDynamicShape32(_AdditiveStateSpaceModelTest):
     # (not necessarily the first) has static num_timesteps.
     num_timesteps = 4
     dynamic_timesteps_component = self._dummy_model(
-        num_timesteps=tf.compat.v1.placeholder_with_default(
+        num_timesteps=tf1.placeholder_with_default(
             input=num_timesteps, shape=None))
     static_timesteps_component = self._dummy_model(
         num_timesteps=num_timesteps)

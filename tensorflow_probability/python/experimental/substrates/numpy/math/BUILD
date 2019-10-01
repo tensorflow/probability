@@ -60,6 +60,7 @@ TEST_FILENAMES = []
     tags = ["tfp_numpy"],
     deps = [
         ":math",
+        "//tensorflow_probability/python/experimental/substrates/numpy/internal:test_case",
     ],
 ) for filename in TEST_FILENAMES]
 

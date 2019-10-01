@@ -26,13 +26,13 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class RealNVPTest(tf.test.TestCase):
+class RealNVPTest(test_case.TestCase):
 
   def testBijectorWithTrivialTransform(self):
     flat_x_ = np.random.normal(0., 1., 8).astype(np.float32)
@@ -141,7 +141,7 @@ class RealNVPTest(tf.test.TestCase):
 @test_util.run_all_in_graph_and_eager_modes
 class RealNVPTestKwargs(
     tfp_test_util.VectorDistributionTestHelpers,
-    tf.test.TestCase):
+    test_case.TestCase):
 
   @property
   def _real_nvp_kwargs(self):

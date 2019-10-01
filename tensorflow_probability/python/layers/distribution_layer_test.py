@@ -19,18 +19,21 @@ from __future__ import print_function
 import functools
 
 # Dependency imports
-import numpy as np
 
-import tensorflow as tf
+import numpy as np
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import layers as tfpl
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfk = tf.keras
+
 tfkl = tf.keras.layers
-tfb = tfp.bijectors
-tfd = tfp.distributions
-tfpl = tfp.layers
 
 
 def _logit_avg_expit(t):
@@ -49,7 +52,7 @@ def _vec_pad(x, value=0):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class EndToEndTest(tf.test.TestCase):
+class EndToEndTest(test_case.TestCase):
   """Test tfp.layers work in all three Keras APIs.
 
   For end-to-end tests we fit a Variational Autoencoder (VAE) because this
@@ -128,7 +131,7 @@ class EndToEndTest(tf.test.TestCase):
           axis=tf.range(-rv_x.event_shape.ndims, 0))
 
     vae_model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
+        optimizer=tf.optimizers.Adam(learning_rate=0.5),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[accuracy])
     vae_model.fit(self.x, self.x,
@@ -168,7 +171,7 @@ class EndToEndTest(tf.test.TestCase):
 
     vae_model = tfk.Model(inputs=images, outputs=decoded)
     vae_model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(),
+        optimizer=tf.optimizers.Adam(),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[])
     vae_model.fit(self.x, self.x,
@@ -226,7 +229,7 @@ class EndToEndTest(tf.test.TestCase):
 
     vae_model = tfk.Model(inputs=images, outputs=decoded)
     vae_model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(),
+        optimizer=tf.optimizers.Adam(),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[])
     vae_model.fit(self.x, self.x,
@@ -267,7 +270,7 @@ class EndToEndTest(tf.test.TestCase):
         inputs=encoder_model.inputs,
         outputs=decoder_model(encoder_model.outputs[0]))
     vae_model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(),
+        optimizer=tf.optimizers.Adam(),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[])
     vae_model.fit(self.x, self.x,
@@ -281,7 +284,7 @@ class EndToEndTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DistributionLambdaSerializationTest(tf.test.TestCase):
+class DistributionLambdaSerializationTest(test_case.TestCase):
 
   def assertSerializable(self, model, batch_size=1):
     """Assert that a model can be saved/loaded via Keras Model.save/load_model.
@@ -399,7 +402,7 @@ class DistributionLambdaSerializationTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DistributionLambdaVariableCreation(tf.test.TestCase):
+class DistributionLambdaVariableCreation(test_case.TestCase):
 
   def test_variable_creation(self):
     conv1 = tfkl.Convolution2D(filters=1, kernel_size=[1, 3])
@@ -419,7 +422,7 @@ class DistributionLambdaVariableCreation(tf.test.TestCase):
 
     model = tfk.Model(x, normal(x))  # pylint: disable=unused-variable
     model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(),
+        optimizer=tf.optimizers.Adam(),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[])
 
@@ -433,7 +436,7 @@ class DistributionLambdaVariableCreation(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class KLDivergenceAddLoss(tf.test.TestCase):
+class KLDivergenceAddLoss(test_case.TestCase):
 
   def test_approx_kl(self):
     # TODO(b/120320323): Enable this test in eager.
@@ -469,7 +472,7 @@ class KLDivergenceAddLoss(tf.test.TestCase):
     self.assertNear(actual_kl_, approx_kl_, err=0.15)
 
     model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(),
+        optimizer=tf.optimizers.Adam(),
         loss=lambda x, dist: -dist.log_prob(x[0, :event_size]),
         metrics=[])
     model.fit(x, x,
@@ -479,7 +482,7 @@ class KLDivergenceAddLoss(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalTriLTest(tf.test.TestCase):
+class MultivariateNormalTriLTest(test_case.TestCase):
 
   def _check_distribution(self, t, x):
     self.assertIsInstance(x, tfd.MultivariateNormalTriL)
@@ -530,7 +533,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(),
+        optimizer=tf.optimizers.Adam(),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 100
@@ -545,7 +548,7 @@ class MultivariateNormalTriLTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class OneHotCategoricalTest(tf.test.TestCase):
+class OneHotCategoricalTest(test_case.TestCase):
 
   def _check_distribution(self, t, x):
     self.assertIsInstance(x, tfd.OneHotCategorical)
@@ -590,7 +593,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
+        optimizer=tf.optimizers.Adam(learning_rate=0.5),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 100
@@ -602,7 +605,7 @@ class OneHotCategoricalTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
+class CategoricalMixtureOfOneHotCategoricalTest(test_case.TestCase):
 
   def _check_distribution(self, t, x):
     self.assertIsInstance(x, tfd.MixtureSameFamily)
@@ -670,7 +673,7 @@ class CategoricalMixtureOfOneHotCategoricalTest(tf.test.TestCase):
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
+        optimizer=tf.optimizers.Adam(learning_rate=0.5),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 100
@@ -712,7 +715,7 @@ class _IndependentLayerTest(object):
     # Enforce parameterized dtype and static/dynamic testing.
     ndarray = np.asarray(ndarray).astype(
         dtype if dtype is not None else self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _check_distribution(self, t, x, batch_shape):
@@ -815,14 +818,14 @@ class _IndependentBernoulliTest(_IndependentLayerTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IndependentBernoulliTestDynamicShape(tf.test.TestCase,
+class IndependentBernoulliTestDynamicShape(test_case.TestCase,
                                            _IndependentBernoulliTest):
   dtype = np.float64
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IndependentBernoulliTestStaticShape(tf.test.TestCase,
+class IndependentBernoulliTestStaticShape(test_case.TestCase,
                                           _IndependentBernoulliTest):
   dtype = np.float32
   use_static_shape = True
@@ -849,7 +852,7 @@ class IndependentBernoulliTestStaticShape(tf.test.TestCase,
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.5),
+        optimizer=tf.optimizers.Adam(learning_rate=0.5),
         loss=lambda y, model: -model.log_prob(y))
     batch_size = 10000
     model.fit(x, y,
@@ -876,14 +879,14 @@ class _IndependentLogisticTest(_IndependentLayerTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IndependentLogisticTestDynamicShape(tf.test.TestCase,
+class IndependentLogisticTestDynamicShape(test_case.TestCase,
                                           _IndependentLogisticTest):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IndependentLogisticTestStaticShape(tf.test.TestCase,
+class IndependentLogisticTestStaticShape(test_case.TestCase,
                                          _IndependentLogisticTest):
   dtype = np.float64
   use_static_shape = True
@@ -961,14 +964,14 @@ class _IndependentNormalTest(_IndependentLayerTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IndependentNormalTestDynamicShape(tf.test.TestCase,
+class IndependentNormalTestDynamicShape(test_case.TestCase,
                                         _IndependentNormalTest):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IndependentNormalTestStaticShape(tf.test.TestCase,
+class IndependentNormalTestStaticShape(test_case.TestCase,
                                        _IndependentNormalTest):
   dtype = np.float64
   use_static_shape = True
@@ -1008,14 +1011,14 @@ class _IndependentPoissonTest(_IndependentLayerTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IndependentPoissonTestDynamicShape(tf.test.TestCase,
+class IndependentPoissonTestDynamicShape(test_case.TestCase,
                                          _IndependentPoissonTest):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class IndependentPoissonTestStaticShape(tf.test.TestCase,
+class IndependentPoissonTestStaticShape(test_case.TestCase,
                                         _IndependentPoissonTest):
   dtype = np.float64
   use_static_shape = True
@@ -1037,7 +1040,7 @@ class IndependentPoissonTestStaticShape(tf.test.TestCase,
 
     # Fit.
     model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.05),
+        optimizer=tf.optimizers.Adam(learning_rate=0.05),
         loss=lambda y, model: -model.log_prob(y),
         metrics=[])
     batch_size = 50
@@ -1070,7 +1073,7 @@ class _MixtureLayerTest(object):
     # Enforce parameterized dtype and static/dynamic testing.
     ndarray = np.asarray(ndarray).astype(
         dtype if dtype is not None else self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _check_distribution(self, t, x, batch_shape):
@@ -1218,7 +1221,7 @@ class _MixtureLogisticTest(_MixtureLayerTest):
     # Fit.
     batch_size = 100
     model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.02),
+        optimizer=tf.optimizers.Adam(learning_rate=0.02),
         loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
@@ -1229,14 +1232,14 @@ class _MixtureLogisticTest(_MixtureLayerTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MixtureLogisticTestDynamicShape(tf.test.TestCase,
+class MixtureLogisticTestDynamicShape(test_case.TestCase,
                                       _MixtureLogisticTest):
   dtype = np.float64
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MixtureLogisticTestStaticShape(tf.test.TestCase,
+class MixtureLogisticTestStaticShape(test_case.TestCase,
                                      _MixtureLogisticTest):
   dtype = np.float32
   use_static_shape = True
@@ -1288,7 +1291,7 @@ class _MixtureNormalTest(_MixtureLayerTest):
     # Fit.
     batch_size = 100
     model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.02),
+        optimizer=tf.optimizers.Adam(learning_rate=0.02),
         loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
@@ -1299,14 +1302,14 @@ class _MixtureNormalTest(_MixtureLayerTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MixtureNormalTestDynamicShape(tf.test.TestCase,
+class MixtureNormalTestDynamicShape(test_case.TestCase,
                                     _MixtureNormalTest):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MixtureNormalTestStaticShape(tf.test.TestCase,
+class MixtureNormalTestStaticShape(test_case.TestCase,
                                    _MixtureNormalTest):
   dtype = np.float64
   use_static_shape = True
@@ -1319,7 +1322,7 @@ class _MixtureSameFamilyTest(object):
     # Enforce parameterized dtype and static/dynamic testing.
     ndarray = np.asarray(ndarray).astype(
         dtype if dtype is not None else self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _check_distribution(self, t, x, batch_shape):
@@ -1404,7 +1407,7 @@ class _MixtureSameFamilyTest(object):
     # Fit.
     batch_size = 100
     model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.02),
+        optimizer=tf.optimizers.Adam(learning_rate=0.02),
         loss=lambda y, model: -model.log_prob(y))
     model.fit(x, y,
               batch_size=batch_size,
@@ -1415,21 +1418,21 @@ class _MixtureSameFamilyTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MixtureSameFamilyTestDynamicShape(tf.test.TestCase,
+class MixtureSameFamilyTestDynamicShape(test_case.TestCase,
                                         _MixtureSameFamilyTest):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MixtureSameFamilyTestStaticShape(tf.test.TestCase,
+class MixtureSameFamilyTestStaticShape(test_case.TestCase,
                                        _MixtureSameFamilyTest):
   dtype = np.float64
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class VariationalGaussianProcessEndToEnd(tf.test.TestCase):
+class VariationalGaussianProcessEndToEnd(test_case.TestCase):
 
   def testEndToEnd(self):
     np.random.seed(43)
@@ -1455,7 +1458,7 @@ class VariationalGaussianProcessEndToEnd(tf.test.TestCase):
         super(KernelFn, self).__init__(**kwargs)
 
         self._amplitude = self.add_variable(
-            initializer=tf.compat.v1.initializers.constant(.54),
+            initializer=tf1.initializers.constant(.54),
             dtype=dtype,
             name='amplitude')
 
@@ -1472,7 +1475,7 @@ class VariationalGaussianProcessEndToEnd(tf.test.TestCase):
     # Add a leading dimension for the event_shape.
     eyes = np.expand_dims(np.eye(num_inducing_points), 0)
     variational_inducing_observations_scale_initializer = (
-        tf.compat.v1.initializers.constant(1e-3 * eyes))
+        tf1.initializers.constant(1e-3 * eyes))
 
     model = tf.keras.Sequential([
         tf.keras.layers.InputLayer(input_shape=[1], dtype=dtype),
@@ -1482,7 +1485,7 @@ class VariationalGaussianProcessEndToEnd(tf.test.TestCase):
             num_inducing_points=num_inducing_points,
             kernel_provider=KernelFn(dtype=dtype),
             inducing_index_points_initializer=(
-                tf.compat.v1.initializers.constant(
+                tf1.initializers.constant(
                     np.linspace(*x_range,
                                 num=num_inducing_points,
                                 dtype=dtype)[..., np.newaxis])),
@@ -1491,13 +1494,13 @@ class VariationalGaussianProcessEndToEnd(tf.test.TestCase):
     ])
 
     if not tf.executing_eagerly():
-      self.evaluate(tf.compat.v1.global_variables_initializer())
+      self.evaluate(tf1.global_variables_initializer())
 
     batch_size = 64
     kl_weight = np.float64(batch_size) / n
     loss = lambda y, d: d.variational_loss(y, kl_weight=kl_weight)
     model.compile(
-        optimizer=tf.compat.v2.optimizers.Adam(learning_rate=0.02),
+        optimizer=tf.optimizers.Adam(learning_rate=0.02),
         loss=loss)
 
     # This should have no issues
@@ -1511,7 +1514,7 @@ class VariationalGaussianProcessEndToEnd(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class JointDistributionLayer(tf.test.TestCase):
+class JointDistributionLayer(test_case.TestCase):
 
   def test_works(self):
     x = tf.keras.Input(shape=())

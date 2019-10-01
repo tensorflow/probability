@@ -22,18 +22,20 @@ import os
 
 # Dependency imports
 from absl import flags
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.auto_batching import xla
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
-
 flags.DEFINE_string('test_device', None,
+
                     'TensorFlow device on which to place operators under test')
 flags.DEFINE_string('tf_xla_flags', None,
                     'Value to set the TF_XLA_FLAGS environment variable to')
 FLAGS = flags.FLAGS
 
 
-class TFPXLATestCase(tf.test.TestCase):
+class TFPXLATestCase(test_case.TestCase):
   """TFP+XLA test harness."""
 
   def __init__(self, method_name='runTest'):
@@ -54,5 +56,5 @@ class TFPXLATestCase(tf.test.TestCase):
 
   def wrap_fn(self, f):
     return xla.compile_nested_output(
-        f, (tf.compat.v1.tpu.rewrite if 'TPU' in self.device
+        f, (tf1.tpu.rewrite if 'TPU' in self.device
             else tf.xla.experimental.compile))

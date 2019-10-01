@@ -20,13 +20,15 @@ from __future__ import print_function
 
 # Dependency imports
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
 from tensorflow_probability.python.experimental.auto_batching import numpy_backend
 from tensorflow_probability.python.experimental.auto_batching import stackless
 from tensorflow_probability.python.experimental.auto_batching import test_programs
 from tensorflow_probability.python.experimental.auto_batching import tf_backend
+from tensorflow_probability.python.internal import test_case
 
 TF_BACKEND = tf_backend.TensorFlowBackend()
 NP_BACKEND = numpy_backend.NumpyBackend()
@@ -45,7 +47,7 @@ def _is_even_stackless_execute(inputs, backend):
 
 
 # Stackless autobatching doesn't work in TF graph mode.
-class StacklessTest(tf.test.TestCase):
+class StacklessTest(test_case.TestCase):
 
   def testStacklessFibonacciNumpy(self):
     self.assertEqual([8], list(_fibonacci_stackless_execute([5], NP_BACKEND)))
@@ -80,5 +82,5 @@ class StacklessTest(tf.test.TestCase):
         self.evaluate(_is_even_stackless_execute([5, 6, 8, 9, 0], TF_BACKEND)))
 
 if __name__ == '__main__':
-  tf.compat.v1.enable_eager_execution()
+  tf1.enable_eager_execution()
   tf.test.main()

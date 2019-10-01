@@ -19,16 +19,19 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 
-import tensorflow as tf
+import numpy as np
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-tfd = tfp.distributions
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class FitTestFast(tf.test.TestCase):
+class FitTestFast(test_case.TestCase):
 
   dtype = np.float32
   fast = True
@@ -272,7 +275,7 @@ class FitTestSlow(FitTestFast):
     ] = self.make_dataset(n=n, d=3, link='probit')
     l2_regularizer = np.array(0.07 * n, model_matrix.dtype.as_numpy_dtype)
     if not static_l2:
-      l2_regularizer = tf.compat.v1.placeholder_with_default(
+      l2_regularizer = tf1.placeholder_with_default(
           l2_regularizer, shape=[])
     [
         expected_model_coefficients,

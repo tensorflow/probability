@@ -21,7 +21,8 @@ from __future__ import print_function
 import collections
 # Dependency imports
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
@@ -87,7 +88,7 @@ def random_walk_normal_fn(scale=1., name=None):
     Raises:
       ValueError: if `scale` does not broadcast with `state_parts`.
     """
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'random_walk_normal_fn', values=[state_parts, scale, seed]):
       scales = scale if mcmc_util.is_list_like(scale) else [scale]
       if len(scales) == 1:
@@ -149,7 +150,7 @@ def random_walk_uniform_fn(scale=1., name=None):
     Raises:
       ValueError: if `scale` does not broadcast with `state_parts`.
     """
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'random_walk_uniform_fn', values=[state_parts, scale, seed]):
       scales = scale if mcmc_util.is_list_like(scale) else [scale]
       if len(scales) == 1:
@@ -501,12 +502,12 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(RandomWalkMetropolis.one_step.__doc__)
   def one_step(self, current_state, previous_kernel_results):
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name=mcmc_util.make_name(self.name, 'rwm', 'one_step'),
         values=[
             self.seed, current_state, previous_kernel_results.target_log_prob
         ]):
-      with tf.compat.v1.name_scope('initialize'):
+      with tf1.name_scope('initialize'):
         if mcmc_util.is_list_like(current_state):
           current_state_parts = list(current_state)
         else:
@@ -536,7 +537,7 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(RandomWalkMetropolis.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
-    with tf.compat.v1.name_scope(self.name, 'rwm_bootstrap_results',
+    with tf1.name_scope(self.name, 'rwm_bootstrap_results',
                                  [init_state]):
       if not mcmc_util.is_list_like(init_state):
         init_state = [init_state]

@@ -34,10 +34,12 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions.internal import correlation_matrix_volumes_lib as corr
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
+from tensorflow_probability.python.internal import test_case
 
 
 # NxN correlation matrices are determined by the N*(N-1)/2
@@ -77,7 +79,7 @@ def four_by_four_volume():
 # method," Journal of Multivariate Analysis 100 (2009), pp 1989-2001.
 
 
-class CorrelationMatrixVolumesTest(tf.test.TestCase):
+class CorrelationMatrixVolumesTest(test_case.TestCase):
 
   def testRejection2D(self):
     num_samples = int(1e5)  # Chosen for a small min detectable discrepancy
@@ -91,7 +93,7 @@ class CorrelationMatrixVolumesTest(tf.test.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         rej_weights, low=0., high=rej_proposal_volume, expected=exact_volumes,
         false_fail_rate=1e-6)
-    chk2 = tf.compat.v1.assert_less(
+    chk2 = tf1.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples,
             low=0.,
@@ -115,7 +117,7 @@ class CorrelationMatrixVolumesTest(tf.test.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         rej_weights, low=0., high=rej_proposal_volume, expected=exact_volumes,
         false_fail_rate=1e-6)
-    chk2 = tf.compat.v1.assert_less(
+    chk2 = tf1.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples,
             low=0.,
@@ -139,7 +141,7 @@ class CorrelationMatrixVolumesTest(tf.test.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         rej_weights, low=0., high=rej_proposal_volume, expected=exact_volumes,
         false_fail_rate=1e-6)
-    chk2 = tf.compat.v1.assert_less(
+    chk2 = tf1.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples,
             low=0.,

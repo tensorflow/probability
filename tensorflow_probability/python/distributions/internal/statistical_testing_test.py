@@ -23,20 +23,22 @@ import functools
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
 # pylint: disable=g-error-prone-assert-raises
+
 # This file is testing new assertions, which must of necessity appear in
 # assertRaises blocks to check that they do, in fact, raise when their terms are
 # violated.
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class StatisticalTestingTest(tf.test.TestCase, parameterized.TestCase):
+class StatisticalTestingTest(test_case.TestCase, parameterized.TestCase):
 
   def assert_design_soundness(self, dtype, min_num_samples, min_discrepancy):
     thresholds = [1e-5, 1e-2, 1.1e-1, 0.9, 1., 1.02, 2., 10., 1e2, 1e5, 1e10]
@@ -138,17 +140,17 @@ class StatisticalTestingTest(tf.test.TestCase, parameterized.TestCase):
     samples = tf.convert_to_tensor(value=samples, dtype=dtype)
     def cdf(x):
       ones = tf.ones_like(x)
-      answer = tf.compat.v1.where(x < 3, 0.6 * ones, ones)
-      answer = tf.compat.v1.where(x < 2, 0.3 * ones, answer)
-      answer = tf.compat.v1.where(x < 1, 0.1 * ones, answer)
-      return tf.compat.v1.where(x < 0, 0 * ones, answer)
+      answer = tf1.where(x < 3, 0.6 * ones, ones)
+      answer = tf1.where(x < 2, 0.3 * ones, answer)
+      answer = tf1.where(x < 1, 0.1 * ones, answer)
+      return tf1.where(x < 0, 0 * ones, answer)
 
     def left_continuous_cdf(x):
       ones = tf.ones_like(x)
-      answer = tf.compat.v1.where(x <= 3, 0.6 * ones, ones)
-      answer = tf.compat.v1.where(x <= 2, 0.3 * ones, answer)
-      answer = tf.compat.v1.where(x <= 1, 0.1 * ones, answer)
-      return tf.compat.v1.where(x <= 0, 0 * ones, answer)
+      answer = tf1.where(x <= 3, 0.6 * ones, ones)
+      answer = tf1.where(x <= 2, 0.3 * ones, answer)
+      answer = tf1.where(x <= 1, 0.1 * ones, answer)
+      return tf1.where(x <= 0, 0 * ones, answer)
     # Unlike empirical_cdfs, the samples Tensor must come in iid across the
     # leading dimension.
     obtained = self.evaluate(st.kolmogorov_smirnov_distance(
@@ -166,17 +168,17 @@ class StatisticalTestingTest(tf.test.TestCase, parameterized.TestCase):
     samples = rng.choice(4, size=shape, p=probs).astype(dtype=dtype)
     def cdf(x):
       ones = tf.ones_like(x)
-      answer = tf.compat.v1.where(x < 3, 0.6 * ones, ones)
-      answer = tf.compat.v1.where(x < 2, 0.3 * ones, answer)
-      answer = tf.compat.v1.where(x < 1, 0.1 * ones, answer)
-      return tf.compat.v1.where(x < 0, 0 * ones, answer)
+      answer = tf1.where(x < 3, 0.6 * ones, ones)
+      answer = tf1.where(x < 2, 0.3 * ones, answer)
+      answer = tf1.where(x < 1, 0.1 * ones, answer)
+      return tf1.where(x < 0, 0 * ones, answer)
 
     def left_continuous_cdf(x):
       ones = tf.ones_like(x)
-      answer = tf.compat.v1.where(x <= 3, 0.6 * ones, ones)
-      answer = tf.compat.v1.where(x <= 2, 0.3 * ones, answer)
-      answer = tf.compat.v1.where(x <= 1, 0.1 * ones, answer)
-      return tf.compat.v1.where(x <= 0, 0 * ones, answer)
+      answer = tf1.where(x <= 3, 0.6 * ones, ones)
+      answer = tf1.where(x <= 2, 0.3 * ones, answer)
+      answer = tf1.where(x <= 1, 0.1 * ones, answer)
+      return tf1.where(x <= 0, 0 * ones, answer)
 
     self.evaluate(st.assert_true_cdf_equal_by_dkwm(
         samples, cdf, left_continuous_cdf=left_continuous_cdf,

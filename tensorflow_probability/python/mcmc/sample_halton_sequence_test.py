@@ -19,28 +19,29 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 
-import tensorflow as tf
+import numpy as np
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import monte_carlo
+from tensorflow_probability.python.internal import test_case
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-tfd = tfp.distributions
 
 
 def _set_seed(seed):
   """Helper which uses graph seed if using TFE."""
   # TODO(b/68017812): Deprecate once TFE supports seed.
   if tf.executing_eagerly():
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     return None
   return seed
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HaltonSequenceTest(tf.test.TestCase):
+class HaltonSequenceTest(test_case.TestCase):
 
   def test_known_values_small_bases(self):
     # The first five elements of the non-randomized Halton sequence

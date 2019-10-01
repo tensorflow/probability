@@ -17,13 +17,14 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.auto_batching import stack_optimization as stack
 from tensorflow_probability.python.experimental.auto_batching import test_programs
+from tensorflow_probability.python.internal import test_case
 
 
-class StackOptimizationTest(tf.test.TestCase):
+class StackOptimizationTest(test_case.TestCase):
 
   def testPopPushFusionPrettyPrint(self):
     # Testing two things: That pop-push fusion does the expected thing, and that

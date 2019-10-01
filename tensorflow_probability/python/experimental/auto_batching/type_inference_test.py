@@ -26,7 +26,8 @@ from absl.testing import parameterized
 
 import numpy as np
 import six
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
 from tensorflow_probability.python.experimental.auto_batching import instructions
@@ -36,10 +37,11 @@ from tensorflow_probability.python.experimental.auto_batching import test_progra
 from tensorflow_probability.python.experimental.auto_batching import tf_backend
 from tensorflow_probability.python.experimental.auto_batching import type_inference
 from tensorflow_probability.python.experimental.auto_batching import virtual_machine as vm
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 NP_BACKEND = numpy_backend.NumpyBackend()
+
 TF_BACKEND = tf_backend.TensorFlowBackend()
 
 
@@ -78,7 +80,7 @@ def _execute(prog, inputs, stack_depth, backend):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TypeInferenceTest(tf.test.TestCase, parameterized.TestCase):
+class TypeInferenceTest(test_case.TestCase, parameterized.TestCase):
 
   def assertSameTypes(self, expected_prog, typed, check_dtypes=True):
     for v, type_ in six.iteritems(typed.var_defs):
@@ -132,7 +134,7 @@ class TypeInferenceTest(tf.test.TestCase, parameterized.TestCase):
     for inputs, outputs in ([5], [8]), ([5, 6, 8, 9], [8, 13, 34, 55]):
       inputs = np.array(inputs, dtype=dtype)
       outputs = np.array(outputs, dtype=dtype)
-      tf.compat.v1.logging.debug('np.fib {} {} {}'.format(
+      tf1.logging.debug('np.fib {} {} {}'.format(
           dtype, inputs.shape, outputs.shape))
       prog = test_programs.fibonacci_function_calls(include_types=False)
       typed = type_inference.infer_types(prog, [inputs], NP_BACKEND)
@@ -152,7 +154,7 @@ class TypeInferenceTest(tf.test.TestCase, parameterized.TestCase):
     for inputs, outputs in ([5], [8]), ([5, 6, 8, 9], [8, 13, 34, 55]):
       inputs = np.array(inputs, dtype=dtype)
       outputs = np.array(outputs, dtype=dtype)
-      tf.compat.v1.logging.debug('tf.fib {} {} {}'.format(
+      tf1.logging.debug('tf.fib {} {} {}'.format(
           dtype, inputs.shape, outputs.shape))
       inputs_t = tf.constant(inputs, dtype=dtype)
       prog = test_programs.fibonacci_function_calls(include_types=False)
@@ -170,7 +172,7 @@ class TypeInferenceTest(tf.test.TestCase, parameterized.TestCase):
                             ([5, 6, 0, 3], [False, True, True, False])]:
       inputs = np.array(inputs, dtype=dtype)
       outputs = np.array(outputs, dtype=np.bool)
-      tf.compat.v1.logging.debug('np.even {} {} {}'.format(
+      tf1.logging.debug('np.even {} {} {}'.format(
           dtype, inputs.shape, outputs.shape))
       prog = test_programs.is_even_function_calls(include_types=False)
       typed = type_inference.infer_types(prog, [inputs], NP_BACKEND)
@@ -192,7 +194,7 @@ class TypeInferenceTest(tf.test.TestCase, parameterized.TestCase):
                             ([5, 6, 0, 3], [False, True, True, False])]:
       inputs = np.array(inputs, dtype=dtype)
       outputs = np.array(outputs, dtype=np.bool)
-      tf.compat.v1.logging.debug('tf.even {} {} {}'.format(
+      tf1.logging.debug('tf.even {} {} {}'.format(
           dtype, inputs.shape, outputs.shape))
       inputs_t = tf.constant(inputs, dtype=dtype)
       prog = test_programs.is_even_function_calls(include_types=False)

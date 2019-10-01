@@ -24,9 +24,11 @@ from absl.testing import flagsaver
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 
 FLAGS = flags.FLAGS
 
@@ -38,11 +40,12 @@ def _maybe_jax(x):
   if JAX_MODE:
     from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
     x = jaxrand.PRNGKey(x)
+
   return x
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SeedSettingTest(tf.test.TestCase):
+class SeedSettingTest(test_case.TestCase):
 
   def testTypeCorrectness(self):
     assert isinstance(tfp_test_util.test_seed_stream(), SeedStream)

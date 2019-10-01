@@ -19,7 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow.python.client import session as tf_session
 from tensorflow.python.framework import ops
@@ -145,7 +146,7 @@ class RandomVariable(object):
     Returns:
       sample_shape: `Tensor`.
     """
-    with tf.compat.v1.name_scope(name):
+    with tf1.name_scope(name):
       if isinstance(self._sample_shape, tf.Tensor):
         return self._sample_shape
       return tf.convert_to_tensor(

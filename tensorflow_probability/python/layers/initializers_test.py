@@ -21,14 +21,14 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BlockwiseInitializerTest(tf.test.TestCase):
+class BlockwiseInitializerTest(test_case.TestCase):
 
   def test_works_correctly(self):
     init = tfp.layers.BlockwiseInitializer(['glorot_uniform', 'zeros'], [3, 4])
@@ -38,9 +38,9 @@ class BlockwiseInitializerTest(tf.test.TestCase):
     self.assertAllEqual(np.zeros([2, 1, 4]), x_[..., 3:])
 
   def test_de_serialization(self):
-    s = tf.compat.v2.initializers.serialize(
+    s = tf.initializers.serialize(
         tfp.layers.BlockwiseInitializer(['glorot_uniform', 'zeros'], [3, 4]))
-    init_clone = tf.compat.v2.initializers.deserialize(s)
+    init_clone = tf.initializers.deserialize(s)
     x = init_clone([2, 1, 7])
     self.assertEqual((2, 1, 7), x.shape)
     x_ = self.evaluate(x)

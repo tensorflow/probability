@@ -26,7 +26,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions.vector_student_t import _VectorStudentT
-
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -72,7 +72,7 @@ class _FakeVectorStudentT(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class VectorStudentTTest(tf.test.TestCase):
+class VectorStudentTTest(test_case.TestCase):
 
   def setUp(self):
     super(VectorStudentTTest, self).setUp()

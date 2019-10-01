@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import warnings
+
 from tensorflow_probability.python.math.psd_kernels.exp_sin_squared import ExpSinSquared
 from tensorflow_probability.python.math.psd_kernels.exponentiated_quadratic import ExponentiatedQuadratic
 from tensorflow_probability.python.math.psd_kernels.feature_scaled import FeatureScaled
@@ -34,6 +36,11 @@ from tensorflow_probability.python.math.psd_kernels.schur_complement import Schu
 
 
 from tensorflow.python.util.all_util import remove_undocumented
+
+warnings.warn(
+    'tfp.positive_semidefinite_kernels module has been moved to '
+    'tfp.math.psd_kernels. This alias will be deleted on 2019-12-01',
+    stacklevel=5)
 
 _allowed_symbols = [
     'ExponentiatedQuadratic',

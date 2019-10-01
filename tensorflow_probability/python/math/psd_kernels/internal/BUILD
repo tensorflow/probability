@@ -53,6 +53,7 @@ py_test(
         ":util",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/math:gradient",
     ],
 )

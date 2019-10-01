@@ -23,7 +23,8 @@ import warnings
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.math.gradient import value_and_gradient as tfp_math_value_and_gradients
 
@@ -64,7 +65,7 @@ def is_namedtuple_like(x):
 
 
 def make_name(super_name, default_super_name, sub_name):
-  """Helper which makes a `str` name; useful for tf.compat.v1.name_scope."""
+  """Helper which makes a `str` name; useful for tf1.name_scope."""
   name = super_name if super_name is not None else default_super_name
   if sub_name is not None:
     name += '_' + sub_name
@@ -78,7 +79,7 @@ def _choose_base_case(is_accepted,
   """Helper to `choose` which expand_dims `is_accepted` and applies tf.where."""
   def _expand_is_accepted_like(x):
     """Helper to expand `is_accepted` like the shape of some input arg."""
-    with tf.compat.v1.name_scope('expand_is_accepted_like'):
+    with tf1.name_scope('expand_is_accepted_like'):
       expand_shape = tf.concat([
           tf.shape(input=is_accepted),
           tf.ones([tf.rank(x) - tf.rank(is_accepted)], dtype=tf.int32),
@@ -98,12 +99,12 @@ def _choose_base_case(is_accepted,
       return accepted
     accepted = tf.convert_to_tensor(value=accepted, name='accepted')
     rejected = tf.convert_to_tensor(value=rejected, name='rejected')
-    r = tf.compat.v1.where(
+    r = tf1.where(
         _expand_is_accepted_like(accepted), accepted, rejected)
     r.set_shape(r.shape.merge_with(accepted.shape.merge_with(rejected.shape)))
     return r
 
-  with tf.compat.v1.name_scope(
+  with tf1.name_scope(
       name, 'choose', values=[is_accepted, accepted, rejected]):
     if not is_list_like(accepted):
       return _where(accepted, rejected)
@@ -151,7 +152,7 @@ def safe_sum(x, alt_value=-np.inf, name=None):
     TypeError: if `x` is not list-like.
     ValueError: if `x` is empty.
   """
-  with tf.compat.v1.name_scope(name, 'safe_sum', [x, alt_value]):
+  with tf1.name_scope(name, 'safe_sum', [x, alt_value]):
     if not is_list_like(x):
       raise TypeError('Expected list input.')
     if not x:
@@ -161,7 +162,7 @@ def safe_sum(x, alt_value=-np.inf, name=None):
     x = tf.reduce_sum(input_tensor=x, axis=-1)
     alt_value = np.array(alt_value, x.dtype.as_numpy_dtype)
     alt_fill = tf.fill(tf.shape(input=x), value=alt_value)
-    x = tf.compat.v1.where(tf.math.is_finite(x), x, alt_fill)
+    x = tf1.where(tf.math.is_finite(x), x, alt_fill)
     x.set_shape(x.shape.merge_with(in_shape))
     return x
 
@@ -176,7 +177,7 @@ def set_doc(value):
 
 def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
   """Helper to `maybe_call_fn_and_grads`."""
-  with tf.compat.v1.name_scope(name, 'value_and_gradients',
+  with tf1.name_scope(name, 'value_and_gradients',
                                [fn_arg_list, result, grads]):
 
     def _convert_to_tensor(x, name):
@@ -226,7 +227,7 @@ def maybe_call_fn_and_grads(fn,
                             check_non_none_grads=True,
                             name=None):
   """Calls `fn` and computes the gradient of the result wrt `args_list`."""
-  with tf.compat.v1.name_scope(name, 'maybe_call_fn_and_grads',
+  with tf1.name_scope(name, 'maybe_call_fn_and_grads',
                                [fn_arg_list, result, grads]):
     fn_arg_list = (list(fn_arg_list) if is_list_like(fn_arg_list)
                    else [fn_arg_list])
@@ -270,12 +271,12 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
   Returns:
     result: `Tensor` representing applying `body_fn` iteratively `n` times.
   """
-  with tf.compat.v1.name_scope(name, 'smart_for_loop',
+  with tf1.name_scope(name, 'smart_for_loop',
                                [loop_num_iter, initial_loop_vars]):
     loop_num_iter_ = tf.get_static_value(loop_num_iter)
     if (loop_num_iter_ is None or tf.executing_eagerly() or
         control_flow_util.GraphOrParentsInXlaContext(
-            tf.compat.v1.get_default_graph())):
+            tf1.get_default_graph())):
       # Cast to int32 to run the comparison against i in host memory,
       # where while/LoopCond needs it.
       loop_num_iter = tf.cast(loop_num_iter, dtype=tf.int32)
@@ -326,9 +327,9 @@ def trace_scan(loop_fn,
       `Tensor` being a stack of the corresponding `Tensors` in the return value
       of `trace_fn` for each slice of `elems`.
   """
-  with tf.compat.v1.name_scope(
-      name, 'trace_scan', [initial_state, elems]), tf.compat.v1.variable_scope(
-          tf.compat.v1.get_variable_scope()) as vs:
+  with tf1.name_scope(
+      name, 'trace_scan', [initial_state, elems]), tf1.variable_scope(
+          tf1.get_variable_scope()) as vs:
     if vs.caching_device is None and not tf.executing_eagerly():
       vs.set_caching_device(lambda op: op.device)
 

@@ -24,14 +24,15 @@ import collections
 
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
 
 _INITIAL_T = 10.0
 _EXPLORATION_SHRINKAGE = 0.05
@@ -138,7 +139,7 @@ class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DualAveragingStepSizeAdaptationTest(tf.test.TestCase,
+class DualAveragingStepSizeAdaptationTest(test_case.TestCase,
                                           parameterized.TestCase):
 
   def testTurnOnStoreParametersInKernelResults(self):
@@ -277,7 +278,7 @@ class DualAveragingStepSizeAdaptationTest(tf.test.TestCase,
       _impl()
 
   def testExample(self):
-    tf.compat.v1.random.set_random_seed(tfp_test_util.test_seed())
+    tf1.random.set_random_seed(tfp_test_util.test_seed())
     target_dist = tfd.JointDistributionSequential([
         tfd.Normal(0., 1.5),
         tfd.Independent(
@@ -311,7 +312,7 @@ class DualAveragingStepSizeAdaptationTest(tf.test.TestCase,
 
 @test_util.run_all_in_graph_and_eager_modes
 class DualAveragingStepSizeAdaptationStaticBroadcastingTest(
-    tf.test.TestCase,
+    test_case.TestCase,
     parameterized.TestCase):
   use_static_shape = True
 
@@ -356,7 +357,7 @@ class DualAveragingStepSizeAdaptationStaticBroadcastingTest(
         np.log([[0.70, 0.76, 0.73],
                 [0.76, 0.76, 0.73]]),
         dtype=tf.float64)
-    log_accept_ratio = tf.compat.v1.placeholder_with_default(
+    log_accept_ratio = tf1.placeholder_with_default(
         input=log_accept_ratio,
         shape=log_accept_ratio.shape if self.use_static_shape else None)
     state = [

@@ -19,14 +19,15 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.sts.internal import missing_values_util
-
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-class _MissingValuesUtilityTests(tf.test.TestCase):
+class _MissingValuesUtilityTests(test_case.TestCase):
 
   def testMoments(self):
     series = np.random.randn(2, 4)
@@ -76,7 +77,7 @@ class _MissingValuesUtilityTests(tf.test.TestCase):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype if dtype is None else dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 

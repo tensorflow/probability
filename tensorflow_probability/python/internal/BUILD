@@ -64,6 +64,7 @@ py_test(
         ":docstring_util",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -86,6 +87,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -115,6 +117,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/math:gradient",
     ],
 )
@@ -155,6 +158,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -206,6 +210,7 @@ py_test(
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/math:gradient",
     ],
 )
@@ -290,6 +295,7 @@ py_test(
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -305,6 +311,7 @@ py_library(
         # numpy dep,
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal/backend/numpy",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -319,6 +326,7 @@ py_test(
         # absl/flags dep,
         # absl/testing:flagsaver dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )

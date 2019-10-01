@@ -23,15 +23,14 @@ from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_case
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
                   'TF execution mode to use')
@@ -309,7 +308,7 @@ def assert_no_none_grad(bijector, method, wrt_vars, grads):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BijectorPropertiesTest(tf.test.TestCase, parameterized.TestCase):
+class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': bname, 'bijector_name': bname}

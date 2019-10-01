@@ -24,6 +24,8 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -110,11 +112,11 @@ class _FeatureScaledTest(parameterized.TestCase):
         self.evaluate(ard_kernel.matrix(z, z)))
 
 
-class FeatureScaledFloat32Test(_FeatureScaledTest, tf.test.TestCase):
+class FeatureScaledFloat32Test(_FeatureScaledTest, test_case.TestCase):
   dtype = np.float32
 
 
-class FeatureScaledFloat64Test(_FeatureScaledTest, tf.test.TestCase):
+class FeatureScaledFloat64Test(_FeatureScaledTest, test_case.TestCase):
   dtype = np.float64
 
 

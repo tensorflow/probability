@@ -21,8 +21,11 @@ from __future__ import print_function
 import collections
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -43,7 +46,7 @@ ValueAndGradient = collections.namedtuple('ValueAndGradient', ['x', 'f', 'df'])
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HagerZhangTest(tf.test.TestCase):
+class HagerZhangTest(test_case.TestCase):
   """Tests for Hager Zhang line search algorithm."""
 
   def test_quadratic(self):
@@ -202,12 +205,12 @@ class HagerZhangTest(tf.test.TestCase):
   def _test_eval_count_graph(self):
     starts = [0.1, 4.0]
     def get_fn():
-      eval_count = tf.compat.v2.Variable(0)
+      eval_count = tf.Variable(0)
       def _fdf(x):
         # Enabling locking is critical here. Otherwise, there are race
         # conditions between various call sites which causes some of the
         # invocations to be missed.
-        inc = tf.compat.v1.assign_add(eval_count, 1, use_locking=True)
+        inc = tf1.assign_add(eval_count, 1, use_locking=True)
         with tf.control_dependencies([inc]):
           f = x * x - 2 * x + 1
           df = 2 * (x - 1)
@@ -218,7 +221,7 @@ class HagerZhangTest(tf.test.TestCase):
       fdf, counter = get_fn()
       results = tfp.optimizer.linesearch.hager_zhang(
           fdf, initial_step_size=tf.constant(start))
-      init = tf.compat.v1.global_variables_initializer()
+      init = tf1.global_variables_initializer()
       with self.cached_session() as session:
         session.run(init)
         results = session.run(results)

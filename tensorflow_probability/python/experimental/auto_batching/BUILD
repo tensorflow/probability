@@ -99,7 +99,9 @@ py_library(
         "virtual_machine.py",
     ],
     srcs_version = "PY2AND3",
-    deps = [":instructions"],
+    deps = [
+        ":instructions",
+    ],
 )
 
 py_library(
@@ -108,7 +110,9 @@ py_library(
         "liveness.py",
     ],
     srcs_version = "PY2AND3",
-    deps = [":instructions"],
+    deps = [
+        ":instructions",
+    ],
 )
 
 py_library(
@@ -163,7 +167,9 @@ py_library(
         "dsl.py",
     ],
     srcs_version = "PY2AND3",
-    deps = [":instructions"],
+    deps = [
+        ":instructions",
+    ],
 )
 
 py_library(
@@ -210,11 +216,13 @@ py_library(
 
 py_library(
     name = "tfp_xla_test_case",
+    testonly = 1,
     srcs = ["tfp_xla_test_case.py"],
     srcs_version = "PY2AND3",
     deps = [
         ":xla",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -235,6 +243,7 @@ py_test(
         ":instructions",
         ":test_programs",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -250,6 +259,7 @@ py_test(
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -265,6 +275,7 @@ py_test(
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -280,6 +291,7 @@ py_test(
         ":test_programs",
         ":virtual_machine",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -293,6 +305,7 @@ py_test(
         ":instructions",
         ":test_programs",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -307,6 +320,7 @@ py_test(
         ":stackless",
         ":test_programs",
         ":tf_backend",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -318,6 +332,7 @@ py_test(
     deps = [
         ":stack_optimization",
         ":test_programs",
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -338,6 +353,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -356,6 +372,7 @@ py_test(
         ":virtual_machine",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )
 
@@ -374,5 +391,6 @@ py_test(
         ":virtual_machine",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
     ],
 )

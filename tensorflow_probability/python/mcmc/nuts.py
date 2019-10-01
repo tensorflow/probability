@@ -61,7 +61,7 @@ MULTINOMIAL_SAMPLE = True             # Default: True
 
 # Whether to use U turn criteria in [1] or generalized U turn criteria in [2]
 # to check the tree trajectory.
-GENERALIZED_UTURN = True              # Default: True
+GENERALIZED_UTURN = False             # Default: True
 ##############################################################
 ### END STATIC CONFIGURATION #################################
 ##############################################################

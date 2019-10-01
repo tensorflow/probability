@@ -49,7 +49,8 @@ from __future__ import print_function
 
 import collections
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions
 
@@ -172,7 +173,7 @@ def one_step(
     next_population_values: A `Tensor` of same shape and dtype as input
       `population_values`. The function values for the `next_population`.
   """
-  with tf.compat.v1.name_scope(
+  with tf1.name_scope(
       name, 'one_step',
       [population, population_values, differential_weight, crossover_prob]):
     population, _ = _ensure_list(population)
@@ -199,15 +200,15 @@ def one_step(
 
     infinity = tf.zeros_like(population_values) + np.inf
 
-    population_values = tf.compat.v1.where(
+    population_values = tf1.where(
         tf.math.is_nan(population_values), x=infinity, y=population_values)
 
     to_replace = candidate_values < population_values
     next_population = [
-        tf.compat.v1.where(to_replace, x=candidates_part, y=population_part)
+        tf1.where(to_replace, x=candidates_part, y=population_part)
         for candidates_part, population_part in zip(candidates, population)
     ]
-    next_values = tf.compat.v1.where(
+    next_values = tf1.where(
         to_replace, x=candidate_values, y=population_values)
 
   return next_population, next_values
@@ -370,7 +371,7 @@ def minimize(objective_function,
     raise ValueError('Only one of initial population or initial position '
                      'should be specified')
 
-  with tf.compat.v1.name_scope(
+  with tf1.name_scope(
       name,
       default_name='minimize',
       values=[
@@ -512,7 +513,7 @@ def _check_failure(population_values):
 def _find_best_in_population(population, values):
   """Finds the population member with the lowest value."""
   best_value = tf.math.reduce_min(input_tensor=values)
-  best_index = tf.compat.v1.where(tf.math.equal(values, best_value))[0, 0]
+  best_index = tf1.where(tf.math.equal(values, best_value))[0, 0]
 
   return ([population_part[best_index] for population_part in population],
           best_value)
@@ -664,7 +665,7 @@ def _binary_crossover(population,
         dtype=crossover_prob.dtype.base_dtype,
         seed=seed_stream()) < crossover_prob
     do_binary_crossover |= force_crossovers
-    recombinant_flat = tf.compat.v1.where(
+    recombinant_flat = tf1.where(
         do_binary_crossover, x=mutant_part_flat, y=pop_part_flat)
     recombinant = tf.reshape(recombinant_flat, tf.shape(input=population_part))
     recombinants.append(recombinant)
@@ -734,7 +735,7 @@ def _get_mixing_indices(size, seed=None, name=None):
     samples without replacement between 0 and size - 1 (inclusive) with the
     `i`th row not including the number `i`.
   """
-  with tf.compat.v1.name_scope(
+  with tf1.name_scope(
       name, default_name='get_mixing_indices', values=[size]):
     size = tf.convert_to_tensor(value=size)
     dtype = size.dtype
@@ -753,18 +754,18 @@ def _get_mixing_indices(size, seed=None, name=None):
                               seed=seed_stream())
 
     # Shift second if it is on top of or to the right of first
-    second = tf.compat.v1.where(first < second, x=second, y=second + 1)
+    second = tf1.where(first < second, x=second, y=second + 1)
     smaller = tf.math.minimum(first, second)
     larger = tf.math.maximum(first, second)
     # Shift the third one so it does not coincide with either the first or the
     # second number. Assuming first < second, shift by 1 if the number is in
     # [first, second) and by 2 if the number is greater than or equal to the
     # second.
-    third = tf.compat.v1.where(third < smaller, x=third, y=third + 1)
-    third = tf.compat.v1.where(third < larger, x=third, y=third + 1)
+    third = tf1.where(third < smaller, x=third, y=third + 1)
+    third = tf1.where(third < larger, x=third, y=third + 1)
     sample = tf.stack([first, second, third], axis=1)
     to_avoid = tf.expand_dims(tf.range(size), axis=-1)
-    sample = tf.compat.v1.where(sample < to_avoid, x=sample, y=sample + 1)
+    sample = tf1.where(sample < to_avoid, x=sample, y=sample + 1)
     return sample
 
 

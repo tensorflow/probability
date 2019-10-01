@@ -25,23 +25,25 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+
+from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-def _assert_sparse_tensor_value(test_case, expected, actual):
-  test_case.assertEqual(np.int64, np.array(actual.indices).dtype)
-  test_case.assertAllEqual(expected.indices, actual.indices)
+def _assert_sparse_tensor_value(test_case_instance, expected, actual):
+  test_case_instance.assertEqual(np.int64, np.array(actual.indices).dtype)
+  test_case_instance.assertAllEqual(expected.indices, actual.indices)
 
-  test_case.assertEqual(
+  test_case_instance.assertEqual(
       np.array(expected.values).dtype, np.array(actual.values).dtype)
-  test_case.assertAllEqual(expected.values, actual.values)
+  test_case_instance.assertAllEqual(expected.values, actual.values)
 
-  test_case.assertEqual(np.int64, np.array(actual.dense_shape).dtype)
-  test_case.assertAllEqual(expected.dense_shape, actual.dense_shape)
+  test_case_instance.assertEqual(np.int64, np.array(actual.dense_shape).dtype)
+  test_case_instance.assertAllEqual(expected.dense_shape, actual.dense_shape)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SparseTest(tf.test.TestCase):
+class SparseTest(test_case.TestCase):
   # Copied (with modifications) from:
   # tensorflow/contrib/layers/python/ops/sparse_ops.py.
 
