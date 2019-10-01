@@ -28,6 +28,7 @@ import os
 
 from absl import app
 from absl import flags
+from tensorflow_docs.api_generator import doc_controls
 from tensorflow_docs.api_generator import generate_lib
 import tensorflow_probability as tfp
 
@@ -49,8 +50,14 @@ flags.DEFINE_string("site_path", "probability/api_docs/python",
 
 FLAGS = flags.FLAGS
 
+DO_NOT_GENERATE_DOCS_FOR = [
+    tfp.experimental.substrates.jax.tf2jax,
+    tfp.experimental.substrates.numpy.tf2numpy,
+]
+
 
 def internal_filter(path, parent, children):
+  """Skip any object with "internal" in the name."""
   del path
   del parent
   children = [
@@ -60,6 +67,8 @@ def internal_filter(path, parent, children):
 
 
 def main(unused_argv):
+  for obj in DO_NOT_GENERATE_DOCS_FOR:
+    doc_controls.do_not_generate_docs(obj)
 
   doc_generator = generate_lib.DocGenerator(
       root_title="TensorFlow Probability",
