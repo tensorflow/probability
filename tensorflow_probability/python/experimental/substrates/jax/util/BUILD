@@ -38,8 +38,8 @@ TEST_FILENAMES = []
     name = "rewrite_{}".format(filename),
     srcs = ["//tensorflow_probability/python/util:{}.py".format(filename)],
     outs = ["{}.py".format(filename)],
-    cmd = "$(location //tensorflow_probability/python/experimental/substrates/numpy:rewrite) $(SRCS) --numpy_to_jax > $@",
-    tools = ["//tensorflow_probability/python/experimental/substrates/numpy:rewrite"],
+    cmd = "$(location //tensorflow_probability/python/experimental/substrates/meta:rewrite) $(SRCS) --numpy_to_jax > $@",
+    tools = ["//tensorflow_probability/python/experimental/substrates/meta:rewrite"],
 ) for filename in FILENAMES + TEST_FILENAMES]
 
 [py_library(

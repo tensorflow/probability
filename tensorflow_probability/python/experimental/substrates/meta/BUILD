@@ -42,3 +42,12 @@ py_test(
         "//tensorflow_probability",
     ],
 )
+
+py_binary(
+    name = "rewrite",
+    srcs = ["rewrite.py"],
+    python_version = "PY3",
+    deps = [
+        # absl:app dep,
+    ],
+)

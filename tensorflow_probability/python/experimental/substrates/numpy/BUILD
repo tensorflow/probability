@@ -35,12 +35,3 @@ py_library(
         "//tensorflow_probability/python/internal/backend",
     ],
 )
-
-py_binary(
-    name = "rewrite",
-    srcs = ["rewrite.py"],
-    python_version = "PY3",
-    deps = [
-        # absl:app dep,
-    ],
-)

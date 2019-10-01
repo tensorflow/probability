@@ -95,8 +95,8 @@ TAP_BLACKLIST = ["{}_test".format(f) for f in (
     name = "rewrite_{}".format(filename),
     srcs = ["//tensorflow_probability/python/bijectors:{}.py".format(filename)],
     outs = ["{}.py".format(filename)],
-    cmd = "$(location //tensorflow_probability/python/experimental/substrates/numpy:rewrite) $(SRCS) --numpy_to_jax > $@",
-    tools = ["//tensorflow_probability/python/experimental/substrates/numpy:rewrite"],
+    cmd = "$(location //tensorflow_probability/python/experimental/substrates/meta:rewrite) $(SRCS) --numpy_to_jax > $@",
+    tools = ["//tensorflow_probability/python/experimental/substrates/meta:rewrite"],
 ) for filename in [
     "__init__",
     "bijector_test_util",

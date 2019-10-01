@@ -138,8 +138,8 @@ TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     name = "rewrite_{}".format(filename),
     srcs = ["//tensorflow_probability/python/distributions:{}.py".format(filename)],
     outs = ["{}.py".format(filename)],
-    cmd = "$(location //tensorflow_probability/python/experimental/substrates/numpy:rewrite) $(SRCS) > $@",
-    tools = ["//tensorflow_probability/python/experimental/substrates/numpy:rewrite"],
+    cmd = "$(location //tensorflow_probability/python/experimental/substrates/meta:rewrite) $(SRCS) > $@",
+    tools = ["//tensorflow_probability/python/experimental/substrates/meta:rewrite"],
 ) for filename in ["__init__"] + FILENAMES + TEST_FILENAMES]
 
 COMMON_DEPS = {
