@@ -184,6 +184,93 @@ class SampleDistributionTest(test_case.TestCase, parameterized.TestCase):
     actual_entropy = d.entropy()
     self.assertAllEqual(*self.evaluate([expected_entropy, actual_entropy]))
 
+  @tfp_test_util.numpy_disable_gradient_test
+  @tfp_test_util.jax_disable_variable_test
+  def test_gradients_through_params(self):
+    loc = tf.Variable(tf.zeros([4, 5, 3]), shape=tf.TensorShape(None))
+    scale = tf.Variable(tf.ones([]), shape=tf.TensorShape(None))
+    # In real life, you'd really always want `sample_shape` to be
+    # `trainable=False`.
+    sample_shape = tf.Variable([1, 2], shape=tf.TensorShape(None))
+    dist = tfd.Sample(
+        tfd.Independent(tfd.Logistic(loc=loc, scale=scale),
+                        reinterpreted_batch_ndims=1),
+        sample_shape=sample_shape,
+        validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -dist.log_prob(0.)
+    self.assertLen(dist.trainable_variables, 3)
+    grad = tape.gradient(loss, [loc, scale, sample_shape])
+    self.assertAllNotNone(grad[:-1])
+    self.assertIs(grad[-1], None)
+
+  @tfp_test_util.numpy_disable_gradient_test
+  @tfp_test_util.jax_disable_variable_test
+  def test_variable_shape_change(self):
+    loc = tf.Variable(tf.zeros([4, 5, 3]), shape=tf.TensorShape(None))
+    scale = tf.Variable(tf.ones([]), shape=tf.TensorShape(None))
+    # In real life, you'd really always want `sample_shape` to be
+    # `trainable=False`.
+    sample_shape = tf.Variable([1, 2], shape=tf.TensorShape(None))
+    dist = tfd.Sample(
+        tfd.Independent(tfd.Logistic(loc=loc, scale=scale),
+                        reinterpreted_batch_ndims=1),
+        sample_shape=sample_shape,
+        validate_args=True)
+    self.evaluate([v.initializer for v in dist.trainable_variables])
+
+    x = dist.mean()
+    y = dist.sample([7, 2], seed=tfp_test_util.test_seed())
+    loss_x = -dist.log_prob(x)
+    loss_0 = -dist.log_prob(0.)
+    batch_shape = dist.batch_shape_tensor()
+    event_shape = dist.event_shape_tensor()
+    [x_, y_, loss_x_, loss_0_, batch_shape_, event_shape_] = self.evaluate([
+        x, y, loss_x, loss_0, batch_shape, event_shape])
+    self.assertAllEqual([4, 5, 1, 2, 3], x_.shape)
+    self.assertAllEqual([7, 2, 4, 5, 1, 2, 3], y_.shape)
+    self.assertAllEqual([4, 5], loss_x_.shape)
+    self.assertAllEqual([4, 5], loss_0_.shape)
+    self.assertAllEqual([4, 5], batch_shape_)
+    self.assertAllEqual([1, 2, 3], event_shape_)
+    self.assertLen(dist.trainable_variables, 3)
+
+    with tf.control_dependencies([
+        loc.assign(tf.zeros([])),
+        scale.assign(tf.ones([3, 1, 2])),
+        sample_shape.assign(6),
+    ]):
+      x = dist.mean()
+      y = dist.sample([7, 2], seed=tfp_test_util.test_seed())
+      loss_x = -dist.log_prob(x)
+      loss_0 = -dist.log_prob(0.)
+      batch_shape = dist.batch_shape_tensor()
+      event_shape = dist.event_shape_tensor()
+    [x_, y_, loss_x_, loss_0_, batch_shape_, event_shape_] = self.evaluate([
+        x, y, loss_x, loss_0, batch_shape, event_shape])
+    self.assertAllEqual([3, 1, 6, 2], x_.shape)
+    self.assertAllEqual([7, 2, 3, 1, 6, 2], y_.shape)
+    self.assertAllEqual([3, 1], loss_x_.shape)
+    self.assertAllEqual([3, 1], loss_0_.shape)
+    self.assertAllEqual([3, 1], batch_shape_)
+    self.assertAllEqual([6, 2], event_shape_)
+    self.assertLen(dist.trainable_variables, 3)
+
+  def test_variable_sample_shape_exception(self):
+    loc = tf.Variable(tf.zeros([4, 5, 3]), shape=tf.TensorShape(None))
+    scale = tf.Variable(tf.ones([]), shape=tf.TensorShape(None))
+    sample_shape = tf.Variable([[1, 2]], shape=tf.TensorShape(None))
+    with self.assertRaisesWithPredicateMatch(
+        Exception,
+        'Argument `sample_shape` must be either a scalar or a vector.'):
+      dist = tfd.Sample(
+          tfd.Independent(tfd.Logistic(loc=loc, scale=scale),
+                          reinterpreted_batch_ndims=1),
+          sample_shape=sample_shape,
+          validate_args=True)
+      self.evaluate([v.initializer for v in dist.trainable_variables])
+      self.evaluate(dist.mean())
+
 
 if __name__ == '__main__':
   tf.test.main()

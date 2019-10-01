@@ -104,21 +104,23 @@ def _get_static_predicate(pred):
 
 def rank_from_shape(shape_tensor_fn, tensorshape=None):
   """Computes `rank` given a `Tensor`'s `shape`."""
-
+  # Note: this function will implicitly interpret scalar "shapes" as length-1
+  # vectors.
   if tensorshape is None:
     shape_tensor = (shape_tensor_fn() if callable(shape_tensor_fn)
                     else shape_tensor_fn)
-    if (hasattr(shape_tensor, 'shape') and
-        hasattr(shape_tensor.shape, 'num_elements')):
-      ndims_ = tensorshape_util.num_elements(shape_tensor.shape)
-    else:
-      ndims_ = len(shape_tensor)
+    shape_tensor_ = tf.get_static_value(shape_tensor)
+    if shape_tensor_ is not None:
+      shape_tensor = np.int32(shape_tensor_)
+    elif not hasattr(shape_tensor, 'shape'):
+      shape_tensor = tf.convert_to_tensor(shape_tensor)
+    ndims_ = tensorshape_util.num_elements(shape_tensor.shape)
     ndims_fn = lambda: tf.size(shape_tensor)
   else:
     ndims_ = tensorshape_util.rank(tensorshape)
     ndims_fn = lambda: tf.size(  # pylint: disable=g-long-lambda
         shape_tensor_fn() if callable(shape_tensor_fn) else shape_tensor_fn)
-  return ndims_fn() if ndims_ is None else ndims_
+  return ndims_fn() if ndims_ is None else np.int32(ndims_)
 
 
 def broadcast_shape(x_shape, y_shape):

@@ -306,17 +306,20 @@ class NumpyVariable(wrapt.ObjectProxy):
       variable_def=None,
       dtype=None,
       import_scope=None,
-      constraint=None):
+      constraint=None,
+      shape=None):
     assert constraint is None
-    super(NumpyVariable, self).__init__(
-        onp.array(initial_value, dtype=dtype or onp.float32))
+    v = convert_to_tensor(initial_value)
+    if dtype is not None:
+      v = v.astype(utils.numpy_dtype(dtype))
+    super(NumpyVariable, self).__init__(v)
     self.initializer = None
   # pylint: enable=unused-argument
 
   def __array__(self, dtype=None):
     if dtype is not None:
-      return self.astype(dtype)
-    return self
+      dtype = utils.numpy_dtype(dtype)
+    return self.astype(dtype).__array__()
 
   def assign(self, value):
     super(NumpyVariable, self).__init__(onp.array(value, dtype=self.dtype))

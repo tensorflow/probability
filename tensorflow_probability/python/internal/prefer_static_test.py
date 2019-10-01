@@ -267,6 +267,12 @@ class ShapeTest(test_case.TestCase):
           vector_value, shape=None))
       self.assertAllEqual(self.evaluate(shape), [2])
 
+  def test_rank_from_shape_scalar(self):
+    self.assertEqual(1, prefer_static.rank_from_shape(5))
+    v = tf.Variable(4, shape=tf.TensorShape(None))
+    self.evaluate(v.initializer)
+    self.assertEqual(1, self.evaluate(prefer_static.rank_from_shape(v)))
+
   def test_rank_from_shape(self):
     shape = [2, 4, 3]
     expected_rank = len(shape)
