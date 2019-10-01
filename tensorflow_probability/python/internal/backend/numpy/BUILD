@@ -315,16 +315,6 @@ py_library(
     ],
 )
 
-py_binary(
-    name = "gen_linear_operators",
-    srcs = ["gen_linear_operators.py"],
-    python_version = "PY3",
-    deps = [
-        # absl:app dep,
-        # tensorflow dep,
-    ],
-)
-
 LINOP_FILES = [
     "adjoint_registrations",
     "cholesky_registrations",
@@ -356,8 +346,12 @@ LINOP_FILES = [
     name = "rewrite_{}".format(filename),
     srcs = [],
     outs = ["{}.py".format(filename)],
-    cmd = "$(location :gen_linear_operators) --module_name={} > $@".format(filename),
-    tools = [":gen_linear_operators"],
+    cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_linear_operators) " +
+           "--module_name={} --whitelist={} > $@").format(
+        filename,
+        ",".join(LINOP_FILES),
+    ),
+    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
 ) for filename in LINOP_FILES]
 
 py_library(

@@ -18,11 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import sys
-if not sys.path[0].endswith('.runfiles'):
-  sys.path.pop(0)
-
-# pylint: disable=g-import-not-at-top,g-bad-import-order
 import importlib
 import inspect
 import re
@@ -31,11 +26,13 @@ import re
 
 from absl import app
 from absl import flags
-# pylint: enable=g-import-not-at-top,g-bad-import-order
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('module_name', '', 'TF linalg module to transform')
+flags.DEFINE_list(
+    'whitelist', '',
+    'TF linalg module whitelist (other imports will be commented-out)')
 
 MODULE_MAPPINGS = {
     'framework import dtypes': 'dtype as dtypes',
@@ -90,6 +87,15 @@ def gen_module(module_name):
       r'from tensorflow\.python\.linalg import (\w+)',
       'from tensorflow_probability.python.internal.backend.numpy import \\1 '
       'as \\1', code)
+  code = code.replace(
+      'from tensorflow.python.ops.linalg import ',
+      '# from tensorflow.python.ops.linalg import ')
+  for f in FLAGS.whitelist:
+    code = code.replace(
+        '# from tensorflow.python.ops.linalg '
+        'import {}'.format(f),
+        'from tensorflow.python.ops.linalg '
+        'import {}'.format(f))
   code = code.replace(
       'tensorflow.python.ops.linalg import ',
       'tensorflow_probability.python.internal.backend.numpy import ')
