@@ -50,7 +50,17 @@ flags.DEFINE_string("site_path", "probability/api_docs/python",
 FLAGS = flags.FLAGS
 
 
+def internal_filter(path, parent, children):
+  del path
+  del parent
+  children = [
+      (name, value) for (name, value) in children if "internal" not in name
+  ]
+  return children
+
+
 def main(unused_argv):
+
   doc_generator = generate_lib.DocGenerator(
       root_title="TensorFlow Probability",
       py_modules=[("tfp", tfp)],
@@ -59,7 +69,7 @@ def main(unused_argv):
       search_hints=FLAGS.search_hints,
       site_path=FLAGS.site_path,
       private_map={"tfp": ["google", "staging", "python"]},
-  )
+      callbacks=[internal_filter])
 
   doc_generator.build(output_dir=FLAGS.output_dir)
 
