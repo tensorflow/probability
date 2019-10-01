@@ -331,7 +331,7 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
         getattr(dist, method)()
 
     for method in ('log_prob', 'prob'):
-      with tfp_hps.assert_no_excessive_var_usage('method', max_permissible=2):
+      with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=2):
         getattr(dist, method)(np.ones((4, 4, 3)) / 3.)
 
     # TODO(b/140579567): The `variance()` and `covariance()` methods require
