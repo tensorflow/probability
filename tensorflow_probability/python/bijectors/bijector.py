@@ -25,6 +25,7 @@ import weakref
 
 # Dependency imports
 import numpy as np
+import numpy as onp  # JAX rewrites numpy import  # pylint: disable=reimported
 import six
 import tensorflow.compat.v2 as tf
 
@@ -109,7 +110,7 @@ class _Mapping(
     def generic_to_array(x):
       if isinstance(x, np.generic):
         x = np.array(x)
-      if isinstance(x, np.ndarray):
+      if isinstance(x, onp.ndarray):
         x.flags.writeable = False
       return x
     if old is None:
@@ -180,7 +181,7 @@ class HashableWeakRef(weakref.ref):
 
   def __hash__(self):
     x = self()
-    if not isinstance(x, np.ndarray):
+    if not isinstance(x, onp.ndarray):
       return id(x)
     if isinstance(x, np.generic):
       raise ValueError('Unable to weakref np.generic')
@@ -202,8 +203,8 @@ class HashableWeakRef(weakref.ref):
       raise ValueError('Unable to weakref np.generic')
     y = other()
     ids_are_equal = id(x) == id(y)
-    if isinstance(x, np.ndarray):
-      return (isinstance(y, np.ndarray) and
+    if isinstance(x, onp.ndarray):
+      return (isinstance(y, onp.ndarray) and
               x.__array_interface__ == y.__array_interface__ and
               ids_are_equal)
     return ids_are_equal
