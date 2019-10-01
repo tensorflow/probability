@@ -99,4 +99,7 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
     keywords='tensorflow probability statistics bayesian machine learning',
+    extras_require={  # e.g. `pip install tfp-nightly[jax]`
+        'jax': ['jax', 'jaxlib'],
+    }
 )
