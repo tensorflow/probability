@@ -46,8 +46,8 @@ def effective_sample_size(states,
   with the same variance as `state`.
 
   More precisely, given a stationary sequence of possibly correlated random
-  variables `X_1, X_2,...,X_N`, each identically distributed ESS is the number
-  such that
+  variables `X_1, X_2, ..., X_N`, identically distributed, ESS is the
+  number such that
 
   ```Variance{ N**-1 * Sum{X_i} } = ESS**-1 * Variance{ X_1 }.```
 
@@ -58,16 +58,16 @@ def effective_sample_size(states,
   Args:
     states:  `Tensor` or list of `Tensor` objects.  Dimension zero should index
       identically distributed states.
-    filter_threshold:  `Tensor` or list of `Tensor` objects.
-      Must broadcast with `state`.  The auto-correlation sequence is truncated
-      after the first appearance of a term less than `filter_threshold`.
-      Setting to `None` means we use no threshold filter.  Since `|R_k| <= 1`,
-      setting to any number less than `-1` has the same effect. Ignored if
+    filter_threshold: `Tensor` or list of `Tensor` objects.  Must broadcast with
+      `state`.  The sequence of auto-correlations is truncated after the first
+      appearance of a term less than `filter_threshold`.  Setting to `None`
+      means we use no threshold filter.  Since `|R_k| <= 1`, setting to any
+      number less than `-1` has the same effect. Ignored if
       `filter_beyond_positive_pairs` is `True`.
-    filter_beyond_lag:  `Tensor` or list of `Tensor` objects.  Must be
-      `int`-like and scalar valued.  The auto-correlation sequence is truncated
-      to this length.  Setting to `None` means we do not filter based on number
-      of lags.
+    filter_beyond_lag: `Tensor` or list of `Tensor` objects.  Must be `int`-like
+      and scalar valued.  The sequence of auto-correlations is truncated to this
+      length.  Setting to `None` means we do not filter based on the size of
+      lags.
     filter_beyond_positive_pairs: Python boolean. If `True`, only consider the
       initial auto-correlation sequence where the pairwise sums are positive.
     name:  `String` name to prepend to created ops.
@@ -122,12 +122,12 @@ def effective_sample_size(states,
   function provides two methods to perform this truncation.
 
   * `filter_threshold` -- since many MCMC methods generate chains where `R_k >
-    0`, a reasonable criteria is to truncate at the first index where the
+    0`, a reasonable criterion is to truncate at the first index where the
     estimated auto-correlation becomes negative. This method does not estimate
     the `ESS` of super-efficient chains (where `ESS > N`) correctly.
 
   * `filter_beyond_positive_pairs` -- reversible MCMC chains produce
-    auto-correlation sequence with the property that pairwise sums of the
+    an auto-correlation sequence with the property that pairwise sums of the
     elements of that sequence are positive [1] (i.e. `R_{2k} + R_{2k + 1} > 0`
     for `k in {0, ..., N/2}`). Deviations are only possible due to noise. This
     method truncates the auto-correlation sequence where the pairwise sums
@@ -136,7 +136,7 @@ def effective_sample_size(states,
   The arguments `filter_beyond_lag`, `filter_threshold` and
   `filter_beyond_positive_pairs` are filters intended to remove noisy tail terms
   from `R_k`.  You can combine `filter_beyond_lag` with `filter_threshold` or
-  `filter_beyond_positive_pairs. E.g. combining `filter_beyond_lag` and
+  `filter_beyond_positive_pairs. E.g., combining `filter_beyond_lag` and
   `filter_beyond_positive_pairs` means that terms are removed if they were to be
   filtered under the `filter_beyond_lag` OR `filter_beyond_positive_pairs`
   criteria.
@@ -188,9 +188,9 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
         states, axis=0, max_lags=filter_beyond_lag)
 
     # With R[k] := auto_corr[k, ...],
-    # ESS = N / {1 + 2 * Sum_{k=1}^N (N - k) / N * R[k]}
-    #     = N / {-1 + 2 * Sum_{k=0}^N (N - k) / N * R[k]} (since R[0] = 1)
-    #     approx N / {-1 + 2 * Sum_{k=0}^M (N - k) / N * R[k]}
+    # ESS = N / {1 + 2 * Sum_{k=1}^N R[k] * (N - k) / N}
+    #     = N / {-1 + 2 * Sum_{k=0}^N R[k] * (N - k) / N} (since R[0] = 1)
+    #     approx N / {-1 + 2 * Sum_{k=0}^M R[k] * (N - k) / N}
     # where M is the filter_beyond_lag truncation point chosen above.
 
     # Get the factor (N - k) / N, and give it shape [M, 1,...,1], having total
@@ -219,7 +219,7 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
       # Pairwise sums are all positive for auto-correlation spectra derived from
       # reversible MCMC chains.
       # E.g. imagine the pairwise sums are [0.2, 0.1, -0.1, -0.2]
-      # Step 1: mask = [False, False, True, False]
+      # Step 1: mask = [False, False, True, True]
       mask = _sum_pairs(auto_corr) < 0.
       # Step 2: mask = [0, 0, 1, 1]
       mask = tf.cast(mask, dt)
@@ -242,9 +242,9 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
       #   Assume auto_corr = [1, 0.5, 0.0, 0.3], and filter_threshold = 0.2.
       # Step 1:  mask = [False, False, True, False]
       mask = auto_corr < filter_threshold
-      # Step 2:  mask = [0, 0, 1, 1]
+      # Step 2:  mask = [0, 0, 1, 0]
       mask = tf.cast(mask, dtype=dt)
-      # Step 3:  mask = [0, 0, 1, 2]
+      # Step 3:  mask = [0, 0, 1, 1]
       mask = tf.cumsum(mask, axis=0)
       # Step 4:  mask = [1, 1, 0, 0]
       mask = tf.maximum(1. - mask, 0.)
