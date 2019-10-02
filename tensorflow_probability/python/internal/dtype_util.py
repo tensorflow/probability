@@ -82,7 +82,7 @@ def common_dtype(args_list, dtype_hint=None):
       else:
         raise TypeError(
             'Found incompatible dtypes, {} and {}.'.format(dtype, dt))
-  return dtype_hint if dtype is None else tf.as_dtype(dtype)
+  return dtype_hint if dtype is None else base_dtype(dtype)
 
 
 def is_bool(dtype):
