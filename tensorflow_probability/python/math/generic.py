@@ -34,6 +34,7 @@ __all__ = [
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
     'smootherstep',
+    'soft_sorting_matrix',
     'soft_threshold',
     'softplus_inverse',
 ]
@@ -439,3 +440,55 @@ def log_sub_exp(x, y, return_sign=False, name=None):
       ones = tf.ones([], result.dtype)
       return result, tf.where(x < y, -ones, ones)
     return result
+
+
+def soft_sorting_matrix(x, temperature, name=None):
+  """Computes a matrix representing a continuous relaxation of sorting.
+
+  Given a vector `x`, there exists a permutation matrix `P_x`, when applied to
+  `x` gives `x` sorted in decreasing order. Here, we compute a continuous
+  relaxation of `P_x`, parameterized by `temperature`. This continuous
+  relaxation satisfies the property that it is a unimodal row-stochastic matrix,
+  meaning that all entries are non-negative, all rows sum to 1., and there is a
+  unique maximum entry in each column. The unique maximum entry will correspond
+  to the location of a `1` in the exact sorting permutation.
+
+  Complexity: Given a vector `x` of size `N`, this operation will take `O(N**2)`
+    time.
+
+  This is also known as a Neural sort in [1].
+
+  Args:
+    x: `float` `Tensor`. Argument to compute the relaxed sorting matrix with
+      respect to.  The relaxed permutation is computed with respect to the last
+      axis.
+    temperature: Positive `float` Tensor`. When `temperature` approaches zero,
+      this will retrieve the exact permutation matrix corresponding to sorting
+      from largest to smallest.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'soft_sorting_matrix'`).
+  Returns:
+    soft_sort: A unimodal row-stochastic matrix. Applying this matrix on x
+      will in the limit of low temperature, sort it.
+
+  #### References
+
+  [1]: Aditya Grover, Eric Wang, Aaron Zweig, Stefano Ermon.
+       Stochastic Optimization of Sorting Networks via Continuous Relaxations.
+       https://arxiv.org/abs/1903.08850
+  """
+  with tf.name_scope(name or 'soft_sorting_matrix'):
+    dtype = dtype_util.common_dtype([temperature, x], dtype_hint=tf.float32)
+    temperature = tf.convert_to_tensor(
+        temperature, name='temperature', dtype=dtype)
+    x = tf.convert_to_tensor(x, name='x', dtype=dtype)
+    n = tf.shape(x)[-1]
+    y = x[..., tf.newaxis]
+    pairwise_distances = tf.abs(y - tf.linalg.matrix_transpose(y))
+    scaling = tf.dtypes.cast(
+        tf.range(n - 1, -(n - 1) - 1, delta=-2), dtype=dtype)
+    p_logits = tf.linalg.matrix_transpose(
+        tf.matmul(y, scaling[tf.newaxis, ...]) - tf.reduce_sum(
+            pairwise_distances, axis=-1)[..., tf.newaxis])
+    y = tf.nn.softmax(p_logits / temperature, axis=-1)
+    return y

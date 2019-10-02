@@ -28,6 +28,7 @@ from tensorflow_probability.python.math.generic import log_sub_exp
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
 from tensorflow_probability.python.math.generic import smootherstep
+from tensorflow_probability.python.math.generic import soft_sorting_matrix
 from tensorflow_probability.python.math.generic import soft_threshold
 from tensorflow_probability.python.math.generic import softplus_inverse
 from tensorflow_probability.python.math.gradient import value_and_gradient
@@ -85,6 +86,7 @@ _allowed_symbols = [
     'reduce_weighted_logsumexp',
     'secant_root',
     'smootherstep',
+    'soft_sorting_matrix',
     'soft_threshold',
     'softplus_inverse',
     'sparse_or_dense_matmul',

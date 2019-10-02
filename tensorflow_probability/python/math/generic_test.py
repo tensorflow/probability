@@ -402,5 +402,37 @@ class Smootherstep(test_case.TestCase):
     self.assertAllClose([[0., 0., 0., 1.875]] * 2, g_, atol=1e-5, rtol=1e-5)
 
 
+@test_util.run_all_in_graph_and_eager_modes
+class SoftSortingMatrixTest(parameterized.TestCase, test_case.TestCase):
+
+  # By applying an argmax on each column of the generated matrix,
+  # we should recover an argsort. This is an invariant with respect
+  # to temperature.
+  @parameterized.parameters(
+      {'shape': (4,), 'temperature': 1e2},
+      {'shape': (4,), 'temperature': 1e1},
+      {'shape': (4,), 'temperature': 1e0},
+      {'shape': (4,), 'temperature': 1e-1},
+      {'shape': (5, 5, 4), 'temperature': 1e2},
+      {'shape': (5, 5, 4), 'temperature': 1e1},
+      {'shape': (5, 5, 4), 'temperature': 1e0},
+      {'shape': (5, 5, 4), 'temperature': 1e-1},
+  )
+  def testMatchesArgsort(self, shape, temperature):
+    x = np.random.randn(*shape)
+    # We sort in decreasing order.
+    expected_sort = np.flip(np.argsort(x, axis=-1), axis=-1)
+    soft_sort_permutation_ = self.evaluate(
+        tfp.math.soft_sorting_matrix(x=x, temperature=temperature))
+    # Check that the rows sum to 1.
+    self.assertAllClose(np.ones(shape), np.sum(soft_sort_permutation_, axis=-1))
+    # Check non-negativity.
+    self.assertTrue(np.all(soft_sort_permutation_ >= 0.))
+
+    # Check that by applying an argmax on the columns we actually get
+    # the indices that correspond to the argsort.
+    actual_sort_ = np.argmax(soft_sort_permutation_, axis=-1)
+    self.assertAllClose(expected_sort, actual_sort_)
+
 if __name__ == '__main__':
   tf.test.main()
