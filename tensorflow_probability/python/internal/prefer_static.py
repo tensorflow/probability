@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import decorator
 import numpy as np
+import numpy as onp  # Avoid jax rewrite  # pylint: disable=reimported
 
 import tensorflow.compat.v2 as tf
 
@@ -274,7 +275,8 @@ def _setdiff1d(a, b, aminusb=True, validate_indices=True):
           a[tf.newaxis], b[tf.newaxis]))[0]
     a_ = np.array(a_, dtype=dtype)
     b_ = np.array(b_, dtype=dtype)
-    return np.setdiff1d(a_, b_)
+    # TODO(https://github.com/google/jax/issues/70): Jax lacks setdiff1d
+    return onp.setdiff1d(a_, b_)
 setdiff1d = _copy_docstring(
     tf.sets.difference,
     _setdiff1d)

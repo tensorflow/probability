@@ -96,15 +96,15 @@ __all__ = [
 # then made more conservative just to be safe. (Conservative means use the
 # expansion more than we probably need to.) See `NdtrTest` in
 # special_math_test.py.
-LOGNDTR_FLOAT64_LOWER = np.array(-20, np.float64)
-LOGNDTR_FLOAT32_LOWER = np.array(-10, np.float32)
+LOGNDTR_FLOAT64_LOWER = -20.
+LOGNDTR_FLOAT32_LOWER = -10.
 
 # Upper bound values were chosen by examining for which values of 'x'
 # Log[cdf(x)] is 0, after which point we need to use the approximation
 # Log[cdf(x)] = Log[1 - cdf(-x)] approx -cdf(-x). We chose a value slightly
 # conservative, meaning we use the approximation earlier than needed.
-LOGNDTR_FLOAT64_UPPER = np.array(8, np.float64)
-LOGNDTR_FLOAT32_UPPER = np.array(5, np.float32)
+LOGNDTR_FLOAT64_UPPER = 8.
+LOGNDTR_FLOAT32_UPPER = 5.
 
 
 def ndtr(x, name="ndtr"):
@@ -348,11 +348,11 @@ def log_ndtr(x, series_order=3, name="log_ndtr"):
     x = tf.convert_to_tensor(x, name="x")
 
     if dtype_util.base_equal(x.dtype, tf.float64):
-      lower_segment = LOGNDTR_FLOAT64_LOWER
-      upper_segment = LOGNDTR_FLOAT64_UPPER
+      lower_segment = np.array(LOGNDTR_FLOAT64_LOWER, np.float64)
+      upper_segment = np.array(LOGNDTR_FLOAT64_UPPER, np.float64)
     elif dtype_util.base_equal(x.dtype, tf.float32):
-      lower_segment = LOGNDTR_FLOAT32_LOWER
-      upper_segment = LOGNDTR_FLOAT32_UPPER
+      lower_segment = np.array(LOGNDTR_FLOAT32_LOWER, np.float32)
+      upper_segment = np.array(LOGNDTR_FLOAT32_UPPER, np.float32)
     else:
       raise TypeError("x.dtype=%s is not supported." % x.dtype)
 
