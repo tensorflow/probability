@@ -21,6 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import exp as exp_bijector
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 
@@ -97,3 +98,25 @@ class LogNormal(transformed_distribution.TransformedDistribution):
   def _entropy(self):
     return (self.distribution.mean() + 0.5 +
             tf.math.log(self.distribution.stddev()) + 0.5 * np.log(2 * np.pi))
+
+
+@kullback_leibler.RegisterKL(LogNormal, LogNormal)
+def _kl_lognormal_lognormal(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b) with a and b LogNormal.
+
+  This is the same as the KL divergence between the underlying Normal
+  distributions.
+
+  Args:
+    a: instance of a LogNormal distribution object.
+    b: instance of a LogNormal distribution object.
+    name: Name to use for created operations.
+      Default value: `None` (i.e., `'kl_lognormal_lognormal'`).
+
+  Returns:
+    kl_div: Batchwise KL(a || b)
+  """
+  return kullback_leibler.kl_divergence(
+      a.distribution,
+      b.distribution,
+      name=(name or 'kl_lognormal_lognormal'))

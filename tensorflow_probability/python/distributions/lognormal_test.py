@@ -87,6 +87,36 @@ class LogNormalTest(test_case.TestCase):
     self.assertAllClose(self.evaluate(cdf),
                         self.evaluate(analytical_cdf))
 
+  def testLogNormalLogNormalKL(self):
+    batch_size = 6
+    mu_a = np.array([3.0] * batch_size)
+    sigma_a = np.array([1.0, 2.0, 3.0, 1.5, 2.5, 3.5])
+    mu_b = np.array([-3.0] * batch_size)
+    sigma_b = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
+
+    ln_a = tfd.LogNormal(loc=mu_a, scale=sigma_a)
+    ln_b = tfd.LogNormal(loc=mu_b, scale=sigma_b)
+
+    kl = tfd.kl_divergence(ln_a, ln_b)
+    kl_val = self.evaluate(kl)
+
+    normal_a = tfd.Normal(loc=mu_a, scale=sigma_a)
+    normal_b = tfd.Normal(loc=mu_b, scale=sigma_b)
+    kl_expected_from_normal = tfd.kl_divergence(normal_a, normal_b)
+
+    kl_expected_from_formula = ((mu_a - mu_b)**2 / (2 * sigma_b**2) + 0.5 * (
+        (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
+
+    x = ln_a.sample(int(1e5), seed=tfp_test_util.test_seed())
+    kl_sample = tf.reduce_mean(ln_a.log_prob(x) - ln_b.log_prob(x), axis=0)
+    kl_sample_ = self.evaluate(kl_sample)
+
+    self.assertEqual(kl.shape, (batch_size,))
+    self.assertAllClose(kl_val, kl_expected_from_normal)
+    self.assertAllClose(kl_val, kl_expected_from_formula)
+    self.assertAllClose(
+        kl_expected_from_formula, kl_sample_, atol=0.0, rtol=1e-2)
+
 
 if __name__ == '__main__':
   tf.test.main()
