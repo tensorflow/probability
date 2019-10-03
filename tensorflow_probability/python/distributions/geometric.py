@@ -86,13 +86,13 @@ class Geometric(distribution.Distribution):
     if (probs is None) == (logits is None):
       raise ValueError('Must pass probs or logits, but not both.')
     with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([logits, probs], dtype_hint=tf.float32)
       self._probs = tensor_util.convert_nonref_to_tensor(
-          probs, dtype_hint=tf.float32, name='probs')
+          probs, dtype=dtype, name='probs')
       self._logits = tensor_util.convert_nonref_to_tensor(
-          logits, dtype_hint=tf.float32, name='logits')
+          logits, dtype=dtype, name='logits')
       super(Geometric, self).__init__(
-          dtype=(self._logits.dtype if self._probs is None
-                 else self._probs.dtype),
+          dtype=dtype,
           reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
