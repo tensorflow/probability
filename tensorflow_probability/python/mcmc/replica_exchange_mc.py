@@ -19,10 +19,12 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
@@ -44,6 +46,21 @@ ReplicaExchangeMCKernelResults = collections.namedtuple(
         'sampled_replica_states',
         # List of kernel-results with pre-exchange samples from each replica.
         'sampled_replica_results',
+
+        # If exchanges are between adjacent replicas only, then we track
+        # proposed/accepted by boolean tensors of shape [..., num_replica - 1].
+        # If more general exchanges are allowed, these will be scalar NaNs.
+        # In principle we could track of any exchanges in a num_replica**2
+        # matrix, and if desired, this could be a future feature.
+        #
+        # is_exchange_proposed[k] is True iff an exchange was proposed between
+        # replicas k and k+1.
+        'is_exchange_proposed',
+
+        # is_exchange_accepted[..., k] is a batch of booleans, equal to True
+        # just where the proposed exchange between batch members of replicas
+        # k and k+1 was accepted.
+        'is_exchange_accepted',
     ])
 
 
@@ -53,7 +70,7 @@ def default_exchange_proposed_fn(prob_exchange):
   With probability `prob_exchange` propose combinations of replica for exchange.
   When exchanging, create combinations of adjacent replicas in
   [Replica Exchange Monte Carlo](
-  https://en.wikipedia.org/wiki/Parallel_tempering)
+  https://en.wikipedia.org/wiki/Parallel_tempering).  See also review paper [1].
 
   ```
   exchange_fn = default_exchange_proposed_fn(prob_exchange=0.5)
@@ -75,6 +92,12 @@ def default_exchange_proposed_fn(prob_exchange):
       replicas (a Python integer), and return combinations of replicas for
       exchange as an [n, 2] integer `Tensor`, `0 <= n <= num_replica // 2`,
       with *unique* values in the set `{0, ..., num_replica}`.
+
+  #### References
+
+  [1]: David J. Earl, Michael W. Deem
+       Parallel Tempering: Theory, Applications, and New Perspectives
+       https://arxiv.org/abs/physics/0508111
   """
 
   def default_exchange_proposed_fn_(num_replica, seed=None):
@@ -107,6 +130,8 @@ def default_exchange_proposed_fn(prob_exchange):
         true_fn=_exchange,
         false_fn=_null_exchange)
 
+  default_exchange_proposed_fn_.exchange_between_adjacent_only = True
+
   return default_exchange_proposed_fn_
 
 
@@ -118,6 +143,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   Monte Carlo (MCMC) algorithm that is also known as Parallel Tempering. This
   algorithm performs multiple sampling with different temperatures in parallel,
   and exchanges those samplings according to the Metropolis-Hastings criterion.
+  See also the review paper [1].
 
   The `K` replicas are parameterized in terms of `inverse_temperature`'s,
   `(beta[0], beta[1], ..., beta[K-1])`.  If the target distribution has
@@ -130,9 +156,9 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
     "flattened" versions of `p` (peak is less high, valley less low).  These
     distributions are somewhat closer to a uniform on the support of `p`.
 
-  Samples from adjacent replicas `i`, `i + 1` are used as proposals for each
-  other in a Metropolis step.  This allows the lower `beta` samples, which
-  explore less dense areas of `p`, to occasionally be used to help the
+  By default, samples from adjacent replicas `i`, `i + 1` are used as proposals
+  for each other in a Metropolis step.  This allows the lower `beta` samples,
+  which explore less dense areas of `p`, to occasionally be used to help the
   `beta == 1` chain explore new regions of the support.
 
   Samples from replica 0 are returned, and the others are discarded.
@@ -162,22 +188,28 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       make_kernel_fn=make_kernel_fn,
       seed=42)
 
-  samples, _ = tfp.mcmc.sample_chain(
+  def trace_exchanges(unused_state, results):
+    return (results.is_exchange_proposed, results.is_exchange_accepted)
+
+  samples, is_exchange_proposed, is_exchange_accepted = tfp.mcmc.sample_chain(
       num_results=1000,
       current_state=dtype(1),
       kernel=remc,
       num_burnin_steps=500,
+      trace_fn=trace_exchanges,
       parallel_iterations=1)  # For determinism.
 
   sample_mean = tf.reduce_mean(samples, axis=0)
   sample_std = tf.sqrt(
       tf.reduce_mean(tf.squared_difference(samples, sample_mean),
                      axis=0))
-  with tf.Session() as sess:
-    [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
 
-  print('Estimated mean: {}'.format(sample_mean_))
-  print('Estimated standard deviation: {}'.format(sample_std_))
+  # conditional_accept_prob[k] is P[ExchangeAccepted | ExchangeProposed]
+  # for the exchange between replicas k and k+1.
+  conditional_accept_prob = (
+      tf.reduce_sum(tf.cast(is_exchange_accepted, tf.float32), axis=0) /
+      tf.reduce_sum(tf.cast(is_exchange_proposed, tf.float32), axis=0)
+  )
   ```
 
   ##### Sampling from a 2-D Mixture Normal Distribution.
@@ -216,9 +248,6 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       num_burnin_steps=500,
       parallel_iterations=1)  # For determinism.
 
-  with tf.Session() as sess:
-    samples_ = sess.run(samples)
-
   plt.figure(figsize=(8, 8))
   plt.xlim(-2, 2)
   plt.ylim(-2, 2)
@@ -226,6 +255,11 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   plt.show()
   ```
 
+  #### References
+
+  [1]: David J. Earl, Michael W. Deem
+       Parallel Tempering: Theory, Applications, and New Perspectives
+       https://arxiv.org/abs/physics/0508111
   """
 
   def __init__(self,
@@ -249,6 +283,8 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         args and returns a TransitionKernel instance.
       exchange_proposed_fn: Python callable which take a number of replicas, and
         return combinations of replicas for exchange.
+        This function may set an attribute, `exchange_between_adjacent_only`,
+        which, if `True`, allows additional kernel_results tracking exchanges.
       seed: Python integer to seed the random number generator.
         Default value: `None` (i.e., no seed).
       name: Python `str` name prefixed to Ops created by this function.
@@ -280,6 +316,16 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
               target_log_prob_fn=_replica_log_prob_fn(inverse_temperatures[i],
                                                       target_log_prob_fn),
               seed=self._seed_stream()))
+
+    # kernel results tracking exchanges are available if this is True.
+    # We could provide those results in general in a num_replica x num_replica
+    # [batch] matrix, but that is pretty inefficient, and the case of adjacent
+    # exchanges only is (by far) the most common case.
+    #
+    # This is a property of exchange_proposed_fn, since that function alone
+    # determines the possible exchanges.
+    self._exchange_between_adjacent_only = getattr(
+        exchange_proposed_fn, 'exchange_between_adjacent_only', False)
 
   @property
   def target_log_prob_fn(self):
@@ -378,9 +424,10 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           self.num_replica, seed=self._seed_stream())
       exchange_proposed_n = tf.shape(input=exchange_proposed)[0]
 
-      exchanged_states = self._get_exchanged_states(
-          old_states, exchange_proposed, exchange_proposed_n,
-          sampled_replica_states, sampled_replica_results)
+      (exchanged_states, is_exchange_proposed_for_kr,
+       is_exchange_accepted_for_kr) = self._get_exchanged_states(
+           old_states, exchange_proposed, exchange_proposed_n,
+           sampled_replica_states, sampled_replica_results)
 
       no_exchange_proposed, _ = tf1.setdiff1d(
           tf.range(self.num_replica), tf.reshape(exchange_proposed, [-1]))
@@ -413,6 +460,8 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           replica_results=next_replica_results,
           sampled_replica_states=sampled_replica_states,
           sampled_replica_results=sampled_replica_results,
+          is_exchange_proposed=is_exchange_proposed_for_kr,
+          is_exchange_accepted=is_exchange_accepted_for_kr,
       )
 
       return next_state, kernel_results
@@ -448,6 +497,28 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           for k in range(num_state_parts)
       ]
 
+      # Two TensorArrays, for KernelResults only.
+      if self._exchange_between_adjacent_only:
+        # Since exchanges are between adjacent only, we track exchanges by the
+        # index of the edge between replicas.  E.g., if we have replicas
+        # [0, 1, 2, 3], then edge index 0 is for exchanges between replicas 0
+        # and 1.
+        is_exchange_proposed_for_kr = tf.TensorArray(
+            dtype=tf.bool,  # Initialized to False
+            size=self.num_replica - 1,
+            dynamic_size=False,
+            tensor_array_name='is_exchange_proposed_for_kr',
+            element_shape=tf.TensorShape([]))
+        is_exchange_accepted_for_kr = tf.TensorArray(
+            dtype=tf.bool,  # Initialized to False
+            size=self.num_replica - 1,
+            dynamic_size=False,
+            tensor_array_name='is_exchange_accepted_for_kr',
+            element_shape=target_log_probs[-1].shape)
+      else:
+        is_exchange_proposed_for_kr = tf.convert_to_tensor(np.nan)
+        is_exchange_accepted_for_kr = tf.convert_to_tensor(np.nan)
+
       # Draw random variables here, to avoid sampling in the loop (and losing
       # reproducibility).  This may mean we sample too many, but we will always
       # have enough.
@@ -465,10 +536,12 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           new_y = mcmc_util.choose(is_exchange_accepted, x, y)
         return new_x, new_y
 
-      def cond(i, unused_exchanged_states):
+      def cond(i, unused_exchanged_states, unused_is_exchanged_for_kr,
+               unused_is_exchange_accepted_for_kr):
         return i < exchange_proposed_n
 
-      def body(i, exchanged_states):
+      def body(i, exchanged_states, is_exchange_proposed_for_kr,
+               is_exchange_accepted_for_kr):
         """Body of while loop for exchanging states."""
         # Propose exchange between replicas indexed by m and n.
         m, n = tf.unstack(exchange_proposed[i])
@@ -485,18 +558,48 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
         is_exchange_accepted = log_uniforms[i] < log_accept_ratio
 
+        if self._exchange_between_adjacent_only:
+          exchange_edge = tf.minimum(m, n)
+          is_exchange_proposed_for_kr = is_exchange_proposed_for_kr.write(
+              exchange_edge, True)
+          is_exchange_accepted_for_kr = is_exchange_accepted_for_kr.write(
+              exchange_edge, is_exchange_accepted)
+
         for k in range(num_state_parts):
           new_m, new_n = _swap(is_exchange_accepted, old_states[k].read(m),
                                old_states[k].read(n))
           exchanged_states[k] = exchanged_states[k].write(m, new_m)
           exchanged_states[k] = exchanged_states[k].write(n, new_n)
 
-        return i + 1, exchanged_states
+        return (i + 1, exchanged_states, is_exchange_proposed_for_kr,
+                is_exchange_accepted_for_kr)
 
       # At this point, exchanged_states[k] is a length num_replicas TensorArray.
-      return tf.while_loop(
-          cond=cond, body=body, loop_vars=[tf.constant(0),
-                                           exchanged_states])[1]  # Remove `i`
+      (exchanged_states, is_exchange_proposed_for_kr,
+       is_exchange_accepted_for_kr) = tf.while_loop(
+           cond=cond,
+           body=body,
+           loop_vars=[
+               tf.constant(0),
+               exchanged_states,
+               is_exchange_proposed_for_kr,
+               is_exchange_accepted_for_kr,
+           ])[1:]  # Remove `i`
+      if self._exchange_between_adjacent_only:
+        # Stack to give shape [self.num_replica]
+        is_exchange_proposed_for_kr = is_exchange_proposed_for_kr.stack()
+        is_exchange_proposed_for_kr.set_shape([self.num_replica - 1])
+
+        # Stack on axis=-1 to give shape batch_shape + [self.num_replica]
+        # ...TensorArray.stack stacks on axis=0, and doesn't take an axis kwarg,
+        # so must rotate_transpose.
+        is_exchange_accepted_for_kr = distribution_util.rotate_transpose(
+            is_exchange_accepted_for_kr.stack(), shift=-1)
+        is_exchange_accepted_for_kr.set_shape(
+            target_log_probs[-1].shape.concatenate(self.num_replica - 1))
+
+      return (exchanged_states, is_exchange_proposed_for_kr,
+              is_exchange_accepted_for_kr)
 
   def _insert_old_states_where_no_exchange_was_proposed(
       self, no_exchange_proposed, old_states, exchanged_states):
@@ -549,11 +652,27 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       if not mcmc_util.is_list_like(init_state):
         replica_states = [s[0] for s in replica_states]
 
+      batch_plus_replica_shape = tf.concat([
+          tf.shape(_get_field(replica_results[0], 'target_log_prob')),
+          [self.num_replica - 1],
+      ], axis=0)
+
+      if self._exchange_between_adjacent_only:
+        is_exchange_proposed = tf.cast(
+            tf.zeros([self.num_replica - 1]), tf.bool)
+        is_exchange_accepted = tf.cast(
+            tf.zeros(batch_plus_replica_shape), tf.bool)
+      else:
+        is_exchange_proposed = tf.convert_to_tensor(np.nan)
+        is_exchange_accepted = tf.convert_to_tensor(np.nan)
+
       return ReplicaExchangeMCKernelResults(
           replica_states=replica_states,
           replica_results=replica_results,
           sampled_replica_states=replica_states,
           sampled_replica_results=replica_results,
+          is_exchange_proposed=is_exchange_proposed,
+          is_exchange_accepted=is_exchange_accepted,
       )
 
 

@@ -488,6 +488,168 @@ class REMCTest(test_case.TestCase):
           make_kernel_fn=make_kernel_fn,
           seed=_set_seed(13))
 
+  def testKernelResultsHaveCorrectThingsWhenExchangeAdjacentOnly(self):
+    target = tfd.Normal(0., 1.)
+
+    def make_kernel_fn(target_log_prob_fn, seed):
+      return tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=target_log_prob_fn,
+          seed=seed,
+          step_size=0.3,
+          num_leapfrog_steps=3)
+
+    inverse_temperatures = [1., 0.99, 0.01]
+    remc = tfp.mcmc.ReplicaExchangeMC(
+        target_log_prob_fn=tf.function(target.log_prob, autograph=False),
+        inverse_temperatures=inverse_temperatures,
+        make_kernel_fn=make_kernel_fn,
+        seed=_set_seed(1))
+
+    num_results = 400
+    num_replicas = len(inverse_temperatures)
+
+    samples, kernel_results = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        current_state=target.sample(seed=_set_seed(1)),
+        kernel=remc,
+        num_burnin_steps=20,
+        trace_fn=lambda _, results: results,
+        parallel_iterations=1)  # For determinism.
+
+    self.assertAllEqual((num_results,), samples.shape)
+
+    kernel_results = self.evaluate(kernel_results)
+
+    # Boring checks of existence/shape.
+    self.assertLen(kernel_results.replica_states, num_replicas)
+    self.assertLen(kernel_results.replica_results, num_replicas)
+    self.assertLen(kernel_results.sampled_replica_results, num_replicas)
+    self.assertAllEqual((num_results, num_replicas - 1),
+                        kernel_results.is_exchange_proposed.shape)
+    self.assertAllEqual((num_results, num_replicas - 1),
+                        kernel_results.is_exchange_accepted.shape)
+
+    # Exciting checks of correctness!
+
+    # Tests below assume these particular temperatures.
+    self.assertAllEqual([1., 0.99, 0.01], inverse_temperatures)
+
+    # Default exchange proposed function is to exchange every time.  There are
+    # two exchanges possible, and they are mutually exclusive, so each is
+    # proposed about 1/2 the time.
+    self.assertAllClose([0.5, 0.5],
+                        np.mean(kernel_results.is_exchange_proposed, axis=0),
+                        rtol=0.1)
+
+    # P[ExchangeAccepted | ExchangeProposed]
+    conditional_accept_prob = (
+        np.sum(kernel_results.is_exchange_accepted, axis=0) /
+        np.sum(kernel_results.is_exchange_proposed, axis=0)
+    )
+
+    # The first exchange is between inverse temps 1 and 0.99, which are
+    # basically the same distributions, so usually accepted.
+    self.assertAllClose(0.99, conditional_accept_prob[0], rtol=0.1)
+
+    # The second exchange is between 0.99 and 0.01, which are totally different,
+    # so will mostly be rejected.
+    self.assertLess(conditional_accept_prob[1], 0.5)
+
+  def testKernelResultsHaveCorrectThingsWhenNotExchangeAdjacentOnly(self):
+    target = tfd.Normal(0., 1.)
+
+    def make_kernel_fn(target_log_prob_fn, seed):
+      return tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=target_log_prob_fn,
+          seed=seed,
+          step_size=0.3,
+          num_leapfrog_steps=3)
+
+    # Hard-set to False.
+    exchange_proposed_fn = tfp.mcmc.default_exchange_proposed_fn(1.)
+    exchange_proposed_fn.exchange_between_adjacent_only = False
+
+    inverse_temperatures = [1., 0.99, 0.01]
+    remc = tfp.mcmc.ReplicaExchangeMC(
+        target_log_prob_fn=tf.function(target.log_prob, autograph=False),
+        inverse_temperatures=inverse_temperatures,
+        make_kernel_fn=make_kernel_fn,
+        exchange_proposed_fn=exchange_proposed_fn,
+        seed=_set_seed(1))
+
+    num_results = 10
+    num_replicas = len(inverse_temperatures)
+
+    samples, kernel_results = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        current_state=target.sample(seed=_set_seed(1)),
+        kernel=remc,
+        num_burnin_steps=20,
+        trace_fn=lambda _, results: results,
+        parallel_iterations=1)  # For determinism.
+
+    self.assertAllEqual((num_results,), samples.shape)
+
+    kernel_results = self.evaluate(kernel_results)
+
+    self.assertLen(kernel_results.replica_states, num_replicas)
+    self.assertLen(kernel_results.replica_results, num_replicas)
+    self.assertLen(kernel_results.sampled_replica_results, num_replicas)
+
+    # exchange_between_adjacent_only is False, so these kernel results are NaN.
+    self.assertAllEqual(np.nan * np.ones((num_results,)),
+                        kernel_results.is_exchange_proposed)
+    self.assertAllEqual(np.nan * np.ones((num_results,)),
+                        kernel_results.is_exchange_accepted)
+
+  def testKernelResultsHaveCorrectShapeWhenMultipleStatesAndBatchDims(self):
+    def target_log_prob(x, y):
+      xy = tf.concat([x, y], axis=-1)
+      return -0.5 * tf.reduce_sum(xy**2, axis=-1)
+
+    def make_kernel_fn(target_log_prob_fn, seed):
+      return tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=target_log_prob_fn,
+          seed=seed,
+          step_size=[0.3, 0.1],
+          num_leapfrog_steps=3)
+
+    inverse_temperatures = [1., 0.5, 0.25, 0.1, 0.05]
+    remc = tfp.mcmc.ReplicaExchangeMC(
+        target_log_prob_fn=tf.function(target_log_prob, autograph=False),
+        inverse_temperatures=inverse_temperatures,
+        make_kernel_fn=make_kernel_fn,
+        seed=_set_seed(1))
+
+    num_results = 6
+    n_batch = 5
+    n_events = 3
+    n_states = 2  # Set by target_log_prob.
+    num_replicas = len(inverse_temperatures)
+
+    samples, kernel_results = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        current_state=[tf.zeros((n_batch, n_events))] * n_states,
+        kernel=remc,
+        num_burnin_steps=2,
+        trace_fn=lambda _, results: results)
+
+    self.assertLen(samples, n_states)
+    self.assertAllEqual((num_results, n_batch, n_events), samples[0].shape)
+    self.assertAllEqual((num_results, n_batch, n_events), samples[1].shape)
+
+    kernel_results = self.evaluate(kernel_results)
+
+    # Boring checks of existence/shape.
+    self.assertLen(kernel_results.replica_states, num_replicas)
+    self.assertLen(kernel_results.replica_results, num_replicas)
+    self.assertLen(kernel_results.sampled_replica_results, num_replicas)
+
+    self.assertAllEqual((num_results, num_replicas - 1),
+                        kernel_results.is_exchange_proposed.shape)
+    self.assertAllEqual((num_results, n_batch, num_replicas - 1),
+                        kernel_results.is_exchange_accepted.shape)
+
 
 if __name__ == '__main__':
   tf.test.main()
