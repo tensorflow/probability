@@ -40,7 +40,7 @@ class TensorTuple(composite_tensor.CompositeTensor):
 
   @property
   def _type_spec(self):
-    return TensorTupleSpec(map(type_spec.TypeSpec.from_value, self._sequence))
+    return TensorTupleSpec(map(type_spec.type_spec_from_value, self._sequence))
 
   def _to_components(self):
     return self._sequence
