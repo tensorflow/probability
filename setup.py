@@ -31,7 +31,7 @@ REQUIRED_PACKAGES = [
     'six >= 1.10.0',
     'numpy >= 1.13.3',
     'decorator',
-    'cloudpickle == 1.1.1',
+    'cloudpickle >= 1.2.2',
     'gast >= 0.2'  # For autobatching
 ]
 
