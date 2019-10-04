@@ -25,7 +25,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.monte_carlo.expectation import _get_samples
+from tensorflow_probability.python.internal.monte_carlo import _get_samples
 
 
 class GetSamplesTest(test_case.TestCase):
