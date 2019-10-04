@@ -134,7 +134,25 @@ TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     outs = ["{}.py".format(filename)],
     cmd = "$(location //tensorflow_probability/python/experimental/substrates/meta:rewrite) $(SRCS) --numpy_to_jax > $@",
     tools = ["//tensorflow_probability/python/experimental/substrates/meta:rewrite"],
-) for filename in ["__init__"] + FILENAMES + TEST_FILENAMES]
+) for filename in FILENAMES + TEST_FILENAMES]
+
+genrule(
+    name = "_init_prefix",
+    srcs = ["//tensorflow_probability/python/distributions:__init__.py"],
+    outs = ["_init_prefix.py"],
+    cmd = "$(location //tensorflow_probability/python/experimental/substrates/meta:rewrite) $(SRCS) --numpy_to_jax > $@",
+    tools = ["//tensorflow_probability/python/experimental/substrates/meta:rewrite"],
+)
+
+genrule(
+    name = "__init__",
+    srcs = [
+        ":_init_prefix.py",
+        "_init_suffix.py",
+    ],
+    outs = ["__init__.py"],
+    cmd = "cat $(SRCS) > $@",
+)
 
 COMMON_DEPS = {
     "distribution": [":kullback_leibler"],
