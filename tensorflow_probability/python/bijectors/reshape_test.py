@@ -68,7 +68,7 @@ class _ReshapeBijectorTest(object):
         bijector.forward_event_shape_tensor(expected_x.shape),
         bijector.inverse_event_shape_tensor(expected_y.shape),
     ])
-    self.assertStartsWith(bijector.name, "reshape")
+    self.assertStartsWith(bijector.name, 'reshape')
     self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
     self.assertAllClose(0., fldj_, rtol=1e-6, atol=0)
@@ -137,7 +137,7 @@ class _ReshapeBijectorTest(object):
     # Here we pass in a tensor (x) whose shape is compatible with
     # the output shape, so tf.reshape will throw no error, but
     # doesn't match the expected input shape.
-    with self.assertRaisesError("Input `event_shape` does not match"):
+    with self.assertRaisesError('Input `event_shape` does not match'):
       self.evaluate(bijector.forward(x))
 
   def testValidButNonMatchingInputPartiallySpecifiedOpError(self):
@@ -149,7 +149,7 @@ class _ReshapeBijectorTest(object):
         event_shape_in=shape_in,
         validate_args=True)
 
-    with self.assertRaisesError("Input `event_shape` does not match"):
+    with self.assertRaisesError('Input `event_shape` does not match'):
       self.evaluate(bijector.forward(x))
 
   # pylint: disable=invalid-name
@@ -217,7 +217,7 @@ class _ReshapeBijectorTest(object):
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
 
   def build_shapes(self, *args, **kwargs):
-    raise NotImplementedError("Subclass failed to implement `build_shapes`.")
+    raise NotImplementedError('Subclass failed to implement `build_shapes`.')
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -313,7 +313,7 @@ class ReshapeBijectorTestStatic(test_case.TestCase, _ReshapeBijectorTest):
 
   def testInputOutputMismatchOpError(self):
     self._testInputOutputMismatchOpError(
-        "(Input to reshape|Cannot reshape a tensor with|cannot reshape array)")
+        '(Input to reshape|Cannot reshape a tensor with|cannot reshape array)')
 
 
 class ReshapeBijectorTestDynamic(test_case.TestCase, _ReshapeBijectorTest):
@@ -361,10 +361,10 @@ class ReshapeBijectorTestDynamic(test_case.TestCase, _ReshapeBijectorTest):
 
   def testInputOutputMismatchOpError(self):
     self._testInputOutputMismatchOpError(
-        "(Input to reshape|Cannot reshape a tensor with|cannot reshape array)")
+        '(Input to reshape|Cannot reshape a tensor with|cannot reshape array)')
 
   def testMultipleUnspecifiedDimensionsOpError(self):
-    with self.assertRaisesError("must have at most one `-1`."):
+    with self.assertRaisesError('must have at most one `-1`.'):
       shape_in, shape_out = self.build_shapes([2, 3], [4, -1, -1,])
       bijector = tfb.Reshape(
           event_shape_out=shape_out,
@@ -376,7 +376,7 @@ class ReshapeBijectorTestDynamic(test_case.TestCase, _ReshapeBijectorTest):
     shape_in, shape_out = self.build_shapes([2, 3], [1, 2, -2,])
 
     with self.assertRaisesError(
-        "elements must be either positive integers or `-1`."):
+        'elements must be either positive integers or `-1`.'):
       bijector = tfb.Reshape(
           event_shape_out=shape_out,
           event_shape_in=shape_in,
@@ -389,11 +389,11 @@ class ReshapeBijectorTestDynamic(test_case.TestCase, _ReshapeBijectorTest):
     known_shape = [2, 2]
 
     with self.assertRaisesRegexp(NotImplementedError,
-                                 "must be statically known."):
+                                 'must be statically known.'):
       tfb.Reshape(event_shape_out=unknown_shape)
 
     with self.assertRaisesRegexp(NotImplementedError,
-                                 "must be statically known."):
+                                 'must be statically known.'):
       tfb.Reshape(event_shape_out=known_shape, event_shape_in=unknown_shape)
 
   def testScalarInVectorOut(self):
@@ -404,5 +404,5 @@ class ReshapeBijectorTestDynamic(test_case.TestCase, _ReshapeBijectorTest):
                         self.evaluate(bijector.inverse(np.zeros([3, 4, 5, 1]))))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

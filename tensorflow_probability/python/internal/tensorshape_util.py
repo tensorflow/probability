@@ -228,15 +228,21 @@ def num_elements(x):
 
 
 def rank(x):
-  """Returns the rank of this shape, or `None` if it is unspecified.
+  """Returns the rank implied by this shape, or `None` if it is unspecified.
 
   For more details, see `help(tf.TensorShape.rank)`.
 
+  Note: This is not the rank of the shape itself, viewed as a Tensor, which
+  would always be 1; rather, it's the rank of every Tensor of the shape given by
+  `x`.
+
   Args:
-    x: object representing a shape; convertible to `tf.TensorShape`.
+    x: object representing a shape; anything convertible to `tf.TensorShape`,
+      or a `Tensor` (interpreted as an in-graph computed shape).
 
   Returns:
-    rank: `int` representing the number of shape dimensions.
+    rank: `int` representing the number of shape dimensions, or `None` if
+      not statically known.
   """
   return tf.TensorShape(x).rank
 

@@ -62,6 +62,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'PowerTransform',
     'RationalQuadraticSpline',
     'Reciprocal',
+    'Reshape',
     'ScaleTriL',
     'Sigmoid',
     'SinhArcsinh',
@@ -241,6 +242,15 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
     axis = draw(hps.integers(min_value=-event_ndims, max_value=-1))
     permutation = draw(hps.permutations(np.arange(event_dim)))
     return tfb.Permute(permutation, axis=axis)
+  if bijector_name == 'Reshape':
+    event_shape_out = draw(tfp_hps.shapes(min_ndims=1))
+    # TODO(b/142135119): Wanted to draw general input and output shapes like the
+    # following, but Hypothesis complained about filtering out too many things.
+    # event_shape_in = draw(tfp_hps.shapes(min_ndims=1))
+    # hp.assume(event_shape_out.num_elements() == event_shape_in.num_elements())
+    event_shape_in = [event_shape_out.num_elements()]
+    return tfb.Reshape(event_shape_out=event_shape_out,
+                       event_shape_in=event_shape_in, validate_args=True)
 
   bijector_params = draw(
       broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,
@@ -253,7 +263,16 @@ Support = tfp_hps.Support
 
 
 def constrain_forward_shape(bijector, shape):
-  """Constrain the shape so it is compatible with bijector.forward."""
+  """Constrain the shape so it is compatible with bijector.forward.
+
+  Args:
+    bijector: A `Bijector`.
+    shape: A TensorShape or compatible, giving the desired event shape.
+
+  Returns:
+    shape: A TensorShape, giving an event shape compatible with
+      `bijector.forward`, loosely inspired by the input `shape`.
+  """
   if is_invert(bijector):
     return constrain_inverse_shape(bijector.bijector, shape=shape)
 
@@ -262,14 +281,29 @@ def constrain_forward_shape(bijector, shape):
   if support == tfp_hps.Support.VECTOR_SIZE_TRIANGULAR:
     # Need to constrain the shape.
     shape[-1] = int(shape[-1] * (shape[-1] + 1) / 2)
-  return shape
+  if isinstance(bijector, tfb.Reshape):
+    # Note: This relies on the out event shape being fully determined
+    shape = tf.get_static_value(bijector._event_shape_in)
+  return tf.TensorShape(shape)
 
 
 def constrain_inverse_shape(bijector, shape):
-  """Constrain the shape so it is compatible with bijector.inverse."""
+  """Constrain the shape so it is compatible with bijector.inverse.
+
+  Args:
+    bijector: A `Bijector`.
+    shape: A TensorShape or compatible, giving the desired event shape.
+
+  Returns:
+    shape: A TensorShape, giving an event shape compatible with
+      `bijector.inverse`, loosely inspired by the input `shape`.
+  """
   if is_invert(bijector):
     return constrain_forward_shape(bijector.bijector, shape=shape)
-  return shape
+  if isinstance(bijector, tfb.Reshape):
+    # Note: This relies on the out event shape being fully determined
+    shape = tf.get_static_value(bijector._event_shape_out)
+  return tf.TensorShape(shape)
 
 
 @hps.composite
