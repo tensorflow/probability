@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for ScaleTriL bijector."""
+"""Tests for FillScaleTriL bijector."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -27,8 +27,8 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ScaleTriLBijectorTest(test_case.TestCase):
-  """Tests the correctness of the ScaleTriL bijector."""
+class FillScaleTriLBijectorTest(test_case.TestCase):
+  """Tests the correctness of the FillScaleTriL bijector."""
 
   def testComputesCorrectValues(self):
     shift = 1.61803398875
@@ -36,7 +36,7 @@ class ScaleTriLBijectorTest(test_case.TestCase):
     y = np.float32(np.array([[np.exp(2) + shift, 0.],
                              [.5, np.exp(-1) + shift]]))
 
-    b = tfb.ScaleTriL(
+    b = tfb.FillScaleTriL(
         diag_bijector=tfb.Exp(), diag_shift=shift)
 
     y_ = self.evaluate(b.forward(x))
@@ -51,7 +51,7 @@ class ScaleTriLBijectorTest(test_case.TestCase):
     # event size 6 to specify 3x3 triangular matrices.
     batch_shape = [2, 1]
     x = np.random.randn(*(batch_shape + [6])).astype(np.float32)
-    b = tfb.ScaleTriL(
+    b = tfb.FillScaleTriL(
         diag_bijector=tfb.Softplus(), diag_shift=3.14159)
     y = self.evaluate(b.forward(x))
     self.assertAllEqual(y.shape, batch_shape + [3, 3])

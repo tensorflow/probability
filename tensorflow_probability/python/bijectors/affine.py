@@ -25,6 +25,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     "Affine",
@@ -92,6 +93,12 @@ class Affine(bijector.Bijector):
 
   """
 
+  @deprecation.deprecated(
+      "2020-01-01",
+      "`Affine` bijector is deprecated; please use "
+      "`tfb.Shift(loc)(tfb.Matvec*)` where `tfb.Matvec*` is one of "
+      "`MatvecDiag`, `MatvecTriL`, or `MatvecLinearOperator`.",
+      warn_once=True)
   def __init__(self,
                shift=None,
                scale_identity_multiplier=None,

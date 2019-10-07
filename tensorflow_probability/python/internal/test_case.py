@@ -22,15 +22,33 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 __all__ = [
-    "TestCase",
+    'TestCase',
 ]
 
 
 class TestCase(tf.test.TestCase):
   """Class to provide TensorFlow Probability specific test features."""
+
+  def maybe_static(self, x, is_static=True):
+    """If `not is_static`, return placeholder_with_default with unknown shape.
+
+    Args:
+      x: A `Tensor`
+      is_static: a Python `bool`; if True, x is returned unchanged. If False, x
+        is wrapped with a tf1.placeholder_with_default with fully dynamic shape.
+
+    Returns:
+      maybe_static_x: `x`, possibly wrapped with in a
+      `placeholder_with_default` of unknown shape.
+    """
+    if is_static:
+      return x
+    else:
+      return tf1.placeholder_with_default(x, shape=None)
 
   def assertAllFinite(self, a):
     """Assert that all entries in a `Tensor` are finite.
@@ -64,6 +82,6 @@ class TestCase(tf.test.TestCase):
       return
 
     msg = (
-        "Expected no entry to be `None` but found `None` in positions {}"
+        'Expected no entry to be `None` but found `None` in positions {}'
         .format([i for i, x in enumerate(each_not_none) if not x]))
     raise AssertionError(msg)

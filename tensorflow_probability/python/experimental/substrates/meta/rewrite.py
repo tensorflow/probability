@@ -43,7 +43,7 @@ TF_REPLACEMENTS = {
         'tfp = tfp.experimental.substrates.numpy',
 }
 
-DISABLED_BIJECTORS = ('masked_autoregressive', 'matveclu', 'real_nvp')
+DISABLED_BIJECTORS = ('masked_autoregressive', 'scale_matvec_lu', 'real_nvp')
 DISABLED_DISTS = ('joint_distribution', 'gaussian_process',
                   'internal.moving_stats', 'student_t_process',
                   'variational_gaussian_process', 'von_mises')

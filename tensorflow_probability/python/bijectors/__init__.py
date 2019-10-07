@@ -35,6 +35,8 @@ from tensorflow_probability.python.bijectors.cumsum import Cumsum
 from tensorflow_probability.python.bijectors.discrete_cosine_transform import DiscreteCosineTransform
 from tensorflow_probability.python.bijectors.exp import Exp
 from tensorflow_probability.python.bijectors.expm1 import Expm1
+from tensorflow_probability.python.bijectors.fill_scale_tril import FillScaleTriL
+from tensorflow_probability.python.bijectors.fill_scale_tril import ScaleTriL
 from tensorflow_probability.python.bijectors.fill_triangular import FillTriangular
 from tensorflow_probability.python.bijectors.gumbel import Gumbel
 from tensorflow_probability.python.bijectors.identity import Identity
@@ -48,7 +50,6 @@ from tensorflow_probability.python.bijectors.masked_autoregressive import masked
 from tensorflow_probability.python.bijectors.masked_autoregressive import masked_dense
 from tensorflow_probability.python.bijectors.masked_autoregressive import MaskedAutoregressiveFlow
 from tensorflow_probability.python.bijectors.matrix_inverse_tril import MatrixInverseTriL
-from tensorflow_probability.python.bijectors.matveclu import MatvecLU
 from tensorflow_probability.python.bijectors.normal_cdf import NormalCDF
 from tensorflow_probability.python.bijectors.ordered import Ordered
 from tensorflow_probability.python.bijectors.pad import Pad
@@ -59,7 +60,13 @@ from tensorflow_probability.python.bijectors.real_nvp import real_nvp_default_te
 from tensorflow_probability.python.bijectors.real_nvp import RealNVP
 from tensorflow_probability.python.bijectors.reciprocal import Reciprocal
 from tensorflow_probability.python.bijectors.reshape import Reshape
-from tensorflow_probability.python.bijectors.scale_tril import ScaleTriL
+from tensorflow_probability.python.bijectors.scale import Scale
+from tensorflow_probability.python.bijectors.scale_matvec_diag import ScaleMatvecDiag
+from tensorflow_probability.python.bijectors.scale_matvec_linear_operator import ScaleMatvecLinearOperator
+from tensorflow_probability.python.bijectors.scale_matvec_lu import MatvecLU
+from tensorflow_probability.python.bijectors.scale_matvec_lu import ScaleMatvecLU
+from tensorflow_probability.python.bijectors.scale_matvec_tril import ScaleMatvecTriL
+from tensorflow_probability.python.bijectors.shift import Shift
 from tensorflow_probability.python.bijectors.sigmoid import Sigmoid
 from tensorflow_probability.python.bijectors.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.bijectors.softfloor import Softfloor
@@ -93,6 +100,7 @@ __all__ = [
     "DiscreteCosineTransform",
     "Exp",
     "Expm1",
+    "FillScaleTriL",
     "FillTriangular",
     "Gumbel",
     "Identity",
@@ -112,7 +120,13 @@ __all__ = [
     "RealNVP",
     "Reciprocal",
     "Reshape",
+    "Scale",
+    "ScaleMatvecDiag",
+    "ScaleMatvecLinearOperator",
+    "ScaleMatvecLU",
+    "ScaleMatvecTriL",
     "ScaleTriL",
+    "Shift",
     "Sigmoid",
     "SinhArcsinh",
     "Softfloor",

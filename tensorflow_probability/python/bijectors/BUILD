@@ -48,6 +48,7 @@ py_library(
         ":discrete_cosine_transform",
         ":exp",
         ":expm1",
+        ":fill_scale_tril",
         ":fill_triangular",
         ":gumbel",
         ":identity",
@@ -57,7 +58,6 @@ py_library(
         ":kumaraswamy",
         ":masked_autoregressive",
         ":matrix_inverse_tril",
-        ":matveclu",
         ":normal_cdf",
         ":ordered",
         ":pad",
@@ -67,7 +67,12 @@ py_library(
         ":real_nvp",
         ":reciprocal",
         ":reshape",
-        ":scale_tril",
+        ":scale",
+        ":scale_matvec_diag",
+        ":scale_matvec_linear_operator",
+        ":scale_matvec_lu",
+        ":scale_matvec_tril",
+        ":shift",
         ":sigmoid",
         ":sinh_arcsinh",
         ":softfloor",
@@ -205,6 +210,61 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+py_library(
+    name = "scale",
+    srcs = ["scale.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+py_library(
+    name = "shift",
+    srcs = ["shift.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+py_library(
+    name = "scale_matvec_linear_operator",
+    srcs = ["scale_matvec_linear_operator.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+py_library(
+    name = "scale_matvec_diag",
+    srcs = ["scale_matvec_diag.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+py_library(
+    name = "scale_matvec_tril",
+    srcs = ["scale_matvec_tril.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -420,8 +480,8 @@ py_library(
 )
 
 py_library(
-    name = "matveclu",
-    srcs = ["matveclu.py"],
+    name = "scale_matvec_lu",
+    srcs = ["scale_matvec_lu.py"],
     deps = [
         ":bijector",
         # tensorflow dep,
@@ -544,8 +604,8 @@ py_library(
 )
 
 py_library(
-    name = "scale_tril",
-    srcs = ["scale_tril.py"],
+    name = "fill_scale_tril",
+    srcs = ["fill_scale_tril.py"],
     deps = [
         ":affine_scalar",
         ":chain",
@@ -803,6 +863,72 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "scale_test",
+    size = "small",
+    srcs = ["scale_test.py"],
+    deps = [
+        ":bijector_test_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "shift_test",
+    size = "small",
+    srcs = ["shift_test.py"],
+    deps = [
+        ":bijectors",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_test(
+    name = "scale_matvec_diag_test",
+    size = "small",
+    srcs = ["scale_matvec_diag_test.py"],
+    deps = [
+        ":bijectors",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_test(
+    name = "scale_matvec_tril_test",
+    size = "small",
+    srcs = ["scale_matvec_tril_test.py"],
+    deps = [
+        ":bijectors",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_test(
+    name = "scale_matvec_linear_operator_test",
+    size = "small",
+    srcs = ["scale_matvec_linear_operator_test.py"],
+    deps = [
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1072,9 +1198,9 @@ py_test(
 )
 
 py_test(
-    name = "matveclu_test",
+    name = "scale_matvec_lu_test",
     size = "small",
-    srcs = ["matveclu_test.py"],
+    srcs = ["scale_matvec_lu_test.py"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1208,9 +1334,9 @@ py_test(
 )
 
 py_test(
-    name = "scale_tril_test",
+    name = "fill_scale_tril_test",
     size = "medium",
-    srcs = ["scale_tril_test.py"],
+    srcs = ["fill_scale_tril_test.py"],
     deps = [
         ":bijectors",
         # numpy dep,

@@ -31,7 +31,7 @@ import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import scale_tril as scale_tril_lib
+from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_lib
 from tensorflow_probability.python.bijectors import transpose as transpose_lib
 from tensorflow_probability.python.distributions import bernoulli as bernoulli_lib
 from tensorflow_probability.python.distributions import categorical as categorical_lib
@@ -362,7 +362,7 @@ class MultivariateNormalTriL(DistributionLambda):
     with tf1.name_scope(name, 'MultivariateNormalTriL',
                                  [params, event_size]):
       params = tf.convert_to_tensor(value=params, name='params')
-      scale_tril = scale_tril_lib.ScaleTriL(
+      scale_tril = fill_scale_tril_lib.FillScaleTriL(
           diag_shift=np.array(1e-5, params.dtype.as_numpy_dtype()),
           validate_args=validate_args)
       return mvn_tril_lib.MultivariateNormalTriL(

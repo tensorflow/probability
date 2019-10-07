@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for MatvecLU Bijector."""
+"""Tests for ScaleMatvecLU Bijector."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -52,12 +52,12 @@ def trainable_lu_factorization(
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MatvecLUTest(test_case.TestCase):
+class ScaleMatvecLUTest(test_case.TestCase):
 
   def test_invertible_from_trainable_lu_factorization(self):
     channels = 3
     lower_upper, permutation = trainable_lu_factorization(channels, seed=42)
-    conv1x1 = tfb.MatvecLU(lower_upper, permutation, validate_args=True)
+    conv1x1 = tfb.ScaleMatvecLU(lower_upper, permutation, validate_args=True)
 
     self.assertIs(lower_upper, conv1x1.lower_upper)
     self.evaluate([v.initializer for v in conv1x1.variables])
@@ -90,7 +90,7 @@ class MatvecLUTest(test_case.TestCase):
     """Initial LU factorization parameters do not change per execution."""
     channels = 8
     lower_upper, permutation = trainable_lu_factorization(channels, seed=42)
-    conv1x1 = tfb.MatvecLU(lower_upper, permutation, validate_args=True)
+    conv1x1 = tfb.ScaleMatvecLU(lower_upper, permutation, validate_args=True)
 
     self.evaluate([v.initializer for v in conv1x1.variables])
 
@@ -106,9 +106,9 @@ class MatvecLUTest(test_case.TestCase):
          [4, 5, 6],
          [0.5, 0., 0.25]])
 
-    conv1x1 = tfb.MatvecLU(lower_upper=lower_upper,
-                           permutation=permutation,
-                           validate_args=True)
+    conv1x1 = tfb.ScaleMatvecLU(lower_upper=lower_upper,
+                                permutation=permutation,
+                                validate_args=True)
 
     channels = tf.compat.dimension_value(lower_upper.shape[-1])
     x = tf.random.uniform(shape=[2, 28, 28, channels])
@@ -143,7 +143,7 @@ class MatvecLUTest(test_case.TestCase):
     batch_mats = raw_mat * tf.range(1., nbatch + 1.)[:, tf.newaxis, tf.newaxis]
     lower_upper, permutation = tf.linalg.lu(tf.cast(batch_mats, tf.float64))
 
-    bijector = tfb.MatvecLU(
+    bijector = tfb.ScaleMatvecLU(
         lower_upper=lower_upper, permutation=permutation, validate_args=True)
     self.assertEqual(tf.float64, bijector.dtype)
 
@@ -174,7 +174,7 @@ class MatvecLUTest(test_case.TestCase):
         tf.linalg.lu([[1., 2, 3], [4, 5, 6], [0.5, 0., 0.25]]))
     lower_upper = tf.Variable(lower_upper)
     self.evaluate(lower_upper.initializer)
-    bijector = tfb.MatvecLU(
+    bijector = tfb.ScaleMatvecLU(
         lower_upper=lower_upper, permutation=permutation, validate_args=True)
 
     self.evaluate(bijector.forward([1., 2, 3]))

@@ -24,6 +24,7 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -51,6 +52,11 @@ class AffineScalar(bijector.Bijector):
 
   """
 
+  @deprecation.deprecated(
+      '2020-01-01',
+      '`AffineScalar` bijector is deprecated; please use '
+      '`tfb.Shift(loc)(tfb.Scale(...))` instead.',
+      warn_once=True)
   def __init__(self,
                shift=None,
                scale=None,

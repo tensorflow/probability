@@ -135,7 +135,7 @@ py_library(
     deps = [
         # cloudpickle dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:scale_tril",
+        "//tensorflow_probability/python/bijectors:fill_scale_tril",
         "//tensorflow_probability/python/bijectors:transpose",
         "//tensorflow_probability/python/distributions:bernoulli",
         "//tensorflow_probability/python/distributions:categorical",

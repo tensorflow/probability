@@ -23,7 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
-
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'AffineLinearOperator',
@@ -66,6 +66,11 @@ class AffineLinearOperator(bijector.Bijector):
 
   """
 
+  @deprecation.deprecated(
+      '2020-01-01',
+      '`AffineLinearOperator` bijector is deprecated; please use '
+      '`tfb.Shift(loc)(tfb.MatvecLinearOperator(...))`.',
+      warn_once=True)
   def __init__(self,
                shift=None,
                scale=None,

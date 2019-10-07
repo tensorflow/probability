@@ -43,6 +43,7 @@ FILENAMES = [
     "discrete_cosine_transform",
     "expm1",
     "exp",
+    "fill_scale_tril",
     "fill_triangular",
     "gumbel",
     "identity",
@@ -52,7 +53,7 @@ FILENAMES = [
     "kumaraswamy",
     # "masked_autoregressive",
     "matrix_inverse_tril",
-    # "matveclu",
+    # "scale_matvec_lu",
     "normal_cdf",
     "ordered",
     "pad",
@@ -62,7 +63,11 @@ FILENAMES = [
     "rational_quadratic_spline",
     "reciprocal",
     "reshape",
-    "scale_tril",
+    "scale",
+    "scale_matvec_diag",
+    "scale_matvec_linear_operator",
+    "scale_matvec_tril",
+    "shift",
     "sigmoid",
     "sinh_arcsinh",
     "softfloor",
@@ -80,6 +85,10 @@ TEST_FILENAMES = [filename + "_test" for filename in FILENAMES]
 
 TAP_BLACKLIST = ["{}_test".format(f) for f in (
     "affine",
+    "scale",
+    "scale_matvec_diag",
+    "scale_matvec_linear_operator",
+    "scale_matvec_tril",
     "batch_normalization",
     "bijector",
     "categorical_to_discrete",
@@ -88,6 +97,7 @@ TAP_BLACKLIST = ["{}_test".format(f) for f in (
     "permute",
     "rational_quadratic_spline",
     "reshape",
+    "shift",
     "sinh_arcsinh",
 )]
 
