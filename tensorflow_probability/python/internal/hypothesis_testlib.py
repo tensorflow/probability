@@ -233,13 +233,14 @@ def min_rank_for_support(support):
   raise NotImplementedError(support)
 
 
-def constrained_tensors(constraint_fn, shape):
+def constrained_tensors(constraint_fn, shape, dtype=np.float32):
   """Strategy for drawing a constrained Tensor.
 
   Args:
     constraint_fn: Function mapping the unconstrained space to the desired
       constrained space.
     shape: Shape of the desired Tensors as a Python list.
+    dtype: Dtype for constrained Tensors.
 
   Returns:
     tensors: A strategy for drawing constrained Tensors of the given shape.
@@ -248,10 +249,10 @@ def constrained_tensors(constraint_fn, shape):
   # float32s = hps.floats(
   #     np.finfo(np.float32).min / 2, np.finfo(np.float32).max / 2,
   #     allow_nan=False, allow_infinity=False)
-  float32s = hps.floats(-200, 200, allow_nan=False, allow_infinity=False)
+  floats = hps.floats(-200, 200, allow_nan=False, allow_infinity=False)
 
   def mapper(x):
-    x = constraint_fn(tf.convert_to_tensor(x))
+    x = constraint_fn(tf.convert_to_tensor(x, dtype_hint=dtype))
     if dtype_util.is_floating(x.dtype) and tf.executing_eagerly():
       # We'll skip this check in graph mode; too expensive.
       if not np.all(np.isfinite(x.numpy())):
@@ -259,8 +260,7 @@ def constrained_tensors(constraint_fn, shape):
             constraint_fn, x.numpy()))
     return x
 
-  return hpnp.arrays(
-      dtype=np.float32, shape=shape, elements=float32s).map(mapper)
+  return hpnp.arrays(dtype=dtype, shape=shape, elements=floats).map(mapper)
 
 
 # pylint: disable=no-value-for-parameter
@@ -335,7 +335,8 @@ def broadcasting_params(draw,
                         event_dim=None,
                         enable_vars=False,
                         constraint_fn_for=lambda param: identity_fn,
-                        mutex_params=()):
+                        mutex_params=(),
+                        dtype=np.float32):
   """Streategy for drawing parameters which jointly have the given batch shape.
 
   Specifically, the batch shapes of the returned parameters will broadcast to
@@ -367,6 +368,7 @@ def broadcasting_params(draw,
       mutually exclusive parameters (e.g., the 'probs' and 'logits' of a
       Categorical).  At most one parameter from each set will appear in the
       result.
+    dtype: Dtype for generated parameters.
 
   Returns:
     params: A Hypothesis strategy for drawing Python `dict`s mapping parameter
@@ -405,14 +407,15 @@ def broadcasting_params(draw,
     # TODO(axch): Can I replace `params_event_ndims` and `constraint_fn_for`
     # with a map from params to `Suppport`s, and use `tensors_in_support` here
     # instead of this explicit `constrained_tensors` function?
-    param_strategy = constrained_tensors(constraint_fn_for(param), param_shape)
+    param_strategy = constrained_tensors(
+        constraint_fn_for(param), param_shape, dtype=dtype)
     params_kwargs[param] = tf.convert_to_tensor(
-        draw(param_strategy), dtype_hint=tf.float32, name=param)
+        draw(param_strategy), dtype_hint=dtype, name=param)
     if enable_vars and draw(hps.booleans()):
       params_kwargs[param] = tf.Variable(params_kwargs[param], name=param)
       alt_value = tf.convert_to_tensor(
           draw(param_strategy),
-          dtype_hint=tf.float32,
+          dtype_hint=dtype,
           name='{}_alt_value'.format(param))
       setattr(params_kwargs[param], '_tfp_alt_value', alt_value)
       if draw(hps.booleans()):

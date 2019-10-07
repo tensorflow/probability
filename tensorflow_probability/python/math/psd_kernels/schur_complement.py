@@ -340,5 +340,5 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
     return self.cholesky_bijector.forward(
         self._divisor_matrix(fixed_inputs))
 
-  def divisor_matrix_cholesky(self):
-    return self._divisor_matrix_cholesky()
+  def divisor_matrix_cholesky(self, fixed_inputs=None):
+    return self._divisor_matrix_cholesky(fixed_inputs)

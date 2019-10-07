@@ -2661,3 +2661,49 @@ test_suite(
         ":distribution_properties_test_graph",
     ],
 )
+
+py_test(
+    name = "stochastic_process_properties_test_eager",
+    size = "large",
+    srcs = ["stochastic_process_properties_test.py"],
+    args = ["--tf_mode=eager"],
+    main = "stochastic_process_properties_test.py",
+    shard_count = 3,
+    tags = ["hypothesis"],
+    deps = [
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:hypothesis_testlib",
+    ],
+)
+
+py_test(
+    name = "stochastic_process_properties_test_graph",
+    size = "large",
+    srcs = ["stochastic_process_properties_test.py"],
+    args = ["--tf_mode=graph"],
+    main = "stochastic_process_properties_test.py",
+    shard_count = 3,
+    tags = ["hypothesis"],
+    deps = [
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:hypothesis_testlib",
+    ],
+)
+
+test_suite(
+    name = "stochastic_process_properties_test",
+    tests = [
+        ":stochastic_process_properties_test_eager",
+        ":stochastic_process_properties_test_graph",
+    ],
+)

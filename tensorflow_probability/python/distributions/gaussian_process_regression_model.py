@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import psd_kernels as tfpk
 
@@ -475,28 +476,26 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
           index_points, observation_index_points, observations,
           observation_noise_variance, predictive_noise_variance, jitter
       ], tf.float32)
-      if index_points is not None:
-        index_points = tf.convert_to_tensor(
-            index_points, dtype=dtype, name='index_points')
-      observation_index_points = (None if observation_index_points is None else  # pylint: disable=g-long-ternary
-                                  tf.convert_to_tensor(
-                                      observation_index_points,
-                                      dtype=dtype,
-                                      name='observation_index_points'))
-      observations = (None if observations is None else tf.convert_to_tensor(
-          observations, dtype=dtype, name='observations'))
-      observation_noise_variance = tf.convert_to_tensor(
+      index_points = tensor_util.convert_nonref_to_tensor(
+          index_points, dtype=dtype, name='index_points')
+      observation_index_points = tensor_util.convert_nonref_to_tensor(
+          observation_index_points, dtype=dtype,
+          name='observation_index_points')
+      observations = tensor_util.convert_nonref_to_tensor(
+          observations, dtype=dtype,
+          name='observations')
+      observation_noise_variance = tensor_util.convert_nonref_to_tensor(
           observation_noise_variance,
           dtype=dtype,
           name='observation_noise_variance')
-      predictive_noise_variance = (
-          observation_noise_variance  # pylint: disable=g-long-ternary
-          if predictive_noise_variance is None else tf.convert_to_tensor(
-              predictive_noise_variance,
-              dtype=dtype,
-              name='predictive_noise_variance'))
-      jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
-
+      predictive_noise_variance = tensor_util.convert_nonref_to_tensor(
+          predictive_noise_variance,
+          dtype=dtype,
+          name='observation_noise_variance')
+      if predictive_noise_variance is None:
+        predictive_noise_variance = observation_noise_variance
+      jitter = tensor_util.convert_nonref_to_tensor(
+          jitter, dtype=dtype, name='jitter')
       if (observation_index_points is None) != (observations is None):
         raise ValueError(
             '`observations` and `observation_index_points` must both be given '
@@ -538,10 +537,15 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
               observations=observations)
 
           def conditional_mean_fn(x):
+            """Conditional mean."""
+            observations = tf.convert_to_tensor(self._observations)
+            observation_index_points = tf.convert_to_tensor(
+                self._observation_index_points)
             k_x_obs_linop = tf.linalg.LinearOperatorFullMatrix(
                 kernel.matrix(x, observation_index_points))
             chol_linop = tf.linalg.LinearOperatorLowerTriangular(
-                conditional_kernel.divisor_matrix_cholesky())
+                conditional_kernel.divisor_matrix_cholesky(
+                    fixed_inputs=observation_index_points))
 
             diff = observations - mean_fn(observation_index_points)
             return mean_fn(x) + k_x_obs_linop.matvec(

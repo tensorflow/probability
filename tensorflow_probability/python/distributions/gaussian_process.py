@@ -314,6 +314,8 @@ class GaussianProcess(distribution.Distribution):
       return (tf.squeeze(kernel_matrix, axis=[-2, -1]) +
               self.observation_noise_variance)
     else:
+      observation_noise_variance = tf.convert_to_tensor(
+          self.observation_noise_variance)
       # We are compute K + obs_noise_variance * I. The shape of this matrix
       # is going to be a broadcast of the shapes of K and obs_noise_variance *
       # I.
@@ -321,11 +323,11 @@ class GaussianProcess(distribution.Distribution):
           kernel_matrix,
           # We pad with two single dimension since this represents a batch of
           # scaled identity matrices.
-          self.observation_noise_variance[..., tf.newaxis, tf.newaxis])
+          observation_noise_variance[..., tf.newaxis, tf.newaxis])
 
       kernel_matrix = tf.broadcast_to(kernel_matrix, broadcast_shape)
       return _add_diagonal_shift(
-          kernel_matrix, self.observation_noise_variance[..., tf.newaxis])
+          kernel_matrix, observation_noise_variance[..., tf.newaxis])
 
   def get_marginal_distribution(self, index_points=None):
     """Compute the marginal of this GP over function values at `index_points`.
@@ -435,7 +437,8 @@ class GaussianProcess(distribution.Distribution):
     ])
 
   def _batch_shape(self, index_points=None):
-    index_points = self._get_index_points(index_points)
+    index_points = (
+        index_points if index_points is not None else self._index_points)
     return functools.reduce(
         tf.broadcast_static_shape,
         [index_points.shape[:-(self.kernel.feature_ndims + 1)],
@@ -452,7 +455,8 @@ class GaussianProcess(distribution.Distribution):
       return tf.shape(index_points)[examples_index:examples_index + 1]
 
   def _event_shape(self, index_points=None):
-    index_points = self._get_index_points(index_points)
+    index_points = (
+        index_points if index_points is not None else self._index_points)
     if self._is_univariate_marginal(index_points):
       return tf.TensorShape([])
     else:

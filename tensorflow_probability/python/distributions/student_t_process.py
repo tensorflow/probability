@@ -408,7 +408,8 @@ class StudentTProcess(distribution.Distribution):
     ])
 
   def _batch_shape(self, index_points=None):
-    index_points = self._get_index_points(index_points)
+    index_points = (
+        index_points if index_points is not None else self._index_points)
     return functools.reduce(
         tf.broadcast_static_shape,
         [index_points.shape[:-(self.kernel.feature_ndims + 1)],
@@ -425,7 +426,8 @@ class StudentTProcess(distribution.Distribution):
       return tf.shape(index_points)[examples_index:examples_index + 1]
 
   def _event_shape(self, index_points=None):
-    index_points = self._get_index_points(index_points)
+    index_points = (
+        index_points if index_points is not None else self._index_points)
     if self._is_univariate_marginal(index_points):
       return tf.TensorShape([])
     else:
@@ -485,6 +487,6 @@ class StudentTProcess(distribution.Distribution):
     if is_init != tensor_util.is_mutable(self.df):
       assertions.append(
           assert_util.assert_greater(
-              self.df, tf.cast(2., self.df.dtype),
+              self.df, dtype_util.as_numpy_dtype(self.df.dtype)(2.),
               message='`df` must be greater than 2.'))
     return assertions
