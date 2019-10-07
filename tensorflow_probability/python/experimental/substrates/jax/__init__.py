@@ -43,6 +43,8 @@ del _ensure_jax_install  # Cleanup symbol to avoid polluting namespace.
 from tensorflow_probability.python.experimental.substrates.jax import bijectors
 from tensorflow_probability.python.experimental.substrates.jax import distributions
 from tensorflow_probability.python.experimental.substrates.jax import internal
+from tensorflow_probability.python.experimental.substrates.jax import math
+from tensorflow_probability.python.experimental.substrates.jax import stats
 from tensorflow_probability.python.experimental.substrates.jax import util
 
 from tensorflow_probability.python.internal.backend import jax as tf2jax
