@@ -384,6 +384,22 @@ class LogSubExpTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
+class Log1mexpTest(test_case.TestCase):
+
+  def testLog1mexp(self):
+    self.assertAllClose(-np.inf, self.evaluate(tfp.math.log1mexp(0.)))
+    self.assertAllClose(0., self.evaluate(tfp.math.log1mexp(np.inf)))
+
+    x = np.linspace(0.1, 20, 100)
+    self.assertAllClose(
+        np.log(-np.expm1(-x)), self.evaluate(tfp.math.log1mexp(x)))
+
+    x = np.linspace(-20., -0.1, 100)
+    self.assertAllClose(
+        np.log(-np.expm1(x)), self.evaluate(tfp.math.log1mexp(x)))
+
+
+@test_util.run_all_in_graph_and_eager_modes
 class Smootherstep(test_case.TestCase):
 
   def test_value_vector(self):

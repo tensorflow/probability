@@ -30,7 +30,9 @@ from tensorflow_probability.python.internal import prefer_static
 
 __all__ = [
     'log_add_exp',
+    'log_sub_exp',
     'log_combinations',
+    'log1mexp',
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
     'smootherstep',
@@ -435,11 +437,38 @@ def log_sub_exp(x, y, return_sign=False, name=None):
     y = tf.convert_to_tensor(y, dtype=dtype, name='y')
     larger = tf.maximum(x, y)
     smaller = tf.minimum(x, y)
-    result = larger + tf.math.log1p(-tf.exp(tf.minimum(smaller - larger, 0)))
+    result = larger + log1mexp(tf.maximum(larger - smaller, 0))
     if return_sign:
       ones = tf.ones([], result.dtype)
       return result, tf.where(x < y, -ones, ones)
     return result
+
+
+def log1mexp(x, name=None):
+  """Compute `log(1 - exp(-|x|))` in a numerically stable way.
+
+  Args:
+    x: Float `Tensor` broadcastable with `y`.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'log1mexp'`).
+
+  Returns:
+    log1mexp: Float `Tensor` of `log1mexp(a)`.
+
+  #### References
+
+  [1]: Machler, Martin. Accurately computing log(1 - exp(-|a|))
+       https://cran.r-project.org/web/packages/Rmpfr/vignettes/log1mexp-note.pdf
+  """
+
+  with tf.name_scope(name or 'log1mexp'):
+    dtype = dtype_util.common_dtype([x], dtype_hint=tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype, name='x')
+    x = tf.math.abs(x)
+    return tf.where(
+        # This switching point is recommended in [1].
+        x < np.log(2), tf.math.log(-tf.math.expm1(-x)),
+        tf.math.log1p(-tf.math.exp(-x)))
 
 
 def soft_sorting_matrix(x, temperature, name=None):

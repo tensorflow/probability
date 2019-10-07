@@ -22,6 +22,7 @@ from tensorflow_probability.python.math import ode
 from tensorflow_probability.python.math import psd_kernels
 from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
+from tensorflow_probability.python.math.generic import log1mexp
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import log_combinations
 from tensorflow_probability.python.math.generic import log_sub_exp
@@ -67,6 +68,7 @@ _allowed_symbols = [
     'fill_triangular',
     'fill_triangular_inverse',
     'interp_regular_1d_grid',
+    'log1mexp',
     'log1psquare',
     'log_add_exp',
     'log_combinations',

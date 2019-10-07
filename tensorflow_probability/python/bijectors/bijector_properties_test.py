@@ -66,6 +66,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'ScaleTriL',
     'Sigmoid',
     'SinhArcsinh',
+    'Softfloor',
     'Softplus',
     'Softsign',
     'Square',
@@ -81,6 +82,7 @@ BIJECTOR_PARAMS_NDIMS = {
     'Kumaraswamy': dict(concentration1=0, concentration0=0),
     'MatvecLU': dict(lower_upper=2, permutation=1),
     'SinhArcsinh': dict(skewness=0, tailweight=0),
+    'Softfloor': dict(temperature=0),
     'Softplus': dict(hinge_softness=0),
     'RationalQuadraticSpline': dict(bin_widths=1, bin_heights=1, knot_slopes=1),
     'Weibull': dict(concentration=0, scale=0),
@@ -539,6 +541,8 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'tailweight':
         tfp_hps.softplus_plus_eps(),
+    'temperature':
+        tfp_hps.softplus_plus_eps(eps=0.5),
     'AffineScalar.scale':
         tfp_hps.softplus_plus_eps(),
     'bin_widths':
