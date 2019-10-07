@@ -328,8 +328,9 @@ class DistributionLambdaSerializationTest(test_case.TestCase):
     dtype = model.input.dtype.as_numpy_dtype()
 
     model_dir = self.create_tempdir()
-    tfk.experimental.export_saved_model(model, model_dir.full_path)
-    model_copy = tfk.experimental.load_from_saved_model(model_dir.full_path)
+    tf1.keras.experimental.export_saved_model(model, model_dir.full_path)
+    model_copy = tf1.keras.experimental.load_from_saved_model(
+        model_dir.full_path)
 
     x = np.random.uniform(-3., 3., input_shape).astype(dtype)
     self.assertAllEqual(self.evaluate(model(x)), self.evaluate(model_copy(x)))
@@ -800,8 +801,9 @@ class _IndependentLayerTest(object):
     model.compile(optimizer='adam', loss='mse')
 
     model_dir = self.create_tempdir()
-    tfk.experimental.export_saved_model(model, model_dir.full_path)
-    model_copy = tfk.experimental.load_from_saved_model(model_dir.full_path)
+    tf1.keras.experimental.export_saved_model(model, model_dir.full_path)
+    model_copy = tf1.keras.experimental.load_from_saved_model(
+        model_dir.full_path)
 
     self.assertAllEqual(self.evaluate(model(x)), self.evaluate(model_copy(x)))
     self.assertEqual(self.dtype, model(x).dtype.as_numpy_dtype)
@@ -1168,8 +1170,9 @@ class _MixtureLayerTest(object):
     model.compile(optimizer='adam', loss='mse')
 
     model_dir = self.create_tempdir()
-    tfk.experimental.export_saved_model(model, model_dir.full_path)
-    model_copy = tfk.experimental.load_from_saved_model(model_dir.full_path)
+    tf1.keras.experimental.export_saved_model(model, model_dir.full_path)
+    model_copy = tf1.keras.experimental.load_from_saved_model(
+        model_dir.full_path)
 
     self.assertAllEqual(self.evaluate(model(x)), self.evaluate(model_copy(x)))
     self.assertEqual(self.dtype, model(x).dtype.as_numpy_dtype)
