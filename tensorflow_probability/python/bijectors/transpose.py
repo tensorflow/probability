@@ -27,6 +27,7 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
@@ -103,13 +104,16 @@ class Transpose(bijector.Bijector):
         represents the first of the rightmost dims and the largest value must be
         `rightmost_transposed_ndims - 1` and corresponds to `tf.rank(x) - 1`.
         Only one of `perm` and `rightmost_transposed_ndims` can (and must) be
-        specified.
+        specified. The number of elements in a permutation must have a value
+        that can be determined statically.
         Default value:
         `tf.range(start=rightmost_transposed_ndims, limit=-1, delta=-1)`.
       rightmost_transposed_ndims: Positive `int32` scalar-shaped `Tensor`
         representing the number of rightmost dimensions to permute.
         Only one of `perm` and `rightmost_transposed_ndims` can (and must) be
-        specified.
+        specified. If `rightmost_transposed_ndims` is specified, the rightmost
+        dims are reversed. This argument must have a value that can be
+        determined statically.
         Default value: `tf.size(perm)`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
@@ -122,35 +126,40 @@ class Transpose(bijector.Bijector):
         graph execution.
     """
     with tf.name_scope(name) as name:
+      # We need to determine `forward_min_event_ndims` statically, which
+      # requires that we know `rightmost_transposed_ndims` statically.
+      # So the corresponding assertions go here rather than in
+      # `_parameter_control_dependencies`
       if (rightmost_transposed_ndims is None) == (perm is None):
         raise ValueError('Must specify exactly one of '
                          '`rightmost_transposed_ndims` and `perm`.')
       if rightmost_transposed_ndims is not None:
-        rightmost_transposed_ndims = tf.convert_to_tensor(
+        rightmost_transposed_ndims = tensor_util.convert_nonref_to_tensor(
             rightmost_transposed_ndims,
-            dtype_hint=np.int32,
-            name='rightmost_transposed_ndims')
+            dtype_hint=np.int32)
+        if not dtype_util.is_integer(rightmost_transposed_ndims.dtype):
+          raise TypeError('`rightmost_transposed_ndims` must be integer type.')
         rightmost_transposed_ndims_ = tf.get_static_value(
             rightmost_transposed_ndims)
-        assertions = _maybe_validate_rightmost_transposed_ndims(
-            rightmost_transposed_ndims, validate_args)
-        if assertions:
-          with tf.control_dependencies(assertions):
-            rightmost_transposed_ndims = tf.identity(rightmost_transposed_ndims)
+        if rightmost_transposed_ndims_ is None:
+          raise NotImplementedError('`rightmost_transposed_ndims` must be '
+                                    'known prior to graph execution.')
+        msg = '`rightmost_transposed_ndims` must be non-negative.'
+        if rightmost_transposed_ndims_ < 0:
+          raise ValueError(msg[:-1] + ', saw: {}.'.format(
+              rightmost_transposed_ndims_))
+
         perm_start = (
             distribution_util.prefer_static_value(rightmost_transposed_ndims) -
             1)
         perm = tf.range(start=perm_start, limit=-1, delta=-1, name='perm')
       else:  # perm is not None:
-        perm = tf.convert_to_tensor(perm, dtype_hint=np.int32, name='perm')
+        perm = tensor_util.convert_nonref_to_tensor(
+            perm, dtype_hint=np.int32, name='perm')
         rightmost_transposed_ndims = tf.size(
             perm, name='rightmost_transposed_ndims')
         rightmost_transposed_ndims_ = tf.get_static_value(
             rightmost_transposed_ndims)
-        assertions = _maybe_validate_perm(perm, validate_args)
-        if assertions:
-          with tf.control_dependencies(assertions):
-            perm = tf.identity(perm)
 
       # TODO(b/110828604): If bijector base class ever supports dynamic
       # `min_event_ndims`, then this class already works dynamically and the
@@ -163,6 +172,7 @@ class Transpose(bijector.Bijector):
 
       self._perm = perm
       self._rightmost_transposed_ndims = rightmost_transposed_ndims
+      self._initial_rightmost_transposed_ndims = rightmost_transposed_ndims_
       super(Transpose, self).__init__(
           forward_min_event_ndims=rightmost_transposed_ndims_,
           is_constant_jacobian=True,
@@ -253,14 +263,29 @@ class Transpose(bijector.Bijector):
     perm = self._make_perm(tf.rank(x), perm)
     return tf.transpose(a=x, perm=perm)
 
+  def _parameter_control_dependencies(self, is_init):
+    assertions = []
+    if is_init != tensor_util.is_ref(self.rightmost_transposed_ndims):
+      if self.validate_args:
+        assertions += _maybe_validate_rightmost_transposed_ndims(
+            self._initial_rightmost_transposed_ndims,
+            self.rightmost_transposed_ndims, self.validate_args)
+
+    if is_init != tensor_util.is_ref(self.perm):
+      if self.validate_args:
+        assertions += _maybe_validate_perm(
+            self._initial_rightmost_transposed_ndims,
+            self.perm, self.validate_args)
+
+    return assertions
+
 
 def _maybe_validate_rightmost_transposed_ndims(
+    initial_rightmost_transposed_ndims,
     rightmost_transposed_ndims, validate_args, name=None):
   """Checks that `rightmost_transposed_ndims` is valid."""
   with tf.name_scope(name or 'maybe_validate_rightmost_transposed_ndims'):
     assertions = []
-    if not dtype_util.is_integer(rightmost_transposed_ndims.dtype):
-      raise TypeError('`rightmost_transposed_ndims` must be integer type.')
 
     if tensorshape_util.rank(rightmost_transposed_ndims.shape) is not None:
       if tensorshape_util.rank(rightmost_transposed_ndims.shape) != 0:
@@ -269,7 +294,14 @@ def _maybe_validate_rightmost_transposed_ndims(
                              tensorshape_util.rank(
                                  rightmost_transposed_ndims.shape)))
     elif validate_args:
-      assertions += [assert_util.assert_rank(rightmost_transposed_ndims, 0)]
+      assertions += [
+          assert_util.assert_rank(rightmost_transposed_ndims, 0),
+          assert_util.assert_equal(
+              rightmost_transposed_ndims,
+              initial_rightmost_transposed_ndims,
+              message='`rightmost_transposed_ndims` must not change '
+                      'from the value set when the `Transpose` '
+                      'bijector was constructed.')]
 
     rightmost_transposed_ndims_ = tf.get_static_value(
         rightmost_transposed_ndims)
@@ -287,7 +319,9 @@ def _maybe_validate_rightmost_transposed_ndims(
     return assertions
 
 
-def _maybe_validate_perm(perm, validate_args, name=None):
+def _maybe_validate_perm(
+    initial_rightmost_transposed_ndims,
+    perm, validate_args, name=None):
   """Checks that `perm` is valid."""
   with tf.name_scope(name or 'maybe_validate_perm'):
     assertions = []
@@ -301,7 +335,14 @@ def _maybe_validate_perm(perm, validate_args, name=None):
             msg[:-1] +
             ', saw rank: {}.'.format(tensorshape_util.rank(perm.shape)))
     elif validate_args:
-      assertions += [assert_util.assert_rank(perm, 1, message=msg)]
+      assertions += [
+          assert_util.assert_rank(perm, 1, message=msg),
+          assert_util.assert_equal(
+              tf.size(perm),
+              initial_rightmost_transposed_ndims,
+              message='The number of elements of `perm` must not '
+                      'change from the value set when the `Transpose` '
+                      'bijector was constructed.')]
 
     perm_ = tf.get_static_value(perm)
     msg = '`perm` must be a valid permutation vector.'
@@ -311,7 +352,8 @@ def _maybe_validate_perm(perm, validate_args, name=None):
     elif validate_args:
       assertions += [
           assert_util.assert_equal(
-              tf.sort(perm), tf.range(tf.size(perm)), message=msg)
+              tf.sort(perm), tf.range(tf.size(perm, out_type=perm.dtype)),
+              message=msg)
       ]
 
     return assertions

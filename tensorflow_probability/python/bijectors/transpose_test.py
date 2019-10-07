@@ -215,6 +215,42 @@ class _TransposeBijectorTest(object):
     self.assertAllEqual([8, 5, 7, 6], b.forward_event_shape([8, 7, 6, 5]))
     self.assertAllEqual([8, 6, 5, 7], b.inverse_event_shape([8, 7, 6, 5]))
 
+  def testNonNegativeAssertion(self):
+    message = '`rightmost_transposed_ndims` must be non-negative'
+    with self.assertRaisesRegexp(Exception, message):
+      ndims = np.int32(-3)
+      bijector = tfb.Transpose(rightmost_transposed_ndims=ndims,
+                               validate_args=True)
+      x = np.random.randn(4, 2, 3)
+      _ = self.evaluate(bijector.forward(x))
+
+  def testNonPermutationAssertion(self):
+    message = '`perm` must be a valid permutation vector'
+    with self.assertRaisesRegexp(Exception, message):
+      permutation = np.int32([1, 0, 1])
+      bijector = tfb.Transpose(perm=permutation, validate_args=True)
+      x = np.random.randn(4, 2, 3)
+      _ = self.evaluate(bijector.forward(x))
+
+  def testVariableNonPermutationAssertion(self):
+    message = '`perm` must be a valid permutation vector'
+    permutation = tf.Variable(np.int32([1, 0, 1]))
+    self.evaluate(permutation.initializer)
+    with self.assertRaisesRegexp(Exception, message):
+      bijector = tfb.Transpose(perm=permutation, validate_args=True)
+      x = np.random.randn(4, 2, 3)
+      _ = self.evaluate(bijector.forward(x))
+
+  def testModifiedVariableNonPermutationAssertion(self):
+    message = '`perm` must be a valid permutation vector'
+    permutation = tf.Variable(np.int32([1, 0, 2]))
+    self.evaluate(permutation.initializer)
+    bijector = tfb.Transpose(perm=permutation, validate_args=True)
+    with self.assertRaisesRegexp(Exception, message):
+      with tf.control_dependencies([permutation.assign([1, 0, 1])]):
+        x = np.random.randn(4, 2, 3)
+        _ = self.evaluate(bijector.forward(x))
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class TransposeBijectorDynamicTest(_TransposeBijectorTest, test_case.TestCase):

@@ -71,6 +71,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'Square',
     'Tanh',
     'TransformDiagonal',
+    'Transpose',
     'Weibull',
 )
 
@@ -240,6 +241,8 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
   if bijector_name == 'Permute':
     event_ndims = draw(hps.integers(min_value=1, max_value=2))
     axis = draw(hps.integers(min_value=-event_ndims, max_value=-1))
+    # This is a permutation of dimensions within an axis.
+    # (Contrast with `Transpose` below.)
     permutation = draw(hps.permutations(np.arange(event_dim)))
     return tfb.Permute(permutation, axis=axis)
   if bijector_name == 'Reshape':
@@ -251,6 +254,12 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
     event_shape_in = [event_shape_out.num_elements()]
     return tfb.Reshape(event_shape_out=event_shape_out,
                        event_shape_in=event_shape_in, validate_args=True)
+  if bijector_name == 'Transpose':
+    event_ndims = draw(hps.integers(min_value=0, max_value=2))
+    # This is a permutation of axes.
+    # (Contrast with `Permute` above.)
+    permutation = draw(hps.permutations(np.arange(event_ndims)))
+    return tfb.Transpose(perm=permutation)
 
   bijector_params = draw(
       broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,
