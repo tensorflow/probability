@@ -75,6 +75,30 @@ py_test(
 )
 
 py_library(
+    name = "runge_kutta_util",
+    srcs = ["runge_kutta_util.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+py_test(
+    name = "runge_kutta_util_test",
+    size = "small",
+    srcs = ["runge_kutta_util_test.py"],
+    deps = [
+        ":runge_kutta_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_case",
+    ],
+)
+
+py_library(
     name = "ode",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
