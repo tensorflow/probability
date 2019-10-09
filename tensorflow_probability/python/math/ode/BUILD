@@ -51,6 +51,19 @@ py_library(
 )
 
 py_library(
+    name = "dormand_prince",
+    srcs = ["dormand_prince.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":base",
+        ":runge_kutta_util",
+        ":util",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+    ],
+)
+
+py_library(
     name = "bdf_util",
     srcs = ["bdf_util.py"],
     srcs_version = "PY2AND3",
@@ -105,6 +118,7 @@ py_library(
     deps = [
         ":base",
         ":bdf",
+        ":dormand_prince",
     ],
 )
 

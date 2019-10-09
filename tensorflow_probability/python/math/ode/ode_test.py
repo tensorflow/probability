@@ -31,7 +31,9 @@ _ATOL = 1e-12
 
 
 @test_util.run_all_in_graph_and_eager_modes
-@parameterized.named_parameters([('bdf', tfp.math.ode.BDF)])
+@parameterized.named_parameters([
+    ('bdf', tfp.math.ode.BDF),
+    ('dormand_prince', tfp.math.ode.DormandPrince)])
 class NonStiffTest(parameterized.TestCase, test_case.TestCase):
 
   def test_zero_dims(self, solver):
@@ -212,7 +214,9 @@ class StiffTest(parameterized.TestCase, test_case.TestCase):
         self.evaluate(results.states[-1, 0]), -1.5, rtol=0., atol=0.05)
 
 
-@parameterized.named_parameters([('bdf', tfp.math.ode.BDF)])
+@parameterized.named_parameters([
+    ('bdf', tfp.math.ode.BDF),
+    ('dormand_prince', tfp.math.ode.DormandPrince)])
 class GradientTest(parameterized.TestCase, test_case.TestCase):
 
   def test_linear_dense(self, solver):
@@ -267,7 +271,9 @@ class GradientTest(parameterized.TestCase, test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-@parameterized.named_parameters([('bdf', tfp.math.ode.BDF)])
+@parameterized.named_parameters([
+    ('bdf', tfp.math.ode.BDF),
+    ('dormand_prince', tfp.math.ode.DormandPrince)])
 class GeneralTest(parameterized.TestCase, test_case.TestCase):
 
   def test_bad_initial_state_dtype(self, solver):

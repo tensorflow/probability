@@ -47,7 +47,15 @@ def _possibly_nonzero(value):
     return np.all(static_value != 0)
 
 
-def _weighted_sum(weights, list_of_states):
+def abs_square(x):
+  """Returns the squared value of `tf.abs(x)` for real and complex dtypes."""
+  if x.dtype.is_complex:
+    return tf.math.square(tf.math.real(x)) + tf.math.square(tf.math.imag(x))
+  else:
+    return tf.math.square(x)
+
+
+def weighted_sum(weights, list_of_states):
   """Computes a weighted sum of `list_of_states`.
 
   Args:
@@ -76,7 +84,57 @@ def _weighted_sum(weights, list_of_states):
     ]
     list_of_components = zip(*weighted_states)  # Put same components together.
     flat_final_state = [tf.add_n(component) for component in list_of_components]
+    if not flat_final_state:
+      return nest_constant(list_of_states[0], 0.0)
     return tf.nest.pack_sequence_as(list_of_states[0], flat_final_state)
+
+
+def nest_constant(structure, value=1.0, dtype=None):
+  """Constructs a nested structure similar to `structure` with constant values.
+
+  Args:
+    structure: A reference nested structure that is used for constant.
+    value: Floating scalar setting the value of each entry of the structure.
+      Default value: `1.0`.
+    dtype: Optional dtype that specifies the dtype of the constant structure
+      being produced. If `None`, then dtype is inferred from components of the
+      structure.
+      Default value: `None`.
+
+  Returns:
+    nest: Possibly nested structure of `Tensor`s with all entries equal to
+    `value`. Has the same structure as `structure`.
+  """
+  flat_structure = tf.nest.flatten(structure)
+  if dtype is None:
+    dtypes = [c.dtype for c in flat_structure]
+  else:
+    dtypes = [dtype] * len(flat_structure)
+  flat_vals = [
+      value * tf.ones_like(c, dtype=dtype)
+      for c, dtype in zip(flat_structure, dtypes)
+  ]
+  return tf.nest.pack_sequence_as(structure, flat_vals)
+
+
+def nest_rms_norm(nest):
+  """Computes root mean squared norm of nested structure of `Tensor`s.
+
+  Args:
+    nest: Possibly nested structure of `Tensor`s of which RMS norm is computed.
+  Returns:
+    norm: Scalar floating tensor equal to the RMS norm of `nest.
+  """
+  sizes = tf.nest.map_structure(tf.size, nest)
+  num_elements = tf.add_n(tf.nest.flatten(sizes))
+  def averaged_sum_squares(input_tensor):
+    num_elements_cast = tf.cast(
+        num_elements, dtype=dtype_util.real_dtype(input_tensor.dtype))
+    return tf.reduce_sum(abs_square(input_tensor)) / num_elements_cast
+
+  squared_sums = tf.nest.map_structure(averaged_sum_squares, nest)
+  norm = tf.math.sqrt(tf.add_n(tf.nest.flatten(squared_sums)))
+  return norm
 
 
 def _fourth_order_interpolation_coefficients(y0, y1, y_mid, f0, f1, dt):
@@ -113,9 +171,9 @@ def _fourth_order_interpolation_coefficients(y0, y1, y_mid, f0, f1, dt):
   #  e: y0}
   #  ```
   with tf.name_scope('interpolation_coefficients'):
-    a = _weighted_sum([-2 * dt, 2 * dt, -8, -8, 16], [f0, f1, y0, y1, y_mid])
-    b = _weighted_sum([5 * dt, -3 * dt, 18, 14, -32], [f0, f1, y0, y1, y_mid])
-    c = _weighted_sum([-4 * dt, dt, -11, -5, 16], [f0, f1, y0, y1, y_mid])
+    a = weighted_sum([-2 * dt, 2 * dt, -8, -8, 16], [f0, f1, y0, y1, y_mid])
+    b = weighted_sum([5 * dt, -3 * dt, 18, 14, -32], [f0, f1, y0, y1, y_mid])
+    c = weighted_sum([-4 * dt, dt, -11, -5, 16], [f0, f1, y0, y1, y_mid])
     d = dt * f0
     e = y0
   return [a, b, c, d, e]
@@ -139,7 +197,7 @@ def rk_fourth_order_interpolation_coefficients(y0, y1, k, dt, tableau):
   """
   with tf.name_scope('interp_fit_rk'):
     dt = tf.cast(dt, y0.dtype)
-    y_mid = y0 + dt * _weighted_sum(tableau.c_mid, k)
+    y_mid = y0 + dt * weighted_sum(tableau.c_mid, k)
     f0 = k[0]
     f1 = k[-1]
     return _fourth_order_interpolation_coefficients(y0, y1, y_mid, f0, f1, dt)
@@ -176,7 +234,7 @@ def evaluate_interpolation(coefficients, t0, t1, t):
     xs = [tf.constant(1, dtype), x]
     for _ in range(2, len(coefficients)):
       xs.append(xs[-1] * x)
-    return _weighted_sum(coefficients, list(reversed(xs)))
+    return weighted_sum(list(reversed(xs)), coefficients)
 
 
 def runge_kutta_step(ode_fn,
@@ -213,14 +271,14 @@ def runge_kutta_step(ode_fn,
     k = [f0]
     for alpha_i, beta_i in zip(tableau.a, tableau.b):
       ti = t0 + alpha_i * dt
-      yi = y0 + dt_cast * _weighted_sum(beta_i, k)
+      yi = y0 + dt_cast * weighted_sum(beta_i, k)
       k.append(ode_fn(ti, yi))
 
     if not (tableau.c_sol[-1] == 0 and tableau.c_sol[:-1] == tableau.b[-1]):
       # This property (true for Dormand-Prince) lets us save a few FLOPs.
-      yi = y0 + dt_cast * _weighted_sum(tableau.c_sol, k)
+      yi = y0 + dt_cast * weighted_sum(tableau.c_sol, k)
 
     y1 = tf.identity(yi, name='y1')
     f1 = tf.identity(k[-1], name='f1')
-    y1_error = dt_cast * _weighted_sum(tableau.c_error, k)
+    y1_error = dt_cast * weighted_sum(tableau.c_error, k)
     return y1, f1, y1_error, k
