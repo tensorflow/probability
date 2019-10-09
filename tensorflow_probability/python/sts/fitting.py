@@ -185,7 +185,7 @@ def build_factored_surrogate_posterior(
 
   """
   with tf.name_scope(name or 'build_factored_surrogate_posterior'):
-    seed = tfp_util.SeedStream(
+    seed = tfp.util.SeedStream(
         seed, salt='StructuralTimeSeries_build_factored_surrogate_posterior')
     variational_posterior = collections.OrderedDict()
     for param in model.parameters:
@@ -340,7 +340,7 @@ def build_factored_variational_loss(model,
   """
 
   with tf.name_scope(name or 'build_factored_variational_loss') as name:
-    seed = tfp_util.SeedStream(
+    seed = tfp.util.SeedStream(
         seed, salt='StructuralTimeSeries_build_factored_variational_loss')
 
     variational_posterior = build_factored_surrogate_posterior(
@@ -563,7 +563,7 @@ def fit_with_hmc(model,
 
   """
   with tf.name_scope(name or 'fit_with_hmc') as name:
-    seed = tfp_util.SeedStream(seed, salt='StructuralTimeSeries_fit_with_hmc')
+    seed = tfp.util.SeedStream(seed, salt='StructuralTimeSeries_fit_with_hmc')
 
     observed_time_series = sts_util.pad_batch_dimension_for_multiple_chains(
         observed_time_series, model, chain_batch_shape=chain_batch_shape)
