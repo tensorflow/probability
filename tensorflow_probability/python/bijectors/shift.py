@@ -63,7 +63,7 @@ class Shift(bijector.Bijector):
       self._shift = tensor_util.convert_nonref_to_tensor(
           shift, dtype=dtype, name='shift')
       super(Shift, self).__init__(
-          forward_min_event_ndims=1,
+          forward_min_event_ndims=0,
           is_constant_jacobian=True,
           dtype=dtype,
           validate_args=False,
