@@ -40,6 +40,7 @@ FILENAMES = [
 
 TAP_WHITELIST = ["{}_test".format(f) for f in (
     "prefer_static",
+    "dtype_util",
     "test_util",
 )]
 

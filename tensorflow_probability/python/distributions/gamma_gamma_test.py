@@ -68,9 +68,9 @@ class GammaGammaTest(test_case.TestCase):
 
   def testGammaGammaLogPDF(self):
     batch_size = 5
-    alpha = tf.constant([2.] * batch_size)
-    alpha0 = tf.constant([3.] * batch_size)
-    beta0 = tf.constant([4.] * batch_size)
+    alpha = tf.constant([2.] * batch_size, dtype=np.float32)
+    alpha0 = tf.constant([3.] * batch_size, dtype=np.float32)
+    beta0 = tf.constant([4.] * batch_size, dtype=np.float32)
     x = np.array([6.] * batch_size, dtype=np.float32)
 
     # Let
@@ -110,9 +110,9 @@ class GammaGammaTest(test_case.TestCase):
 
   def testGammaGammaLogPDFMultidimensional(self):
     batch_size = 6
-    alpha = tf.constant([[2., 4.]] * batch_size)
-    alpha0 = tf.constant([[3., 6.]] * batch_size)
-    beta0 = tf.constant([[4., 8.]] * batch_size)
+    alpha = tf.constant([[2., 4.]] * batch_size, dtype=np.float32)
+    alpha0 = tf.constant([[3., 6.]] * batch_size, dtype=np.float32)
+    beta0 = tf.constant([[4., 8.]] * batch_size, dtype=np.float32)
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
 
     gg = tfd.GammaGamma(
@@ -122,9 +122,9 @@ class GammaGammaTest(test_case.TestCase):
 
   def testGammaGammaLogPDFMultidimensionalBroadcasting(self):
     batch_size = 6
-    alpha = tf.constant([[2., 4.]] * batch_size)
-    alpha0 = tf.constant(3.0)
-    beta0 = tf.constant([4., 8.])
+    alpha = tf.constant([[2., 4.]] * batch_size, dtype=np.float32)
+    alpha0 = tf.constant(3.0, dtype=np.float32)
+    beta0 = tf.constant([4., 8.], dtype=np.float32)
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
 
     gg = tfd.GammaGamma(

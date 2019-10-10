@@ -21,17 +21,16 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_case
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-class DtypeUtilTest(test_case.TestCase):
+class DtypeUtilTest(test_case.TestCase, parameterized.TestCase):
 
   def testIsInteger(self):
     self.assertFalse(dtype_util.is_integer(np.float64))
@@ -64,11 +63,34 @@ class DtypeUtilTest(test_case.TestCase):
         tf.float16, dtype_util.common_dtype([x], dtype_hint=tf.float32))
 
   def testCommonDtypeFromEdRV(self):
+    # Only test Edward2 if it's able to be imported (not possible in jax/numpy
+    # modes).
+    try:
+      from tensorflow_probability.python.experimental import edward2 as ed  # pylint: disable=g-import-not-at-top
+    except ImportError:
+      self.skipTest('No edward2 module present in jax/numpy modes.')
     # As in tensorflow_probability github issue #221
-    ed = tfp.edward2
     x = ed.Dirichlet(np.ones(3, dtype='float64'))
     self.assertEqual(
         tf.float64, dtype_util.common_dtype([x], dtype_hint=tf.float32))
+
+  @parameterized.named_parameters(
+      dict(testcase_name='Float32', dtype=tf.float32,
+           expected_minval=np.float32(-3.4028235e+38)),
+      dict(testcase_name='Float64', dtype=tf.float64,
+           expected_minval=np.float64(-1.7976931348623157e+308)),
+  )
+  def testMin(self, dtype, expected_minval):
+    self.assertEqual(dtype_util.min(dtype), expected_minval)
+
+  @parameterized.named_parameters(
+      dict(testcase_name='Float32', dtype=tf.float32,
+           expected_maxval=np.float32(3.4028235e+38)),
+      dict(testcase_name='Float64', dtype=tf.float64,
+           expected_maxval=np.float64(1.7976931348623157e+308)),
+  )
+  def testMax(self, dtype, expected_maxval):
+    self.assertEqual(dtype_util.max(dtype), expected_maxval)
 
 
 class FloatDTypeTest(test_case.TestCase):
@@ -94,6 +116,9 @@ class FloatDTypeTest(test_case.TestCase):
     self.assertRaises(ValueError, dtype_util.assert_same_float_dtype,
                       [const_float], tf.int32)
 
+    if not hasattr(tf, 'SparseTensor'):
+      # No SparseTensor in numpy/jax mode.
+      return
     sparse_float = tf.SparseTensor(
         tf.constant([[111], [232]], tf.int64),
         tf.constant([23.4, -43.2], tf.float32),
