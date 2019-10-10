@@ -35,6 +35,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensorshape_util
 
+
 __all__ = [
     'Bijector',
 ]
@@ -481,7 +482,8 @@ class Bijector(tf.Module):
       - `_forward`,
       - `_inverse`,
       - `_inverse_log_det_jacobian`,
-      - `_forward_log_det_jacobian` (optional).
+      - `_forward_log_det_jacobian` (optional),
+      - `_is_increasing` (scalar bijectors only)
 
     The `_forward_log_det_jacobian` is called when the bijector is inverted via
     the `Invert` bijector. If undefined, a slightly less efficiently
@@ -961,6 +963,32 @@ class Bijector(tf.Module):
       NotImplementedError: if `_forward` is not implemented.
     """
     return self._call_forward(x, name, **kwargs)
+
+  @classmethod
+  def _is_increasing(cls, **kwargs):
+    """Subclass implementation for `is_increasing` public function."""
+    raise NotImplementedError('`_is_increasing` not implemented.')
+
+  def _call_is_increasing(self, name, **kwargs):
+    """Wraps call to _is_increasing, allowing extra shared logic."""
+    with self._name_and_control_scope(name):
+      return tf.identity(self._is_increasing(**kwargs))
+
+  def _internal_is_increasing(self, name='is_increasing', **kwargs):
+    """For scalar bijectors, returns True where `d forward(x) / d x > 0`.
+
+    This method, like `_is_injective`, is part of a contract with
+    `TransformedDistribution`. This method supports the correctness of scalar
+    `quantile` / `cdf` / `survival_function` for transformed distributions.
+
+    Args:
+      name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
+
+    Returns:
+      A python `bool` or a `tf.bool` `Tensor`.
+    """
+    return self._call_is_increasing(name, **kwargs)
 
   def _inverse(self, y):
     """Subclass implementation for `inverse` public function."""

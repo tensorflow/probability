@@ -48,6 +48,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'DiscreteCosineTransform',
     'Exp',
     'Expm1',
+    'FillScaleTriL',
     'FillTriangular',
     'Gumbel',
     'Identity',
@@ -56,6 +57,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'IteratedSigmoidCentered',
     'Kumaraswamy',
     'MatvecLU',
+    'MatrixInverseTriL',
     'NormalCDF',
     'Ordered',
     'Permute',
@@ -63,6 +65,11 @@ TF2_FRIENDLY_BIJECTORS = (
     'RationalQuadraticSpline',
     'Reciprocal',
     'Reshape',
+    'Scale',
+    'ScaleMatvecDiag',
+    'ScaleMatvecLU',
+    'ScaleMatvecTriL',
+    'Shift',
     'ScaleTriL',
     'Sigmoid',
     'SinhArcsinh',
@@ -81,6 +88,11 @@ BIJECTOR_PARAMS_NDIMS = {
     'Gumbel': dict(loc=0, scale=0),
     'Kumaraswamy': dict(concentration1=0, concentration0=0),
     'MatvecLU': dict(lower_upper=2, permutation=1),
+    'Scale': dict(scale=0),
+    'ScaleMatvecDiag': dict(scale_diag=1),
+    'ScaleMatvecLU': dict(lower_upper=2, permutation=1),
+    'ScaleMatvecTriL': dict(scale_tril=2),
+    'Shift': dict(shift=0),
     'SinhArcsinh': dict(skewness=0, tailweight=0),
     'Softfloor': dict(temperature=0),
     'Softplus': dict(hinge_softness=0),
@@ -101,6 +113,7 @@ NO_LDJ_GRADS_EXPECTED = {
     'AffineScalar': dict(shift={FLDJ, ILDJ}),
     'BatchNormalization': dict(beta={FLDJ, ILDJ}),
     'Gumbel': dict(loc={ILDJ}),
+    'Shift': dict(shift={FLDJ, ILDJ}),
 }
 
 TRANSFORM_DIAGONAL_WHITELIST = {
@@ -116,6 +129,11 @@ TRANSFORM_DIAGONAL_WHITELIST = {
     'NormalCDF',
     'PowerTransform',
     'Reciprocal',
+    'Scale',
+    'ScaleMatvecDiag',
+    'ScaleMatvecLU',
+    'ScaleMatvecTriL',
+    'Shift',
     'Sigmoid',
     'SinhArcsinh',
     'Softplus',
@@ -162,6 +180,17 @@ def broadcasting_params(draw,
           mutex_params=MUTEX_PARAMS))
 
 
+class CallableModule(tf.Module):  # TODO(b/141098791): Eliminate this.
+  """Convenience object for capturing variables closed over by Inline."""
+
+  def __init__(self, fn, varobj):
+    self._fn = fn
+    self._vars = varobj
+
+  def __call__(self, *args, **kwargs):
+    return self._fn(*args, **kwargs)
+
+
 @hps.composite
 def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
               enable_vars=False):
@@ -205,8 +234,8 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
             batch_shape=batch_shape,
             event_dim=event_dim,
             enable_vars=enable_vars))
-    return tfb.Invert(underlying, validate_args=True)
-  if bijector_name == 'TransformDiagonal':
+    bijector_params = {'bijector': underlying}
+  elif bijector_name == 'TransformDiagonal':
     underlying_name = draw(
         hps.sampled_from(sorted(TRANSFORM_DIAGONAL_WHITELIST)))
     underlying = draw(
@@ -215,62 +244,55 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
             batch_shape=(),
             event_dim=event_dim,
             enable_vars=enable_vars))
-    return tfb.TransformDiagonal(underlying, validate_args=True)
-  if bijector_name == 'Inline':
+    bijector_params = {'diag_bijector': underlying}
+  elif bijector_name == 'Inline':
+    scale = draw(hps.sampled_from(np.float32([1., -1., 2, -2.])))
     if enable_vars:
-      scale = tf.Variable(1., name='scale')
-    else:
-      scale = 2.
-    b = tfb.AffineScalar(scale=scale)
+      scale = tf.Variable(scale, name='scale')
+    b = tfb.Scale(scale=scale)
 
-    inline = tfb.Inline(
-        forward_fn=b.forward,
+    bijector_params = dict(
+        forward_fn=CallableModule(b.forward, b),
         inverse_fn=b.inverse,
         forward_log_det_jacobian_fn=lambda x: b.forward_log_det_jacobian(  # pylint: disable=g-long-lambda
             x, event_ndims=b.forward_min_event_ndims),
         forward_min_event_ndims=b.forward_min_event_ndims,
         is_constant_jacobian=b.is_constant_jacobian,
+        is_increasing=b._internal_is_increasing,  # pylint: disable=protected-access
     )
-    inline.b = b
-    return inline
-  if bijector_name == 'DiscreteCosineTransform':
-    dct_type = draw(hps.integers(min_value=2, max_value=3))
-    return tfb.DiscreteCosineTransform(
-        validate_args=True, dct_type=dct_type)
-  if bijector_name == 'PowerTransform':
-    power = draw(hps.floats(min_value=0., max_value=10.))
-    return tfb.PowerTransform(validate_args=True, power=power)
-  if bijector_name == 'Permute':
+  elif bijector_name == 'DiscreteCosineTransform':
+    bijector_params = {'dct_type': draw(hps.integers(min_value=2, max_value=3))}
+  elif bijector_name == 'PowerTransform':
+    bijector_params = {'power': draw(hps.floats(min_value=1e-6, max_value=10.))}
+  elif bijector_name == 'Permute':
     event_ndims = draw(hps.integers(min_value=1, max_value=2))
     axis = draw(hps.integers(min_value=-event_ndims, max_value=-1))
     # This is a permutation of dimensions within an axis.
     # (Contrast with `Transpose` below.)
-    permutation = draw(hps.permutations(np.arange(event_dim)))
-    return tfb.Permute(permutation, axis=axis)
-  if bijector_name == 'Reshape':
+    bijector_params = {
+        'axis': axis,
+        'permutation': draw(hps.permutations(np.arange(event_dim)))
+    }
+  elif bijector_name == 'Reshape':
     event_shape_out = draw(tfp_hps.shapes(min_ndims=1))
     # TODO(b/142135119): Wanted to draw general input and output shapes like the
     # following, but Hypothesis complained about filtering out too many things.
     # event_shape_in = draw(tfp_hps.shapes(min_ndims=1))
     # hp.assume(event_shape_out.num_elements() == event_shape_in.num_elements())
     event_shape_in = [event_shape_out.num_elements()]
-    return tfb.Reshape(event_shape_out=event_shape_out,
-                       event_shape_in=event_shape_in, validate_args=True)
-  if bijector_name == 'Transpose':
+    bijector_params = {'event_shape_out': event_shape_out,
+                       'event_shape_in': event_shape_in}
+  elif bijector_name == 'Transpose':
     event_ndims = draw(hps.integers(min_value=0, max_value=2))
     # This is a permutation of axes.
     # (Contrast with `Permute` above.)
-    permutation = draw(hps.permutations(np.arange(event_ndims)))
-    return tfb.Transpose(perm=permutation)
-
-  bijector_params = draw(
-      broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,
-                          enable_vars=enable_vars))
+    bijector_params = {'perm': draw(hps.permutations(np.arange(event_ndims)))}
+  else:
+    bijector_params = draw(
+        broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,
+                            enable_vars=enable_vars))
   ctor = getattr(tfb, bijector_name)
   return ctor(validate_args=True, **bijector_params)
-
-
-Support = tfp_hps.Support
 
 
 def constrain_forward_shape(bijector, shape):
@@ -421,6 +443,7 @@ class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
     bijector = data.draw(
         bijectors(bijector_name=bijector_name, event_dim=event_dim,
                   enable_vars=True))
+    self.evaluate(tf.group(*[v.initializer for v in bijector.variables]))
 
     # Forward mapping: Check differentiation through forward mapping with
     # respect to the input and parameter variables.  Also check that any
@@ -450,6 +473,17 @@ class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
         ys = bijector.forward(xs + 0)
     grads = tape.gradient(ys, wrt_vars)
     assert_no_none_grad(bijector, 'forward', wrt_vars, grads)
+
+    # For scalar bijectors, verify correctness of the _is_increasing method.
+    if (bijector.forward_min_event_ndims == 0 and
+        bijector.inverse_min_event_ndims == 0):
+      dydx = grads[0]
+      hp.note('dydx: {}'.format(dydx))
+      isfinite = tf.math.is_finite(dydx)
+      incr_or_slope_eq0 = bijector._internal_is_increasing() | tf.equal(dydx, 0)  # pylint: disable=protected-access
+      self.assertAllEqual(
+          isfinite & incr_or_slope_eq0,
+          isfinite & (dydx >= 0) | tf.zeros_like(incr_or_slope_eq0))
 
     # FLDJ: Check differentiation through forward log det jacobian with
     # respect to the input and parameter variables.  Also check that any
@@ -519,8 +553,8 @@ class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
           max_permissible=max_permitted):
         tape.watch(wrt_vars)
         # TODO(b/73073515): Fix graph mode gradients with bijector caching.
-        xs = bijector.inverse_log_det_jacobian(ys + 0, event_ndims=event_ndims)
-    grads = tape.gradient(xs, wrt_vars)
+        ldj = bijector.inverse_log_det_jacobian(ys + 0, event_ndims=event_ndims)
+    grads = tape.gradient(ldj, wrt_vars)
     assert_no_none_grad(bijector, 'inverse_log_det_jacobian', wrt_vars, grads)
 
 
@@ -545,6 +579,12 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(eps=0.5),
     'AffineScalar.scale':
         tfp_hps.softplus_plus_eps(),
+    'Scale.scale':
+        tfp_hps.softplus_plus_eps(),
+    'ScaleMatvecDiag.scale_diag':
+        tfp_hps.softplus_plus_eps(),
+    'ScaleMatvecTriL.scale_tril':
+        tfp_hps.lower_tril_positive_definite,
     'bin_widths':
         bijector_hps.spline_bin_size_constraint,
     'bin_heights':

@@ -148,6 +148,9 @@ def bijector_supports():
                           Support.SCALAR_POSITIVE),
       'Expm1':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_GT_NEG1),
+      'FillScaleTriL':
+          BijectorSupport(Support.VECTOR_SIZE_TRIANGULAR,
+                          Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
       'FillTriangular':
           BijectorSupport(
               Support.VECTOR_SIZE_TRIANGULAR, Support.MATRIX_LOWER_TRIL),
@@ -192,9 +195,24 @@ def bijector_supports():
       'Reshape':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
+      'Scale':
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED,
+                          Support.SCALAR_UNCONSTRAINED),
+      'ScaleMatvecDiag':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_UNCONSTRAINED),
+      'ScaleMatvecLU':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_UNCONSTRAINED),
+      'ScaleMatvecTriL':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_UNCONSTRAINED),
       'ScaleTriL':
           BijectorSupport(Support.VECTOR_SIZE_TRIANGULAR,
                           Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
+      'Shift':
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED,
+                          Support.SCALAR_UNCONSTRAINED),
       'Sigmoid':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'SinhArcsinh':

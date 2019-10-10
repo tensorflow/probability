@@ -89,6 +89,9 @@ class Invert(bijector_lib.Bijector):
   def bijector(self):
     return self._bijector
 
+  def _internal_is_increasing(self, **kwargs):
+    return self.bijector._internal_is_increasing(**kwargs)  # pylint: disable=protected-access
+
   def forward(self, x, **kwargs):
     return self.bijector.inverse(x, **kwargs)
 

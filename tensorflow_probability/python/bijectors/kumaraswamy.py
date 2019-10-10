@@ -85,6 +85,10 @@ class Kumaraswamy(bijector.Bijector):
     """The `b` in: `Y = g(X) = (1 - (1 - X)**(1 / b))**(1 / a)`."""
     return self._concentration0
 
+  @classmethod
+  def _is_increasing(cls):
+    return True
+
   def _forward(self, x):
     x = self._maybe_assert_valid(x)
     return tf.exp(

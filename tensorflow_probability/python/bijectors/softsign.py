@@ -59,6 +59,10 @@ class Softsign(bijector.Bijector):
           validate_args=validate_args,
           name=name)
 
+  @classmethod
+  def _is_increasing(cls):
+    return True
+
   def _forward(self, x):
     return x / (1. + tf.math.abs(x))
 

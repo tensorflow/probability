@@ -84,6 +84,10 @@ class Gumbel(bijector.Bijector):
     """This is `scale` in `Y = g(X) = exp(-exp(-(X - loc) / scale))`."""
     return self._scale
 
+  @classmethod
+  def _is_increasing(cls):
+    return True
+
   def _forward(self, x):
     z = (x - self.loc) / self.scale
     return tf.exp(-tf.exp(-z))

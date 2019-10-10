@@ -19,9 +19,9 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.bijectors import affine_scalar
 from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import fill_triangular
+from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.bijectors import transform_diagonal
 from tensorflow_probability.python.internal import dtype_util
@@ -74,10 +74,10 @@ class FillScaleTriL(chain.Chain):
   # pre- and post- shifts inside of `diag_bijector`.
   b = tfb.FillScaleTriL(
        diag_bijector=tfb.Chain([
-         tfb.AffineScalar(shift=1e-3),
+         tfb.Shift(1e-3),
          tfb.Softplus(),
-         tfb.AffineScalar(shift=0.5413)]),  # softplus_inverse(1.)
-                                            #  = log(expm1(1.)) = 0.5413
+         tfb.Shift(0.5413)]),  # tfp.math.softplus_inverse(1.)
+                               #  = log(expm1(1.)) = 0.5413
        diag_shift=None)
   ```
 
@@ -111,12 +111,12 @@ class FillScaleTriL(chain.Chain):
         diag_bijector = softplus.Softplus(validate_args=validate_args)
 
       if diag_shift is not None:
-        dtype = dtype_util.common_dtype([diag_shift], tf.float32)
+        dtype = dtype_util.common_dtype([diag_bijector, diag_shift], tf.float32)
         diag_shift = tensor_util.convert_nonref_to_tensor(diag_shift,
                                                           name='diag_shift',
                                                           dtype=dtype)
         diag_bijector = chain.Chain([
-            affine_scalar.AffineScalar(shift=diag_shift),
+            shift.Shift(shift=diag_shift),
             diag_bijector
         ])
 
@@ -128,56 +128,11 @@ class FillScaleTriL(chain.Chain):
 
 
 class ScaleTriL(chain.Chain):
-  """Transforms unconstrained vectors to TriL matrices with positive diagonal.
-
-  This is implemented as a simple `tfb.Chain` of `tfb.FillTriangular`
-  followed by `tfb.TransformDiagonal`, and provided mostly as a
-  convenience. The default setup is somewhat opinionated, using a
-  Softplus transformation followed by a small shift (`1e-5`) which
-  attempts to avoid numerical issues from zeros on the diagonal.
-
-  #### Examples
-
-  ```python
-  tfb = tfp.distributions.bijectors
-  b = tfb.ScaleTriL(
-       diag_bijector=tfb.Exp(),
-       diag_shift=None)
-  b.forward(x=[0., 0., 0.])
-  # Result: [[1., 0.],
-  #          [0., 1.]]
-  b.inverse(y=[[1., 0],
-               [.5, 2]])
-  # Result: [log(2), .5, log(1)]
-
-  # Define a distribution over PSD matrices of shape `[3, 3]`,
-  # with `1 + 2 + 3 = 6` degrees of freedom.
-  dist = tfd.TransformedDistribution(
-          tfd.Normal(tf.zeros(6), tf.ones(6)),
-          tfb.Chain([tfb.CholeskyOuterProduct(), tfb.ScaleTriL()]))
-
-  # Using an identity transformation, ScaleTriL is equivalent to
-  # tfb.FillTriangular.
-  b = tfb.ScaleTriL(
-       diag_bijector=tfb.Identity(),
-       diag_shift=None)
-
-  # For greater control over initialization, one can manually encode
-  # pre- and post- shifts inside of `diag_bijector`.
-  b = tfb.ScaleTriL(
-       diag_bijector=tfb.Chain([
-         tfb.AffineScalar(shift=1e-3),
-         tfb.Softplus(),
-         tfb.AffineScalar(shift=0.5413)]),  # softplus_inverse(1.)
-                                            #  = log(expm1(1.)) = 0.5413
-       diag_shift=None)
-  ```
-
-  """
+  """DEPRECATED. Please use `tfp.bijectors.FillScaleTriL`."""
 
   @deprecation.deprecated(
       '2020-01-01',
-      '`ScaleTriL` has been deprecated and renamed FillScaleTriL`; please use '
+      '`ScaleTriL` has been deprecated and renamed `FillScaleTriL`; please use '
       'that symbol instead.')
   def __init__(self,
                diag_bijector=None,
@@ -207,12 +162,12 @@ class ScaleTriL(chain.Chain):
         diag_bijector = softplus.Softplus(validate_args=validate_args)
 
       if diag_shift is not None:
-        dtype = dtype_util.common_dtype([diag_shift], tf.float32)
+        dtype = dtype_util.common_dtype([diag_bijector, diag_shift], tf.float32)
         diag_shift = tensor_util.convert_nonref_to_tensor(diag_shift,
                                                           name='diag_shift',
                                                           dtype=dtype)
         diag_bijector = chain.Chain([
-            affine_scalar.AffineScalar(shift=diag_shift),
+            shift.Shift(diag_shift),
             diag_bijector
         ])
 

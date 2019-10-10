@@ -38,24 +38,25 @@ class Shift(bijector.Bijector):
   Example Use:
 
   ```python
-  linalg = tf.linalg
-
-  shift = Shift([-1., 0., 1], scale)
+  shift = Shift([-1., 0., 1])
   x = [1., 2, 3]
   # `forward` is equivalent to:
   # y = x + shift
-  y = affine.forward(x)  # [0., 2., 4.]
+  y = shift.forward(x)  # [0., 2., 4.]
   ```
 
   """
 
   def __init__(self,
                shift,
-               name='affine_linear_operator'):
+               validate_args=False,
+               name='shift'):
     """Instantiates the `Shift` bijector.
 
     Args:
       shift: Floating-point `Tensor`.
+      validate_args: Python `bool` indicating whether arguments should be
+        checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
     with tf.name_scope(name) as name:
@@ -66,13 +67,17 @@ class Shift(bijector.Bijector):
           forward_min_event_ndims=0,
           is_constant_jacobian=True,
           dtype=dtype,
-          validate_args=False,
+          validate_args=validate_args,
           name=name)
 
   @property
   def shift(self):
     """The `shift` `Tensor` in `Y = X + shift`."""
     return self._shift
+
+  @classmethod
+  def _is_increasing(cls):
+    return True
 
   def _forward(self, x):
     return x + self.shift
@@ -84,4 +89,4 @@ class Shift(bijector.Bijector):
     # is_constant_jacobian = True for this bijector, hence the
     # `log_det_jacobian` need only be specified for a single input, as this will
     # be tiled to match `event_ndims`.
-    return tf.constant(0., dtype=dtype_util.base_dtype(x.dtype))
+    return tf.zeros([], dtype=dtype_util.base_dtype(x.dtype))

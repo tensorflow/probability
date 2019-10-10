@@ -56,18 +56,13 @@ class Scale(bijector.Bijector):
     ```
 
     Args:
-      scale: Floating-point `Tensor`. If this is set to `None`, no scale is
-        applied. This should not be set if `log_scale` is set.
+      scale: Floating-point `Tensor`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
-
-    Raises:
-      ValueError: If both `scale` and `log_scale` are specified.
     """
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([scale], dtype_hint=tf.float32)
-
       self._scale = tensor_util.convert_nonref_to_tensor(
           scale, dtype=dtype, name='scale')
 
@@ -82,6 +77,9 @@ class Scale(bijector.Bijector):
   def scale(self):
     """The `scale` term in `Y = scale * X`."""
     return self._scale
+
+  def _is_increasing(self):
+    return self.scale > 0
 
   def _forward(self, x):
     return x * self.scale

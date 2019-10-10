@@ -114,6 +114,10 @@ class Softfloor(bijector.Bijector):
           dtype=dtype,
           name=name)
 
+  @classmethod
+  def _is_increasing(cls):
+    return True
+
   def _forward(self, x):
     # This has a well defined derivative with respect to x.
     # This is because in the range [0.5, 1.5] this is just a rescaled

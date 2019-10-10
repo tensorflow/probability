@@ -187,6 +187,12 @@ class Transpose(bijector.Bijector):
   def rightmost_transposed_ndims(self):
     return self._rightmost_transposed_ndims
 
+  def _is_increasing(self):
+    if self.forward_min_event_ndims == 0:
+      return True
+    raise NotImplementedError(
+        '`_is_increasing` not supported unless Transpose is no-op.')
+
   def _forward(self, x):
     return self._transpose(x, self.perm)
 
