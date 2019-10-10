@@ -56,6 +56,15 @@ from discussion.fun_mcmc.fun_mcmc_lib import random_walk_metropolis
 from discussion.fun_mcmc.fun_mcmc_lib import random_walk_metropolis_init
 from discussion.fun_mcmc.fun_mcmc_lib import RandomWalkMetropolisExtra
 from discussion.fun_mcmc.fun_mcmc_lib import RandomWalkMetropolisState
+from discussion.fun_mcmc.fun_mcmc_lib import running_covariance_init
+from discussion.fun_mcmc.fun_mcmc_lib import running_covariance_step
+from discussion.fun_mcmc.fun_mcmc_lib import running_mean_init
+from discussion.fun_mcmc.fun_mcmc_lib import running_mean_step
+from discussion.fun_mcmc.fun_mcmc_lib import running_variance_init
+from discussion.fun_mcmc.fun_mcmc_lib import running_variance_step
+from discussion.fun_mcmc.fun_mcmc_lib import RunningCovarianceState
+from discussion.fun_mcmc.fun_mcmc_lib import RunningMeanState
+from discussion.fun_mcmc.fun_mcmc_lib import RunningVarianceState
 from discussion.fun_mcmc.fun_mcmc_lib import ruth4_step
 from discussion.fun_mcmc.fun_mcmc_lib import sign_adaptation
 from discussion.fun_mcmc.fun_mcmc_lib import spliting_integrator_step
@@ -64,6 +73,7 @@ from discussion.fun_mcmc.fun_mcmc_lib import trace
 from discussion.fun_mcmc.fun_mcmc_lib import transform_log_prob_fn
 from discussion.fun_mcmc.fun_mcmc_lib import transition_kernel_wrapper
 from discussion.fun_mcmc.fun_mcmc_lib import TransitionOperator
+
 
 __all__ = [
     'adam_init',
@@ -102,6 +112,15 @@ __all__ = [
     'random_walk_metropolis_init',
     'RandomWalkMetropolisExtra',
     'RandomWalkMetropolisState',
+    'running_covariance_init',
+    'running_covariance_step',
+    'running_mean_init',
+    'running_mean_step',
+    'running_variance_init',
+    'running_variance_step',
+    'RunningCovarianceState',
+    'RunningMeanState',
+    'RunningVarianceState',
     'ruth4_step',
     'set_backend',
     'sign_adaptation',

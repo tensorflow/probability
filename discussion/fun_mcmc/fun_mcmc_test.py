@@ -65,6 +65,65 @@ def _skip_on_jax(fn):
   return _wrapper
 
 
+def _gen_cov(data, axis):
+  """This computes a generalized covariance, supporting batch and reduction.
+
+  This computes a batch of covariances from data, with the relevant dimensions
+  are determined as follows:
+
+  - Dimensions specified by `axis` are reduced over.
+  - The final non-reduced over dimension is taken as the event dimension.
+  - The remaining dimensions are batch dimensions.
+
+  Args:
+    data: An NDArray.
+    axis: An integer or a tuple of integers.
+
+  Returns:
+    cov: A batch of covariances.
+  """
+  axis = tuple(util.flatten_tree(axis))
+  shape = tuple(data.shape)
+  rank = len(shape)
+  centered_data = data - np.mean(data, axis, keepdims=True)
+  symbols = 'abcdefg'
+  # Destination is missing the axes we reduce over.
+  dest = []
+  last_unaggregated_src_dim = None
+  last_unaggregated_dest_dim = None
+  for i in range(rank):
+    if i not in axis:
+      dest.append(symbols[i])
+      last_unaggregated_src_dim = i
+      last_unaggregated_dest_dim = len(dest) - 1
+  source_1 = list(symbols[:rank])
+  source_1[last_unaggregated_src_dim] = 'x'
+  source_2 = list(symbols[:rank])
+  source_2[last_unaggregated_src_dim] = 'y'
+  dest = dest[:last_unaggregated_dest_dim] + [
+      'x', 'y'
+  ] + dest[last_unaggregated_dest_dim + 1:]
+  formula = '{source_1},{source_2}->{dest}'.format(
+      source_1=''.join(source_1),
+      source_2=''.join(source_2),
+      dest=''.join(dest))
+  cov = (
+      np.einsum(formula, centered_data, centered_data) /
+      np.prod(np.array(shape)[np.array(axis)]))
+  return cov
+
+
+class GenCovTest(real_tf.test.TestCase):
+
+  def testGenCov(self):
+    x = np.arange(10).reshape(5, 2)
+    true_cov = np.cov(x, rowvar=False, bias=True)
+    self.assertAllClose(true_cov, _gen_cov(x, 0))
+
+    true_cov = np.cov(x, rowvar=True, bias=True)
+    self.assertAllClose(true_cov, _gen_cov(x, 1))
+
+
 class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
 
   def setUp(self):
@@ -787,6 +846,90 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
 
     sample_mean = tf.reduce_mean(tf.one_hot(chain, 4), axis=[0, 1])
     self.assertAllClose(tf.nn.softmax(target_logits), sample_mean, atol=0.1)
+
+  @parameterized.named_parameters(
+      ('Basic', (10, 3), None),
+      ('Batched', (10, 4, 3), None),
+      ('Aggregated0', (10, 4, 3), 0),
+      ('Aggregated1', (10, 4, 3), 1),
+      ('Aggregated01', (10, 4, 3), (0, 1)),
+      ('Aggregated02', (10, 4, 5, 3), (0, 2)),
+  )
+  def testRunningMean(self, shape, aggregation):
+    data = tf.convert_to_tensor(np.random.randn(*shape))
+
+    def kernel(rms, idx):
+      rms, _ = fun_mcmc.running_mean_step(rms, data[idx], axis=aggregation)
+      return (rms, idx + 1), ()
+
+    true_aggregation = (0,) + (() if aggregation is None else tuple(
+        [a + 1 for a in util.flatten_tree(aggregation)]))
+    true_mean = np.mean(data, true_aggregation)
+
+    (rms, _), _ = fun_mcmc.trace(
+        state=(fun_mcmc.running_mean_init(true_mean.shape, data.dtype), 0),
+        fn=kernel,
+        num_steps=len(data),
+        trace_fn=lambda *args: ())
+
+    self.assertAllClose(true_mean, rms.mean)
+
+  @parameterized.named_parameters(
+      ('Basic', (10, 3), None),
+      ('Batched', (10, 4, 3), None),
+      ('Aggregated0', (10, 4, 3), 0),
+      ('Aggregated1', (10, 4, 3), 1),
+      ('Aggregated01', (10, 4, 3), (0, 1)),
+      ('Aggregated02', (10, 4, 5, 3), (0, 2)),
+  )
+  def testRunningVariance(self, shape, aggregation):
+    data = tf.convert_to_tensor(np.random.randn(*shape))
+
+    true_aggregation = (0,) + (() if aggregation is None else tuple(
+        [a + 1 for a in util.flatten_tree(aggregation)]))
+    true_mean = np.mean(data, true_aggregation)
+    true_var = np.var(data, true_aggregation)
+
+    def kernel(rvs, idx):
+      rvs, _ = fun_mcmc.running_variance_step(rvs, data[idx], axis=aggregation)
+      return (rvs, idx + 1), ()
+
+    (rvs, _), _ = fun_mcmc.trace(
+        state=(fun_mcmc.running_variance_init(true_mean.shape,
+                                              data[0].dtype), 0),
+        fn=kernel,
+        num_steps=len(data),
+        trace_fn=lambda *args: ())
+    self.assertAllClose(true_mean, rvs.mean)
+    self.assertAllClose(true_var, rvs.variance)
+
+  @parameterized.named_parameters(
+      ('Basic', (10, 3), None),
+      ('Batched', (10, 4, 3), None),
+      ('Aggregated0', (10, 4, 3), 0),
+      ('Aggregated01', (10, 4, 5, 3), (0, 1)),
+  )
+  def testRunningCovariance(self, shape, aggregation):
+    data = tf.convert_to_tensor(np.random.randn(*shape))
+
+    true_aggregation = (0,) + (() if aggregation is None else tuple(
+        [a + 1 for a in util.flatten_tree(aggregation)]))
+    true_mean = np.mean(data, true_aggregation)
+    true_cov = _gen_cov(data, true_aggregation)
+
+    def kernel(rcs, idx):
+      rcs, _ = fun_mcmc.running_covariance_step(
+          rcs, data[idx], axis=aggregation)
+      return (rcs, idx + 1), ()
+
+    (rcs, _), _ = fun_mcmc.trace(
+        state=(fun_mcmc.running_covariance_init(true_mean.shape,
+                                                data[0].dtype), 0),
+        fn=kernel,
+        num_steps=len(data),
+        trace_fn=lambda *args: ())
+    self.assertAllClose(true_mean, rcs.mean)
+    self.assertAllClose(true_cov, rcs.covariance)
 
 
 class FunMCMCTestJAX(FunMCMCTestTensorFlow):

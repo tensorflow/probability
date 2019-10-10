@@ -46,7 +46,7 @@ import numpy as np
 
 import tensorflow_probability as tfp
 from discussion.fun_mcmc import backend
-from typing import Any, Callable, Mapping, Optional, Sequence, Text, Tuple, Union
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Text, Tuple, Union
 
 tf = backend.tf
 util = backend.util
@@ -88,6 +88,15 @@ __all__ = [
     'random_walk_metropolis_init',
     'RandomWalkMetropolisExtra',
     'RandomWalkMetropolisState',
+    'running_covariance_init',
+    'running_covariance_step',
+    'running_mean_init',
+    'running_mean_step',
+    'running_variance_init',
+    'running_variance_step',
+    'RunningCovarianceState',
+    'RunningMeanState',
+    'RunningVarianceState',
     'ruth4_step',
     'sign_adaptation',
     'spliting_integrator_step',
@@ -110,6 +119,8 @@ TensorSpecNest = Union['tf.TensorSpec', Sequence['tf.TensorSpec'],
 BijectorNest = Union[tfb.Bijector, Sequence[tfb.Bijector],
                      Mapping[Any, tfb.Bijector]]
 FloatNest = Union[FloatTensor, Sequence[FloatTensor], Mapping[Any, FloatTensor]]
+IntNest = Union[IntTensor, Sequence[IntTensor], Mapping[Any, IntTensor]]
+DTypeNest = Union['tf.DType', Sequence['tf.DType'], Mapping[Any, 'tf.DType']]
 State = TensorNest  # pylint: disable=invalid-name
 TransitionOperator = Callable[..., Tuple[State, TensorNest]]
 PotentialFn = Union[Callable[[TensorNest], Tuple['tf.Tensor', TensorNest]],
@@ -1460,3 +1471,301 @@ def random_walk_metropolis(
 
   rwm_state = rwm_state  # type: RandomWalkMetropolisState
   return rwm_state, rwm_extra
+
+
+RunningVarianceState = collections.namedtuple('RunningVarianceState',
+                                              'num_points, mean, variance')
+
+
+def running_variance_init(shape: IntTensor,
+                          dtype: tf.DType) -> RunningVarianceState:
+  """Initializes the `RunningVarianceState`.
+
+  Args:
+    shape: Shape of the computed statistics.
+    dtype: DType of the computed statistics.
+
+  Returns:
+    state: `RunningVarianceState`.
+  """
+  return RunningVarianceState(
+      num_points=util.map_tree(lambda _: tf.zeros([], tf.int32), dtype),
+      mean=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
+      variance=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
+  )
+
+
+# TODO(b/141892260): g-bare-generic here is a Pylint bug.
+def running_variance_step(
+    state: RunningVarianceState,
+    vec: FloatNest,
+    axis: Union[int,
+                List[int]] = None) -> Tuple[RunningVarianceState, Tuple[()]]:  # pylint: disable=g-bare-generic
+  """Updates the `RunningVarianceState`.
+
+  As a computational convenience, this allows computing both independent
+  variance estimates, as well as aggregating across an axis of `vec`. For
+  example:
+
+  - vec shape: [3, 4], axis=None -> mean/var shape: [3, 4]
+  - vec shape: [3, 4], axis=0 -> mean/var shape: [4]
+  - vec shape: [3, 4], axis=1 -> mean/var shape: [3]
+  - vec shape: [3, 4], axis=[0, 1] -> mean/var shape: []
+
+  Note that this produces a biased estimate of variance, for simplicity. If the
+  unbiased estimate is required, compute it as follows: `state.variance *
+  state.num_points / (state.num_points - 1)`.
+
+  Args:
+    state: `RunningVarianceState`.
+    vec: A Tensor to incorporate into the variance estimate.
+    axis: If not `None`, treat these axes as being additional axes to aggregate
+      over.
+
+  Returns:
+    state: `RunningVarianceState`.
+    extra: Empty tuple.
+  """
+
+  def _one_part(vec, mean, variance, num_points):
+    """Updates a single part."""
+    vec = tf.convert_to_tensor(vec, mean.dtype)
+    broadcast_mean = mean
+    if axis is not None:
+      for a in util.flatten_tree(axis):
+        broadcast_mean = tf.expand_dims(broadcast_mean, a)
+    centered_vec = vec - broadcast_mean
+    num_points_f = tf.cast(num_points, vec.dtype)
+    # pyformat: disable
+    # These are derived by using the definition of variance for N and N + 1
+    # points, and then identifying the previous terms/simplifying.
+    if axis is None:
+      additional_points = 1
+      additional_points_f = 1
+      new_variance = (
+          num_points_f * (num_points_f + additional_points_f) * variance +
+          num_points_f * tf.square(centered_vec)) / (
+              tf.square(num_points_f + additional_points_f))
+    else:
+      vec_shape = tf.shape(vec)
+      additional_points = tf.math.reduce_prod(tf.gather(vec_shape, axis))
+      additional_points_f = tf.cast(additional_points, vec.dtype)
+      new_variance = (
+          num_points_f * (num_points_f + additional_points_f) * variance +
+          num_points_f * tf.reduce_sum(tf.square(centered_vec), axis) -
+          tf.square(tf.reduce_sum(vec, axis)) + additional_points_f *
+          tf.reduce_sum(tf.square(vec), axis)) / (
+              tf.square(num_points_f + additional_points_f))
+      centered_vec = tf.reduce_sum(centered_vec, axis)
+    # pyformat: enable
+    new_mean = mean + centered_vec / (num_points_f + additional_points_f)
+    return new_mean, new_variance, num_points + additional_points
+
+  new_mean_variance_num_points = util.map_tree(_one_part, vec, state.mean,
+                                               state.variance, state.num_points)
+
+  new_mean = util.map_tree_up_to(state.mean, lambda x: x[0],
+                                 new_mean_variance_num_points)
+  new_variance = util.map_tree_up_to(state.mean, lambda x: x[1],
+                                     new_mean_variance_num_points)
+  new_num_points = util.map_tree_up_to(state.mean, lambda x: x[2],
+                                       new_mean_variance_num_points)
+  return RunningVarianceState(
+      num_points=new_num_points, mean=new_mean, variance=new_variance), ()
+
+
+RunningCovarianceState = collections.namedtuple('RunningCovarianceState',
+                                                'num_points, mean, covariance')
+
+
+def running_covariance_init(shape: IntTensor,
+                            dtype: tf.DType) -> RunningCovarianceState:
+  """Initializes the `RunningCovarianceState`.
+
+  Args:
+    shape: Shape of the computed mean.
+    dtype: DType of the computed statistics.
+
+  Returns:
+    state: `RunningCovarianceState`.
+  """
+  return RunningCovarianceState(
+      num_points=util.map_tree(lambda _: tf.zeros([], tf.int32), dtype),
+      mean=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
+      covariance=util.map_tree_up_to(
+          dtype, lambda shape, dtype: tf.zeros(  # pylint: disable=g-long-lambda
+              tf.concat(
+                  [
+                      tf.convert_to_tensor(shape),
+                      tf.convert_to_tensor(shape[-1:]),
+                  ],
+                  axis=0,
+              ),
+              dtype=dtype), shape, dtype),
+  )
+
+
+# TODO(b/141892260): g-bare-generic here is a Pylint bug.
+def running_covariance_step(
+    state: RunningCovarianceState,
+    vec: FloatTensor,
+    axis: Union[int,
+                List[int]] = None) -> Tuple[RunningCovarianceState, Tuple[()]]:  # pylint: disable=g-bare-generic
+  """Updates the `RunningCovarianceState`.
+
+  As a computational convenience, this allows computing both independent
+  covariance estimates, as well as aggregating across an axis of `vec`. For
+  example:
+
+  - vec shape: [3, 4], axis=None -> mean shape: [3, 4], cov shape [3, 4, 4]
+  - vec shape: [3, 4], axis=0 -> mean shape: [4], cov shape [4, 4]
+
+  Note that the final unreduced dimension must be the last one (and there must
+  be at least one unreduced dimension); thus, the following are illegal:
+
+  - vec shape: [3, 4], axis=1 -> Illegal, unreduced dimension is not last.
+  - vec shape: [3, 4], axis=[0, 1] -> Illegal, no unreduced dimensions.
+
+  Note that this produces a biased estimate of covariance, for simplicity. If
+  the unbiased estimate is required, compute it as follows: `state.covariance *
+  state.num_points / (state.num_points - 1)`.
+
+  Args:
+    state: `RunningCovarianceState`.
+    vec: A Tensor to incorporate into the variance estimate.
+    axis: If not `None`, treat these axes as being additional axes to aggregate
+      over.
+
+  Returns:
+    state: `RunningCovarianceState`.
+    extra: Empty tuple.
+  """
+
+  def _outer(x):
+    res = tf.einsum('...i,...j->...ij', x, x)
+    return res
+
+  def _one_part(vec, mean, covariance, num_points):
+    """Updates a single part."""
+    vec = tf.convert_to_tensor(vec, mean.dtype)
+    broadcast_mean = mean
+    if axis is not None:
+      for a in util.flatten_tree(axis):
+        broadcast_mean = tf.expand_dims(broadcast_mean, a)
+    centered_vec = vec - broadcast_mean
+    num_points_f = tf.cast(num_points, vec.dtype)
+
+    # pyformat: disable
+    # These are derived by using the definition of covariance for N and N + 1
+    # points, and then identifying the previous terms/simplifying.
+    if axis is None:
+      additional_points = 1
+      additional_points_f = 1
+      new_covariance = (
+          num_points_f * (num_points_f + additional_points_f) * covariance +
+          num_points_f * _outer(centered_vec)) / (
+              tf.square(num_points_f + additional_points_f))
+    else:
+      vec_shape = tf.shape(vec)
+      additional_points = tf.math.reduce_prod(tf.gather(vec_shape, axis))
+      additional_points_f = tf.cast(additional_points, vec.dtype)
+      new_covariance = (
+          num_points_f * (num_points_f + additional_points_f) * covariance +
+          num_points_f * tf.reduce_sum(_outer(centered_vec), axis) -
+          _outer(tf.reduce_sum(vec, axis)) + additional_points_f *
+          tf.reduce_sum(_outer(vec), axis)) / (
+              tf.square(num_points_f + additional_points_f))
+      centered_vec = tf.reduce_sum(centered_vec, axis)
+    # pyformat: enable
+    new_mean = mean + centered_vec / (num_points_f + additional_points_f)
+    return new_mean, new_covariance, num_points + additional_points
+
+  new_mean_covariance_num_points = util.map_tree(_one_part, vec, state.mean,
+                                                 state.covariance,
+                                                 state.num_points)
+
+  new_mean = util.map_tree_up_to(state.mean, lambda x: x[0],
+                                 new_mean_covariance_num_points)
+  new_covariance = util.map_tree_up_to(state.mean, lambda x: x[1],
+                                       new_mean_covariance_num_points)
+  new_num_points = util.map_tree_up_to(state.mean, lambda x: x[2],
+                                       new_mean_covariance_num_points)
+  return RunningCovarianceState(
+      num_points=new_num_points, mean=new_mean, covariance=new_covariance), ()
+
+
+RunningMeanState = collections.namedtuple('RunningMeanState',
+                                          'num_points, mean')
+
+
+def running_mean_init(shape: IntTensor, dtype: tf.DType) -> RunningMeanState:
+  """Initializes the `RunningMeanState`.
+
+  Args:
+    shape: Shape of the computed statistics.
+    dtype: DType of the computed statistics.
+
+  Returns:
+    state: `RunningMeanState`.
+  """
+  return RunningMeanState(
+      num_points=util.map_tree(lambda _: tf.zeros([], tf.int32), dtype),
+      mean=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
+  )
+
+
+# TODO(b/141892260): g-bare-generic here is a Pylint bug.
+def running_mean_step(
+    state: RunningMeanState,
+    vec: FloatTensor,
+    axis: Union[int, List[int]] = None
+) -> Tuple[RunningMeanState, Tuple[()]]:  # pylint: disable=g-bare-generic
+  """Updates the `RunningMeanState`.
+
+  As a computational convenience, this allows computing both independent
+  mean estimates, as well as aggregating across an axis of `vec`. For example:
+
+  - vec shape: [3, 4], axis=None -> mean shape: [3, 4]
+  - vec shape: [3, 4], axis=0 -> mean shape: [4]
+  - vec shape: [3, 4], axis=1 -> mean shape: [3]
+  - vec shape: [3, 4], axis=[0, 1] -> mean shape: []
+
+  Args:
+    state: `RunningMeanState`.
+    vec: A Tensor to incorporate into the mean.
+    axis: If not `None`, treat these axes as being additional axes to aggregate
+      over.
+
+  Returns:
+    state: `RunningMeanState`.
+    extra: Empty tuple.
+  """
+
+  def _one_part(vec, mean, num_points):
+    """Updates a single part."""
+    vec = tf.convert_to_tensor(vec, mean.dtype)
+    broadcast_mean = mean
+    if axis is not None:
+      for a in util.flatten_tree(axis):
+        broadcast_mean = tf.expand_dims(broadcast_mean, a)
+    centered_vec = vec - broadcast_mean
+    num_points_f = tf.cast(num_points, vec.dtype)
+    if axis is None:
+      additional_points = 1
+      additional_points_f = 1
+    else:
+      vec_shape = tf.shape(vec)
+      additional_points = tf.math.reduce_prod(tf.gather(vec_shape, axis))
+      additional_points_f = tf.cast(additional_points, vec.dtype)
+      centered_vec = tf.reduce_sum(centered_vec, axis)
+    new_mean = state.mean + centered_vec / (num_points_f + additional_points_f)
+    return new_mean, num_points + additional_points
+
+  new_mean_num_points = util.map_tree(_one_part, vec, state.mean,
+                                      state.num_points)
+
+  new_mean = util.map_tree_up_to(state.mean, lambda x: x[0],
+                                 new_mean_num_points)
+  new_num_points = util.map_tree_up_to(state.mean, lambda x: x[1],
+                                       new_mean_num_points)
+  return RunningMeanState(num_points=new_num_points, mean=new_mean), ()
