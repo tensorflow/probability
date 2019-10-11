@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -38,7 +38,7 @@ def _reduce_variance(x, axis=None, keepdims=False):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class RWMTest(test_case.TestCase):
+class RWMTest(tfp_test_util.TestCase):
 
   def testRWM1DUniform(self):
     """Sampling from the Standard Normal Distribution."""

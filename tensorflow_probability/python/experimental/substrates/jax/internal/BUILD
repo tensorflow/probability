@@ -34,7 +34,6 @@ FILENAMES = [
     "prefer_static",
     "special_math",
     "tensor_util",
-    "test_case",
     "test_util",
 ]
 
@@ -50,9 +49,8 @@ DEPS = {
     "distribution_util": [":prefer_static"],
     "test_util": [
         "//tensorflow_probability/python/experimental/substrates/jax/util:seed_stream",
+        "//tensorflow_probability/python/experimental/substrates/jax/internal:dtype_util",
     ],
-    "prefer_static_test": [":test_util"],
-    "test_util_test": [":test_util"],
     "special_math": [
         "//tensorflow_probability/python/experimental/substrates/jax/math:gradient",
     ],
@@ -93,7 +91,7 @@ DEPS = {
     tags = ([] if filename in TAP_WHITELIST else ["notap"]) + ["tfp_jax"],
     deps = [
         ":internal",
-        ":test_case",
+        ":test_util",
         # absl/testing:flagsaver dep,
         # absl/testing:parameterized dep,
         # hypothesis dep,

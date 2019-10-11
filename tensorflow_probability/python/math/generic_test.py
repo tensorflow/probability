@@ -27,7 +27,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
 
@@ -36,7 +36,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LogCombinationsTest(test_case.TestCase):
+class LogCombinationsTest(tfp_test_util.TestCase):
 
   def testLogCombinationsBinomial(self):
     n = [2, 5, 12, 15]
@@ -62,7 +62,7 @@ class LogCombinationsTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ReduceWeightedLogSumExp(test_case.TestCase):
+class ReduceWeightedLogSumExp(tfp_test_util.TestCase):
 
   def _reduce_weighted_logsumexp(self, logx, w, axis, keep_dims=False):
     m = np.max(logx, axis=axis, keepdims=True)
@@ -173,7 +173,7 @@ class ReduceWeightedLogSumExp(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SoftThresholdTest(test_case.TestCase, parameterized.TestCase):
+class SoftThresholdTest(tfp_test_util.TestCase):
 
   dtype = tf.float32
 
@@ -206,7 +206,7 @@ class SoftThresholdTest(test_case.TestCase, parameterized.TestCase):
 # tensorflow/python/kernel_tests/softplus_op_test.py
 # once TF core is accepting new ops.
 @test_util.run_all_in_graph_and_eager_modes
-class SoftplusInverseTest(test_case.TestCase):
+class SoftplusInverseTest(tfp_test_util.TestCase):
 
   def _npSoftplus(self, np_features):
     np_features = np.asarray(np_features)
@@ -312,7 +312,7 @@ class SoftplusInverseTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LogAddExp(test_case.TestCase):
+class LogAddExp(tfp_test_util.TestCase):
 
   def test_small(self):
     x = [-2, -1000]
@@ -340,7 +340,7 @@ class LogAddExp(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LogSubExpTest(test_case.TestCase):
+class LogSubExpTest(tfp_test_util.TestCase):
 
   def testLogSubExp(self):
     self.assertAllClose(-np.inf, self.evaluate(tfp.math.log_sub_exp(1., 1.)))
@@ -384,7 +384,7 @@ class LogSubExpTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class Log1mexpTest(test_case.TestCase):
+class Log1mexpTest(tfp_test_util.TestCase):
 
   def testLog1mexp(self):
     self.assertAllClose(-np.inf, self.evaluate(tfp.math.log1mexp(0.)))
@@ -400,7 +400,7 @@ class Log1mexpTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class Smootherstep(test_case.TestCase):
+class Smootherstep(tfp_test_util.TestCase):
 
   def test_value_vector(self):
     x = tf.constant([-np.inf, -20., 0., 0.5, 1., 20., np.inf])
@@ -419,7 +419,7 @@ class Smootherstep(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SoftSortingMatrixTest(parameterized.TestCase, test_case.TestCase):
+class SoftSortingMatrixTest(tfp_test_util.TestCase):
 
   # By applying an argmax on each column of the generated matrix,
   # we should recover an argsort. This is an invariant with respect

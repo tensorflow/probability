@@ -27,7 +27,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -44,7 +44,7 @@ def make_relaxed_categorical(batch_shape, num_classes, dtype=tf.float32):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ExpRelaxedOneHotCategoricalTest(test_case.TestCase):
+class ExpRelaxedOneHotCategoricalTest(tfp_test_util.TestCase):
 
   def testProbs(self):
     temperature = 1.0
@@ -87,7 +87,7 @@ def analytical_pdf(x, temperature, logits):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class RelaxedOneHotCategoricalTest(test_case.TestCase):
+class RelaxedOneHotCategoricalTest(tfp_test_util.TestCase):
 
   def assertRaises(self, error_class, msg):
     if tf.executing_eagerly():
@@ -245,7 +245,7 @@ class RelaxedOneHotCategoricalTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ExpRelaxedOneHotCategoricalFromVariableTest(test_case.TestCase):
+class ExpRelaxedOneHotCategoricalFromVariableTest(tfp_test_util.TestCase):
 
   def testGradientLogits(self):
     t = tf.Variable([0.01, 1.])

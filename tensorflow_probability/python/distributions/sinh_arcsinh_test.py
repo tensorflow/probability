@@ -25,7 +25,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -34,7 +33,7 @@ rng = np.random.RandomState(123)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SinhArcsinhTest(test_case.TestCase):
+class SinhArcsinhTest(tfp_test_util.TestCase):
 
   def testDefaultIsSameAsNormal(self):
     b = 10

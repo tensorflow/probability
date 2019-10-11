@@ -26,11 +26,11 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-class DtypeUtilTest(test_case.TestCase, parameterized.TestCase):
+class DtypeUtilTest(tfp_test_util.TestCase):
 
   def testIsInteger(self):
     self.assertFalse(dtype_util.is_integer(np.float64))
@@ -93,7 +93,7 @@ class DtypeUtilTest(test_case.TestCase, parameterized.TestCase):
     self.assertEqual(dtype_util.max(dtype), expected_maxval)
 
 
-class FloatDTypeTest(test_case.TestCase):
+class FloatDTypeTest(tfp_test_util.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_assert_same_float_dtype(self):
@@ -152,3 +152,4 @@ class FloatDTypeTest(test_case.TestCase):
 
 if __name__ == '__main__':
   tf.test.main()
+

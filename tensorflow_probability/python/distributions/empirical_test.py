@@ -25,7 +25,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -496,8 +495,7 @@ class EmpiricalVectorTest(tfp_test_util.VectorDistributionTestHelpers):
 
 @test_util.run_all_in_graph_and_eager_modes
 class EmpiricalNdTest(tfp_test_util.VectorDistributionTestHelpers,
-                      test_case.TestCase,
-                      parameterized.TestCase):
+                      tfp_test_util.TestCase):
 
   def testSamples(self):
     for samples_shape in ([4, 2, 4], [4, 2, 2, 4]):
@@ -672,22 +670,22 @@ class EmpiricalNdTest(tfp_test_util.VectorDistributionTestHelpers,
 
 
 class EmpiricalScalarStaticShapeTest(
-    EmpiricalScalarTest, test_case.TestCase):
+    EmpiricalScalarTest, tfp_test_util.TestCase):
   static_shape = True
 
 
 class EmpiricalScalarDynamicShapeTest(
-    EmpiricalScalarTest, test_case.TestCase):
+    EmpiricalScalarTest, tfp_test_util.TestCase):
   static_shape = False
 
 
 class EmpiricalVectorStaticShapeTest(
-    EmpiricalVectorTest, test_case.TestCase):
+    EmpiricalVectorTest, tfp_test_util.TestCase):
   static_shape = True
 
 
 class EmpiricalVectorDynamicShapeTest(
-    EmpiricalVectorTest, test_case.TestCase):
+    EmpiricalVectorTest, tfp_test_util.TestCase):
   static_shape = False
 
 

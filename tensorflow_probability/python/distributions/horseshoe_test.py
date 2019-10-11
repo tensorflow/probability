@@ -24,7 +24,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -244,22 +243,22 @@ class _HorseshoeTest(object):
         param_, shape=param_.shape if self.use_static_shape else None)
 
 
-class HorseshoeTestStaticShapeFloat32(test_case.TestCase, _HorseshoeTest):
+class HorseshoeTestStaticShapeFloat32(tfp_test_util.TestCase, _HorseshoeTest):
   dtype = np.float32
   use_static_shape = True
 
 
-class HorseshoeTestDynamicShapeFloat32(test_case.TestCase, _HorseshoeTest):
+class HorseshoeTestDynamicShapeFloat32(tfp_test_util.TestCase, _HorseshoeTest):
   dtype = np.float32
   use_static_shape = False
 
 
-class HorseshoeTestStaticShapeFloat64(test_case.TestCase, _HorseshoeTest):
+class HorseshoeTestStaticShapeFloat64(tfp_test_util.TestCase, _HorseshoeTest):
   dtype = np.float64
   use_static_shape = True
 
 
-class HorseshoeTestDynamicShapeFloat64(test_case.TestCase, _HorseshoeTest):
+class HorseshoeTestDynamicShapeFloat64(tfp_test_util.TestCase, _HorseshoeTest):
   dtype = np.float64
   use_static_shape = False
 

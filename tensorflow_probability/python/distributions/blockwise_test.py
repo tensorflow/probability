@@ -22,7 +22,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -30,7 +29,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BlockwiseTest(test_case.TestCase):
+class BlockwiseTest(tfp_test_util.TestCase):
 
   def testDocstring1(self):
     d = tfd.Blockwise(
@@ -198,7 +197,7 @@ class BlockwiseTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BlockwiseTestStaticParams(test_case.TestCase, parameterized.TestCase):
+class BlockwiseTestStaticParams(tfp_test_util.TestCase):
   use_static_shape = True
 
   def _input(self, value):

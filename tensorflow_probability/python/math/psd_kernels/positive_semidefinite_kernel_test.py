@@ -28,7 +28,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math.psd_kernels.internal import util as kernels_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -86,8 +86,7 @@ class TestKernel(tfp.math.psd_kernels.PositiveSemidefiniteKernel):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PositiveSemidefiniteKernelTest(test_case.TestCase,
-                                     parameterized.TestCase):
+class PositiveSemidefiniteKernelTest(tfp_test_util.TestCase):
   """Test the abstract base class behaviors."""
 
   def createKernelInputs(self, batched=False):

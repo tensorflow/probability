@@ -31,7 +31,6 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -167,7 +166,7 @@ def assert_mvn_target_conservation(event_size, batch_size, **kwargs):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NutsTest(parameterized.TestCase, test_case.TestCase):
+class NutsTest(tfp_test_util.TestCase):
 
   @parameterized.parameters(itertools.product([2, 3], [1, 2, 3]))
   def testLeapfrogStepCounter(self, tree_depth, unrolled_leapfrog_steps):

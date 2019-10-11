@@ -69,7 +69,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -94,7 +94,6 @@ py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -126,7 +125,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -157,7 +156,6 @@ py_library(
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -171,7 +169,7 @@ py_test(
     tags = ["nozapfhahn"],
     deps = [
         ":nuts_testlib",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -189,7 +187,7 @@ py_test(
     ],
     deps = [
         ":nuts_testlib",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -217,7 +215,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -250,7 +248,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -275,7 +273,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -301,7 +299,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -325,7 +323,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -348,7 +346,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -372,7 +370,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:monte_carlo",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -400,7 +398,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/mcmc/internal",
     ],
 )
@@ -428,7 +426,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -485,7 +483,6 @@ py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

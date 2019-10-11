@@ -26,7 +26,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import monte_carlo
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -41,7 +41,7 @@ def _set_seed(seed):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HaltonSequenceTest(test_case.TestCase):
+class HaltonSequenceTest(tfp_test_util.TestCase):
 
   def test_known_values_small_bases(self):
     # The first five elements of the non-randomized Halton sequence

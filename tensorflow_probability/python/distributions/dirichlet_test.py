@@ -25,7 +25,6 @@ from scipy import stats as sp_stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -34,7 +33,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DirichletTest(test_case.TestCase):
+class DirichletTest(tfp_test_util.TestCase):
 
   def testSimpleShapes(self):
     alpha = np.random.rand(3)
@@ -289,7 +288,7 @@ class DirichletTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DirichletFromVariableTest(test_case.TestCase):
+class DirichletFromVariableTest(tfp_test_util.TestCase):
 
   def testGradients(self):
     x = tf.Variable([1., 1.1, 1.2])

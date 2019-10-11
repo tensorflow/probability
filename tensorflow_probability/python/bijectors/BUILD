@@ -127,7 +127,7 @@ py_library(
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -141,7 +141,7 @@ py_test(
     tags = ["hypothesis"],
     deps = [
         ":bijector_properties_testlib",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -155,7 +155,7 @@ py_test(
     tags = ["hypothesis"],
     deps = [
         ":bijector_properties_testlib",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -798,7 +798,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensor_util",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -812,7 +812,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -823,7 +823,7 @@ py_test(
     deps = [
         ":bijectors",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -837,7 +837,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -849,7 +849,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -863,7 +862,6 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -877,7 +875,6 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -891,7 +888,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -904,7 +901,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -917,7 +914,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -929,7 +926,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -945,7 +941,6 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -960,7 +955,7 @@ py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -973,7 +968,7 @@ py_test(
         ":categorical_to_discrete",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -987,7 +982,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -999,7 +994,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1011,7 +1006,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1025,7 +1020,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:lkj",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1038,7 +1033,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1053,7 +1047,7 @@ py_test(
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1066,7 +1060,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1080,7 +1073,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1093,7 +1086,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1107,7 +1100,6 @@ py_test(
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1119,7 +1111,7 @@ py_test(
         ":bijector_test_util",
         ":bijectors",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1132,7 +1124,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1146,7 +1138,6 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1160,7 +1151,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1178,7 +1168,6 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1192,7 +1181,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1206,7 +1194,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1219,7 +1207,7 @@ py_test(
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1232,7 +1220,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1244,7 +1232,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1258,7 +1245,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1271,7 +1258,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1285,7 +1272,6 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1302,7 +1288,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:hypothesis_testlib",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1316,7 +1302,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1329,7 +1315,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1341,7 +1327,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1355,7 +1341,7 @@ py_test(
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1369,7 +1355,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1383,7 +1369,6 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1397,7 +1382,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1410,7 +1395,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1423,7 +1408,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1437,7 +1422,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
     ],
 )
@@ -1451,7 +1436,6 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1465,7 +1449,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1482,7 +1466,6 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1497,7 +1480,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1511,7 +1494,6 @@ py_test(
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

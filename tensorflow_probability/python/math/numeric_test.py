@@ -25,12 +25,12 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class Log1pSquareTest32(test_case.TestCase, parameterized.TestCase):
+class Log1pSquareTest32(tfp_test_util.TestCase):
 
   dtype = tf.float32
 
@@ -65,7 +65,7 @@ class Log1pSquareTest64(Log1pSquareTest32):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ClipByValuePreserveGrad32(test_case.TestCase, parameterized.TestCase):
+class ClipByValuePreserveGrad32(tfp_test_util.TestCase):
 
   dtype = tf.float32
 

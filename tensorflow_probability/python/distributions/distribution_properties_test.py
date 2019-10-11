@@ -40,7 +40,6 @@ from tensorflow_probability.python.bijectors import hypothesis_testlib as biject
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -723,7 +722,7 @@ def extra_tensor_conversion_allowed(dist):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DistributionParamsAreVarsTest(parameterized.TestCase, test_case.TestCase):
+class DistributionParamsAreVarsTest(tfp_test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
@@ -895,7 +894,7 @@ def no_tf_rank_errors():
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ReproducibilityTest(parameterized.TestCase, test_case.TestCase):
+class ReproducibilityTest(tfp_test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
@@ -915,7 +914,7 @@ class ReproducibilityTest(parameterized.TestCase, test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DistributionSlicingTest(test_case.TestCase):
+class DistributionSlicingTest(tfp_test_util.TestCase):
 
   def _test_slicing(self, data, dist):
     strm = tfp_test_util.test_seed_stream()

@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -76,7 +76,7 @@ negloglik = lambda y, rv_y: -rv_y.log_prob(y)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DenseVariationalLayerTest(test_case.TestCase):
+class DenseVariationalLayerTest(tfp_test_util.TestCase):
 
   def test_end_to_end(self):
     # Get dataset.

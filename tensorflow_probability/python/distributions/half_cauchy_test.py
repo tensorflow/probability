@@ -24,7 +24,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -494,25 +494,27 @@ class _HalfCauchyTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HalfCauchyTestStaticShapeFloat32(test_case.TestCase, _HalfCauchyTest):
+class HalfCauchyTestStaticShapeFloat32(tfp_test_util.TestCase, _HalfCauchyTest):
   dtype = np.float32
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HalfCauchyTestDynamicShapeFloat32(test_case.TestCase, _HalfCauchyTest):
+class HalfCauchyTestDynamicShapeFloat32(tfp_test_util.TestCase,
+                                        _HalfCauchyTest):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HalfCauchyTestStaticShapeFloat64(test_case.TestCase, _HalfCauchyTest):
+class HalfCauchyTestStaticShapeFloat64(tfp_test_util.TestCase, _HalfCauchyTest):
   dtype = np.float64
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HalfCauchyTestDynamicShapeFloat64(test_case.TestCase, _HalfCauchyTest):
+class HalfCauchyTestDynamicShapeFloat64(tfp_test_util.TestCase,
+                                        _HalfCauchyTest):
   dtype = np.float64
   use_static_shape = False
 

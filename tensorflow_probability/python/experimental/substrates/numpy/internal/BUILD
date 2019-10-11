@@ -34,7 +34,6 @@ FILENAMES = [
     "prefer_static",
     "special_math",
     "tensor_util",
-    "test_case",
     "test_util",
 ]
 
@@ -48,12 +47,9 @@ TEST_FILENAMES = ["{}_test".format(filename) for filename in FILENAMES if filena
 
 DEPS = {
     "distribution_util": [":prefer_static"],
-    "prefer_static_test": [":test_util"],
     "test_util": [
+        ":dtype_util",
         "//tensorflow_probability/python/experimental/substrates/numpy/util:seed_stream",
-    ],
-    "test_util_test": [
-        ":test_util",
     ],
     "special_math": [
         "//tensorflow_probability/python/experimental/substrates/numpy/math",
@@ -95,7 +91,7 @@ DEPS = {
     tags = ([] if filename in TAP_WHITELIST else ["notap"]) + ["tfp_numpy"],
     deps = [
         ":internal",
-        ":test_case",
+        ":test_util",
         # absl/testing:flagsaver dep,
         # absl/testing:parameterized dep,
         # hypothesis dep,

@@ -25,7 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.keras import testing_utils
 from tensorflow.python.layers import utils as tf_layers_util
@@ -726,12 +726,12 @@ class ConvVariational(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ConvVariationalTestChannelsFirst(test_case.TestCase, ConvVariational):
+class ConvVariationalTestChannelsFirst(tfp_test_util.TestCase, ConvVariational):
   data_format = 'channels_first'
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ConvVariationalTestChannelsLast(test_case.TestCase, ConvVariational):
+class ConvVariationalTestChannelsLast(tfp_test_util.TestCase, ConvVariational):
   data_format = 'channels_last'
 
 if __name__ == '__main__':

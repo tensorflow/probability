@@ -26,7 +26,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -297,19 +296,19 @@ class _GumbelTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GumbelTestStaticShape(test_case.TestCase, _GumbelTest):
+class GumbelTestStaticShape(tfp_test_util.TestCase, _GumbelTest):
   _dtype = np.float32
   _use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GumbelTestFloat64StaticShape(test_case.TestCase, _GumbelTest):
+class GumbelTestFloat64StaticShape(tfp_test_util.TestCase, _GumbelTest):
   _dtype = np.float64
   _use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GumbelTestDynamicShape(test_case.TestCase, _GumbelTest):
+class GumbelTestDynamicShape(tfp_test_util.TestCase, _GumbelTest):
   _dtype = np.float32
   _use_static_shape = False
 

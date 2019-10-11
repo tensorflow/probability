@@ -24,7 +24,6 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -590,14 +589,14 @@ class _BatchReshapeTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BatchReshapeStaticTest(_BatchReshapeTest, test_case.TestCase):
+class BatchReshapeStaticTest(_BatchReshapeTest, tfp_test_util.TestCase):
 
   dtype = np.float32
   is_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BatchReshapeDynamicTest(_BatchReshapeTest, test_case.TestCase):
+class BatchReshapeDynamicTest(_BatchReshapeTest, tfp_test_util.TestCase):
 
   dtype = np.float64
   is_static_shape = False

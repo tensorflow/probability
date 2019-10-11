@@ -25,7 +25,6 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -43,7 +42,7 @@ def make_plackett_luce(batch_shape,
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PlackettLuceTest(test_case.TestCase):
+class PlackettLuceTest(tfp_test_util.TestCase):
 
   def setUp(self):
     super(PlackettLuceTest, self).setUp()
@@ -145,7 +144,7 @@ class PlackettLuceTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PlackettLuceFromVariableTest(test_case.TestCase):
+class PlackettLuceFromVariableTest(tfp_test_util.TestCase):
 
   def testAssertionsProbsAfterMutation(self):
     x = tf.Variable([0.25, 0.25, 0.5])

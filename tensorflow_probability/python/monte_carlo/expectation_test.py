@@ -24,11 +24,11 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.internal.monte_carlo import _get_samples
 
 
-class GetSamplesTest(test_case.TestCase):
+class GetSamplesTest(tfp_test_util.TestCase):
   """Test the private method 'get_samples'."""
 
   def test_raises_if_both_z_and_n_are_none(self):
@@ -64,7 +64,7 @@ class GetSamplesTest(test_case.TestCase):
     self.assertEqual((10,), z.shape)
 
 
-class ExpectationTest(test_case.TestCase):
+class ExpectationTest(tfp_test_util.TestCase):
 
   def test_works_correctly(self):
     x = tf.constant([-1e6, -100, -10, -1, 1, 10, 100, 1e6])

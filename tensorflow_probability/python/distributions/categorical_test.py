@@ -27,7 +27,6 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -42,7 +41,7 @@ def make_categorical(batch_shape, num_classes, dtype=tf.int32):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CategoricalTest(test_case.TestCase, parameterized.TestCase):
+class CategoricalTest(tfp_test_util.TestCase):
 
   def testP(self):
     p = [0.2, 0.8]
@@ -503,7 +502,7 @@ class CategoricalTest(test_case.TestCase, parameterized.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CategoricalFromVariableTest(test_case.TestCase):
+class CategoricalFromVariableTest(tfp_test_util.TestCase):
 
   def testGradientLogits(self):
     x = tf.Variable([-1., 0., 1])

@@ -37,7 +37,7 @@ from tensorflow_probability.python.experimental.auto_batching import test_progra
 from tensorflow_probability.python.experimental.auto_batching import tf_backend
 from tensorflow_probability.python.experimental.auto_batching import type_inference
 from tensorflow_probability.python.experimental.auto_batching import virtual_machine as vm
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 NP_BACKEND = numpy_backend.NumpyBackend()
@@ -80,7 +80,7 @@ def _execute(prog, inputs, stack_depth, backend):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TypeInferenceTest(test_case.TestCase, parameterized.TestCase):
+class TypeInferenceTest(tfp_test_util.TestCase):
 
   def assertSameTypes(self, expected_prog, typed, check_dtypes=True):
     for v, type_ in six.iteritems(typed.var_defs):

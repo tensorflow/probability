@@ -29,7 +29,7 @@ from tensorflow_probability.python.bijectors import hypothesis_testlib as biject
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -429,7 +429,7 @@ def assert_no_none_grad(bijector, method, wrt_vars, grads):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
+class BijectorPropertiesTest(tfp_test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': bname, 'bijector_name': bname}

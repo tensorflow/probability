@@ -23,14 +23,13 @@ from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BinomialTest(test_case.TestCase):
+class BinomialTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -260,7 +259,7 @@ class BinomialTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BinomialFromVariableTest(test_case.TestCase):
+class BinomialFromVariableTest(tfp_test_util.TestCase):
 
   def testAssertionsTotalCount(self):
     x = tf.Variable([-1.0, 4.0, 1.0])

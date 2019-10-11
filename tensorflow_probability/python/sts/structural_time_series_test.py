@@ -24,7 +24,6 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.sts import Autoregressive
 from tensorflow_probability.python.sts import DynamicLinearRegression
@@ -109,21 +108,21 @@ class _StructuralTimeSeriesTests(object):
 
 @test_util.run_all_in_graph_and_eager_modes
 class StructuralTimeSeriesTestsStaticShape32(
-    _StructuralTimeSeriesTests, test_case.TestCase):
+    _StructuralTimeSeriesTests, tfp_test_util.TestCase):
   dtype = np.float32
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class StructuralTimeSeriesTestsDynamicShape32(
-    _StructuralTimeSeriesTests, test_case.TestCase):
+    _StructuralTimeSeriesTests, tfp_test_util.TestCase):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class StructuralTimeSeriesTestsStaticShape64(
-    _StructuralTimeSeriesTests, test_case.TestCase):
+    _StructuralTimeSeriesTests, tfp_test_util.TestCase):
   dtype = np.float64
   use_static_shape = True
 
@@ -256,28 +255,28 @@ class _StsTestHarness(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoregressiveTest(test_case.TestCase, _StsTestHarness):
+class AutoregressiveTest(tfp_test_util.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return Autoregressive(order=3, observed_time_series=observed_time_series)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LocalLevelTest(test_case.TestCase, _StsTestHarness):
+class LocalLevelTest(tfp_test_util.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return LocalLevel(observed_time_series=observed_time_series)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LocalLinearTrendTest(test_case.TestCase, _StsTestHarness):
+class LocalLinearTrendTest(tfp_test_util.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return LocalLinearTrend(observed_time_series=observed_time_series)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SeasonalTest(test_case.TestCase, _StsTestHarness):
+class SeasonalTest(tfp_test_util.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     # Note that a Seasonal model with `num_steps_per_season > 1` would have
@@ -294,7 +293,8 @@ class SeasonalTest(test_case.TestCase, _StsTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SeasonalWithZeroMeanConstraintTest(test_case.TestCase, _StsTestHarness):
+class SeasonalWithZeroMeanConstraintTest(tfp_test_util.TestCase,
+                                         _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return Seasonal(num_seasons=7,
@@ -304,7 +304,7 @@ class SeasonalWithZeroMeanConstraintTest(test_case.TestCase, _StsTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SeasonalWithMultipleStepsAndNoiseTest(test_case.TestCase,
+class SeasonalWithMultipleStepsAndNoiseTest(tfp_test_util.TestCase,
                                             _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
@@ -318,14 +318,14 @@ class SeasonalWithMultipleStepsAndNoiseTest(test_case.TestCase,
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SemiLocalLinearTrendTest(test_case.TestCase, _StsTestHarness):
+class SemiLocalLinearTrendTest(tfp_test_util.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return SemiLocalLinearTrend(observed_time_series=observed_time_series)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SmoothSeasonalTest(test_case.TestCase, _StsTestHarness):
+class SmoothSeasonalTest(tfp_test_util.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return SmoothSeasonal(period=42,
@@ -334,7 +334,7 @@ class SmoothSeasonalTest(test_case.TestCase, _StsTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SmoothSeasonalWithNoDriftTest(test_case.TestCase, _StsTestHarness):
+class SmoothSeasonalWithNoDriftTest(tfp_test_util.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     smooth_seasonal = SmoothSeasonal(period=42,
@@ -347,7 +347,7 @@ class SmoothSeasonalWithNoDriftTest(test_case.TestCase, _StsTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SumTest(test_case.TestCase, _StsTestHarness):
+class SumTest(tfp_test_util.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     first_component = LocalLinearTrend(
@@ -360,7 +360,7 @@ class SumTest(test_case.TestCase, _StsTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LinearRegressionTest(test_case.TestCase, _StsTestHarness):
+class LinearRegressionTest(tfp_test_util.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     max_timesteps = 100
@@ -389,7 +389,7 @@ class LinearRegressionTest(test_case.TestCase, _StsTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SparseLinearRegressionTest(test_case.TestCase, _StsTestHarness):
+class SparseLinearRegressionTest(tfp_test_util.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     max_timesteps = 100
@@ -414,7 +414,7 @@ class SparseLinearRegressionTest(test_case.TestCase, _StsTestHarness):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DynamicLinearRegressionTest(test_case.TestCase, _StsTestHarness):
+class DynamicLinearRegressionTest(tfp_test_util.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     max_timesteps = 100

@@ -27,14 +27,13 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
+class MultivariateNormalTriLTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -427,8 +426,7 @@ make_slicer = _MakeSlicer()
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalTriLSlicingTest(test_case.TestCase,
-                                        parameterized.TestCase):
+class MultivariateNormalTriLSlicingTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)

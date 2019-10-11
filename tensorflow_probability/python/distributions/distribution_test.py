@@ -25,7 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -108,7 +108,7 @@ class NamedTupleDistribution(tfd.Distribution):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DistributionStrReprTest(test_case.TestCase):
+class DistributionStrReprTest(tfp_test_util.TestCase):
 
   def testStrWorksCorrectlyScalar(self):
     normal = tfd.Normal(loc=np.float16(0), scale=1)
@@ -281,7 +281,7 @@ class DistributionStrReprTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DistributionTest(test_case.TestCase):
+class DistributionTest(tfp_test_util.TestCase):
 
   def testParamShapesAndFromParams(self):
     classes = [
@@ -521,7 +521,7 @@ class Dummy(tfd.Distribution):
     return self._mean_
 
 
-class ParametersTest(test_case.TestCase):
+class ParametersTest(tfp_test_util.TestCase):
 
   def testParameters(self):
     d = Dummy(1., arg2=2.)
@@ -547,7 +547,7 @@ class ParametersTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TfModuleTest(test_case.TestCase):
+class TfModuleTest(tfp_test_util.TestCase):
 
   def test_variable_tracking_works(self):
     scale = tf.Variable(1.)
@@ -567,7 +567,7 @@ class TfModuleTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ConditionalDistributionTest(test_case.TestCase):
+class ConditionalDistributionTest(tfp_test_util.TestCase):
 
   def _GetFakeDistribution(self):
     class _FakeDistribution(tfd.Distribution):

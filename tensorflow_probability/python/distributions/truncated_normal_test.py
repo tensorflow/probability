@@ -29,7 +29,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
@@ -60,7 +59,7 @@ def scipy_trunc_norm_dist(loc, scale, low, high):
   return sp_stats.truncnorm(a, b, loc=loc, scale=scale)
 
 
-class _TruncatedNormalTestCase(test_case.TestCase):
+class _TruncatedNormalTestCase(tfp_test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -103,8 +102,7 @@ class _TruncatedNormalTestCase(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
-                                        parameterized.TestCase):
+class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
 
   def _testParamShapes(self, desired_shape):
     tn_param_shapes = tfd.TruncatedNormal.param_shapes(desired_shape)
@@ -365,8 +363,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase,
     (-0.3, 2.0),
     (100., 5.0),
     )
-class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase,
-                                           parameterized.TestCase):
+class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase):
   """Test by comparing TruncatedNormals with wide bounds and unbounded Normal.
   """
 
@@ -439,8 +436,7 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase,
     (10., 3.0, 9.9, 25.),
     (2., 1.5, 0.1, 1.9),
     (-2., 0.2, -1.5, -0.5))
-class TruncatedNormalTestCompareWithScipy(_TruncatedNormalTestCase,
-                                          parameterized.TestCase):
+class TruncatedNormalTestCompareWithScipy(_TruncatedNormalTestCase):
 
   def constructDists(self, loc, scale, low, high):
     tf_dist = tfd.TruncatedNormal(loc=loc, scale=scale,

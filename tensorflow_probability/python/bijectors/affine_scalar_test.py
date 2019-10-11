@@ -25,7 +25,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -197,12 +196,12 @@ class _AffineScalarBijectorTest(object):
         _ = self.evaluate(b.forward(1.))
 
 
-class AffineScalarBijectorTestFloat32(test_case.TestCase,
+class AffineScalarBijectorTestFloat32(tfp_test_util.TestCase,
                                       _AffineScalarBijectorTest):
   dtype = np.float32
 
 
-class AffineScalarBijectorTestFloat64(test_case.TestCase,
+class AffineScalarBijectorTestFloat64(tfp_test_util.TestCase,
                                       _AffineScalarBijectorTest):
   dtype = np.float64
 

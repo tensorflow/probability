@@ -25,11 +25,11 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-class _MaternTestCase(parameterized.TestCase, test_case.TestCase):
+class _MaternTestCase(tfp_test_util.TestCase):
   """Mixin test for Matern type kernels.
 
   Subclasses must specify _kernel_type and _numpy_kernel.

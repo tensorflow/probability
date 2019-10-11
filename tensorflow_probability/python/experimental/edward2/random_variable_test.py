@@ -27,7 +27,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability import edward2 as ed
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -44,7 +44,7 @@ class FakeDistribution(tfd.Distribution):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class RandomVariableTest(parameterized.TestCase, test_case.TestCase):
+class RandomVariableTest(tfp_test_util.TestCase):
 
   def testConstructor(self):
     x = ed.RandomVariable(tfd.Poisson(rate=tf.ones([2, 5])),

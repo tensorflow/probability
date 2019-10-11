@@ -21,12 +21,12 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions.deprecated_linalg import tridiag
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TridiagTest(test_case.TestCase):
+class TridiagTest(tfp_test_util.TestCase):
 
   def testWorksCorrectlyNoBatches(self):
     self.assertAllEqual(

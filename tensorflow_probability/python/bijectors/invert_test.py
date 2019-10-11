@@ -23,14 +23,13 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class InvertBijectorTest(test_case.TestCase):
+class InvertBijectorTest(tfp_test_util.TestCase):
   """Tests the correctness of the Y = Invert(bij) transformation."""
 
   def testBijector(self):

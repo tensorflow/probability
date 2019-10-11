@@ -57,7 +57,7 @@ TEST_FILENAMES = []
     tags = ["tfp_jax"],
     deps = [
         ":util",
-        "//tensorflow_probability/python/experimental/substrates/jax/internal:test_case",
+        "//tensorflow_probability/python/experimental/substrates/jax/internal:test_util",
     ],
 ) for filename in TEST_FILENAMES]
 

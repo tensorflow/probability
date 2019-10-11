@@ -25,7 +25,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math import value_and_gradient
 
@@ -159,11 +158,11 @@ class _SoftFloorBijectorBase(object):
         self.evaluate(b.forward(0.5))
 
 
-class SoftFloor32Test(_SoftFloorBijectorBase, test_case.TestCase):
+class SoftFloor32Test(_SoftFloorBijectorBase, tfp_test_util.TestCase):
   dtype = np.float32
 
 
-class SoftFloor64Test(_SoftFloorBijectorBase, test_case.TestCase):
+class SoftFloor64Test(_SoftFloorBijectorBase, tfp_test_util.TestCase):
   dtype = np.float64
 
 

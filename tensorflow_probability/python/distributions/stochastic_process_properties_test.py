@@ -30,7 +30,6 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
 
@@ -287,7 +286,7 @@ def assert_shapes_unchanged(target_shaped_dict, possibly_bcast_dict):
 
 @test_util.run_all_in_graph_and_eager_modes
 class StochasticProcessParamsAreVarsTest(
-    parameterized.TestCase, test_case.TestCase):
+    tfp_test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': sname, 'process_name': sname}

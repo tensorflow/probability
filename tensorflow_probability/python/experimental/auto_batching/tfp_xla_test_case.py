@@ -25,7 +25,7 @@ from absl import flags
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.auto_batching import xla
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 flags.DEFINE_string('test_device', None,
 
@@ -35,7 +35,7 @@ flags.DEFINE_string('tf_xla_flags', None,
 FLAGS = flags.FLAGS
 
 
-class TFPXLATestCase(test_case.TestCase):
+class TFPXLATestCase(tfp_test_util.TestCase):
   """TFP+XLA test harness."""
 
   def __init__(self, method_name='runTest'):

@@ -28,12 +28,12 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BaseBijectorTest(test_case.TestCase):
+class BaseBijectorTest(tfp_test_util.TestCase):
   """Tests properties of the Bijector base-class."""
 
   def testIsAbstract(self):
@@ -164,7 +164,7 @@ class ConstantJacobian(tfb.Bijector):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BijectorTestEventNdims(test_case.TestCase):
+class BijectorTestEventNdims(tfp_test_util.TestCase):
 
   def assertRaisesError(self, msg):
     return self.assertRaisesRegexp(Exception, msg)
@@ -197,7 +197,7 @@ class BijectorTestEventNdims(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BijectorCachingTest(test_case.TestCase):
+class BijectorCachingTest(tfp_test_util.TestCase):
 
   def testCachingOfForwardResults(self):
     forward_only_bijector = ForwardOnlyBijector()
@@ -259,7 +259,7 @@ class BijectorCachingTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BijectorReduceEventDimsTest(test_case.TestCase):
+class BijectorReduceEventDimsTest(tfp_test_util.TestCase):
   """Test reducing of event dims."""
 
   def testReduceEventNdimsForward(self):
@@ -331,7 +331,7 @@ class BijectorReduceEventDimsTest(test_case.TestCase):
     self.assertAllClose(-np.log(x_), ildj)
 
 
-class BijectorLDJCachingTest(test_case.TestCase):
+class BijectorLDJCachingTest(tfp_test_util.TestCase):
 
   def testShapeCachingIssue(self):
     if tf.executing_eagerly(): return
@@ -352,7 +352,7 @@ class BijectorLDJCachingTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NumpyArrayCaching(test_case.TestCase):
+class NumpyArrayCaching(tfp_test_util.TestCase):
 
   def test_caches(self):
     if mock is None:
@@ -388,7 +388,7 @@ class NumpyArrayCaching(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TfModuleTest(test_case.TestCase):
+class TfModuleTest(tfp_test_util.TestCase):
 
   def test_variable_tracking(self):
     x = tf.Variable(1.)
@@ -428,7 +428,7 @@ class _ConditionalBijector(tfb.Bijector):
 # Test that ensures kwargs from public methods are passed in to
 # private methods.
 @test_util.run_all_in_graph_and_eager_modes
-class ConditionalBijectorTest(test_case.TestCase):
+class ConditionalBijectorTest(tfp_test_util.TestCase):
 
   def testConditionalBijector(self):
     b = _ConditionalBijector()

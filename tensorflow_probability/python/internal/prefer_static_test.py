@@ -25,7 +25,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -43,7 +42,7 @@ def raise_exception_in_eager_mode(value):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GetStaticValueTest(test_case.TestCase, parameterized.TestCase):
+class GetStaticValueTest(tfp_test_util.TestCase):
 
   @parameterized.named_parameters(
       dict(testcase_name='_True',
@@ -83,7 +82,7 @@ class GetStaticValueTest(test_case.TestCase, parameterized.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PredicatesTest(test_case.TestCase, parameterized.TestCase):
+class PredicatesTest(tfp_test_util.TestCase):
 
   @parameterized.named_parameters(
       dict(testcase_name='_greater_true',
@@ -185,7 +184,7 @@ class PredicatesTest(test_case.TestCase, parameterized.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CondTest(test_case.TestCase, parameterized.TestCase):
+class CondTest(tfp_test_util.TestCase):
 
   def test_true(self):
     x = tf.constant(2)
@@ -213,7 +212,7 @@ class CondTest(test_case.TestCase, parameterized.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CaseTest(test_case.TestCase):
+class CaseTest(tfp_test_util.TestCase):
 
   def test_true(self):
     x = tf.constant(0)
@@ -250,7 +249,7 @@ class CaseTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ShapeTest(test_case.TestCase):
+class ShapeTest(tfp_test_util.TestCase):
 
   def test_shape(self):
     vector_value = [0., 1.]
@@ -310,7 +309,7 @@ class ShapeTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SetDiff1DTest(test_case.TestCase):
+class SetDiff1DTest(tfp_test_util.TestCase):
 
   def test_static(self):
     self.assertAllEqual(
@@ -339,7 +338,7 @@ class SetDiff1DTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SizeTest(test_case.TestCase):
+class SizeTest(tfp_test_util.TestCase):
 
   def test_static(self):
     self.assertAllEqual(
@@ -357,7 +356,7 @@ class SizeTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NonNegativeAxisTest(test_case.TestCase):
+class NonNegativeAxisTest(tfp_test_util.TestCase):
 
   def test_static_scalar_positive_index(self):
     positive_axis = prefer_static.non_negative_axis(axis=2, rank=4)
@@ -380,7 +379,7 @@ class NonNegativeAxisTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BroadcastShapeTest(test_case.TestCase):
+class BroadcastShapeTest(tfp_test_util.TestCase):
 
   def test_static(self):
     self.assertAllEqual(
@@ -403,7 +402,7 @@ class BroadcastShapeTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PadTest(test_case.TestCase):
+class PadTest(tfp_test_util.TestCase):
 
   def test_num_paddings_dynamic(self):
     n = tf1.placeholder_with_default(2, shape=None)
@@ -419,7 +418,7 @@ class PadTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SmartWhereTest(test_case.TestCase):
+class SmartWhereTest(tfp_test_util.TestCase):
 
   def test_static_scalar_condition(self):
     fn_calls = [0, 0]

@@ -25,14 +25,14 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math import diag_jacobian
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class StochasticGradientLangevinDynamicsOptimizerTest(test_case.TestCase):
+class StochasticGradientLangevinDynamicsOptimizerTest(tfp_test_util.TestCase):
 
   def testBasic(self):
     if tf.executing_eagerly():

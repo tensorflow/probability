@@ -29,7 +29,6 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -40,7 +39,7 @@ def _preserves_vector_dim(dim):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TransformDiagonalBijectorTest(test_case.TestCase):
+class TransformDiagonalBijectorTest(tfp_test_util.TestCase):
   """Tests correctness of the TransformDiagonal bijector."""
 
   def testBijector(self):

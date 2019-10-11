@@ -26,12 +26,12 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PolynomialTest(test_case.TestCase, parameterized.TestCase):
+class PolynomialTest(tfp_test_util.TestCase):
   """Test the Polynomial kernel."""
 
   def test_mismatched_float_types_are_bad(self):
@@ -250,7 +250,7 @@ class PolynomialTest(test_case.TestCase, parameterized.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LinearTest(test_case.TestCase, parameterized.TestCase):
+class LinearTest(tfp_test_util.TestCase):
   """Test the Linear kernel."""
 
   def testIsPolynomial(self):

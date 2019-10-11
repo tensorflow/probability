@@ -25,14 +25,13 @@ import collections
 from absl.testing import parameterized
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class JointDistributionNamedTest(test_case.TestCase, parameterized.TestCase):
+class JointDistributionNamedTest(tfp_test_util.TestCase):
 
   def test_dict_sample_log_prob(self):
     # pylint: disable=bad-whitespace

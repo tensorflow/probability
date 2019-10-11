@@ -29,7 +29,6 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -148,7 +147,7 @@ def assert_mvn_target_conservation(event_size, batch_size, **kwargs):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NutsTest(parameterized.TestCase, test_case.TestCase):
+class NutsTest(tfp_test_util.TestCase):
 
   def testReproducibility(self):
     seed = tfp_test_util.test_seed()

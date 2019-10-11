@@ -193,7 +193,6 @@ DEPS = {
         # scipy dep,
         # six dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/experimental/substrates/jax/internal:test_case",
         "//tensorflow_probability/python/experimental/substrates/jax/internal:test_util",
     ],
 ) for filename in TEST_FILENAMES]

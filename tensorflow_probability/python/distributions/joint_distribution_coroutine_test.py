@@ -26,7 +26,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -38,7 +38,7 @@ Root = tfd.JointDistributionCoroutine.Root
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class JointDistributionCoroutineTest(test_case.TestCase):
+class JointDistributionCoroutineTest(tfp_test_util.TestCase):
 
   def test_batch_and_event_shape_no_plate(self):
     # The joint distribution specified below corresponds to this

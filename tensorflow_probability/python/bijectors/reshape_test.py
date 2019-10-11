@@ -25,7 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -221,7 +221,7 @@ class _ReshapeBijectorTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ReshapeBijectorTestStatic(test_case.TestCase, _ReshapeBijectorTest):
+class ReshapeBijectorTestStatic(tfp_test_util.TestCase, _ReshapeBijectorTest):
 
   def build_shapes(self, shape_in, shape_out):
     return shape_in, shape_out
@@ -316,7 +316,7 @@ class ReshapeBijectorTestStatic(test_case.TestCase, _ReshapeBijectorTest):
         '(Input to reshape|Cannot reshape a tensor with|cannot reshape array)')
 
 
-class ReshapeBijectorTestDynamic(test_case.TestCase, _ReshapeBijectorTest):
+class ReshapeBijectorTestDynamic(tfp_test_util.TestCase, _ReshapeBijectorTest):
 
   def build_shapes(self, shape_in, shape_out):
     shape_in = np.array(shape_in, np.int32)

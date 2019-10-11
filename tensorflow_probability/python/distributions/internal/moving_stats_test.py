@@ -23,12 +23,12 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions.internal import moving_stats
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MovingReduceMeanVarianceTest(test_case.TestCase):
+class MovingReduceMeanVarianceTest(tfp_test_util.TestCase):
 
   def test_assign_moving_mean_variance(self):
     shape = [1, 2]
@@ -95,7 +95,7 @@ class MovingReduceMeanVarianceTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MovingLogExponentialMovingMeanExpTest(test_case.TestCase):
+class MovingLogExponentialMovingMeanExpTest(tfp_test_util.TestCase):
 
   def test_assign_log_moving_mean_exp(self):
     shape = [1, 2]

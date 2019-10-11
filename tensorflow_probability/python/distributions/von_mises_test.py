@@ -28,7 +28,6 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -392,12 +391,12 @@ class _VonMisesTest(object):
         _ = self.evaluate(d.entropy())
 
 
-class VonMisesTestStaticShapeFloat32(test_case.TestCase, _VonMisesTest):
+class VonMisesTestStaticShapeFloat32(tfp_test_util.TestCase, _VonMisesTest):
   dtype = tf.float32
   use_static_shape = True
 
 
-class VonMisesTestDynamicShapeFloat64(test_case.TestCase, _VonMisesTest):
+class VonMisesTestDynamicShapeFloat64(tfp_test_util.TestCase, _VonMisesTest):
   dtype = tf.float64
   use_static_shape = False
 

@@ -25,7 +25,7 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -49,7 +49,7 @@ def _numpy_exp_quad_matrix(amplitude, length_scale, x, feature_ndims):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class _KumaraswamyTransformedTest(parameterized.TestCase):
+class _KumaraswamyTransformedTest(tfp_test_util.TestCase):
 
   @parameterized.parameters(
       {'feature_ndims': 1, 'dims': 3},
@@ -144,13 +144,11 @@ class _KumaraswamyTransformedTest(parameterized.TestCase):
         self.evaluate(kum_kernel.matrix(z, z)), atol=1e-4, rtol=1e-4)
 
 
-class KumaraswamyTransformedFloat32Test(
-    _KumaraswamyTransformedTest, test_case.TestCase):
+class KumaraswamyTransformedFloat32Test(_KumaraswamyTransformedTest):
   dtype = np.float32
 
 
-class KumaraswamyTransformedFloat64Test(
-    _KumaraswamyTransformedTest, test_case.TestCase):
+class KumaraswamyTransformedFloat64Test(_KumaraswamyTransformedTest):
   dtype = np.float64
 
 

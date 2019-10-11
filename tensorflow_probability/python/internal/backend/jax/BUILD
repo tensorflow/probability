@@ -121,7 +121,7 @@ py_test(
         # jax dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

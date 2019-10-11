@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import SparseLinearRegression
 from tensorflow_probability.python.sts import Sum
@@ -35,7 +35,7 @@ from tensorflow.python.platform import test
 tfl = tf.linalg
 
 
-class _LinearRegressionTest(test_case.TestCase):
+class _LinearRegressionTest(tfp_test_util.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_basic_statistics(self):
@@ -156,7 +156,7 @@ class _LinearRegressionTest(test_case.TestCase):
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-class _SparseLinearRegressionTest(test_case.TestCase):
+class _SparseLinearRegressionTest(tfp_test_util.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_builds_without_errors(self):

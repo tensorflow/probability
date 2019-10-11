@@ -29,7 +29,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -152,7 +151,7 @@ def make_multivariate_mixture(batch_shape, num_components, event_shape,
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MixtureTest(test_case.TestCase):
+class MixtureTest(tfp_test_util.TestCase):
   use_static_graph = False
 
   def testShapes(self):

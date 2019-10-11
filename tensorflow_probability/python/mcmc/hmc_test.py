@@ -30,7 +30,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.mcmc.hmc import _compute_log_acceptance_correction
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -54,7 +54,7 @@ def _reduce_variance(x, axis=None, keepdims=False):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HMCTest(test_case.TestCase):
+class HMCTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._shape_param = 5.
@@ -736,17 +736,17 @@ class _LogCorrectionTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LogCorrectionTest16(test_case.TestCase, _LogCorrectionTest):
+class LogCorrectionTest16(tfp_test_util.TestCase, _LogCorrectionTest):
   dtype = np.float16
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LogCorrectionTest32(test_case.TestCase, _LogCorrectionTest):
+class LogCorrectionTest32(tfp_test_util.TestCase, _LogCorrectionTest):
   dtype = np.float32
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LogCorrectionTest64(test_case.TestCase, _LogCorrectionTest):
+class LogCorrectionTest64(tfp_test_util.TestCase, _LogCorrectionTest):
   dtype = np.float64
 
 
@@ -802,17 +802,17 @@ class _HMCHandlesLists(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HMCHandlesLists32(_HMCHandlesLists, test_case.TestCase):
+class HMCHandlesLists32(_HMCHandlesLists, tfp_test_util.TestCase):
   dtype = np.float32
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HMCHandlesLists64(_HMCHandlesLists, test_case.TestCase):
+class HMCHandlesLists64(_HMCHandlesLists, tfp_test_util.TestCase):
   dtype = np.float64
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HMCAdaptiveStepSize(test_case.TestCase):
+class HMCAdaptiveStepSize(tfp_test_util.TestCase):
 
   def setUp(self):
     tf1.random.set_random_seed(10014)
@@ -956,7 +956,7 @@ class HMCAdaptiveStepSize(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HMCEMAdaptiveStepSize(test_case.TestCase):
+class HMCEMAdaptiveStepSize(tfp_test_util.TestCase):
   """This test verifies that the docstring example works as advertised."""
 
   def setUp(self):

@@ -22,7 +22,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -136,14 +136,14 @@ class _VariationalInferenceTests(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class VariationalInferenceTestsStatic64(test_case.TestCase,
+class VariationalInferenceTestsStatic64(tfp_test_util.TestCase,
                                         _VariationalInferenceTests):
   dtype = np.float64
   use_static_shape = True
 
 
 # This test runs in graph mode only to reduce test weight.
-class VariationalInferenceTestsDynamic32(test_case.TestCase,
+class VariationalInferenceTestsDynamic32(tfp_test_util.TestCase,
                                          _VariationalInferenceTests):
   dtype = np.float32
   use_static_shape = False
@@ -273,7 +273,8 @@ class _HMCTests(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HMCTestsStatic32(test_case.TestCase, parameterized.TestCase, _HMCTests):
+class HMCTestsStatic32(tfp_test_util.TestCase,
+                       _HMCTests):
   dtype = np.float32
   use_static_shape = True
 
@@ -310,13 +311,13 @@ class HMCTestsStatic32(test_case.TestCase, parameterized.TestCase, _HMCTests):
 
 
 # This test runs in graph mode only to reduce test weight.
-class HMCTestsDynamic32(test_case.TestCase, _HMCTests):
+class HMCTestsDynamic32(tfp_test_util.TestCase, _HMCTests):
   dtype = np.float32
   use_static_shape = False
 
 
 # This test runs in graph mode only to reduce test weight.
-class HMCTestsStatic64(test_case.TestCase, _HMCTests):
+class HMCTestsStatic64(tfp_test_util.TestCase, _HMCTests):
   dtype = np.float64
   use_static_shape = True
 

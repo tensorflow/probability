@@ -28,14 +28,13 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import exponential as exponential_lib
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ExponentialTest(test_case.TestCase):
+class ExponentialTest(tfp_test_util.TestCase):
 
   def testExponentialLogPDF(self):
     batch_size = 6

@@ -30,7 +30,6 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -64,7 +63,7 @@ def generalized_paretos(draw, batch_shape=None):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GeneralizedParetoTest(test_case.TestCase):
+class GeneralizedParetoTest(tfp_test_util.TestCase):
 
   @hp.given(generalized_paretos())
   @tfp_hps.tfp_hp_settings(default_max_examples=5)

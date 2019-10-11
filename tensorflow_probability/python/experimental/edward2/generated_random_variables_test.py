@@ -27,12 +27,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability import distributions as tfd
 from tensorflow_probability import edward2 as ed
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GeneratedRandomVariablesTest(parameterized.TestCase, test_case.TestCase):
+class GeneratedRandomVariablesTest(tfp_test_util.TestCase):
 
   def testBernoulliDoc(self):
     self.assertGreater(len(ed.Bernoulli.__doc__), 0)

@@ -27,7 +27,6 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -54,7 +53,7 @@ def wishart_var(df, x):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class WishartTest(test_case.TestCase):
+class WishartTest(tfp_test_util.TestCase):
 
   def testEntropy(self):
     scale = make_pd(1., 2)

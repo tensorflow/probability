@@ -222,7 +222,7 @@ py_library(
     deps = [
         ":xla",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -243,7 +243,7 @@ py_test(
         ":instructions",
         ":test_programs",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -259,7 +259,7 @@ py_test(
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -275,7 +275,7 @@ py_test(
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -291,7 +291,7 @@ py_test(
         ":test_programs",
         ":virtual_machine",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -305,7 +305,7 @@ py_test(
         ":instructions",
         ":test_programs",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -320,7 +320,7 @@ py_test(
         ":stackless",
         ":test_programs",
         ":tf_backend",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -332,7 +332,7 @@ py_test(
     deps = [
         ":stack_optimization",
         ":test_programs",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -353,7 +353,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -372,7 +372,7 @@ py_test(
         ":virtual_machine",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -391,6 +391,6 @@ py_test(
         ":virtual_machine",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

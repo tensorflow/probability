@@ -50,7 +50,7 @@ DISABLED_DISTS = ('joint_distribution', 'gaussian_process',
 LIBS = ('bijectors', 'distributions', 'math', 'stats', 'util.seed_stream')
 INTERNALS = ('assert_util', 'distribution_util', 'dtype_util',
              'hypothesis_testlib', 'prefer_static', 'special_math',
-             'tensor_util', 'test_case', 'test_util')
+             'tensor_util', 'test_util')
 
 
 def main(argv):
@@ -92,6 +92,12 @@ def main(argv):
       'SKIP_DTYPE_CHECKS = False': 'SKIP_DTYPE_CHECKS = True',
       '@test_util.run_all_in_graph_and_eager_modes': (
           '# @test_util.run_all_in_graph_and_eager_modes'),
+      '@tfp_test_util.test_all_tf_execution_regimes': (
+          '# @tfp_test_util.test_all_tf_execution_regimes'),
+      '@tfp_test_util.test_graph_and_eager_modes': (
+          '# @tfp_test_util.test_graph_and_eager_modes'),
+      'TestCombinationsTest(tfp_test_util.TestCase)': (
+          'TestCombinationsDoNotTest(object)')
   })
 
   contents = open(argv[1]).read()

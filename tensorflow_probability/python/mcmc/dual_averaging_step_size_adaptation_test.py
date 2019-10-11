@@ -28,7 +28,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -139,8 +138,7 @@ class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DualAveragingStepSizeAdaptationTest(test_case.TestCase,
-                                          parameterized.TestCase):
+class DualAveragingStepSizeAdaptationTest(tfp_test_util.TestCase):
 
   def testTurnOnStoreParametersInKernelResults(self):
     kernel = FakeWrapperKernel(FakeSteppedKernel(step_size=0.5))
@@ -312,8 +310,7 @@ class DualAveragingStepSizeAdaptationTest(test_case.TestCase,
 
 @test_util.run_all_in_graph_and_eager_modes
 class DualAveragingStepSizeAdaptationStaticBroadcastingTest(
-    test_case.TestCase,
-    parameterized.TestCase):
+    tfp_test_util.TestCase):
   use_static_shape = True
 
   @parameterized.parameters(
@@ -389,7 +386,7 @@ class DualAveragingStepSizeAdaptationDynamicBroadcastingTest(
   use_static_shape = False
 
 
-class TfFunctionTest(test_case.TestCase):
+class TfFunctionTest(tfp_test_util.TestCase):
 
   def testDtypeIssue(self):
     # Test issue https://github.com/tensorflow/probability/issues/543

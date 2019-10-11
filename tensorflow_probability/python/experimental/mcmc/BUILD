@@ -65,7 +65,6 @@ py_library(
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/experimental/auto_batching",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -79,7 +78,7 @@ py_test(
     tags = ["nozapfhahn"],
     deps = [
         ":nuts_testlib",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -96,6 +95,6 @@ py_test(
     ],
     deps = [
         ":nuts_testlib",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

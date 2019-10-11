@@ -25,14 +25,13 @@ from scipy import stats as sp_stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class UniformTest(test_case.TestCase):
+class UniformTest(tfp_test_util.TestCase):
 
   def testUniformRange(self):
     a = 3.0

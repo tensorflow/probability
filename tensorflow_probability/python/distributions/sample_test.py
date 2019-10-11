@@ -25,14 +25,13 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SampleDistributionTest(test_case.TestCase, parameterized.TestCase):
+class SampleDistributionTest(tfp_test_util.TestCase):
 
   def test_everything_scalar(self):
     s = tfd.Sample(tfd.Normal(loc=0, scale=1), 5, validate_args=True)

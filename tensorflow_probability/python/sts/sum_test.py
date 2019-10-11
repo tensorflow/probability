@@ -24,7 +24,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.sts import AdditiveStateSpaceModel
 from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
@@ -33,7 +33,7 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 tfl = tf.linalg
 
 
-class _AdditiveStateSpaceModelTest(test_case.TestCase):
+class _AdditiveStateSpaceModelTest(tfp_test_util.TestCase):
 
   def test_identity(self):
 

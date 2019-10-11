@@ -27,7 +27,6 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -35,7 +34,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PERTTest(test_case.TestCase):
+class PERTTest(tfp_test_util.TestCase):
 
   def _generate_boilerplate_param(self):
     temperature = np.array([1., 2., 4., 10.])

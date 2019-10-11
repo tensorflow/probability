@@ -22,12 +22,12 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.sts.internal import missing_values_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-class _MissingValuesUtilityTests(test_case.TestCase):
+class _MissingValuesUtilityTests(tfp_test_util.TestCase):
 
   def testMoments(self):
     series = np.random.randn(2, 4)

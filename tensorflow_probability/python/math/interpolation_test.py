@@ -24,12 +24,12 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class InterpRegular1DGridTest(test_case.TestCase):
+class InterpRegular1DGridTest(tfp_test_util.TestCase):
   """Test for tfp.math.interp_regular_1d_grid."""
 
   def setUp(self):
@@ -295,7 +295,7 @@ class InterpRegular1DGridTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BatchInterpRegular1DGridTest(test_case.TestCase):
+class BatchInterpRegular1DGridTest(tfp_test_util.TestCase):
   """Test for 1-D usage of tfp.math.interp_regular_1d_grid."""
 
   def setUp(self):
@@ -574,7 +574,7 @@ class BatchInterpRegular1DGridTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BatchInterpRegularNDGridTest(test_case.TestCase):
+class BatchInterpRegularNDGridTest(tfp_test_util.TestCase):
 
   def test_2d_scalar_valued_no_leading_dims(self):
     y_ref = [[0., 1.], [2., 3.]]

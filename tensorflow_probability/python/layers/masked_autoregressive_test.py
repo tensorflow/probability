@@ -23,7 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import layers as tfpl
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -32,7 +32,7 @@ tfkl = tf.keras.layers
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoregressiveTransformTest(test_case.TestCase):
+class AutoregressiveTransformTest(tfp_test_util.TestCase):
 
   def test_doc_string(self):
     # Generate data -- as in Figure 1 in [Papamakarios et al. (2017)][1]).

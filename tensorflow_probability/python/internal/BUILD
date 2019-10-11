@@ -64,7 +64,7 @@ py_test(
         ":docstring_util",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -87,7 +87,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -117,7 +117,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
     ],
 )
@@ -158,7 +158,7 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -183,7 +183,6 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -211,7 +210,7 @@ py_test(
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
     ],
 )
@@ -235,7 +234,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -244,28 +243,6 @@ py_library(
     srcs = ["tensorshape_util.py"],
     srcs_version = "PY2AND3",
     deps = [
-        # tensorflow dep,
-    ],
-)
-
-py_library(
-    name = "test_case",
-    testonly = 1,
-    srcs = ["test_case.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "test_case_test",
-    size = "small",
-    srcs = ["test_case_test.py"],
-    deps = [
-        ":dtype_util",
-        ":test_case",
-        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -296,7 +273,7 @@ py_test(
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -312,7 +289,6 @@ py_library(
         # numpy dep,
         # six dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal/backend/numpy",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -327,29 +303,6 @@ py_test(
         # absl/flags dep,
         # absl/testing:flagsaver dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/util:seed_stream",
-    ],
-)
-
-py_library(
-    name = "test_combinations",
-    testonly = 1,
-    srcs = ["test_combinations.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "test_combinations_test",
-    size = "small",
-    srcs = ["test_combinations_test.py"],
-    deps = [
-        ":test_case",
-        ":test_combinations",
-        # absl/testing:parameterized dep,
-        # tensorflow dep,
     ],
 )

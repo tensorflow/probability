@@ -26,14 +26,13 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class RelaxedBernoulliTest(test_case.TestCase):
+class RelaxedBernoulliTest(tfp_test_util.TestCase):
 
   def testP(self):
     """Tests that parameter P is set correctly. Note that dist.p != dist.pdf."""
@@ -179,7 +178,7 @@ class RelaxedBernoulliTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class RelaxedBernoulliFromVariableTest(test_case.TestCase):
+class RelaxedBernoulliFromVariableTest(tfp_test_util.TestCase):
 
   def testGradientLogits(self):
     x = tf.Variable([-1., 1])

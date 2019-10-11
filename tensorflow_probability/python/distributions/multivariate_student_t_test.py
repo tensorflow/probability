@@ -26,7 +26,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -38,7 +37,7 @@ tfd = tfp.distributions
 
 @test_util.run_all_in_graph_and_eager_modes
 class MultivariateStudentTTestFloat32StaticShape(
-    test_case.TestCase, parameterized.TestCase,
+    tfp_test_util.TestCase,
     tfp_test_util.VectorDistributionTestHelpers):
   dtype = tf.float32
   use_static_shape = True

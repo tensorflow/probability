@@ -24,13 +24,13 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class JacobianTest(test_case.TestCase):
+class JacobianTest(tfp_test_util.TestCase):
 
   def testJacobianDiagonal3DListInput(self):
     """Tests that the diagonal of the Jacobian matrix computes correctly."""

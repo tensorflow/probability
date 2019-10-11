@@ -162,7 +162,6 @@ py_library(
         "//tensorflow_probability/python/experimental/substrates/numpy/internal:dtype_util",
         "//tensorflow_probability/python/experimental/substrates/numpy/internal:hypothesis_testlib",
         "//tensorflow_probability/python/experimental/substrates/numpy/internal:prefer_static",
-        "//tensorflow_probability/python/experimental/substrates/numpy/internal:test_case",
         "//tensorflow_probability/python/experimental/substrates/numpy/internal:test_util",
         "//tensorflow_probability/python/internal:name_util",
         "//tensorflow_probability/python/internal/backend/numpy",

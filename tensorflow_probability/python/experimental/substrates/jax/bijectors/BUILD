@@ -163,7 +163,6 @@ py_library(
         "//tensorflow_probability/python/experimental/substrates/jax/internal:dtype_util",
         "//tensorflow_probability/python/experimental/substrates/jax/internal:hypothesis_testlib",
         "//tensorflow_probability/python/experimental/substrates/jax/internal:prefer_static",
-        "//tensorflow_probability/python/experimental/substrates/jax/internal:test_case",
         "//tensorflow_probability/python/experimental/substrates/jax/internal:test_util",
         "//tensorflow_probability/python/internal:name_util",
         "//tensorflow_probability/python/internal/backend/jax",

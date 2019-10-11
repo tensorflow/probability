@@ -22,7 +22,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 rng = np.random.RandomState(0)
@@ -30,7 +30,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DeterministicTest(test_case.TestCase):
+class DeterministicTest(tfp_test_util.TestCase):
 
   def testShape(self):
     loc = rng.rand(2, 3, 4)
@@ -252,7 +252,7 @@ class DeterministicTest(test_case.TestCase):
       self.evaluate(deterministic.log_prob(1.))
 
 
-class VectorDeterministicTest(test_case.TestCase):
+class VectorDeterministicTest(tfp_test_util.TestCase):
 
   def testParamBroadcasts(self):
     loc = rng.rand(2, 1, 4)

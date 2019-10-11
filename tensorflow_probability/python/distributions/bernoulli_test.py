@@ -27,7 +27,6 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -45,7 +44,7 @@ def entropy(p):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BernoulliTest(test_case.TestCase):
+class BernoulliTest(tfp_test_util.TestCase):
 
   def testP(self):
     p = [0.2, 0.4]
@@ -324,7 +323,7 @@ make_slicer = _MakeSlicer()
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BernoulliSlicingTest(test_case.TestCase):
+class BernoulliSlicingTest(tfp_test_util.TestCase):
 
   def testScalarSlice(self):
     logits = self.evaluate(tf.random.normal([]))
@@ -447,7 +446,7 @@ class BernoulliSlicingTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BernoulliFromVariableTest(test_case.TestCase):
+class BernoulliFromVariableTest(tfp_test_util.TestCase):
 
   def testGradientLogits(self):
     x = tf.Variable([-1., 1])

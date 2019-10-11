@@ -31,7 +31,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 # pylint: disable=no-value-for-parameter
@@ -63,7 +63,7 @@ def rq_splines(draw, batch_shape=None, dtype=tf.float32):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class RationalQuadraticSplineTest(test_case.TestCase):
+class RationalQuadraticSplineTest(tfp_test_util.TestCase):
 
   def testDocExample(self):
 

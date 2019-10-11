@@ -25,7 +25,7 @@ from scipy import stats
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -33,7 +33,7 @@ rng = np.random.RandomState(42)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalFullCovarianceTest(test_case.TestCase):
+class MultivariateNormalFullCovarianceTest(tfp_test_util.TestCase):
 
   def _random_pd_matrix(self, *shape):
     mat = rng.rand(*shape)

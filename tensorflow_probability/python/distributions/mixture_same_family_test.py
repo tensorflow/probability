@@ -26,7 +26,6 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -456,7 +455,7 @@ class _MixtureSameFamilyTest(tfp_test_util.VectorDistributionTestHelpers):
 @test_util.run_all_in_graph_and_eager_modes
 class MixtureSameFamilyTestStatic32(
     _MixtureSameFamilyTest,
-    test_case.TestCase):
+    tfp_test_util.TestCase):
   use_static_shape = True
   dtype = np.float32
 
@@ -464,7 +463,7 @@ class MixtureSameFamilyTestStatic32(
 @test_util.run_all_in_graph_and_eager_modes
 class MixtureSameFamilyTestDynamic32(
     _MixtureSameFamilyTest,
-    test_case.TestCase):
+    tfp_test_util.TestCase):
   use_static_shape = False
   dtype = np.float32
 
@@ -510,7 +509,7 @@ class MixtureSameFamilyTestDynamic32(
 @test_util.run_all_in_graph_and_eager_modes
 class MixtureSameFamilyTestStatic64(
     _MixtureSameFamilyTest,
-    test_case.TestCase):
+    tfp_test_util.TestCase):
   use_static_shape = True
   dtype = np.float64
 

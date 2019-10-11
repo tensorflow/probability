@@ -31,7 +31,7 @@ from tensorflow_probability.python.experimental.auto_batching import frontend
 from tensorflow_probability.python.experimental.auto_batching import instructions
 from tensorflow_probability.python.experimental.auto_batching import numpy_backend
 from tensorflow_probability.python.experimental.auto_batching import tf_backend
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 TF_BACKEND = tf_backend.TensorFlowBackend()
@@ -50,7 +50,7 @@ def fibonacci(n):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoGraphFrontendTest(test_case.TestCase):
+class AutoGraphFrontendTest(tfp_test_util.TestCase):
 
   def testFibonacci(self):
     self.assertEqual(1, fibonacci(0))
@@ -673,12 +673,12 @@ class _TestHidingTFBatchSize(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestTFStaticBatchSize(test_case.TestCase, _TestHidingTFBatchSize):
+class TestTFStaticBatchSize(tfp_test_util.TestCase, _TestHidingTFBatchSize):
   use_static_batch_size = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TestTFDynamicBatchSize(test_case.TestCase, _TestHidingTFBatchSize):
+class TestTFDynamicBatchSize(tfp_test_util.TestCase, _TestHidingTFBatchSize):
   use_static_batch_size = False
 
 if __name__ == '__main__':

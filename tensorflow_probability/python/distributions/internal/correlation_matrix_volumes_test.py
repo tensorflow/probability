@@ -39,7 +39,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions.internal import correlation_matrix_volumes_lib as corr
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 
 # NxN correlation matrices are determined by the N*(N-1)/2
@@ -79,7 +79,7 @@ def four_by_four_volume():
 # method," Journal of Multivariate Analysis 100 (2009), pp 1989-2001.
 
 
-class CorrelationMatrixVolumesTest(test_case.TestCase):
+class CorrelationMatrixVolumesTest(tfp_test_util.TestCase):
 
   def testRejection2D(self):
     num_samples = int(1e5)  # Chosen for a small min detectable discrepancy

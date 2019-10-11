@@ -28,7 +28,6 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.bijectors.masked_autoregressive import _gen_mask
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
@@ -90,7 +89,7 @@ def _masked_autoregressive_gated_bijector_fn(hidden_units,
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GenMaskTest(test_case.TestCase):
+class GenMaskTest(tfp_test_util.TestCase):
 
   def test346Exclusive(self):
     expected_mask = np.array(
@@ -117,7 +116,7 @@ class GenMaskTest(test_case.TestCase):
 
 @test_util.run_all_in_graph_and_eager_modes
 class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
-                                   test_case.TestCase):
+                                   tfp_test_util.TestCase):
 
   event_shape = [4]
 
@@ -378,7 +377,7 @@ class MaskedAutoregressive2DLayerTest(MaskedAutoregressiveFlowTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoregressiveNetworkTest(test_case.TestCase):
+class AutoregressiveNetworkTest(tfp_test_util.TestCase):
 
   def _count_trainable_params(self, layer):
     ret = 0

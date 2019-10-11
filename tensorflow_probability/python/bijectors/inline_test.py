@@ -25,12 +25,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class InlineBijectorTest(test_case.TestCase):
+class InlineBijectorTest(tfp_test_util.TestCase):
   """Tests correctness of the inline constructed bijector."""
 
   def testBijector(self):

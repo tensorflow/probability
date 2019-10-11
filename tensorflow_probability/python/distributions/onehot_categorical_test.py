@@ -26,7 +26,6 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -41,7 +40,7 @@ def make_onehot_categorical(batch_shape, num_classes, dtype=tf.int32):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class OneHotCategoricalTest(test_case.TestCase):
+class OneHotCategoricalTest(tfp_test_util.TestCase):
 
   def setUp(self):
     super(OneHotCategoricalTest, self).setUp()
@@ -296,7 +295,7 @@ class OneHotCategoricalTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class OneHotCategoricalFromVariableTest(test_case.TestCase):
+class OneHotCategoricalFromVariableTest(tfp_test_util.TestCase):
 
   def testGradientLogits(self):
     x = tf.Variable([-1., 0., 1])

@@ -26,7 +26,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math.gradient import batch_jacobian
 
@@ -129,13 +128,13 @@ class _IteratedSigmoidCenteredBijectorTest(object):
 
 
 class IteratedSigmoidCenteredBijectorTestFloat32(
-    test_case.TestCase,
+    tfp_test_util.TestCase,
     _IteratedSigmoidCenteredBijectorTest):
   dtype = np.float32
 
 
 class IteratedSigmoidCenteredBijectorTestFloat64(
-    test_case.TestCase,
+    tfp_test_util.TestCase,
     _IteratedSigmoidCenteredBijectorTest):
   dtype = np.float64
 

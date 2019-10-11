@@ -66,7 +66,7 @@ TEST_FILENAMES = [filename + "_test" for filename in FILENAMES]
         # numpy dep,
         # scipy dep,
         # six dep,
-        "//tensorflow_probability/python/experimental/substrates/numpy/internal:test_case",
+        "//tensorflow_probability/python/experimental/substrates/numpy/internal:test_util",
     ],
 ) for filename in TEST_FILENAMES]
 

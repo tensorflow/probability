@@ -22,7 +22,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -385,37 +385,37 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
 
 
 class FiniteDiscreteValidateArgsStaticShapeTest(FiniteDiscreteValidateArgsTest,
-                                                test_case.TestCase):
+                                                tfp_test_util.TestCase):
   use_static_shape = True
 
 
 class FiniteDiscreteValidateArgsDynamicShapeTest(FiniteDiscreteValidateArgsTest,
-                                                 test_case.TestCase):
+                                                 tfp_test_util.TestCase):
   use_static_shape = False
 
 
 class FiniteDiscreteScalarStaticShapeTest(FiniteDiscreteScalarTest,
-                                          test_case.TestCase):
+                                          tfp_test_util.TestCase):
   use_static_shape = True
 
 
 class FiniteDiscreteScalarDynamicShapeTest(FiniteDiscreteScalarTest,
-                                           test_case.TestCase):
+                                           tfp_test_util.TestCase):
   use_static_shape = False
 
 
 class FiniteDiscreteVectorStaticShapeTest(FiniteDiscreteVectorTest,
-                                          test_case.TestCase):
+                                          tfp_test_util.TestCase):
   use_static_shape = True
 
 
 class FiniteDiscreteVectorDynamicShapeTest(FiniteDiscreteVectorTest,
-                                           test_case.TestCase):
+                                           tfp_test_util.TestCase):
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class FiniteDiscreteFromVariableTest(test_case.TestCase):
+class FiniteDiscreteFromVariableTest(tfp_test_util.TestCase):
 
   def testAssertionLastDimensionOfOutcomesAndLogits(self):
     x = tf.Variable([0., -1., -2., -3.])

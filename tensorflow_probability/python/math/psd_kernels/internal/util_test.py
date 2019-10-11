@@ -23,12 +23,12 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.math.psd_kernels.internal import util
 
 
-class UtilTest(test_case.TestCase):
+class UtilTest(tfp_test_util.TestCase):
 
   def testPadShapeRightWithOnes(self):
     # Test nominal behavior.

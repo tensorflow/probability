@@ -23,7 +23,6 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
@@ -33,7 +32,7 @@ rng = np.random.RandomState(0)
 
 @test_util.run_all_in_graph_and_eager_modes
 class VectorDiffeomixtureTest(tfp_test_util.VectorDistributionTestHelpers,
-                              test_case.TestCase):
+                              tfp_test_util.TestCase):
   """Tests the VectorDiffeomixture distribution."""
 
   def testSampleProbConsistentBroadcastMixNoBatch(self):

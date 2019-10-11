@@ -29,15 +29,13 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.distributions import lkj
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CorrelationCholeskyBijectorTest(parameterized.TestCase,
-                                      test_case.TestCase):
+class CorrelationCholeskyBijectorTest(tfp_test_util.TestCase):
   """Tests the correctness of the CorrelationCholesky bijector."""
 
   def testBijector(self):

@@ -24,7 +24,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 _RTOL = 1e-8
 _ATOL = 1e-12
@@ -34,7 +34,7 @@ _ATOL = 1e-12
 @parameterized.named_parameters([
     ('bdf', tfp.math.ode.BDF),
     ('dormand_prince', tfp.math.ode.DormandPrince)])
-class NonStiffTest(parameterized.TestCase, test_case.TestCase):
+class NonStiffTest(tfp_test_util.TestCase):
 
   def test_zero_dims(self, solver):
     ode_fn = lambda time, state: -state
@@ -185,7 +185,7 @@ class NonStiffTest(parameterized.TestCase, test_case.TestCase):
 
 @test_util.run_all_in_graph_and_eager_modes
 @parameterized.named_parameters([('bdf', tfp.math.ode.BDF)])
-class StiffTest(parameterized.TestCase, test_case.TestCase):
+class StiffTest(tfp_test_util.TestCase):
 
   def test_van_der_pol(self, solver):
 
@@ -217,7 +217,7 @@ class StiffTest(parameterized.TestCase, test_case.TestCase):
 @parameterized.named_parameters([
     ('bdf', tfp.math.ode.BDF),
     ('dormand_prince', tfp.math.ode.DormandPrince)])
-class GradientTest(parameterized.TestCase, test_case.TestCase):
+class GradientTest(tfp_test_util.TestCase):
 
   def test_linear_dense(self, solver):
     initial_time = 0.
@@ -274,7 +274,7 @@ class GradientTest(parameterized.TestCase, test_case.TestCase):
 @parameterized.named_parameters([
     ('bdf', tfp.math.ode.BDF),
     ('dormand_prince', tfp.math.ode.DormandPrince)])
-class GeneralTest(parameterized.TestCase, test_case.TestCase):
+class GeneralTest(tfp_test_util.TestCase):
 
   def test_bad_initial_state_dtype(self, solver):
     ode_fn = lambda time, state: -state

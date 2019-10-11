@@ -25,7 +25,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -41,7 +40,7 @@ def tridiag(d, diag_value, offdiag_value):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AmariAlphaTest(test_case.TestCase):
+class AmariAlphaTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -95,7 +94,7 @@ class AmariAlphaTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class KLReverseTest(test_case.TestCase):
+class KLReverseTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -118,7 +117,7 @@ class KLReverseTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class KLForwardTest(test_case.TestCase):
+class KLForwardTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -141,7 +140,7 @@ class KLForwardTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class JensenShannonTest(test_case.TestCase):
+class JensenShannonTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -178,7 +177,7 @@ class JensenShannonTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ArithmeticGeometricMeanTest(test_case.TestCase):
+class ArithmeticGeometricMeanTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -209,7 +208,7 @@ class ArithmeticGeometricMeanTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TotalVariationTest(test_case.TestCase):
+class TotalVariationTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -225,7 +224,7 @@ class TotalVariationTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PearsonTest(test_case.TestCase):
+class PearsonTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -241,7 +240,7 @@ class PearsonTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SquaredHellingerTest(test_case.TestCase):
+class SquaredHellingerTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -263,7 +262,7 @@ class SquaredHellingerTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TriangularTest(test_case.TestCase):
+class TriangularTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -285,7 +284,7 @@ class TriangularTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TPowerTest(test_case.TestCase):
+class TPowerTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -329,7 +328,7 @@ class TPowerTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class Log1pAbsTest(test_case.TestCase):
+class Log1pAbsTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -345,7 +344,7 @@ class Log1pAbsTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class JeffreysTest(test_case.TestCase):
+class JeffreysTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -367,7 +366,7 @@ class JeffreysTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ChiSquareTest(test_case.TestCase):
+class ChiSquareTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -383,7 +382,7 @@ class ChiSquareTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ModifiedGanTest(test_case.TestCase):
+class ModifiedGanTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10, 100)
@@ -407,7 +406,7 @@ class ModifiedGanTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SymmetrizedCsiszarFunctionTest(test_case.TestCase):
+class SymmetrizedCsiszarFunctionTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10., 100)
@@ -446,7 +445,7 @@ class SymmetrizedCsiszarFunctionTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DualCsiszarFunctionTest(test_case.TestCase):
+class DualCsiszarFunctionTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._logu = np.linspace(-10., 10., 100)
@@ -466,7 +465,7 @@ class DualCsiszarFunctionTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MonteCarloVariationalLossTest(test_case.TestCase):
+class MonteCarloVariationalLossTest(tfp_test_util.TestCase):
 
   def test_kl_forward(self):
     q = tfd.Normal(
@@ -749,7 +748,7 @@ class MonteCarloVariationalLossTest(test_case.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CsiszarVIMCOTest(test_case.TestCase):
+class CsiszarVIMCOTest(tfp_test_util.TestCase):
 
   def _csiszar_vimco_helper(self, logu):
     """Numpy implementation of `csiszar_vimco_helper`."""

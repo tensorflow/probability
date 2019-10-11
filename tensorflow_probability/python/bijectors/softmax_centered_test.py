@@ -26,7 +26,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
@@ -36,7 +35,7 @@ rng = np.random.RandomState(42)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SoftmaxCenteredBijectorTest(test_case.TestCase):
+class SoftmaxCenteredBijectorTest(tfp_test_util.TestCase):
   """Tests correctness of the Y = g(X) = exp(X) / sum(exp(X)) transformation."""
 
   def testBijectorVector(self):
