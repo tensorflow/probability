@@ -67,13 +67,11 @@ class AurocAuprcTest(tfp_test_util.TestCase):
     y_true = np.array([1] * num_positive_trials + [0] * num_negative_trials)
     y_pred = np.concatenate([positive_trials_, negative_trials_])
 
-    m = tf.keras.metrics.AUC(num_thresholds=total_trials, curve=curve)
-    self.evaluate([v.initializer for v in m.variables])
-
     def auc_fn(y_pred):
+      m = tf.keras.metrics.AUC(num_thresholds=total_trials, curve=curve)
+      self.evaluate([v.initializer for v in m.variables])
       self.evaluate(m.update_state(y_true, y_pred))
       out = self.evaluate(m.result())
-      m.reset_states()
       return out
 
     batch_shape = np.array(positive_means).shape
