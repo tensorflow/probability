@@ -22,7 +22,7 @@ licenses(["notice"])  # Apache 2.0
 
 package(
     default_visibility = [
-        "//tensorflow_probability:__subpackages__",
+        "//visibility:public",
     ],
 )
 
