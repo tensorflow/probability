@@ -50,7 +50,9 @@ def _kumaraswamy_cdf(a, b, x):
   a = np.asarray(a)
   b = np.asarray(b)
   x = np.asarray(x)
-  return 1 - (1 - x**a)**b
+  # The CDF is 1. - (1 - x ** a) ** b
+  # We write this in a numerically stable way.
+  return -np.expm1(b * np.log1p(-x ** a))
 
 
 def _kumaraswamy_pdf(a, b, x):
@@ -318,7 +320,7 @@ class KumaraswamyTest(tfp_test_util.TestCase):
       actual = self.evaluate(tfd.Kumaraswamy(a, b).cdf(x))
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 0. <= x)
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
-      self.assertAllClose(_kumaraswamy_cdf(a, b, x), actual, rtol=1e-4, atol=0)
+      self.assertAllClose(_kumaraswamy_cdf(a, b, x), actual)
 
   def testKumaraswamyLogCdf(self):
     shape = (30, 40, 50)
@@ -329,7 +331,7 @@ class KumaraswamyTest(tfp_test_util.TestCase):
       actual = self.evaluate(tf.exp(tfd.Kumaraswamy(a, b).log_cdf(x)))
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 0. <= x)
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
-      self.assertAllClose(_kumaraswamy_cdf(a, b, x), actual, rtol=1e-4, atol=0)
+      self.assertAllClose(_kumaraswamy_cdf(a, b, x), actual)
 
   def testInvalidConcentration1(self):
     x = tf.Variable(1.)
@@ -341,7 +343,7 @@ class KumaraswamyTest(tfp_test_util.TestCase):
     with self.assertRaisesOpError(
         'Argument `concentration1` must be positive.'):
       with tf.control_dependencies([x.assign(-1.)]):
-        self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
+        self.evaluate(dist.event_shape_tensor())
 
   def testInvalidConcentration0(self):
     x = tf.Variable(1.)
@@ -353,7 +355,7 @@ class KumaraswamyTest(tfp_test_util.TestCase):
     with self.assertRaisesOpError(
         'Argument `concentration0` must be positive.'):
       with tf.control_dependencies([x.assign(-1.)]):
-        self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
+        self.evaluate(dist.event_shape_tensor())
 
 
 if __name__ == '__main__':

@@ -190,6 +190,10 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
     return ((1 - 1. / b) + (1 - 1. / a) * _harmonic_number(b) -
             tf.math.log(a) - tf.math.log(b))
 
+  def _log_cdf(self, x):
+    return tfp_math.log1mexp(self.concentration0 * tf.math.log1p(
+        -x ** self.concentration1))
+
   def _log_moment(self, n, concentration1=None, concentration0=None):
     """Compute the n'th (uncentered) moment."""
     concentration0 = tf.convert_to_tensor(

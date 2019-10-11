@@ -99,7 +99,7 @@ class KumaraswamyTest(tfp_test_util.TestCase):
     with self.assertRaisesOpError(
         'Argument `concentration1` must be positive.'):
       with tf.control_dependencies([x.assign(-1.)]):
-        self.assertEqual((), self.evaluate(b.forward(1.)).shape)
+        self.evaluate(b.forward(1.))
 
   @tfp_test_util.jax_disable_variable_test
   def testVariableConcentration0(self):
@@ -111,7 +111,7 @@ class KumaraswamyTest(tfp_test_util.TestCase):
     with self.assertRaisesOpError(
         'Argument `concentration0` must be positive.'):
       with tf.control_dependencies([x.assign(-1.)]):
-        self.assertEqual((), self.evaluate(b.forward(1.)).shape)
+        self.evaluate(b.forward(1.))
 
   def testShapeGetterRaisesException(self):
     x = tf.Variable(-1.)

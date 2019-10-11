@@ -97,8 +97,8 @@ class Kumaraswamy(bijector.Bijector):
 
   def _inverse(self, y):
     y = self._maybe_assert_valid(y)
-    return tf.exp(
-        tf.math.log1p(-(1 - y**self.concentration1)**self.concentration0))
+    return -tf.math.expm1(self.concentration0 * tf.math.log1p(
+        -(y ** self.concentration1)))
 
   def _inverse_log_det_jacobian(self, y):
     y = self._maybe_assert_valid(y)
