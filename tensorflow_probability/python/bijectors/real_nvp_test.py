@@ -61,6 +61,30 @@ class RealNVPTest(tfp_test_util.TestCase):
       self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
       self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
+  def testBijectorWithReverseMask(self):
+    flat_x_ = np.random.normal(0., 1., 8).astype(np.float32)
+    batched_x_ = np.random.normal(0., 1., (3, 8)).astype(np.float32)
+    num_masked = -5
+    for x_ in [flat_x_, batched_x_]:
+      flip_nvp = tfb.RealNVP(
+          num_masked=num_masked,
+          validate_args=True,
+          shift_and_log_scale_fn=tfb.real_nvp_default_template(
+              hidden_layers=[3], shift_only=False),
+          is_constant_jacobian=False)
+
+      _, x2_ = np.split(x_, [8 - abs(num_masked)], axis=-1)
+      x = tf.constant(x_)
+
+      # Check latter half is the same after passing thru reversed mask RealNVP.
+      forward_x = flip_nvp.forward(x)
+      _, forward_x2 = tf.split(forward_x, [8 - abs(num_masked),
+                                           abs(num_masked)], axis=-1)
+      self.evaluate(tf1.global_variables_initializer())
+      forward_x2_ = self.evaluate(forward_x2)
+
+      self.assertAllClose(forward_x2_, x2_, rtol=1e-4, atol=0.)
+
   def testBijectorConditionKwargs(self):
     batch_size = 3
     x_ = np.linspace(-1.0, 1.0, (batch_size * 4 * 2)).astype(

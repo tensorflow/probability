@@ -146,7 +146,8 @@ class RealNVP(bijector_lib.Bijector):
     Args:
       num_masked: Python `int` indicating that the first `d` units of the event
         should be masked. Must be in the closed interval `[0, D-1]`, where `D`
-        is the event size of the base distribution.
+        is the event size of the base distribution. If the value is negative,
+        then the last `d` units of the event are masked instead.
       shift_and_log_scale_fn: Python `callable` which computes `shift` and
         `log_scale` from both the forward domain (`x`) and the inverse domain
         (`y`). Calculation must respect the 'autoregressive property' (see class
@@ -175,9 +176,10 @@ class RealNVP(bijector_lib.Bijector):
           are specified.
     """
     name = name or 'real_nvp'
-    if num_masked < 0:
-      raise ValueError('num_masked must be a non-negative integer.')
+
     self._num_masked = num_masked
+
+    self._reverse_mask = self._num_masked < 0
     # At construction time, we don't know input_depth.
     self._input_depth = None
     if bool(shift_and_log_scale_fn) == bool(bijector_fn):
@@ -215,33 +217,64 @@ class RealNVP(bijector_lib.Bijector):
         raise ValueError(
             'Number of masked units must be smaller than the event size.')
 
+  def _bijector_input_units(self):
+    return self._input_depth - abs(self._num_masked)
+
   def _forward(self, x, **condition_kwargs):
     self._cache_input_depth(x)
+
     x0, x1 = x[..., :self._num_masked], x[..., self._num_masked:]
-    y1 = self._bijector_fn(x0, self._input_depth - self._num_masked,
+
+    if self._reverse_mask:
+      x0, x1 = x1, x0
+
+    y1 = self._bijector_fn(x0, self._bijector_input_units(),
                            **condition_kwargs).forward(x1)
+
+    if self._reverse_mask:
+      y1, x0 = x0, y1
+
     y = tf.concat([x0, y1], axis=-1)
     return y
 
   def _inverse(self, y, **condition_kwargs):
     self._cache_input_depth(y)
+
     y0, y1 = y[..., :self._num_masked], y[..., self._num_masked:]
-    x1 = self._bijector_fn(y0, self._input_depth - self._num_masked,
+
+    if self._reverse_mask:
+      y0, y1 = y1, y0
+
+    x1 = self._bijector_fn(y0, self._bijector_input_units(),
                            **condition_kwargs).inverse(y1)
+
+    if self._reverse_mask:
+      x1, y0 = y0, x1
+
     x = tf.concat([y0, x1], axis=-1)
     return x
 
   def _forward_log_det_jacobian(self, x, **condition_kwargs):
     self._cache_input_depth(x)
+
     x0, x1 = x[..., :self._num_masked], x[..., self._num_masked:]
-    return self._bijector_fn(x0, self._input_depth - self._num_masked,
+
+    if self._reverse_mask:
+      x0, x1 = x1, x0
+
+    return self._bijector_fn(x0, self._bijector_input_units(),
                              **condition_kwargs).forward_log_det_jacobian(
                                  x1, event_ndims=1)
 
   def _inverse_log_det_jacobian(self, y, **condition_kwargs):
     self._cache_input_depth(y)
+
     y0, y1 = y[..., :self._num_masked], y[..., self._num_masked:]
-    return self._bijector_fn(y0, self._input_depth - self._num_masked,
+
+    if self._reverse_mask:
+      y0, y1 = y1, y0
+
+    return self._bijector_fn(y0, self._bijector_input_units(),
                              **condition_kwargs).inverse_log_det_jacobian(
                                  y1, event_ndims=1)
 
