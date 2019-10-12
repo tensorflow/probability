@@ -34,6 +34,7 @@ from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.eager import def_function  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import combinations  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import test_combinations  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -115,6 +116,37 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
         'Expected no entry to be `None` but found `None` in positions {}'
         .format([i for i, x in enumerate(each_not_none) if not x]))
     raise AssertionError(msg)
+
+  def compute_max_gradient_error(self, f, args, delta=1e-3):
+    """Wrapper around TF's gradient_checker_v2.
+
+    `gradient_checker_v2` depends on there being a default session, but our test
+    setup, using test_combinations, doesn't run the test function under a global
+    `self.test_session()` context. Thus, when running
+    `gradient_checker_v2.compute_gradient`, we need to ensure we're in a
+    `self.test_session()` context when not in eager mode. This function bundles
+    up the relevant logic, and ultimately returns the max error across autodiff
+    and finite difference gradient calculations.
+
+    Args:
+      f: callable function whose gradient to compute.
+      args: Python `list` of independent variables with respect to which to
+      compute gradients.
+      delta: floating point value to use for finite difference calculation.
+
+    Returns:
+      err: the maximum error between all components of the numeric and
+      autodiff'ed gradients.
+    """
+    def _compute_error():
+      return gradient_checker_v2.max_error(
+          *gradient_checker_v2.compute_gradient(f, x=args, delta=delta))
+    if tf.executing_eagerly():
+      return _compute_error()
+    else:
+      # Make sure there's a global default session in graph mode.
+      with self.test_session():
+        return _compute_error()
 
 
 @contextlib.contextmanager

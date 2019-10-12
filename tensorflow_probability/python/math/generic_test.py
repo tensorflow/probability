@@ -29,7 +29,6 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
 
 
 tfd = tfp.distributions
@@ -287,8 +286,7 @@ class SoftplusInverseTest(tfp_test_util.TestCase):
         [-0.9, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 0.9],
         shape=[2, 5],
         name='x')
-    err = gradient_checker_v2.max_error(
-        *gradient_checker_v2.compute_gradient(tf.math.softplus, [x]))
+    err = self.compute_max_gradient_error(tf.math.softplus, [x])
     tf1.logging.vlog(2, 'softplus (float) gradient err = ', err)
     self.assertLess(err, 1e-4)
 

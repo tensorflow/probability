@@ -31,7 +31,6 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
 
 
 tfd = tfp.distributions
@@ -287,9 +286,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
       return tf.reduce_mean(
           input_tensor=tf.abs(dist.sample(n, seed=tfp_test_util.test_seed())))
 
-    err = gradient_checker_v2.max_error(
-        *gradient_checker_v2.compute_gradient(
-            f, [loc, scale, low, high], delta=0.1))
+    err = self.compute_max_gradient_error(f, [loc, scale, low, high], delta=0.1)
 
     # These gradients are noisy due to sampling.
     self.assertLess(err, 0.05)
@@ -324,8 +321,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
       func = getattr(dist, fn_name)
       return tf.reduce_mean(func(x))
 
-    err = gradient_checker_v2.max_error(
-        *gradient_checker_v2.compute_gradient(f, [loc, scale]))
+    err = self.compute_max_gradient_error(f, [loc, scale])
     self.assertLess(err, 1e-2)
 
   @parameterized.parameters(
@@ -346,13 +342,10 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
       return func()
 
     if fn_name not in ['mode']:
-      err = gradient_checker_v2.max_error(
-          *gradient_checker_v2.compute_gradient(f, [loc, scale]))
+      err = self.compute_max_gradient_error(f, [loc, scale])
       self.assertLess(err, 0.005)
     else:
-      err = gradient_checker_v2.max_error(
-          *gradient_checker_v2.compute_gradient(
-              lambda x: f(x, scale), [loc]))
+      err = self.compute_max_gradient_error(lambda x: f(x, scale), [loc])
       self.assertLess(err, 0.005)
 
 
