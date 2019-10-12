@@ -114,7 +114,7 @@ class FillTriangular(bijector.Bijector):
     elif n1 != n2:
       raise ValueError('Matrix must be square. (saw [{}, {}])'.format(n1, n2))
     else:
-      m = n1 * (n1 + 1) / 2
+      m = n1 * (n1 + 1) // 2
     return tensorshape_util.concatenate(batch_shape, [m])
 
   def _forward_event_shape_tensor(self, input_shape_tensor):
