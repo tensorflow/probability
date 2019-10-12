@@ -286,11 +286,16 @@ def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-built
   return tf.ones(s, dtype or s.dtype, name)
 ones_like = _copy_docstring(tf.ones_like, _ones_like)
 
+
+def _rank(input, name=None):  # pylint: disable=redefined-builtin,unused-argument
+  if not hasattr(input, 'shape'):
+    input = (tf.convert_to_tensor(input) if tf.get_static_value(input) is None
+             else np.array(input))
+  ndims_ = tensorshape_util.rank(getattr(input, 'shape', None))
+  return tf.rank(input) if ndims_ is None else np.int32(ndims_)
 rank = _copy_docstring(
     tf.rank,
-    lambda input, name=None: (  # pylint: disable=redefined-builtin,g-long-lambda
-        tf.rank(input) if tensorshape_util.rank(input.shape) is None
-        else np.int32(tensorshape_util.rank(input.shape))))
+    _rank)
 
 
 def _setdiff1d(a, b, aminusb=True, validate_indices=True):

@@ -362,7 +362,7 @@ class REMCTest(tfp_test_util.TestCase):
     sample_cov = tf.matmul(x, x, transpose_a=True) / dtype(num_results)
     sample_mean_, sample_cov_ = self.evaluate([sample_mean, sample_cov])
     self.assertAllClose(true_mean, sample_mean_, atol=0.06, rtol=0.)
-    self.assertAllClose(true_cov, sample_cov_, atol=0., rtol=0.2)
+    self.assertAllClose(true_cov, sample_cov_, atol=0., rtol=0.21)
 
   def testNormalWithTwoBatchDimsAndThreeReplicas(self):
     """Sampling from the Standard Normal Distribution."""

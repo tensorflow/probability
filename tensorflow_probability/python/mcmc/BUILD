@@ -57,6 +57,9 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/stats",
     ],
 )
@@ -79,6 +82,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":kernel",
+        ":simple_step_size_adaptation",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
@@ -107,7 +111,8 @@ py_library(
         ":metropolis_hastings",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
@@ -125,6 +130,7 @@ py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -138,6 +144,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
         "//tensorflow_probability/python/util:seed_stream",
@@ -199,7 +206,8 @@ py_library(
         ":kernel",
         ":metropolis_hastings",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math:diag_jacobian",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
@@ -235,6 +243,8 @@ py_library(
     deps = [
         ":kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -260,6 +270,7 @@ py_library(
         ":kernel",
         ":metropolis_hastings",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -323,6 +334,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -334,6 +346,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/mcmc/internal",
     ],
 )
@@ -381,7 +394,9 @@ py_library(
     deps = [
         ":kernel",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/mcmc/internal:slice_sampler_utils",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
@@ -472,6 +487,11 @@ py_library(
         ":kernel",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/mcmc/internal",
     ],
 )

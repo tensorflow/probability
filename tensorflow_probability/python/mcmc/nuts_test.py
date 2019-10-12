@@ -411,7 +411,9 @@ class NutsTest(tfp_test_util.TestCase):
     neals_funnel = tfd.JointDistributionSequential(
         [
             tfd.Normal(loc=0., scale=3.),  # b0
-            lambda y: tfd.Sample(tfd.Normal(loc=0., scale=tf.exp(y/2)), 9),
+            lambda y: tfd.Sample(  # pylint: disable=g-long-lambda
+                tfd.Normal(loc=0., scale=tf.math.exp(y / 2)),
+                sample_shape=9),
         ],
         validate_args=True
     )
@@ -518,7 +520,7 @@ class NutsTest(tfp_test_util.TestCase):
       rhat = tfp.mcmc.potential_scale_reduction(mcmc_trace)
       return (
           [s[-1] for s in step_size],  # final step size
-          tf.reduce_mean(tf.exp(log_accept_ratio)),
+          tf.math.exp(tfp.math.reduce_logmeanexp(log_accept_ratio)),
           [tf.reduce_mean(rhat_) for rhat_ in rhat],  # average rhat
       )
 

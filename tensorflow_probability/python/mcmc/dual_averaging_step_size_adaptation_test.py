@@ -187,7 +187,7 @@ class DualAveragingStepSizeAdaptationTest(tfp_test_util.TestCase):
         num_adaptation_steps=1,
         validate_args=True)
 
-    init_state = tf.convert_to_tensor(value=0.)
+    init_state = tf.constant(0.)
     kernel_results = kernel.bootstrap_results(init_state)
     for _ in range(2):
       _, kernel_results = kernel.one_step(init_state, kernel_results)
@@ -302,8 +302,8 @@ class DualAveragingStepSizeAdaptationTest(tfp_test_util.TestCase):
         kernel=kernel,
         trace_fn=lambda _, pkr: pkr.inner_results.log_accept_ratio)
 
-    p_accept = tf.reduce_mean(
-        input_tensor=tf.exp(tf.minimum(log_accept_ratio, 0.)))
+    p_accept = tf.math.exp(tfp.math.reduce_logmeanexp(
+        tf.minimum(log_accept_ratio, 0.)))
 
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
 
@@ -355,7 +355,7 @@ class DualAveragingStepSizeAdaptationStaticBroadcastingTest(
                 [0.76, 0.76, 0.73]]),
         dtype=tf.float64)
     log_accept_ratio = tf1.placeholder_with_default(
-        input=log_accept_ratio,
+        log_accept_ratio,
         shape=log_accept_ratio.shape if self.use_static_shape else None)
     state = [
         tf.zeros([2, 3], dtype=tf.float64),

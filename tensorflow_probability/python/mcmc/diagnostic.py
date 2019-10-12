@@ -22,12 +22,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import stats
-from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'effective_sample_size',
@@ -198,8 +198,8 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
     n = _axis_size(states, axis=0)
     k = tf.range(0., _axis_size(auto_corr, axis=0))
     nk_factor = (n - k) / n
-    if auto_corr.shape.ndims is not None:
-      new_shape = [-1] + [1] * (auto_corr.shape.ndims - 1)
+    if tensorshape_util.rank(auto_corr.shape) is not None:
+      new_shape = [-1] + [1] * (tensorshape_util.rank(auto_corr.shape) - 1)
     else:
       new_shape = tf.concat(
           ([-1],
@@ -414,16 +414,17 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims,
             'Must provide at least 2 samples.  Found {}'.format(n_samples_))
     elif validate_args:
       if split_chains:
-        state = distribution_util.with_dependencies([
-            tf1.assert_greater(
-                tf.shape(state)[0], 4,
-                message='Must provide at least 4 samples when splitting chains.'
-            )], state)
+        assertions = [assert_util.assert_greater(
+            tf.shape(state)[0], 4,
+            message='Must provide at least 4 samples when splitting chains.')]
+        with tf.control_dependencies(assertions):
+          state = tf.identity(state)
       else:
-        state = distribution_util.with_dependencies([
-            tf1.assert_greater(
-                tf.shape(state)[0], 2,
-                message='Must provide at least 2 samples.')], state)
+        assertions = [assert_util.assert_greater(
+            tf.shape(state)[0], 2,
+            message='Must provide at least 2 samples.')]
+        with tf.control_dependencies(assertions):
+          state = tf.identity(state)
 
     # Define so it's not a magic number.
     # Warning!  `if split_chains` logic assumes this is 1!

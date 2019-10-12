@@ -23,9 +23,7 @@ from __future__ import print_function
 
 import collections
 import warnings
-# Dependency imports
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -295,9 +293,10 @@ def sample_chain(
   _, log_accept_ratio = sample_chain(trace_fn=trace_log_accept_ratio)
   _, kernel_results = sample_chain(trace_fn=trace_everything)
 
-  acceptance_prob = tf.exp(tf.minimum(log_accept_ratio_, 0.))
+  acceptance_prob = tf.math.exp(tf.minimum(log_accept_ratio_, 0.))
   # Equivalent to, but more efficient than:
-  acceptance_prob = tf.exp(tf.minimum(kernel_results.log_accept_ratio_, 0.))
+  acceptance_prob = tf.math.exp(tf.minimum(
+      kernel_results.log_accept_ratio_, 0.))
   ```
 
   #### References
@@ -309,19 +308,17 @@ def sample_chain(
   if not kernel.is_calibrated:
     warnings.warn("supplied `TransitionKernel` is not calibrated. Markov "
                   "chain may not converge to intended target distribution.")
-  with tf1.name_scope(
-      name, "mcmc_sample_chain",
-      [num_results, num_burnin_steps, num_steps_between_results]):
+  with tf.name_scope(name or "mcmc_sample_chain"):
     num_results = tf.convert_to_tensor(
-        value=num_results, dtype=tf.int32, name="num_results")
+        num_results, dtype=tf.int32, name="num_results")
     num_burnin_steps = tf.convert_to_tensor(
-        value=num_burnin_steps, dtype=tf.int32, name="num_burnin_steps")
+        num_burnin_steps, dtype=tf.int32, name="num_burnin_steps")
     num_steps_between_results = tf.convert_to_tensor(
-        value=num_steps_between_results,
+        num_steps_between_results,
         dtype=tf.int32,
         name="num_steps_between_results")
     current_state = tf.nest.map_structure(
-        lambda x: tf.convert_to_tensor(value=x, name="current_state"),
+        lambda x: tf.convert_to_tensor(x, name="current_state"),
         current_state)
     if previous_kernel_results is None:
       previous_kernel_results = kernel.bootstrap_results(current_state)

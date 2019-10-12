@@ -22,8 +22,9 @@ import collections
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
@@ -190,13 +191,12 @@ def sample_annealed_importance_chain(
   ```
 
   """
-  with tf1.name_scope(name, "sample_annealed_importance_chain",
-                               [num_steps, current_state]):
+  with tf.name_scope(name or "sample_annealed_importance_chain"):
     num_steps = tf.convert_to_tensor(
         value=num_steps, dtype=tf.int32, name="num_steps")
     if mcmc_util.is_list_like(current_state):
       current_state = [
-          tf.convert_to_tensor(value=s, name="current_state")
+          tf.convert_to_tensor(s, name="current_state")
           for s in current_state
       ]
     else:
@@ -207,7 +207,7 @@ def sample_annealed_importance_chain(
       def _fn(*args):
         p = tf.identity(proposal_log_prob_fn(*args), name="proposal_log_prob")
         t = tf.identity(target_log_prob_fn(*args), name="target_log_prob")
-        dtype = p.dtype.base_dtype
+        dtype = dtype_util.base_dtype(p.dtype)
         beta = tf.cast(iter_ + 1, dtype) / tf.cast(num_steps, dtype)
         return tf.identity(beta * t + (1. - beta) * p,
                            name="convex_combined_log_prob")
@@ -237,8 +237,8 @@ def sample_annealed_importance_chain(
       inner_results = kernel.bootstrap_results(init_state)
 
       convex_combined_log_prob = inner_results.accepted_results.target_log_prob
-      dtype = convex_combined_log_prob.dtype.as_numpy_dtype
-      shape = tf.shape(input=convex_combined_log_prob)
+      dtype = dtype_util.as_numpy_dtype(convex_combined_log_prob.dtype)
+      shape = tf.shape(convex_combined_log_prob)
       proposal_log_prob = tf.fill(shape, dtype(np.nan),
                                   name="bootstrap_proposal_log_prob")
       target_log_prob = tf.fill(shape, dtype(np.nan),
@@ -255,9 +255,9 @@ def sample_annealed_importance_chain(
 
     ais_weights = tf.zeros(
         shape=tf.broadcast_dynamic_shape(
-            tf.shape(input=inner_results.proposed_results.target_log_prob),
-            tf.shape(input=inner_results.accepted_results.target_log_prob)),
-        dtype=inner_results.proposed_results.target_log_prob.dtype.base_dtype)
+            tf.shape(inner_results.proposed_results.target_log_prob),
+            tf.shape(inner_results.accepted_results.target_log_prob)),
+        dtype=inner_results.proposed_results.target_log_prob.dtype)
 
     [_, ais_weights, current_state, kernel_results] = tf.while_loop(
         cond=lambda iter_, *args: iter_ < num_steps,

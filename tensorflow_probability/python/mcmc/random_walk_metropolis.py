@@ -21,9 +21,9 @@ from __future__ import print_function
 import collections
 # Dependency imports
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
@@ -88,8 +88,7 @@ def random_walk_normal_fn(scale=1., name=None):
     Raises:
       ValueError: if `scale` does not broadcast with `state_parts`.
     """
-    with tf1.name_scope(
-        name, 'random_walk_normal_fn', values=[state_parts, scale, seed]):
+    with tf.name_scope(name or 'random_walk_normal_fn'):
       scales = scale if mcmc_util.is_list_like(scale) else [scale]
       if len(scales) == 1:
         scales *= len(state_parts)
@@ -100,8 +99,8 @@ def random_walk_normal_fn(scale=1., name=None):
           tf.random.normal(
               mean=state_part,
               stddev=scale_part,
-              shape=tf.shape(input=state_part),
-              dtype=state_part.dtype.base_dtype,
+              shape=tf.shape(state_part),
+              dtype=dtype_util.base_dtype(state_part.dtype),
               seed=seed_stream())
           for scale_part, state_part in zip(scales, state_parts)
       ]
@@ -150,8 +149,7 @@ def random_walk_uniform_fn(scale=1., name=None):
     Raises:
       ValueError: if `scale` does not broadcast with `state_parts`.
     """
-    with tf1.name_scope(
-        name, 'random_walk_uniform_fn', values=[state_parts, scale, seed]):
+    with tf.name_scope(name or 'random_walk_uniform_fn'):
       scales = scale if mcmc_util.is_list_like(scale) else [scale]
       if len(scales) == 1:
         scales *= len(state_parts)
@@ -162,8 +160,8 @@ def random_walk_uniform_fn(scale=1., name=None):
           tf.random.uniform(
               minval=state_part - scale_part,
               maxval=state_part + scale_part,
-              shape=tf.shape(input=state_part),
-              dtype=state_part.dtype.base_dtype,
+              shape=tf.shape(state_part),
+              dtype=dtype_util.base_dtype(state_part.dtype),
               seed=seed_stream())
           for scale_part, state_part in zip(scales, state_parts)
       ]
@@ -502,18 +500,14 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(RandomWalkMetropolis.one_step.__doc__)
   def one_step(self, current_state, previous_kernel_results):
-    with tf1.name_scope(
-        name=mcmc_util.make_name(self.name, 'rwm', 'one_step'),
-        values=[
-            self.seed, current_state, previous_kernel_results.target_log_prob
-        ]):
-      with tf1.name_scope('initialize'):
+    with tf.name_scope(mcmc_util.make_name(self.name, 'rwm', 'one_step')):
+      with tf.name_scope('initialize'):
         if mcmc_util.is_list_like(current_state):
           current_state_parts = list(current_state)
         else:
           current_state_parts = [current_state]
         current_state_parts = [
-            tf.convert_to_tensor(value=s, name='current_state')
+            tf.convert_to_tensor(s, name='current_state')
             for s in current_state_parts
         ]
 
@@ -528,20 +522,18 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
       return [
           maybe_flatten(next_state_parts),
           UncalibratedRandomWalkResults(
-              log_acceptance_correction=tf.zeros(
-                  shape=tf.shape(input=next_target_log_prob),
-                  dtype=next_target_log_prob.dtype.base_dtype),
+              log_acceptance_correction=tf.zeros_like(next_target_log_prob),
               target_log_prob=next_target_log_prob,
           ),
       ]
 
   @mcmc_util.set_doc(RandomWalkMetropolis.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
-    with tf1.name_scope(self.name, 'rwm_bootstrap_results',
-                                 [init_state]):
+    with tf.name_scope(mcmc_util.make_name(
+        self.name, 'rwm', 'bootstrap_results')):
       if not mcmc_util.is_list_like(init_state):
         init_state = [init_state]
-      init_state = [tf.convert_to_tensor(value=x) for x in init_state]
+      init_state = [tf.convert_to_tensor(x) for x in init_state]
       init_target_log_prob = self.target_log_prob_fn(*init_state)  # pylint:disable=not-callable
       return UncalibratedRandomWalkResults(
           log_acceptance_correction=tf.zeros_like(init_target_log_prob),
@@ -560,7 +552,7 @@ def _maybe_call_fn(fn,
 
   if fn_result is None:
     fn_result = fn(*fn_arg_list)
-  if not fn_result.dtype.is_floating:
+  if not dtype_util.is_floating(fn_result.dtype):
     raise TypeError('`{}` must be a `Tensor` with `float` `dtype`.'.format(
         description))
   return fn_result

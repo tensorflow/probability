@@ -71,7 +71,7 @@ class FakeMHKernel(tfp.mcmc.TransitionKernel):
         accepted_results=self.parameters['inner_kernel'].bootstrap_results(
             current_state),
         log_accept_ratio=tf.convert_to_tensor(
-            value=self.parameters['log_accept_ratio']),
+            self.parameters['log_accept_ratio']),
     )
 
   def is_calibrated(self):
@@ -372,8 +372,8 @@ class SimpleStepSizeAdaptationTest(tfp_test_util.TestCase):
         kernel=kernel,
         trace_fn=lambda _, pkr: pkr.inner_results.log_accept_ratio)
 
-    p_accept = tf.reduce_mean(
-        input_tensor=tf.exp(tf.minimum(log_accept_ratio, 0.)))
+    p_accept = tf.math.exp(tfp.math.reduce_logmeanexp(
+        tf.minimum(log_accept_ratio, 0.)))
 
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
 
@@ -420,7 +420,7 @@ class SimpleStepSizeAdaptationStaticBroadcastingTest(tfp_test_util.TestCase):
          [np.log(0.77), np.log(0.77), np.log(0.73)]],
         dtype=tf.float64)
     log_accept_ratio = tf1.placeholder_with_default(
-        input=log_accept_ratio,
+        log_accept_ratio,
         shape=log_accept_ratio.shape if self.use_static_shape else None)
     state = [
         tf.zeros([2, 3], dtype=tf.float64),

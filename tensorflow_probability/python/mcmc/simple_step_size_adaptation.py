@@ -21,58 +21,56 @@ from __future__ import print_function
 import collections
 
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 @mcmc_util.make_innermost_setter
-def _hmc_like_step_size_setter_fn(kernel_results, new_step_size):
+def hmc_like_step_size_setter_fn(kernel_results, new_step_size):
   return kernel_results._replace(
       accepted_results=kernel_results.accepted_results._replace(
           step_size=new_step_size))
 
 
 @mcmc_util.make_innermost_getter
-def _hmc_like_step_size_getter_fn(kernel_results):
+def hmc_like_step_size_getter_fn(kernel_results):
   return kernel_results.accepted_results.step_size
 
 
 @mcmc_util.make_innermost_getter
-def _hmc_like_log_accept_prob_getter_fn(kernel_results):
-  log_accept_ratio = kernel_results.log_accept_ratio
-  return tf.minimum(tf.constant(0., log_accept_ratio.dtype), log_accept_ratio)
+def hmc_like_log_accept_prob_getter_fn(kernel_results):
+  return tf.minimum(kernel_results.log_accept_ratio, 0.)
 
 
-def _reduce_logmeanexp(value, dims, keepdims=False):
-  # This is intentionally numerically imprecise for simplicity. For the purposes
-  # of computing the mean acceptance probability this is more than sufficient.
-  # TODO(b/139011227): Use tfp.math.general.reduce_logmeanexp
-  return tf.math.log(
-      tf.reduce_mean(input_tensor=tf.exp(value), axis=dims, keepdims=keepdims))
-
-
-def _get_differing_dims(a, b):
+def get_differing_dims(a, b):
   # Get the indices of dimensions where shapes of `a` and `b` differ.
   # `a` is allowed to have fewer dimensions than `b`.
-  if a.shape.is_fully_defined() and b.shape.is_fully_defined():
-    a_shape = np.array(a.shape.as_list())
-    b_shape = np.array(b.shape.as_list())
-    return np.where(a_shape != b_shape[:len(a_shape)])[0]
-  else:
-    return tf1.where(
-        tf.not_equal(tf.shape(input=a),
-                     tf.shape(input=b)[:tf.rank(a)]))[:, 0]
+  if (not tensorshape_util.is_fully_defined(a.shape) or
+      not tensorshape_util.is_fully_defined(b.shape)):
+    return tf.where(
+        tf.not_equal(tf.shape(a), tf.shape(b)[:tf.rank(a)]))[:, 0]
+  a_shape = np.int32(a.shape)
+  b_shape = np.int32(b.shape)
+  return np.where(a_shape != b_shape[:len(a_shape)])[0]
 
 
 class SimpleStepSizeAdaptationResults(
     collections.namedtuple(
         'SimpleStepSizeAdaptationResults',
-        'inner_results, target_accept_prob, adaptation_rate, step, '
-        'new_step_size')):
+        [
+            'inner_results',
+            'target_accept_prob',
+            'adaptation_rate',
+            'step',
+            'new_step_size',
+        ])):
   """Results of the SimpleStepSizeAdaptation TransitionKernel.
 
   Attributes:
@@ -182,7 +180,8 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
                                pkr.inner_results.log_accept_ratio])
 
   # ~0.75
-  p_accept = tf.reduce_mean(tf.exp(tf.minimum(log_accept_ratio, 0.)))
+  p_accept = tf.math.exp(tfp.math.reduce_logmeanexp(
+      tf.minimum(log_accept_ratio, 0.)))
   ```
 
   #### References
@@ -201,9 +200,9 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
                num_adaptation_steps,
                target_accept_prob=0.75,
                adaptation_rate=0.01,
-               step_size_setter_fn=_hmc_like_step_size_setter_fn,
-               step_size_getter_fn=_hmc_like_step_size_getter_fn,
-               log_accept_prob_getter_fn=_hmc_like_log_accept_prob_getter_fn,
+               step_size_setter_fn=hmc_like_step_size_setter_fn,
+               step_size_getter_fn=hmc_like_step_size_getter_fn,
+               log_accept_prob_getter_fn=hmc_like_log_accept_prob_getter_fn,
                validate_args=False,
                name=None):
     """Creates the step size adaptation kernel.
@@ -255,18 +254,16 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
 
     inner_kernel = mcmc_util.enable_store_parameters_in_results(inner_kernel)
 
-    with tf1.name_scope(
-        mcmc_util.make_name(name, 'simple_step_size_adaptation', '__init__'),
-        values=[target_accept_prob, adaptation_rate,
-                num_adaptation_steps]) as name:
+    with tf.name_scope(mcmc_util.make_name(
+        name, 'simple_step_size_adaptation', '__init__')) as name:
       dtype = dtype_util.common_dtype([target_accept_prob, adaptation_rate],
                                       tf.float32)
       target_accept_prob = tf.convert_to_tensor(
-          value=target_accept_prob, dtype=dtype, name='target_accept_prob')
+          target_accept_prob, dtype=dtype, name='target_accept_prob')
       adaptation_rate = tf.convert_to_tensor(
-          value=adaptation_rate, dtype=dtype, name='adaptation_rate')
+          adaptation_rate, dtype=dtype, name='adaptation_rate')
       num_adaptation_steps = tf.convert_to_tensor(
-          value=num_adaptation_steps,
+          num_adaptation_steps,
           dtype=tf.int32,
           name='num_adaptation_steps')
 
@@ -312,11 +309,8 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
     return self._parameters
 
   def one_step(self, current_state, previous_kernel_results):
-    with tf1.name_scope(
-        name=mcmc_util.make_name(self.name, 'simple_step_size_adaptation',
-                                 'one_step'),
-        values=[current_state, previous_kernel_results]):
-
+    with tf.name_scope(mcmc_util.make_name(
+        self.name, 'simple_step_size_adaptation', 'one_step')):
       # Set the step_size.
       inner_results = self.step_size_setter_fn(
           previous_kernel_results.inner_results,
@@ -329,12 +323,13 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
       # Get the new step size.
       log_accept_prob = self.log_accept_prob_getter_fn(new_inner_results)
       log_target_accept_prob = tf.math.log(
-          previous_kernel_results.target_accept_prob)
+          tf.cast(previous_kernel_results.target_accept_prob,
+                  dtype=log_accept_prob.dtype))
 
       state_parts = tf.nest.flatten(current_state)
       step_size = self.step_size_getter_fn(new_inner_results)
       step_size_parts = tf.nest.flatten(step_size)
-      log_accept_prob_rank = tf.rank(log_accept_prob)
+      log_accept_prob_rank = prefer_static.rank(log_accept_prob)
 
       new_step_size_parts = []
       for step_size_part, state_part in zip(step_size_parts, state_parts):
@@ -373,44 +368,44 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
         # states, and B are the shared dimensions of all the states, which are
         # equal to the step size. When we subtract B, we will always get a
         # number >= L, which means we'll get the full reduction we want.
-        num_reduce_dims = tf.minimum(
+        num_reduce_dims = prefer_static.minimum(
             log_accept_prob_rank,
-            tf.rank(state_part) - tf.rank(step_size_part))
-        reduced_log_accept_prob = _reduce_logmeanexp(log_accept_prob,
-                                                     tf.range(num_reduce_dims))
+            prefer_static.rank(state_part) - prefer_static.rank(step_size_part))
+        reduced_log_accept_prob = reduce_logmeanexp(
+            log_accept_prob,
+            axis=prefer_static.range(num_reduce_dims))
         # reduced_log_accept_prob must broadcast into step_size_part on the
         # left, so we do an additional reduction over dimensions where their
         # shapes differ.
-        reduce_indices = _get_differing_dims(reduced_log_accept_prob,
-                                             step_size_part)
-        reduced_log_accept_prob = _reduce_logmeanexp(
-            reduced_log_accept_prob, reduce_indices, keepdims=True)
+        reduce_indices = get_differing_dims(reduced_log_accept_prob,
+                                            step_size_part)
+        reduced_log_accept_prob = reduce_logmeanexp(
+            reduced_log_accept_prob, axis=reduce_indices, keepdims=True)
 
+        one_plus_adaptation_rate = 1. + tf.cast(
+            previous_kernel_results.adaptation_rate,
+            dtype=step_size_part.dtype)
         new_step_size_part = mcmc_util.choose(
             reduced_log_accept_prob > log_target_accept_prob,
-            step_size_part * (1. + previous_kernel_results.adaptation_rate),
-            step_size_part / (1. + previous_kernel_results.adaptation_rate))
+            step_size_part * one_plus_adaptation_rate,
+            step_size_part / one_plus_adaptation_rate)
 
         new_step_size_parts.append(
-            tf1.where(
-                previous_kernel_results.step < self.num_adaptation_steps,
-                new_step_size_part, step_size_part))
+            tf.where(previous_kernel_results.step < self.num_adaptation_steps,
+                     new_step_size_part,
+                     step_size_part))
       new_step_size = tf.nest.pack_sequence_as(step_size, new_step_size_parts)
 
       return new_state, previous_kernel_results._replace(
           inner_results=new_inner_results,
-          step=previous_kernel_results.step + 1,
+          step=1 + previous_kernel_results.step,
           new_step_size=new_step_size)
 
   def bootstrap_results(self, init_state):
-    with tf1.name_scope(
-        name=mcmc_util.make_name(self.name, 'simple_step_size_adaptation',
-                                 'bootstrap_results'),
-        values=[init_state]):
-
+    with tf.name_scope(mcmc_util.make_name(
+        self.name, 'simple_step_size_adaptation', 'bootstrap_results')):
       inner_results = self.inner_kernel.bootstrap_results(init_state)
       step_size = self.step_size_getter_fn(inner_results)
-
       return SimpleStepSizeAdaptationResults(
           inner_results=inner_results,
           step=tf.constant(0, dtype=tf.int32),
@@ -427,9 +422,9 @@ def _maybe_validate_target_accept_prob(target_accept_prob, validate_args):
   if not validate_args:
     return target_accept_prob
   with tf.control_dependencies([
-      tf1.assert_positive(
+      assert_util.assert_positive(
           target_accept_prob, message='`target_accept_prob` must be > 0.'),
-      tf1.assert_less(
+      assert_util.assert_less(
           target_accept_prob,
           tf.ones_like(target_accept_prob),
           message='`target_accept_prob` must be < 1.')

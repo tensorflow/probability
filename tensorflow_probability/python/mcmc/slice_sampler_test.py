@@ -48,10 +48,10 @@ class SliceSamplerTest(tfp_test_util.TestCase):
         num_burnin_steps=500,
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.reduce_mean(input_tensor=samples, axis=0)
+    sample_mean = tf.reduce_mean(samples, axis=0)
     sample_std = tf.sqrt(
         tf.reduce_mean(
-            input_tensor=tf.math.squared_difference(samples, sample_mean),
+            tf.math.squared_difference(samples, sample_mean),
             axis=0))
     [sample_mean, sample_std] = self.evaluate([sample_mean, sample_std])
 
@@ -95,10 +95,9 @@ class SliceSamplerTest(tfp_test_util.TestCase):
         parallel_iterations=1)
 
     states = tf.stack([x, y], axis=-1)
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=[0, 1])
+    sample_mean = tf.reduce_mean(states, axis=[0, 1])
     z = states - sample_mean
-    sample_cov = tf.reduce_mean(
-        input_tensor=tf.matmul(z, z, transpose_a=True), axis=[0, 1])
+    sample_cov = tf.reduce_mean(tf.matmul(z, z, transpose_a=True), axis=[0, 1])
     [sample_mean, sample_cov] = self.evaluate([
         sample_mean, sample_cov])
 
@@ -148,10 +147,9 @@ class SliceSamplerTest(tfp_test_util.TestCase):
         parallel_iterations=1)
 
     states = tf.stack([x, y], axis=-1)
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=[0, 1])
+    sample_mean = tf.reduce_mean(states, axis=[0, 1])
     z = states - sample_mean
-    sample_cov = tf.reduce_mean(
-        input_tensor=tf.matmul(z, z, transpose_a=True), axis=[0, 1])
+    sample_cov = tf.reduce_mean(tf.matmul(z, z, transpose_a=True), axis=[0, 1])
     [sample_mean, sample_cov] = self.evaluate([sample_mean, sample_cov])
 
     self.assertAllClose(true_mean, b=np.squeeze(sample_mean),
@@ -199,10 +197,9 @@ class SliceSamplerTest(tfp_test_util.TestCase):
         parallel_iterations=1)
 
     states = tf.stack([x, y], axis=-1)
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=[0, 1])
+    sample_mean = tf.reduce_mean(states, axis=[0, 1])
     z = states - sample_mean
-    sample_cov = tf.reduce_mean(
-        input_tensor=tf.matmul(z, z, transpose_a=True), axis=[0, 1])
+    sample_cov = tf.reduce_mean(tf.matmul(z, z, transpose_a=True), axis=[0, 1])
     [sample_mean, sample_cov] = self.evaluate([sample_mean, sample_cov])
 
     self.assertAllClose(true_mean, b=np.squeeze(sample_mean),
@@ -238,10 +235,10 @@ class SliceSamplerTest(tfp_test_util.TestCase):
         num_steps_between_results=1,
         parallel_iterations=1)
     result = states[0]
-    sample_mean = tf.reduce_mean(input_tensor=result, axis=[0, 1])
+    sample_mean = tf.reduce_mean(result, axis=[0, 1])
     deviation = tf.reshape(result - sample_mean, shape=[-1, 4])
     sample_cov = tf.matmul(deviation, b=deviation, transpose_a=True)
-    sample_cov /= tf.cast(tf.shape(input=deviation)[0], dtype=tf.float32)
+    sample_cov /= tf.cast(tf.shape(deviation)[0], dtype=tf.float32)
     sample_mean_err = sample_mean - true_mean
     sample_cov_err = sample_cov - true_cov
 

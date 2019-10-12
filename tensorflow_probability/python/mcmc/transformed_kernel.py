@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import collections
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static
@@ -317,9 +316,8 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
       kernel_results: `collections.namedtuple` of internal calculations used to
         advance the chain.
     """
-    with tf1.name_scope(
-        name=mcmc_util.make_name(self.name, 'transformed_kernel', 'one_step'),
-        values=[previous_kernel_results]):
+    with tf.name_scope(mcmc_util.make_name(
+        self.name, 'transformed_kernel', 'one_step')):
       transformed_next_state, kernel_results = self._inner_kernel.one_step(
           previous_kernel_results.transformed_state,
           previous_kernel_results.inner_results)
@@ -385,10 +383,8 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
     if (init_state is None) == (transformed_init_state is None):
       raise ValueError('Must specify exactly one of `init_state` '
                        'or `transformed_init_state`.')
-    with tf1.name_scope(
-        name=mcmc_util.make_name(self.name, 'transformed_kernel',
-                                 'bootstrap_results'),
-        values=[init_state, transformed_init_state]):
+    with tf.name_scope(mcmc_util.make_name(
+        self.name, 'transformed_kernel', 'bootstrap_results')):
       if transformed_init_state is None:
         init_state_parts = (init_state if mcmc_util.is_list_like(init_state)
                             else [init_state])
@@ -400,7 +396,7 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
       else:
         if mcmc_util.is_list_like(transformed_init_state):
           transformed_init_state = [
-              tf.convert_to_tensor(value=s, name='transformed_init_state')
+              tf.convert_to_tensor(s, name='transformed_init_state')
               for s in transformed_init_state
           ]
         else:

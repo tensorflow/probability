@@ -134,9 +134,8 @@ class HaltonSequenceTest(tfp_test_util.TestCase):
     # Evaluate the integral of x_1 * x_2^2 * x_3^3  over the three dimensional
     # hypercube.
     powers = tf.range(1., limit=dim + 1)
-    integral = tf.reduce_mean(
-        input_tensor=tf.reduce_prod(input_tensor=sample**powers, axis=-1))
-    true_value = 1. / tf.reduce_prod(input_tensor=powers + 1.)
+    integral = tf.reduce_mean(tf.reduce_prod(sample**powers, axis=-1))
+    true_value = 1. / tf.reduce_prod(powers + 1.)
 
     # Produces a relative absolute error of 1.7%.
     self.assertAllClose(
@@ -151,8 +150,7 @@ class HaltonSequenceTest(tfp_test_util.TestCase):
         dim, sequence_indices=sequence_indices, randomized=False)
 
     integral_leaped = tf.reduce_mean(
-        input_tensor=tf.reduce_prod(
-            input_tensor=sample_leaped**powers, axis=-1))
+        tf.reduce_prod(sample_leaped**powers, axis=-1))
     self.assertAllClose(
         self.evaluate(integral_leaped), self.evaluate(true_value), rtol=0.05)
 
@@ -169,8 +167,7 @@ class HaltonSequenceTest(tfp_test_util.TestCase):
     for _ in range(replica):
       sample = tfp.mcmc.sample_halton_sequence(
           dim, num_results=num_results, seed=seed())
-      f = tf.reduce_mean(
-          input_tensor=tf.reduce_sum(input_tensor=sample, axis=1)**2)
+      f = tf.reduce_mean(tf.reduce_sum(sample, axis=1)**2)
       values.append(self.evaluate(f))
     self.assertAllClose(np.mean(values), 101.6667, atol=np.std(values) * 2)
 
@@ -205,8 +202,7 @@ class HaltonSequenceTest(tfp_test_util.TestCase):
 
     def func_estimate(x):
       return tf.reduce_mean(
-          input_tensor=tf.math.squared_difference(
-              tf.reduce_sum(input_tensor=x[:, -m:], axis=-1), m / 2.))
+          tf.math.squared_difference(tf.reduce_sum(x[:, -m:], axis=-1), m / 2.))
 
     estimates = []
     for _ in range(replica):

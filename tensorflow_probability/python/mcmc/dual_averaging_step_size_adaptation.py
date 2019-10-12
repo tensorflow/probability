@@ -29,34 +29,10 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-
-
-@mcmc_util.make_innermost_setter
-def _hmc_like_step_size_setter_fn(kernel_results, new_step_size):
-  return kernel_results._replace(
-      accepted_results=kernel_results.accepted_results._replace(
-          step_size=new_step_size))
-
-
-@mcmc_util.make_innermost_getter
-def _hmc_like_step_size_getter_fn(kernel_results):
-  return kernel_results.accepted_results.step_size
-
-
-@mcmc_util.make_innermost_getter
-def _hmc_like_log_accept_prob_getter_fn(kernel_results):
-  return prefer_static.minimum(kernel_results.log_accept_ratio,
-                               tf.zeros_like(kernel_results.log_accept_ratio))
-
-
-def _get_differing_dims(a, b):
-  # Get the indices of dimensions where shapes of `a` and `b` differ.
-  # `a` is allowed to have fewer dimensions than `b`.
-  if not a.shape.is_fully_defined() or not b.shape.is_fully_defined():
-    return tf.where(tf.not_equal(tf.shape(a), tf.shape(b)[:tf.rank(a)]))[:, 0]
-  a_shape = np.array(a.shape.as_list())
-  b_shape = np.array(b.shape.as_list())
-  return np.where(a_shape != b_shape[:len(a_shape)])[0]
+from tensorflow_probability.python.mcmc.simple_step_size_adaptation import get_differing_dims
+from tensorflow_probability.python.mcmc.simple_step_size_adaptation import hmc_like_log_accept_prob_getter_fn
+from tensorflow_probability.python.mcmc.simple_step_size_adaptation import hmc_like_step_size_getter_fn
+from tensorflow_probability.python.mcmc.simple_step_size_adaptation import hmc_like_step_size_setter_fn
 
 
 class DualAveragingStepSizeAdaptationResults(
@@ -216,9 +192,9 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
       exploration_shrinkage=0.05,
       step_count_smoothing=10,
       decay_rate=0.75,
-      step_size_setter_fn=_hmc_like_step_size_setter_fn,
-      step_size_getter_fn=_hmc_like_step_size_getter_fn,
-      log_accept_prob_getter_fn=_hmc_like_log_accept_prob_getter_fn,
+      step_size_setter_fn=hmc_like_step_size_setter_fn,
+      step_size_getter_fn=hmc_like_step_size_getter_fn,
+      log_accept_prob_getter_fn=hmc_like_log_accept_prob_getter_fn,
       validate_args=False,
       name=None):
     """Initializes this transition kernel.
@@ -400,7 +376,8 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
     # reduced_log_accept_prob must broadcast into step_size on the
     # left, so we do an additional reduction over dimensions where their
     # shapes differ.
-    reduce_indices = _get_differing_dims(reduced_log_accept_prob, step_size)
+    reduce_indices = get_differing_dims(
+        reduced_log_accept_prob, step_size)
     reduced_log_accept_prob = reduce_logmeanexp(
         reduced_log_accept_prob, axis=reduce_indices, keepdims=True)
     new_error_sum = (error_sum +
@@ -521,8 +498,8 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
         reduced_log_accept_prob = reduce_logmeanexp(
             log_accept_prob,
             axis=prefer_static.range(num_reduce_dims))
-        reduce_indices = _get_differing_dims(reduced_log_accept_prob,
-                                             step_size_part)
+        reduce_indices = get_differing_dims(
+            reduced_log_accept_prob, step_size_part)
         reduced_log_accept_prob = reduce_logmeanexp(
             reduced_log_accept_prob,
             axis=reduce_indices,

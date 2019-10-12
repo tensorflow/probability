@@ -43,6 +43,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
 from tensorflow_probability.python.mcmc.kernel import TransitionKernel
@@ -587,12 +588,14 @@ class NoUTurnSampler(TransitionKernel):
 
       for new_candidate_state_temp, old_candidate_state_temp in zip(
           new_candidate_state.state, last_candidate_state.state):
-        new_candidate_state_temp.set_shape(old_candidate_state_temp.shape)
+        tensorshape_util.set_shape(new_candidate_state_temp,
+                                   old_candidate_state_temp.shape)
 
       for new_candidate_grad_temp, old_candidate_grad_temp in zip(
           new_candidate_state.target_grad_parts,
           last_candidate_state.target_grad_parts):
-        new_candidate_grad_temp.set_shape(old_candidate_grad_temp.shape)
+        tensorshape_util.set_shape(new_candidate_grad_temp,
+                                   old_candidate_grad_temp.shape)
 
       # Update left right information of the trajectory, and check trajectory
       # level U turn
@@ -618,13 +621,13 @@ class NoUTurnSampler(TransitionKernel):
       for p0, p1 in zip(
           initial_step_metastate.momentum_sum, momentum_subtree_cumsum):
         momentum_part_temp = p0 + p1
-        momentum_part_temp.set_shape(p0.shape)
+        tensorshape_util.set_shape(momentum_part_temp, p0.shape)
         momentum_tree_cumsum.append(momentum_part_temp)
 
       for new_state_temp, old_state_temp in zip(
           tf.nest.flatten(new_step_state),
           tf.nest.flatten(initial_step_state)):
-        new_state_temp.set_shape(old_state_temp.shape)
+        tensorshape_util.set_shape(new_state_temp, old_state_temp.shape)
 
       if GENERALIZED_UTURN:
         state_diff = momentum_tree_cumsum
@@ -866,7 +869,7 @@ class NoUTurnSampler(TransitionKernel):
           prefer_static.ones(batch_shape, dtype=tf.bool))
 
       # min(1., exp(energy_diff)).
-      exp_energy_diff = tf.clip_by_value(tf.exp(energy_diff), 0., 1.)
+      exp_energy_diff = tf.math.exp(tf.minimum(energy_diff, 0.))
       energy_diff_sum = tf.where(continue_tree,
                                  energy_diff_sum_previous + exp_energy_diff,
                                  energy_diff_sum_previous)

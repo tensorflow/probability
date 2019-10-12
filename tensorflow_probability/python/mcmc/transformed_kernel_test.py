@@ -97,9 +97,9 @@ class TransformedTransitionKernelTest(tfp_test_util.TestCase):
         num_steps_between_results=1,
         parallel_iterations=1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
+    sample_mean = tf.reduce_mean(states, axis=0)
     sample_var = tf.reduce_mean(
-        input_tensor=tf.math.squared_difference(states, sample_mean), axis=0)
+        tf.math.squared_difference(states, sample_mean), axis=0)
     [
         sample_mean_,
         sample_var_,
@@ -142,9 +142,9 @@ class TransformedTransitionKernelTest(tfp_test_util.TestCase):
         num_steps_between_results=1,
         parallel_iterations=1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
+    sample_mean = tf.reduce_mean(states, axis=0)
     sample_var = tf.reduce_mean(
-        input_tensor=tf.math.squared_difference(states, sample_mean), axis=0)
+        tf.math.squared_difference(states, sample_mean), axis=0)
     [
         sample_mean_,
         sample_var_,
@@ -184,9 +184,9 @@ class TransformedTransitionKernelTest(tfp_test_util.TestCase):
         num_steps_between_results=1,
         parallel_iterations=1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
+    sample_mean = tf.reduce_mean(states, axis=0)
     sample_var = tf.reduce_mean(
-        input_tensor=tf.math.squared_difference(states, sample_mean), axis=0)
+        tf.math.squared_difference(states, sample_mean), axis=0)
     [
         sample_mean_,
         sample_var_,
@@ -217,7 +217,7 @@ class TransformedTransitionKernelTest(tfp_test_util.TestCase):
               np.linalg.cholesky(true_cov),
               z[..., tf.newaxis]),
           axis=-1)
-      return -0.5 * tf.reduce_sum(input_tensor=z**2., axis=-1)
+      return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
     transformed_hmc = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
@@ -244,7 +244,7 @@ class TransformedTransitionKernelTest(tfp_test_util.TestCase):
         parallel_iterations=1)
     states = tf.stack(states, axis=-1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
+    sample_mean = tf.reduce_mean(states, axis=0)
     x = states - sample_mean
     sample_cov = tf.matmul(x, x, transpose_a=True) / self.dtype(num_results)
     [sample_mean_, sample_cov_, is_accepted_] = self.evaluate([
@@ -253,7 +253,7 @@ class TransformedTransitionKernelTest(tfp_test_util.TestCase):
     self.assertAllClose(true_mean, sample_mean_,
                         atol=0.06, rtol=0.)
     self.assertAllClose(true_cov, sample_cov_,
-                        atol=0., rtol=0.1)
+                        atol=0., rtol=0.16)
 
   def test_bootstrap_requires_xor_args(self):
     def fake_target_log_prob(x):

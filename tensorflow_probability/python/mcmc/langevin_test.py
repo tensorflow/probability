@@ -47,10 +47,10 @@ class LangevinTest(tfp_test_util.TestCase):
         num_burnin_steps=500,
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.reduce_mean(input_tensor=samples, axis=0)
+    sample_mean = tf.reduce_mean(samples, axis=0)
     sample_std = tf.sqrt(
         tf.reduce_mean(
-            input_tensor=tf.math.squared_difference(samples, sample_mean),
+            tf.math.squared_difference(samples, sample_mean),
             axis=0))
 
     sample_mean_, sample_std_ = self.evaluate([sample_mean, sample_std])
@@ -95,10 +95,10 @@ class LangevinTest(tfp_test_util.TestCase):
         parallel_iterations=1)
 
     states = tf.concat(states, axis=-1)
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=[0, 1])
-    x = tf.expand_dims(states - sample_mean, -1)
+    sample_mean = tf.reduce_mean(states, axis=[0, 1])
+    x = (states - sample_mean)[..., tf.newaxis]
     sample_cov = tf.reduce_mean(
-        input_tensor=tf.matmul(x, tf.transpose(a=x, perm=[0, 1, 3, 2])),
+        tf.matmul(x, tf.transpose(a=x, perm=[0, 1, 3, 2])),
         axis=[0, 1])
 
     sample_mean_, sample_cov_ = self.evaluate([sample_mean, sample_cov])
@@ -150,11 +150,9 @@ class LangevinTest(tfp_test_util.TestCase):
         parallel_iterations=1)
 
     states = tf.concat(states, axis=-1)
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=[0, 1])
-    x = tf.expand_dims(states - sample_mean, -1)
-    sample_cov = tf.reduce_mean(
-        input_tensor=tf.matmul(x, tf.transpose(a=x, perm=[0, 1, 3, 2])),
-        axis=[0, 1])
+    sample_mean = tf.reduce_mean(states, axis=[0, 1])
+    x = (states - sample_mean)[..., tf.newaxis]
+    sample_cov = tf.reduce_mean(tf.matmul(x, x, transpose_b=True), axis=[0, 1])
 
     sample_mean_, sample_cov_ = self.evaluate([sample_mean, sample_cov])
 
