@@ -238,13 +238,13 @@ class _VonMisesTest(object):
     self.assertAllClose(kl_same_val, np.zeros((1, 3)))
 
   def testVonMisesSampleMoments(self):
-    locs_v = np.array([-2., -1., 0.3, 2.3])
-    concentrations_v = np.array([0.1, 1.0, 2.0, 10.0])
+    locs_v = np.array([-1., 0.3, 2.3])
+    concentrations_v = np.array([1.0, 2.0, 10.0])
     von_mises = tfd.VonMises(
         self.make_tensor(locs_v), self.make_tensor(concentrations_v))
 
     n = 10000
-    seed = tfp_test_util.test_seed(hardcoded_seed=12345, set_eager_seed=False)
+    seed = tfp_test_util.test_seed()
     samples = von_mises.sample(n, seed=seed)
 
     expected_mean = von_mises.mean()
