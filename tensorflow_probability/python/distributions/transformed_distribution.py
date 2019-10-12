@@ -541,13 +541,19 @@ class TransformedDistribution(distribution_lib.Distribution):
     inv_cdf = self.distribution.quantile(value, **distribution_kwargs)
     return self.bijector.forward(inv_cdf, **bijector_kwargs)
 
+  def _mode(self, **kwargs):
+    return self._mean_mode_impl("mode", kwargs)
+
   def _mean(self, **kwargs):
+    return self._mean_mode_impl("mean", kwargs)
+
+  def _mean_mode_impl(self, attr, kwargs):
     if not self.bijector.is_constant_jacobian:
       raise NotImplementedError("mean is not implemented for non-affine "
                                 "bijectors")
 
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
-    x = self.distribution.mean(**distribution_kwargs)
+    x = getattr(self.distribution, attr)(**distribution_kwargs)
 
     if self._is_maybe_batch_override or self._is_maybe_event_override:
       # A batch (respectively event) shape override is only allowed if the batch

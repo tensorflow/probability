@@ -314,6 +314,18 @@ class TransformedDistributionTest(tfp_test_util.TestCase):
     self.evaluate(normal.mean())
     self.evaluate(normal.entropy())
 
+  def testMode(self):
+    dist = self._cls()(
+        tfd.Beta(
+            concentration1=[5., 10.],
+            concentration0=15.,
+            validate_args=True),
+        tfb.Shift(2., validate_args=True)(tfb.Scale(10., validate_args=True)),
+        validate_args=True)
+    self.assertAllClose(2. + 10. * dist.distribution.mode(),
+                        self.evaluate(dist.mode()),
+                        atol=0., rtol=1e-6)
+
   def testMean(self):
     shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
     diag = np.array([[1, 2, 3], [2, 3, 2]], dtype=np.float32)
