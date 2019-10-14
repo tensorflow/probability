@@ -94,7 +94,8 @@ class _ProximalHessianTest(object):
           indices=[
               b + (i, i) for i in range(n) for b in np.ndindex(*batch_shape)
           ],
-          values=tf.ones(shape=[np.product(batch_shape) * n], dtype=self.dtype),
+          values=tf.ones(
+              shape=[np.prod(batch_shape, dtype=int) * n], dtype=self.dtype),
           dense_shape=batch_shape + [n, n])
 
       hessian_middle_per_batch = 2 * tf.concat(
