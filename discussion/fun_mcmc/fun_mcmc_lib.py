@@ -83,7 +83,11 @@ __all__ = [
     'mclachlan_optimal_4th_order_step',
     'metropolis_hastings_step',
     'MetropolisHastingsExtra',
+    'potential_scale_reduction_extract',
+    'potential_scale_reduction_init',
+    'potential_scale_reduction_step',
     'PotentialFn',
+    'PotentialScaleReductionState',
     'random_walk_metropolis',
     'random_walk_metropolis_init',
     'RandomWalkMetropolisExtra',
@@ -1769,3 +1773,100 @@ def running_mean_step(
   new_num_points = util.map_tree_up_to(state.mean, lambda x: x[1],
                                        new_mean_num_points)
   return RunningMeanState(num_points=new_num_points, mean=new_mean), ()
+
+
+class PotentialScaleReductionState(RunningVarianceState):
+  pass
+
+
+def potential_scale_reduction_init(shape,
+                                   dtype) -> PotentialScaleReductionState:
+  """Initializes `PotentialScaleReductionState`.
+
+  Args:
+    shape: Shape of the MCMC state.
+    dtype: DType of the MCMC state.
+
+  Returns:
+    state: `PotentialScaleReductionState`.
+  """
+  # We are wrapping running variance so that the user doesn't get the chance to
+  # set the reduction axis, which would break the assumptions of
+  # `potential_scale_reduction_extract`.
+  return PotentialScaleReductionState(
+      *running_variance_init(shape, dtype))
+
+
+def potential_scale_reduction_step(
+    state: PotentialScaleReductionState,
+    sample) -> Tuple[PotentialScaleReductionState, Tuple[()]]:
+  """Updates `PotentialScaleReductionState`.
+
+  This computes the 'potential scale reduction' statistic from [1]. Note that
+  this actually refers to the potential *variance* reduction, but the scale
+  terminology has stuck. When this is close to 1, the chains are often
+  considered converged.
+
+  To extract the actual value of the statistic, use
+  `potential_scale_reduction_extract`.
+
+  Args:
+    state: `PotentialScaleReductionState`
+    sample: A sample from an MCMC chain. The leading dimension must have shape
+      of at least 1.
+
+  Returns:
+    state: `PotentialScaleReductionState`.
+    extra: Empty tuple.
+
+  #### References
+
+  [1]: Rooks, S. P. B., & Elman, A. G. (1998). General Methods for Monitoring
+       Convergence of Iterative Simulations, 7(4), 434-455.
+  """
+  # We are wrapping running variance so that the user doesn't get the chance to
+  # set the reduction axis, which would break the assumptions of
+  # `potential_scale_reduction_extract`.
+  return PotentialScaleReductionState(
+      *running_variance_step(state, sample)[0]), ()
+
+
+def potential_scale_reduction_extract(
+    state: PotentialScaleReductionState,
+    independent_chain_ndims: IntNest = 1) -> FloatNest:
+  """Extracts the 'potential scale reduction' statistic.
+
+  Args:
+    state: `PotentialScaleReductionState`.
+    independent_chain_ndims: Number of initial dimensions that are treated as
+      indexing independent chains. Must be at least 1.
+
+  Returns:
+    rhat: Potential scale reduction.
+  """
+  independent_chain_ndims = maybe_broadcast_structure(independent_chain_ndims,
+                                                      state.mean)
+  dtype = state.mean.dtype
+
+  def _psr_part(num_points, mean, variance, independent_chain_ndims):
+    """Compute PSR for a single part."""
+    # TODO(siege): Keeping these per-component points is mildly wasteful because
+    # unlike general running variance estimation, these are always the same
+    # across parts.
+    num_points = tf.cast(num_points, dtype)
+    num_chains = tf.cast(
+        tf.math.reduce_prod(tf.shape(mean)[:independent_chain_ndims]), dtype)
+
+    independent_dims = list(range(independent_chain_ndims))
+    # Within chain variance.
+    var_w = tf.reduce_mean(variance, independent_dims)
+    # Between chain variance.
+    var_b = num_chains / (num_chains - 1) * tf.math.reduce_variance(
+        state.mean, independent_dims)
+    # Estimate of the true variance of the target distribution.
+    sigma2p = var_w + var_b
+    return ((num_chains + 1) / num_chains * sigma2p / var_w - (num_points - 1) /
+            (num_chains * num_points))
+
+  return util.map_tree(_psr_part, state.num_points, state.mean, state.variance,
+                       independent_chain_ndims)

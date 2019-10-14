@@ -931,6 +931,33 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(true_mean, rcs.mean)
     self.assertAllClose(true_cov, rcs.covariance)
 
+  @parameterized.named_parameters(
+      ('BasicScalar', (10, 20), 1),
+      ('BatchedScalar', (10, 5, 20), 2),
+      ('BasicVector', (10, 5, 20), 1),
+      ('BatchedVector', (10, 5, 20, 7), 2),
+  )
+  def testPotentialScaleReduction(self, chain_shape, independent_chain_ndims):
+    chain_means = np.random.randn(*((1,) + chain_shape[1:])).astype(np.float32)
+    chains = 0.4 * np.random.randn(*chain_shape).astype(
+        np.float32) + chain_means
+
+    true_rhat = tfp.mcmc.potential_scale_reduction(
+        chains, independent_chain_ndims=independent_chain_ndims)
+
+    chains = tf.convert_to_tensor(chains)
+    psrs, _ = fun_mcmc.trace(
+        state=fun_mcmc.potential_scale_reduction_init(chain_shape[1:],
+                                                      tf.float32),
+        fn=lambda psrs: fun_mcmc.potential_scale_reduction_step(  # pylint: disable=g-long-lambda
+            psrs, chains[psrs.num_points]),
+        num_steps=chain_shape[0],
+        trace_fn=lambda *_: ())
+
+    running_rhat = fun_mcmc.potential_scale_reduction_extract(
+        psrs, independent_chain_ndims=independent_chain_ndims)
+    self.assertAllClose(true_rhat, running_rhat)
+
 
 class FunMCMCTestJAX(FunMCMCTestTensorFlow):
 

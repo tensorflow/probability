@@ -51,7 +51,11 @@ from discussion.fun_mcmc.fun_mcmc_lib import maybe_broadcast_structure
 from discussion.fun_mcmc.fun_mcmc_lib import mclachlan_optimal_4th_order_step
 from discussion.fun_mcmc.fun_mcmc_lib import metropolis_hastings_step
 from discussion.fun_mcmc.fun_mcmc_lib import MetropolisHastingsExtra
+from discussion.fun_mcmc.fun_mcmc_lib import potential_scale_reduction_extract
+from discussion.fun_mcmc.fun_mcmc_lib import potential_scale_reduction_init
+from discussion.fun_mcmc.fun_mcmc_lib import potential_scale_reduction_step
 from discussion.fun_mcmc.fun_mcmc_lib import PotentialFn
+from discussion.fun_mcmc.fun_mcmc_lib import PotentialScaleReductionState
 from discussion.fun_mcmc.fun_mcmc_lib import random_walk_metropolis
 from discussion.fun_mcmc.fun_mcmc_lib import random_walk_metropolis_init
 from discussion.fun_mcmc.fun_mcmc_lib import RandomWalkMetropolisExtra
@@ -73,7 +77,6 @@ from discussion.fun_mcmc.fun_mcmc_lib import trace
 from discussion.fun_mcmc.fun_mcmc_lib import transform_log_prob_fn
 from discussion.fun_mcmc.fun_mcmc_lib import transition_kernel_wrapper
 from discussion.fun_mcmc.fun_mcmc_lib import TransitionOperator
-
 
 __all__ = [
     'adam_init',
@@ -107,7 +110,11 @@ __all__ = [
     'mclachlan_optimal_4th_order_step',
     'metropolis_hastings_step',
     'MetropolisHastingsExtra',
+    'potential_scale_reduction_extract',
+    'potential_scale_reduction_init',
+    'potential_scale_reduction_step',
     'PotentialFn',
+    'PotentialScaleReductionState',
     'random_walk_metropolis',
     'random_walk_metropolis_init',
     'RandomWalkMetropolisExtra',
