@@ -25,6 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
@@ -314,6 +315,37 @@ class ReshapeBijectorTestStatic(tfp_test_util.TestCase, _ReshapeBijectorTest):
   def testInputOutputMismatchOpError(self):
     self._testInputOutputMismatchOpError(
         '(Input to reshape|Cannot reshape a tensor with|cannot reshape array)')
+
+  def testCheckingVariableShape(self):
+    shape_out = tf.Variable([-2, 10])
+    self.evaluate(shape_out.initializer)
+    with self.assertRaisesOpError(
+        'elements must be either positive integers or `-1`'):
+      self.evaluate(tfb.Reshape(shape_out, validate_args=True).forward([0]))
+
+  def testCheckingMutatedVariableShape(self):
+    shape_out = tf.Variable([1, 1])
+    self.evaluate(shape_out.initializer)
+    reshape = tfb.Reshape(shape_out, validate_args=True)
+    self.evaluate(reshape.forward([0]))
+    with self.assertRaisesOpError(
+        'elements must be either positive integers or `-1`'):
+      with tf.control_dependencies([shape_out.assign([-2, 10])]):
+        self.evaluate(reshape.forward([0]))
+
+  @tfp_test_util.numpy_disable_test_missing_functionality('b/142265598')
+  def testConcretizationLimits(self):
+    shape_out = tfp_hps.defer_and_count_usage(tf.Variable([1]))
+    reshape = tfb.Reshape(shape_out, validate_args=True)
+    x = [1]  # Pun: valid input or output, and valid input or output shape
+    for method in ['forward', 'inverse', 'forward_event_shape',
+                   'inverse_event_shape', 'forward_event_shape_tensor',
+                   'inverse_event_shape_tensor']:
+      with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=7):
+        getattr(reshape, method)(x)
+    for method in ['forward_log_det_jacobian', 'inverse_log_det_jacobian']:
+      with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=4):
+        getattr(reshape, method)(x, event_ndims=1)
 
 
 class ReshapeBijectorTestDynamic(tfp_test_util.TestCase, _ReshapeBijectorTest):

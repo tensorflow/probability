@@ -20,6 +20,8 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow.python.framework import ops  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.framework import tensor_shape  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -138,7 +140,29 @@ def constant_value_as_shape(tensor):  # pylint: disable=invalid-name
   """
   shape = tf.get_static_value(tensor)
   if shape is not None:
-    return [None if dim == -1 else dim for dim in shape]
+    return tensor_shape.as_shape(
+        [None if dim == -1 else dim for dim in shape])
+  try:
+    # Importing here, conditionally, to avoid a hard dependency on
+    # DeferredTensor, because that creates a BUILD dependency cycle.
+    # Why is it necessary to mention DeferredTensor at all?
+    # Because TF's `constant_value_as_shape` barfs on it: b/142254634.
+    # pylint: disable=g-import-not-at-top
+    from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
+    if isinstance(tensor, DeferredTensor):
+      # Presumably not constant if deferred
+      return tf.TensorShape(None)
+  except ImportError:
+    # If DeferredTensor doesn't even exist, couldn't have been an instance of
+    # it.
+    pass
+  if tf.executing_eagerly():
+    # Working around b/142251799
+    if isinstance(tensor, ops.EagerTensor):
+      return tensor_shape.as_shape(
+          [dim if dim != -1 else None for dim in tensor.numpy()])
+    else:
+      return tf.TensorShape(None)
   return tensor_util.constant_value_as_shape(tensor)
 
 

@@ -300,6 +300,25 @@ def jax_disable_variable_test(test_fn):
   return new_test
 
 
+def numpy_disable_test_missing_functionality(issue_link):
+  """Disable a test for unimplemented numpy functionality."""
+
+  def f(test_fn):
+    """Decorator."""
+    if JAX_MODE:
+      return test_fn
+
+    def new_test(self, *args, **kwargs):
+      if tf.Variable == ops.NumpyVariable:
+        msg = 'Test disabled for numpy missing functionality: {}'
+        self.skipTest(msg.format(issue_link))
+      return test_fn(self, *args, **kwargs)
+
+    return new_test
+
+  return f
+
+
 def jax_disable_test_missing_functionality(issue_link):
   """Disable a test for unimplemented JAX functionality."""
 

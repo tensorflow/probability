@@ -599,6 +599,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
@@ -1315,6 +1316,7 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

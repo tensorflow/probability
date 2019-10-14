@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -147,9 +148,9 @@ class Reshape(bijector.Bijector):
     with tf.name_scope(name or 'reshape') as name:
       dtype = dtype_util.common_dtype(
           [event_shape_out, event_shape_in], dtype_hint=tf.int32)
-      event_shape_out = tf.convert_to_tensor(
+      event_shape_out = tensor_util.convert_nonref_to_tensor(
           event_shape_out, name='event_shape_out', dtype=dtype)
-      event_shape_in = tf.convert_to_tensor(
+      event_shape_in = tensor_util.convert_nonref_to_tensor(
           event_shape_in, name='event_shape_in', dtype=dtype)
 
       forward_min_event_ndims_ = _rank_from_shape(event_shape_in)
@@ -164,19 +165,6 @@ class Reshape(bijector.Bijector):
             'The length of `event_shape_out` must be statically known. For '
             'dynamic support, please contact `tfprobability@tensorflow.org`.')
 
-      assertions = []
-      assertions.extend(_maybe_check_valid_shape(
-          event_shape_out, validate_args))
-      assertions.extend(_maybe_check_valid_shape(
-          event_shape_in, validate_args))
-
-      if assertions:
-        with tf.control_dependencies(assertions):
-          event_shape_in = tf.identity(
-              event_shape_in, name='validated_event_shape_in')
-          event_shape_out = tf.identity(
-              event_shape_out, name='validated_event_shape_out')
-
       self._event_shape_in = event_shape_in
       self._event_shape_out = event_shape_out
 
@@ -186,6 +174,16 @@ class Reshape(bijector.Bijector):
           is_constant_jacobian=True,
           validate_args=validate_args,
           name=name or 'reshape')
+
+  def _parameter_control_dependencies(self, is_init):
+    assertions = []
+    if is_init != tensor_util.is_ref(self._event_shape_in):
+      assertions.extend(_maybe_check_valid_shape(
+          self._event_shape_in, self.validate_args))
+    if is_init != tensor_util.is_ref(self._event_shape_out):
+      assertions.extend(_maybe_check_valid_shape(
+          self._event_shape_out, self.validate_args))
+    return assertions
 
   def _forward(self, x):
     output_shape, output_tensorshape = _replace_event_shape_in_shape_tensor(
