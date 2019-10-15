@@ -112,6 +112,7 @@ from tensorflow_probability.python.distributions.internal.moving_stats import as
 from tensorflow_probability.python.distributions.internal.moving_stats import moving_mean_variance
 from tensorflow_probability.python.distributions.kullback_leibler import RegisterKL
 from tensorflow_probability.python.distributions.kullback_leibler import kl_divergence
+from tensorflow_probability.python.distributions.normal_conjugate_posteriors import mvn_conjugate_linear_update
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import normal_conjugates_known_scale_posterior
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import normal_conjugates_known_scale_predictive
 from tensorflow_probability.python.distributions.poisson_lognormal import quadrature_scheme_lognormal_gauss_hermite
@@ -259,6 +260,7 @@ __all__ = [
     'reduce_weighted_logsumexp',
     'softplus_inverse',
     'tridiag',
+    'mvn_conjugate_linear_update',
     'normal_conjugates_known_scale_posterior',
     'normal_conjugates_known_scale_predictive',
     'assign_moving_mean_variance',
