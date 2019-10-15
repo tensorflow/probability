@@ -24,6 +24,7 @@ import functools
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import mvn_tril
@@ -34,7 +35,6 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 tfl = tf.linalg
 
@@ -621,7 +621,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """Draw a joint sample from the prior over latents and observations."""
 
     with tf.name_scope("sample_n_joint"):
-      stream = SeedStream(
+      stream = util.SeedStream(
           seed, salt="LinearGaussianStateSpaceModel_sample_n_joint")
 
       sample_and_batch_shape = distribution_util.prefer_static_value(
@@ -1751,7 +1751,7 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
       `[observation_size]`.
     full_sample_and_batch_shape: Desired sample and batch shape of the
       returned samples, concatenated in a single `Tensor`.
-    stream: `tfd.SeedStream` instance used to generate a
+    stream: `tfp.util.SeedStream` instance used to generate a
       sequence of random seeds.
     validate_args: if True, perform error checking at runtime.
 

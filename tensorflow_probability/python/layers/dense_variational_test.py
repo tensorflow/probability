@@ -27,7 +27,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.keras import testing_utils
+from tensorflow.python.keras import testing_utils  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
 
@@ -392,7 +392,7 @@ class DenseVariational(tfp_test_util.TestCase):
       expected_kernel_posterior_affine_tensor = (
           expected_kernel_posterior_affine.sample(seed=42))
 
-      stream = tfd.SeedStream(layer.seed, salt='DenseFlipout')
+      stream = tfp.util.SeedStream(layer.seed, salt='DenseFlipout')
 
       sign_input = tf.random.uniform([batch_size, in_size],
                                      minval=0,

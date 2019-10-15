@@ -23,10 +23,10 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import util
 from tensorflow_probability.python.distributions import linear_gaussian_ssm
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
-
 from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
@@ -212,7 +212,8 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         samples of observed series generated from the sampled `latents`.
     """
     with tf.name_scope('joint_sample_n'):
-      strm = tfd.SeedStream(seed, 'LocalLevelStateSpaceModel_joint_sample_n')
+      strm = util.SeedStream(
+          seed, 'LocalLevelStateSpaceModel_joint_sample_n')
 
       if self.batch_shape.is_fully_defined():
         batch_shape = self.batch_shape.as_list()

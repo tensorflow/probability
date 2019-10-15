@@ -24,10 +24,11 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
+tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -52,7 +53,7 @@ class _ProximalHessianTest(object):
                     batch_shape=None,
                     dtype=np.float32,
                     seed=42):
-    seed = tfd.SeedStream(seed=seed, salt='tfp.glm.proximal_hessian_test')
+    seed = tfp.util.SeedStream(seed=seed, salt='tfp.glm.proximal_hessian_test')
 
     if batch_shape is None:
       batch_shape = []
@@ -68,7 +69,7 @@ class _ProximalHessianTest(object):
 
     mask = tfd.Bernoulli(probs=0.5, dtype=tf.bool).sample(batch_shape + [d])
     model_coefficients = tf1.where(mask, model_coefficients,
-                                            tf.zeros_like(model_coefficients))
+                                   tf.zeros_like(model_coefficients))
     model_matrix = tfd.Normal(
         loc=np.array(0, dtype), scale=np.array(1, dtype)).sample(
             batch_shape + [n, d], seed=seed())

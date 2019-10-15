@@ -48,7 +48,7 @@ def make_iaf_stack(total_event_size,
     bijector: The created bijector.
   """
 
-  seed = tfd.SeedStream(seed, 'make_iaf_stack')
+  seed = tfp.util.SeedStream(seed, 'make_iaf_stack')
 
   def make_iaf():
     """Create an IAF."""
