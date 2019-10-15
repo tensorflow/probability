@@ -102,6 +102,7 @@ TF2_FRIENDLY_DISTS = (
     'Uniform',
     'VonMises',
     'VonMisesFisher',
+    'WishartTriL',
     'Zipf',
 )
 
@@ -126,9 +127,10 @@ SPECIAL_DISTS = (
     'TransformedDistribution',
 )
 
-EXTRA_TENSOR_CONVERSION_DISTS = (
-    'RelaxedBernoulli',
-)
+EXTRA_TENSOR_CONVERSION_DISTS = {
+    'RelaxedBernoulli': 1,
+    'WishartTriL': 3,  # not concretizing linear operator scale
+}
 
 # Whitelist of underlying distributions for QuantizedDistribution (must have
 # continuous, infinite support -- QuantizedDistribution also works for finite-
@@ -738,6 +740,13 @@ def base_distributions(draw,
       dist_name, params_constrained))
   assert_shapes_unchanged(params_kwargs, params_constrained)
   params_constrained['validate_args'] = True
+
+  if dist_name in ['Wishart', 'WishartTriL']:
+    # With the default `input_output_cholesky = False`, Wishart occasionally
+    # produces samples for which the Cholesky decompositions fail, causing
+    # an error in testDistribution when `log_prob` is called on a sample.
+    params_constrained['input_output_cholesky'] = True
+
   dist_cls = INSTANTIABLE_BASE_DISTS[dist_name].cls
   result_dist = dist_cls(**params_constrained)
   if batch_shape != result_dist.batch_shape:
@@ -826,12 +835,14 @@ def get_event_dim(dist):
       return tf.compat.dimension_value(val.shape[-1])
 
 
-def extra_tensor_conversion_allowed(dist):
-  """Returns `True` for dists that are allowed one extra tensor conversion."""
-  if (isinstance(dist, tfd.TransformedDistribution) or
-      (type(dist).__name__ in EXTRA_TENSOR_CONVERSION_DISTS)):
-    return True
-  return False
+def extra_tensor_conversions_allowed(dist):
+  """Returns number of extra tensor conversions allowed for the input dist."""
+  extra_conversions = EXTRA_TENSOR_CONVERSION_DISTS.get(type(dist).__name__)
+  if extra_conversions:
+    return extra_conversions
+  if isinstance(dist, tfd.TransformedDistribution):
+    return 1
+  return 0
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -867,6 +878,7 @@ class DistributionParamsAreVarsTest(tfp_test_util.TestCase):
     # Check that standard statistics do not read distribution parameters more
     # than twice (once in the stat itself and up to once in any validation
     # assertions).
+    max_permissible = 2 + extra_tensor_conversions_allowed(dist)
     for stat in data.draw(
         hps.sets(
             hps.one_of(
@@ -879,7 +891,8 @@ class DistributionParamsAreVarsTest(tfp_test_util.TestCase):
       hp.note('Testing excessive var usage in {}.{}'.format(dist_name, stat))
       try:
         with tfp_hps.assert_no_excessive_var_usage(
-            'statistic `{}` of `{}`'.format(stat, dist)):
+            'statistic `{}` of `{}`'.format(stat, dist),
+            max_permissible=max_permissible):
           getattr(dist, stat)()
 
       except NotImplementedError:
@@ -891,7 +904,7 @@ class DistributionParamsAreVarsTest(tfp_test_util.TestCase):
     with tf.GradientTape() as tape:
       # TDs do bijector assertions twice (once by distribution.sample, and once
       # by bijector.forward).
-      max_permissible = 3 if extra_tensor_conversion_allowed(dist) else 2
+      max_permissible = 2 + extra_tensor_conversions_allowed(dist)
       with tfp_hps.assert_no_excessive_var_usage(
           'method `sample` of `{}`'.format(dist),
           max_permissible=max_permissible):
@@ -962,7 +975,7 @@ class DistributionParamsAreVarsTest(tfp_test_util.TestCase):
       try:
         # No validation => 1 convert. But for TD we allow 2:
         # dist.log_prob(bijector.inverse(samp)) + bijector.ildj(samp)
-        max_permissible = 2 if extra_tensor_conversion_allowed(dist) else 1
+        max_permissible = 2 + extra_tensor_conversions_allowed(dist)
         with tfp_hps.assert_no_excessive_var_usage(
             'evaluative `{}` of `{}`'.format(evaluative, dist),
             max_permissible=max_permissible):
@@ -1286,6 +1299,8 @@ CONSTRAINTS = {
     'Uniform':
         lambda d: dict(d, high=ensure_high_gt_low(d['low'], d['high'])),
     'Wishart':
+        fix_wishart,
+    'WishartTriL':
         fix_wishart,
     'Zipf':
         lambda d: dict(d, dtype=tf.float32),
