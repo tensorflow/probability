@@ -130,6 +130,22 @@ EXTRA_TENSOR_CONVERSION_DISTS = (
     'RelaxedBernoulli',
 )
 
+# Whitelist of underlying distributions for QuantizedDistribution (must have
+# continuous, infinite support -- QuantizedDistribution also works for finite-
+# support distributions for which the length of the support along each dimension
+# is at least 1, though it is difficult to construct draws of these
+# distributions in general, and wouldn't contribute much to test coverage.)
+QUANTIZED_BASE_DISTS = (
+    'Chi2',
+    'Exponential',
+    'LogNormal',
+    'Logistic',
+    'Normal',
+    'Pareto',
+    'Poisson',
+    'StudentT',
+)
+
 
 class DistInfo(collections.namedtuple(
     'DistInfo', ['cls', 'params_event_ndims'])):
@@ -201,6 +217,7 @@ INSTANTIABLE_META_DISTS = (
     'Independent',
     'MixtureSameFamily',
     'TransformedDistribution',
+    'QuantizedDistribution',
 )
 
 # pylint is unable to handle @hps.composite (e.g. complains "No value for
@@ -476,6 +493,99 @@ def transformed_distributions(draw,
 
 
 @hps.composite
+def quantized_distributions(draw,
+                            batch_shape=None,
+                            event_dim=None,
+                            enable_vars=False):
+  """Strategy for drawing `QuantizedDistribution`s.
+
+  The underlying distribution is drawn from the `base_distributions` strategy.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    batch_shape: An optional `TensorShape`.  The batch shape of the resulting
+      `QuantizedDistribution`. Hypothesis will pick a `batch_shape` if omitted.
+    event_dim: Optional Python int giving the size of each of the underlying
+      distribution's parameters' event dimensions.  This is shared across all
+      parameters, permitting square event matrices, compatible location and
+      scale Tensors, etc. If omitted, Hypothesis will choose one.
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test.  If `False`, the returned parameters are
+      all Tensors, never Variables or DeferredTensor.
+
+  Returns:
+    dists: A strategy for drawing `QuantizedDistribution`s with the specified
+      `batch_shape` (or an arbitrary one if omitted).
+  """
+
+  if batch_shape is None:
+    batch_shape = draw(tfp_hps.shapes())
+
+  low_quantile = draw(
+      hps.one_of(
+          hps.just(None),
+          hps.floats(min_value=0.01, max_value=0.7)))
+  high_quantile = draw(
+      hps.one_of(
+          hps.just(None),
+          hps.floats(min_value=0.3, max_value=.99)))
+
+  underlyings = base_distributions(
+      batch_shape=batch_shape,
+      event_dim=event_dim,
+      enable_vars=enable_vars,
+      eligibility_filter=lambda name: name in QUANTIZED_BASE_DISTS,
+  )
+  underlying = draw(underlyings)
+
+  if high_quantile is not None:
+    high_quantile = tf.convert_to_tensor(high_quantile, dtype=underlying.dtype)
+  if low_quantile is not None:
+    low_quantile = tf.convert_to_tensor(low_quantile, dtype=underlying.dtype)
+    if high_quantile is not None:
+      high_quantile = ensure_high_gt_low(low_quantile, high_quantile)
+
+  hp.note('Drawing QuantizedDistribution with underlying distribution'
+          ' {}'.format(underlying))
+
+  try:
+    low = None if low_quantile is None else underlying.quantile(low_quantile)
+    high = None if high_quantile is None else underlying.quantile(high_quantile)
+  except NotImplementedError:
+    # The following code makes ReproducibilityTest flaky in graph mode (but not
+    # eager). Failures are due either to partial mismatch in the samples in
+    # ReproducibilityTest or to `low` and/or `high` being NaN. For now, to avoid
+    # this, we set `low` and `high` to `None` for distributions not implementing
+    # `quantile`.
+
+    # seed = tfp_test_util.test_seed(hardcoded_seed=123)
+    # low = (None if low_quantile is None
+    #        else underlying.sample(low_quantile.shape, seed=seed))
+    # high = (None if high_quantile is None else
+    #         underlying.sample(high_quantile.shape, seed=seed))
+    low = None
+    high = None
+
+  # Ensure that `low` and `high` are ints contained in distribution support
+  # and span at least a few bins.
+  if high is not None:
+    high = tf.clip_by_value(high, -2**23, 2**23)
+    high = tf.math.ceil(high + 5.)
+
+  if low is not None:
+    low = tf.clip_by_value(low, -2**23, 2**23)
+    low = tf.math.ceil(low)
+
+  result_dist = tfd.QuantizedDistribution(
+      distribution=underlying,
+      low=low,
+      high=high,
+      validate_args=True)
+
+  return result_dist
+
+
+@hps.composite
 def mixtures_same_family(draw,
                          batch_shape=None,
                          event_dim=None,
@@ -703,6 +813,9 @@ def distributions(draw,
   if dist_name == 'TransformedDistribution':
     return draw(transformed_distributions(
         batch_shape, event_dim, enable_vars, depth))
+  if dist_name == 'QuantizedDistribution':
+    return draw(quantized_distributions(
+        batch_shape, event_dim, enable_vars))
   raise ValueError('Unknown Distribution name {}'.format(dist_name))
 
 
