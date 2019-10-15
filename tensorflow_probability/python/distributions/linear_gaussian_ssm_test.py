@@ -922,6 +922,35 @@ class KalmanSmootherTest(tfp_test_util.TestCase):
                           [-0.01090359, 0.10666106, -0.34516996],
                           [0.07458252, -0.34516996, 1.33941529]]])
 
+  def testPosteriorSample(self):
+    kf = self.build_kf()
+    obs = np.array(
+        [[[1.36560337, 0.28252135],
+          [-0.44638565, -0.76692033],
+          [0.43440145, -1.65087236],
+          [-0.96462844, -0.29173164],
+          [-0.46593086, 0.23341251]]],
+        dtype=np.float32)  # shape = [1, 5, 2]
+    mask = np.array([[[False, False, True, False, False]]])  # shape = [1, 1, 5]
+
+    sample_shape = [5000, 2]
+    posterior_samples = kf.posterior_sample(
+        obs, sample_shape, seed=tfp_test_util.test_seed(), mask=mask)
+    self.assertAllEqual(posterior_samples.shape,
+                        sample_shape + [1, 1, 5, 3])
+    posterior_mean, posterior_covs = kf.posterior_marginals(obs, mask=mask)
+    empirical_mean = tf.reduce_mean(posterior_samples, axis=[0, 1])
+    centered_samples = posterior_samples - posterior_mean
+    empirical_covs = tf.einsum(
+        "nm...tb,nm...td->...tbd",
+        centered_samples, centered_samples) / np.prod(sample_shape)
+
+    (empirical_mean_, empirical_covs_,
+     posterior_mean_, posterior_covs_) = self.evaluate((
+         empirical_mean, empirical_covs, posterior_mean, posterior_covs))
+    self.assertAllClose(posterior_mean_, empirical_mean_, atol=3e-2)
+    self.assertAllClose(posterior_covs_, empirical_covs_, atol=3e-2)
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class _KalmanStepsTest(object):

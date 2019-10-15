@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import functools
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
@@ -572,36 +573,36 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
   def _batch_shape_tensor(self):
     # We assume the batch shapes of parameters don't change over time,
     # so use the initial step as a prototype.
-    return tf.broadcast_dynamic_shape(
-        self.initial_state_prior.batch_shape_tensor(),
-        tf.broadcast_dynamic_shape(
+    return functools.reduce(
+        tf.broadcast_dynamic_shape,
+        [
+            self.initial_state_prior.batch_shape_tensor(),
             self.get_transition_matrix_for_timestep(
                 self.initial_step).batch_shape_tensor(),
-            tf.broadcast_dynamic_shape(
-                self.get_transition_noise_for_timestep(
-                    self.initial_step).batch_shape_tensor(),
-                tf.broadcast_dynamic_shape(
-                    self.get_observation_matrix_for_timestep(
-                        self.initial_step).batch_shape_tensor(),
-                    self.get_observation_noise_for_timestep(
-                        self.initial_step).batch_shape_tensor()))))
+            self.get_transition_noise_for_timestep(
+                self.initial_step).batch_shape_tensor(),
+            self.get_observation_matrix_for_timestep(
+                self.initial_step).batch_shape_tensor(),
+            self.get_observation_noise_for_timestep(
+                self.initial_step).batch_shape_tensor(),
+        ])
 
   def _batch_shape(self):
     # We assume the batch shapes of parameters don't change over time,
     # so use the initial step as a prototype.
-    return tf.broadcast_static_shape(
-        self.initial_state_prior.batch_shape,
-        tf.broadcast_static_shape(
+    return functools.reduce(
+        tf.broadcast_static_shape,
+        [
+            self.initial_state_prior.batch_shape,
             self.get_transition_matrix_for_timestep(
                 self.initial_step).batch_shape,
-            tf.broadcast_static_shape(
-                self.get_transition_noise_for_timestep(
-                    self.initial_step).batch_shape,
-                tf.broadcast_static_shape(
-                    self.get_observation_matrix_for_timestep(
-                        self.initial_step).batch_shape,
-                    self.get_observation_noise_for_timestep(
-                        self.initial_step).batch_shape))))
+            self.get_transition_noise_for_timestep(
+                self.initial_step).batch_shape,
+            self.get_observation_matrix_for_timestep(
+                self.initial_step).batch_shape,
+            self.get_observation_noise_for_timestep(
+                self.initial_step).batch_shape,
+        ])
 
   def _event_shape(self):
     return tf.TensorShape([
@@ -827,28 +828,23 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # event shape. But users can specify inputs that broadcast
       # batch dimensions, so we need to broadcast this against
       # self.batch_shape.
-      if tensorshape_util.is_fully_defined(
-          self.batch_shape) and tensorshape_util.is_fully_defined(x.shape):
-        sample_and_batch_shape = tf.broadcast_static_shape(
-            x.shape[:-2], self.batch_shape)
-      else:
-        sample_and_batch_shape = tf.broadcast_dynamic_shape(
-            tf.shape(x)[:-2], self.batch_shape_tensor())
+      batch_shape = self.batch_shape
+      if not tensorshape_util.is_fully_defined(batch_shape):
+        batch_shape = self.batch_shape_tensor()
+      sample_and_batch_shape = functools.reduce(
+          prefer_static.broadcast_shape, [
+              prefer_static.shape(x)[:-2],
+              prefer_static.shape(mask)[:-1] if mask is not None else [],
+              batch_shape
+          ])
 
       # Get the full output shape for covariances. The posterior variances
       # in a LGSSM depend only on the model params (batch shape) and on the
       # missingness pattern (mask shape), so in general this may be smaller
       # than the full `sample_and_batch_shape`.
-      if mask is None:
-        mask_sample_and_batch_shape = self.batch_shape_tensor()
-      else:
-        if (tensorshape_util.is_fully_defined(self.batch_shape) and
-            tensorshape_util.is_fully_defined(mask.shape)):
-          mask_sample_and_batch_shape = tf.broadcast_static_shape(
-              mask.shape[:-1], self.batch_shape)
-        else:
-          mask_sample_and_batch_shape = tf.broadcast_dynamic_shape(
-              tf.shape(mask)[:-1], self.batch_shape_tensor())
+      mask_sample_and_batch_shape = prefer_static.broadcast_shape(
+          prefer_static.shape(mask)[:-1] if mask is not None else [],
+          batch_shape)
 
       # To scan over timesteps we need to move `num_timsteps` from the
       # event shape to the initial dimension of the tensor.
@@ -1004,6 +1000,87 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           predicted_means, predicted_covs)
 
       return (smoothed_means, smoothed_covs)
+
+  def posterior_sample(self, x, sample_shape, mask=None, seed=None, name=None):
+    """Draws samples from the posterior over latent trajectories.
+
+    This method uses Durbin-Koopman sampling [1], an efficient algorithm to
+    sample from the posterior latents of a linear Gaussian state space model.
+    The cost of drawing a sample is equal to the cost of drawing a prior
+    sample (`.sample(sample_shape)`), plus the cost of Kalman smoothing (
+    `.posterior_marginals(...)` on both the observed time series and the
+    prior sample. This method is significantly more efficient in graph mode,
+    because it uses only the posterior means and can elide the unneeded
+    calculation of marginal covariances.
+
+    [1] Durbin, J. and Koopman, S.J. A simple and efficient simulation
+        smoother for state space time series analysis. _Biometrika_
+        89(3):603-615, 2002.
+        https://www.jstor.org/stable/4140605
+
+    Args:
+      x: a float-type `Tensor` with rightmost dimensions
+        `[num_timesteps, observation_size]` matching
+        `self.event_shape`. Additional dimensions must match or be
+        broadcastable with `self.batch_shape`.
+      sample_shape: `int` `Tensor` shape of samples to draw.
+      mask: optional bool-type `Tensor` with rightmost dimension
+        `[num_timesteps]`; `True` values specify that the value of `x`
+        at that timestep is masked, i.e., not conditioned on. Additional
+        dimensions must match or be broadcastable with `self.batch_shape` and
+        `x.shape[:-2]`.
+        Default value: `None`.
+      seed: Python `int` random seed.
+      name: Python `str` name for ops generated by this method.
+    Returns:
+      latent_posterior_sample: Float `Tensor` of shape
+        `concat([sample_shape, batch_shape, [num_timesteps, latent_size]])`,
+        where `batch_shape` is the broadcast shape of `self.batch_shape`,
+        `x.shape[:-2]`, and `mask.shape[:-1]`, representing `n` samples from
+        the posterior over latent states given the observed value `x`.
+    """
+    with tf.name_scope(name or "posterior_sample"):
+      x = tf.convert_to_tensor(x, name="x")
+      if mask is not None:
+        mask = tf.convert_to_tensor(mask, name="mask", dtype_hint=tf.bool)
+
+      # Get static batch shape if possible.
+      if self.batch_shape.is_fully_defined():
+        batch_shape = tensorshape_util.as_list(self.batch_shape)
+      else:
+        batch_shape = self.batch_shape_tensor()
+
+      # Draw one prior sample per result. If `x` has larger batch shape
+      # than the distribution, we'll need to draw extra samples to match.
+      result_sample_and_batch_shape = prefer_static.concat([
+          distribution_util.expand_to_vector(sample_shape),
+          functools.reduce(prefer_static.broadcast_shape, [
+              prefer_static.shape(x)[:-2],
+              prefer_static.shape(mask)[:-1] if mask is not None else [],
+              batch_shape,
+          ])], axis=0)
+      sample_size = tf.cast(
+          prefer_static.reduce_prod(result_sample_and_batch_shape) /
+          prefer_static.reduce_prod(batch_shape), tf.int32)
+      prior_latent_sample, prior_obs_sample = self._joint_sample_n(
+          sample_size, seed=seed)
+
+      result_shape = prefer_static.concat(
+          [result_sample_and_batch_shape,
+           [self.num_timesteps, self.latent_size]], axis=0)
+      broadcast_observed_shape = prefer_static.concat(
+          [result_sample_and_batch_shape,
+           [self.num_timesteps, self.observation_size]], axis=0)
+      prior_latent_sample = tf.reshape(prior_latent_sample, result_shape)
+      prior_obs_sample = tf.reshape(prior_obs_sample, broadcast_observed_shape)
+
+      # Compute latent posterior means from the sampled and real observations.
+      batch_mean, _ = self.posterior_marginals(
+          tf.stack([prior_obs_sample,
+                    tf.broadcast_to(x, broadcast_observed_shape)],
+                   axis=0), mask=mask)
+      prior_latent_mean, posterior_latent_mean = tf.unstack(batch_mean, axis=0)
+      return posterior_latent_mean + prior_latent_sample - prior_latent_mean
 
   def _mean(self):
     _, observation_mean = self._joint_mean()
