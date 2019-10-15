@@ -19,10 +19,11 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'pad_shape_with_ones',
@@ -72,12 +73,16 @@ def pad_shape_with_ones(x, ndims, start=-1):
   new_shape = tf.concat([new_shape, second_shape], axis=0)
   x = tf.reshape(x, new_shape)
   if start == -1:
-    x.set_shape(original_shape.concatenate([1] * ndims))
-  elif original_shape.ndims is not None:
-    x.set_shape(original_shape[
-        :original_shape.ndims + start + 1].concatenate(
-            [1] * ndims).concatenate(
-                original_shape[original_shape.ndims + start + 1:]))
+    tensorshape_util.set_shape(
+        x, tensorshape_util.concatenate(original_shape, [1] * ndims))
+  elif tensorshape_util.rank(original_shape) is not None:
+    original_ndims = tensorshape_util.rank(original_shape)
+    new_shape = tensorshape_util.concatenate(
+        original_shape[:original_ndims + start + 1],
+        tensorshape_util.concatenate(
+            [1] * ndims,
+            original_shape[original_ndims + start + 1:]))
+    tensorshape_util.set_shape(x, new_shape)
   return x
 
 
@@ -94,12 +99,9 @@ def sum_rightmost_ndims_preserving_shape(x, ndims):
     have statically known shape. Otherwise, the resulting shape will only be
     known at runtime.
   """
-  x = tf.convert_to_tensor(value=x)
-  if x.shape.ndims is not None:
-    axes = tf.range(x.shape.ndims - ndims, x.shape.ndims)
-  else:
-    axes = tf.range(tf.rank(x) - ndims, tf.rank(x))
-  return tf.reduce_sum(x, axis=axes)
+  x = tf.convert_to_tensor(x)
+  x_ndims = prefer_static.rank(x)
+  return tf.reduce_sum(x, axis=prefer_static.range(x_ndims - ndims, x_ndims))
 
 
 @tf.custom_gradient
@@ -157,7 +159,7 @@ def sqrt_with_finite_grads(x, name=None):
   the sqrt (as opposed to just using the max floating point value) to avoid
   potential overflow when combining this value with others downstream.
   """
-  with tf1.name_scope(name, 'sqrt_with_finite_grads', [x]):
+  with tf.name_scope(name or 'sqrt_with_finite_grads'):
     x = tf.convert_to_tensor(value=x, name='x')
     if not x.dtype.is_floating:
       raise TypeError('Input `x` must be floating type.')

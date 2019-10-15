@@ -75,7 +75,7 @@ class ExpSinSquaredTest(tfp_test_util.TestCase):
   def testNoneShapes(self):
     k = tfp.math.psd_kernels.ExpSinSquared(
         amplitude=np.reshape([1.] * 6, [3, 2]))
-    self.assertEqual([3, 2], k.batch_shape.as_list())
+    self.assertEqual((3, 2), k.batch_shape)
 
   def testShapesAreCorrect(self):
     k = tfp.math.psd_kernels.ExpSinSquared(

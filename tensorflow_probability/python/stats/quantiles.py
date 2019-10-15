@@ -26,6 +26,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -238,7 +239,8 @@ def find_bins(x,
           'First dimension of `edges` must have length > 1 to index 1 or '
           'more bin. Found: {}'.format(edges.shape))
 
-    flattening_x = edges.shape.ndims == 1 and x.shape.ndims > 1
+    flattening_x = (tensorshape_util.rank(edges.shape) == 1 and
+                    tensorshape_util.rank(x.shape) > 1)
 
     if flattening_x:
       x_orig_shape = tf.shape(x)
@@ -394,7 +396,8 @@ def histogram(x,
         dtype=dtype or in_dtype)
     n_edges = tf.compat.dimension_value(edges.shape[0])
     if n_edges is not None:
-      counts.set_shape(
+      tensorshape_util.set_shape(
+          counts,
           tf.TensorShape([n_edges - 1]).concatenate(counts.shape[1:]))
     return counts
 
@@ -501,8 +504,9 @@ def percentile(x,
     interpolation = 'nearest'
   else:
     if interpolation not in allowed_interpolations:
-      raise ValueError('Argument `interpolation` must be in %s.  Found %s' %
-                       (allowed_interpolations, interpolation))
+      raise ValueError(
+          'Argument `interpolation` must be in {}. Found {}.'.format(
+              allowed_interpolations, interpolation))
 
   with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name='x')
@@ -745,36 +749,33 @@ def _get_static_ndims(x,
   Raises:
     ValueError:  If any of the expectations above are violated.
   """
-  ndims = x.shape.ndims
-  if ndims is None:
-    shape_const = tf.get_static_value(tf.shape(x))
-    if shape_const is not None:
-      ndims = shape_const.ndim
+  ndims = tensorshape_util.rank(x.shape)
 
   if ndims is None:
     if expect_static:
       raise ValueError(
-          'Expected argument `x` to have statically defined `ndims`.  Found: ' %
-          x)
+          'Expected argument `x` to have statically defined `ndims`. '
+          'Found: {}.'.format(x))
     return
 
   if expect_ndims is not None:
-    ndims_message = ('Expected argument `x` to have ndims %s.  Found tensor %s'
-                     % (expect_ndims, x))
+    ndims_message = (
+        'Expected argument `x` to have ndims {}. Found tensor {}.'.format(
+            expect_ndims, x))
     if ndims != expect_ndims:
       raise ValueError(ndims_message)
 
   if expect_ndims_at_least is not None:
     ndims_at_least_message = (
-        'Expected argument `x` to have ndims >= %d.  Found tensor %s' %
-        (expect_ndims_at_least, x))
+        'Expected argument `x` to have ndims >= {}. Found tensor {}.'.format(
+            expect_ndims_at_least, x))
     if ndims < expect_ndims_at_least:
       raise ValueError(ndims_at_least_message)
 
   if expect_ndims_no_more_than is not None:
     ndims_no_more_than_message = (
-        'Expected argument `x` to have ndims <= %d.  Found tensor %s' %
-        (expect_ndims_no_more_than, x))
+        'Expected argument `x` to have ndims <= {}. Found tensor {}.'.format(
+            expect_ndims_no_more_than, x))
     if ndims > expect_ndims_no_more_than:
       raise ValueError(ndims_no_more_than_message)
 
@@ -829,8 +830,8 @@ def _make_static_axis_non_negative_list(axis, ndims):
   axis_const = tf.get_static_value(axis)
   if axis_const is None:
     raise ValueError(
-        'Expected argument `axis` to be statically available.  Found: %s' %
-        axis)
+        'Expected argument `axis` to be statically available. '
+        'Found: {}.'.format(axis))
 
   # Make at least 1-D.
   axis = axis_const + np.zeros([1], dtype=axis_const.dtype)
@@ -864,8 +865,8 @@ def _move_dims_to_flat_end(x, axis, x_ndims, right_end=True):
   perm = other_dims + list(axis) if right_end else list(axis) + other_dims
   x_permed = tf.transpose(a=x, perm=perm)
 
-  if x.shape.is_fully_defined():
-    x_shape = x.shape.as_list()
+  if tensorshape_util.is_fully_defined(x.shape):
+    x_shape = tensorshape_util.as_list(x.shape)
     # other_shape = [a, c], end_shape = [b * d]
     other_shape = [x_shape[i] for i in other_dims]
     end_shape = [np.prod([x_shape[i] for i in axis])]
@@ -881,5 +882,5 @@ def _move_dims_to_flat_end(x, axis, x_ndims, right_end=True):
 def _sort_tensor(tensor):
   """Use `top_k` to sort a `Tensor` along the last dimension."""
   sorted_, _ = tf.math.top_k(tensor, k=tf.shape(tensor)[-1])
-  sorted_.set_shape(tensor.shape)
+  tensorshape_util.set_shape(sorted_, tensor.shape)
   return sorted_

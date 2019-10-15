@@ -189,7 +189,7 @@ class PositiveSemidefiniteKernelTest(tfp_test_util.TestCase):
       ('Shape [2, 1] kernel', [[1.], [2.]], [2, 1]))
   def testStaticBatchShape(self, params, shape):
     k = TestKernel(params)
-    self.assertAllEqual(shape, k.batch_shape.as_list())
+    self.assertAllEqual(shape, k.batch_shape)
     self.assertAllEqual(shape, self.evaluate(k.batch_shape_tensor()))
 
   @parameterized.named_parameters(

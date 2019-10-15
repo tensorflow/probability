@@ -25,6 +25,7 @@ import operator
 import six
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.psd_kernels.internal import util
 
 
@@ -298,9 +299,9 @@ class PositiveSemidefiniteKernel(tf.Module):
         fully-broadcast shapes of the kernel parameters.
     """
     with tf.name_scope(self._name):
-      if self.batch_shape.is_fully_defined():
+      if tensorshape_util.is_fully_defined(self.batch_shape):
         return tf.convert_to_tensor(
-            self.batch_shape.as_list(), dtype=tf.int32, name='batch_shape')
+            self.batch_shape, dtype=tf.int32, name='batch_shape')
       with tf.name_scope('batch_shape_tensor'):
         return self._batch_shape_tensor()
 

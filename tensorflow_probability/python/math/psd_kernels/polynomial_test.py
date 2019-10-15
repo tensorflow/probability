@@ -80,7 +80,7 @@ class PolynomialTest(tfp_test_util.TestCase):
   def testNoneShapes(self):
     k = tfp.math.psd_kernels.Polynomial(
         bias_variance=np.reshape(np.arange(12.), [2, 3, 2]))
-    self.assertEqual([2, 3, 2], k.batch_shape.as_list())
+    self.assertEqual([2, 3, 2], k.batch_shape)
 
   @parameterized.named_parameters(
       dict(
@@ -126,7 +126,7 @@ class PolynomialTest(tfp_test_util.TestCase):
         shift=shift,
         exponent=exponent,
         validate_args=True)
-    self.assertAllEqual(shape, k.batch_shape.as_list())
+    self.assertAllEqual(shape, k.batch_shape)
     self.assertAllEqual(shape, self.evaluate(k.batch_shape_tensor()))
 
   def testFloat32(self):

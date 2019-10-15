@@ -27,6 +27,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import psd_kernels as tfpk
 
 
@@ -107,7 +108,7 @@ def kernel_input(
   # matrices that are semi-definite.
   x = draw(hpnp.arrays(
       dtype=np.float64,
-      shape=input_shape.as_list(),
+      shape=tensorshape_util.as_list(input_shape),
       elements=hps.floats(-50, 50, allow_nan=False, allow_infinity=False),
       unique=True))
   if enable_vars and draw(hps.booleans()):
@@ -283,7 +284,7 @@ def schur_complements(
   # Positive shift to ensure the divisor matrix is PD.
   diag_shift = np.float64(draw(hpnp.arrays(
       dtype=np.float64,
-      shape=batch_shape.as_list(),
+      shape=tensorshape_util.as_list(batch_shape),
       elements=hps.floats(1, 100, allow_nan=False, allow_infinity=False))))
 
   hp.note('Forming SchurComplement kernel with fixed_inputs: {} '

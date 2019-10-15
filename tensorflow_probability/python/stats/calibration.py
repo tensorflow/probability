@@ -29,6 +29,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -97,7 +98,7 @@ def brier_decomposition(labels, logits, name=None):
     # Compute pbar, the average distribution
     pred_class = tf.argmax(logits, axis=-1, output_type=labels.dtype)
 
-    if logits.shape.rank > 2:
+    if tensorshape_util.rank(logits.shape) > 2:
       flatten, unflatten = _make_flatten_unflatten_fns(logits.shape[:-2])
       def fn_to_map(args):
         yhat, y = args
@@ -134,7 +135,7 @@ def brier_decomposition(labels, logits, name=None):
                                axis=-1)
 
     # Reliability: expected quadratic divergence of predictive to true
-    if logits.shape.rank > 2:
+    if tensorshape_util.rank(logits.shape) > 2:
       # TODO(b/139094519): Avoid using tf.map_fn here.
       prob_true = tf.map_fn(lambda args: tf.gather(args[0], args[1]),
                             [flatten(dist_mean), flatten(pred_class)],
@@ -232,7 +233,7 @@ def _compute_calibration_bin_statistics(
 
   # Collect predicted probabilities of decisions
   pred = tf.nn.softmax(logits, axis=1)
-  prob_y = tf1.batch_gather(pred, tf.expand_dims(pred_y, 1))  # p(pred_y | x)
+  prob_y = tf1.batch_gather(pred, pred_y[:, tf.newaxis])  # p(pred_y | x)
   prob_y = tf.reshape(prob_y, (tf.size(prob_y),))
 
   # Compute b/z histogram statistics:
@@ -242,7 +243,7 @@ def _compute_calibration_bin_statistics(
   event_bin_counts = tf.math.bincount(
       correct * num_bins + bins,
       minlength=2 * num_bins,
-      maxlength=2*num_bins)
+      maxlength=2 * num_bins)
   event_bin_counts = tf.reshape(event_bin_counts, (2, num_bins))
 
   # Compute mean predicted probability value in each of the `num_bins` bins
@@ -342,10 +343,5 @@ def _make_flatten_unflatten_fns(batch_shape):
 
 
 def _reduce_log_l2_exp(loga, logb, axis=-1):
-  return tf.math.reduce_logsumexp(
-      2 *  tfp_math.reduce_weighted_logsumexp(
-          tf.stack([loga, logb], axis=-1),
-          w=[1, -1],
-          axis=-1),
-      axis=axis,
-  )
+  return tf.math.reduce_logsumexp(2. * tfp_math.log_sub_exp(loga, logb),
+                                  axis=axis)

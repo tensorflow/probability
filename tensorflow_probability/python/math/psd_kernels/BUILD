@@ -49,6 +49,7 @@ py_library(
     deps = [
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -302,6 +303,7 @@ py_library(
     deps = [
         # hypothesis dep,
         # numpy dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 

@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.math.psd_kernels.internal import util
@@ -64,18 +65,18 @@ class UtilTest(tfp_test_util.TestCase):
     # Test partially unknown shape
     x = tf1.placeholder_with_default(np.ones([3], np.float32), [None])
     expanded = util.pad_shape_with_ones(x, 3)
-    self.assertAllEqual(expanded.shape.as_list(), [None, 1, 1, 1])
-    self.assertAllEqual(self.evaluate(expanded).shape, [3, 1, 1, 1])
+    self.assertAllEqual((1, 1, 1), expanded.shape[1:])
+    self.assertAllEqual((3, 1, 1, 1), self.evaluate(expanded).shape)
 
     expanded = util.pad_shape_with_ones(x, 3, start=-2)
-    self.assertAllEqual(expanded.shape.as_list(), [1, 1, 1, None])
+    self.assertAllEqual((1, 1, 1), expanded.shape[:-1])
     self.assertAllEqual(self.evaluate(expanded).shape, [1, 1, 1, 3])
+    self.assertAllEqual((1, 1, 1, 3), self.evaluate(expanded).shape)
 
     # Test totally unknown shape
     x = tf1.placeholder_with_default(np.ones([3], np.float32), None)
     expanded = util.pad_shape_with_ones(x, 3)
-    self.assertIsNone(expanded.shape.ndims)
-    self.assertAllEqual(self.evaluate(expanded).shape, [3, 1, 1, 1])
+    self.assertAllEqual([3, 1, 1, 1], self.evaluate(expanded).shape)
 
   def testPadShapeRightWithOnesCanBeGraphNoop(self):
     # First ensure graph actually *is* changed when we use non-trivial ndims.
@@ -104,19 +105,20 @@ class UtilTest(tfp_test_util.TestCase):
 
     x = tf1.placeholder_with_default(
         np.ones((5, 4, 3, 2)), shape=[5, 4, None, None])
-    self.assertAllEqual(
-        util.sum_rightmost_ndims_preserving_shape(x, ndims=1).shape.as_list(),
-        [5, 4, 3 if tf.executing_eagerly() else None])
+    if not tf.executing_eagerly():
+      return
+    y = util.sum_rightmost_ndims_preserving_shape(x, ndims=1)
+    self.assertAllEqual((5, 4, 3), y.shape)
 
   def testSumRightmostNdimsPreservingShapeDynamicRank(self):
     if tf.executing_eagerly(): return
     x = tf1.placeholder_with_default(np.ones((5, 4, 3, 2)), shape=None)
-    self.assertIsNone(
-        util.sum_rightmost_ndims_preserving_shape(x, ndims=2).shape.ndims)
+    y = util.sum_rightmost_ndims_preserving_shape(x, ndims=2)
+    self.assertIsNone(tensorshape_util.rank(y.shape))
     self.assertAllEqual(
+        (5, 4),
         self.evaluate(
-            util.sum_rightmost_ndims_preserving_shape(x, ndims=2)).shape,
-        [5, 4])
+            util.sum_rightmost_ndims_preserving_shape(x, ndims=2)).shape)
 
   def testSqrtWithFiniteGradsHasCorrectValues(self):
     self.assertTrue(np.isnan(self.evaluate(util.sqrt_with_finite_grads(-1.))))

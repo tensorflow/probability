@@ -143,7 +143,7 @@ class _MaternTestCase(tfp_test_util.TestCase):
     grads = [tape.gradient(kvs, x) for kvs in kernel_val_slices]
 
     self.assertAllEqual(
-        [np.zeros(grad.shape.as_list(), np.float32) for grad in grads],
+        [np.zeros(np.int32(grad.shape), np.float32) for grad in grads],
         self.evaluate(grads))
 
 

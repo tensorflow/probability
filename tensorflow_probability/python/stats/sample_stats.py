@@ -197,7 +197,7 @@ def auto_correlation(x,
     if know_static_shape:
       chopped_shape = tensorshape_util.as_list(x_rotated.shape)
       chopped_shape[-1] = min(x_len, max_lags + 1)
-      shifted_product_chopped.set_shape(chopped_shape)
+      tensorshape_util.set_shape(shifted_product_chopped, chopped_shape)
 
     # Recall R[m] is a sum of N / 2 - m nonzero terms x[n] Conj(x[n - m]).  The
     # other terms were zeros arising only due to zero padding.

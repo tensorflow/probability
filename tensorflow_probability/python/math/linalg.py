@@ -30,10 +30,9 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
-# pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops.linalg import linear_operator_util
-from tensorflow.python.util import deprecation
-# pylint: enable=g-direct-tensorflow-import
+from tensorflow.python.ops.linalg import linear_operator_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
     'cholesky_concat',
@@ -186,9 +185,16 @@ def _swap_m_with_i(vecs, m, i):
       vecs[..., m + 1:])
   # TODO(bjp): Could we use tensor_scatter_nd_update?
   vecs_shape = vecs.shape
+  vecs_rank = tensorshape_util.rank(vecs_shape)
+  if vecs_rank is None:
+    raise NotImplementedError(
+        'Input vector to swap must have statically known rank. If you cannot '
+        'provide static rank please contact core TensorFlow team and request '
+        'that `tf.gather` `batch_dims` argument support `tf.Tensor`-valued '
+        'inputs.')
   vecs = tf.concat([
       vecs[..., :m],
-      tf.gather(vecs, i, batch_dims=int(prefer_static.rank(vecs)) - 1),
+      tf.gather(vecs, i, batch_dims=int(vecs_rank) - 1),
       trailing_elts
   ], axis=-1)
   tensorshape_util.set_shape(vecs, vecs_shape)
@@ -458,7 +464,10 @@ def pinv(a, rcond=None, validate_args=False, name=None):
         adjoint_b=True)
 
     if tensorshape_util.rank(a.shape) is not None:
-      a_pinv.set_shape(a.shape[:-2].concatenate([a.shape[-1], a.shape[-2]]))
+      tensorshape_util.set_shape(
+          a_pinv,
+          tensorshape_util.concatenate(a.shape[:-2],
+                                       [a.shape[-1], a.shape[-2]]))
 
     return a_pinv
 
@@ -704,7 +713,7 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
     else:
       x = tf.gather(x, tf.math.invert_permutation(perm))
 
-    x.set_shape(lower_upper.shape)
+    tensorshape_util.set_shape(x, lower_upper.shape)
     return x
 
 
@@ -747,8 +756,8 @@ def _lu_solve_assertions(lower_upper, perm, rhs, validate_args):
   assertions = lu_reconstruct_assertions(lower_upper, perm, validate_args)
 
   message = 'Input `rhs` must have at least 2 dimensions.'
-  if rhs.shape.ndims is not None:
-    if rhs.shape.ndims < 2:
+  if tensorshape_util.rank(rhs.shape) is not None:
+    if tensorshape_util.rank(rhs.shape) < 2:
       raise ValueError(message)
   elif validate_args:
     assertions.append(
