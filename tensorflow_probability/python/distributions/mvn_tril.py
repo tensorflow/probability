@@ -188,6 +188,7 @@ class MultivariateNormalTriL(
       loc = tensor_util.convert_nonref_to_tensor(loc, name='loc', dtype=dtype)
       scale_tril = tensor_util.convert_nonref_to_tensor(
           scale_tril, name='scale_tril', dtype=dtype)
+      self._scale_tril = scale_tril
       if scale_tril is None:
         scale = tf.linalg.LinearOperatorIdentity(
             num_rows=distribution_util.dimension_size(loc, -1),
@@ -215,3 +216,7 @@ class MultivariateNormalTriL(
   @classmethod
   def _params_event_ndims(cls):
     return dict(loc=1, scale_tril=2)
+
+  @property
+  def scale_tril(self):
+    return self._scale_tril
