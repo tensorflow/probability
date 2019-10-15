@@ -64,7 +64,8 @@ def assert_no_none_grad(kernel, method, wrt_vars, grads):
 @test_util.run_all_in_graph_and_eager_modes
 class KernelPropertiesTest(tfp_test_util.TestCase):
 
-  @parameterized.parameters((bname,) for bname in TF2_FRIENDLY_KERNELS)
+  @parameterized.named_parameters(dict(testcase_name=kname, kernel_name=kname)
+                                  for kname in TF2_FRIENDLY_KERNELS)
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(
       default_max_examples=10,
