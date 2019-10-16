@@ -109,7 +109,6 @@ FILENAMES = [
     "vector_laplace_diag",
     "vector_laplace_linear_operator",
     "vector_sinh_arcsinh_diag",
-    "vector_student_t",
     "von_mises_fisher",
     # "von_mises",
     "wishart",
@@ -130,7 +129,6 @@ TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     "kumaraswamy",
     "sample",
     "sinh_arcsinh",
-    "vector_student_t",
     "transformed_distribution",
 )]
 

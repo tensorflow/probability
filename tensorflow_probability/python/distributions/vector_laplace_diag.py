@@ -20,13 +20,105 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import vector_laplace_linear_operator as vllo
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
-    "VectorLaplaceDiag",
+    'VectorLaplaceDiag',
 ]
+
+
+# Copied from distribution_util, where it is to be removed, and duplicated here
+# to support VectorLaplaceDiag until the deprecation window is closed.
+def _make_diag_scale(loc=None,
+                     scale_diag=None,
+                     scale_identity_multiplier=None,
+                     shape_hint=None,
+                     validate_args=False,
+                     assert_positive=False,
+                     name=None,
+                     dtype=None):
+  """Creates a LinearOperator representing a diagonal matrix.
+
+  Args:
+    loc: Floating-point `Tensor`. This is used for inferring shape in the case
+      where only `scale_identity_multiplier` is set.
+    scale_diag: Floating-point `Tensor` representing the diagonal matrix.
+      `scale_diag` has shape [N1, N2, ...  k], which represents a k x k diagonal
+      matrix. When `None` no diagonal term is added to the LinearOperator.
+    scale_identity_multiplier: floating point rank 0 `Tensor` representing a
+      scaling done to the identity matrix. When `scale_identity_multiplier =
+      scale_diag = scale_tril = None` then `scale += IdentityMatrix`. Otherwise
+      no scaled-identity-matrix is added to `scale`.
+    shape_hint: scalar integer `Tensor` representing a hint at the dimension of
+      the identity matrix when only `scale_identity_multiplier` is set.
+    validate_args: Python `bool` indicating whether arguments should be checked
+      for correctness.
+    assert_positive: Python `bool` indicating whether LinearOperator should be
+      checked for being positive definite.
+    name: Python `str` name given to ops managed by this object.
+    dtype: TF `DType` to prefer when converting args to `Tensor`s. Else, we fall
+      back to a compatible dtype across all of `loc`, `scale_diag`, and
+      `scale_identity_multiplier`.
+
+  Returns:
+    `LinearOperator` representing a lower triangular matrix.
+
+  Raises:
+    ValueError:  If only `scale_identity_multiplier` is set and `loc` and
+      `shape_hint` are both None.
+  """
+
+  with tf.name_scope(name or 'make_diag_scale'):
+    if dtype is None:
+      dtype = dtype_util.common_dtype(
+          [loc, scale_diag, scale_identity_multiplier],
+          dtype_hint=tf.float32)
+    loc = tensor_util.convert_nonref_to_tensor(loc, name='loc', dtype=dtype)
+    scale_diag = tensor_util.convert_nonref_to_tensor(
+        scale_diag, name='scale_diag', dtype=dtype)
+    scale_identity_multiplier = tensor_util.convert_nonref_to_tensor(
+        scale_identity_multiplier,
+        name='scale_identity_multiplier',
+        dtype=dtype)
+
+    if scale_diag is not None:
+      if scale_identity_multiplier is not None:
+        scale_diag = scale_diag + scale_identity_multiplier[..., tf.newaxis]
+      return tf.linalg.LinearOperatorDiag(
+          diag=scale_diag,
+          is_non_singular=True,
+          is_self_adjoint=True,
+          is_positive_definite=assert_positive)
+
+    if loc is None and shape_hint is None:
+      raise ValueError('Cannot infer `event_shape` unless `loc` or '
+                       '`shape_hint` is specified.')
+
+    num_rows = shape_hint
+    del shape_hint
+    if num_rows is None:
+      num_rows = tf.compat.dimension_value(loc.shape[-1])
+      if num_rows is None:
+        num_rows = tf.shape(loc)[-1]
+
+    if scale_identity_multiplier is None:
+      return tf.linalg.LinearOperatorIdentity(
+          num_rows=num_rows,
+          dtype=dtype,
+          is_self_adjoint=True,
+          is_positive_definite=True,
+          assert_proper_shapes=validate_args)
+
+    return tf.linalg.LinearOperatorScaledIdentity(
+        num_rows=num_rows,
+        multiplier=scale_identity_multiplier,
+        is_non_singular=True,
+        is_self_adjoint=True,
+        is_positive_definite=assert_positive,
+        assert_proper_shapes=validate_args)
 
 
 class VectorLaplaceDiag(vllo.VectorLaplaceLinearOperator):
@@ -151,13 +243,20 @@ class VectorLaplaceDiag(vllo.VectorLaplaceLinearOperator):
 
   """
 
+  @deprecation.deprecated(
+      '2020-01-01',
+      '`VectorLaplaceDiag` is deprecated. If all you need is the diagonal '
+      'scale, you can use '
+      '`tfd.Independent(tfd.Laplace(loc=loc, scale=scale_diag), 1)` instead. '
+      'You can also directly use `VectorLaplaceLinearOperator` with the '
+      'appropriate `LinearOperator` instance.')
   def __init__(self,
                loc=None,
                scale_diag=None,
                scale_identity_multiplier=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="VectorLaplaceDiag"):
+               name='VectorLaplaceDiag'):
     """Construct Vector Laplace distribution on `R^k`.
 
     The `batch_shape` is the broadcast shape between `loc` and `scale`
@@ -202,7 +301,7 @@ class VectorLaplaceDiag(vllo.VectorLaplaceLinearOperator):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`,
-        statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+        statistics (e.g., mean, mode, variance) use the value '`NaN`' to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -212,13 +311,13 @@ class VectorLaplaceDiag(vllo.VectorLaplaceLinearOperator):
     """
     parameters = dict(locals())
     with tf.name_scope(name):
-      with tf.name_scope("init"):
+      with tf.name_scope('init'):
         dtype = dtype_util.common_dtype(
             [loc, scale_diag, scale_identity_multiplier], tf.float32)
         # No need to validate_args while making diag_scale.  The returned
         # LinearOperatorDiag has an assert_non_singular method that is called by
         # the Bijector.
-        scale = distribution_util.make_diag_scale(
+        scale = _make_diag_scale(
             loc=loc,
             scale_diag=scale_diag,
             scale_identity_multiplier=scale_identity_multiplier,

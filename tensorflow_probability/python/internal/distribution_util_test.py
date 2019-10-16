@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import itertools
-
 # Dependency imports
 import numpy as np
 
@@ -33,8 +31,8 @@ from tensorflow_probability.python.distributions import MultivariateNormalDiag
 from tensorflow_probability.python.distributions import Normal
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
+from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 def _logit(x):
@@ -42,156 +40,8 @@ def _logit(x):
   return np.log(x) - np.log1p(-x)
 
 
-def _powerset(x):
-  s = list(x)
-  return itertools.chain.from_iterable(
-      itertools.combinations(s, r) for r in range(len(s) + 1))
-
-
-def _matrix_diag(d):
-  """Batch version of np.diag."""
-  orig_shape = d.shape
-  d = np.reshape(d, (int(np.prod(d.shape[:-1])), d.shape[-1]))
-  diag_list = []
-  for i in range(d.shape[0]):
-    diag_list.append(np.diag(d[i, ...]))
-  return np.reshape(diag_list, orig_shape + (d.shape[-1],))
-
-
-def _make_tril_scale(
-    loc=None,
-    scale_tril=None,
-    scale_diag=None,
-    scale_identity_multiplier=None,
-    shape_hint=None):
-  if scale_tril is not None:
-    scale_tril = np.tril(scale_tril)
-    if scale_diag is not None:
-      scale_tril += _matrix_diag(np.array(scale_diag, dtype=np.float32))
-    if scale_identity_multiplier is not None:
-      scale_tril += (
-          scale_identity_multiplier * _matrix_diag(np.ones(
-              [scale_tril.shape[-1]], dtype=np.float32)))
-    return scale_tril
-  return _make_diag_scale(
-      loc, scale_diag, scale_identity_multiplier, shape_hint)
-
-
-def _make_diag_scale(
-    loc=None,
-    scale_diag=None,
-    scale_identity_multiplier=None,
-    shape_hint=None):
-  if scale_diag is not None:
-    scale_diag = np.asarray(scale_diag)
-    if scale_identity_multiplier is not None:
-      scale_diag += scale_identity_multiplier
-    return _matrix_diag(scale_diag)
-
-  if loc is None and shape_hint is None:
-    return None
-
-  if shape_hint is None:
-    shape_hint = loc.shape[-1]
-  if scale_identity_multiplier is None:
-    scale_identity_multiplier = 1.
-  return scale_identity_multiplier * np.diag(np.ones(shape_hint))
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class MakeTrilScaleTest(tfp_test_util.TestCase):
-
-  def _testLegalInputs(
-      self, loc=None, shape_hint=None, scale_params=None):
-    for args in _powerset(scale_params.items()):
-      args = dict(args)
-
-      scale_args = dict({
-          'loc': loc,
-          'shape_hint': shape_hint}, **args)
-      expected_scale = _make_tril_scale(**scale_args)
-      if expected_scale is None:
-        # Not enough shape information was specified.
-        with self.assertRaisesRegexp(ValueError, ('is specified.')):
-          scale = distribution_util.make_tril_scale(**scale_args)
-          self.evaluate(scale.to_dense())
-      else:
-        scale = distribution_util.make_tril_scale(**scale_args)
-        self.assertAllClose(expected_scale, self.evaluate(scale.to_dense()))
-
-  def testLegalInputs(self):
-    self._testLegalInputs(
-        loc=np.array([-1., -1.], dtype=np.float32),
-        shape_hint=2,
-        scale_params={
-            'scale_identity_multiplier': 2.,
-            'scale_diag': [2., 3.],
-            'scale_tril': [[1., 0.],
-                           [-3., 3.]],
-        })
-
-  def testLegalInputsMultidimensional(self):
-    self._testLegalInputs(
-        loc=np.array([[[-1., -1., 2.], [-2., -3., 4.]]], dtype=np.float32),
-        shape_hint=3,
-        scale_params={
-            'scale_identity_multiplier': 2.,
-            'scale_diag': [[[2., 3., 4.], [3., 4., 5.]]],
-            'scale_tril': [[[[1., 0., 0.],
-                             [-3., 3., 0.],
-                             [1., -2., 1.]],
-                            [[2., 1., 0.],
-                             [-4., 7., 0.],
-                             [1., -1., 1.]]]]
-        })
-
-  def testZeroTriU(self):
-    scale = distribution_util.make_tril_scale(scale_tril=[[1., 1], [1., 1.]])
-    self.assertAllClose([[1., 0], [1., 1.]], self.evaluate(scale.to_dense()))
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class MakeDiagScaleTest(tfp_test_util.TestCase):
-
-  def _testLegalInputs(
-      self, loc=None, shape_hint=None, scale_params=None):
-    for args in _powerset(scale_params.items()):
-      args = dict(args)
-
-      scale_args = dict({
-          'loc': loc,
-          'shape_hint': shape_hint}, **args)
-      expected_scale = _make_diag_scale(**scale_args)
-      if expected_scale is None:
-        # Not enough shape information was specified.
-        with self.assertRaisesRegexp(ValueError, ('is specified.')):
-          scale = distribution_util.make_diag_scale(**scale_args)
-          self.evaluate(scale.to_dense())
-      else:
-        scale = distribution_util.make_diag_scale(**scale_args)
-        self.assertAllClose(expected_scale, self.evaluate(scale.to_dense()))
-
-  def testLegalInputs(self):
-    self._testLegalInputs(
-        loc=np.array([-1., -1.], dtype=np.float32),
-        shape_hint=2,
-        scale_params={
-            'scale_identity_multiplier': 2.,
-            'scale_diag': [2., 3.]
-        })
-
-  def testLegalInputsMultidimensional(self):
-    self._testLegalInputs(
-        loc=np.array([[[-1., -1., 2.], [-2., -3., 4.]]], dtype=np.float32),
-        shape_hint=3,
-        scale_params={
-            'scale_identity_multiplier': 2.,
-            'scale_diag': [[[2., 3., 4.], [3., 4., 5.]]]
-        })
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class ShapesFromLocAndScaleTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class ShapesFromLocAndScaleTest(test_util.TestCase):
 
   def test_static_loc_static_scale_non_matching_event_size_raises(self):
     loc = tf.zeros([2, 4])
@@ -291,8 +141,8 @@ class ShapesFromLocAndScaleTest(tfp_test_util.TestCase):
     self.assertAllEqual([3], event_shape_)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GetBroadcastShapeTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class GetBroadcastShapeTest(test_util.TestCase):
 
   def test_all_static_shapes_work(self):
     x = tf.ones((2, 1, 3))
@@ -312,8 +162,8 @@ class GetBroadcastShapeTest(tfp_test_util.TestCase):
     self.assertAllEqual([2, 5, 3], bcast_shape)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MixtureStddevTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class MixtureStddevTest(test_util.TestCase):
 
   def test_mixture_dev(self):
     mixture_weights = np.array([
@@ -347,8 +197,8 @@ class MixtureStddevTest(tfp_test_util.TestCase):
     self.assertAllClose(expected_devs, self.evaluate(mix_dev))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PadMixtureDimensionsTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class PadMixtureDimensionsTest(test_util.TestCase):
 
   def test_pad_mixture_dimensions_mixture(self):
     gm = Mixture(
@@ -475,24 +325,24 @@ class _PadTest(object):
         x1_both_, atol=0., rtol=1e-6)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PadStaticTest(_PadTest, tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class PadStaticTest(_PadTest, test_util.TestCase):
 
   @property
   def is_static_shape(self):
     return True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PadDynamicTest(_PadTest, tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class PadDynamicTest(_PadTest, test_util.TestCase):
 
   @property
   def is_static_shape(self):
     return False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PickScalarConditionTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class PickScalarConditionTest(test_util.TestCase):
 
   def test_pick_scalar_condition_static(self):
 
@@ -538,8 +388,8 @@ class PickScalarConditionTest(tfp_test_util.TestCase):
     self.assertAllEqual(neg_, neg)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TestMoveDimension(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class TestMoveDimension(test_util.TestCase):
 
   def test_move_dimension_static_shape(self):
 
@@ -634,8 +484,8 @@ class TestMoveDimension(tfp_test_util.TestCase):
     self.assertAllEqual(x_perm5_, [200, 30, 6, 4, 1])
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AssertCloseTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class AssertCloseTest(test_util.TestCase):
 
   def testAssertIntegerForm(self):
     # This should only be detected as an integer.
@@ -669,8 +519,8 @@ class AssertCloseTest(tfp_test_util.TestCase):
         self.evaluate(tf.identity(w))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MaybeGetStaticTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class MaybeGetStaticTest(test_util.TestCase):
 
   def testGetStaticInt(self):
     x = 2
@@ -703,8 +553,8 @@ class MaybeGetStaticTest(tfp_test_util.TestCase):
         None, distribution_util.maybe_get_static_value(x, dtype=np.float64))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GetLogitsAndProbsTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class GetLogitsAndProbsTest(test_util.TestCase):
 
   def testImproperArguments(self):
     with self.assertRaises(ValueError):
@@ -853,8 +703,8 @@ class GetLogitsAndProbsTest(tfp_test_util.TestCase):
       self.evaluate(logit)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class EmbedCheckCategoricalEventShapeTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class EmbedCheckCategoricalEventShapeTest(test_util.TestCase):
 
   def testTooSmall(self):
     with self.assertRaises(ValueError):
@@ -894,8 +744,8 @@ class EmbedCheckCategoricalEventShapeTest(tfp_test_util.TestCase):
       distribution_util.embed_check_categorical_event_shape(param)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class EmbedCheckIntegerCastingClosedTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class EmbedCheckIntegerCastingClosedTest(test_util.TestCase):
 
   def testCorrectlyAssertsNonnegative(self):
     with self.assertRaisesOpError('Elements must be non-negative'):
@@ -938,8 +788,8 @@ class EmbedCheckIntegerCastingClosedTest(tfp_test_util.TestCase):
       self.evaluate(x_checked)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DynamicShapeTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class DynamicShapeTest(test_util.TestCase):
 
   def testSameDynamicShape(self):
     scalar = tf.constant(2.)
@@ -1010,8 +860,8 @@ class DynamicShapeTest(tfp_test_util.TestCase):
             multidimensional1, multidimensional3)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RotateTransposeTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class RotateTransposeTest(test_util.TestCase):
 
   def _np_rotate_transpose(self, x, shift):
     if not isinstance(x, np.ndarray):
@@ -1045,8 +895,8 @@ class RotateTransposeTest(tfp_test_util.TestCase):
             self.evaluate(distribution_util.rotate_transpose(x, shift)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PickVectorTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class PickVectorTest(test_util.TestCase):
 
   def testCorrectlyPicksVector(self):
     x = np.arange(10, 12)
@@ -1063,8 +913,8 @@ class PickVectorTest(tfp_test_util.TestCase):
                             tf.constant(False), x, y))  # No eval.
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PreferStaticRankTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class PreferStaticRankTest(test_util.TestCase):
 
   def testNonEmptyConstantTensor(self):
     x = tf.zeros([2, 3, 4])
@@ -1109,8 +959,8 @@ class PreferStaticRankTest(tfp_test_util.TestCase):
     self.assertAllEqual(0, self.evaluate(rank))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PreferStaticShapeTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class PreferStaticShapeTest(test_util.TestCase):
 
   def testNonEmptyConstantTensor(self):
     x = tf.zeros((2, 3, 4))
@@ -1152,8 +1002,8 @@ class PreferStaticShapeTest(tfp_test_util.TestCase):
     self.assertAllEqual([], self.evaluate(shape))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PreferStaticValueTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class PreferStaticValueTest(test_util.TestCase):
 
   def testNonEmptyConstantTensor(self):
     x = tf.zeros((2, 3, 4))
@@ -1198,15 +1048,15 @@ class PreferStaticValueTest(tfp_test_util.TestCase):
 
 
 # No need for eager tests; this function doesn't depend on TF.
-class GenNewSeedTest(tfp_test_util.TestCase):
+class GenNewSeedTest(test_util.TestCase):
 
   def testOnlyNoneReturnsNone(self):
     self.assertIsNotNone(distribution_util.gen_new_seed(0, 'salt'))
     self.assertIsNone(distribution_util.gen_new_seed(None, 'salt'))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ArgumentsTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class ArgumentsTest(test_util.TestCase):
 
   def testNoArguments(self):
     def foo():
@@ -1263,8 +1113,8 @@ class ArgumentsTest(tfp_test_util.TestCase):
                      foo(1, 2, 3, *[1, 2, 3], unicorn=None))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ExpandToVectorTest(tfp_test_util.TestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class ExpandToVectorTest(test_util.TestCase):
 
   def _check_static(self, expected, actual, dtype=np.int32):
     const_actual = tf.get_static_value(actual)
@@ -1363,8 +1213,8 @@ class ExpandToVectorTest(tfp_test_util.TestCase):
         self.evaluate(_expand_tensor([[1, 2]], shape=None, validate_args=True))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class WithDependenciesTestCase(test_util.TensorFlowTestCase):
+@tf_test_util.run_all_in_graph_and_eager_modes
+class WithDependenciesTestCase(test_util.TestCase):
 
   def testTupleDependencies(self):
     counter = tf.Variable(0, name='my_counter')

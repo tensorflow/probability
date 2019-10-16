@@ -1301,7 +1301,8 @@ py_library(
     deps = [
         ":vector_exponential_linear_operator",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1325,8 +1326,8 @@ py_library(
     deps = [
         ":vector_laplace_linear_operator",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1357,19 +1358,7 @@ py_library(
         "//tensorflow_probability/python/bijectors:sinh_arcsinh",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
-    ],
-)
-
-py_library(
-    name = "vector_student_t",
-    srcs = ["vector_student_t.py"],
-    deps = [
-        ":student_t",
-        ":transformed_distribution",
-        # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:affine",
-        "//tensorflow_probability/python/internal:distribution_util",
-        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -2467,19 +2456,6 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_test(
-    name = "vector_student_t_test",
-    size = "medium",
-    srcs = ["vector_student_t_test.py"],
-    deps = [
-        ":vector_student_t",
-        # numpy dep,
-        # scipy dep,
-        # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

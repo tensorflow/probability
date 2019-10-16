@@ -109,7 +109,6 @@ FILENAMES = [
     "vector_laplace_diag",
     "vector_laplace_linear_operator",
     "vector_sinh_arcsinh_diag",
-    "vector_student_t",
     "von_mises_fisher",
     # "von_mises",
     "wishart",
