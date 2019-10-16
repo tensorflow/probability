@@ -5,20 +5,28 @@
 
 # Module: tfp.edward2
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Edward2 probabilistic programming language.
-
-
-
-Defined in [`python/edward2/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/__init__.py).
 
 <!-- Placeholder for "Used in" -->
 
 For user guides, see:
 
 + [Overview](
-   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/README.md)
+   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/README.md)
 + [Upgrading from Edward to Edward2](
-   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/edward2/Upgrading_From_Edward_To_Edward2.md)
+   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/Upgrading_From_Edward_To_Edward2.md)
 
 ## Classes
 
@@ -46,11 +54,7 @@ For user guides, see:
 
 [`Chi2(...)`](../tfp/edward2/Chi2.md): Create a random variable for Chi2.
 
-[`Chi2WithAbsDf(...)`](../tfp/edward2/Chi2WithAbsDf.md): Create a random variable for Chi2WithAbsDf.
-
-[`ConditionalDistribution(...)`](../tfp/edward2/ConditionalDistribution.md): Create a random variable for ConditionalDistribution.
-
-[`ConditionalTransformedDistribution(...)`](../tfp/edward2/ConditionalTransformedDistribution.md): Create a random variable for ConditionalTransformedDistribution.
+[`CholeskyLKJ(...)`](../tfp/edward2/CholeskyLKJ.md): Create a random variable for CholeskyLKJ.
 
 [`Deterministic(...)`](../tfp/edward2/Deterministic.md): Create a random variable for Deterministic.
 
@@ -59,6 +63,8 @@ For user guides, see:
 [`DirichletMultinomial(...)`](../tfp/edward2/DirichletMultinomial.md): Create a random variable for DirichletMultinomial.
 
 [`Distribution(...)`](../tfp/edward2/Distribution.md): Create a random variable for Distribution.
+
+[`DoublesidedMaxwell(...)`](../tfp/edward2/DoublesidedMaxwell.md): Create a random variable for DoublesidedMaxwell.
 
 [`Empirical(...)`](../tfp/edward2/Empirical.md): Create a random variable for Empirical.
 
@@ -75,6 +81,8 @@ For user guides, see:
 [`GaussianProcess(...)`](../tfp/edward2/GaussianProcess.md): Create a random variable for GaussianProcess.
 
 [`GaussianProcessRegressionModel(...)`](../tfp/edward2/GaussianProcessRegressionModel.md): Create a random variable for GaussianProcessRegressionModel.
+
+[`GeneralizedPareto(...)`](../tfp/edward2/GeneralizedPareto.md): Create a random variable for GeneralizedPareto.
 
 [`Geometric(...)`](../tfp/edward2/Geometric.md): Create a random variable for Geometric.
 
@@ -124,8 +132,6 @@ For user guides, see:
 
 [`MultivariateNormalDiagPlusLowRank(...)`](../tfp/edward2/MultivariateNormalDiagPlusLowRank.md): Create a random variable for MultivariateNormalDiagPlusLowRank.
 
-[`MultivariateNormalDiagWithSoftplusScale(...)`](../tfp/edward2/MultivariateNormalDiagWithSoftplusScale.md): Create a random variable for MultivariateNormalDiagWithSoftplusScale.
-
 [`MultivariateNormalFullCovariance(...)`](../tfp/edward2/MultivariateNormalFullCovariance.md): Create a random variable for MultivariateNormalFullCovariance.
 
 [`MultivariateNormalLinearOperator(...)`](../tfp/edward2/MultivariateNormalLinearOperator.md): Create a random variable for MultivariateNormalLinearOperator.
@@ -140,11 +146,17 @@ For user guides, see:
 
 [`OneHotCategorical(...)`](../tfp/edward2/OneHotCategorical.md): Create a random variable for OneHotCategorical.
 
+[`PERT(...)`](../tfp/edward2/PERT.md): Create a random variable for PERT.
+
 [`Pareto(...)`](../tfp/edward2/Pareto.md): Create a random variable for Pareto.
+
+[`PlackettLuce(...)`](../tfp/edward2/PlackettLuce.md): Create a random variable for PlackettLuce.
 
 [`Poisson(...)`](../tfp/edward2/Poisson.md): Create a random variable for Poisson.
 
 [`PoissonLogNormalQuadratureCompound(...)`](../tfp/edward2/PoissonLogNormalQuadratureCompound.md): Create a random variable for PoissonLogNormalQuadratureCompound.
+
+[`ProbitBernoulli(...)`](../tfp/edward2/ProbitBernoulli.md): Create a random variable for ProbitBernoulli.
 
 [`QuantizedDistribution(...)`](../tfp/edward2/QuantizedDistribution.md): Create a random variable for QuantizedDistribution.
 

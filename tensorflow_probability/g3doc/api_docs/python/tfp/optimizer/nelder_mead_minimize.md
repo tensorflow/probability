@@ -5,6 +5,18 @@
 
 # tfp.optimizer.nelder_mead_minimize
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/optimizer/nelder_mead.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Minimum of the objective function using the Nelder Mead simplex algorithm.
 
 ``` python
@@ -29,8 +41,6 @@ tfp.optimizer.nelder_mead_minimize(
 ```
 
 
-
-Defined in [`python/optimizer/nelder_mead.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/nelder_mead.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -101,6 +111,7 @@ point.
   https://pdfs.semanticscholar.org/15b4/c4aa7437df4d032c6ee6ce98d6030dd627be.pdf
 
 #### Args:
+
 
 * <b>`objective_function`</b>:  A Python callable that accepts a point as a
   real `Tensor` and returns a `Tensor` of real dtype containing
@@ -181,6 +192,7 @@ point.
 
 #### Returns:
 
+
 * <b>`optimizer_results`</b>: A namedtuple containing the following items:
   converged: Scalar boolean tensor indicating whether the minimum was
     found within tolerance.
@@ -203,6 +215,7 @@ point.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: If any of the following conditions hold
   1. If none or more than one of `initial_simplex` and `initial_vertex` are

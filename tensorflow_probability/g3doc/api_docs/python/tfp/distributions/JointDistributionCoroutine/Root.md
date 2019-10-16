@@ -7,15 +7,23 @@
 
 # tfp.distributions.JointDistributionCoroutine.Root
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/joint_distribution_coroutine.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `Root`
 
 Wrapper for coroutine distributions which lack distribution parents.
 
 
-
-
-
-Defined in [`python/distributions/joint_distribution_coroutine.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/joint_distribution_coroutine.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -33,9 +41,11 @@ Create new instance of Root(distribution,)
 
 
 
+
 ## Properties
 
 <h3 id="distribution"><code>distribution</code></h3>
+
 
 
 

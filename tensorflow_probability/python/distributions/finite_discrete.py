@@ -19,12 +19,16 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'FiniteDiscrete',
@@ -37,6 +41,9 @@ class FiniteDiscrete(distribution.Distribution):
   The FiniteDiscrete distribution is parameterized by either probabilities or
   log-probabilities of a set of `K` possible outcomes, which is defined by
   a strictly ascending list of `K` values.
+
+  Note: log_prob, prob, cdf, mode, and entropy are differentiable with respect
+  to `logits` or `probs` but not with respect to `outcomes`.
 
   #### Mathematical Details
 
@@ -105,21 +112,20 @@ class FiniteDiscrete(distribution.Distribution):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
-    with tf.compat.v1.name_scope(
-        name, values=[outcomes, logits, probs]) as name:
-      self._outcomes = tf.convert_to_tensor(value=outcomes, name='outcomes')
-      if validate_args:
-        assertions = _maybe_validate_args(self._outcomes, logits, probs,
-                                          validate_args)
-        with tf.control_dependencies(assertions):
-          self._outcomes = tf.identity(self._outcomes)
+    with tf.name_scope(name) as name:
+      outcomes_dtype = dtype_util.common_dtype(
+          [outcomes], dtype_hint=tf.float32)
+      self._outcomes = tensor_util.convert_nonref_to_tensor(
+          outcomes, dtype_hint=outcomes_dtype, name='outcomes')
+
       if dtype_util.is_floating(self._outcomes.dtype):
-        eps = np.finfo(dtype_util.as_numpy_dtype(self._outcomes.dtype)).eps
+        eps = np.finfo(dtype_util.as_numpy_dtype(outcomes_dtype)).eps
         self._rtol = 10 * eps if rtol is None else rtol
         self._atol = 10 * eps if atol is None else atol
       else:
         self._rtol = None
         self._atol = None
+
       self._categorical = categorical.Categorical(
           logits=logits,
           probs=probs,
@@ -132,9 +138,6 @@ class FiniteDiscrete(distribution.Distribution):
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
-        graph_parents=[
-            self._outcomes, self._categorical.logits, self._categorical.probs
-        ],
         name=name)
 
   @classmethod
@@ -148,10 +151,12 @@ class FiniteDiscrete(distribution.Distribution):
 
   @property
   def logits(self):
+    """Input argument `logits`."""
     return self._categorical.logits
 
   @property
   def probs(self):
+    """Input argument `probs`."""
     return self._categorical.probs
 
   def _batch_shape_tensor(self):
@@ -167,7 +172,7 @@ class FiniteDiscrete(distribution.Distribution):
     return tf.TensorShape([])
 
   def _cdf(self, x):
-    x = tf.convert_to_tensor(value=x, name='x')
+    x = tf.convert_to_tensor(x, name='x')
     flat_x = tf.reshape(x, shape=[-1])
     upper_bound = tf.searchsorted(self.outcomes, values=flat_x, side='right')
     values_at_ub = tf.gather(
@@ -176,8 +181,7 @@ class FiniteDiscrete(distribution.Distribution):
                            dist_util.prefer_static_shape(self.outcomes)[-1] -
                            1))
     should_use_upper_bound = self._is_equal_or_close(flat_x, values_at_ub)
-    indices = tf.compat.v1.where(should_use_upper_bound, upper_bound,
-                                 upper_bound - 1)
+    indices = tf.where(should_use_upper_bound, upper_bound, upper_bound - 1)
     return self._categorical.cdf(
         tf.reshape(indices, shape=dist_util.prefer_static_shape(x)))
 
@@ -190,9 +194,9 @@ class FiniteDiscrete(distribution.Distribution):
     return tf.abs(a - b) < self._atol + self._rtol * tf.abs(b)
 
   def _log_prob(self, x):
-    x = tf.convert_to_tensor(value=x, name='x')
+    x = tf.convert_to_tensor(x, name='x')
     right_indices = tf.minimum(
-        tf.size(input=self.outcomes) - 1,
+        tf.size(self.outcomes) - 1,
         tf.reshape(
             tf.searchsorted(
                 self.outcomes, values=tf.reshape(x, shape=[-1]), side='right'),
@@ -203,18 +207,15 @@ class FiniteDiscrete(distribution.Distribution):
     use_left_indices = self._is_equal_or_close(
         x, tf.gather(self.outcomes, indices=left_indices))
     log_probs = self._categorical.log_prob(
-        tf.compat.v1.where(use_left_indices, left_indices, right_indices))
-    should_be_neg_inf = tf.broadcast_to(
+        tf.where(use_left_indices, left_indices, right_indices))
+    return tf.where(
         tf.logical_not(use_left_indices | use_right_indices),
-        shape=dist_util.prefer_static_shape(log_probs))
-    return tf.compat.v1.where(
-        should_be_neg_inf,
-        tf.fill(
-            dist_util.prefer_static_shape(should_be_neg_inf),
-            dtype_util.as_numpy_dtype(log_probs.dtype)(-np.inf)), log_probs)
+        dtype_util.as_numpy_dtype(log_probs.dtype)(-np.inf),
+        log_probs)
 
-  def _mean(self):
-    probs = self.probs
+  def _mean(self, probs=None):
+    if probs is None:
+      probs = self._categorical.probs_parameter()
     outcomes = self.outcomes
     if dtype_util.is_integer(outcomes.dtype):
       if self._validate_args:
@@ -233,7 +234,7 @@ class FiniteDiscrete(distribution.Distribution):
             sample_shape=[n], seed=seed, **distribution_kwargs))
 
   def _variance(self):
-    probs = self._categorical.probs
+    probs = self._categorical.probs_parameter()
     outcomes = tf.broadcast_to(
         self.outcomes, shape=dist_util.prefer_static_shape(probs))
     if dtype_util.is_integer(outcomes.dtype):
@@ -241,58 +242,87 @@ class FiniteDiscrete(distribution.Distribution):
         outcomes = dist_util.embed_check_integer_casting_closed(
             outcomes, target_dtype=probs.dtype)
       outcomes = tf.cast(outcomes, dtype=probs.dtype)
-    square_d = tf.math.squared_difference(outcomes,
-                                          tf.expand_dims(self.mean(), axis=-1))
-    return tf.reduce_sum(input_tensor=probs * square_d, axis=-1)
+    square_d = tf.math.squared_difference(
+        outcomes, self._mean(probs)[..., tf.newaxis])
+    return tf.reduce_sum(probs * square_d, axis=-1)
 
+  def logits_parameter(self, name=None):
+    """Logits vec computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'logits_parameter'):
+      return self._categorical.logits_parameter()
 
-def _maybe_validate_args(outcomes, logits, probs, validate_args):
-  """Validate `outcomes`, `logits` and `probs`'s shapes."""
-  assertions = []
+  def probs_parameter(self, name=None):
+    """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
+    with self._name_and_control_scope(name or 'probs_parameter'):
+      return self._categorical.probs_parameter()
 
-  def validate_equal_last_dim(tensor_a, tensor_b, message):
-    if tensor_a.shape.is_fully_defined() and tensor_b.shape.is_fully_defined():
-      if tensor_a.shape[-1] != tensor_b.shape[-1]:
-        raise ValueError(message)
-    elif validate_args:
+  def _parameter_control_dependencies(self, is_init):
+    assertions = []
+
+    # For `logits` and `probs`, we only want to have an assertion on what the
+    # user actually passed. For now, we access the underlying categorical's
+    # _logits and _probs directly. After the 2019-10-01 deprecation, it would
+    # also work to use .logits() and .probs().
+    logits = self._categorical._logits
+    probs = self._categorical._probs
+    outcomes = self._outcomes
+    validate_args = self._validate_args
+
+    # Build all shape and dtype checks during the `is_init` call.
+    if is_init:
+      def validate_equal_last_dim(tensor_a, tensor_b, message):
+        event_size_a = tf.compat.dimension_value(tensor_a.shape[-1])
+        event_size_b = tf.compat.dimension_value(tensor_b.shape[-1])
+        if event_size_a is not None and event_size_b is not None:
+          if event_size_a != event_size_b:
+            raise ValueError(message)
+        elif validate_args:
+          return assert_util.assert_equal(
+              tf.shape(tensor_a)[-1], tf.shape(tensor_b)[-1], message=message)
+
+      message = 'Size of outcomes must be greater than 0.'
+      if tensorshape_util.num_elements(outcomes.shape) is not None:
+        if tensorshape_util.num_elements(outcomes.shape) == 0:
+          raise ValueError(message)
+      elif validate_args:
+        assertions.append(
+            tf.assert_greater(tf.size(outcomes), 0, message=message))
+
+      if logits is not None:
+        maybe_assert = validate_equal_last_dim(
+            outcomes,
+            # pylint: disable=protected-access
+            self._categorical._logits,
+            # pylint: enable=protected-access
+            message='Last dimension of outcomes and logits must be equal size.')
+        if maybe_assert:
+          assertions.append(maybe_assert)
+
+      if probs is not None:
+        maybe_assert = validate_equal_last_dim(
+            outcomes,
+            probs,
+            message='Last dimension of outcomes and probs must be equal size.')
+        if maybe_assert:
+          assertions.append(maybe_assert)
+
+      message = 'Rank of outcomes must be 1.'
+      ndims = tensorshape_util.rank(outcomes.shape)
+      if ndims is not None:
+        if ndims != 1:
+          raise ValueError(message)
+      elif validate_args:
+        assertions.append(assert_util.assert_rank(outcomes, 1, message=message))
+
+    if not validate_args:
+      assert not assertions  # Should never happen.
+      return []
+
+    if is_init != tensor_util.is_ref(outcomes):
       assertions.append(
-          tf.compat.v1.assert_equal(
-              tf.shape(input=tensor_a)[-1],
-              tf.shape(input=tensor_b)[-1],
-              message=message))
+          assert_util.assert_equal(
+              tf.math.is_strictly_increasing(outcomes),
+              True,
+              message='outcomes is not strictly increasing.'))
 
-  if logits is not None:
-    validate_equal_last_dim(
-        outcomes,
-        logits,
-        message='Last dimension of outcomes and logits must be equal size.')
-  if probs is not None:
-    validate_equal_last_dim(
-        outcomes,
-        probs,
-        message='Last dimension of outcomes and probs must be equal size.')
-
-  message = 'Rank of outcomes must be 1.'
-  if outcomes.shape.ndims is not None:
-    if outcomes.shape.ndims != 1:
-      raise ValueError(message)
-  elif validate_args:
-    assertions.append(tf.compat.v1.assert_rank(outcomes, 1, message=message))
-
-  message = 'Size of outcomes must be greater than 0.'
-  if outcomes.shape.num_elements() is not None:
-    if outcomes.shape.num_elements() == 0:
-      raise ValueError(message)
-  elif validate_args:
-    assertions.append(
-        tf.compat.v1.assert_greater(
-            tf.size(input=outcomes), 0, message=message))
-
-  if validate_args:
-    assertions.append(
-        tf.compat.v1.assert_equal(
-            tf.math.is_strictly_increasing(outcomes),
-            True,
-            message='outcomes is not strictly increasing.'))
-
-  return assertions
+    return assertions

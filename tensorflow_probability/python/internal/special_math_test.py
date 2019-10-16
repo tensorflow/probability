@@ -19,29 +19,19 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import importlib
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+from scipy import special as sp_special
+from scipy import stats as sp_stats
+
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import special_math
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
-
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-
-special = try_import("scipy.special")
-stats = try_import("scipy.stats")
 
 
 def _check_strictly_increasing(array_1d):
@@ -67,7 +57,7 @@ ErrorSpec = collections.namedtuple("ErrorSpec", ["rtol", "atol"])
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NdtriTest(tf.test.TestCase):
+class NdtriTest(tfp_test_util.TestCase):
 
   def assertAllFinite(self, x):
     is_finite = np.isfinite(x)
@@ -76,25 +66,21 @@ class NdtriTest(tf.test.TestCase):
 
   def testNdtri(self):
     """Verifies that ndtri computation is correct."""
-    if not special:
-      return
 
     p = np.linspace(0., 1., 50).astype(np.float64)
     # Quantile performs piecewise rational approximation so adding some
-    # special input values to make sure we hit all the pieces.
+    # sp_special input values to make sure we hit all the pieces.
     p = np.hstack((p, np.exp(-32), 1. - np.exp(-32), np.exp(-2),
                    1. - np.exp(-2)))
-    expected_x = special.ndtri(p)
+    expected_x = sp_special.ndtri(p)
     x = special_math.ndtri(p)
     self.assertAllClose(expected_x, self.evaluate(x), atol=0.)
 
   def testNdtriDynamicShape(self):
     """Verifies that ndtri computation is correct."""
-    if not special:
-      return
     p_ = np.linspace(0., 1., 50).astype(np.float32)
-    p = tf.compat.v1.placeholder_with_default(p_, shape=None)
-    self.assertAllClose(special.ndtri(p_),
+    p = tf1.placeholder_with_default(p_, shape=None)
+    self.assertAllClose(sp_special.ndtri(p_),
                         self.evaluate(special_math.ndtri(p)),
                         atol=0.)
 
@@ -123,7 +109,7 @@ class NdtriTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NdtrTest(tf.test.TestCase):
+class NdtrTest(tfp_test_util.TestCase):
   _use_log = False
   # Grid min/max chosen to ensure 0 < cdf(x) < 1.
   _grid32 = GridSpec(min=-12.9, max=5., shape=[100])
@@ -138,8 +124,6 @@ class NdtrTest(tf.test.TestCase):
       self._test_grid_no_log(dtype, grid_spec, error_spec)
 
   def _test_grid_log(self, dtype, grid_spec, error_spec):
-    if not special:
-      return
 
     grid = _make_grid(dtype, grid_spec)
     actual = self.evaluate(special_math.log_ndtr(grid))
@@ -154,7 +138,7 @@ class NdtrTest(tf.test.TestCase):
     _check_strictly_increasing(actual)
 
     # Versus scipy.
-    expected = special.log_ndtr(grid)
+    expected = sp_special.log_ndtr(grid)
     # Scipy prematurely goes to zero at some places that we don't.  So don't
     # include these in the comparison.
     self.assertAllClose(
@@ -164,8 +148,6 @@ class NdtrTest(tf.test.TestCase):
         atol=error_spec.atol)
 
   def _test_grid_no_log(self, dtype, grid_spec, error_spec):
-    if not special:
-      return
 
     grid = _make_grid(dtype, grid_spec)
     actual = self.evaluate(special_math.ndtr(grid))
@@ -180,7 +162,7 @@ class NdtrTest(tf.test.TestCase):
     _check_strictly_increasing(actual)
 
     # Versus scipy.
-    expected = special.ndtr(grid)
+    expected = sp_special.ndtr(grid)
     # Scipy prematurely goes to zero at some places that we don't.  So don't
     # include these in the comparison.
     self.assertAllClose(
@@ -210,7 +192,7 @@ class LogNdtrTestLower(NdtrTest):
 
 
 # The errors are quite large when the input is > 6 or so.  Also,
-# scipy.special.log_ndtr becomes zero very early, before 10,
+# scipy.sp_special.log_ndtr becomes zero very early, before 10,
 # (due to ndtr becoming 1).  We approximate Log[1 + epsilon] as epsilon, and
 # avoid this issue.
 @test_util.run_all_in_graph_and_eager_modes
@@ -243,7 +225,7 @@ class LogNdtrTestUpper(NdtrTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NdtrGradientTest(tf.test.TestCase):
+class NdtrGradientTest(tfp_test_util.TestCase):
   _use_log = False
   _grid = GridSpec(min=-100., max=100., shape=[1, 2, 3, 8])
   _error32 = ErrorSpec(rtol=1e-4, atol=0)
@@ -288,12 +270,12 @@ class NdtrGradientTest(tf.test.TestCase):
     self.assert_all_true(np.isfinite(actual_grad))
 
     # Versus scipy.
-    if not (special and stats):
+    if not (sp_special and sp_stats):
       return
 
-    expected_grad = stats.norm.pdf(grid)
+    expected_grad = sp_stats.norm.pdf(grid)
     if self._use_log:
-      expected_grad /= special.ndtr(grid)
+      expected_grad /= sp_special.ndtr(grid)
       expected_grad[np.isnan(expected_grad)] = 0.
     # Scipy prematurely goes to zero at some places that we don't.  So don't
     # include these in the comparison.
@@ -318,13 +300,11 @@ class LogNdtrGradientTest(NdtrGradientTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ErfInvTest(tf.test.TestCase):
+class ErfInvTest(tfp_test_util.TestCase):
 
   def testErfInvValues(self):
-    if not special:
-      return
     x = np.linspace(0., 1., 50).astype(np.float64)
-    self.assertAllClose(special.erfinv(x),
+    self.assertAllClose(sp_special.erfinv(x),
                         self.evaluate(special_math.erfinv(x)),
                         atol=0)
 
@@ -339,7 +319,7 @@ class ErfInvTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class LogCDFLaplaceTest(tf.test.TestCase):
+class LogCDFLaplaceTest(tfp_test_util.TestCase):
   # Note that scipy.stats.laplace does not have a stable Log CDF, so we cannot
   # rely on scipy to cross check the extreme values.
 
@@ -369,10 +349,8 @@ class LogCDFLaplaceTest(tf.test.TestCase):
     _check_strictly_increasing(actual)
 
     # Versus scipy.
-    if not stats:
-      return
 
-    scipy_dist = stats.laplace(loc=0., scale=1.)
+    scipy_dist = sp_stats.laplace(loc=0., scale=1.)
     expected = scipy_dist.logcdf(grid.astype(scipy_dtype))
     self.assertAllClose(
         expected.astype(np.float64),

@@ -5,7 +5,24 @@
 
 # tfp.edward2.RelaxedBernoulli
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for RelaxedBernoulli.
+
+### Aliases:
+
+* `tfp.experimental.edward2.RelaxedBernoulli`
+
 
 ``` python
 tfp.edward2.RelaxedBernoulli(
@@ -16,25 +33,24 @@ tfp.edward2.RelaxedBernoulli(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See RelaxedBernoulli for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
 Construct RelaxedBernoulli distributions.
 
-
 #### Args:
 
-* <b>`temperature`</b>: An 0-D `Tensor`, representing the temperature
-  of a set of RelaxedBernoulli distributions. The temperature should be
+
+* <b>`temperature`</b>: A `Tensor`, representing the temperature of a set of
+  RelaxedBernoulli distributions. The temperature values should be
   positive.
 * <b>`logits`</b>: An N-D `Tensor` representing the log-odds
   of a positive event. Each entry in the `Tensor` parametrizes
@@ -56,5 +72,6 @@ Construct RelaxedBernoulli distributions.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: If both `probs` and `logits` are passed, or if neither.

@@ -5,6 +5,18 @@
 
 # tfp.stats.count_integers
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/stats/quantiles.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Counts the number of occurrences of each value in an integer array `arr`.
 
 ``` python
@@ -21,8 +33,6 @@ tfp.stats.count_integers(
 
 
 
-Defined in [`python/stats/quantiles.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/stats/quantiles.py).
-
 <!-- Placeholder for "Used in" -->
 
 Works like `tf.math.bincount`, but provides an `axis` kwarg that specifies
@@ -37,6 +47,7 @@ value in `weights` at each index where the corresponding value in `arr` is
 `i`.
 
 #### Args:
+
 
 * <b>`arr`</b>: An `int32` `Tensor` of non-negative values.
 * <b>`weights`</b>: If non-None, must be the same shape as arr. For each value in

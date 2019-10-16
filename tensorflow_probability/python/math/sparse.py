@@ -19,8 +19,9 @@ from __future__ import division
 from __future__ import print_function
 
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     'dense_to_sparse',
@@ -45,17 +46,17 @@ def dense_to_sparse(x, ignore_value=None, name=None):
   """
   # Copied (with modifications) from:
   # tensorflow/contrib/layers/python/ops/sparse_ops.py.
-  with tf.compat.v1.name_scope(name, 'dense_to_sparse', [x, ignore_value]):
-    x = tf.convert_to_tensor(value=x, name='x')
+  with tf.name_scope(name or 'dense_to_sparse'):
+    x = tf.convert_to_tensor(x, name='x')
     if ignore_value is None:
-      if x.dtype.base_dtype == tf.string:
+      if dtype_util.base_dtype(x.dtype) == tf.string:
         # Exception due to TF strings are converted to numpy objects by default.
         ignore_value = ''
       else:
-        ignore_value = x.dtype.as_numpy_dtype(0)
+        ignore_value = dtype_util.as_numpy_dtype(x.dtype)(0)
       ignore_value = tf.cast(ignore_value, x.dtype, name='ignore_value')
-    indices = tf.compat.v1.where(tf.not_equal(x, ignore_value), name='indices')
+    indices = tf.where(tf.not_equal(x, ignore_value), name='indices')
     return tf.SparseTensor(
         indices=indices,
         values=tf.gather_nd(x, indices, name='values'),
-        dense_shape=tf.shape(input=x, out_type=tf.int64, name='dense_shape'))
+        dense_shape=tf.shape(x, out_type=tf.int64, name='dense_shape'))

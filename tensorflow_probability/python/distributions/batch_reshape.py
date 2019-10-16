@@ -20,7 +20,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
@@ -29,7 +28,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
-    "BatchReshape",
+    'BatchReshape',
 ]
 
 
@@ -88,7 +87,7 @@ class BatchReshape(distribution_lib.Distribution):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
-        (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+        (e.g., mean, mode, variance) use the value `NaN` to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
       name: The name to give Ops created by the initializer.
@@ -101,11 +100,11 @@ class BatchReshape(distribution_lib.Distribution):
         `distribution.batch_shape` size.
     """
     parameters = dict(locals())
-    name = name or "BatchReshape" + distribution.name
+    name = name or 'BatchReshape' + distribution.name
     with tf.name_scope(name) as name:
       # The unexpanded batch shape may contain up to one dimension of -1.
       self._batch_shape_unexpanded = tf.convert_to_tensor(
-          value=batch_shape, dtype=tf.int32, name="batch_shape")
+          batch_shape, dtype=tf.int32, name='batch_shape')
       validate_init_args_statically(distribution, self._batch_shape_unexpanded)
       batch_shape, batch_shape_static, runtime_assertions = calculate_reshape(
           distribution.batch_shape_tensor(), self._batch_shape_unexpanded,
@@ -120,8 +119,6 @@ class BatchReshape(distribution_lib.Distribution):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          graph_parents=(
-              [self._batch_shape_unexpanded] + distribution._graph_parents),  # pylint: disable=protected-access
           name=name)
 
   @property
@@ -214,11 +211,11 @@ class BatchReshape(distribution_lib.Distribution):
         tf.rank(x) if tensorshape_util.rank(x.shape) is None else
         tensorshape_util.rank(x.shape))
     event_ndims = (
-        tf.size(input=self.event_shape_tensor())
+        tf.size(self.event_shape_tensor())
         if tensorshape_util.rank(self.event_shape) is None else
         tensorshape_util.rank(self.event_shape))
     batch_ndims = (
-        tf.size(input=self._batch_shape_unexpanded)
+        tf.size(self._batch_shape_unexpanded)
         if tensorshape_util.rank(self.batch_shape) is None else
         tensorshape_util.rank(self.batch_shape))
     sample_ndims = x_ndims - batch_ndims - event_ndims
@@ -229,7 +226,7 @@ class BatchReshape(distribution_lib.Distribution):
     if tensorshape_util.is_fully_defined(static_sample_shape):
       sample_shape = np.int32(static_sample_shape)
     else:
-      sample_shape = tf.shape(input=x)[:sample_ndims]
+      sample_shape = tf.shape(x)[:sample_ndims]
     return sample_shape, static_sample_shape
 
   def _call_reshape_input_output(self, fn, x, extra_kwargs=None):
@@ -294,16 +291,16 @@ class BatchReshape(distribution_lib.Distribution):
 
   def _validate_sample_arg(self, x):
     """Helper which validates sample arg, e.g., input to `log_prob`."""
-    with tf.name_scope("validate_sample_arg"):
+    with tf.name_scope('validate_sample_arg'):
       x_ndims = (
           tf.rank(x) if tensorshape_util.rank(x.shape) is None else
           tensorshape_util.rank(x.shape))
       event_ndims = (
-          tf.size(input=self.event_shape_tensor())
+          tf.size(self.event_shape_tensor())
           if tensorshape_util.rank(self.event_shape) is None else
           tensorshape_util.rank(self.event_shape))
       batch_ndims = (
-          tf.size(input=self._batch_shape_unexpanded)
+          tf.size(self._batch_shape_unexpanded)
           if tensorshape_util.rank(self.batch_shape) is None else
           tensorshape_util.rank(self.batch_shape))
       expected_batch_event_ndims = batch_ndims + event_ndims
@@ -312,8 +309,8 @@ class BatchReshape(distribution_lib.Distribution):
           isinstance(expected_batch_event_ndims, int)):
         if x_ndims < expected_batch_event_ndims:
           raise NotImplementedError(
-              "Broadcasting is not supported; too few batch and event dims "
-              "(expected at least {}, saw {}).".format(
+              'Broadcasting is not supported; too few batch and event dims '
+              '(expected at least {}, saw {}).'.format(
                   expected_batch_event_ndims, x_ndims))
         ndims_assertion = []
       elif self.validate_args:
@@ -321,9 +318,9 @@ class BatchReshape(distribution_lib.Distribution):
             assert_util.assert_greater_equal(
                 x_ndims,
                 expected_batch_event_ndims,
-                message=("Broadcasting is not supported; too few "
-                         "batch and event dims."),
-                name="assert_batch_and_event_ndims_large_enough"),
+                message=('Broadcasting is not supported; too few '
+                         'batch and event dims.'),
+                name='assert_batch_and_event_ndims_large_enough'),
         ]
 
       if (tensorshape_util.is_fully_defined(self.batch_shape) and
@@ -345,14 +342,14 @@ class BatchReshape(distribution_lib.Distribution):
         actual_batch_event_shape = np.int32(x.shape[sample_ndims:])
       else:
         sample_ndims = tf.maximum(sample_ndims, 0)
-        actual_batch_event_shape = tf.shape(input=x)[sample_ndims:]
+        actual_batch_event_shape = tf.shape(x)[sample_ndims:]
 
       if (isinstance(expected_batch_event_shape, np.ndarray) and
           isinstance(actual_batch_event_shape, np.ndarray)):
         if any(expected_batch_event_shape != actual_batch_event_shape):
-          raise NotImplementedError("Broadcasting is not supported; "
-                                    "unexpected batch and event shape "
-                                    "(expected {}, saw {}).".format(
+          raise NotImplementedError('Broadcasting is not supported; '
+                                    'unexpected batch and event shape '
+                                    '(expected {}, saw {}).'.format(
                                         expected_batch_event_shape,
                                         actual_batch_event_shape))
         # We need to set the final runtime-assertions to `ndims_assertion` since
@@ -368,9 +365,9 @@ class BatchReshape(distribution_lib.Distribution):
           shape_assertion = assert_util.assert_equal(
               expected_batch_event_shape,
               actual_batch_event_shape,
-              message=("Broadcasting is not supported; "
-                       "unexpected batch and event shape."),
-              name="assert_batch_and_event_shape_same")
+              message=('Broadcasting is not supported; '
+                       'unexpected batch and event shape.'),
+              name='assert_batch_and_event_shape_same')
         runtime_assertions = [shape_assertion]
       else:
         runtime_assertions = []
@@ -383,29 +380,28 @@ def calculate_reshape(original_shape, new_shape, validate=False, name=None):
   batch_shape_static = tensorshape_util.constant_value_as_shape(new_shape)
   if tensorshape_util.is_fully_defined(batch_shape_static):
     return np.int32(batch_shape_static), batch_shape_static, []
-  with tf.name_scope(name or "calculate_reshape"):
-    original_size = tf.reduce_prod(input_tensor=original_shape)
+  with tf.name_scope(name or 'calculate_reshape'):
+    original_size = tf.reduce_prod(original_shape)
     implicit_dim = tf.equal(new_shape, -1)
     size_implicit_dim = (
-        original_size // tf.maximum(1, -tf.reduce_prod(input_tensor=new_shape)))
-    new_ndims = tf.shape(input=new_shape)
-    expanded_new_shape = tf1.where(  # Assumes exactly one `-1`.
-        implicit_dim, tf.fill(new_ndims, size_implicit_dim), new_shape)
+        original_size // tf.maximum(1, -tf.reduce_prod(new_shape)))
+    expanded_new_shape = tf.where(  # Assumes exactly one `-1`.
+        implicit_dim, size_implicit_dim, new_shape)
     validations = [] if not validate else [  # pylint: disable=g-long-ternary
         assert_util.assert_rank(
-            original_shape, 1, message="Original shape must be a vector."),
+            original_shape, 1, message='Original shape must be a vector.'),
         assert_util.assert_rank(
-            new_shape, 1, message="New shape must be a vector."),
+            new_shape, 1, message='New shape must be a vector.'),
         assert_util.assert_less_equal(
             tf.math.count_nonzero(implicit_dim, dtype=tf.int32),
             1,
-            message="At most one dimension can be unknown."),
+            message='At most one dimension can be unknown.'),
         assert_util.assert_positive(
-            expanded_new_shape, message="Shape elements must be >=-1."),
+            expanded_new_shape, message='Shape elements must be >=-1.'),
         assert_util.assert_equal(
-            tf.reduce_prod(input_tensor=expanded_new_shape),
+            tf.reduce_prod(expanded_new_shape),
             original_size,
-            message="Shape sizes do not match."),
+            message='Shape sizes do not match.'),
     ]
     return expanded_new_shape, batch_shape_static, validations
 
@@ -414,8 +410,8 @@ def validate_init_args_statically(distribution, batch_shape):
   """Helper to __init__ which makes or raises assertions."""
   if tensorshape_util.rank(batch_shape.shape) is not None:
     if tensorshape_util.rank(batch_shape.shape) != 1:
-      raise ValueError("`batch_shape` must be a vector "
-                       "(saw rank: {}).".format(
+      raise ValueError('`batch_shape` must be a vector '
+                       '(saw rank: {}).'.format(
                            tensorshape_util.rank(batch_shape.shape)))
 
   batch_shape_static = tensorshape_util.constant_value_as_shape(batch_shape)
@@ -425,12 +421,12 @@ def validate_init_args_statically(distribution, batch_shape):
 
   if batch_size_static is not None and dist_batch_size_static is not None:
     if batch_size_static != dist_batch_size_static:
-      raise ValueError("`batch_shape` size ({}) must match "
-                       "`distribution.batch_shape` size ({}).".format(
+      raise ValueError('`batch_shape` size ({}) must match '
+                       '`distribution.batch_shape` size ({}).'.format(
                            batch_size_static, dist_batch_size_static))
 
   if tensorshape_util.dims(batch_shape_static) is not None:
     if any(
         tf.compat.dimension_value(dim) is not None and
         tf.compat.dimension_value(dim) < 1 for dim in batch_shape_static):
-      raise ValueError("`batch_shape` elements must be >=-1.")
+      raise ValueError('`batch_shape` elements must be >=-1.')

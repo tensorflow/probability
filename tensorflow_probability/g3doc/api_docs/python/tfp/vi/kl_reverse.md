@@ -5,6 +5,18 @@
 
 # tfp.vi.kl_reverse
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/vi/csiszar_divergence.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 The reverse Kullback-Leibler Csiszar-function in log-space.
 
 ``` python
@@ -16,8 +28,6 @@ tfp.vi.kl_reverse(
 ```
 
 
-
-Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -49,6 +59,7 @@ calculations and may therefore be numerically unstable for `|logu| >> 0`.
 
 #### Args:
 
+
 * <b>`logu`</b>: `float`-like `Tensor` representing `log(u)` from above.
 * <b>`self_normalized`</b>: Python `bool` indicating whether `f'(u=1)=0`. When
   `f'(u=1)=0` the implied Csiszar f-Divergence remains non-negative even
@@ -58,10 +69,12 @@ calculations and may therefore be numerically unstable for `|logu| >> 0`.
 
 #### Returns:
 
+
 * <b>`kl_reverse_of_u`</b>: `float`-like `Tensor` of the Csiszar-function evaluated at
   `u = exp(logu)`.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `self_normalized` is `None` or a `Tensor`.

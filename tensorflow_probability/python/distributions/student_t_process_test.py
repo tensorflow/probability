@@ -19,11 +19,13 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -45,11 +47,10 @@ class _StudentTProcessTest(object):
     batched_index_points = np.stack([index_points]*6)
     # ==> shape = [6, 25, 2]
     if not self.is_static:
-      df = tf.compat.v1.placeholder_with_default(df, shape=None)
-      amplitude = tf.compat.v1.placeholder_with_default(amplitude, shape=None)
-      length_scale = tf.compat.v1.placeholder_with_default(
-          length_scale, shape=None)
-      batched_index_points = tf.compat.v1.placeholder_with_default(
+      df = tf1.placeholder_with_default(df, shape=None)
+      amplitude = tf1.placeholder_with_default(amplitude, shape=None)
+      length_scale = tf1.placeholder_with_default(length_scale, shape=None)
+      batched_index_points = tf1.placeholder_with_default(
           batched_index_points, shape=None)
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
     tp = tfd.StudentTProcess(
@@ -73,6 +74,8 @@ class _StudentTProcessTest(object):
       self.assertAllEqual(tp.event_shape, event_shape)
       self.assertAllEqual(samples.shape,
                           sample_shape + batch_shape + event_shape)
+      self.assertAllEqual(tp.mean().shape, batch_shape + event_shape)
+      self.assertAllEqual(tp.variance().shape, batch_shape + event_shape)
     else:
       self.assertAllEqual(self.evaluate(tp.batch_shape_tensor()), batch_shape)
       self.assertAllEqual(self.evaluate(tp.event_shape_tensor()), event_shape)
@@ -84,6 +87,10 @@ class _StudentTProcessTest(object):
       self.assertEqual(tensorshape_util.rank(tp.event_shape), 1)
       self.assertIsNone(
           tf.compat.dimension_value(tensorshape_util.dims(tp.event_shape)[0]))
+      self.assertAllEqual(
+          self.evaluate(tf.shape(tp.mean())), batch_shape + event_shape)
+      self.assertAllEqual(self.evaluate(
+          tf.shape(tp.variance())), batch_shape + event_shape)
 
   def testVarianceAndCovarianceMatrix(self):
     df = np.float64(4.)
@@ -106,8 +113,7 @@ class _StudentTProcessTest(object):
 
     expected_covariance = (
         _kernel_fn(np.expand_dims(index_points, 0),
-                   np.expand_dims(index_points, 1)) +
-        jitter * np.eye(10))
+                   np.expand_dims(index_points, 1)))
 
     self.assertAllClose(expected_covariance,
                         self.evaluate(tp.covariance()))
@@ -132,10 +138,8 @@ class _StudentTProcessTest(object):
 
     # ==> shape = [6, 25, 2]
     if not self.is_static:
-      index_points_1 = tf.compat.v1.placeholder_with_default(
-          index_points_1, shape=None)
-      index_points_2 = tf.compat.v1.placeholder_with_default(
-          index_points_2, shape=None)
+      index_points_1 = tf1.placeholder_with_default(index_points_1, shape=None)
+      index_points_2 = tf1.placeholder_with_default(index_points_2, shape=None)
 
     mean_fn = lambda x: np.array([0.], np.float32)
     kernel_1 = psd_kernels.ExponentiatedQuadratic()
@@ -181,14 +185,63 @@ class _StudentTProcessTest(object):
       self.assertAllEqual(self.evaluate(tp1.index_points), index_points_1)
       self.assertAllEqual(self.evaluate(tp2.index_points), index_points_2)
 
+  def testLateBindingIndexPoints(self):
+    amp = np.float64(.5)
+    len_scale = np.float64(.2)
+    kernel = psd_kernels.ExponentiatedQuadratic(amp, len_scale)
+    mean_fn = lambda x: x[:, 0]**2
+    jitter = np.float64(1e-4)
+
+    tp = tfd.StudentTProcess(
+        df=np.float64(3.),
+        kernel=kernel,
+        mean_fn=mean_fn,
+        jitter=jitter)
+
+    index_points = np.random.uniform(-1., 1., [10, 1]).astype(np.float64)
+
+    expected_mean = mean_fn(index_points)
+    self.assertAllClose(expected_mean,
+                        self.evaluate(tp.mean(index_points=index_points)))
+
+    def _kernel_fn(x, y):
+      return amp ** 2 * np.exp(-.5 * (np.squeeze((x - y)**2)) / (len_scale**2))
+
+    expected_covariance = _kernel_fn(np.expand_dims(index_points, -3),
+                                     np.expand_dims(index_points, -2))
+
+    self.assertAllClose(expected_covariance,
+                        self.evaluate(tp.covariance(index_points=index_points)))
+    self.assertAllClose(np.diag(expected_covariance),
+                        self.evaluate(tp.variance(index_points=index_points)))
+    self.assertAllClose(np.sqrt(np.diag(expected_covariance)),
+                        self.evaluate(tp.stddev(index_points=index_points)))
+
+    # Calling mean with no index_points should raise an Error
+    with self.assertRaises(ValueError):
+      tp.mean()
+
+  def testMarginalHasCorrectTypes(self):
+    tp = tfd.StudentTProcess(df=3., kernel=psd_kernels.ExponentiatedQuadratic())
+
+    self.assertIsInstance(
+        tp.get_marginal_distribution(
+            index_points=np.ones([1, 1], dtype=np.float32)),
+        tfd.StudentT)
+
+    self.assertIsInstance(
+        tp.get_marginal_distribution(
+            index_points=np.ones([10, 1], dtype=np.float32)),
+        tfd.MultivariateStudentTLinearOperator)
+
 
 @test_util.run_all_in_graph_and_eager_modes
-class StudentTProcessStaticTest(_StudentTProcessTest, tf.test.TestCase):
+class StudentTProcessStaticTest(_StudentTProcessTest, tfp_test_util.TestCase):
   is_static = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class StudentTProcessDynamicTest(_StudentTProcessTest, tf.test.TestCase):
+class StudentTProcessDynamicTest(_StudentTProcessTest, tfp_test_util.TestCase):
   is_static = False
 
 

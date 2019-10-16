@@ -7,15 +7,23 @@
 
 # tfp.math.ode.ChosenBySolver
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/ode/base.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `ChosenBySolver`
 
 Sentinel used to modify the behaviour of the `solve` method of a solver.
 
 
-
-
-
-Defined in [`python/math/ode/base.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/ode/base.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -24,6 +32,7 @@ solver. Doing so requests that the solver automatically choose suitable times
 at which to store the computed state (see `tfp.math.ode.Base.solve`).
 
 #### Properties:
+
 
 * <b>`final_time`</b>: Scalar float `Tensor` specifying the largest time at which to
   store the computed state.
@@ -41,9 +50,11 @@ Create new instance of ChosenBySolver(final_time,)
 
 
 
+
 ## Properties
 
 <h3 id="final_time"><code>final_time</code></h3>
+
 
 
 

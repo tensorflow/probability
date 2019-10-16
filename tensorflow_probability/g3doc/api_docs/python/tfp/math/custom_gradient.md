@@ -5,6 +5,18 @@
 
 # tfp.math.custom_gradient
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/custom_gradient.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Embeds a custom gradient into a `Tensor`.
 
 ``` python
@@ -18,8 +30,6 @@ tfp.math.custom_gradient(
 ```
 
 
-
-Defined in [`python/math/custom_gradient.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/custom_gradient.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -46,6 +56,7 @@ relevant portions of `f`, `g`. For example see the unit-test,
 
 #### Args:
 
+
 * <b>`fx`</b>: `Tensor`. Output of function evaluated at `x`.
 * <b>`gx`</b>: `Tensor` or list of `Tensor`s. Gradient of function at (each) `x`.
 * <b>`x`</b>: `Tensor` or list of `Tensor`s. Args of evaluation for `f`.
@@ -55,6 +66,7 @@ relevant portions of `f`, `g`. For example see the unit-test,
 
 
 #### Returns:
+
 
 * <b>`fx`</b>: Floating-type `Tensor` equal to `f(x)` but which has gradient
   `stop_gradient(g(x))`.

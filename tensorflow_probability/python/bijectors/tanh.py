@@ -44,13 +44,18 @@ class Tanh(bijector.Bijector):
   """
 
   def __init__(self, validate_args=False, name="tanh"):
-    super(Tanh, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(Tanh, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
+
+  @classmethod
+  def _is_increasing(cls):
+    return True
 
   def _forward(self, x):
-    return tf.nn.tanh(x)
+    return tf.math.tanh(x)
 
   def _inverse(self, y):
     return tf.atanh(y)
@@ -70,4 +75,4 @@ class Tanh(bijector.Bijector):
     #    = 2 * log(2e^-x / (e^-2x + 1))
     #    = 2 * (log(2) - x - log(e^-2x + 1))
     #    = 2 * (log(2) - x - softplus(-2x))
-    return 2. * (np.log(2.) - x - tf.nn.softplus(-2. * x))
+    return 2. * (np.log(2.) - x - tf.math.softplus(-2. * x))

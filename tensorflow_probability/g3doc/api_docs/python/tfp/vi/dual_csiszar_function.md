@@ -5,6 +5,18 @@
 
 # tfp.vi.dual_csiszar_function
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/vi/csiszar_divergence.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Calculates the dual Csiszar-function in log-space.
 
 ``` python
@@ -16,8 +28,6 @@ tfp.vi.dual_csiszar_function(
 ```
 
 
-
-Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -53,6 +63,7 @@ numerically unstable for `|logu| >> 0`.
 
 #### Args:
 
+
 * <b>`logu`</b>: `float`-like `Tensor` representing `log(u)` from above.
 * <b>`csiszar_function`</b>: Python `callable` representing a Csiszar-function over
   log-domain.
@@ -60,6 +71,7 @@ numerically unstable for `|logu| >> 0`.
 
 
 #### Returns:
+
 
 * <b>`dual_f_of_u`</b>: `float`-like `Tensor` of the result of calculating the dual of
   `f` at `u = exp(logu)`.

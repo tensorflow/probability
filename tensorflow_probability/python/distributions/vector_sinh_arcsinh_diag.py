@@ -26,10 +26,103 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
-    "VectorSinhArcsinhDiag",
+    'VectorSinhArcsinhDiag',
 ]
+
+
+# Copied from distribution_util, where it is to be removed, and duplicated here
+# to support VectorLaplaceDiag until the deprecation window is closed.
+def _make_diag_scale(loc=None,
+                     scale_diag=None,
+                     scale_identity_multiplier=None,
+                     shape_hint=None,
+                     validate_args=False,
+                     assert_positive=False,
+                     name=None,
+                     dtype=None):
+  """Creates a LinearOperator representing a diagonal matrix.
+
+  Args:
+    loc: Floating-point `Tensor`. This is used for inferring shape in the case
+      where only `scale_identity_multiplier` is set.
+    scale_diag: Floating-point `Tensor` representing the diagonal matrix.
+      `scale_diag` has shape [N1, N2, ...  k], which represents a k x k diagonal
+      matrix. When `None` no diagonal term is added to the LinearOperator.
+    scale_identity_multiplier: floating point rank 0 `Tensor` representing a
+      scaling done to the identity matrix. When `scale_identity_multiplier =
+      scale_diag = scale_tril = None` then `scale += IdentityMatrix`. Otherwise
+      no scaled-identity-matrix is added to `scale`.
+    shape_hint: scalar integer `Tensor` representing a hint at the dimension of
+      the identity matrix when only `scale_identity_multiplier` is set.
+    validate_args: Python `bool` indicating whether arguments should be checked
+      for correctness.
+    assert_positive: Python `bool` indicating whether LinearOperator should be
+      checked for being positive definite.
+    name: Python `str` name given to ops managed by this object.
+    dtype: TF `DType` to prefer when converting args to `Tensor`s. Else, we fall
+      back to a compatible dtype across all of `loc`, `scale_diag`, and
+      `scale_identity_multiplier`.
+
+  Returns:
+    `LinearOperator` representing a lower triangular matrix.
+
+  Raises:
+    ValueError:  If only `scale_identity_multiplier` is set and `loc` and
+      `shape_hint` are both None.
+  """
+
+  with tf.name_scope(name or 'make_diag_scale'):
+    if dtype is None:
+      dtype = dtype_util.common_dtype(
+          [loc, scale_diag, scale_identity_multiplier],
+          dtype_hint=tf.float32)
+    loc = tensor_util.convert_nonref_to_tensor(loc, name='loc', dtype=dtype)
+    scale_diag = tensor_util.convert_nonref_to_tensor(
+        scale_diag, name='scale_diag', dtype=dtype)
+    scale_identity_multiplier = tensor_util.convert_nonref_to_tensor(
+        scale_identity_multiplier,
+        name='scale_identity_multiplier',
+        dtype=dtype)
+
+    if scale_diag is not None:
+      if scale_identity_multiplier is not None:
+        scale_diag = scale_diag + scale_identity_multiplier[..., tf.newaxis]
+      return tf.linalg.LinearOperatorDiag(
+          diag=scale_diag,
+          is_non_singular=True,
+          is_self_adjoint=True,
+          is_positive_definite=assert_positive)
+
+    if loc is None and shape_hint is None:
+      raise ValueError('Cannot infer `event_shape` unless `loc` or '
+                       '`shape_hint` is specified.')
+
+    num_rows = shape_hint
+    del shape_hint
+    if num_rows is None:
+      num_rows = tf.compat.dimension_value(loc.shape[-1])
+      if num_rows is None:
+        num_rows = tf.shape(loc)[-1]
+
+    if scale_identity_multiplier is None:
+      return tf.linalg.LinearOperatorIdentity(
+          num_rows=num_rows,
+          dtype=dtype,
+          is_self_adjoint=True,
+          is_positive_definite=True,
+          assert_proper_shapes=validate_args)
+
+    return tf.linalg.LinearOperatorScaledIdentity(
+        num_rows=num_rows,
+        multiplier=scale_identity_multiplier,
+        is_non_singular=True,
+        is_self_adjoint=True,
+        is_positive_definite=assert_positive,
+        assert_proper_shapes=validate_args)
 
 
 class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
@@ -43,7 +136,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
   [Sinh-arcsinh distributions](https://www.jstor.org/stable/27798865).
   Here we use a slightly different parameterization, in terms of `tailweight`
   and `skewness`.  Additionally we allow for distributions other than Normal,
-  and control over `scale` as well as a "shift" parameter `loc`.
+  and control over `scale` as well as a 'shift' parameter `loc`.
 
   #### Mathematical Details
 
@@ -53,8 +146,8 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
   matrix multiplication):
 
   ```
-  Y := loc + scale @ F(Z) * (2 / F_0(2))
-  F(Z) := Sinh( (Arcsinh(Z) + skewness) * tailweight )
+  Y := loc + scale @ F(Z)
+  F(Z) := Sinh( (Arcsinh(Z) + skewness) * tailweight ) * (2 / F_0(2))
   F_0(Z) := Sinh( Arcsinh(Z) * tailweight )
   ```
 
@@ -73,12 +166,12 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
   reshaping done by `F`:
 
   * Positive (negative) `skewness` leads to positive (negative) skew.
-    * positive skew means, the mode of `F(Z)` is "tilted" to the right.
+    * positive skew means, the mode of `F(Z)` is 'tilted' to the right.
     * positive skew means positive values of `F(Z)` become more likely, and
       negative values become less likely.
   * Larger (smaller) `tailweight` leads to fatter (thinner) tails.
     * Fatter tails mean larger values of `|F(Z)|` become more likely.
-    * `tailweight < 1` leads to a distribution that is "flat" around `Y = loc`,
+    * `tailweight < 1` leads to a distribution that is 'flat' around `Y = loc`,
       and a very steep drop-off in the tails.
     * `tailweight > 1` leads to a distribution more peaked at the mode with
       heavier tails.
@@ -96,6 +189,12 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
   ```
   """
 
+  @deprecation.deprecated(
+      '2020-01-01',
+      '`VectorSinhArcsinhDiag` is deprecated. If all you need is the diagonal '
+      'scale, you can use '
+      '`tfd.Independent(tfd.SinhArcsinh(loc=loc, scale=scale_diag, ...), 1)` '
+      'instead.')
   def __init__(self,
                loc=None,
                scale_diag=None,
@@ -105,7 +204,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
                distribution=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="VectorSinhArcsinhDiag"):
+               name='VectorSinhArcsinhDiag'):
     """Construct VectorSinhArcsinhDiag distribution on `R^k`.
 
     The arguments `scale_diag` and `scale_identity_multiplier` combine to
@@ -156,7 +255,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`,
-        statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+        statistics (e.g., mean, mode, variance) use the value '`NaN`' to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -171,9 +270,8 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
           [loc, scale_diag, scale_identity_multiplier, skewness, tailweight],
           tf.float32)
       loc = loc if loc is None else tf.convert_to_tensor(
-          value=loc, name="loc", dtype=dtype)
+          loc, name='loc', dtype=dtype)
       tailweight = 1. if tailweight is None else tailweight
-      has_default_skewness = skewness is None
       skewness = 0. if skewness is None else skewness
 
       # Recall, with Z a random variable,
@@ -187,7 +285,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
       #  1. get shapes from looking at loc and the two scale args.
       #  2. combine scale_diag with scale_identity_multiplier, which gives us
       #     'scale', which in turn gives us 'C'.
-      scale_linop = distribution_util.make_diag_scale(
+      scale_linop = _make_diag_scale(
           loc=loc,
           scale_diag=scale_diag,
           scale_identity_multiplier=scale_identity_multiplier,
@@ -213,24 +311,13 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
               asserts, scale_diag_part)
 
       # Make the SAS bijector, 'F'.
-      skewness = tf.convert_to_tensor(
-          value=skewness, dtype=dtype, name="skewness")
+      skewness = tf.convert_to_tensor(skewness, dtype=dtype, name='skewness')
       tailweight = tf.convert_to_tensor(
-          value=tailweight, dtype=dtype, name="tailweight")
+          tailweight, dtype=dtype, name='tailweight')
       f = sinh_arcsinh_bijector.SinhArcsinh(
           skewness=skewness, tailweight=tailweight)
-      if has_default_skewness:
-        f_noskew = f
-      else:
-        f_noskew = sinh_arcsinh_bijector.SinhArcsinh(
-            skewness=dtype_util.as_numpy_dtype(skewness.dtype)(0.),
-            tailweight=tailweight)
-
-      # Make the Affine bijector, Z --> loc + C * Z.
-      c = 2 * scale_diag_part / f_noskew.forward(
-          tf.convert_to_tensor(value=2, dtype=dtype))
       affine = affine_bijector.Affine(
-          shift=loc, scale_diag=c, validate_args=validate_args)
+          shift=loc, scale_diag=scale_diag_part, validate_args=validate_args)
 
       bijector = chain_bijector.Chain([affine, f])
 
@@ -249,12 +336,12 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
 
   @property
   def loc(self):
-    """The `loc` in `Y := loc + scale @ F(Z) * (2 / F(2))."""
+    """The `loc` in `Y := loc + scale @ F(Z)`."""
     return self._loc
 
   @property
   def scale(self):
-    """The `LinearOperator` `scale` in `Y := loc + scale @ F(Z) * (2 / F(2))."""
+    """The `LinearOperator` `scale` in `Y := loc + scale @ F(Z)`."""
     return self._scale
 
   @property

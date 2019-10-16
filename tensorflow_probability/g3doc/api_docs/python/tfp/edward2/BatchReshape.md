@@ -5,7 +5,24 @@
 
 # tfp.edward2.BatchReshape
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for BatchReshape.
+
+### Aliases:
+
+* `tfp.experimental.edward2.BatchReshape`
+
 
 ``` python
 tfp.edward2.BatchReshape(
@@ -16,22 +33,21 @@ tfp.edward2.BatchReshape(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See BatchReshape for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
 Construct BatchReshape distribution.
 
-
 #### Args:
+
 
 * <b>`distribution`</b>: The base distribution instance to reshape. Typically an
   instance of `Distribution`.
@@ -43,7 +59,7 @@ Construct BatchReshape distribution.
   performance. When `False` invalid inputs may silently render incorrect
   outputs.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-  (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+  (e.g., mean, mode, variance) use the value `NaN` to indicate the
   result is undefined. When `False`, an exception is raised if one or
   more of the statistic's batch members are undefined.
 * <b>`name`</b>: The name to give Ops created by the initializer.
@@ -51,6 +67,7 @@ Construct BatchReshape distribution.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `batch_shape` is not a vector.
 * <b>`ValueError`</b>: if `batch_shape` has non-positive elements.

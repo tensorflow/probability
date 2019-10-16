@@ -16,15 +16,23 @@
 
 # tfp.mcmc.ReplicaExchangeMC
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/replica_exchange_mc.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `ReplicaExchangeMC`
 
 Runs one step of the Replica Exchange Monte Carlo.
 
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
-
-
-
-Defined in [`python/mcmc/replica_exchange_mc.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/replica_exchange_mc.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -143,6 +151,8 @@ plt.show()
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/replica_exchange_mc.py">View source</a>
+
 ``` python
 __init__(
     target_log_prob_fn,
@@ -156,7 +166,9 @@ __init__(
 
 Instantiates this object.
 
+
 #### Args:
+
 
 * <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
   `current_state` (or `*current_state` if it's a list) and returns its
@@ -177,6 +189,7 @@ Instantiates this object.
 
 #### Raises:
 
+
 * <b>`ValueError`</b>: `inverse_temperatures` doesn't have statically known 1D shape.
 
 
@@ -187,7 +200,9 @@ Instantiates this object.
 
 
 
+
 <h3 id="inverse_temperatures"><code>inverse_temperatures</code></h3>
+
 
 
 
@@ -202,7 +217,9 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 
 
+
 <h3 id="num_replica"><code>num_replica</code></h3>
+
 
 
 
@@ -210,7 +227,9 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 Return `dict` of ``__init__`` arguments and their values.
 
+
 <h3 id="seed"><code>seed</code></h3>
+
 
 
 
@@ -220,9 +239,12 @@ Return `dict` of ``__init__`` arguments and their values.
 
 
 
+
 ## Methods
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/replica_exchange_mc.py">View source</a>
 
 ``` python
 bootstrap_results(init_state)
@@ -230,7 +252,9 @@ bootstrap_results(init_state)
 
 Returns an object with the same type as returned by `one_step`.
 
+
 #### Args:
+
 
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   initial state(s) of the Markov chain(s).
@@ -238,11 +262,14 @@ Returns an object with the same type as returned by `one_step`.
 
 #### Returns:
 
+
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
   `Tensor`s representing internal calculations made within this function.
   This inculdes replica states.
 
 <h3 id="one_step"><code>one_step</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/replica_exchange_mc.py">View source</a>
 
 ``` python
 one_step(
@@ -253,7 +280,9 @@ one_step(
 
 Takes one step of the TransitionKernel.
 
+
 #### Args:
+
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   current state(s) of the Markov chain(s).
@@ -263,6 +292,7 @@ Takes one step of the TransitionKernel.
 
 
 #### Returns:
+
 
 * <b>`next_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   next state(s) of the Markov chain(s).

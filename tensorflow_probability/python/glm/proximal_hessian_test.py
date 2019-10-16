@@ -19,10 +19,12 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 
-import tensorflow as tf
+import numpy as np
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -51,7 +53,7 @@ class _ProximalHessianTest(object):
                     batch_shape=None,
                     dtype=np.float32,
                     seed=42):
-    seed = tfd.SeedStream(seed=seed, salt='tfp.glm.proximal_hessian_test')
+    seed = tfp.util.SeedStream(seed=seed, salt='tfp.glm.proximal_hessian_test')
 
     if batch_shape is None:
       batch_shape = []
@@ -66,8 +68,8 @@ class _ProximalHessianTest(object):
         tf.linalg.norm(tensor=model_coefficients, axis=-1)[..., tf.newaxis])
 
     mask = tfd.Bernoulli(probs=0.5, dtype=tf.bool).sample(batch_shape + [d])
-    model_coefficients = tf.compat.v1.where(mask, model_coefficients,
-                                            tf.zeros_like(model_coefficients))
+    model_coefficients = tf1.where(mask, model_coefficients,
+                                   tf.zeros_like(model_coefficients))
     model_matrix = tfd.Normal(
         loc=np.array(0, dtype), scale=np.array(1, dtype)).sample(
             batch_shape + [n, d], seed=seed())
@@ -89,7 +91,7 @@ class _ProximalHessianTest(object):
     return self.evaluate([model_matrix, response, model_coefficients, mask])
 
   def _make_placeholder(self, x):
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=x, shape=(x.shape if self.use_static_shape else None))
 
   def _adjust_dtype_and_shape_hints(self, x):
@@ -385,25 +387,25 @@ class _ProximalHessianTest(object):
     self._test_compare_batch_to_single_instance(use_sparse_tensor=True)
 
 
-class ProximalHessianTestStaticShapeFloat32(tf.test.TestCase,
+class ProximalHessianTestStaticShapeFloat32(tfp_test_util.TestCase,
                                             _ProximalHessianTest):
   dtype = tf.float32
   use_static_shape = True
 
 
-class ProximalHessianTestDynamicShapeFloat32(tf.test.TestCase,
+class ProximalHessianTestDynamicShapeFloat32(tfp_test_util.TestCase,
                                              _ProximalHessianTest):
   dtype = tf.float32
   use_static_shape = False
 
 
-class ProximalHessianTestStaticShapeFloat64(tf.test.TestCase,
+class ProximalHessianTestStaticShapeFloat64(tfp_test_util.TestCase,
                                             _ProximalHessianTest):
   dtype = tf.float64
   use_static_shape = True
 
 
-class ProximalHessianTestDynamicShapeFloat64(tf.test.TestCase,
+class ProximalHessianTestDynamicShapeFloat64(tfp_test_util.TestCase,
                                              _ProximalHessianTest):
   dtype = tf.float64
   use_static_shape = False

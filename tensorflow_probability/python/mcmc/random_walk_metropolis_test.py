@@ -19,27 +19,18 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
-
-import tensorflow as tf
-
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
-
-
-def _reduce_variance(x, axis=None, keepdims=False):
-  sample_mean = tf.math.reduce_mean(input_tensor=x, axis=axis, keepdims=True)
-  return tf.math.reduce_mean(
-      input_tensor=tf.math.squared_difference(x, sample_mean),
-      axis=axis,
-      keepdims=keepdims)
-
 
 @test_util.run_all_in_graph_and_eager_modes
-class RWMTest(tf.test.TestCase):
+class RWMTest(tfp_test_util.TestCase):
 
   def testRWM1DUniform(self):
     """Sampling from the Standard Normal Distribution."""
@@ -57,10 +48,10 @@ class RWMTest(tf.test.TestCase):
         num_burnin_steps=500,
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.math.reduce_mean(input_tensor=samples, axis=0)
+    sample_mean = tf.math.reduce_mean(samples, axis=0)
     sample_std = tf.math.sqrt(
         tf.math.reduce_mean(
-            input_tensor=tf.math.squared_difference(samples, sample_mean),
+            tf.math.squared_difference(samples, sample_mean),
             axis=0))
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
 
@@ -81,10 +72,10 @@ class RWMTest(tf.test.TestCase):
         num_burnin_steps=500,
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.math.reduce_mean(input_tensor=samples, axis=0)
+    sample_mean = tf.math.reduce_mean(samples, axis=0)
     sample_std = tf.math.sqrt(
         tf.math.reduce_mean(
-            input_tensor=tf.math.squared_difference(samples, sample_mean),
+            tf.math.squared_difference(samples, sample_mean),
             axis=0))
 
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
@@ -103,7 +94,8 @@ class RWMTest(tf.test.TestCase):
     def cauchy_new_state_fn(scale, dtype):
       cauchy = tfd.Cauchy(loc=dtype(0), scale=dtype(scale))
       def _fn(state_parts, seed):
-        seed_stream = tfd.SeedStream(seed, salt='RandomWalkCauchyIncrement')
+        seed_stream = tfp.util.SeedStream(
+            seed, salt='RandomWalkCauchyIncrement')
         next_state_parts = [
             state + cauchy.sample(
                 sample_shape=state.shape, seed=seed_stream())
@@ -121,10 +113,10 @@ class RWMTest(tf.test.TestCase):
             seed=42),
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.math.reduce_mean(input_tensor=samples, axis=0)
+    sample_mean = tf.math.reduce_mean(samples, axis=0)
     sample_std = tf.math.sqrt(
         tf.math.reduce_mean(
-            input_tensor=tf.math.squared_difference(samples, sample_mean),
+            tf.math.squared_difference(samples, sample_mean),
             axis=0))
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
 
@@ -166,10 +158,10 @@ class RWMTest(tf.test.TestCase):
         parallel_iterations=1)
 
     states = tf.stack(states, axis=-1)
-    sample_mean = tf.math.reduce_mean(input_tensor=states, axis=[0, 1])
+    sample_mean = tf.math.reduce_mean(states, axis=[0, 1])
     x = states - sample_mean
     sample_cov = tf.math.reduce_mean(
-        input_tensor=tf.linalg.matmul(x, x, transpose_a=True), axis=[0, 1])
+        tf.linalg.matmul(x, x, transpose_a=True), axis=[0, 1])
     [sample_mean_, sample_cov_] = self.evaluate([
         sample_mean, sample_cov])
 

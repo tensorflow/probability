@@ -5,6 +5,18 @@
 
 # tfp.mcmc.sample_halton_sequence
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/sample_halton_sequence.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Returns a sample from the `dim` dimensional Halton sequence.
 
 ``` python
@@ -20,8 +32,6 @@ tfp.mcmc.sample_halton_sequence(
 ```
 
 
-
-Defined in [`python/mcmc/sample_halton_sequence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/sample_halton_sequence.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -103,6 +113,7 @@ print ("Leaped Estimated: %f, True Value: %f" % values)
 
 #### Args:
 
+
 * <b>`dim`</b>: Positive Python `int` representing each sample's `event_size.` Must
   not be greater than 1000.
 * <b>`num_results`</b>: (Optional) Positive scalar `Tensor` of dtype int32. The number
@@ -136,6 +147,7 @@ print ("Leaped Estimated: %f, True Value: %f" % values)
 
 #### Returns:
 
+
 * <b>`halton_elements`</b>: Elements of the Halton sequence. `Tensor` of supplied dtype
   and `shape` `[num_results, dim]` if `num_results` was specified or shape
   `[s, dim]` where s is the size of `sequence_indices` if `sequence_indices`
@@ -144,8 +156,9 @@ print ("Leaped Estimated: %f, True Value: %f" % values)
 
 #### Raises:
 
-  ValueError: if both `sequence_indices` and `num_results` were specified or
-    if dimension `dim` is less than 1 or greater than 1000.
+
+* <b>`ValueError`</b>: if both `sequence_indices` and `num_results` were specified or
+  if dimension `dim` is less than 1 or greater than 1000.
 
 #### References
 

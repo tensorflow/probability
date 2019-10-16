@@ -21,19 +21,16 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import positive_semidefinite_kernels as tfpk
+from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import psd_kernels as tfpk
 
 __all__ = [
     'GaussianProcessRegressionModel',
 ]
-
-
-def _add_diagonal_shift(matrix, shift):
-  diag_plus_shift = tf.linalg.diag_part(matrix) + shift
-  return tf.linalg.set_diag(matrix, diag_plus_shift)
 
 
 def _is_empty_observation_data(
@@ -363,8 +360,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
       index_points=index_points,
       observation_index_points=observation_index_points,
       observations=observations,
-      # We reshape this to align batch dimensions.
-      observation_noise_variance=observation_noise_variances[..., np.newaxis])
+      observation_noise_variance=observation_noise_variances)
   samples = gprm.sample()
 
   with tf.Session() as sess:
@@ -480,28 +476,26 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
           index_points, observation_index_points, observations,
           observation_noise_variance, predictive_noise_variance, jitter
       ], tf.float32)
-      if index_points is not None:
-        index_points = tf.convert_to_tensor(
-            value=index_points, dtype=dtype, name='index_points')
-      observation_index_points = (None if observation_index_points is None else
-                                  tf.convert_to_tensor(
-                                      value=observation_index_points,
-                                      dtype=dtype,
-                                      name='observation_index_points'))
-      observations = (None if observations is None else tf.convert_to_tensor(
-          value=observations, dtype=dtype, name='observations'))
-      observation_noise_variance = tf.convert_to_tensor(
-          value=observation_noise_variance,
+      index_points = tensor_util.convert_nonref_to_tensor(
+          index_points, dtype=dtype, name='index_points')
+      observation_index_points = tensor_util.convert_nonref_to_tensor(
+          observation_index_points, dtype=dtype,
+          name='observation_index_points')
+      observations = tensor_util.convert_nonref_to_tensor(
+          observations, dtype=dtype,
+          name='observations')
+      observation_noise_variance = tensor_util.convert_nonref_to_tensor(
+          observation_noise_variance,
           dtype=dtype,
           name='observation_noise_variance')
-      predictive_noise_variance = (
-          observation_noise_variance
-          if predictive_noise_variance is None else tf.convert_to_tensor(
-              value=predictive_noise_variance,
-              dtype=dtype,
-              name='predictive_noise_variance'))
-      jitter = tf.convert_to_tensor(value=jitter, dtype=dtype, name='jitter')
-
+      predictive_noise_variance = tensor_util.convert_nonref_to_tensor(
+          predictive_noise_variance,
+          dtype=dtype,
+          name='observation_noise_variance')
+      if predictive_noise_variance is None:
+        predictive_noise_variance = observation_noise_variance
+      jitter = tensor_util.convert_nonref_to_tensor(
+          jitter, dtype=dtype, name='jitter')
       if (observation_index_points is None) != (observations is None):
         raise ValueError(
             '`observations` and `observation_index_points` must both be given '
@@ -527,8 +521,8 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
         conditional_kernel = tfpk.SchurComplement(
             base_kernel=kernel,
             fixed_inputs=observation_index_points,
-            diag_shift=jitter + observation_noise_variance)
-
+            diag_shift=tfp_util.DeferredTensor(
+                observation_noise_variance, lambda x: jitter + x))
         # Special logic for mean_fn only; SchurComplement already handles the
         # case of empty observations (ie, falls back to base_kernel).
         if _is_empty_observation_data(
@@ -543,22 +537,19 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
               observations=observations)
 
           def conditional_mean_fn(x):
+            """Conditional mean."""
+            observations = tf.convert_to_tensor(self._observations)
+            observation_index_points = tf.convert_to_tensor(
+                self._observation_index_points)
             k_x_obs_linop = tf.linalg.LinearOperatorFullMatrix(
                 kernel.matrix(x, observation_index_points))
             chol_linop = tf.linalg.LinearOperatorLowerTriangular(
-                conditional_kernel.divisor_matrix_cholesky)
+                conditional_kernel.divisor_matrix_cholesky(
+                    fixed_inputs=observation_index_points))
 
             diff = observations - mean_fn(observation_index_points)
             return mean_fn(x) + k_x_obs_linop.matvec(
                 chol_linop.solvevec(chol_linop.solvevec(diff), adjoint=True))
-
-        graph_parents = [observation_noise_variance, jitter]
-        def _maybe_append(x):
-          if x is not None:
-            graph_parents.append(x)
-        _maybe_append(index_points)
-        _maybe_append(observation_index_points)
-        _maybe_append(observations)
 
         super(GaussianProcessRegressionModel, self).__init__(
             kernel=conditional_kernel,
@@ -573,7 +564,6 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats, name=name)
         self._parameters = parameters
-        self._graph_parents = graph_parents
 
   @property
   def observation_index_points(self):

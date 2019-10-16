@@ -5,7 +5,24 @@
 
 # tfp.edward2.VonMises
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for VonMises.
+
+### Aliases:
+
+* `tfp.experimental.edward2.VonMises`
+
 
 ``` python
 tfp.edward2.VonMises(
@@ -16,15 +33,14 @@ tfp.edward2.VonMises(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See VonMises for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
@@ -33,8 +49,8 @@ Construct von Mises distributions with given location and concentration.
 The parameters `loc` and `concentration` must be shaped in a way that
 supports broadcasting (e.g. `loc + concentration` is a valid operation).
 
-
 #### Args:
+
 
 * <b>`loc`</b>: Floating point tensor, the circular means of the distribution(s).
 * <b>`concentration`</b>: Floating point tensor, the level of concentration of the
@@ -53,5 +69,6 @@ supports broadcasting (e.g. `loc + concentration` is a valid operation).
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if loc and concentration are different dtypes.

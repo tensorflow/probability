@@ -7,6 +7,7 @@
 <meta itemprop="property" content="input"/>
 <meta itemprop="property" content="input_mask"/>
 <meta itemprop="property" content="input_shape"/>
+<meta itemprop="property" content="input_spec"/>
 <meta itemprop="property" content="losses"/>
 <meta itemprop="property" content="metrics"/>
 <meta itemprop="property" content="name"/>
@@ -17,6 +18,7 @@
 <meta itemprop="property" content="output_mask"/>
 <meta itemprop="property" content="output_shape"/>
 <meta itemprop="property" content="submodules"/>
+<meta itemprop="property" content="trainable"/>
 <meta itemprop="property" content="trainable_variables"/>
 <meta itemprop="property" content="trainable_weights"/>
 <meta itemprop="property" content="updates"/>
@@ -24,7 +26,6 @@
 <meta itemprop="property" content="weights"/>
 <meta itemprop="property" content="__call__"/>
 <meta itemprop="property" content="__init__"/>
-<meta itemprop="property" content="apply"/>
 <meta itemprop="property" content="build"/>
 <meta itemprop="property" content="compute_mask"/>
 <meta itemprop="property" content="compute_output_shape"/>
@@ -48,6 +49,18 @@
 
 # tfp.layers.IndependentLogistic
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `IndependentLogistic`
 
 An independent logistic Keras layer.
@@ -56,12 +69,8 @@ Inherits From: [`DistributionLambda`](../../tfp/layers/DistributionLambda.md)
 
 ### Aliases:
 
-* Class `tfp.layers.IndependentLogistic`
 * Class `tfp.layers.distribution_layer.IndependentLogistic`
 
-
-
-Defined in [`python/layers/distribution_layer.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/distribution_layer.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -87,6 +96,8 @@ encoder = tfk.Sequential([
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">View source</a>
+
 ``` python
 __init__(
     event_shape=(),
@@ -98,7 +109,9 @@ __init__(
 
 Initialize the `IndependentLogistic` layer.
 
+
 #### Args:
+
 
 * <b>`event_shape`</b>: integer vector `Tensor` representing the shape of single
   draw from this distribution.
@@ -120,11 +133,14 @@ Initialize the `IndependentLogistic` layer.
 
 Optional regularizer function for the output of this layer.
 
+
 <h3 id="dtype"><code>dtype</code></h3>
 
 
 
+
 <h3 id="dynamic"><code>dynamic</code></h3>
+
 
 
 
@@ -140,13 +156,9 @@ i.e. if it is connected to one incoming layer.
 Input tensor or list of input tensors.
 
 
-#### Raises:
-
-* <b>`AttributeError`</b>: if the layer is connected to
-more than one incoming layers.
-
 
 #### Raises:
+
 
 * <b>`RuntimeError`</b>: If called in Eager mode.
 * <b>`AttributeError`</b>: If no inbound nodes are found.
@@ -164,7 +176,9 @@ Input mask tensor (potentially None) or list of input
 mask tensors.
 
 
+
 #### Raises:
+
 
 * <b>`AttributeError`</b>: if the layer is connected to
 more than one incoming layers.
@@ -183,10 +197,17 @@ Input shape, as an integer shape tuple
 (or list of shape tuples, one tuple per input tensor).
 
 
+
 #### Raises:
+
 
 * <b>`AttributeError`</b>: if the layer has no defined input_shape.
 * <b>`RuntimeError`</b>: if called in Eager mode.
+
+<h3 id="input_spec"><code>input_spec</code></h3>
+
+
+
 
 <h3 id="losses"><code>losses</code></h3>
 
@@ -200,7 +221,9 @@ propagate gradients back to the corresponding variables.
 
 A list of tensors.
 
+
 <h3 id="metrics"><code>metrics</code></h3>
+
 
 
 
@@ -215,11 +238,14 @@ parent module names.
 
 Returns a `tf.name_scope` instance for this class.
 
+
 <h3 id="non_trainable_variables"><code>non_trainable_variables</code></h3>
 
 
 
+
 <h3 id="non_trainable_weights"><code>non_trainable_weights</code></h3>
+
 
 
 
@@ -235,7 +261,9 @@ i.e. if it is connected to one incoming layer.
 Output tensor or list of output tensors.
 
 
+
 #### Raises:
+
 
 * <b>`AttributeError`</b>: if the layer is connected to more than one incoming
   layers.
@@ -254,7 +282,9 @@ Output mask tensor (potentially None) or list of output
 mask tensors.
 
 
+
 #### Raises:
+
 
 * <b>`AttributeError`</b>: if the layer is connected to
 more than one incoming layers.
@@ -272,7 +302,9 @@ Output shape, as an integer shape tuple
 (or list of shape tuples, one tuple per output tensor).
 
 
+
 #### Raises:
+
 
 * <b>`AttributeError`</b>: if the layer has no defined output shape.
 * <b>`RuntimeError`</b>: if called in Eager mode.
@@ -284,22 +316,30 @@ Sequence of all sub-modules.
 Submodules are modules which are properties of this module, or found as
 properties of modules which are properties of this module (and so on).
 
->>> a = tf.Module()
->>> b = tf.Module()
->>> c = tf.Module()
->>> a.b = b
->>> b.c = c
->>> assert list(a.submodules) == [b, c]
->>> assert list(b.submodules) == [c]
->>> assert list(c.submodules) == []
+```
+a = tf.Module()
+b = tf.Module()
+c = tf.Module()
+a.b = b
+b.c = c
+assert list(a.submodules) == [b, c]
+assert list(b.submodules) == [c]
+assert list(c.submodules) == []
+```
 
 #### Returns:
 
 A sequence of all submodules.
 
+
+<h3 id="trainable"><code>trainable</code></h3>
+
+
+
+
 <h3 id="trainable_variables"><code>trainable_variables</code></h3>
 
-Sequence of variables owned by this module and it's submodules.
+Sequence of trainable variables owned by this module and its submodules.
 
 Note: this method uses reflection to find variables on the current instance
 and submodules. For performance reasons you may wish to cache the result
@@ -311,11 +351,14 @@ A sequence of variables for the current module (sorted by attribute
 name) followed by variables from all submodules recursively (breadth
 first).
 
+
 <h3 id="trainable_weights"><code>trainable_weights</code></h3>
 
 
 
+
 <h3 id="updates"><code>updates</code></h3>
+
 
 
 
@@ -329,9 +372,11 @@ Alias of `self.weights`.
 
 A list of variables.
 
+
 <h3 id="weights"><code>weights</code></h3>
 
 Returns the list of all layer variables/weights.
+
 
 #### Returns:
 
@@ -339,9 +384,12 @@ A list of variables.
 
 
 
+
 ## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">View source</a>
 
 ``` python
 __call__(
@@ -353,7 +401,9 @@ __call__(
 
 Wraps `call`, applying pre- and post-processing steps.
 
+
 #### Arguments:
+
 
 * <b>`inputs`</b>: input tensor(s).
 * <b>`*args`</b>: additional positional arguments to be passed to `self.call`.
@@ -363,6 +413,7 @@ Wraps `call`, applying pre- and post-processing steps.
 #### Returns:
 
 Output tensor(s).
+
 
 
 #### Note:
@@ -378,34 +429,11 @@ Output tensor(s).
   a Keras layer with masking support.
 
 
+
 #### Raises:
 
+
 * <b>`ValueError`</b>: if the layer's `call` method returns None (an invalid value).
-
-<h3 id="apply"><code>apply</code></h3>
-
-``` python
-apply(
-    inputs,
-    *args,
-    **kwargs
-)
-```
-
-Apply the layer on a input.
-
-This is an alias of `self.__call__`.
-
-#### Arguments:
-
-* <b>`inputs`</b>: Input tensor(s).
-* <b>`*args`</b>: additional positional arguments to be passed to `self.call`.
-* <b>`**kwargs`</b>: additional keyword arguments to be passed to `self.call`.
-
-
-#### Returns:
-
-Output tensor(s).
 
 <h3 id="build"><code>build</code></h3>
 
@@ -423,6 +451,7 @@ This is typically used to create the weights of `Layer` subclasses.
 
 #### Arguments:
 
+
 * <b>`input_shape`</b>: Instance of `TensorShape`, or list of instances of
   `TensorShape` if the layer expects a list of inputs
   (one instance per input).
@@ -438,7 +467,9 @@ compute_mask(
 
 Computes an output mask tensor.
 
+
 #### Arguments:
+
 
 * <b>`inputs`</b>: Tensor or list of tensors.
 * <b>`mask`</b>: Tensor or list of tensors.
@@ -448,6 +479,7 @@ Computes an output mask tensor.
 
 None or a tensor (or list of tensors,
     one per output tensor of the layer).
+
 
 <h3 id="compute_output_shape"><code>compute_output_shape</code></h3>
 
@@ -460,6 +492,7 @@ compute_output_shape(
 
 
 
+
 <h3 id="count_params"><code>count_params</code></h3>
 
 ``` python
@@ -468,12 +501,15 @@ count_params()
 
 Count the total number of scalars composing the weights.
 
+
 #### Returns:
 
 An integer count.
 
 
+
 #### Raises:
+
 
 * <b>`ValueError`</b>: if the layer isn't yet built
   (in which case its weights aren't yet defined).
@@ -497,6 +533,7 @@ dictionary. It does not handle layer connectivity
 
 #### Arguments:
 
+
 * <b>`config`</b>: A Python dictionary, typically the
     output of get_config.
 
@@ -505,7 +542,10 @@ dictionary. It does not handle layer connectivity
 
 A layer instance.
 
+
 <h3 id="get_config"><code>get_config</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">View source</a>
 
 ``` python
 get_config()
@@ -516,11 +556,11 @@ Returns the config of this layer.
 NOTE: At the moment, this configuration can only be serialized if the
 Layer's `convert_to_tensor_fn` is a serializable Keras object (i.e.,
 implements `get_config`) or one of the standard values:
- - `Distribution.sample` (or `"sample"`)
- - `Distribution.mean` (or `"mean"`)
- - `Distribution.mode` (or `"mode"`)
- - `Distribution.stddev` (or `"stddev"`)
- - `Distribution.variance` (or `"variance"`)
+ - <a href="../../tfp/distributions/Distribution.md#sample"><code>Distribution.sample</code></a> (or `"sample"`)
+ - <a href="../../tfp/distributions/Distribution.md#mean"><code>Distribution.mean</code></a> (or `"mean"`)
+ - <a href="../../tfp/distributions/Distribution.md#mode"><code>Distribution.mode</code></a> (or `"mode"`)
+ - <a href="../../tfp/distributions/Distribution.md#stddev"><code>Distribution.stddev</code></a> (or `"stddev"`)
+ - <a href="../../tfp/distributions/Distribution.md#variance"><code>Distribution.variance</code></a> (or `"variance"`)
 
 <h3 id="get_input_at"><code>get_input_at</code></h3>
 
@@ -530,7 +570,9 @@ get_input_at(node_index)
 
 Retrieves the input tensor(s) of a layer at a given node.
 
+
 #### Arguments:
+
 
 * <b>`node_index`</b>: Integer, index of the node
     from which to retrieve the attribute.
@@ -543,7 +585,9 @@ Retrieves the input tensor(s) of a layer at a given node.
 A tensor (or list of tensors if the layer has multiple inputs).
 
 
+
 #### Raises:
+
 
 * <b>`RuntimeError`</b>: If called in Eager mode.
 
@@ -555,7 +599,9 @@ get_input_mask_at(node_index)
 
 Retrieves the input mask tensor(s) of a layer at a given node.
 
+
 #### Arguments:
+
 
 * <b>`node_index`</b>: Integer, index of the node
     from which to retrieve the attribute.
@@ -568,6 +614,7 @@ Retrieves the input mask tensor(s) of a layer at a given node.
 A mask tensor
 (or list of tensors if the layer has multiple inputs).
 
+
 <h3 id="get_input_shape_at"><code>get_input_shape_at</code></h3>
 
 ``` python
@@ -576,7 +623,9 @@ get_input_shape_at(node_index)
 
 Retrieves the input shape(s) of a layer at a given node.
 
+
 #### Arguments:
+
 
 * <b>`node_index`</b>: Integer, index of the node
     from which to retrieve the attribute.
@@ -590,7 +639,9 @@ A shape tuple
 (or list of shape tuples if the layer has multiple inputs).
 
 
+
 #### Raises:
+
 
 * <b>`RuntimeError`</b>: If called in Eager mode.
 
@@ -602,7 +653,9 @@ get_losses_for(inputs)
 
 Retrieves losses relevant to a specific set of inputs.
 
+
 #### Arguments:
+
 
 * <b>`inputs`</b>: Input tensor or list/tuple of input tensors.
 
@@ -610,6 +663,7 @@ Retrieves losses relevant to a specific set of inputs.
 #### Returns:
 
 List of loss tensors of the layer that depend on `inputs`.
+
 
 <h3 id="get_output_at"><code>get_output_at</code></h3>
 
@@ -619,7 +673,9 @@ get_output_at(node_index)
 
 Retrieves the output tensor(s) of a layer at a given node.
 
+
 #### Arguments:
+
 
 * <b>`node_index`</b>: Integer, index of the node
     from which to retrieve the attribute.
@@ -632,7 +688,9 @@ Retrieves the output tensor(s) of a layer at a given node.
 A tensor (or list of tensors if the layer has multiple outputs).
 
 
+
 #### Raises:
+
 
 * <b>`RuntimeError`</b>: If called in Eager mode.
 
@@ -644,7 +702,9 @@ get_output_mask_at(node_index)
 
 Retrieves the output mask tensor(s) of a layer at a given node.
 
+
 #### Arguments:
+
 
 * <b>`node_index`</b>: Integer, index of the node
     from which to retrieve the attribute.
@@ -657,6 +717,7 @@ Retrieves the output mask tensor(s) of a layer at a given node.
 A mask tensor
 (or list of tensors if the layer has multiple outputs).
 
+
 <h3 id="get_output_shape_at"><code>get_output_shape_at</code></h3>
 
 ``` python
@@ -665,7 +726,9 @@ get_output_shape_at(node_index)
 
 Retrieves the output shape(s) of a layer at a given node.
 
+
 #### Arguments:
+
 
 * <b>`node_index`</b>: Integer, index of the node
     from which to retrieve the attribute.
@@ -679,7 +742,9 @@ A shape tuple
 (or list of shape tuples if the layer has multiple outputs).
 
 
+
 #### Raises:
+
 
 * <b>`RuntimeError`</b>: If called in Eager mode.
 
@@ -691,7 +756,9 @@ get_updates_for(inputs)
 
 Retrieves updates relevant to a specific set of inputs.
 
+
 #### Arguments:
+
 
 * <b>`inputs`</b>: Input tensor or list/tuple of input tensors.
 
@@ -699,6 +766,7 @@ Retrieves updates relevant to a specific set of inputs.
 #### Returns:
 
 List of update ops of the layer that depend on `inputs`.
+
 
 <h3 id="get_weights"><code>get_weights</code></h3>
 
@@ -708,11 +776,15 @@ get_weights()
 
 Returns the current weights of the layer.
 
+
 #### Returns:
 
 Weights values as a list of numpy arrays.
 
+
 <h3 id="new"><code>new</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">View source</a>
 
 ``` python
 @staticmethod
@@ -726,7 +798,10 @@ new(
 
 Create the distribution instance from a `params` vector.
 
+
 <h3 id="params_size"><code>params_size</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/distribution_layer.py">View source</a>
 
 ``` python
 @staticmethod
@@ -738,6 +813,7 @@ params_size(
 
 The number of `params` needed to create a single distribution.
 
+
 <h3 id="set_weights"><code>set_weights</code></h3>
 
 ``` python
@@ -746,7 +822,9 @@ set_weights(weights)
 
 Sets the weights of the layer, from Numpy arrays.
 
+
 #### Arguments:
+
 
 * <b>`weights`</b>: a list of Numpy arrays. The number
     of arrays and their shape must match
@@ -756,6 +834,7 @@ Sets the weights of the layer, from Numpy arrays.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: If the provided weights list does not match the
     layer's specifications.
@@ -771,23 +850,28 @@ with_name_scope(
 
 Decorator to automatically enter the module name scope.
 
->>> class MyModule(tf.Module):
-...   @tf.Module.with_name_scope
-...   def __call__(self, x):
-...     if not hasattr(self, 'w'):
-...       self.w = tf.Variable(tf.random.normal([x.shape[1], 64]))
-...     return tf.matmul(x, self.w)
+```
+class MyModule(tf.Module):
+  @tf.Module.with_name_scope
+  def __call__(self, x):
+    if not hasattr(self, 'w'):
+      self.w = tf.Variable(tf.random.normal([x.shape[1], 64]))
+    return tf.matmul(x, self.w)
+```
 
 Using the above module would produce `tf.Variable`s and `tf.Tensor`s whose
 names included the module name:
 
->>> mod = MyModule()
->>> mod(tf.ones([8, 32]))
-<tf.Tensor: ...>
->>> mod.w
-<tf.Variable ...'my_module/w:0'>
+```
+mod = MyModule()
+mod(tf.ones([8, 32]))
+# ==> <tf.Tensor: ...>
+mod.w
+# ==> <tf.Variable ...'my_module/w:0'>
+```
 
 #### Args:
+
 
 * <b>`method`</b>: The method to wrap.
 
@@ -795,6 +879,7 @@ names included the module name:
 #### Returns:
 
 The original method wrapped such that it enters the module's name scope.
+
 
 
 

@@ -5,7 +5,24 @@
 
 # tfp.edward2.Logistic
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for Logistic.
+
+### Aliases:
+
+* `tfp.experimental.edward2.Logistic`
+
 
 ``` python
 tfp.edward2.Logistic(
@@ -16,15 +33,14 @@ tfp.edward2.Logistic(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See Logistic for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
@@ -33,8 +49,8 @@ Construct Logistic distributions with mean and scale `loc` and `scale`.
 The parameters `loc` and `scale` must be shaped in a way that supports
 broadcasting (e.g. `loc + scale` is a valid operation).
 
-
 #### Args:
+
 
 * <b>`loc`</b>: Floating point tensor, the means of the distribution(s).
 * <b>`scale`</b>: Floating point tensor, the scales of the distribution(s). Must
@@ -44,12 +60,13 @@ broadcasting (e.g. `loc + scale` is a valid operation).
   performance. When `False` invalid inputs may silently render incorrect
   outputs.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
-  (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+  (e.g., mean, mode, variance) use the value '`NaN`' to indicate the
   result is undefined. When `False`, an exception is raised if one or
   more of the statistic's batch members are undefined.
 * <b>`name`</b>: The name to give Ops created by the initializer.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if loc and scale are different dtypes.

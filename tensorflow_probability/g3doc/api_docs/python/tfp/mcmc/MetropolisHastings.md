@@ -13,15 +13,23 @@
 
 # tfp.mcmc.MetropolisHastings
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/metropolis_hastings.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `MetropolisHastings`
 
 Runs one step of the Metropolis-Hastings algorithm.
 
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
-
-
-
-Defined in [`python/mcmc/metropolis_hastings.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/metropolis_hastings.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -85,6 +93,8 @@ hmc = tfp.mcmc.MetropolisHastings(
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/metropolis_hastings.py">View source</a>
+
 ``` python
 __init__(
     inner_kernel,
@@ -95,7 +105,9 @@ __init__(
 
 Instantiates this object.
 
+
 #### Args:
+
 
 * <b>`inner_kernel`</b>: `TransitionKernel`-like object which has
   `collections.namedtuple` `kernel_results` and which contains a
@@ -108,6 +120,7 @@ Instantiates this object.
 
 #### Returns:
 
+
 * <b>`metropolis_hastings_kernel`</b>: Instance of `TransitionKernel` which wraps the
   input transition kernel with the Metropolis-Hastings algorithm.
 
@@ -116,6 +129,7 @@ Instantiates this object.
 ## Properties
 
 <h3 id="inner_kernel"><code>inner_kernel</code></h3>
+
 
 
 
@@ -130,11 +144,14 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 
 
+
 <h3 id="parameters"><code>parameters</code></h3>
 
 Return `dict` of ``__init__`` arguments and their values.
 
+
 <h3 id="seed"><code>seed</code></h3>
+
 
 
 
@@ -144,13 +161,17 @@ Return `dict` of ``__init__`` arguments and their values.
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/metropolis_hastings.py">View source</a>
+
 ``` python
 bootstrap_results(init_state)
 ```
 
 Returns an object with the same type as returned by `one_step`.
 
+
 #### Args:
+
 
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   initial state(s) of the Markov chain(s).
@@ -158,16 +179,20 @@ Returns an object with the same type as returned by `one_step`.
 
 #### Returns:
 
+
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
   `Tensor`s representing internal calculations made within this function.
 
 
 #### Raises:
 
+
 * <b>`ValueError`</b>: if `inner_kernel` results doesn't contain the member
   "target_log_prob".
 
 <h3 id="one_step"><code>one_step</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/metropolis_hastings.py">View source</a>
 
 ``` python
 one_step(
@@ -178,7 +203,9 @@ one_step(
 
 Takes one step of the TransitionKernel.
 
+
 #### Args:
+
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   current state(s) of the Markov chain(s).
@@ -189,6 +216,7 @@ Takes one step of the TransitionKernel.
 
 #### Returns:
 
+
 * <b>`next_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   next state(s) of the Markov chain(s).
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
@@ -196,6 +224,7 @@ Takes one step of the TransitionKernel.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `inner_kernel` results doesn't contain the member
   "target_log_prob".

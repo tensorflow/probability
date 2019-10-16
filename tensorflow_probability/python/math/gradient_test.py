@@ -21,14 +21,16 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GradientTest(tf.test.TestCase):
+class GradientTest(tfp_test_util.TestCase):
 
   def test_non_list(self):
     f = lambda x: x**2 / 2
@@ -46,6 +48,17 @@ class GradientTest(tf.test.TestCase):
     y, dydx = self.evaluate(tfp.math.value_and_gradient(f, args))
     self.assertAllClose(f(*args), y, atol=1e-6, rtol=1e-6)
     self.assertAllClose(g(*args), dydx, atol=1e-6, rtol=1e-6)
+
+  def test_output_gradients(self):
+    jacobian = np.float32([[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]])
+    f = lambda x: tf.squeeze(tf.matmul(jacobian, x[:, tf.newaxis]))
+    x = np.ones([3], dtype=np.float32)
+    output_gradients = np.float32([1., 2., 3.])
+    y, dydx = self.evaluate(
+        tfp.math.value_and_gradient(f, x, output_gradients=output_gradients))
+    self.assertAllClose(f(x), y, atol=1e-6, rtol=1e-6)
+    self.assertAllClose(
+        np.dot(output_gradients, jacobian), dydx, atol=1e-6, rtol=1e-6)
 
 
 if __name__ == '__main__':

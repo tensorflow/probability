@@ -19,10 +19,10 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -30,7 +30,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ZipfTest(test_case.TestCase):
+class ZipfTest(tfp_test_util.TestCase):
 
   def assertBetween(self, x, minimum, maximum):
     self.assertGreaterEqual(x, minimum)
@@ -61,7 +61,7 @@ class ZipfTest(test_case.TestCase):
     for power in invalid_powers:
       with self.assertRaisesOpError("Condition x > y"):
         zipf = tfd.Zipf(power=power, validate_args=True)
-        self.evaluate(zipf.power)
+        self.evaluate(zipf.mean())
 
   def testNanPower(self):
     zipf = tfd.Zipf(power=np.nan, validate_args=False)
@@ -399,11 +399,11 @@ class ZipfTest(test_case.TestCase):
     power = 1.5
 
     zipf1 = tfd.Zipf(power=power, name="zipf1")
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     samples1 = self.evaluate(zipf1.sample(n, seed=seed))
 
     zipf2 = tfd.Zipf(power=power, name="zipf2")
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     samples2 = self.evaluate(zipf2.sample(n, seed=seed))
 
     self.assertAllEqual(samples1, samples2)

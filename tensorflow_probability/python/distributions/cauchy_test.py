@@ -18,33 +18,24 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+from scipy import stats as sp_stats
+
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-
-stats = try_import("scipy.stats")
 
 tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CauchyTest(test_case.TestCase):
+class CauchyTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
@@ -56,7 +47,7 @@ class CauchyTest(test_case.TestCase):
 
   def _testParamShapes(self, sample_shape, expected):
     param_shapes = tfd.Cauchy.param_shapes(sample_shape)
-    loc_shape, scale_shape = param_shapes["loc"], param_shapes["scale"]
+    loc_shape, scale_shape = param_shapes['loc'], param_shapes['scale']
     self.assertAllEqual(expected, self.evaluate(loc_shape))
     self.assertAllEqual(expected, self.evaluate(scale_shape))
     loc = tf.zeros(loc_shape)
@@ -67,7 +58,7 @@ class CauchyTest(test_case.TestCase):
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.Cauchy.param_static_shapes(sample_shape)
-    loc_shape, scale_shape = param_shapes["loc"], param_shapes["scale"]
+    loc_shape, scale_shape = param_shapes['loc'], param_shapes['scale']
     self.assertEqual(expected, loc_shape)
     self.assertEqual(expected, scale_shape)
 
@@ -105,10 +96,8 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(cauchy.batch_shape, pdf.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(pdf).shape)
 
-    if not stats:
-      return
-    expected_log_pdf = stats.cauchy(self.evaluate(loc),
-                                    self.evaluate(scale)).logpdf(x)
+    expected_log_pdf = sp_stats.cauchy(self.evaluate(loc),
+                                       self.evaluate(scale)).logpdf(x)
     self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
     self.assertAllClose(np.exp(expected_log_pdf), self.evaluate(pdf))
 
@@ -141,10 +130,8 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(cauchy.batch_shape, pdf.shape)
     self.assertAllEqual(cauchy.batch_shape, pdf_values.shape)
 
-    if not stats:
-      return
-    expected_log_pdf = stats.cauchy(self.evaluate(loc),
-                                    self.evaluate(scale)).logpdf(x)
+    expected_log_pdf = sp_stats.cauchy(self.evaluate(loc),
+                                       self.evaluate(scale)).logpdf(x)
     self.assertAllClose(expected_log_pdf, log_pdf_values)
     self.assertAllClose(np.exp(expected_log_pdf), pdf_values)
 
@@ -162,9 +149,7 @@ class CauchyTest(test_case.TestCase):
         self.evaluate(cdf).shape)
     self.assertAllEqual(cauchy.batch_shape, cdf.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(cdf).shape)
-    if not stats:
-      return
-    expected_cdf = stats.cauchy(loc, scale).cdf(x)
+    expected_cdf = sp_stats.cauchy(loc, scale).cdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0)
 
   def testCauchySurvivalFunction(self):
@@ -182,9 +167,7 @@ class CauchyTest(test_case.TestCase):
         self.evaluate(sf).shape)
     self.assertAllEqual(cauchy.batch_shape, sf.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(sf).shape)
-    if not stats:
-      return
-    expected_sf = stats.cauchy(loc, scale).sf(x)
+    expected_sf = sp_stats.cauchy(loc, scale).sf(x)
     self.assertAllClose(expected_sf, self.evaluate(sf), atol=0)
 
   def testCauchyLogCDF(self):
@@ -203,25 +186,24 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(cauchy.batch_shape, cdf.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(cdf).shape)
 
-    if not stats:
-      return
-    expected_cdf = stats.cauchy(loc, scale).logcdf(x)
+    expected_cdf = sp_stats.cauchy(loc, scale).logcdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0, rtol=1e-5)
 
+  @tfp_test_util.numpy_disable_gradient_test
   def testFiniteGradientAtDifficultPoints(self):
     for dtype in [np.float32, np.float64]:
-      loc = tf.compat.v2.Variable(dtype(0.0))
-      scale = tf.compat.v2.Variable(dtype(1.0))
+      loc = tf.Variable(dtype(0.0))
+      scale = tf.Variable(dtype(1.0))
       x = np.array([-100., -20., -5., 0., 5., 20., 100.]).astype(dtype)
       def cauchy_function(name, x):
         def cauchy(loc, scale):
           return getattr(tfd.Cauchy(loc=loc, scale=scale), name)(x)
         return cauchy
 
-      self.evaluate(tf.compat.v1.global_variables_initializer())
+      self.evaluate([loc.initializer, scale.initializer])
       for func_name in [
-          "cdf", "log_cdf", "survival_function",
-          "log_survival_function", "log_prob", "prob"
+          'cdf', 'log_cdf', 'survival_function',
+          'log_survival_function', 'log_prob', 'prob'
       ]:
         print(func_name)
         value, grads = self.evaluate(tfp.math.value_and_gradient(
@@ -246,9 +228,7 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(cauchy.batch_shape, sf.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(sf).shape)
 
-    if not stats:
-      return
-    expected_sf = stats.cauchy(loc, scale).logsf(x)
+    expected_sf = sp_stats.cauchy(loc, scale).logsf(x)
     self.assertAllClose(expected_sf, self.evaluate(sf), atol=0, rtol=1e-5)
 
   def testCauchyEntropy(self):
@@ -265,9 +245,7 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(cauchy.batch_shape, entropy.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(entropy).shape)
 
-    if not stats:
-      return
-    expected_entropy = stats.cauchy(loc, scale[0]).entropy().reshape((1, 3))
+    expected_entropy = sp_stats.cauchy(loc, scale[0]).entropy().reshape((1, 3))
     self.assertAllClose(expected_entropy, self.evaluate(entropy))
 
   def testCauchyMode(self):
@@ -312,9 +290,7 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(cauchy.batch_shape, x.shape)
     self.assertAllEqual(cauchy.batch_shape, self.evaluate(x).shape)
 
-    if not stats:
-      return
-    expected_x = stats.cauchy(loc, scale).ppf(p)
+    expected_x = sp_stats.cauchy(loc, scale).ppf(p)
     self.assertAllClose(expected_x, self.evaluate(x), atol=0.)
 
   def testCauchyVariance(self):
@@ -400,8 +376,8 @@ class CauchyTest(test_case.TestCase):
     self.assertAllEqual(expected_shape, samples.shape)
     self.assertAllEqual(expected_shape, sample_values.shape)
 
-  def testCauchyNegativeLocFails(self):
-    with self.assertRaisesOpError("Condition x > 0 did not hold"):
+  def testCauchyNegativeScaleFails(self):
+    with self.assertRaisesOpError('`scale` must be positive.'):
       cauchy = tfd.Cauchy(loc=[1.], scale=[-5.], validate_args=True)
       self.evaluate(cauchy.mode())
 
@@ -418,16 +394,37 @@ class CauchyTest(test_case.TestCase):
   def testCauchyShapeWithPlaceholders(self):
     if tf.executing_eagerly():
       return
-    loc = tf.compat.v1.placeholder_with_default(input=5., shape=[])
-    scale = tf.compat.v1.placeholder_with_default(input=[1., 2], shape=None)
+    loc = tf1.placeholder_with_default(input=5., shape=[])
+    scale = tf1.placeholder_with_default(input=[1., 2], shape=None)
     cauchy = tfd.Cauchy(loc=loc, scale=scale)
 
-    # get_batch_shape should return an "<unknown>" tensor.
+    # get_batch_shape should return an '<unknown>' tensor.
     self.assertEqual(cauchy.batch_shape, tf.TensorShape(None))
     self.assertEqual(cauchy.event_shape, ())
     self.assertAllEqual(self.evaluate(cauchy.event_shape_tensor()), [])
     self.assertAllEqual(self.evaluate(cauchy.batch_shape_tensor()), [2])
 
+  def testAssertsPositiveScale(self):
+    loc, scale = (
+        tf.Variable([-1, 0, 1], dtype=tf.float64),
+        tf.Variable([-1, 2, 3], dtype=tf.float64)
+    )
+    with self.assertRaisesOpError('Argument `scale` must be positive.'):
+      d = tfd.Cauchy(loc, scale, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.sample())
 
-if __name__ == "__main__":
+  def testAssertsPositiveScaleAfterMutation(self):
+    loc, scale = (
+        tf.Variable([-1., 0., 1.]),
+        tf.Variable([1., 2., 3.])
+    )
+    d = tfd.Cauchy(loc, scale, validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
+    with self.assertRaisesOpError('Argument `scale` must be positive.'):
+      with tf.control_dependencies([scale.assign([1., 2., -3.])]):
+        self.evaluate(d.mean())
+
+
+if __name__ == '__main__':
   tf.test.main()

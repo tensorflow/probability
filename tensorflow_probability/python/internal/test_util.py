@@ -12,42 +12,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Utilities for testing distributions and/or bijectors."""
+"""Utilities for testing TFP code."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import contextlib
 import os
 
-# Dependency imports
 from absl import flags
-import hypothesis.strategies as hps
+from absl import logging
+from absl.testing import parameterized
 import numpy as np
 import six
-
-import tensorflow as tf
-
-from tensorflow_probability.python.distributions import seed_stream
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal.backend.numpy import ops
+from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow.python.eager import def_function  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.framework import combinations  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.framework import test_combinations  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
-    'broadcasting_shapes',
-    'derandomize_hypothesis',
+    'numpy_disable_gradient_test',
+    'jax_disable_variable_test',
+    'jax_disable_test_missing_functionality',
+    'test_all_tf_execution_regimes',
+    'test_graph_and_eager_modes',
     'test_seed',
     'test_seed_stream',
     'DiscreteScalarDistributionTestHelpers',
+    'TestCase',
     'VectorDistributionTestHelpers',
 ]
 
 
-def derandomize_hypothesis():
-  # Use --test_env=TFP_DERANDOMIZE_HYPOTHESIS=0 to get random coverage.
-  return os.environ.get('TFP_DERANDOMIZE_HYPOTHESIS', 1) in (0, '0')
-
-
-FLAGS = flags.FLAGS
-
+# Flags for controlling test_teed behavior.
 flags.DEFINE_bool('vary_seed', False,
                   ('Whether to vary the PRNG seed unpredictably.  '
                    'With --runs_per_test=N, produces N iid runs.'))
@@ -57,86 +61,279 @@ flags.DEFINE_string('fixed_seed', None,
                      'Takes precedence over --vary-seed when both appear.'))
 
 
-def _compute_rank_and_fullsize_reqd(draw, target_shape, current_shape, is_last):
-  """Returns a param rank and a list of bools for full-size-required by axis.
+class TestCase(tf.test.TestCase, parameterized.TestCase):
+  """Class to provide TensorFlow Probability specific test features."""
+
+  def maybe_static(self, x, is_static=True):
+    """If `not is_static`, return placeholder_with_default with unknown shape.
+
+    Args:
+      x: A `Tensor`
+      is_static: a Python `bool`; if True, x is returned unchanged. If False, x
+        is wrapped with a tf1.placeholder_with_default with fully dynamic shape.
+
+    Returns:
+      maybe_static_x: `x`, possibly wrapped with in a
+      `placeholder_with_default` of unknown shape.
+    """
+    if is_static:
+      return x
+    else:
+      return tf1.placeholder_with_default(x, shape=None)
+
+  def assertAllFinite(self, a):
+    """Assert that all entries in a `Tensor` are finite.
+
+    Args:
+      a: A `Tensor` whose entries are checked for finiteness.
+    """
+    is_finite = np.isfinite(self._GetNdArray(a))
+    all_true = np.ones_like(is_finite, dtype=np.bool)
+    self.assertAllEqual(all_true, is_finite)
+
+  def assertAllNan(self, a):
+    """Assert that every entry in a `Tensor` is NaN.
+
+    Args:
+      a: A `Tensor` whose entries must be verified as NaN.
+    """
+    is_nan = np.isnan(self._GetNdArray(a))
+    all_true = np.ones_like(is_nan, dtype=np.bool)
+    self.assertAllEqual(all_true, is_nan)
+
+  def assertAllNotNone(self, a):
+    """Assert that no entry in a collection is None.
+
+    Args:
+      a: A Python iterable collection, whose entries must be verified as not
+      being `None`.
+    """
+    each_not_none = [x is not None for x in a]
+    if all(each_not_none):
+      return
+
+    msg = (
+        'Expected no entry to be `None` but found `None` in positions {}'
+        .format([i for i, x in enumerate(each_not_none) if not x]))
+    raise AssertionError(msg)
+
+  def compute_max_gradient_error(self, f, args, delta=1e-3):
+    """Wrapper around TF's gradient_checker_v2.
+
+    `gradient_checker_v2` depends on there being a default session, but our test
+    setup, using test_combinations, doesn't run the test function under a global
+    `self.test_session()` context. Thus, when running
+    `gradient_checker_v2.compute_gradient`, we need to ensure we're in a
+    `self.test_session()` context when not in eager mode. This function bundles
+    up the relevant logic, and ultimately returns the max error across autodiff
+    and finite difference gradient calculations.
+
+    Args:
+      f: callable function whose gradient to compute.
+      args: Python `list` of independent variables with respect to which to
+      compute gradients.
+      delta: floating point value to use for finite difference calculation.
+
+    Returns:
+      err: the maximum error between all components of the numeric and
+      autodiff'ed gradients.
+    """
+    def _compute_error():
+      return gradient_checker_v2.max_error(
+          *gradient_checker_v2.compute_gradient(f, x=args, delta=delta))
+    if tf.executing_eagerly():
+      return _compute_error()
+    else:
+      # Make sure there's a global default session in graph mode.
+      with self.test_session():
+        return _compute_error()
+
+
+@contextlib.contextmanager
+def _tf_function_mode_context(tf_function_mode):
+  """Context manager controlling `tf.function` behavior (enabled/disabled).
+
+  Before activating, the previously set mode is stored. Then the mode is changed
+  to the given `tf_function_mode` and control yielded back to the caller. Upon
+  exiting the context, the mode is returned to its original state.
 
   Args:
-    draw: Hypothesis data sampler.
-    target_shape: `tf.TensorShape`, the target broadcasted shape.
-    current_shape: `tf.TensorShape`, the broadcasted shape of the shapes
-      selected thus far. This is ignored for non-last shapes.
-    is_last: bool indicator of whether this is the last shape (in which case, we
-      must achieve the target shape).
+    tf_function_mode: a Python `str`, either 'disabled' or 'enabled'. If
+    'enabled', `@tf.function`-decorated code behaves as usual (ie, a background
+    graph is created). If 'disabled', `@tf.function`-decorated code will behave
+    as if it had not been `@tf.function`-decorated. Since users will be able to
+    do this (e.g., to debug library code that has been
+    `@tf.function`-decorated), we need to ensure our tests cover the behavior
+    when this is the case.
 
-  Returns:
-    next_rank: Sampled rank for the next shape.
-    force_fullsize_dim: `next_rank`-sized list of bool indicating whether the
-      corresponding axis of the shape must be full-sized (True) or is allowed to
-      be 1 (i.e., broadcast) (False).
+  Yields:
+    None
   """
-  target_rank = target_shape.ndims
-  if is_last:
-    # We must force full size dim on any mismatched axes, and proper rank.
-    full_rank_current = tf.broadcast_static_shape(
-        current_shape, tf.TensorShape([1] * target_rank))
-    # Identify axes in which the target shape is not yet matched.
-    axis_is_mismatched = [
-        full_rank_current[i] != target_shape[i] for i in range(target_rank)
-    ]
-    min_rank = target_rank
-    if current_shape.ndims == target_rank:
-      # Current rank might be already correct, but we could have a case like
-      # batch_shape=[4,3,2] and current_batch_shape=[4,1,2], in which case
-      # we must have at least 2 axes on this param's batch shape.
-      min_rank -= (axis_is_mismatched + [True]).index(True)
-    next_rank = draw(
-        hps.integers(min_value=min_rank, max_value=target_rank))
-    # Get the last param_batch_rank (possibly 0!) items.
-    force_fullsize_dim = axis_is_mismatched[target_rank - next_rank:]
-  else:
-    # There are remaining params to be drawn, so we will be able to force full
-    # size axes on subsequent params.
-    next_rank = draw(hps.integers(min_value=0, max_value=target_rank))
-    force_fullsize_dim = [False] * next_rank
-  return next_rank, force_fullsize_dim
+  if tf_function_mode not in ['enabled', 'disabled']:
+    raise ValueError(
+        'Only allowable values for tf_function_mode_context are `enabled` and '
+        '`disabled`; but got `{}`'.format(tf_function_mode))
+  original_mode = def_function.RUN_FUNCTIONS_EAGERLY
+  try:
+    tf.config.experimental_run_functions_eagerly(tf_function_mode == 'disabled')
+    yield
+  finally:
+    tf.config.experimental_run_functions_eagerly(original_mode)
 
 
-@hps.composite
-def broadcasting_shapes(draw, target_shape, n):
-  """Draws a set of `n` shapes that broadcast to `target_shape`.
+class ExecuteFunctionsEagerlyCombination(test_combinations.TestCombination):
+  """A `TestCombinationi` for enabling/disabling `tf.function` execution modes.
 
-  For each shape we need to choose its rank, and whether or not each axis i is 1
-  or target_shape[i]. This function chooses a set of `n` shapes that have
-  possibly mismatched ranks, and possibly broadcasting axes, with the promise
-  that the broadcast of the set of all shapes matches `target_shape`.
+  For more on `TestCombination`, check out
+  'tensorflow/python/framework/test_combinations.py' in the TensorFlow code
+  base.
+
+  This `TestCombination` supports two values for the `tf_function`
+  combination argument: 'disabled' and 'enabled'. The mode switching is
+  performed using `tf.experimental_run_functions_eagerly(mode)`.
+  """
+
+  def context_managers(self, kwargs):
+    mode = kwargs.pop('tf_function', 'enabled')
+    return [_tf_function_mode_context(mode)]
+
+  def parameter_modifiers(self):
+    return [test_combinations.OptionalParameter('tf_function')]
+
+
+def test_all_tf_execution_regimes(test_class_or_method=None):
+  """Decorator for generating a collection of tests in various contexts.
+
+  Must be applied to subclasses of `parameterized.TestCase` (from
+  `absl/testing`), or a method of such a subclass.
+
+  When applied to a test method, this decorator results in the replacement of
+  that method with a collection of new test methods, each executed under a
+  different set of context managers that control some aspect of the execution
+  model. This decorator generates three test scenario combinations:
+
+    1. Eager mode with `tf.function` decorations enabled
+    2. Eager mode with `tf.function` decorations disabled
+    3. Graph mode (eveything)
+
+  When applied to a test class, all the methods in the class are affected.
 
   Args:
-    draw: Hypothesis sampler.
-    target_shape: The target (fully-defined) batch shape.
-    n: `int`, the number of shapes to draw.
+    test_class_or_method: the `TestCase` class or method to decorate.
 
   Returns:
-    shapes: Sequence of `tf.TensorShape` such that the set of shapes broadcast
-      to `target_shape`. The shapes are fully defined.
+    decorator: A generated TF `test_combinations` decorator, or if
+    `test_class_or_method` is not `None`, the generated decorator applied to
+    that function.
   """
-  target_shape = tf.TensorShape(target_shape)
-  target_rank = target_shape.ndims
-  result = []
-  current_shape = tf.TensorShape([])
-  for is_last in [False] * (n-1) + [True]:
-    next_rank, force_fullsize_dim = _compute_rank_and_fullsize_reqd(
-        draw, target_shape, current_shape, is_last=is_last)
+  decorator = test_combinations.generate(
+      (test_combinations.combine(mode='graph',
+                                 tf_function='enabled') +
+       test_combinations.combine(mode='eager',
+                                 tf_function=['enabled', 'disabled'])),
+      test_combinations=[
+          combinations.EagerGraphCombination(),
+          ExecuteFunctionsEagerlyCombination(),
+      ])
 
-    # Get the last next_rank (possibly 0!) dimensions.
-    next_shape = target_shape[target_rank - next_rank:].as_list()
-    for i, force_fullsize in enumerate(force_fullsize_dim):
-      if not force_fullsize and draw(hps.booleans()):
-        # Choose to make this param broadcast against some other param.
-        next_shape[i] = 1
-    next_shape = tf.TensorShape(next_shape)
-    current_shape = tf.broadcast_static_shape(current_shape, next_shape)
-    result.append(next_shape)
-  return result
+  if test_class_or_method:
+    return decorator(test_class_or_method)
+  return decorator
+
+
+def test_graph_and_eager_modes(test_class_or_method=None):
+  """Decorator for generating graph and eager mode tests from a single test.
+
+  Must be applied to subclasses of `parameterized.TestCase` (from
+  absl/testing), or a method of such a subclass.
+
+  When applied to a test method, this decorator results in the replacement of
+  that method with a two new test methods, one executed in graph mode and the
+  other in eager mode.
+
+  When applied to a test class, all the methods in the class are affected.
+
+  Args:
+    test_class_or_method: the `TestCase` class or method to decorate.
+
+  Returns:
+    decorator: A generated TF `test_combinations` decorator, or if
+    `test_class_or_method` is not `None`, the generated decorator applied to
+    that function.
+  """
+  decorator = test_combinations.generate(
+      test_combinations.combine(mode=['graph', 'eager']),
+      test_combinations=[combinations.EagerGraphCombination()])
+
+  if test_class_or_method:
+    return decorator(test_class_or_method)
+  return decorator
+
+
+JAX_MODE = False
+
+
+def numpy_disable_gradient_test(test_fn):
+  """Disable a gradient-using test when using the numpy backend."""
+
+  if JAX_MODE:
+    return test_fn
+
+  def new_test(self, *args, **kwargs):
+    if tf.Variable == ops.NumpyVariable:
+      self.skipTest('gradient-using test disabled for numpy')
+    return test_fn(self, *args, **kwargs)
+
+  return new_test
+
+
+def jax_disable_variable_test(test_fn):
+  """Disable a Variable-using test when using the JAX backend."""
+
+  if not JAX_MODE:
+    return test_fn
+
+  def new_test(self, *args, **kwargs):
+    self.skipTest('tf.Variable-using test disabled for JAX')
+    return test_fn(self, *args, **kwargs)
+
+  return new_test
+
+
+def numpy_disable_test_missing_functionality(issue_link):
+  """Disable a test for unimplemented numpy functionality."""
+
+  def f(test_fn):
+    """Decorator."""
+    if JAX_MODE:
+      return test_fn
+
+    def new_test(self, *args, **kwargs):
+      if tf.Variable == ops.NumpyVariable:
+        msg = 'Test disabled for numpy missing functionality: {}'
+        self.skipTest(msg.format(issue_link))
+      return test_fn(self, *args, **kwargs)
+
+    return new_test
+
+  return f
+
+
+def jax_disable_test_missing_functionality(issue_link):
+  """Disable a test for unimplemented JAX functionality."""
+
+  def f(test_fn):
+    if not JAX_MODE:
+      return test_fn
+
+    def new_test(self, *args, **kwargs):
+      self.skipTest(
+          'Test disabled for JAX missing functionality: {}'.format(issue_link))
+      return test_fn(self, *args, **kwargs)
+
+    return new_test
+
+  return f
 
 
 def test_seed(hardcoded_seed=None, set_eager_seed=True):
@@ -157,12 +354,12 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
     (e.g., debugging a crash that only some seeds trigger).
 
   To those ends, this function returns 17, but respects the command line flags
-  `--fixed_seed=<seed>` and `--vary-seed` (Boolean, default False).
+  `--fixed_seed=<seed>` and `--vary_seed` (Boolean, default False).
   `--vary_seed` uses system entropy to produce unpredictable seeds.
   `--fixed_seed` takes precedence over `--vary_seed` when both are present.
 
   Note that TensorFlow graph mode operations tend to read seed state from two
-  sources: a "graph-level seed" and an "op-level seed".  tf.test.TestCase will
+  sources: a "graph-level seed" and an "op-level seed".  test_util.TestCase will
   set the former to a fixed value per test, but in general it may be necessary
   to explicitly set both to ensure reproducibility.
 
@@ -177,9 +374,9 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
   Returns:
     seed: 17, unless otherwise specified by arguments or command line flags.
   """
-  if FLAGS.fixed_seed is not None:
-    answer = int(FLAGS.fixed_seed)
-  elif FLAGS.vary_seed:
+  if flags.FLAGS.fixed_seed is not None:
+    answer = int(flags.FLAGS.fixed_seed)
+  elif flags.FLAGS.vary_seed:
     entropy = os.urandom(64)
     # Why does Python make it so hard to just grab a bunch of bytes from
     # /dev/urandom and get them interpreted as an integer?  Oh, well.
@@ -187,15 +384,24 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
       answer = int(entropy.encode('hex'), 16)
     else:
       answer = int.from_bytes(entropy, 'big')
-    tf.compat.v1.logging.warning('Using seed {}'.format(answer))
+    logging.warning('Using seed %s', answer)
   elif hardcoded_seed is not None:
     answer = hardcoded_seed
   else:
     answer = 17
+  return (_wrap_seed_jax if JAX_MODE else _wrap_seed)(answer, set_eager_seed)
+
+
+def _wrap_seed(seed, set_eager_seed):
   # TODO(b/68017812): Remove this clause once eager correctly supports seeding.
   if tf.executing_eagerly() and set_eager_seed:
-    tf.compat.v1.set_random_seed(answer)
-  return answer
+    tf1.set_random_seed(seed)
+  return seed
+
+
+def _wrap_seed_jax(seed, _):
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  return jaxrand.PRNGKey(seed % (2**32 - 1))
 
 
 def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
@@ -219,7 +425,7 @@ def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
   `--vary_seed` when both are present.
 
   Note that TensorFlow graph mode operations tend to read seed state from two
-  sources: a "graph-level seed" and an "op-level seed".  tf.test.TestCase will
+  sources: a "graph-level seed" and an "op-level seed".  test_util.TestCase will
   set the former to a fixed value per test, but in general it may be necessary
   to explicitly set both to ensure reproducibility.
 
@@ -234,7 +440,7 @@ def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
     strm: A SeedStream instance seeded with 17, unless otherwise specified by
       arguments or command line flags.
   """
-  return seed_stream.SeedStream(salt, test_seed(hardcoded_seed))
+  return SeedStream(test_seed(hardcoded_seed), salt=salt)
 
 
 class DiscreteScalarDistributionTestHelpers(object):
@@ -375,7 +581,7 @@ class DiscreteScalarDistributionTestHelpers(object):
         `counts[i] = sum{ edges[i-1] <= values[j] < edges[i] : j }`.
       edges: 1D `Tensor` characterizing intervals used for counting.
     """
-    with tf.compat.v2.name_scope(name or 'histogram'):
+    with tf.name_scope(name or 'histogram'):
       x = tf.convert_to_tensor(value=x, name='x')
       if value_range is None:
         value_range = [
@@ -490,13 +696,13 @@ class VectorDistributionTestHelpers(object):
       x = dist.sample(num_samples, seed=seed)
       x = tf.identity(x)  # Invalidate bijector cacheing.
       inverse_log_prob = tf.exp(-dist.log_prob(x))
-      importance_weights = tf.compat.v1.where(
+      importance_weights = tf1.where(
           tf.norm(tensor=x - center, axis=-1) <= radius, inverse_log_prob,
           tf.zeros_like(inverse_log_prob))
       return tf.reduce_mean(input_tensor=importance_weights, axis=0)
 
     # Build graph.
-    with tf.compat.v2.name_scope('run_test_sample_consistent_log_prob'):
+    with tf.name_scope('run_test_sample_consistent_log_prob'):
       batch_shape = dist.batch_shape_tensor()
       actual_volume = actual_hypersphere_volume(
           dims=dist.event_shape_tensor()[0],
@@ -506,7 +712,7 @@ class VectorDistributionTestHelpers(object):
           num_samples=num_samples,
           radius=radius,
           center=center)
-      init_op = tf.compat.v1.global_variables_initializer()
+      init_op = tf1.global_variables_initializer()
 
     # Execute graph.
     sess_run_fn(init_op)
@@ -591,5 +797,5 @@ class VectorDistributionTestHelpers(object):
 
 def _vec_outer_square(x, name=None):
   """Computes the outer-product of a vector, i.e., x.T x."""
-  with tf.compat.v2.name_scope(name or 'vec_osquare'):
+  with tf.name_scope(name or 'vec_osquare'):
     return x[..., :, tf.newaxis] * x[..., tf.newaxis, :]

@@ -5,6 +5,18 @@
 
 # tfp.math.diag_jacobian
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/diag_jacobian.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Computes diagonal of the Jacobian matrix of `ys=fn(xs)` wrt `xs`.
 
 ``` python
@@ -19,8 +31,6 @@ tfp.math.diag_jacobian(
 ```
 
 
-
-Defined in [`python/math/diag_jacobian.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/diag_jacobian.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -81,6 +91,7 @@ print('hessian computed through `diag_jacobian`, sample_shape skipped',
 
 #### Args:
 
+
 * <b>`xs`</b>: `Tensor` or a python `list` of `Tensors` of real-like dtypes and shapes
   `sample_shape` + `event_shape_i`, where `event_shape_i` can be different
   for different tensors.
@@ -101,6 +112,7 @@ print('hessian computed through `diag_jacobian`, sample_shape skipped',
 
 #### Returns:
 
+
 * <b>`ys`</b>: a list, which coincides with the input `ys`, when provided.
   If the input `ys` is None, `fn(*xs)` gets computed and returned as a list.
 * <b>`jacobians_diag_res`</b>: a `Tensor` or a Python list of `Tensor`s of the same
@@ -109,6 +121,7 @@ print('hessian computed through `diag_jacobian`, sample_shape skipped',
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if lists `xs` and `ys` have different length or both `ys` and
   `fn` are `None`, or `fn` is None in the eager execution mode.

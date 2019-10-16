@@ -13,23 +13,29 @@
 
 # tfp.mcmc.TransformedTransitionKernel
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/transformed_kernel.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `TransformedTransitionKernel`
 
 TransformedTransitionKernel applies a bijector to the MCMC's state space.
 
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
 
-
-
-Defined in [`python/mcmc/transformed_kernel.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/transformed_kernel.py).
-
 <!-- Placeholder for "Used in" -->
 
 The `TransformedTransitionKernel` `TransitionKernel` enables fitting
-a [Bijector](
-https://www.tensorflow.org/api_docs/python/tf/distributions/bijectors/Bijector)
-which serves to decorrelate the Markov chain Monte Carlo (MCMC)
-event dimensions thus making the chain mix faster. This is
+a <a href="../../tfp/bijectors/Bijector.md"><code>tfp.bijectors.Bijector</code></a> which serves to decorrelate the Markov chain Monte
+Carlo (MCMC) event dimensions thus making the chain mix faster. This is
 particularly useful when the geometry of the target distribution is
 unfavorable. In such cases it may take many evaluations of the
 `target_log_prob_fn` for the chain to mix between faraway states.
@@ -42,8 +48,7 @@ idea is an instance of Riemannian manifold HMC [(Girolami and Calderhead,
 
 The `TransformedTransitionKernel` enables arbitrary bijective transformations
 of arbitrary `TransitionKernel`s, e.g., one could use bijectors
-`tfp.distributions.bijectors.Affine`,
-`tfp.distributions.bijectors.RealNVP`, etc. with transition kernels
+<a href="../../tfp/bijectors/Affine.md"><code>tfp.bijectors.Affine</code></a>, <a href="../../tfp/bijectors/RealNVP.md"><code>tfp.bijectors.RealNVP</code></a>, etc. with transition kernels
 <a href="../../tfp/mcmc/HamiltonianMonteCarlo.md"><code>tfp.mcmc.HamiltonianMonteCarlo</code></a>, <a href="../../tfp/mcmc/RandomWalkMetropolis.md"><code>tfp.mcmc.RandomWalkMetropolis</code></a>,
 etc.
 
@@ -107,6 +112,8 @@ sample_var = tf.reduce_mean(
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/transformed_kernel.py">View source</a>
+
 ``` python
 __init__(
     inner_kernel,
@@ -117,7 +124,9 @@ __init__(
 
 Instantiates this object.
 
+
 #### Args:
+
 
 * <b>`inner_kernel`</b>: `TransitionKernel`-like object which has a
   `target_log_prob_fn` argument.
@@ -131,6 +140,7 @@ Instantiates this object.
 
 #### Returns:
 
+
 * <b>`transformed_kernel`</b>: Instance of `TransitionKernel` which copies the input
   transition kernel then modifies its `target_log_prob_fn` by applying the
   provided bijector(s).
@@ -143,7 +153,9 @@ Instantiates this object.
 
 
 
+
 <h3 id="inner_kernel"><code>inner_kernel</code></h3>
+
 
 
 
@@ -158,15 +170,19 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 
 
+
 <h3 id="parameters"><code>parameters</code></h3>
 
 Return `dict` of ``__init__`` arguments and their values.
 
 
 
+
 ## Methods
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/transformed_kernel.py">View source</a>
 
 ``` python
 bootstrap_results(
@@ -178,7 +194,7 @@ bootstrap_results(
 Returns an object with the same type as returned by `one_step`.
 
 Unlike other `TransitionKernel`s,
-`TransformedTransitionKernel.bootstrap_results` has the option of
+<a href="../../tfp/mcmc/TransformedTransitionKernel.md#bootstrap_results"><code>TransformedTransitionKernel.bootstrap_results</code></a> has the option of
 initializing the `TransformedTransitionKernelResults` from either an initial
 state, eg, requiring computing `bijector.inverse(init_state)`, or
 directly from `transformed_init_state`, i.e., a `Tensor` or list
@@ -186,6 +202,7 @@ of `Tensor`s which is interpretted as the `bijector.inverse`
 transformed state.
 
 #### Args:
+
 
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the a
   state(s) of the Markov chain(s). Must specify `init_state` or
@@ -197,14 +214,16 @@ transformed state.
 
 #### Returns:
 
+
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
   `Tensor`s representing internal calculations made within this function.
 
 
 #### Raises:
 
-  ValueError: if `inner_kernel` results doesn't contain the member
-    "target_log_prob".
+
+* <b>`ValueError`</b>: if `inner_kernel` results doesn't contain the member
+  "target_log_prob".
 
 #### Examples
 
@@ -226,6 +245,8 @@ results, _ = tfp.mcmc.sample_chain(
 
 <h3 id="one_step"><code>one_step</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/transformed_kernel.py">View source</a>
+
 ``` python
 one_step(
     current_state,
@@ -235,7 +256,9 @@ one_step(
 
 Runs one iteration of the Transformed Kernel.
 
+
 #### Args:
+
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s
   representing the current state(s) of the Markov chain(s),
@@ -254,6 +277,7 @@ Runs one iteration of the Transformed Kernel.
 
 
 #### Returns:
+
 
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
   of the Markov chain(s) after taking exactly one step. Has same type and

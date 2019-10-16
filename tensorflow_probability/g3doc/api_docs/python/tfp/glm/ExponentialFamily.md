@@ -10,15 +10,23 @@
 
 # tfp.glm.ExponentialFamily
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/glm/family.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `ExponentialFamily`
 
 Specifies a mean-value parameterized exponential family.
 
 
-
-
-
-Defined in [`python/glm/family.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/family.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -42,13 +50,17 @@ weights for given model matrix ("X") and responses ("Y").
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/glm/family.py">View source</a>
+
 ``` python
 __init__(name=None)
 ```
 
 Creates the ExponentialFamily.
 
+
 #### Args:
+
 
 * <b>`name`</b>: Python `str` used as TF namescope for ops created by member
   functions. Default value: `None` (i.e., the subclass name).
@@ -61,15 +73,19 @@ Creates the ExponentialFamily.
 
 Returns `True` when `variance(r) == grad_mean(r)` for all `r`.
 
+
 <h3 id="name"><code>name</code></h3>
 
 Returns TF namescope prefixed to ops created by member functions.
 
 
 
+
 ## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/glm/family.py">View source</a>
 
 ``` python
 __call__(
@@ -94,6 +110,7 @@ often `T(Y) := Y` and in that case the distinction doesn't matter.
 
 #### Args:
 
+
 * <b>`predicted_linear_response`</b>: `float`-like `Tensor` corresponding to
   `tf.matmul(model_matrix, weights)`.
 * <b>`name`</b>: Python `str` used as TF namescope for ops created by member
@@ -101,6 +118,7 @@ often `T(Y) := Y` and in that case the distinction doesn't matter.
 
 
 #### Returns:
+
 
 * <b>`mean`</b>: `Tensor` with shape and dtype of `predicted_linear_response`
   representing the distribution prescribed mean, given the prescribed
@@ -115,6 +133,8 @@ often `T(Y) := Y` and in that case the distinction doesn't matter.
 
 <h3 id="log_prob"><code>log_prob</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/glm/family.py">View source</a>
+
 ``` python
 log_prob(
     response,
@@ -125,7 +145,9 @@ log_prob(
 
 Computes `D(param=mean(r)).log_prob(response)` for linear response, `r`.
 
+
 #### Args:
+
 
 * <b>`response`</b>: `float`-like `Tensor` representing observed ("actual")
   responses.
@@ -136,6 +158,7 @@ Computes `D(param=mean(r)).log_prob(response)` for linear response, `r`.
 
 
 #### Returns:
+
 
 * <b>`log_prob`</b>: `Tensor` with shape and dtype of `predicted_linear_response`
   representing the distribution prescribed log-probability of the observed

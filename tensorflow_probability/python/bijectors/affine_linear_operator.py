@@ -22,10 +22,11 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import dtype_util
-
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
-    "AffineLinearOperator",
+    'AffineLinearOperator',
 ]
 
 
@@ -65,12 +66,17 @@ class AffineLinearOperator(bijector.Bijector):
 
   """
 
+  @deprecation.deprecated(
+      '2020-01-01',
+      '`AffineLinearOperator` bijector is deprecated; please use '
+      '`tfb.Shift(loc)(tfb.ScaleMatvecLinearOperator(...))`.',
+      warn_once=True)
   def __init__(self,
                shift=None,
                scale=None,
                adjoint=False,
                validate_args=False,
-               name="affine_linear_operator"):
+               name='affine_linear_operator'):
     """Instantiates the `AffineLinearOperator` bijector.
 
     Args:
@@ -89,38 +95,19 @@ class AffineLinearOperator(bijector.Bijector):
       TypeError: if `shift.dtype` does not match `scale.dtype`.
       ValueError: if not `scale.is_non_singular`.
     """
-    self._graph_parents = []
-    self._name = name
-    self._validate_args = validate_args
-    graph_parents = []
-    with self._name_scope("init"):
-      # In the absence of `loc` and `scale`, we'll assume `dtype` is `float32`.
-      dtype = tf.float32
-
-      if shift is not None:
-        shift = tf.convert_to_tensor(value=shift, name="shift")
-        graph_parents += [shift]
-        dtype = dtype_util.base_dtype(shift.dtype)
-      self._shift = shift
-
+    with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([shift, scale], dtype_hint=tf.float32)
+      self._shift = tensor_util.convert_nonref_to_tensor(
+          shift, dtype=dtype, name='shift')
       if scale is not None:
-        if (shift is not None and
-            not dtype_util.base_equal(shift.dtype, scale.dtype)):
-          raise TypeError(
-              "shift.dtype({}) is incompatible with scale.dtype({}).".format(
-                  shift.dtype, scale.dtype))
         if not isinstance(scale, tf.linalg.LinearOperator):
-          raise TypeError("scale is not an instance of tf.LinearOperator")
+          raise TypeError('scale is not an instance of tf.LinearOperator')
         if validate_args and not scale.is_non_singular:
-          raise ValueError("Scale matrix must be non-singular.")
-        graph_parents += scale.graph_parents
-        if scale.dtype is not None:
-          dtype = dtype_util.base_dtype(scale.dtype)
+          raise ValueError('Scale matrix must be non-singular.')
       self._scale = scale
       self._adjoint = adjoint
       super(AffineLinearOperator, self).__init__(
           forward_min_event_ndims=1,
-          graph_parents=graph_parents,
           is_constant_jacobian=True,
           dtype=dtype,
           validate_args=validate_args,
@@ -148,13 +135,13 @@ class AffineLinearOperator(bijector.Bijector):
                                    if self.validate_args else []):
         y = self.scale.matvec(y, adjoint=self.adjoint)
     if self.shift is not None:
-      y += self.shift
+      y = y + self.shift
     return y
 
   def _inverse(self, y):
     x = y
     if self.shift is not None:
-      x -= self.shift
+      x = x - self.shift
     if self.scale is not None:
       # Solve fails if the op is singular so we may safely skip this assertion.
       x = self.scale.solvevec(x, adjoint=self.adjoint)

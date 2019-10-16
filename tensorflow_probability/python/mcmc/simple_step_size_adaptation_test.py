@@ -24,14 +24,14 @@ import collections
 
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfd = tfp.distributions
 
 _RATE = 1.01
 
@@ -71,7 +71,7 @@ class FakeMHKernel(tfp.mcmc.TransitionKernel):
         accepted_results=self.parameters['inner_kernel'].bootstrap_results(
             current_state),
         log_accept_ratio=tf.convert_to_tensor(
-            value=self.parameters['log_accept_ratio']),
+            self.parameters['log_accept_ratio']),
     )
 
   def is_calibrated(self):
@@ -129,7 +129,7 @@ class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SimpleStepSizeAdaptationTest(tf.test.TestCase, parameterized.TestCase):
+class SimpleStepSizeAdaptationTest(tfp_test_util.TestCase):
 
   def testTurnOnStoreParametersInKernelResults(self):
     kernel = FakeWrapperKernel(FakeSteppedKernel(step_size=0.5))
@@ -350,7 +350,7 @@ class SimpleStepSizeAdaptationTest(tf.test.TestCase, parameterized.TestCase):
       _impl()
 
   def testExample(self):
-    tf.compat.v1.random.set_random_seed(tfp_test_util.test_seed())
+    tf1.random.set_random_seed(tfp_test_util.test_seed())
     target_log_prob_fn = tfd.Normal(loc=0., scale=1.).log_prob
     num_burnin_steps = 500
     num_results = 500
@@ -372,15 +372,14 @@ class SimpleStepSizeAdaptationTest(tf.test.TestCase, parameterized.TestCase):
         kernel=kernel,
         trace_fn=lambda _, pkr: pkr.inner_results.log_accept_ratio)
 
-    p_accept = tf.reduce_mean(
-        input_tensor=tf.exp(tf.minimum(log_accept_ratio, 0.)))
+    p_accept = tf.math.exp(tfp.math.reduce_logmeanexp(
+        tf.minimum(log_accept_ratio, 0.)))
 
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SimpleStepSizeAdaptationStaticBroadcastingTest(tf.test.TestCase,
-                                                     parameterized.TestCase):
+class SimpleStepSizeAdaptationStaticBroadcastingTest(tfp_test_util.TestCase):
   use_static_shape = True
 
   @parameterized.parameters(
@@ -420,8 +419,8 @@ class SimpleStepSizeAdaptationStaticBroadcastingTest(tf.test.TestCase,
         [[np.log(0.73), np.log(0.76), np.log(0.73)],
          [np.log(0.77), np.log(0.77), np.log(0.73)]],
         dtype=tf.float64)
-    log_accept_ratio = tf.compat.v1.placeholder_with_default(
-        input=log_accept_ratio,
+    log_accept_ratio = tf1.placeholder_with_default(
+        log_accept_ratio,
         shape=log_accept_ratio.shape if self.use_static_shape else None)
     state = [
         tf.zeros([2, 3], dtype=tf.float64),

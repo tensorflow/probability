@@ -31,10 +31,15 @@ class Sigmoid(bijector.Bijector):
   """Bijector which computes `Y = g(X) = 1 / (1 + exp(-X))`."""
 
   def __init__(self, validate_args=False, name="sigmoid"):
-    super(Sigmoid, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(Sigmoid, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
+
+  @classmethod
+  def _is_increasing(cls):
+    return True
 
   def _forward(self, x):
     return tf.sigmoid(x)
@@ -47,4 +52,4 @@ class Sigmoid(bijector.Bijector):
   # `-tf.log(y) - tf.log1p(-y)` has lower numerical precision.
 
   def _forward_log_det_jacobian(self, x):
-    return -tf.nn.softplus(-x) - tf.nn.softplus(x)
+    return -tf.math.softplus(-x) - tf.math.softplus(x)

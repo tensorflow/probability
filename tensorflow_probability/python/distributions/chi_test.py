@@ -33,7 +33,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ChiTest(tf.test.TestCase):
+class ChiTest(tfp_test_util.TestCase):
 
   def testChiLogPDF(self):
     df = np.arange(1, 6, dtype=np.float64)
@@ -52,6 +52,14 @@ class ChiTest(tf.test.TestCase):
     pdf = chi.prob(x)
     self.assertEqual(pdf.shape, np.broadcast(df, x).shape)
     self.assertAllClose(self.evaluate(pdf), np.exp(expected_log_pdf))
+
+  def testLogPdfAssertsOnInvalidSample(self):
+    d = tfd.Chi(df=13.37, validate_args=True)
+    with self.assertRaisesOpError('All elements must be non-negative.'):
+      self.evaluate(d.log_prob([14.2, -5.3]))
+
+    with self.assertRaisesOpError('Sample must be positive.'):
+      print(self.evaluate(d.log_prob([0.0, 0.0])))
 
   def testChiCDF(self):
     df = np.arange(1, 6, dtype=np.float64)
@@ -109,8 +117,7 @@ class ChiTest(tf.test.TestCase):
     x = a.sample(
         int(8e5),
         seed=tfp_test_util.test_seed(hardcoded_seed=0, set_eager_seed=False))
-    kl_sample = tf.reduce_mean(
-        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
     self.assertAllClose(true_kl, kl_, atol=0., rtol=1e-14)
@@ -119,6 +126,31 @@ class ChiTest(tf.test.TestCase):
     zero_kl = tfd.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
+
+  def testGradientThroughParams(self):
+    df = tf.Variable(19.43, dtype=tf.float64)
+    d = tfd.Chi(df, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([1., 2., 3.])
+    grad = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
+
+  def testAssertsPositiveDf(self):
+    df = tf.Variable([1., 2., -3.])
+    with self.assertRaisesOpError('Argument `df` must be positive.'):
+      d = tfd.Chi(df, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.entropy())
+
+  def testAssertsPositiveDfAfterMutation(self):
+    df = tf.Variable([1., 2., 3.])
+    d = tfd.Chi(df, validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
+    with self.assertRaisesOpError('Argument `df` must be positive.'):
+      with tf.control_dependencies([df.assign([1., 2., -3.])]):
+        self.evaluate(d.sample())
+
 
 if __name__ == '__main__':
   tf.test.main()

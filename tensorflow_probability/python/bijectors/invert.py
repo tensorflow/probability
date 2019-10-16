@@ -66,7 +66,6 @@ class Invert(bijector_lib.Bijector):
 
     self._bijector = bijector
     super(Invert, self).__init__(
-        graph_parents=bijector.graph_parents,
         forward_min_event_ndims=bijector.inverse_min_event_ndims,
         inverse_min_event_ndims=bijector.forward_min_event_ndims,
         is_constant_jacobian=bijector.is_constant_jacobian,
@@ -90,14 +89,17 @@ class Invert(bijector_lib.Bijector):
   def bijector(self):
     return self._bijector
 
-  def forward(self, x):
-    return self.bijector.inverse(x)
+  def _internal_is_increasing(self, **kwargs):
+    return self.bijector._internal_is_increasing(**kwargs)  # pylint: disable=protected-access
 
-  def inverse(self, y):
-    return self.bijector.forward(y)
+  def forward(self, x, **kwargs):
+    return self.bijector.inverse(x, **kwargs)
 
-  def inverse_log_det_jacobian(self, y, event_ndims):
-    return self.bijector.forward_log_det_jacobian(y, event_ndims)
+  def inverse(self, y, **kwargs):
+    return self.bijector.forward(y, **kwargs)
 
-  def forward_log_det_jacobian(self, x, event_ndims):
-    return self.bijector.inverse_log_det_jacobian(x, event_ndims)
+  def inverse_log_det_jacobian(self, y, event_ndims, **kwargs):
+    return self.bijector.forward_log_det_jacobian(y, event_ndims, **kwargs)
+
+  def forward_log_det_jacobian(self, x, event_ndims, **kwargs):
+    return self.bijector.inverse_log_det_jacobian(x, event_ndims, **kwargs)

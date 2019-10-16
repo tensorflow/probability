@@ -32,6 +32,7 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":leapfrog_integrator",
         ":slice_sampler_utils",
         ":util",
     ],
@@ -53,6 +54,8 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -65,5 +68,29 @@ py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "leapfrog_integrator",
+    srcs = ["leapfrog_integrator.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":util",
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "leapfrog_integrator_test",
+    size = "small",
+    srcs = ["leapfrog_integrator_test.py"],
+    deps = [
+        ":leapfrog_integrator",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

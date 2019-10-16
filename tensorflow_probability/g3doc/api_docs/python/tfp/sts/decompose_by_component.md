@@ -5,6 +5,18 @@
 
 # tfp.sts.decompose_by_component
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/decomposition.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Decompose an observed time series into contributions from each component.
 
 ``` python
@@ -16,8 +28,6 @@ tfp.sts.decompose_by_component(
 ```
 
 
-
-Defined in [`python/sts/decomposition.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/decomposition.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -31,6 +41,7 @@ of a structural time series model. In particular, it:
     observation model, to generate the time series modeled by that component.
 
 #### Args:
+
 
 * <b>`model`</b>: An instance of <a href="../../tfp/sts/Sum.md"><code>tfp.sts.Sum</code></a> representing a structural time series
   model.
@@ -48,12 +59,13 @@ of a structural time series model. In particular, it:
 
 #### Returns:
 
-  component_dists: A `collections.OrderedDict` instance mapping
-    component StructuralTimeSeries instances (elements of `model.components`)
-    to `tfd.Distribution` instances representing the posterior marginal
-    distributions on the process modeled by each component. Each distribution
-    has batch shape matching that of `posterior_means`/`posterior_covs`, and
-    event shape of `[num_timesteps]`.
+
+* <b>`component_dists`</b>: A `collections.OrderedDict` instance mapping
+  component StructuralTimeSeries instances (elements of `model.components`)
+  to `tfd.Distribution` instances representing the posterior marginal
+  distributions on the process modeled by each component. Each distribution
+  has batch shape matching that of `posterior_means`/`posterior_covs`, and
+  event shape of `[num_timesteps]`.
 
 #### Examples
 

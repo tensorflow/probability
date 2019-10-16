@@ -5,7 +5,24 @@
 
 # tfp.edward2.VectorDiffeomixture
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for VectorDiffeomixture.
+
+### Aliases:
+
+* `tfp.experimental.edward2.VectorDiffeomixture`
+
 
 ``` python
 tfp.edward2.VectorDiffeomixture(
@@ -16,15 +33,14 @@ tfp.edward2.VectorDiffeomixture(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See VectorDiffeomixture for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
@@ -38,8 +54,8 @@ where z is in the K-simplex, and
 p(x | z) := p(x | loc=sum_k z[k] loc[k], scale=sum_k z[k] scale[k])
 ```
 
-
 #### Args:
+
 
 * <b>`mix_loc`</b>: `float`-like `Tensor` with shape `[b1, ..., bB, K-1]`.
   In terms of samples, larger `mix_loc[..., k]` ==>
@@ -86,6 +102,7 @@ p(x | z) := p(x | loc=sum_k z[k] loc[k], scale=sum_k z[k] scale[k])
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `not scale or len(scale) < 2`.
 * <b>`ValueError`</b>: if `len(loc) != len(scale)`

@@ -16,15 +16,23 @@
 
 # tfp.mcmc.MetropolisAdjustedLangevinAlgorithm
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/langevin.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `MetropolisAdjustedLangevinAlgorithm`
 
 Runs one step of Metropolis-adjusted Langevin algorithm.
 
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
-
-
-
-Defined in [`python/mcmc/langevin.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/langevin.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -217,6 +225,8 @@ print('sample covariance matrix', sample_cov_)
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/langevin.py">View source</a>
+
 ``` python
 __init__(
     target_log_prob_fn,
@@ -230,7 +240,9 @@ __init__(
 
 Initializes MALA transition kernel.
 
+
 #### Args:
+
 
 * <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
   `current_state` (or `*current_state` if it's a list) and returns its
@@ -256,6 +268,7 @@ Initializes MALA transition kernel.
 
 #### Returns:
 
+
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
   of the Markov chain(s) at each result step. Has same shape as
   `current_state`.
@@ -264,6 +277,7 @@ Initializes MALA transition kernel.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if there isn't one `step_size` or a list with same length as
   `current_state`.
@@ -284,7 +298,9 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 
 
+
 <h3 id="parallel_iterations"><code>parallel_iterations</code></h3>
+
 
 
 
@@ -292,7 +308,9 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 Return `dict` of ``__init__`` arguments and their values.
 
+
 <h3 id="seed"><code>seed</code></h3>
+
 
 
 
@@ -300,7 +318,9 @@ Return `dict` of ``__init__`` arguments and their values.
 
 
 
+
 <h3 id="target_log_prob_fn"><code>target_log_prob_fn</code></h3>
+
 
 
 
@@ -310,9 +330,12 @@ Return `dict` of ``__init__`` arguments and their values.
 
 
 
+
 ## Methods
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/langevin.py">View source</a>
 
 ``` python
 bootstrap_results(init_state)
@@ -320,7 +343,10 @@ bootstrap_results(init_state)
 
 Creates initial `previous_kernel_results` using a supplied `state`.
 
+
 <h3 id="one_step"><code>one_step</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/langevin.py">View source</a>
 
 ``` python
 one_step(
@@ -331,7 +357,9 @@ one_step(
 
 Runs one iteration of MALA.
 
+
 #### Args:
+
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   current state(s) of the Markov chain(s). The first `r` dimensions index
@@ -343,6 +371,7 @@ Runs one iteration of MALA.
 
 #### Returns:
 
+
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
   of the Markov chain(s) after taking exactly one step. Has same type and
   shape as `current_state`.
@@ -351,6 +380,7 @@ Runs one iteration of MALA.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if there isn't one `step_size` or a list with same length as
   `current_state` or `diffusion_drift`.

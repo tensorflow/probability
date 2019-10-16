@@ -10,15 +10,23 @@
 
 # tfp.math.ode.Diagnostics
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/ode/base.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `Diagnostics`
 
 Diagnostics returned by a Solver.
 
 
-
-
-
-Defined in [`python/math/ode/base.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/ode/base.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -29,7 +37,9 @@ Defined in [`python/math/ode/base.py`](https://github.com/tensorflow/probability
 
 Number of Jacobian evaluations.
 
+
 #### Returns:
+
 
 * <b>`num_jacobian_evaluations`</b>: Scalar integer `Tensor` containing number of
   Jacobian evaluations.
@@ -38,7 +48,9 @@ Number of Jacobian evaluations.
 
 Number of matrix factorizations.
 
+
 #### Returns:
+
 
 * <b>`num_matrix_factorizations`</b>: Scalar integer `Tensor` containing the number
   of matrix factorizations.
@@ -47,7 +59,9 @@ Number of matrix factorizations.
 
 Number of function evaluations.
 
+
 #### Returns:
+
 
 * <b>`num_ode_fn_evaluations`</b>: Scalar integer `Tensor` containing the number of
   function evaluations.
@@ -56,7 +70,9 @@ Number of function evaluations.
 
 Completion status.
 
+
 #### Returns:
+
 
 * <b>`status`</b>: Scalar integer `Tensor` containing the reason for termination. -1
   on failure, 1 on termination by an event, and 0 otherwise.
@@ -65,7 +81,9 @@ Completion status.
 
 Boolean indicating whether or not the method succeeded.
 
+
 #### Returns:
+
 
 * <b>`success`</b>: Boolean `Tensor` equivalent to `status >= 0`.
 

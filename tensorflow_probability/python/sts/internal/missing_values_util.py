@@ -20,7 +20,8 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 tfl = tf.linalg
 
@@ -95,6 +96,12 @@ class MaskedTimeSeries(collections.namedtuple('MaskedTimeSeries',
   # Forecast
   forecast_dist = tfp.sts.forecast(
     model, observed_time_series, num_steps_forecast=5)
+
+  # Impute missing values
+  observations_dist = tfp.sts.impute_missing_values(model, observed_time_series)
+  print('imputed means and stddevs: ',
+        observations_dist.mean(),
+        observations_dist.stddev())
   ```
 
   """
@@ -124,13 +131,13 @@ def moments_of_masked_time_series(time_series_tensor, broadcast_mask):
   # Manually compute mean and variance, excluding masked entries.
   mean = (
       tf.reduce_sum(
-          input_tensor=tf.compat.v1.where(broadcast_mask,
+          input_tensor=tf1.where(broadcast_mask,
                                           tf.zeros_like(time_series_tensor),
                                           time_series_tensor),
           axis=-1) / num_unmasked_entries)
   variance = (
       tf.reduce_sum(
-          input_tensor=tf.compat.v1.where(
+          input_tensor=tf1.where(
               broadcast_mask, tf.zeros_like(time_series_tensor),
               (time_series_tensor - mean[..., tf.newaxis])**2),
           axis=-1) / num_unmasked_entries)
@@ -160,6 +167,7 @@ def initial_value_of_masked_time_series(time_series_tensor, broadcast_mask):
         'dynamic rank.')  # `batch_gather` requires static rank
 
   # Extract the initial value for each series in the batch.
-  return tf.squeeze(tf.compat.v1.batch_gather(
+  return tf.squeeze(tf.gather(
       params=time_series_tensor,
-      indices=first_unmasked_indices[..., tf.newaxis]), axis=-1)
+      indices=first_unmasked_indices[..., tf.newaxis],
+      batch_dims=first_unmasked_indices.shape.ndims), axis=-1)

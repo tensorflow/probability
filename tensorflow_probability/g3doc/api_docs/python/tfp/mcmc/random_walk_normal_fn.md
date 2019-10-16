@@ -5,6 +5,18 @@
 
 # tfp.mcmc.random_walk_normal_fn
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/random_walk_metropolis.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Returns a callable that adds a random normal perturbation to the input.
 
 ``` python
@@ -15,8 +27,6 @@ tfp.mcmc.random_walk_normal_fn(
 ```
 
 
-
-Defined in [`python/mcmc/random_walk_metropolis.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/random_walk_metropolis.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -31,6 +41,7 @@ as the state parts of `current_state`.
 
 #### Args:
 
+
 * <b>`scale`</b>: a `Tensor` or Python `list` of `Tensor`s of any shapes and `dtypes`
   controlling the scale of the normal proposal distribution.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
@@ -38,6 +49,7 @@ as the state parts of `current_state`.
 
 
 #### Returns:
+
 
 * <b>`random_walk_normal_fn`</b>: A callable accepting a Python `list` of `Tensor`s
   representing the state parts of the `current_state` and an `int`

@@ -18,7 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
+
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -26,8 +28,10 @@ __all__ = [
 ]
 
 
+@deprecation.deprecated_args(
+    '2020-01-04', 'Use `keepdims` instead of `keep_dims`', 'keep_dims')
 def expectation(f, samples, log_prob=None, use_reparametrization=True,
-                axis=0, keep_dims=False, name=None):
+                axis=0, keepdims=False, name=None, keep_dims=False):
   """Computes the Monte-Carlo approximation of `E_p[f(X)]`.
 
   This function computes the Monte-Carlo approximation of an expectation, i.e.,
@@ -125,7 +129,8 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
 
   Args:
     f: Python callable which can return `f(samples)`.
-    samples: `Tensor` of samples used to form the Monte-Carlo approximation of
+    samples: `Tensor` or nested structure (list, dict, etc.) of `Tensor`s,
+      representing samples used to form the Monte-Carlo approximation of
       `E_p[f(X)]`.  A batch of samples should be indexed by `axis` dimensions.
     log_prob: Python callable which can return `log_prob(samples)`. Must
       correspond to the natural-logarithm of the pdf/pmf of each sample. Only
@@ -139,10 +144,12 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
     axis: The dimensions to average. If `None`, averages all
       dimensions.
       Default value: `0` (the left-most dimension).
-    keep_dims: If True, retains averaged dimensions using size `1`.
+    keepdims: If True, retains averaged dimensions using size `1`.
       Default value: `False`.
     name: A `name_scope` for operations created by this function.
       Default value: `None` (which implies "expectation").
+    keep_dims: (Deprecated) If True, retains averaged dimensions using size `1`.
+      Default value: `False`.
 
   Returns:
     approx_expectation: `Tensor` corresponding to the Monte-Carlo approximation
@@ -153,18 +160,18 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
     ValueError: if `use_reparametrization=False` and `log_prob` is not a Python
       `callable`.
   """
-
-  with tf.compat.v1.name_scope(name, 'expectation', [samples]):
+  keepdims = keepdims or keep_dims
+  del keep_dims
+  with tf.name_scope(name or 'expectation'):
     if not callable(f):
       raise ValueError('`f` must be a callable function.')
     if use_reparametrization:
-      return tf.reduce_mean(
-          input_tensor=f(samples), axis=axis, keepdims=keep_dims)
+      return tf.reduce_mean(f(samples), axis=axis, keepdims=keepdims)
     else:
       if not callable(log_prob):
         raise ValueError('`log_prob` must be a callable function.')
       stop = tf.stop_gradient  # For readability.
-      x = stop(samples)
+      x = tf.nest.map_structure(stop, samples)
       logpx = log_prob(x)
       fx = f(x)  # Call `f` once in case it has side-effects.
       # To achieve this, we use the fact that:
@@ -189,27 +196,4 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       # "Is there a floating point value of x, for which x-x == 0 is false?"
       # http://stackoverflow.com/q/2686644
       dice = fx * tf.exp(logpx - stop(logpx))
-      return tf.reduce_mean(input_tensor=dice, axis=axis, keepdims=keep_dims)
-
-
-def _sample_mean(values):
-  """Mean over sample indices.  In this module this is always [0]."""
-  return tf.reduce_mean(input_tensor=values, axis=[0])
-
-
-def _sample_max(values):
-  """Max over sample indices.  In this module this is always [0]."""
-  return tf.reduce_max(input_tensor=values, axis=[0])
-
-
-def _get_samples(dist, z, n, seed):
-  """Check args and return samples."""
-  with tf.compat.v1.name_scope('get_samples', values=[z, n]):
-    if (n is None) == (z is None):
-      raise ValueError(
-          'Must specify exactly one of arguments "n" and "z".  Found: '
-          'n = %s, z = %s' % (n, z))
-    if n is not None:
-      return dist.sample(n, seed=seed)
-    else:
-      return tf.convert_to_tensor(value=z, name='z')
+      return tf.reduce_mean(dice, axis=axis, keepdims=keepdims)

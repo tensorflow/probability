@@ -18,17 +18,19 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-tfd = tfp.distributions
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 rng = np.random.RandomState(0)
+tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class DeterministicTest(tf.test.TestCase):
+class DeterministicTest(tfp_test_util.TestCase):
 
   def testShape(self):
     loc = rng.rand(2, 3, 4)
@@ -66,6 +68,15 @@ class DeterministicTest(tf.test.TestCase):
     prob = deterministic.prob(x)
     self.assertAllEqual((2, 2), prob.shape)
     self.assertAllEqual(expected_prob, self.evaluate(prob))
+
+  def testLogProbWithDefaultTolInt32Loc(self):
+    loc = [[0, 1], [2, 3]]
+    x = [[0, 2], [1, 3]]
+    deterministic = tfd.Deterministic(tf.constant(loc, dtype=tf.int32))
+    expected_logprob = [[0., float("-inf")], [float("-inf"), 0.]]
+    prob = deterministic.log_prob(x)
+    self.assertAllEqual((2, 2), prob.shape)
+    self.assertAllEqual(expected_logprob, self.evaluate(prob))
 
   def testProbWithNonzeroATol(self):
     loc = [[0., 1.], [2., 3.]]
@@ -169,12 +180,12 @@ class DeterministicTest(tf.test.TestCase):
           self.evaluate(sample))
 
   def testSampleDynamicWithBatchDims(self):
-    loc = tf.compat.v1.placeholder_with_default(input=[0., 0], shape=[2])
+    loc = tf1.placeholder_with_default([0., 0], shape=[2])
 
     deterministic = tfd.Deterministic(loc)
     for sample_shape_ in [(), (4,)]:
-      sample_shape = tf.compat.v1.placeholder_with_default(
-          input=np.array(sample_shape_, dtype=np.int32), shape=None)
+      sample_shape = tf1.placeholder_with_default(
+          np.array(sample_shape_, dtype=np.int32), shape=None)
       sample_ = self.evaluate(deterministic.sample(sample_shape))
       self.assertAllClose(
           np.zeros(sample_shape_ + (2,)).astype(np.float32), sample_)
@@ -211,8 +222,37 @@ class DeterministicTest(tf.test.TestCase):
     expected_kl_, actual_kl_ = self.evaluate([expected_kl, actual_kl])
     self.assertAllEqual(expected_kl_, actual_kl_)
 
+  def testVariableGradients(self):
+    loc = tf.Variable(1.)
+    deterministic = tfd.Deterministic(loc=loc)
+    with tf.GradientTape() as tape:
+      s = deterministic.sample()
+    g = tape.gradient(s, deterministic.trainable_variables)
+    self.assertLen(g, 1)
+    self.assertAllNotNone(g)
 
-class VectorDeterministicTest(tf.test.TestCase):
+  def testVariableAssertions(self):
+    atol = tf.Variable(0.1)
+    rtol = tf.Variable(0.1)
+    deterministic = tfd.Deterministic(
+        loc=0.1, atol=atol, rtol=rtol, validate_args=True)
+
+    self.evaluate([v.initializer for v in deterministic.variables])
+    self.evaluate(deterministic.log_prob(1.))
+
+    self.evaluate(atol.assign(-1.))
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "Condition x >= 0"):
+      self.evaluate(deterministic.log_prob(1.))
+
+    self.evaluate(atol.assign(0.1))
+    self.evaluate(rtol.assign(-1.))
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "Condition x >= 0"):
+      self.evaluate(deterministic.log_prob(1.))
+
+
+class VectorDeterministicTest(tfp_test_util.TestCase):
 
   def testParamBroadcasts(self):
     loc = rng.rand(2, 1, 4)
@@ -237,7 +277,7 @@ class VectorDeterministicTest(tf.test.TestCase):
     self.assertEqual(deterministic.event_shape, tf.TensorShape([4]))
 
   def testShapeUknown(self):
-    loc = tf.compat.v1.placeholder_with_default(np.float32([0]), shape=[None])
+    loc = tf1.placeholder_with_default(np.float32([0]), shape=[None])
     deterministic = tfd.VectorDeterministic(loc)
     self.assertAllEqual(deterministic.event_shape_tensor().shape, [1])
 
@@ -335,13 +375,12 @@ class VectorDeterministicTest(tf.test.TestCase):
           self.evaluate(sample))
 
   def testSampleDynamicWithBatchDims(self):
-    loc = tf.compat.v1.placeholder_with_default(
-        input=[[0.], [0.]], shape=[2, 1])
+    loc = tf1.placeholder_with_default([[0.], [0.]], shape=[2, 1])
 
     deterministic = tfd.VectorDeterministic(loc)
     for sample_shape_ in [(), (4,)]:
-      sample_shape = tf.compat.v1.placeholder_with_default(
-          input=np.array(sample_shape_, dtype=np.int32), shape=None)
+      sample_shape = tf1.placeholder_with_default(
+          np.array(sample_shape_, dtype=np.int32), shape=None)
       sample_ = self.evaluate(deterministic.sample(sample_shape))
       self.assertAllClose(
           np.zeros(sample_shape_ + (2, 1)).astype(np.float32), sample_)
@@ -379,6 +418,35 @@ class VectorDeterministicTest(tf.test.TestCase):
     actual_kl = tfd.kl_divergence(a, b)
     expected_kl_, actual_kl_ = self.evaluate([expected_kl, actual_kl])
     self.assertAllEqual(expected_kl_, actual_kl_)
+
+  def testVariableGradients(self):
+    loc = tf.Variable([1., 2.])
+    deterministic = tfd.VectorDeterministic(loc=loc)
+    with tf.GradientTape() as tape:
+      s = deterministic.sample()
+    g = tape.gradient(s, deterministic.trainable_variables)
+    self.assertLen(g, 1)
+    self.assertAllNotNone(g)
+
+  def testVariableAssertions(self):
+    atol = tf.Variable(0.1)
+    rtol = tf.Variable(0.1)
+    deterministic = tfd.VectorDeterministic(
+        loc=[0.1], atol=atol, rtol=rtol, validate_args=True)
+
+    self.evaluate([v.initializer for v in deterministic.variables])
+    self.evaluate(deterministic.log_prob([1.]))
+
+    self.evaluate(atol.assign(-1.))
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "Condition x >= 0"):
+      self.evaluate(deterministic.log_prob([1.]))
+
+    self.evaluate(atol.assign(0.1))
+    self.evaluate(rtol.assign(-1.))
+    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
+                                 "Condition x >= 0"):
+      self.evaluate(deterministic.log_prob([1.]))
 
 
 if __name__ == "__main__":

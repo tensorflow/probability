@@ -44,12 +44,13 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/util",
     ],
 )
 
 py_test(
     name = "distribution_tensor_coercible_test",
-    size = "small",
+    size = "medium",
     srcs = ["distribution_tensor_coercible_test.py"],
     deps = [
         ":distribution_tensor_coercible",
@@ -57,6 +58,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

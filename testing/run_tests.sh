@@ -51,11 +51,34 @@ install_bazel() {
   sudo apt-get install bazel
 }
 
+find_version_str() {
+  PKG_NAME=$1
+  # These are nightly builds we'd like to avoid for some reason; separated by
+  # regex OR operator.
+  BAD_NIGHTLY_DATES="20190915\|20190916"
+  # This will fail to find version 'X" and log available version strings to
+  # stderr. We then sort, remove bad versions and take the last entry. This
+  # allows us to avoid hardcoding the main version number, which would then need
+  # to be updated on every new TF release.
+  pip install $PKG_NAME==X 2>&1 \
+    | grep -o "[0-9.]\+dev[0-9]\{8\}" \
+    | sort \
+    | grep -v "$BAD_NIGHTLY_DATES" \
+    | tail -n1
+}
+
 install_python_packages() {
+  # Ensure newer than 18.x pip version, which is necessary after tf-nightly
+  # switched to manylinux2010.
+  pip install --upgrade pip>=19.2
+
   # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
-  pip install tf-nightly
+  TF_VERSION_STR=$(find_version_str tf-nightly)
+  pip install tf-nightly==$TF_VERSION_STR \
+    gast==0.2.2
 
   # The following unofficial dependencies are used only by tests.
+  # TODO(b/141170087): Unpin Hypothesis version.
   pip install scipy hypothesis matplotlib mock
 
   # Install additional TFP dependencies.
@@ -69,9 +92,18 @@ install_python_packages() {
 call_with_log_folding install_bazel
 call_with_log_folding install_python_packages
 
+# Print out all versions, as an FYI in the logs.
+python --version
+pip --version
+pip freeze
+
 # Get a shard of tests.
 shard_tests=$(bazel query 'tests(//tensorflow_probability/...)' |
   awk -v n=${NUM_SHARDS} -v s=${SHARD} 'NR%n == s' )
+MAYBE_FORCE_PY2_FLAG=""
+if [[ $(python -V 2>&1) =~ Python\ 2.* ]]; then
+  MAYBE_FORCE_PY2_FLAG="--noincompatible_py3_is_default"
+fi
 
 # Run tests. Notes on less obvious options:
 #   --notest_keep_going -- stop running tests as soon as anything fails. This is
@@ -86,11 +118,13 @@ shard_tests=$(bazel query 'tests(//tensorflow_probability/...)' |
 #     See https://github.com/bazelbuild/bazel/issues/6648 and b/121259040.
 echo "${shard_tests}" \
   | xargs bazel test \
+    --compilation_mode=opt \
     --copt=-O3 \
     --copt=-march=native \
     --notest_keep_going \
-    --test_tag_filters=-gpu,-requires-gpu-sm35,-no-oss-ci \
+    --test_tag_filters=-gpu,-requires-gpu-sm35,-notap,-no-oss-ci,-tfp_jax,-tf2-broken \
     --test_timeout 300,450,1200,3600 \
     --action_env=PATH \
     --action_env=LD_LIBRARY_PATH \
-    --test_output=errors
+    --test_output=errors \
+    ${MAYBE_FORCE_PY2_FLAG}

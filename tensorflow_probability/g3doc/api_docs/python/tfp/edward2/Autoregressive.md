@@ -5,7 +5,24 @@
 
 # tfp.edward2.Autoregressive
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for Autoregressive.
+
+### Aliases:
+
+* `tfp.experimental.edward2.Autoregressive`
+
 
 ``` python
 tfp.edward2.Autoregressive(
@@ -16,22 +33,21 @@ tfp.edward2.Autoregressive(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See Autoregressive for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
 Construct an `Autoregressive` distribution.
 
-
 #### Args:
+
 
 * <b>`distribution_fn`</b>: Python `callable` which constructs a
   `tfd.Distribution`-like instance from a `Tensor` (e.g.,
@@ -57,6 +73,7 @@ Construct an `Autoregressive` distribution.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `num_steps` and
   `num_elements(distribution_fn(sample0).event_shape)` are both `None`.

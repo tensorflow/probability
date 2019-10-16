@@ -19,12 +19,15 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
-import tensorflow as tf
-from tensorflow_probability.python import bijectors as tfb
 
+import numpy as np
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -32,18 +35,18 @@ rng = np.random.RandomState(42)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SoftmaxCenteredBijectorTest(tf.test.TestCase):
+class SoftmaxCenteredBijectorTest(tfp_test_util.TestCase):
   """Tests correctness of the Y = g(X) = exp(X) / sum(exp(X)) transformation."""
 
   def testBijectorVector(self):
     softmax = tfb.SoftmaxCentered()
-    self.assertEqual("softmax_centered", softmax.name)
+    self.assertStartsWith(softmax.name, "softmax_centered")
     x = np.log([[2., 3, 4], [4., 8, 12]])
     y = [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]]
     self.assertAllClose(y, self.evaluate(softmax.forward(x)))
     self.assertAllClose(x, self.evaluate(softmax.inverse(y)))
     self.assertAllClose(
-        -np.sum(np.log(y), axis=1),
+        -np.sum(np.log(y), axis=1) - 0.5 * np.log(4.)[np.newaxis, ...],
         self.evaluate(softmax.inverse_log_det_jacobian(y, event_ndims=1)),
         atol=0.,
         rtol=1e-7)
@@ -55,16 +58,16 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
 
   def testBijectorUnknownShape(self):
     softmax = tfb.SoftmaxCentered()
-    self.assertEqual("softmax_centered", softmax.name)
+    self.assertStartsWith(softmax.name, "softmax_centered")
     x_ = np.log([[2., 3, 4], [4., 8, 12]]).astype(np.float32)
     y_ = np.array(
         [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]], dtype=np.float32)
-    x = tf.compat.v1.placeholder_with_default(x_, shape=[2, None])
-    y = tf.compat.v1.placeholder_with_default(y_, shape=[2, None])
+    x = tf1.placeholder_with_default(x_, shape=[2, None])
+    y = tf1.placeholder_with_default(y_, shape=[2, None])
     self.assertAllClose(y_, self.evaluate(softmax.forward(x)))
     self.assertAllClose(x_, self.evaluate(softmax.inverse(y)))
     self.assertAllClose(
-        -np.sum(np.log(y_), axis=1),
+        -np.sum(np.log(y_), axis=1) - 0.5 * np.log(4.)[np.newaxis, ...],
         self.evaluate(softmax.inverse_log_det_jacobian(y, event_ndims=1)),
         atol=0.,
         rtol=1e-7)
@@ -105,8 +108,8 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
             bijector.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
   def testShapeGettersWithDynamicShape(self):
-    x = tf.compat.v1.placeholder_with_default(input=[2, 4], shape=None)
-    y = tf.compat.v1.placeholder_with_default(input=[2, 5], shape=None)
+    x = tf1.placeholder_with_default([2, 4], shape=None)
+    y = tf1.placeholder_with_default([2, 5], shape=None)
     bijector = tfb.SoftmaxCentered(validate_args=True)
     self.assertAllEqual(
         [2, 5], self.evaluate(bijector.forward_event_shape_tensor(x)))
@@ -125,6 +128,20 @@ class SoftmaxCenteredBijectorTest(tf.test.TestCase):
     y = y.T  # y.shape = [5, 3]
     bijector_test_util.assert_bijective_and_finite(
         softmax, x, y, eval_func=self.evaluate, event_ndims=1)
+
+  @tfp_test_util.numpy_disable_gradient_test
+  def testTheoreticalFldj(self):
+    softmax = tfb.SoftmaxCentered()
+    x = np.linspace(-15, 15, num=10).reshape(5, 2).astype(np.float64)
+
+    fldj = softmax.forward_log_det_jacobian(x, event_ndims=1)
+    fldj_theoretical = bijector_test_util.get_fldj_theoretical(
+        softmax, x, event_ndims=1)
+    self.assertAllClose(
+        self.evaluate(fldj_theoretical),
+        self.evaluate(fldj),
+        atol=1e-5,
+        rtol=1e-5)
 
 
 if __name__ == "__main__":

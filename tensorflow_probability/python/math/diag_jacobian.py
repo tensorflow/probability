@@ -18,8 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.math.gradient import value_and_gradient
 
@@ -121,14 +120,14 @@ def diag_jacobian(xs,
     ValueError: if lists `xs` and `ys` have different length or both `ys` and
       `fn` are `None`, or `fn` is None in the eager execution mode.
   """
-  with tf.compat.v1.name_scope(name, 'jacobians_diag', [xs, ys]):
+  with tf.name_scope(name or 'jacobians_diag'):
     if sample_shape is None:
       sample_shape = [1]
     # Output Jacobian diagonal
     jacobians_diag_res = []
     # Convert input `xs` to a list
     xs = list(xs) if _is_list_like(xs) else [xs]
-    xs = [tf.convert_to_tensor(value=x) for x in xs]
+    xs = [tf.convert_to_tensor(x) for x in xs]
     if not tf.executing_eagerly():
       if ys is None:
         if fn is None:
@@ -146,8 +145,7 @@ def diag_jacobian(xs,
         y_ = tf.reshape(y, tf.concat([sample_shape, [-1]], -1))
 
         # Declare an iterator and tensor array loop variables for the gradients.
-        n = tf.size(input=x) / tf.cast(
-            tf.reduce_prod(input_tensor=sample_shape), dtype=tf.int32)
+        n = tf.size(x) / tf.cast(tf.reduce_prod(sample_shape), dtype=tf.int32)
         n = tf.cast(n, dtype=tf.int32)
         loop_vars = [
             0,
@@ -178,7 +176,7 @@ def diag_jacobian(xs,
             loop_vars=loop_vars,
             parallel_iterations=parallel_iterations)
 
-        shape_x = tf.shape(input=x)
+        shape_x = tf.shape(x)
         # Stack gradients together and move flattened `event_shape` to the
         # zero position
         reshaped_jacobian_diag = tf.transpose(a=jacobian_diag_res.stack())
@@ -221,8 +219,7 @@ def diag_jacobian(xs,
 
       for i, x in enumerate(xs):
         # Declare an iterator and tensor array loop variables for the gradients.
-        n = tf.size(input=x) / tf.cast(
-            tf.reduce_prod(input_tensor=sample_shape), dtype=tf.int32)
+        n = tf.size(x) / tf.cast(tf.reduce_prod(sample_shape), dtype=tf.int32)
         n = tf.cast(n, dtype=tf.int32)
         loop_vars = [
             0,
@@ -237,7 +234,7 @@ def diag_jacobian(xs,
             loop_vars=loop_vars,
             parallel_iterations=parallel_iterations)
 
-        shape_x = tf.shape(input=x)
+        shape_x = tf.shape(x)
         # Stack gradients together and move flattened `event_shape` to the
         # zero position
         reshaped_jacobian_diag = tf.transpose(a=jacobian_diag_res.stack())

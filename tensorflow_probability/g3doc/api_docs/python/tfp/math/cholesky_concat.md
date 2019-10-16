@@ -5,6 +5,18 @@
 
 # tfp.math.cholesky_concat
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/linalg.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Concatenates `chol @ chol.T` with additional rows and columns.
 
 ``` python
@@ -16,8 +28,6 @@ tfp.math.cholesky_concat(
 ```
 
 
-
-Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/linalg.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -40,6 +50,7 @@ separate `rows` argument (which can be inferred from `conj(cols.T)`).
 
 #### Args:
 
+
 * <b>`chol`</b>: Cholesky decomposition of `mat = chol @ chol.T`.
 * <b>`cols`</b>: The new columns whose first `n` rows we would like concatenated to the
   right of `mat = chol @ chol.T`, and whose conjugate transpose we would
@@ -51,6 +62,7 @@ separate `rows` argument (which can be inferred from `conj(cols.T)`).
 
 
 #### Returns:
+
 
 * <b>`chol_concat`</b>: The Cholesky decomposition of:
   ```

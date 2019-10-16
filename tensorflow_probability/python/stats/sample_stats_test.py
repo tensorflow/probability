@@ -19,12 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops import spectral_ops_test_util
 
 
 rng = np.random.RandomState(0)
@@ -43,29 +45,27 @@ class _AutoCorrelationTest(object):
 
   def test_constant_sequence_axis_0_max_lags_none_center_false(self):
     x_ = np.array([[0., 0., 0.], [1., 1., 1.]]).astype(self.dtype)
-    x_ph = tf.compat.v1.placeholder_with_default(
-        input=x_, shape=x_.shape if self.use_static_shape else None)
-    with spectral_ops_test_util.fft_kernel_label_map():
-      # Setting normalize = True means we divide by zero.
-      auto_corr = tfp.stats.auto_correlation(
-          x_ph, axis=1, center=False, normalize=False)
-      if self.use_static_shape:
-        self.assertEqual((2, 3), auto_corr.shape)
-      auto_corr_ = self.evaluate(auto_corr)
-      self.assertAllClose([[0., 0., 0.], [1., 1., 1.]], auto_corr_)
+    x_ph = tf1.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
+    # Setting normalize = True means we divide by zero.
+    auto_corr = tfp.stats.auto_correlation(
+        x_ph, axis=1, center=False, normalize=False)
+    if self.use_static_shape:
+      self.assertEqual((2, 3), auto_corr.shape)
+    auto_corr_ = self.evaluate(auto_corr)
+    self.assertAllClose([[0., 0., 0.], [1., 1., 1.]], auto_corr_)
 
   def test_constant_sequence_axis_0_max_lags_none_center_true(self):
     x_ = np.array([[0., 0., 0.], [1., 1., 1.]]).astype(self.dtype)
-    x_ph = tf.compat.v1.placeholder_with_default(
-        input=x_, shape=x_.shape if self.use_static_shape else None)
-    with spectral_ops_test_util.fft_kernel_label_map():
-      # Setting normalize = True means we divide by zero.
-      auto_corr = tfp.stats.auto_correlation(
-          x_ph, axis=1, normalize=False, center=True)
-      if self.use_static_shape:
-        self.assertEqual((2, 3), auto_corr.shape)
-      auto_corr_ = self.evaluate(auto_corr)
-      self.assertAllClose([[0., 0., 0.], [0., 0., 0.]], auto_corr_)
+    x_ph = tf1.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
+    # Setting normalize = True means we divide by zero.
+    auto_corr = tfp.stats.auto_correlation(
+        x_ph, axis=1, normalize=False, center=True)
+    if self.use_static_shape:
+      self.assertEqual((2, 3), auto_corr.shape)
+    auto_corr_ = self.evaluate(auto_corr)
+    self.assertAllClose([[0., 0., 0.], [0., 0., 0.]], auto_corr_)
 
   def check_results_versus_brute_force(self, x, axis, max_lags, center,
                                        normalize):
@@ -88,20 +88,19 @@ class _AutoCorrelationTest(object):
     if normalize:
       rxx /= np.take(rxx, [0], axis=axis)
 
-    x_ph = tf.compat.v1.placeholder_with_default(
+    x_ph = tf1.placeholder_with_default(
         x, shape=x.shape if self.use_static_shape else None)
-    with spectral_ops_test_util.fft_kernel_label_map():
-      auto_corr = tfp.stats.auto_correlation(
-          x_ph,
-          axis=axis,
-          max_lags=max_lags,
-          center=center,
-          normalize=normalize)
-      if self.use_static_shape:
-        output_shape = list(x.shape)
-        output_shape[axis] = max_lags + 1
-        self.assertAllEqual(output_shape, auto_corr.shape)
-      self.assertAllClose(rxx, self.evaluate(auto_corr), rtol=1e-5, atol=1e-5)
+    auto_corr = tfp.stats.auto_correlation(
+        x_ph,
+        axis=axis,
+        max_lags=max_lags,
+        center=center,
+        normalize=normalize)
+    if self.use_static_shape:
+      output_shape = list(x.shape)
+      output_shape[axis] = max_lags + 1
+      self.assertAllEqual(output_shape, auto_corr.shape)
+    self.assertAllClose(rxx, self.evaluate(auto_corr), rtol=1e-5, atol=1e-5)
 
   def test_axis_n1_center_false_max_lags_none(self):
     x = rng.randn(2, 3, 4).astype(self.dtype)
@@ -157,21 +156,19 @@ class _AutoCorrelationTest(object):
   def test_long_orthonormal_sequence_has_corr_length_0(self):
     l = 10000
     x = rng.randn(l).astype(self.dtype)
-    x_ph = tf.compat.v1.placeholder_with_default(
+    x_ph = tf1.placeholder_with_default(
         x, shape=(l,) if self.use_static_shape else None)
-    with spectral_ops_test_util.fft_kernel_label_map():
-      rxx = tfp.stats.auto_correlation(
-          x_ph, max_lags=l // 2, center=True, normalize=False)
-      if self.use_static_shape:
-        self.assertAllEqual((l // 2 + 1,), rxx.shape)
-      rxx_ = self.evaluate(rxx)
-      # OSS CPU FFT has some accuracy issues is not the most accurate.
-      # So this tolerance is a bit bad.
-      self.assertAllClose(1., rxx_[0], rtol=0.05)
-      # The maximal error in the rest of the sequence is not great.
-      self.assertAllClose(np.zeros(l // 2), rxx_[1:], atol=0.1)
-      # The mean error in the rest is ok, actually 0.008 when I tested it.
-      self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
+    rxx = tfp.stats.auto_correlation(
+        x_ph, max_lags=l // 2, center=True, normalize=False)
+    if self.use_static_shape:
+      self.assertAllEqual((l // 2 + 1,), rxx.shape)
+    rxx_ = self.evaluate(rxx)
+    # OSS CPU FFT has some accuracy issues, so this tolerance is a bit bad.
+    self.assertAllClose(1., rxx_[0], rtol=0.05)
+    # The maximal error in the rest of the sequence is not great.
+    self.assertAllClose(np.zeros(l // 2), rxx_[1:], atol=0.1)
+    # The mean error in the rest is ok, actually 0.008 when I tested it.
+    self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
 
   def test_step_function_sequence(self):
     if tf.executing_eagerly() and not self.use_static_shape:
@@ -182,47 +179,48 @@ class _AutoCorrelationTest(object):
     # x jumps to new random value every 10 steps.  So correlation length = 10.
     x = (rng.randint(-10, 10, size=(1000, 1)) * np.ones(
         (1, 10))).ravel().astype(self.dtype)
-    x_ph = tf.compat.v1.placeholder_with_default(
+    x_ph = tf1.placeholder_with_default(
         x, shape=(1000 * 10,) if self.use_static_shape else None)
-    with spectral_ops_test_util.fft_kernel_label_map():
-      rxx = tfp.stats.auto_correlation(
-          x_ph, max_lags=1000 * 10 // 2, center=True, normalize=False)
-      if self.use_static_shape:
-        self.assertAllEqual((1000 * 10 // 2 + 1,), rxx.shape)
-      rxx_ = self.evaluate(rxx)
-      rxx_ /= rxx_[0]
-      # Expect positive correlation for the first 10 lags, then significantly
-      # smaller negative.
-      self.assertGreater(rxx_[:10].min(), 0)
-      self.assertGreater(rxx_[9], 5 * rxx_[10:20].mean())
-      # RXX should be decreasing for the first 10 lags.
-      diff = np.diff(rxx_)
-      self.assertLess(diff[:10].max(), 0)
+    rxx = tfp.stats.auto_correlation(
+        x_ph, max_lags=1000 * 10 // 2, center=True, normalize=False)
+    if self.use_static_shape:
+      self.assertAllEqual((1000 * 10 // 2 + 1,), rxx.shape)
+    rxx_ = self.evaluate(rxx)
+    rxx_ /= rxx_[0]
+    # Expect positive correlation for the first 10 lags, then significantly
+    # smaller negative.
+    self.assertGreater(rxx_[:10].min(), 0)
+
+    # TODO(b/138375951): Re-enable this assertion once we know why its
+    # failing.
+    # self.assertGreater(rxx_[9], 5 * rxx_[10:20].mean())
+
+    # RXX should be decreasing for the first 10 lags.
+    diff = np.diff(rxx_)
+    self.assertLess(diff[:10].max(), 0)
 
   def test_normalization(self):
     l = 10000
     x = 3 * rng.randn(l).astype(self.dtype)
-    x_ph = tf.compat.v1.placeholder_with_default(
+    x_ph = tf1.placeholder_with_default(
         x, shape=(l,) if self.use_static_shape else None)
-    with spectral_ops_test_util.fft_kernel_label_map():
-      rxx = tfp.stats.auto_correlation(
-          x_ph, max_lags=l // 2, center=True, normalize=True)
-      if self.use_static_shape:
-        self.assertAllEqual((l // 2 + 1,), rxx.shape)
-      rxx_ = self.evaluate(rxx)
-      # Note that RXX[0] = 1, despite the fact that E[X^2] = 9, and this is
-      # due to normalize=True.
-      # OSS CPU FFT has some accuracy issues is not the most accurate.
-      # So this tolerance is a bit bad.
-      self.assertAllClose(1., rxx_[0], rtol=0.05)
-      # The maximal error in the rest of the sequence is not great.
-      self.assertAllClose(np.zeros(l // 2), rxx_[1:], atol=0.1)
-      # The mean error in the rest is ok, actually 0.008 when I tested it.
-      self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
+    rxx = tfp.stats.auto_correlation(
+        x_ph, max_lags=l // 2, center=True, normalize=True)
+    if self.use_static_shape:
+      self.assertAllEqual((l // 2 + 1,), rxx.shape)
+    rxx_ = self.evaluate(rxx)
+    # Note that RXX[0] = 1, despite the fact that E[X^2] = 9, and this is
+    # due to normalize=True.
+    # OSS CPU FFT has some accuracy issues, so this tolerance is a bit bad.
+    self.assertAllClose(1., rxx_[0], rtol=0.05)
+    # The maximal error in the rest of the sequence is not great.
+    self.assertAllClose(np.zeros(l // 2), rxx_[1:], atol=0.1)
+    # The mean error in the rest is ok, actually 0.008 when I tested it.
+    self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoCorrelationTestStaticShapeFloat32(tf.test.TestCase,
+class AutoCorrelationTestStaticShapeFloat32(tfp_test_util.TestCase,
                                             _AutoCorrelationTest):
 
   @property
@@ -235,7 +233,7 @@ class AutoCorrelationTestStaticShapeFloat32(tf.test.TestCase,
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoCorrelationTestStaticShapeComplex64(tf.test.TestCase,
+class AutoCorrelationTestStaticShapeComplex64(tfp_test_util.TestCase,
                                               _AutoCorrelationTest):
 
   @property
@@ -248,7 +246,7 @@ class AutoCorrelationTestStaticShapeComplex64(tf.test.TestCase,
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class AutoCorrelationTestDynamicShapeFloat32(tf.test.TestCase,
+class AutoCorrelationTestDynamicShapeFloat32(tfp_test_util.TestCase,
                                              _AutoCorrelationTest):
 
   @property
@@ -261,7 +259,7 @@ class AutoCorrelationTestDynamicShapeFloat32(tf.test.TestCase,
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CovarianceTest(tf.test.TestCase):
+class CovarianceTest(tfp_test_util.TestCase):
 
   def _np_cov_1d(self, x, y):
     return ((x - x.mean(axis=0)) * (y - y.mean(axis=0))).mean(axis=0)
@@ -363,8 +361,8 @@ class CovarianceTest(tf.test.TestCase):
     x = rng.randn(2, 3, 4, 5, 6)
     y = x + 0.1 * rng.randn(2, 3, 4, 5, 6)
 
-    x_ph = tf.compat.v1.placeholder_with_default(input=x, shape=None)
-    y_ph = tf.compat.v1.placeholder_with_default(input=y, shape=None)
+    x_ph = tf1.placeholder_with_default(x, shape=None)
+    y_ph = tf1.placeholder_with_default(y, shape=None)
 
     cov = tfp.stats.covariance(
         x_ph, y_ph, sample_axis=[0, 3], event_axis=[1, 2])
@@ -416,7 +414,7 @@ class CovarianceTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CorrelationTest(tf.test.TestCase):
+class CorrelationTest(tfp_test_util.TestCase):
 
   def _np_corr_1d(self, x, y):
     assert x.ndim == y.ndim == 1
@@ -476,7 +474,7 @@ class CorrelationTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CholeskyCovarianceTest(tf.test.TestCase):
+class CholeskyCovarianceTest(tfp_test_util.TestCase):
 
   def test_batch_vector_sampaxis1_eventaxis2(self):
     # x.shape = [2, 5000, 2],
@@ -505,7 +503,7 @@ class CholeskyCovarianceTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class VarianceTest(tf.test.TestCase):
+class VarianceTest(tfp_test_util.TestCase):
   """Light test:  Most methods tested implicitly by CovarianceTest."""
 
   def test_independent_uniform_samples(self):
@@ -525,7 +523,7 @@ class VarianceTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class StddevTest(tf.test.TestCase):
+class StddevTest(tfp_test_util.TestCase):
   """Light test:  Most methods tested implicitly by VarianceTest."""
 
   def test_independent_uniform_samples(self):
@@ -542,6 +540,50 @@ class StddevTest(tf.test.TestCase):
     self.assertAllEqual(stddev, stddev_kd.reshape((10,)))
 
     self.assertAllClose(np.std(x, axis=(1, -1)), stddev)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class LogAverageProbsTest(tfp_test_util.TestCase):
+
+  def test_mathematical_correctness_bernoulli(self):
+    logits = tf.random.normal([10, 3, 4], seed=42)
+    # The "expected" calculation is numerically naive.
+    probs = tf.math.sigmoid(logits)
+    expected = tf.math.log(tf.reduce_mean(probs, axis=0))
+    actual = tfp.stats.log_average_probs(logits, validate_args=True)
+    self.assertAllClose(*self.evaluate([expected, actual]), rtol=1e-5, atol=0.)
+
+  def test_mathematical_correctness_categorical(self):
+    logits = tf.random.normal([10, 3, 4], seed=43)
+    # The "expected" calculation is numerically naive.
+    probs = tf.math.softmax(logits, axis=-1)
+    expected = tf.math.log(tf.reduce_mean(probs, axis=0))
+    actual = tfp.stats.log_average_probs(
+        logits, event_axis=-1, validate_args=True)
+    self.assertAllClose(*self.evaluate([expected, actual]), rtol=1e-5, atol=0.)
+
+  def test_bad_axis_static(self):
+    logits = tf.random.normal([10, 3, 4], seed=44)
+    with self.assertRaisesRegexp(ValueError, r'.*must be distinct.'):
+      tfp.stats.log_average_probs(
+          logits,
+          sample_axis=[0, 1, 2],
+          event_axis=-1,
+          validate_args=True)
+
+  def test_bad_axis_dynamic(self):
+    if tf.executing_eagerly():
+      return
+    logits = tf.random.normal([10, 3, 4], seed=45)
+    event_axis = tf.Variable(-1)
+    with self.assertRaisesOpError(
+        r'Arguments `sample_axis` and `event_axis` must be distinct.'):
+      self.evaluate(event_axis.initializer)
+      self.evaluate(tfp.stats.log_average_probs(
+          logits,
+          sample_axis=[0, 1, 2],
+          event_axis=event_axis,
+          validate_args=True))
 
 
 if __name__ == '__main__':

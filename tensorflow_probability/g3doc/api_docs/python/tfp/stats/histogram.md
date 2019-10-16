@@ -5,6 +5,18 @@
 
 # tfp.stats.histogram
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/stats/quantiles.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Count how often `x` falls in intervals defined by `edges`.
 
 ``` python
@@ -21,8 +33,6 @@ tfp.stats.histogram(
 
 
 
-Defined in [`python/stats/quantiles.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/stats/quantiles.py).
-
 <!-- Placeholder for "Used in" -->
 
 Given `edges = [c0, ..., cK]`, defining intervals
@@ -33,6 +43,7 @@ Values of `x` outside of the intervals cause errors.  Consider using
 `extend_lower_interval`, `extend_upper_interval` to deal with this.
 
 #### Args:
+
 
 * <b>`x`</b>:  Numeric `N-D` `Tensor` with `N > 0`.  If `axis` is not
   `None`, must have statically known number of dimensions. The
@@ -58,11 +69,12 @@ Values of `x` outside of the intervals cause errors.  Consider using
 
 #### Returns:
 
-  counts: `Tensor` of type `dtype` and, with
-    `~axis = [i for i in range(arr.ndim) if i not in axis]`,
-    `counts.shape = [edges.shape[0]] + x.shape[~axis]`.
-    With `I` a multi-index into `~axis`, `counts[k][I]` is the number of times
-    event(s) fell into the `kth` interval of `edges`.
+
+* <b>`counts`</b>: `Tensor` of type `dtype` and, with
+  `~axis = [i for i in range(arr.ndim) if i not in axis]`,
+  `counts.shape = [edges.shape[0]] + x.shape[~axis]`.
+  With `I` a multi-index into `~axis`, `counts[k][I]` is the number of times
+  event(s) fell into the `kth` interval of `edges`.
 
 #### Examples
 

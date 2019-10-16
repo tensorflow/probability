@@ -37,8 +37,12 @@ __all__ = [
     'max',
     'min',
     'name',
+    'real_dtype',
     'size',
 ]
+
+
+SKIP_DTYPE_CHECKS = False
 
 
 def as_numpy_dtype(dtype):
@@ -62,19 +66,23 @@ def base_equal(a, b):
   return base_dtype(a) == base_dtype(b)
 
 
-def common_dtype(args_list, preferred_dtype=None):
+def common_dtype(args_list, dtype_hint=None):
   """Returns explict dtype from `args_list` if there is one."""
   dtype = None
   for a in tf.nest.flatten(args_list):
-    if hasattr(a, 'dtype'):
+    if hasattr(a, 'dtype') and a.dtype:
       dt = as_numpy_dtype(a.dtype)
     else:
       continue
     if dtype is None:
       dtype = dt
     elif dtype != dt:
-      raise TypeError('Found incompatible dtypes, {} and {}.'.format(dtype, dt))
-  return preferred_dtype if dtype is None else tf.as_dtype(dtype)
+      if SKIP_DTYPE_CHECKS:
+        dtype = (np.ones([2], dtype) + np.ones([2], dt)).dtype
+      else:
+        raise TypeError(
+            'Found incompatible dtypes, {} and {}.'.format(dtype, dt))
+  return dtype_hint if dtype is None else base_dtype(dtype)
 
 
 def is_bool(dtype):
@@ -100,13 +108,13 @@ def is_floating(dtype):
   dtype = tf.as_dtype(dtype)
   if hasattr(dtype, 'is_floating'):
     return dtype.is_floating
-  return np.issubdtype(np.dtype(dtype), np.float)
+  return np.issubdtype(np.dtype(dtype), np.floating)
 
 
 def is_integer(dtype):
   """Returns whether this is a (non-quantized) integer type."""
   dtype = tf.as_dtype(dtype)
-  if hasattr(dtype, 'is_integer'):
+  if hasattr(dtype, 'is_integer') and not callable(dtype.is_integer):
     return dtype.is_integer
   return np.issubdtype(np.dtype(dtype), np.integer)
 
@@ -114,7 +122,7 @@ def is_integer(dtype):
 def max(dtype):  # pylint: disable=redefined-builtin
   """Returns the maximum representable value in this data type."""
   dtype = tf.as_dtype(dtype)
-  if hasattr(dtype, 'max'):
+  if hasattr(dtype, 'max') and not callable(dtype.max):
     return dtype.max
   use_finfo = is_floating(dtype) or is_complex(dtype)
   return np.finfo(dtype).max if use_finfo else np.iinfo(dtype).max
@@ -123,7 +131,7 @@ def max(dtype):  # pylint: disable=redefined-builtin
 def min(dtype):  # pylint: disable=redefined-builtin
   """Returns the minimum representable value in this data type."""
   dtype = tf.as_dtype(dtype)
-  if hasattr(dtype, 'min'):
+  if hasattr(dtype, 'min') and not callable(dtype.min):
     return dtype.min
   use_finfo = is_floating(dtype) or is_complex(dtype)
   return np.finfo(dtype).min if use_finfo else np.iinfo(dtype).min
@@ -147,6 +155,15 @@ def size(dtype):
   return np.dtype(dtype).itemsize
 
 
+def real_dtype(dtype):
+  """Returns the dtype of the real part."""
+  dtype = tf.as_dtype(dtype)
+  if hasattr(dtype, 'real_dtype'):
+    return dtype.real_dtype
+  # TODO(jvdillon): Find a better way.
+  return np.array(0, as_numpy_dtype(dtype)).real.dtype
+
+
 def _assert_same_base_type(items, expected_type=None):
   r"""Asserts all items are of the same base type.
 
@@ -168,7 +185,7 @@ def _assert_same_base_type(items, expected_type=None):
   for item in items:
     if item is not None:
       item_type = base_dtype(item.dtype)
-      if not expected_type:
+      if expected_type is None:
         expected_type = item_type
       elif expected_type != item_type:
         mismatch = True

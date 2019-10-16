@@ -24,10 +24,12 @@ from tensorflow_probability.python.sts.decomposition import decompose_by_compone
 from tensorflow_probability.python.sts.decomposition import decompose_forecast_by_component
 from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegression
 from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegressionStateSpaceModel
+from tensorflow_probability.python.sts.fitting import build_factored_surrogate_posterior
 from tensorflow_probability.python.sts.fitting import build_factored_variational_loss
 from tensorflow_probability.python.sts.fitting import fit_with_hmc
 from tensorflow_probability.python.sts.fitting import sample_uniform_initial_state
 from tensorflow_probability.python.sts.forecast import forecast
+from tensorflow_probability.python.sts.forecast import impute_missing_values
 from tensorflow_probability.python.sts.forecast import one_step_predictive
 from tensorflow_probability.python.sts.internal.missing_values_util import MaskedTimeSeries
 from tensorflow_probability.python.sts.local_level import LocalLevel
@@ -41,11 +43,13 @@ from tensorflow_probability.python.sts.seasonal import Seasonal
 from tensorflow_probability.python.sts.seasonal import SeasonalStateSpaceModel
 from tensorflow_probability.python.sts.semilocal_linear_trend import SemiLocalLinearTrend
 from tensorflow_probability.python.sts.semilocal_linear_trend import SemiLocalLinearTrendStateSpaceModel
+from tensorflow_probability.python.sts.smooth_seasonal import SmoothSeasonal
+from tensorflow_probability.python.sts.smooth_seasonal import SmoothSeasonalStateSpaceModel
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 from tensorflow_probability.python.sts.sum import AdditiveStateSpaceModel
 from tensorflow_probability.python.sts.sum import Sum
 
-from tensorflow.python.util.all_util import remove_undocumented
+from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'AdditiveStateSpaceModel',
@@ -64,14 +68,18 @@ _allowed_symbols = [
     'SeasonalStateSpaceModel',
     'SemiLocalLinearTrend',
     'SemiLocalLinearTrendStateSpaceModel',
+    'SmoothSeasonal',
+    'SmoothSeasonalStateSpaceModel',
     'SparseLinearRegression',
     'StructuralTimeSeries',
     'Sum',
+    'build_factored_surrogate_posterior',
     'build_factored_variational_loss',
     'decompose_by_component',
     'decompose_forecast_by_component',
     'fit_with_hmc',
     'forecast',
+    'impute_missing_values',
     'one_step_predictive',
     'sample_uniform_initial_state'
 ]

@@ -5,6 +5,18 @@
 
 # tfp.math.batch_interp_regular_1d_grid
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/interpolation.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Linear `1-D` interpolation on a regular (constant spacing) grid.
 
 ``` python
@@ -23,8 +35,6 @@ tfp.math.batch_interp_regular_1d_grid(
 ```
 
 
-
-Defined in [`python/math/interpolation.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/interpolation.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -48,6 +58,7 @@ with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
 
 #### Args:
 
+
 * <b>`x`</b>: Numeric `Tensor` The x-coordinates of the interpolated output values for
   each batch.  Shape broadcasts with `[A1, ..., AN, D]`, `N >= 0`.
 * <b>`x_ref_min`</b>:  `Tensor` of same `dtype` as `x`.  The minimum value of the each
@@ -65,9 +76,9 @@ with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
   Default value: `-1`, the rightmost axis.
 * <b>`fill_value`</b>:  Determines what values output should take for `x` values that
   are below `x_ref_min` or above `x_ref_max`. `Tensor` or one of the strings
-  "constant_extension" ==> Extend as constant function. "extrapolate" ==>
+  'constant_extension' ==> Extend as constant function. 'extrapolate' ==>
   Extrapolate in a linear fashion.
-  Default value: `"constant_extension"`
+  Default value: `'constant_extension'`
 * <b>`fill_value_below`</b>:  Optional override of `fill_value` for `x < x_ref_min`.
 * <b>`fill_value_above`</b>:  Optional override of `fill_value` for `x > x_ref_max`.
 * <b>`grid_regularizing_transform`</b>:  Optional transformation `g` which regularizes
@@ -75,10 +86,11 @@ with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
   provided, we assume `g(x_ref_i)` is a regular grid between `g(x_ref_min)`
   and `g(x_ref_max)`.
 * <b>`name`</b>:  A name to prepend to created ops.
-  Default value: `"batch_interp_regular_1d_grid"`.
+  Default value: `'batch_interp_regular_1d_grid'`.
 
 
 #### Returns:
+
 
 * <b>`y_interp`</b>:  Interpolation between members of `y_ref`, at points `x`.
   `Tensor` of same `dtype` as `x`, and shape `[A1, ..., AN, D, B1, ..., BM]`
@@ -86,8 +98,9 @@ with leading dimensions in `x`, `x_ref_min`, `x_ref_max`.
 
 #### Raises:
 
-  ValueError:  If `fill_value` is not an allowed string.
-  ValueError:  If `axis` is not a scalar.
+
+* <b>`ValueError`</b>:  If `fill_value` is not an allowed string.
+* <b>`ValueError`</b>:  If `axis` is not a scalar.
 
 #### Examples
 

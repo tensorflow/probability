@@ -21,26 +21,29 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-def _assert_sparse_tensor_value(test_case, expected, actual):
-  test_case.assertEqual(np.int64, np.array(actual.indices).dtype)
-  test_case.assertAllEqual(expected.indices, actual.indices)
+def _assert_sparse_tensor_value(test_case_instance, expected, actual):
+  test_case_instance.assertEqual(np.int64, np.array(actual.indices).dtype)
+  test_case_instance.assertAllEqual(expected.indices, actual.indices)
 
-  test_case.assertEqual(
+  test_case_instance.assertEqual(
       np.array(expected.values).dtype, np.array(actual.values).dtype)
-  test_case.assertAllEqual(expected.values, actual.values)
+  test_case_instance.assertAllEqual(expected.values, actual.values)
 
-  test_case.assertEqual(np.int64, np.array(actual.dense_shape).dtype)
-  test_case.assertAllEqual(expected.dense_shape, actual.dense_shape)
+  test_case_instance.assertEqual(np.int64, np.array(actual.dense_shape).dtype)
+  test_case_instance.assertAllEqual(expected.dense_shape, actual.dense_shape)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SparseTest(tf.test.TestCase):
+class SparseTest(tfp_test_util.TestCase):
   # Copied (with modifications) from:
   # tensorflow/contrib/layers/python/ops/sparse_ops.py.
 
@@ -124,9 +127,8 @@ class SparseTest(tf.test.TestCase):
     self.assertAllEqual([2, 2, 4], result.dense_shape)
 
   def test_dense_to_sparse_unknown_1d_shape(self):
-    tensor = tf.compat.v1.placeholder_with_default(
-        np.array([0, 100, 0, 3], np.int32),
-        shape=[None])
+    tensor = tf1.placeholder_with_default(
+        np.array([0, 100, 0, 3], np.int32), shape=[None])
     st = tfp.math.dense_to_sparse(tensor)
     result = self.evaluate(st)
     self.assertAllEqual([[1], [3]], result.indices)
@@ -134,9 +136,9 @@ class SparseTest(tf.test.TestCase):
     self.assertAllEqual([4], result.dense_shape)
 
   def test_dense_to_sparse_unknown_3d_shape(self):
-    tensor = tf.compat.v1.placeholder_with_default(
-        np.array([[[1, 2, 0, 0], [3, 4, 5, 0]],
-                  [[7, 8, 0, 0], [9, 0, 0, 0]]], np.int32),
+    tensor = tf1.placeholder_with_default(
+        np.array([[[1, 2, 0, 0], [3, 4, 5, 0]], [[7, 8, 0, 0], [9, 0, 0, 0]]],
+                 np.int32),
         shape=[None, None, None])
     st = tfp.math.dense_to_sparse(tensor)
     result = self.evaluate(st)
@@ -154,9 +156,8 @@ class SparseTest(tf.test.TestCase):
     self.assertAllEqual([2, 2, 4], result.dense_shape)
 
   def test_dense_to_sparse_unknown_rank(self):
-    ph = tf.compat.v1.placeholder_with_default(
-        np.array([[1, 2, 0, 0], [3, 4, 5, 0]], np.int32),
-        shape=None)
+    ph = tf1.placeholder_with_default(
+        np.array([[1, 2, 0, 0], [3, 4, 5, 0]], np.int32), shape=None)
     st = tfp.math.dense_to_sparse(ph)
     result = self.evaluate(st)
     self.assertAllEqual(

@@ -51,10 +51,13 @@ import sys
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import uniform
-from tensorflow_probability.python.internal import distribution_util as util
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.math.linalg import fill_triangular
 
 __all__ = [
     "correlation_matrix_volume_rejection_samples",
@@ -67,7 +70,7 @@ def try_import(name):  # pylint: disable=invalid-name
   try:
     module = importlib.import_module(name)
   except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
+    tf1.logging.warning("Could not import %s: %s" % (name, str(e)))
   return module
 
 optimize = try_import("scipy.optimize")
@@ -161,10 +164,11 @@ def _uniform_correlation_like_matrix(num_rows, batch_shape, dtype, seed):
   # `fill_triangular`.  Then would need to filter almost half out with
   # `matrix_band_part`.
   unifs = uniform.Uniform(-ones, ones).sample(batch_shape, seed=seed)
-  tril = util.fill_triangular(unifs)
+  tril = fill_triangular(unifs)
   symmetric = tril + tf.linalg.matrix_transpose(tril)
   diagonal_ones = tf.ones(
-      shape=util.pad(batch_shape, axis=0, back=True, value=num_rows),
+      prefer_static.pad(
+          batch_shape, paddings=[[0, 1]], constant_values=num_rows),
       dtype=dtype)
   return tf.linalg.set_diag(symmetric, diagonal_ones)
 
@@ -204,7 +208,7 @@ def correlation_matrix_volume_rejection_samples(
     volume: The volume of the set of `dim` by `dim` correlation-like
       matrices.
   """
-  with tf.compat.v1.name_scope("rejection_sampler"):
+  with tf.name_scope("rejection_sampler"):
     rej_proposals = _uniform_correlation_like_matrix(
         dim, sample_shape, dtype, seed=seed)
     rej_proposal_volume = 2. ** (dim * (dim - 1) / 2.)
@@ -318,7 +322,7 @@ def compute_true_volumes(
       tuple giving the confidence interval.
   """
   bounds = {}
-  with tf.compat.v1.Session() as sess:
+  with tf1.Session() as sess:
     rej_weights, _ = correlation_matrix_volume_rejection_samples(
         det_bounds, dim, [num_samples, len(det_bounds)], np.float32, seed=seed)
     rej_weights = sess.run(rej_weights)

@@ -24,12 +24,13 @@ import warnings
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
 
 TestTransitionKernelResults = collections.namedtuple(
     'TestTransitionKernelResults', 'counter_1, counter_2')
@@ -50,13 +51,13 @@ class TestTransitionKernel(tfp.mcmc.TransitionKernel):
     return True
 
 
-class SampleChainTest(tf.test.TestCase):
+class SampleChainTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._shape_param = 5.
     self._rate_param = 10.
 
-    tf.compat.v1.random.set_random_seed(10003)
+    tf1.random.set_random_seed(10003)
     np.random.seed(10003)
 
   def testChainWorksCorrelatedMultivariate(self):
@@ -76,10 +77,10 @@ class SampleChainTest(tf.test.TestCase):
               np.linalg.cholesky(true_cov),
               z[..., tf.newaxis]),
           axis=-1)
-      return -0.5 * tf.reduce_sum(input_tensor=z**2., axis=-1)
+      return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
     if tf.executing_eagerly():
-      tf.compat.v1.set_random_seed(54)
+      tf1.set_random_seed(54)
     states, _ = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=[dtype(-2), dtype(2)],
@@ -95,7 +96,7 @@ class SampleChainTest(tf.test.TestCase):
       self.assertAllEqual(dict(target_calls=4), counter)
     states = tf.stack(states, axis=-1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
+    sample_mean = tf.reduce_mean(states, axis=0)
     x = states - sample_mean
     sample_cov = tf.matmul(x, x, transpose_a=True) / dtype(num_results)
     sample_mean_, sample_cov_ = self.evaluate([sample_mean, sample_cov])
@@ -109,9 +110,12 @@ class SampleChainTest(tf.test.TestCase):
     samples, kernel_results = tfp.mcmc.sample_chain(
         num_results=2, current_state=0, kernel=kernel)
 
-    self.assertAllClose([2], samples.shape.as_list())
-    self.assertAllClose([2], kernel_results.counter_1.shape.as_list())
-    self.assertAllClose([2], kernel_results.counter_2.shape.as_list())
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(samples.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
 
     samples, kernel_results = self.evaluate([samples, kernel_results])
     self.assertAllClose([1, 2], samples)
@@ -123,9 +127,11 @@ class SampleChainTest(tf.test.TestCase):
     samples, kernel_results = tfp.mcmc.sample_chain(
         num_results=2, current_state=0, kernel=kernel, num_burnin_steps=1)
 
-    self.assertAllClose([2], samples.shape.as_list())
-    self.assertAllClose([2], kernel_results.counter_1.shape.as_list())
-    self.assertAllClose([2], kernel_results.counter_2.shape.as_list())
+    self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
 
     samples, kernel_results = self.evaluate([samples, kernel_results])
     self.assertAllClose([2, 3], samples)
@@ -140,9 +146,11 @@ class SampleChainTest(tf.test.TestCase):
         kernel=kernel,
         num_steps_between_results=2)
 
-    self.assertAllClose([2], samples.shape.as_list())
-    self.assertAllClose([2], kernel_results.counter_1.shape.as_list())
-    self.assertAllClose([2], kernel_results.counter_2.shape.as_list())
+    self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
 
     samples, kernel_results = self.evaluate([samples, kernel_results])
     self.assertAllClose([1, 4], samples)
@@ -153,9 +161,11 @@ class SampleChainTest(tf.test.TestCase):
     kernel = TestTransitionKernel()
     res = tfp.mcmc.sample_chain(num_results=2, current_state=0, kernel=kernel)
 
-    self.assertAllClose([2], res.all_states.shape.as_list())
-    self.assertAllClose([2], res.trace.counter_1.shape.as_list())
-    self.assertAllClose([2], res.trace.counter_2.shape.as_list())
+    self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(res.trace.counter_1.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(res.trace.counter_2.shape))
 
     res = self.evaluate(res)
     self.assertAllClose([1, 2], res.all_states)
@@ -167,7 +177,7 @@ class SampleChainTest(tf.test.TestCase):
     samples = tfp.mcmc.sample_chain(
         num_results=2, current_state=0, kernel=kernel, trace_fn=None)
 
-    self.assertAllClose([2], samples.shape.as_list())
+    self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
 
     samples = self.evaluate(samples)
     self.assertAllClose([1, 2], samples)
@@ -180,10 +190,12 @@ class SampleChainTest(tf.test.TestCase):
         kernel=kernel,
         trace_fn=lambda *args: args)
 
-    self.assertAllClose([2], res.all_states.shape.as_list())
-    self.assertAllClose([2], res.trace[0].shape.as_list())
-    self.assertAllClose([2], res.trace[1].counter_1.shape.as_list())
-    self.assertAllClose([2], res.trace[1].counter_2.shape.as_list())
+    self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
+    self.assertAllClose([2], tensorshape_util.as_list(res.trace[0].shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(res.trace[1].counter_1.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(res.trace[1].counter_2.shape))
 
     res = self.evaluate(res)
     self.assertAllClose([1, 2], res.all_states)
@@ -200,10 +212,12 @@ class SampleChainTest(tf.test.TestCase):
         trace_fn=None,
         return_final_kernel_results=True)
 
-    self.assertAllClose([2], res.all_states.shape.as_list())
+    self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
     self.assertEqual((), res.trace)
-    self.assertAllClose([], res.final_kernel_results.counter_1.shape.as_list())
-    self.assertAllClose([], res.final_kernel_results.counter_2.shape.as_list())
+    self.assertAllClose(
+        [], tensorshape_util.as_list(res.final_kernel_results.counter_1.shape))
+    self.assertAllClose(
+        [], tensorshape_util.as_list(res.final_kernel_results.counter_2.shape))
 
     res = self.evaluate(res)
     self.assertAllClose([1, 2], res.all_states)

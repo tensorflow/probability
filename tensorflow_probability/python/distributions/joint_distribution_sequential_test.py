@@ -22,7 +22,9 @@ import collections
 
 # Dependency imports
 from absl.testing import parameterized
+import numpy as np
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -31,6 +33,7 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -43,7 +46,8 @@ class Dummy(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
+class JointDistributionSequentialTest(
+    tfp_test_util.TestCase):
 
   def test_sample_log_prob(self):
     d = tfd.JointDistributionSequential(
@@ -308,6 +312,114 @@ class JointDistributionSequentialTest(tf.test.TestCase, parameterized.TestCase):
       tfd.JointDistributionSequential(collections.namedtuple('model', 'a b')(
           a=tfd.Normal(0, 1),
           b=tfd.Normal(1, 2)))
+
+  def test_simple_example_with_dynamic_shapes(self):
+    dist = tfd.JointDistributionSequential([
+        tfd.Normal(tf1.placeholder_with_default(0., shape=None),
+                   tf1.placeholder_with_default(1., shape=None)),
+        lambda a: tfd.Normal(a, 1.)], validate_args=True)
+    lp = dist.log_prob(dist.sample(5))
+    self.assertAllEqual(self.evaluate(lp).shape, [5])
+
+  def test_latent_dirichlet_allocation(self):
+    """Tests Latent Dirichlet Allocation joint model.
+
+    The LDA generative process can be written as:
+
+    ```none
+    N[i] ~ Poisson(xi)
+    theta[i] ~ Dirichlet(alpha)
+    Z[i] ~ Multinomial(N[i], theta[i])
+    for k in 1...K:
+      X[i,k] ~ Multinomial(Z[i, k], beta[j])
+    ```
+
+    Typically `xi` is specified and `alpha`, `beta` are fit using type-II
+    maximum likelihood estimators.
+
+    Reference: http://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf
+    """
+
+    # Hyperparameters.
+    num_topics = 3
+    num_words = 10
+    avg_doc_length = 5
+    u = tfd.Uniform(low=-1., high=1.)
+    alpha = tfp.util.TransformedVariable(
+        u.sample([num_topics]), tfb.Softplus(), name='alpha')
+    beta = tf.Variable(u.sample([num_topics, num_words]), name='beta')
+
+    # LDA Model.
+    # Note near 1:1 with mathematical specification. The main distinction is the
+    # use of Independent--this lets us easily aggregate multinomials across
+    # topics (and in any "shape" of documents).
+    lda = tfd.JointDistributionSequential([
+        tfd.Poisson(rate=avg_doc_length),                              # n
+        tfd.Dirichlet(concentration=alpha),                            # theta
+        lambda theta, n: tfd.Multinomial(total_count=n, probs=theta),  # z
+        lambda z: tfd.Independent(                                     # x  pylint: disable=g-long-lambda
+            tfd.Multinomial(total_count=z, logits=beta),
+            reinterpreted_batch_ndims=1),
+    ])
+
+    # Now, let's sample some "documents" and compute the log-prob of each.
+    docs_shape = [2, 4]  # That is, 8 docs in the shape of [2, 4].
+    [n, theta, z, x] = lda.sample(docs_shape)
+    log_probs = lda.log_prob([n, theta, z, x])
+    self.assertEqual(docs_shape, log_probs.shape)
+
+    # Verify we correctly track trainable variables.
+    self.assertLen(lda.trainable_variables, 2)
+    self.assertIs(alpha.pretransformed_input, lda.trainable_variables[0])
+    self.assertIs(beta, lda.trainable_variables[1])
+
+    # Ensure we can compute gradients.
+    with tf.GradientTape() as tape:
+      # Note: The samples are not taped, hence implicitly "stop_gradient."
+      negloglik = -lda.log_prob([n, theta, z, x])
+    grads = tape.gradient(negloglik, lda.trainable_variables)
+
+    self.assertLen(grads, 2)
+    self.assertAllEqual((alpha.pretransformed_input.shape, beta.shape),
+                        (grads[0].shape, grads[1].shape))
+    self.assertAllNotNone(grads)
+
+  def test_poisson_switchover_graphical_model(self):
+    # Build a pretend dataset.
+    n = [43, 31]
+    count_data = tf.cast(
+        tf.concat([
+            tfd.Poisson(rate=15.).sample(n[0], seed=1),
+            tfd.Poisson(rate=25.).sample(n[1], seed=2),
+        ], axis=0),
+        dtype=tf.float32)
+    count_data = self.evaluate(count_data)
+    n = np.sum(n).astype(np.float32)
+
+    # Make model.
+    gather = lambda tau, lambda_: tf.gather(  # pylint: disable=g-long-lambda
+        lambda_,
+        indices=tf.cast(
+            tau[..., tf.newaxis] < tf.linspace(0., 1., n),
+            dtype=tf.int32),
+        # TODO(b/139204153): Remove static value hack after bug closed.
+        batch_dims=int(tf.get_static_value(tf.rank(tau))))
+
+    alpha = tf.math.reciprocal(tf.reduce_mean(count_data))
+
+    joint = tfd.JointDistributionSequential([
+        tfd.Sample(tfd.Exponential(rate=alpha),
+                   sample_shape=[2]),
+        tfd.Uniform(),
+        lambda tau, lambda_: tfd.Independent(  # pylint: disable=g-long-lambda
+            tfd.Poisson(rate=gather(tau, lambda_)),
+            reinterpreted_batch_ndims=1),
+    ], validate_args=True)
+
+    # Verify model correctly "compiles".
+    batch_shape = [3, 4]
+    self.assertEqual(batch_shape,
+                     joint.log_prob(joint.sample(batch_shape)).shape)
 
 
 if __name__ == '__main__':

@@ -19,16 +19,18 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class SoftsignBijectorTest(tf.test.TestCase):
+class SoftsignBijectorTest(tfp_test_util.TestCase):
   """Tests the correctness of the Y = g(X) = X / (1 + |X|) transformation."""
 
   def _softsign(self, x):
@@ -37,9 +39,6 @@ class SoftsignBijectorTest(tf.test.TestCase):
   def _softsign_ildj_before_reduction(self, y):
     """Inverse log det jacobian, before being reduced."""
     return -2. * np.log1p(-np.abs(y))
-
-  def setUp(self):
-    self._rng = np.random.RandomState(42)
 
   def testBijectorBounds(self):
     bijector = tfb.Softsign(validate_args=True)
@@ -55,8 +54,8 @@ class SoftsignBijectorTest(tf.test.TestCase):
 
   def testBijectorForwardInverse(self):
     bijector = tfb.Softsign(validate_args=True)
-    self.assertEqual("softsign", bijector.name)
-    x = 2. * self._rng.randn(2, 10)
+    self.assertStartsWith(bijector.name, "softsign")
+    x = 2. * np.random.randn(2, 10)
     y = self._softsign(x)
 
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
@@ -64,7 +63,7 @@ class SoftsignBijectorTest(tf.test.TestCase):
 
   def testBijectorLogDetJacobianEventDimsZero(self):
     bijector = tfb.Softsign(validate_args=True)
-    y = self._rng.rand(2, 10)
+    y = np.random.rand(2, 10)
     # No reduction needed if event_dims = 0.
     ildj = self._softsign_ildj_before_reduction(y)
 
@@ -73,15 +72,15 @@ class SoftsignBijectorTest(tf.test.TestCase):
 
   def testBijectorForwardInverseEventDimsOne(self):
     bijector = tfb.Softsign(validate_args=True)
-    self.assertEqual("softsign", bijector.name)
-    x = 2. * self._rng.randn(2, 10)
+    self.assertStartsWith(bijector.name, "softsign")
+    x = 2. * np.random.randn(2, 10)
     y = self._softsign(x)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorLogDetJacobianEventDimsOne(self):
     bijector = tfb.Softsign(validate_args=True)
-    y = self._rng.rand(2, 10)
+    y = np.random.rand(2, 10)
     ildj_before = self._softsign_ildj_before_reduction(y)
     ildj = np.sum(ildj_before, axis=1)
     self.assertAllClose(
@@ -91,7 +90,7 @@ class SoftsignBijectorTest(tf.test.TestCase):
   def testScalarCongruency(self):
     bijector = tfb.Softsign(validate_args=True)
     bijector_test_util.assert_scalar_congruency(
-        bijector, lower_x=-20., upper_x=20., eval_func=self.evaluate)
+        bijector, lower_x=-20., upper_x=20., eval_func=self.evaluate, rtol=.05)
 
   def testBijectiveAndFinite(self):
     bijector = tfb.Softsign(validate_args=True)

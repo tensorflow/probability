@@ -5,6 +5,18 @@
 
 # tfp.distributions.quadrature_scheme_softmaxnormal_quantiles
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/vector_diffeomixture.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Use SoftmaxNormal quantiles to form quadrature on `K - 1` simplex.
 
 ``` python
@@ -19,8 +31,6 @@ tfp.distributions.quadrature_scheme_softmaxnormal_quantiles(
 
 
 
-Defined in [`python/distributions/vector_diffeomixture.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/vector_diffeomixture.py).
-
 <!-- Placeholder for "Used in" -->
 
 A `SoftmaxNormal` random variable `Y` may be generated via
@@ -31,6 +41,7 @@ X = Normal(normal_loc, normal_scale)
 ```
 
 #### Args:
+
 
 * <b>`normal_loc`</b>: `float`-like `Tensor` with shape `[b1, ..., bB, K-1]`, B>=0.
   The location parameter of the Normal used to construct the SoftmaxNormal.
@@ -46,6 +57,7 @@ X = Normal(normal_loc, normal_scale)
 
 
 #### Returns:
+
 
 * <b>`grid`</b>: Shape `[b1, ..., bB, K, quadrature_size]` `Tensor` representing the
   convex combination of affine parameters for `K` components.

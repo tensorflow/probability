@@ -5,7 +5,24 @@
 
 # tfp.edward2.GammaGamma
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for GammaGamma.
+
+### Aliases:
+
+* `tfp.experimental.edward2.GammaGamma`
+
 
 ``` python
 tfp.edward2.GammaGamma(
@@ -16,15 +33,14 @@ tfp.edward2.GammaGamma(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See GammaGamma for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
@@ -34,8 +50,8 @@ The parameters `concentration` and `rate` must be shaped in a way that
 supports broadcasting (e.g.
 `concentration + mixing_concentration + mixing_rate` is a valid operation).
 
-
 #### Args:
+
 
 * <b>`concentration`</b>: Floating point tensor, the concentration params of the
   distribution(s). Must contain only positive values.
@@ -55,5 +71,6 @@ supports broadcasting (e.g.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `concentration` and `rate` are different dtypes.

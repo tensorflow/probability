@@ -18,12 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import prefer_static
 
 __all__ = [
-    "Cumsum",
+    'Cumsum',
 ]
 
 
@@ -57,7 +57,7 @@ class Cumsum(bijector.Bijector):
 
   """
 
-  def __init__(self, axis=-1, validate_args=False, name="cumsum"):
+  def __init__(self, axis=-1, validate_args=False, name='cumsum'):
     """Instantiates the `Cumsum` bijector.
 
     Args:
@@ -71,17 +71,20 @@ class Cumsum(bijector.Bijector):
       TypeError: if `axis` is not an `int`.
       ValueError: if `axis` is not negative.
     """
-    if not isinstance(axis, int):
-      raise TypeError("`axis` is not an `int`.")
-    if axis >= 0:
-      raise ValueError("`axis` needs to be negative.")
-    self._axis = axis
-
-    super(Cumsum, self).__init__(
-        is_constant_jacobian=True,
-        forward_min_event_ndims=-axis,  # Positive because we verify `axis < 0`.
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      if not isinstance(axis, int):
+        raise TypeError(
+            'Argument `axis` is not an `int` type; got {}'.format(axis))
+      if axis >= 0:
+        raise ValueError(
+            'Argument `axis` must be negative; got {}'.format(axis))
+      self._axis = axis
+      super(Cumsum, self).__init__(
+          is_constant_jacobian=True,
+          # Positive because we verify `axis < 0`.
+          forward_min_event_ndims=-axis,
+          validate_args=validate_args,
+          name=name)
 
   @property
   def axis(self):
@@ -89,20 +92,20 @@ class Cumsum(bijector.Bijector):
     return self._axis
 
   def _forward(self, x):
-    return tf.cumsum(x, axis=self._axis)
+    return tf.cumsum(x, axis=self.axis)
 
   def _inverse(self, y):
     ndims = prefer_static.rank(y)
     shifted_y = tf.pad(
-        tensor=tf.slice(
-            y, tf.zeros(ndims, dtype=tf.dtypes.int32),
+        tf.slice(
+            y, tf.zeros(ndims, dtype=tf.int32),
             prefer_static.shape(y) -
-            tf.one_hot(ndims + self._axis, ndims, dtype=tf.dtypes.int32)
+            tf.one_hot(ndims + self.axis, ndims, dtype=tf.int32)
         ),  # Remove the last entry of y in the chosen dimension.
         paddings=tf.one_hot(
-            tf.one_hot(ndims + self._axis, ndims, on_value=0, off_value=-1),
+            tf.one_hot(ndims + self.axis, ndims, on_value=0, off_value=-1),
             2,
-            dtype=tf.dtypes.int32
+            dtype=tf.int32
         )  # Insert zeros at the beginning of the chosen dimension.
     )
 

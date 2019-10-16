@@ -19,11 +19,13 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -36,24 +38,26 @@ class _GaussianProcessTest(object):
     index_points = np.reshape(index_points, [-1, 2])
     # ==> shape = [25, 2]
 
-    # Kernel with batch_shape [2, 4, 1]
-    amplitude = np.array([1., 2.], np.float32).reshape([2, 1, 1])
-    length_scale = np.array([1., 2., 3., 4.], np.float32).reshape([1, 4, 1])
+    # Kernel with batch_shape [2, 4, 3, 1]
+    amplitude = np.array([1., 2.], np.float32).reshape([2, 1, 1, 1])
+    length_scale = np.array([1., 2., 3., 4.], np.float32).reshape([1, 4, 1, 1])
+    observation_noise_variance = np.array(
+        [1e-5, 1e-6, 1e-5], np.float32).reshape([1, 1, 3, 1])
     batched_index_points = np.stack([index_points]*6)
     # ==> shape = [6, 25, 2]
     if not self.is_static:
-      amplitude = tf.compat.v1.placeholder_with_default(amplitude, shape=None)
-      length_scale = tf.compat.v1.placeholder_with_default(
-          length_scale, shape=None)
-      batched_index_points = tf.compat.v1.placeholder_with_default(
+      amplitude = tf1.placeholder_with_default(amplitude, shape=None)
+      length_scale = tf1.placeholder_with_default(length_scale, shape=None)
+      batched_index_points = tf1.placeholder_with_default(
           batched_index_points, shape=None)
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
     gp = tfd.GaussianProcess(
         kernel,
         batched_index_points,
+        observation_noise_variance=observation_noise_variance,
         jitter=1e-5)
 
-    batch_shape = [2, 4, 6]
+    batch_shape = [2, 4, 3, 6]
     event_shape = [25]
     sample_shape = [5, 3]
 
@@ -68,6 +72,8 @@ class _GaussianProcessTest(object):
       self.assertAllEqual(gp.event_shape, event_shape)
       self.assertAllEqual(samples.shape,
                           sample_shape + batch_shape + event_shape)
+      self.assertAllEqual(gp.mean().shape, batch_shape + event_shape)
+      self.assertAllEqual(gp.variance().shape, batch_shape + event_shape)
     else:
       self.assertAllEqual(self.evaluate(gp.batch_shape_tensor()), batch_shape)
       self.assertAllEqual(self.evaluate(gp.event_shape_tensor()), event_shape)
@@ -79,6 +85,10 @@ class _GaussianProcessTest(object):
       self.assertEqual(tensorshape_util.rank(gp.event_shape), 1)
       self.assertIsNone(
           tf.compat.dimension_value(tensorshape_util.dims(gp.event_shape)[0]))
+      self.assertAllEqual(
+          self.evaluate(tf.shape(gp.mean())), batch_shape + event_shape)
+      self.assertAllEqual(self.evaluate(
+          tf.shape(gp.variance())), batch_shape + event_shape)
 
   def testVarianceAndCovarianceMatrix(self):
     amp = np.float64(.5)
@@ -126,10 +136,8 @@ class _GaussianProcessTest(object):
 
     # ==> shape = [6, 25, 2]
     if not self.is_static:
-      index_points_1 = tf.compat.v1.placeholder_with_default(
-          index_points_1, shape=None)
-      index_points_2 = tf.compat.v1.placeholder_with_default(
-          index_points_2, shape=None)
+      index_points_1 = tf1.placeholder_with_default(index_points_1, shape=None)
+      index_points_2 = tf1.placeholder_with_default(index_points_2, shape=None)
 
     mean_fn = lambda x: np.array([0.], np.float32)
     kernel_1 = psd_kernels.ExponentiatedQuadratic()
@@ -220,12 +228,12 @@ class _GaussianProcessTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GaussianProcessStaticTest(_GaussianProcessTest, tf.test.TestCase):
+class GaussianProcessStaticTest(_GaussianProcessTest, tfp_test_util.TestCase):
   is_static = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GaussianProcessDynamicTest(_GaussianProcessTest, tf.test.TestCase):
+class GaussianProcessDynamicTest(_GaussianProcessTest, tfp_test_util.TestCase):
   is_static = False
 
 

@@ -20,10 +20,14 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
+
 
 __all__ = [
     'count_integers',
@@ -75,9 +79,7 @@ def count_integers(arr,
     A vector with the same dtype as `weights` or the given `dtype`. The bin
     values.
   """
-  with tf.compat.v1.name_scope(
-      name, 'count_integers', values=[arr, weights, minlength, maxlength,
-                                      axis]):
+  with tf.name_scope(name or 'count_integers'):
     if axis is None:
       return tf.math.bincount(
           arr,
@@ -86,7 +88,7 @@ def count_integers(arr,
           maxlength=maxlength,
           dtype=dtype)
 
-    arr = tf.convert_to_tensor(value=arr, dtype=tf.int32, name='arr')
+    arr = tf.convert_to_tensor(arr, dtype=tf.int32, name='arr')
     arr_ndims = _get_static_ndims(arr, expect_static=True)
 
     axis = _make_static_axis_non_negative_list(axis, arr_ndims)
@@ -122,7 +124,7 @@ def count_integers(arr,
 
       flat_counts = tf.map_fn(one_bincount, elems=flat_arr, dtype=dtype)
     else:
-      weights = tf.convert_to_tensor(value=weights, name='weights')
+      weights = tf.convert_to_tensor(weights, name='weights')
       _get_static_ndims(weights, expect_static=True, expect_ndims=arr_ndims)
       flat_weights = _move_dims_to_flat_end(
           weights, not_axis, arr_ndims, right_end=False)
@@ -147,7 +149,7 @@ def count_integers(arr,
     _get_static_ndims(flat_counts_t, expect_ndims=2, expect_static=True)
 
     # not_axis_shape = arr.shape[~axis]
-    not_axis_shape = tf.gather(tf.shape(input=arr), indices=not_axis)
+    not_axis_shape = tf.gather(tf.shape(arr), indices=not_axis)
 
     # The first index of flat_counts_t indexes bins 0,..,K-1, the rest are ~axis
     out_shape = tf.concat([[-1], not_axis_shape], axis=0)
@@ -226,12 +228,10 @@ def find_bins(x,
   #    quantile/percentile return these edges in the leftmost (sample) dim.
   # 2. Say you have event_shape = [5], then we expect the bin will be different
   #    for all 5 events, so the index of the bin should not be in the event dim.
-  with tf.compat.v1.name_scope(
-      name, default_name='find_bins', values=[x, edges]):
-    in_type = dtype_util.common_dtype([x, edges],
-                                      preferred_dtype=tf.float32)
-    edges = tf.convert_to_tensor(value=edges, name='edges', dtype=in_type)
-    x = tf.convert_to_tensor(value=x, name='x', dtype=in_type)
+  with tf.name_scope(name or 'find_bins'):
+    in_type = dtype_util.common_dtype([x, edges], dtype_hint=tf.float32)
+    edges = tf.convert_to_tensor(edges, name='edges', dtype=in_type)
+    x = tf.convert_to_tensor(x, name='x', dtype=in_type)
 
     if (tf.compat.dimension_value(edges.shape[0]) is not None and
         tf.compat.dimension_value(edges.shape[0]) < 2):
@@ -239,10 +239,11 @@ def find_bins(x,
           'First dimension of `edges` must have length > 1 to index 1 or '
           'more bin. Found: {}'.format(edges.shape))
 
-    flattening_x = edges.shape.ndims == 1 and x.shape.ndims > 1
+    flattening_x = (tensorshape_util.rank(edges.shape) == 1 and
+                    tensorshape_util.rank(x.shape) > 1)
 
     if flattening_x:
-      x_orig_shape = tf.shape(input=x)
+      x_orig_shape = tf.shape(x)
       x = tf.reshape(x, [-1])
 
     if dtype is None:
@@ -270,19 +271,18 @@ def find_bins(x,
 
     # In above example, we want [0, 0, 1, 1], so correct this here.
     bins = tf.clip_by_value(almost_output - 1, tf.cast(0, dtype),
-                            tf.cast(tf.shape(input=edges)[0] - 2, dtype))
+                            tf.cast(tf.shape(edges)[0] - 2, dtype))
 
     if not extend_lower_interval:
-      low_fill = np.nan if dtype.is_floating else -1
-      bins = tf.compat.v1.where(
-          x < tf.expand_dims(edges[0], 0),
-          tf.fill(tf.shape(input=x), tf.cast(low_fill, dtype)), bins)
+      low_fill = np.nan if dtype_util.is_floating(dtype) else -1
+      bins = tf.where(x < tf.expand_dims(edges[0], 0),
+                      tf.cast(low_fill, dtype), bins)
 
     if not extend_upper_interval:
-      up_fill = np.nan if dtype.is_floating else tf.shape(input=edges)[0] - 1
-      bins = tf.compat.v1.where(
-          x > tf.expand_dims(edges[-1], 0),
-          tf.fill(tf.shape(input=x), tf.cast(up_fill, dtype)), bins)
+      up_fill = (np.nan if dtype_util.is_floating(dtype)
+                 else tf.shape(edges)[0] - 1)
+      bins = tf.where(x > tf.expand_dims(edges[-1], 0),
+                      tf.cast(up_fill, dtype), bins)
 
     if flattening_x:
       bins = tf.reshape(bins, x_orig_shape)
@@ -354,13 +354,13 @@ def histogram(x,
   ```
 
   """
-  with tf.compat.v1.name_scope(name, 'histogram', values=[x, edges, axis]):
+  with tf.name_scope(name or 'histogram'):
 
     # Tensor conversions.
-    in_dtype = dtype_util.common_dtype([x, edges], preferred_dtype=tf.float32)
+    in_dtype = dtype_util.common_dtype([x, edges], dtype_hint=tf.float32)
 
-    x = tf.convert_to_tensor(value=x, name='x', dtype=in_dtype)
-    edges = tf.convert_to_tensor(value=edges, name='edges', dtype=in_dtype)
+    x = tf.convert_to_tensor(x, name='x', dtype=in_dtype)
+    edges = tf.convert_to_tensor(edges, name='edges', dtype=in_dtype)
 
     # Move dims in axis to the left end as one flattened dim.
     # After this, x.shape = [n_samples] + E.
@@ -390,13 +390,14 @@ def histogram(x,
     counts = count_integers(
         bins,
         # Ensure we get correct output, even if x did not fall into every bin
-        minlength=tf.shape(input=edges)[0] - 1,
-        maxlength=tf.shape(input=edges)[0] - 1,
+        minlength=tf.shape(edges)[0] - 1,
+        maxlength=tf.shape(edges)[0] - 1,
         axis=0,
         dtype=dtype or in_dtype)
     n_edges = tf.compat.dimension_value(edges.shape[0])
     if n_edges is not None:
-      counts.set_shape(
+      tensorshape_util.set_shape(
+          counts,
           tf.TensorShape([n_edges - 1]).concatenate(counts.shape[1:]))
     return counts
 
@@ -503,13 +504,15 @@ def percentile(x,
     interpolation = 'nearest'
   else:
     if interpolation not in allowed_interpolations:
-      raise ValueError('Argument `interpolation` must be in %s.  Found %s' %
-                       (allowed_interpolations, interpolation))
+      raise ValueError(
+          'Argument `interpolation` must be in {}. Found {}.'.format(
+              allowed_interpolations, interpolation))
 
-  with tf.compat.v1.name_scope(name, values=[x, q]):
-    x = tf.convert_to_tensor(value=x, name='x')
+  with tf.name_scope(name):
+    x = tf.convert_to_tensor(x, name='x')
 
-    if interpolation in {'linear', 'midpoint'} and x.dtype.is_integer:
+    if (interpolation in {'linear', 'midpoint'} and
+        dtype_util.is_integer(x.dtype)):
       raise TypeError('{} interpolation not allowed with dtype {}'.format(
           interpolation, x.dtype))
 
@@ -520,9 +523,9 @@ def percentile(x,
 
     if validate_args:
       q = distribution_util.with_dependencies([
-          tf.compat.v1.assert_rank_in(q, [0, 1]),
-          tf.compat.v1.assert_greater_equal(q, tf.cast(0., tf.float64)),
-          tf.compat.v1.assert_less_equal(q, tf.cast(100., tf.float64))
+          assert_util.assert_rank_in(q, [0, 1]),
+          assert_util.assert_greater_equal(q, tf.cast(0., tf.float64)),
+          assert_util.assert_less_equal(q, tf.cast(100., tf.float64))
       ], q)
 
     # Move `axis` dims of `x` to the rightmost, call it `y`.
@@ -540,7 +543,7 @@ def percentile(x,
     # to sort only once (under the hood) and use CSE.
     sorted_y = _sort_tensor(y)
 
-    d = tf.cast(tf.shape(input=y)[-1], tf.float64)
+    d = tf.cast(tf.shape(y)[-1], tf.float64)
 
     def _get_indices(interp_type):
       """Get values of y at the indices implied by interp_type."""
@@ -557,7 +560,7 @@ def percentile(x,
       # So clip to avoid out of bounds errors.
       return tf.clip_by_value(
           tf.cast(indices, tf.int32), 0,
-          tf.shape(input=y)[-1] - 1)
+          tf.shape(y)[-1] - 1)
 
     if interpolation in ['nearest', 'lower', 'higher']:
       gathered_y = tf.gather(sorted_y, _get_indices(interpolation), axis=-1)
@@ -579,7 +582,7 @@ def percentile(x,
         # The fix is to ensure that smaller_y_idx and larger_y_idx are always
         # separated by exactly 1.
         smaller_y_idx = tf.maximum(larger_y_idx - 1, 0)
-        larger_y_idx = tf.minimum(smaller_y_idx + 1, tf.shape(input=y)[-1] - 1)
+        larger_y_idx = tf.minimum(smaller_y_idx + 1, tf.shape(y)[-1] - 1)
         fraction = tf.cast(larger_y_idx, tf.float64) - exact_idx
       else:
         smaller_y_idx = _get_indices('higher')
@@ -593,19 +596,15 @@ def percentile(x,
     # Propagate NaNs
     if x.dtype in (tf.bfloat16, tf.float16, tf.float32, tf.float64):
       # Apparently tf.is_nan doesn't like other dtypes
-      nan_batch_members = tf.reduce_any(
-          input_tensor=tf.math.is_nan(x), axis=axis)
+      nan_batch_members = tf.reduce_any(tf.math.is_nan(x), axis=axis)
       right_rank_matched_shape = tf.pad(
-          tensor=tf.shape(input=nan_batch_members),
-          paddings=[[0, tf.rank(input=q)]],
+          tf.shape(nan_batch_members),
+          paddings=[[0, tf.rank(q)]],
           constant_values=1)
       nan_batch_members = tf.reshape(
           nan_batch_members, shape=right_rank_matched_shape)
-      shape_gathered_y = tf.shape(input=gathered_y)
-      nan = np.array(np.nan, gathered_y.dtype.as_numpy_dtype)
-      gathered_y = tf.compat.v1.where(
-          tf.broadcast_to(nan_batch_members, shape_gathered_y),
-          tf.fill(shape_gathered_y, nan), gathered_y)
+      nan = np.array(np.nan, dtype_util.as_numpy_dtype(gathered_y.dtype))
+      gathered_y = tf.where(nan_batch_members, nan, gathered_y)
 
     # Expand dimensions if requested
     if keep_dims:
@@ -703,9 +702,8 @@ def quantiles(x,
   ```
 
   """
-  with tf.compat.v1.name_scope(
-      name, 'quantiles', values=[x, num_quantiles, axis]):
-    x = tf.convert_to_tensor(value=x, name='x')
+  with tf.name_scope(name or 'quantiles'):
+    x = tf.convert_to_tensor(x, name='x')
     return percentile(
         x,
         q=tf.linspace(
@@ -713,8 +711,8 @@ def quantiles(x,
             # float64 here. Note that  using x.dtype won't work with linspace
             # if x is integral type (which is anothe motivation for hard-coding
             # float64).
-            tf.convert_to_tensor(value=0, dtype=tf.float64),
-            tf.convert_to_tensor(value=100, dtype=tf.float64),
+            tf.convert_to_tensor(0, dtype=tf.float64),
+            tf.convert_to_tensor(100, dtype=tf.float64),
             num=num_quantiles + 1),
         axis=axis,
         interpolation=interpolation,
@@ -751,36 +749,33 @@ def _get_static_ndims(x,
   Raises:
     ValueError:  If any of the expectations above are violated.
   """
-  ndims = x.shape.ndims
-  if ndims is None:
-    shape_const = tf.get_static_value(tf.shape(input=x))
-    if shape_const is not None:
-      ndims = shape_const.ndim
+  ndims = tensorshape_util.rank(x.shape)
 
   if ndims is None:
     if expect_static:
       raise ValueError(
-          'Expected argument `x` to have statically defined `ndims`.  Found: ' %
-          x)
+          'Expected argument `x` to have statically defined `ndims`. '
+          'Found: {}.'.format(x))
     return
 
   if expect_ndims is not None:
-    ndims_message = ('Expected argument `x` to have ndims %s.  Found tensor %s'
-                     % (expect_ndims, x))
+    ndims_message = (
+        'Expected argument `x` to have ndims {}. Found tensor {}.'.format(
+            expect_ndims, x))
     if ndims != expect_ndims:
       raise ValueError(ndims_message)
 
   if expect_ndims_at_least is not None:
     ndims_at_least_message = (
-        'Expected argument `x` to have ndims >= %d.  Found tensor %s' %
-        (expect_ndims_at_least, x))
+        'Expected argument `x` to have ndims >= {}. Found tensor {}.'.format(
+            expect_ndims_at_least, x))
     if ndims < expect_ndims_at_least:
       raise ValueError(ndims_at_least_message)
 
   if expect_ndims_no_more_than is not None:
     ndims_no_more_than_message = (
-        'Expected argument `x` to have ndims <= %d.  Found tensor %s' %
-        (expect_ndims_no_more_than, x))
+        'Expected argument `x` to have ndims <= {}. Found tensor {}.'.format(
+            expect_ndims_no_more_than, x))
     if ndims > expect_ndims_no_more_than:
       raise ValueError(ndims_no_more_than_message)
 
@@ -830,13 +825,13 @@ def _make_static_axis_non_negative_list(axis, ndims):
   Raises:
     ValueError: If `axis` is not statically defined.
   """
-  axis = distribution_util.make_non_negative_axis(axis, ndims)
+  axis = prefer_static.non_negative_axis(axis, ndims)
 
   axis_const = tf.get_static_value(axis)
   if axis_const is None:
     raise ValueError(
-        'Expected argument `axis` to be statically available.  Found: %s' %
-        axis)
+        'Expected argument `axis` to be statically available. '
+        'Found: {}.'.format(axis))
 
   # Make at least 1-D.
   axis = axis_const + np.zeros([1], dtype=axis_const.dtype)
@@ -870,15 +865,15 @@ def _move_dims_to_flat_end(x, axis, x_ndims, right_end=True):
   perm = other_dims + list(axis) if right_end else list(axis) + other_dims
   x_permed = tf.transpose(a=x, perm=perm)
 
-  if x.shape.is_fully_defined():
-    x_shape = x.shape.as_list()
+  if tensorshape_util.is_fully_defined(x.shape):
+    x_shape = tensorshape_util.as_list(x.shape)
     # other_shape = [a, c], end_shape = [b * d]
     other_shape = [x_shape[i] for i in other_dims]
     end_shape = [np.prod([x_shape[i] for i in axis])]
     full_shape = (
         other_shape + end_shape if right_end else end_shape + other_shape)
   else:
-    other_shape = tf.gather(tf.shape(input=x), other_dims)
+    other_shape = tf.gather(tf.shape(x), other_dims)
     full_shape = tf.concat(
         [other_shape, [-1]] if right_end else [[-1], other_shape], axis=0)
   return tf.reshape(x_permed, shape=full_shape)
@@ -886,6 +881,6 @@ def _move_dims_to_flat_end(x, axis, x_ndims, right_end=True):
 
 def _sort_tensor(tensor):
   """Use `top_k` to sort a `Tensor` along the last dimension."""
-  sorted_, _ = tf.nn.top_k(tensor, k=tf.shape(input=tensor)[-1])
-  sorted_.set_shape(tensor.shape)
+  sorted_, _ = tf.math.top_k(tensor, k=tf.shape(tensor)[-1])
+  tensorshape_util.set_shape(sorted_, tensor.shape)
   return sorted_

@@ -32,29 +32,49 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":docstring",
+        ":deferred_tensor",
+        ":seed_stream",
     ],
 )
 
 py_library(
-    name = "docstring",
-    srcs = [
-        "docstring.py",
-    ],
+    name = "deferred_tensor",
+    srcs = ["deferred_tensor.py"],
     srcs_version = "PY2AND3",
     deps = [
-        # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:name_util",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
 py_test(
-    name = "docstring_test",
+    name = "deferred_tensor_test",
     size = "small",
-    srcs = ["docstring_test.py"],
+    srcs = ["deferred_tensor_test.py"],
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "seed_stream",
+    srcs = ["seed_stream.py"],
+)
+
+py_test(
+    name = "seed_stream_test",
+    size = "small",
+    srcs = ["seed_stream_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

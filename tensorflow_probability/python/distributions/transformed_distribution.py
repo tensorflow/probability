@@ -17,7 +17,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
@@ -26,10 +25,8 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
-    "ConditionalTransformedDistribution",
     "TransformedDistribution",
 ]
 
@@ -43,10 +40,10 @@ def _pick_scalar_condition(pred, cond_true, cond_false):
   """Convenience function which chooses the condition based on the predicate."""
   # Note: This function is only valid if all of pred, cond_true, and cond_false
   # are scalars. This means its semantics are arguably more like tf.cond than
-  # tf.where even though we use tf1.where to implement it.
-  pred_ = tf.get_static_value(tf.convert_to_tensor(value=pred))
+  # tf.where even though we use tf.where to implement it.
+  pred_ = tf.get_static_value(tf.convert_to_tensor(pred))
   if pred_ is None:
-    return tf1.where(pred, cond_true, cond_false)
+    return tf.where(pred, cond_true, cond_false)
   return cond_true if pred_ else cond_false
 
 
@@ -109,20 +106,22 @@ class TransformedDistribution(distribution_lib.Distribution):
   distribution:
 
   ```python
-  ds = tfp.distributions
-  log_normal = ds.TransformedDistribution(
-    distribution=ds.Normal(loc=0., scale=1.),
-    bijector=ds.bijectors.Exp(),
+  tfd = tfp.distributions
+  tfb = tfp.bijectors
+  log_normal = tfd.TransformedDistribution(
+    distribution=tfd.Normal(loc=0., scale=1.),
+    bijector=tfb.Exp(),
     name="LogNormalTransformedDistribution")
   ```
 
   A `LogNormal` made from callables:
 
   ```python
-  ds = tfp.distributions
-  log_normal = ds.TransformedDistribution(
-    distribution=ds.Normal(loc=0., scale=1.),
-    bijector=ds.bijectors.Inline(
+  tfd = tfp.distributions
+  tfb = tfp.bijectors
+  log_normal = tfd.TransformedDistribution(
+    distribution=tfd.Normal(loc=0., scale=1.),
+    bijector=tfb.Inline(
       forward_fn=tf.exp,
       inverse_fn=tf.log,
       inverse_log_det_jacobian_fn=(
@@ -133,10 +132,11 @@ class TransformedDistribution(distribution_lib.Distribution):
   Another example constructing a Normal from a StandardNormal:
 
   ```python
-  ds = tfp.distributions
-  normal = ds.TransformedDistribution(
-    distribution=ds.Normal(loc=0., scale=1.),
-    bijector=ds.bijectors.Affine(
+  tfd = tfp.distributions
+  tfb = tfp.bijectors
+  normal = tfd.TransformedDistribution(
+    distribution=tfd.Normal(loc=0., scale=1.),
+    bijector=tfb.Affine(
       shift=-1.,
       scale_identity_multiplier=2.)
     name="NormalTransformedDistribution")
@@ -151,7 +151,8 @@ class TransformedDistribution(distribution_lib.Distribution):
   multivariate Normal as a `TransformedDistribution`.
 
   ```python
-  ds = tfp.distributions
+  tfd = tfp.distributions
+  tfb = tfp.bijectors
   # We will create two MVNs with batch_shape = event_shape = 2.
   mean = [[-1., 0],      # batch:0
           [0., 1]]       # batch:1
@@ -159,9 +160,9 @@ class TransformedDistribution(distribution_lib.Distribution):
                [0, 1]],  # batch:0
               [[1, 0],
                [2, 2]]]  # batch:1
-  mvn1 = ds.TransformedDistribution(
-      distribution=ds.Normal(loc=0., scale=1.),
-      bijector=ds.bijectors.Affine(shift=mean, scale_tril=chol_cov),
+  mvn1 = tfd.TransformedDistribution(
+      distribution=tfd.Normal(loc=0., scale=1.),
+      bijector=tfb.Affine(shift=mean, scale_tril=chol_cov),
       batch_shape=[2],  # Valid because base_distribution.batch_shape == [].
       event_shape=[2])  # Valid because base_distribution.event_shape == [].
   mvn2 = ds.MultivariateNormalTriL(loc=mean, scale_tril=chol_cov)
@@ -258,7 +259,7 @@ class TransformedDistribution(distribution_lib.Distribution):
           self._needs_rotation, override_event_ndims, 0)
       # We'll be reducing the head dims (if at all), i.e., this will be []
       # if we don't need to reduce.
-      self._reduce_event_indices = tf.range(
+      self._reduce_event_indices = prefer_static.range(
           self._rotate_ndims - override_event_ndims, self._rotate_ndims)
 
     self._distribution = distribution
@@ -269,10 +270,6 @@ class TransformedDistribution(distribution_lib.Distribution):
         validate_args=validate_args,
         allow_nan_stats=self._distribution.allow_nan_stats,
         parameters=parameters,
-        # We let TransformedDistribution access _graph_parents since this class
-        # is more like a baseclass than derived.
-        graph_parents=(distribution._graph_parents +  # pylint: disable=protected-access
-                       bijector.graph_parents),
         name=name)
 
   @property
@@ -299,7 +296,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     if (tensorshape_util.rank(self.distribution.batch_shape) == 0 and
         self.parameters.get("batch_shape", None) is not None):
       overrides["batch_shape"] = tf.shape(
-          input=tf.zeros(self.parameters["batch_shape"])[slices])
+          tf.zeros(self.parameters["batch_shape"])[slices])
     elif self.parameters.get("distribution", None) is not None:
       overrides["distribution"] = self.distribution[slices]
     return self.copy(**overrides)
@@ -366,9 +363,9 @@ class TransformedDistribution(distribution_lib.Distribution):
     # We override `_call_sample_n` rather than `_sample_n` so we can ensure that
     # the result of `self.bijector.forward` is not modified (and thus caching
     # works).
-    with self._name_scope(name):
+    with self._name_and_control_scope(name):
       sample_shape = tf.convert_to_tensor(
-          value=sample_shape, dtype=tf.int32, name="sample_shape")
+          sample_shape, dtype=tf.int32, name="sample_shape")
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, "sample_shape")
 
@@ -381,7 +378,7 @@ class TransformedDistribution(distribution_lib.Distribution):
 
       # Next, we reshape `x` into its final form. We do this prior to the call
       # to the bijector to ensure that the bijector caching works.
-      batch_event_shape = tf.shape(input=x)[1:]
+      batch_event_shape = tf.shape(x)[1:]
       final_shape = tf.concat([sample_shape, batch_event_shape], 0)
       x = tf.reshape(x, final_shape)
 
@@ -411,7 +408,7 @@ class TransformedDistribution(distribution_lib.Distribution):
         self._finish_log_prob_for_one_fiber(
             y, x_i, ildj_i, event_ndims, **distribution_kwargs)
         for x_i, ildj_i in zip(x, ildj)]
-    return tf.reduce_logsumexp(input_tensor=tf.stack(lp_on_fibers), axis=0)
+    return tf.reduce_logsumexp(tf.stack(lp_on_fibers), axis=0)
 
   def _finish_log_prob_for_one_fiber(self, y, x, ildj, event_ndims,
                                      **distribution_kwargs):
@@ -419,9 +416,8 @@ class TransformedDistribution(distribution_lib.Distribution):
     x = self._maybe_rotate_dims(x, rotate_right=True)
     log_prob = self.distribution.log_prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
-      log_prob = tf.reduce_sum(
-          input_tensor=log_prob, axis=self._reduce_event_indices)
-    log_prob += tf.cast(ildj, log_prob.dtype)
+      log_prob = tf.reduce_sum(log_prob, axis=self._reduce_event_indices)
+    log_prob = log_prob + tf.cast(ildj, log_prob.dtype)
     if self._is_maybe_event_override and isinstance(event_ndims, int):
       tensorshape_util.set_shape(
           log_prob,
@@ -455,8 +451,8 @@ class TransformedDistribution(distribution_lib.Distribution):
     x = self._maybe_rotate_dims(x, rotate_right=True)
     prob = self.distribution.prob(x, **distribution_kwargs)
     if self._is_maybe_event_override:
-      prob = tf.reduce_prod(input_tensor=prob, axis=self._reduce_event_indices)
-    prob *= tf.exp(tf.cast(ildj, prob.dtype))
+      prob = tf.reduce_prod(prob, axis=self._reduce_event_indices)
+    prob = prob * tf.exp(tf.cast(ildj, prob.dtype))
     if self._is_maybe_event_override and isinstance(event_ndims, int):
       tensorshape_util.set_shape(
           prob,
@@ -474,7 +470,12 @@ class TransformedDistribution(distribution_lib.Distribution):
                                 "bijector is not injective.")
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     x = self.bijector.inverse(y, **bijector_kwargs)
-    return self.distribution.log_cdf(x, **distribution_kwargs)
+    dist = self.distribution
+    # TODO(b/141130733): Check/fix any gradient numerics issues.
+    return prefer_static.smart_where(
+        self.bijector._internal_is_increasing(**bijector_kwargs),  # pylint: disable=protected-access
+        lambda: dist.log_cdf(x, **distribution_kwargs),
+        lambda: dist.log_survival_function(x, **distribution_kwargs))
 
   def _cdf(self, y, **kwargs):
     if self._is_maybe_event_override:
@@ -485,7 +486,11 @@ class TransformedDistribution(distribution_lib.Distribution):
                                 "bijector is not injective.")
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     x = self.bijector.inverse(y, **bijector_kwargs)
-    return self.distribution.cdf(x, **distribution_kwargs)
+    # TODO(b/141130733): Check/fix any gradient numerics issues.
+    return prefer_static.smart_where(
+        self.bijector._internal_is_increasing(**bijector_kwargs),  # pylint: disable=protected-access
+        lambda: self.distribution.cdf(x, **distribution_kwargs),
+        lambda: self.distribution.survival_function(x, **distribution_kwargs))
 
   def _log_survival_function(self, y, **kwargs):
     if self._is_maybe_event_override:
@@ -496,7 +501,12 @@ class TransformedDistribution(distribution_lib.Distribution):
                                 "bijector is not injective.")
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     x = self.bijector.inverse(y, **bijector_kwargs)
-    return self.distribution.log_survival_function(x, **distribution_kwargs)
+    dist = self.distribution
+    # TODO(b/141130733): Check/fix any gradient numerics issues.
+    return prefer_static.smart_where(
+        self.bijector._internal_is_increasing(**bijector_kwargs),  # pylint: disable=protected-access
+        lambda: dist.log_survival_function(x, **distribution_kwargs),
+        lambda: dist.log_cdf(x, **distribution_kwargs))
 
   def _survival_function(self, y, **kwargs):
     if self._is_maybe_event_override:
@@ -507,7 +517,11 @@ class TransformedDistribution(distribution_lib.Distribution):
                                 "bijector is not injective.")
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     x = self.bijector.inverse(y, **bijector_kwargs)
-    return self.distribution.survival_function(x, **distribution_kwargs)
+    # TODO(b/141130733): Check/fix any gradient numerics issues.
+    return prefer_static.smart_where(
+        self.bijector._internal_is_increasing(**bijector_kwargs),  # pylint: disable=protected-access
+        lambda: self.distribution.survival_function(x, **distribution_kwargs),
+        lambda: self.distribution.cdf(x, **distribution_kwargs))
 
   def _quantile(self, value, **kwargs):
     if self._is_maybe_event_override:
@@ -517,19 +531,29 @@ class TransformedDistribution(distribution_lib.Distribution):
       raise NotImplementedError("quantile is not implemented when "
                                 "bijector is not injective.")
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    value = prefer_static.smart_where(
+        self.bijector._internal_is_increasing(**bijector_kwargs),  # pylint: disable=protected-access
+        lambda: value,
+        lambda: 1 - value)
     # x_q is the "qth quantile" of X iff q = P[X <= x_q].  Now, since X =
     # g^{-1}(Y), q = P[X <= x_q] = P[g^{-1}(Y) <= x_q] = P[Y <= g(x_q)],
     # implies the qth quantile of Y is g(x_q).
     inv_cdf = self.distribution.quantile(value, **distribution_kwargs)
     return self.bijector.forward(inv_cdf, **bijector_kwargs)
 
+  def _mode(self, **kwargs):
+    return self._mean_mode_impl("mode", kwargs)
+
   def _mean(self, **kwargs):
+    return self._mean_mode_impl("mean", kwargs)
+
+  def _mean_mode_impl(self, attr, kwargs):
     if not self.bijector.is_constant_jacobian:
       raise NotImplementedError("mean is not implemented for non-affine "
                                 "bijectors")
 
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
-    x = self.distribution.mean(**distribution_kwargs)
+    x = getattr(self.distribution, attr)(**distribution_kwargs)
 
     if self._is_maybe_batch_override or self._is_maybe_event_override:
       # A batch (respectively event) shape override is only allowed if the batch
@@ -549,8 +573,7 @@ class TransformedDistribution(distribution_lib.Distribution):
 
     y = self.bijector.forward(x, **bijector_kwargs)
 
-    sample_shape = tf.convert_to_tensor(
-        value=[], dtype=tf.int32, name="sample_shape")
+    sample_shape = tf.convert_to_tensor([], dtype=tf.int32, name="sample_shape")
     y = self._set_sample_static_shape(y, sample_shape)
     return y
 
@@ -571,8 +594,8 @@ class TransformedDistribution(distribution_lib.Distribution):
     if self._is_maybe_event_override:
       # H[X] = sum_i H[X_i] if X_i are mutually independent.
       # This means that a reduce_sum is a simple rescaling.
-      entropy *= tf.cast(
-          tf.reduce_prod(input_tensor=self._override_event_shape),
+      entropy = entropy * tf.cast(
+          tf.reduce_prod(self._override_event_shape),
           dtype=dtype_util.base_dtype(entropy.dtype))
     if self._is_maybe_batch_override:
       new_shape = tf.concat([
@@ -593,11 +616,11 @@ class TransformedDistribution(distribution_lib.Distribution):
     event_ndims = (
         tensorshape_util.rank(self.event_shape)
         if tensorshape_util.rank(self.event_shape) is not None else tf.size(
-            input=self.event_shape_tensor()))
+            self.event_shape_tensor()))
     ildj = self.bijector.inverse_log_det_jacobian(
         dummy, event_ndims=event_ndims, **bijector_kwargs)
 
-    entropy -= tf.cast(ildj, entropy.dtype)
+    entropy = entropy - tf.cast(ildj, entropy.dtype)
     tensorshape_util.set_shape(entropy, self.batch_shape)
     return entropy
 
@@ -608,7 +631,7 @@ class TransformedDistribution(distribution_lib.Distribution):
       override_shape = []
 
     override_shape = tf.convert_to_tensor(
-        value=override_shape, dtype=tf.int32, name=name)
+        override_shape, dtype=tf.int32, name=name)
 
     if not dtype_util.is_integer(override_shape.dtype):
       raise TypeError("shape override must be an integer")
@@ -670,23 +693,10 @@ class TransformedDistribution(distribution_lib.Distribution):
     if tensorshape_util.rank(self.event_shape) is not None:
       return tensorshape_util.rank(self.event_shape)
 
-    event_ndims = tf.size(input=self.event_shape_tensor())
+    event_ndims = tf.size(self.event_shape_tensor())
     event_ndims_ = distribution_util.maybe_get_static_value(event_ndims)
 
     if event_ndims_ is not None:
       return event_ndims_
 
     return event_ndims
-
-
-class ConditionalTransformedDistribution(TransformedDistribution):
-  """A TransformedDistribution that allows intrinsic conditioning."""
-
-  @deprecation.deprecated(
-      "2019-07-01",
-      "`ConditionalTransformedDistribution` is no longer required; "
-      "`TransformedDistribution` top-level functions now pass-through "
-      "`**kwargs`.",
-      warn_once=True)
-  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
-    return super(ConditionalTransformedDistribution, cls).__new__(cls)

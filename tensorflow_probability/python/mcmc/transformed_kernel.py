@@ -20,8 +20,9 @@ from __future__ import print_function
 
 import collections
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -39,49 +40,78 @@ TransformedTransitionKernelResults = collections.namedtuple(
     ])
 
 
-def forward_log_det_jacobian_fn(bijector):
+def make_log_det_jacobian_fn(bijector, direction):
   """Makes a function which applies a list of Bijectors' `log_det_jacobian`s."""
   if not mcmc_util.is_list_like(bijector):
     bijector = [bijector]
-
-  def fn(transformed_state_parts, event_ndims):
-    return sum([
-        b.forward_log_det_jacobian(sp, event_ndims=e)
-        for b, e, sp in zip(bijector, event_ndims, transformed_state_parts)
-    ])
-
+  attr = '{}_log_det_jacobian'.format(direction)
+  def fn(state_parts, event_ndims):
+    return [
+        getattr(b, attr)(sp, event_ndims=e)
+        for b, e, sp in zip(bijector, event_ndims, state_parts)
+    ]
   return fn
 
 
-def forward_transform_fn(bijector):
+def make_transform_fn(bijector, direction):
   """Makes a function which applies a list of Bijectors' `forward`s."""
   if not mcmc_util.is_list_like(bijector):
     bijector = [bijector]
-
-  def fn(transformed_state_parts):
-    return [b.forward(sp) for b, sp in zip(bijector, transformed_state_parts)]
-
-  return fn
-
-
-def inverse_transform_fn(bijector):
-  """Makes a function which applies a list of Bijectors' `inverse`s."""
-  if not mcmc_util.is_list_like(bijector):
-    bijector = [bijector]
   def fn(state_parts):
-    return [b.inverse(sp)
-            for b, sp in zip(bijector, state_parts)]
+    return [getattr(b, direction)(sp) for b, sp in zip(bijector, state_parts)]
   return fn
+
+
+def make_transformed_log_prob(
+    log_prob_fn, bijector, direction, enable_bijector_caching=True):
+  """Transforms a log_prob function using bijectors.
+
+  Note: `direction = 'inverse'` corresponds to the transformation calculation
+  done in `tfp.distributions.TransformedDistribution.log_prob`.
+
+  Args:
+    log_prob_fn: Python `callable` taking an argument for each state part which
+      returns a `Tensor` representing the joint `log` probability of those state
+      parts.
+    bijector: `tfp.bijectors.Bijector`-like instance (or list thereof)
+      corresponding to each state part. When `direction = 'forward'` the
+      `Bijector`-like instance must possess members `forward` and
+      `forward_log_det_jacobian` (and corresponding when
+      `direction = 'inverse'`).
+    direction: Python `str` being either `'forward'` or `'inverse'` which
+      indicates the nature of the bijector transformation applied to each state
+      part.
+    enable_bijector_caching: Python `bool` indicating if `Bijector` caching
+      should be invalidated.
+      Default value: `True`.
+
+  Returns:
+    transformed_log_prob_fn: Python `callable` which takes an argument for each
+      transformed state part and returns a `Tensor` representing the joint `log`
+      probability of the transformed state parts.
+  """
+  if direction not in {'forward', 'inverse'}:
+    raise ValueError('Argument `direction` must be either `"forward"` or '
+                     '`"inverse"`; saw "{}".'.format(direction))
+  fn = make_transform_fn(bijector, direction)
+  ldj_fn = make_log_det_jacobian_fn(bijector, direction)
+  def transformed_log_prob_fn(*state_parts):
+    """Log prob of the transformed state."""
+    if not enable_bijector_caching:
+      state_parts = [tf.identity(sp) for sp in state_parts]
+    tlp = log_prob_fn(*fn(state_parts))
+    tlp_rank = prefer_static.rank(tlp)
+    event_ndims = [(prefer_static.rank(sp) - tlp_rank) for sp in state_parts]
+    return tlp + sum(ldj_fn(state_parts, event_ndims))
+  return transformed_log_prob_fn
 
 
 class TransformedTransitionKernel(kernel_base.TransitionKernel):
   """TransformedTransitionKernel applies a bijector to the MCMC's state space.
 
   The `TransformedTransitionKernel` `TransitionKernel` enables fitting
-  a [Bijector](
-  https://www.tensorflow.org/api_docs/python/tf/distributions/bijectors/Bijector)
-  which serves to decorrelate the Markov chain Monte Carlo (MCMC)
-  event dimensions thus making the chain mix faster. This is
+  a `tfp.bijectors.Bijector` which serves to decorrelate the Markov chain Monte
+  Carlo (MCMC) event dimensions thus making the chain mix faster. This is
   particularly useful when the geometry of the target distribution is
   unfavorable. In such cases it may take many evaluations of the
   `target_log_prob_fn` for the chain to mix between faraway states.
@@ -94,10 +124,50 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
 
   The `TransformedTransitionKernel` enables arbitrary bijective transformations
   of arbitrary `TransitionKernel`s, e.g., one could use bijectors
-  `tfp.distributions.bijectors.Affine`,
-  `tfp.distributions.bijectors.RealNVP`, etc. with transition kernels
+  `tfp.bijectors.Affine`, `tfp.bijectors.RealNVP`, etc. with transition kernels
   `tfp.mcmc.HamiltonianMonteCarlo`, `tfp.mcmc.RandomWalkMetropolis`,
   etc.
+
+  #### Mathematical Details
+
+  `TransformedTransitionKernel` enables Markov chains which operate in
+  "unconstrained space." Since we interpret the bijector as mapping
+  "unconstrained space" to "user space", this means that the MCMC transformed
+  `target_log_prob` is:
+
+  ```python
+  target_log_prob(bij.forward(x)) + bij.forward_log_det_jacobian(x)
+  ```
+
+  Recall that `tfp.distributions.TransformedDistribution` uses the `inverse` to
+  compute its `log_prob`. Despite this difference, the use of `forward` in
+  `TransformedTransitionKernel` is perfectly consistent with
+  `TransformedDistribution` following the TFP convention of "sampling" being
+  what defines semantics. The apparent difference is because
+  `TransformedDistribution.log_prob` is derived from a user provided
+  distribution while in `TransformedTransitionKernel` samples are derived from
+  `target_log_prob_fn`. That is, in `TransformedDistribution` we do:
+
+  ```python
+  x ~ NoiseDistribution()
+  y = bij.forward(x)
+  log_prob_y = NoiseDistribution().log_prob(bij.inverse(y))
+               + bij.inverse_log_det_jacobian(y)
+  ```
+
+  yet in `TransformedTransitionKernel` we do:
+
+  ```python
+  x ~ MCMC()
+  y = bij.forward(x)
+  log_prob_y = log_prob(y) + bij.forward_log_det_jacobian(x)
+  ```
+
+  In other words (and in general), `tfp.mcmc` is derived from a `log_prob`
+  which what induces a *seeming* direction convention change. Aside from TFP
+  convention, that Bijectors should adhere to "sample first" semantics is
+  important because it mitigates pervasive necessity of `tfp.bijectors.Invert`
+  in user code.
 
   #### Examples
 
@@ -182,29 +252,22 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         name=name or 'transformed_kernel')
     inner_kernel_kwargs = inner_kernel.parameters.copy()
     target_log_prob_fn = inner_kernel_kwargs['target_log_prob_fn']
-    self._forward_transform = forward_transform_fn(bijector)
-    self._inverse_transform = inverse_transform_fn(bijector)
-    self._forward_log_det_jacobian = forward_log_det_jacobian_fn(bijector)
-
-    def new_target_log_prob(*transformed_state_parts):
-      """Log prob of the transformed state."""
-      # TODO(b/72831017): Use `tf.identity` to disable caching (since HMC takes
-      # gradient with respect to input).
-      transformed_state_parts = [
-          tf.identity(sp) for sp in transformed_state_parts
-      ]
-      tlp = target_log_prob_fn(
-          *self._forward_transform(transformed_state_parts))
-      event_ndims = [
-          tf.rank(sp) - tf.rank(tlp) for sp in transformed_state_parts
-      ]
-      return tlp + self._forward_log_det_jacobian(
-          transformed_state_parts=transformed_state_parts,
-          event_ndims=event_ndims)
-
+    new_target_log_prob = make_transformed_log_prob(
+        target_log_prob_fn,
+        bijector,
+        direction='forward',
+        # TODO(b/72831017): Disable caching until gradient linkage
+        # generally works.
+        enable_bijector_caching=False)
     inner_kernel_kwargs.update(target_log_prob_fn=new_target_log_prob)
     with deprecation.silence():
       self._inner_kernel = type(inner_kernel)(**inner_kernel_kwargs)
+    # Prebuild `_forward_transform` which is used by `one_step`.
+    self._transform_unconstrained_to_target_support = make_transform_fn(
+        bijector, direction='forward')
+    # Prebuild `_inverse_transform` which is used by `bootstrap_kernel_results`.
+    self._transform_target_support_to_unconstrained = make_transform_fn(
+        bijector, direction='inverse')
 
   @property
   def inner_kernel(self):
@@ -253,9 +316,8 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
       kernel_results: `collections.namedtuple` of internal calculations used to
         advance the chain.
     """
-    with tf.compat.v1.name_scope(
-        name=mcmc_util.make_name(self.name, 'transformed_kernel', 'one_step'),
-        values=[previous_kernel_results]):
+    with tf.name_scope(mcmc_util.make_name(
+        self.name, 'transformed_kernel', 'one_step')):
       transformed_next_state, kernel_results = self._inner_kernel.one_step(
           previous_kernel_results.transformed_state,
           previous_kernel_results.inner_results)
@@ -263,7 +325,8 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
           transformed_next_state
           if mcmc_util.is_list_like(transformed_next_state) else
           [transformed_next_state])
-      next_state_parts = self._forward_transform(transformed_next_state_parts)
+      next_state_parts = self._transform_unconstrained_to_target_support(
+          transformed_next_state_parts)
       next_state = (
           next_state_parts if mcmc_util.is_list_like(transformed_next_state)
           else next_state_parts[0])
@@ -320,21 +383,20 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
     if (init_state is None) == (transformed_init_state is None):
       raise ValueError('Must specify exactly one of `init_state` '
                        'or `transformed_init_state`.')
-    with tf.compat.v1.name_scope(
-        name=mcmc_util.make_name(self.name, 'transformed_kernel',
-                                 'bootstrap_results'),
-        values=[init_state, transformed_init_state]):
+    with tf.name_scope(mcmc_util.make_name(
+        self.name, 'transformed_kernel', 'bootstrap_results')):
       if transformed_init_state is None:
         init_state_parts = (init_state if mcmc_util.is_list_like(init_state)
                             else [init_state])
-        transformed_init_state_parts = self._inverse_transform(init_state_parts)
+        transformed_init_state_parts = (
+            self._transform_target_support_to_unconstrained(init_state_parts))
         transformed_init_state = (
             transformed_init_state_parts if mcmc_util.is_list_like(init_state)
             else transformed_init_state_parts[0])
       else:
         if mcmc_util.is_list_like(transformed_init_state):
           transformed_init_state = [
-              tf.convert_to_tensor(value=s, name='transformed_init_state')
+              tf.convert_to_tensor(s, name='transformed_init_state')
               for s in transformed_init_state
           ]
         else:

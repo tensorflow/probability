@@ -19,12 +19,15 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
-import tensorflow as tf
 
+import numpy as np
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -39,12 +42,12 @@ class ShapeChanging(tfb.Bijector):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ChainBijectorTest(tf.test.TestCase):
+class ChainBijectorTest(tfp_test_util.TestCase):
   """Tests the correctness of the Y = Chain(bij1, bij2, bij3) transformation."""
 
   def testBijector(self):
     chain = tfb.Chain((tfb.Exp(), tfb.Softplus()))
-    self.assertEqual("chain_of_exp_of_softplus", chain.name)
+    self.assertStartsWith(chain.name, "chain_of_exp_of_softplus")
     x = np.asarray([[[1., 2.],
                      [2., 3.]]])
     self.assertAllClose(1. + np.exp(x), self.evaluate(chain.forward(x)))
@@ -58,7 +61,7 @@ class ChainBijectorTest(tf.test.TestCase):
 
   def testBijectorIdentity(self):
     chain = tfb.Chain()
-    self.assertEqual("identity", chain.name)
+    self.assertStartsWith(chain.name, "identity")
     x = np.asarray([[[1., 2.],
                      [2., 3.]]])
     self.assertAllClose(x, self.evaluate(chain.forward(x)))
@@ -186,7 +189,7 @@ class ChainBijectorTest(tf.test.TestCase):
 
   def testChainIldjWithPlaceholder(self):
     chain = tfb.Chain((tfb.Exp(), tfb.Exp()))
-    samples = tf.compat.v1.placeholder_with_default(
+    samples = tf1.placeholder_with_default(
         np.zeros([2, 10], np.float32), shape=None)
     ildj = chain.inverse_log_det_jacobian(samples, event_ndims=0)
     self.assertTrue(ildj is not None)
@@ -197,7 +200,7 @@ class ChainBijectorTest(tf.test.TestCase):
       return
 
     def xform_dynamic(x):
-      return tf.compat.v1.placeholder_with_default(x, shape=None)
+      return tf1.placeholder_with_default(x, shape=None)
 
     def xform_static(x):
       tensorshape_util.set_shape(x, [1])

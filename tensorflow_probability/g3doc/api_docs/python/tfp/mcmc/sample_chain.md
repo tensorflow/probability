@@ -5,6 +5,18 @@
 
 # tfp.mcmc.sample_chain
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/sample.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Implements Markov chain Monte Carlo via repeated `TransitionKernel` steps.
 
 ``` python
@@ -23,8 +35,6 @@ tfp.mcmc.sample_chain(
 ```
 
 
-
-Defined in [`python/mcmc/sample.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/sample.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -57,6 +67,7 @@ accordingly. See below for some examples of this feature.
 
 #### Args:
 
+
 * <b>`num_results`</b>: Integer number of Markov chain draws.
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   current state(s) of the Markov chain(s).
@@ -86,17 +97,18 @@ accordingly. See below for some examples of this feature.
 
 #### Returns:
 
-  checkpointable_states_and_trace: if `return_final_kernel_results` is
-    `True`. The return value is an instance of
-    `CheckpointableStatesAndTrace`.
-  all_states: if `return_final_kernel_results` is `False` and `trace_fn` is
-    `None`. The return value is a `Tensor` or Python list of `Tensor`s
-    representing the state(s) of the Markov chain(s) at each result step. Has
-    same shape as input `current_state` but with a prepended
-    `num_results`-size dimension.
-  states_and_trace: if `return_final_kernel_results` is `False` and
-    `trace_fn` is not `None`. The return value is an instance of
-    `StatesAndTrace`.
+
+* <b>`checkpointable_states_and_trace`</b>: if `return_final_kernel_results` is
+  `True`. The return value is an instance of
+  `CheckpointableStatesAndTrace`.
+* <b>`all_states`</b>: if `return_final_kernel_results` is `False` and `trace_fn` is
+  `None`. The return value is a `Tensor` or Python list of `Tensor`s
+  representing the state(s) of the Markov chain(s) at each result step. Has
+  same shape as input `current_state` but with a prepended
+  `num_results`-size dimension.
+* <b>`states_and_trace`</b>: if `return_final_kernel_results` is `False` and
+  `trace_fn` is not `None`. The return value is an instance of
+  `StatesAndTrace`.
 
 #### Examples
 

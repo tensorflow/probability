@@ -21,7 +21,8 @@ from __future__ import print_function
 import time
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
@@ -51,7 +52,7 @@ def eight_schools_joint_log_prob(
       loc=tf.zeros_like(school_effects_standard),
       scale=tf.ones_like(school_effects_standard))
   rv_treatment_effects = mvn(
-      loc=(avg_effect + tf.exp(avg_stddev) * school_effects_standard),
+      loc=(avg_effect + tf.math.exp(avg_stddev) * school_effects_standard),
       scale=treatment_stddevs)
   return (
       rv_avg_effect.log_prob(avg_effect) +
@@ -110,7 +111,7 @@ def benchmark_eight_schools_hmc(
   # trial.
   is_accepted_tensor = computation()
   if not tf.executing_eagerly():
-    session = tf.compat.v1.Session()
+    session = tf1.Session()
     session.run(is_accepted_tensor)
 
   start_time = time.time()

@@ -23,11 +23,13 @@ from tensorflow_probability.python.math.ode.base import Diagnostics
 from tensorflow_probability.python.math.ode.base import Results
 from tensorflow_probability.python.math.ode.base import Solver
 from tensorflow_probability.python.math.ode.bdf import BDF
+from tensorflow_probability.python.math.ode.dormand_prince import DormandPrince
 
 __all__ = [
     'BDF',
     'ChosenBySolver',
     'Diagnostics',
+    'DormandPrince',
     'Results',
     'Solver',
 ]

@@ -5,11 +5,19 @@
 
 # Module: tfp.positive_semidefinite_kernels
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/positive_semidefinite_kernels/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Positive-semidefinite kernels package.
-
-
-
-Defined in [`python/positive_semidefinite_kernels/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/positive_semidefinite_kernels/__init__.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -19,6 +27,12 @@ Defined in [`python/positive_semidefinite_kernels/__init__.py`](https://github.c
 [`class ExpSinSquared`](../tfp/positive_semidefinite_kernels/ExpSinSquared.md): Exponentiated Sine Squared Kernel.
 
 [`class ExponentiatedQuadratic`](../tfp/positive_semidefinite_kernels/ExponentiatedQuadratic.md): The ExponentiatedQuadratic kernel.
+
+[`class FeatureScaled`](../tfp/positive_semidefinite_kernels/FeatureScaled.md): Kernel that first rescales all feature dimensions.
+
+[`class FeatureTransformed`](../tfp/positive_semidefinite_kernels/FeatureTransformed.md): Input transformed kernel.
+
+[`class KumaraswamyTransformed`](../tfp/positive_semidefinite_kernels/KumaraswamyTransformed.md): Transform inputs by Kumaraswamy bijector.
 
 [`class Linear`](../tfp/positive_semidefinite_kernels/Linear.md): Linear Kernel.
 

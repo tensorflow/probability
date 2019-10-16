@@ -5,6 +5,18 @@
 
 # tfp.sts.fit_with_hmc
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/fitting.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Draw posterior samples using Hamiltonian Monte Carlo (HMC).
 
 ``` python
@@ -19,14 +31,13 @@ tfp.sts.fit_with_hmc(
     chain_batch_shape=(),
     num_variational_steps=150,
     variational_optimizer=None,
+    variational_sample_size=5,
     seed=None,
     name=None
 )
 ```
 
 
-
-Defined in [`python/sts/fitting.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/fitting.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -47,6 +58,7 @@ which is thought to be in the desirable range for optimal mixing [2].
 
 
 #### Args:
+
 
 * <b>`model`</b>: An instance of `StructuralTimeSeries` representing a
   time-series model. This represents a joint distribution over
@@ -90,6 +102,10 @@ which is thought to be in the desirable range for optimal mixing [2].
   the variational optimization. If `None`, defaults to
   `tf.train.AdamOptimizer(0.1)`.
   Default value: `None`.
+* <b>`variational_sample_size`</b>: Python `int` number of Monte Carlo samples to use
+  in estimating the variational divergence. Larger values may stabilize
+  the optimization, but at higher cost per step in time and memory.
+  Default value: `1`.
 * <b>`seed`</b>: Python integer to seed the random number generator.
 * <b>`name`</b>: Python `str` name prefixed to ops created by this function.
   Default value: `None` (i.e., 'fit_with_hmc').
@@ -97,12 +113,13 @@ which is thought to be in the desirable range for optimal mixing [2].
 
 #### Returns:
 
-  samples: Python `list` of `Tensors` representing posterior samples of model
-    parameters, with shapes `[concat([[num_results], chain_batch_shape,
-    param.prior.batch_shape, param.prior.event_shape]) for param in
-    model.parameters]`.
-  kernel_results: A (possibly nested) `tuple`, `namedtuple` or `list` of
-    `Tensor`s representing internal calculations made within the HMC sampler.
+
+* <b>`samples`</b>: Python `list` of `Tensors` representing posterior samples of model
+  parameters, with shapes `[concat([[num_results], chain_batch_shape,
+  param.prior.batch_shape, param.prior.event_shape]) for param in
+  model.parameters]`.
+* <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
+  `Tensor`s representing internal calculations made within the HMC sampler.
 
 #### Examples
 
@@ -180,9 +197,9 @@ constructs a basic HMC sampler, using a `TransformedTransitionKernel` to
 incorporate constraints on the parameter space.
 
 ```python
-transformed_hmc_kernel = mcmc.TransformedTransitionKernel(
-    inner_kernel=mcmc.SimpleStepSizeAdaptation(
-        inner_kernel=mcmc.HamiltonianMonteCarlo(
+transformed_hmc_kernel = tfp.mcmc.TransformedTransitionKernel(
+    inner_kernel=tfp.mcmc.DualAveragingStepSizeAdaptation(
+        inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=model.joint_log_prob(observed_time_series),
             step_size=step_size,
             num_leapfrog_steps=num_leapfrog_steps,

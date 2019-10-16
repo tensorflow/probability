@@ -5,6 +5,18 @@
 
 # tfp.math.pivoted_cholesky
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/linalg.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Computes the (partial) pivoted cholesky decomposition of `matrix`.
 
 ``` python
@@ -17,8 +29,6 @@ tfp.math.pivoted_cholesky(
 ```
 
 
-
-Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/linalg.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -38,6 +48,7 @@ cheaply done via the Woodbury matrix identity, as implemented by
 
 #### Args:
 
+
 * <b>`matrix`</b>: Floating point `Tensor` batch of symmetric, positive definite
   matrices.
 * <b>`max_rank`</b>: Scalar `int` `Tensor`, the rank at which to truncate the
@@ -50,7 +61,8 @@ cheaply done via the Woodbury matrix identity, as implemented by
 
 #### Returns:
 
-  lr: Low rank pivoted Cholesky approximation of `matrix`.
+
+* <b>`lr`</b>: Low rank pivoted Cholesky approximation of `matrix`.
 
 #### References
 

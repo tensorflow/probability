@@ -31,7 +31,7 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class Chi2Test(tf.test.TestCase):
+class Chi2Test(tfp_test_util.TestCase):
 
   def testChi2LogPDF(self):
     batch_size = 6
@@ -48,6 +48,14 @@ class Chi2Test(tf.test.TestCase):
     pdf = chi2.prob(x)
     self.assertEqual(pdf.shape, (6,))
     self.assertAllClose(self.evaluate(pdf), np.exp(expected_log_pdf))
+
+  def testLogPdfAssertsOnInvalidSample(self):
+    d = tfd.Chi2(df=13.37, validate_args=True)
+    with self.assertRaisesOpError('Sample must be positive.'):
+      self.evaluate(d.log_prob([14.2, -5.3]))
+
+    with self.assertRaisesOpError('Sample must be positive.'):
+      self.evaluate(d.log_prob([0.0, 0.0]))
 
   def testChi2CDF(self):
     batch_size = 6
@@ -83,12 +91,6 @@ class Chi2Test(tf.test.TestCase):
     self.assertEqual(chi2.entropy().shape, (3,))
     self.assertAllClose(self.evaluate(chi2.entropy()), expected_entropy)
 
-  def testChi2WithAbsDf(self):
-    df_v = np.array([-1.3, -3.2, 5], dtype=np.float64)
-    chi2 = tfd.Chi2WithAbsDf(df=df_v)
-    self.assertAllClose(
-        self.evaluate(tf.floor(tf.abs(df_v))), self.evaluate(chi2.df))
-
   def testChi2Chi2KL(self):
     a_df = np.arange(1.0, 10.0)
     b_df = np.arange(1.0, 10.0)
@@ -108,8 +110,7 @@ class Chi2Test(tf.test.TestCase):
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(1e5), seed=tfp_test_util.test_seed())
-    kl_sample = tf.reduce_mean(
-        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
     self.assertAllClose(true_kl, kl_, atol=0., rtol=5e-13)
@@ -119,5 +120,39 @@ class Chi2Test(tf.test.TestCase):
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
-if __name__ == "__main__":
+  def testGradientThroughParams(self):
+    df = tf.Variable(19.43, dtype=tf.float64)
+    d = tfd.Chi2(df, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([1., 2., 3.])
+    grad = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
+
+  def testGradientThroughNonVariableParams(self):
+    df = tf.convert_to_tensor(13.37)
+    d = tfd.Chi2(df, validate_args=True)
+    with tf.GradientTape() as tape:
+      tape.watch(d.df)
+      loss = -d.log_prob([1., 2., 3.])
+    grad = tape.gradient(loss, [d.df])
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
+
+  def testAssertsPositiveDf(self):
+    df = tf.Variable([1., 2., -3.])
+    with self.assertRaisesOpError('Argument `df` must be positive.'):
+      d = tfd.Chi2(df, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.sample())
+
+  def testAssertsPositiveDfAfterMutation(self):
+    df = tf.Variable([1., 2., 3.])
+    d = tfd.Chi2(df, validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
+    with self.assertRaisesOpError('Argument `df` must be positive.'):
+      with tf.control_dependencies([df.assign([1., 2., -3.])]):
+        self.evaluate(d.mean())
+
+if __name__ == '__main__':
   tf.test.main()

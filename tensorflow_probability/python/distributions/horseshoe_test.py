@@ -20,10 +20,10 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -39,7 +39,7 @@ class _HorseshoeTest(object):
     self.assertAllEqual(expected, self.evaluate(scale_shape))
     scale = self._test_param(np.ones(self.evaluate(scale_shape)))
     self.assertAllEqual(
-        expected, self.evaluate(tf.shape(input=tfd.Horseshoe(scale).sample())))
+        expected, self.evaluate(tf.shape(tfd.Horseshoe(scale).sample())))
 
   def _test_param_static_shapes(self, sample_shape, expected):
     param_shapes = tfd.Horseshoe.param_static_shapes(sample_shape)
@@ -194,7 +194,7 @@ class _HorseshoeTest(object):
         -horseshoe_log_prob - tf.math.log(x * scale))
     horseshoe_log_prob_gradient_expected = tf.reshape(
         horseshoe_log_prob_derivatives_expected,
-        tf.shape(input=horseshoe_log_prob_gradient))
+        tf.shape(horseshoe_log_prob_gradient))
     self.assertAllClose(
         self.evaluate(horseshoe_log_prob_gradient_expected),
         self.evaluate(horseshoe_log_prob_gradient),
@@ -211,9 +211,11 @@ class _HorseshoeTest(object):
         scale, with shape original_batch_shape + [num_candidates],
         where different candidates for a single scalar parameter are at the
         inner most dimension (axis -1).
+    Returns:
+      scale_mle: max log-likelihood estimate for scale.
     """
     dist = tfd.Horseshoe(scale=scale_candidates)
-    dims = tf.shape(input=scale_candidates)
+    dims = tf.shape(scale_candidates)
     num_candidates = dims[-1]
     original_batch_shape = dims[:-1]
     # log_likelihood has same shape as scale_candidates
@@ -221,42 +223,42 @@ class _HorseshoeTest(object):
     log_likelihood = tf.reduce_sum(
         # dist.log_prob here returns a tensor with shape
         # [num_samples] + original_batch_shape + [num_candidates]
-        input_tensor=dist.log_prob(
+        dist.log_prob(
             tf.reshape(samples,
                        tf.concat([[-1], original_batch_shape, [1]], axis=0))),
         axis=0)
     # max log-likelihood candidate location mask
     mask = tf.one_hot(
-        tf.argmax(input=log_likelihood, axis=-1),
+        tf.argmax(log_likelihood, axis=-1),
         depth=num_candidates,
         dtype=self.dtype)
-    return tf.reduce_sum(input_tensor=scale_candidates * mask, axis=-1)
+    return tf.reduce_sum(scale_candidates * mask, axis=-1)
 
   def _test_param(self, param):
     if isinstance(param, np.ndarray):
       param_ = param.astype(self.dtype)
     else:
       param_ = np.array(param, dtype=self.dtype)
-    return tf.compat.v1.placeholder_with_default(
-        input=param_, shape=param_.shape if self.use_static_shape else None)
+    return tf1.placeholder_with_default(
+        param_, shape=param_.shape if self.use_static_shape else None)
 
 
-class HorseshoeTestStaticShapeFloat32(test_case.TestCase, _HorseshoeTest):
+class HorseshoeTestStaticShapeFloat32(tfp_test_util.TestCase, _HorseshoeTest):
   dtype = np.float32
   use_static_shape = True
 
 
-class HorseshoeTestDynamicShapeFloat32(test_case.TestCase, _HorseshoeTest):
+class HorseshoeTestDynamicShapeFloat32(tfp_test_util.TestCase, _HorseshoeTest):
   dtype = np.float32
   use_static_shape = False
 
 
-class HorseshoeTestStaticShapeFloat64(test_case.TestCase, _HorseshoeTest):
+class HorseshoeTestStaticShapeFloat64(tfp_test_util.TestCase, _HorseshoeTest):
   dtype = np.float64
   use_static_shape = True
 
 
-class HorseshoeTestDynamicShapeFloat64(test_case.TestCase, _HorseshoeTest):
+class HorseshoeTestDynamicShapeFloat64(tfp_test_util.TestCase, _HorseshoeTest):
   dtype = np.float64
   use_static_shape = False
 

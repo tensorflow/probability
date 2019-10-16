@@ -19,34 +19,32 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
-tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
 rng = np.random.RandomState(123)
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
-                                tf.test.TestCase):
+                                tfp_test_util.TestCase):
 
   def test_default_is_same_as_normal(self):
     d = 10
-    scale_diag = rng.rand(d)
-    scale_identity_multiplier = np.float64(1.0)
+    scale_diag = rng.rand(d) + np.float64(1.0)
     loc = rng.randn(d)
     norm = tfd.MultivariateNormalDiag(
         loc=loc,
         scale_diag=scale_diag,
-        scale_identity_multiplier=scale_identity_multiplier,
         validate_args=True)
     sasnorm = tfd.VectorSinhArcsinhDiag(
         loc=loc,
         scale_diag=scale_diag,
-        scale_identity_multiplier=scale_identity_multiplier,
         validate_args=True)
 
     x = rng.randn(5, d)
@@ -65,18 +63,15 @@ class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
 
   def test_passing_in_laplace_plus_defaults_is_same_as_laplace(self):
     d = 10
-    scale_diag = rng.rand(d)
-    scale_identity_multiplier = np.float64(1.2)
+    scale_diag = rng.rand(d) + np.float64(1.2)
     loc = rng.randn(d)
     vlap = tfd.VectorLaplaceDiag(
         loc=loc,
         scale_diag=scale_diag,
-        scale_identity_multiplier=scale_identity_multiplier,
         validate_args=True)
     sasvlap = tfd.VectorSinhArcsinhDiag(
         loc=loc,
         scale_diag=scale_diag,
-        scale_identity_multiplier=scale_identity_multiplier,
         distribution=tfd.Laplace(np.float64(0.), np.float64(1.)),
         validate_args=True)
 
@@ -96,18 +91,15 @@ class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
 
   def test_tailweight_small_gives_fewer_outliers_than_normal(self):
     d = 10
-    scale_diag = rng.rand(d)
-    scale_identity_multiplier = np.float64(0.9)
+    scale_diag = rng.rand(d) + np.float64(0.9)
     loc = rng.randn(d)
     norm = tfd.MultivariateNormalDiag(
         loc=loc,
         scale_diag=scale_diag,
-        scale_identity_multiplier=scale_identity_multiplier,
         validate_args=True)
     sasnorm = tfd.VectorSinhArcsinhDiag(
         loc=loc,
         scale_diag=scale_diag,
-        scale_identity_multiplier=scale_identity_multiplier,
         tailweight=0.1,
         validate_args=True)
 
@@ -141,18 +133,15 @@ class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
 
   def test_tailweight_large_gives_more_outliers_than_normal(self):
     d = 10
-    scale_diag = rng.rand(d)
-    scale_identity_multiplier = np.float64(1.0)
+    scale_diag = rng.rand(d) + np.float64(1.0)
     loc = rng.randn(d)
     norm = tfd.MultivariateNormalDiag(
         loc=loc,
         scale_diag=scale_diag,
-        scale_identity_multiplier=scale_identity_multiplier,
         validate_args=True)
     sasnorm = tfd.VectorSinhArcsinhDiag(
         loc=loc,
         scale_diag=scale_diag,
-        scale_identity_multiplier=scale_identity_multiplier,
         tailweight=3.,
         validate_args=True)
 
@@ -186,13 +175,11 @@ class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
 
   def test_positive_skewness_moves_mean_to_the_right(self):
     d = 10
-    scale_diag = rng.rand(d)
-    scale_identity_multiplier = np.float64(1.0)
+    scale_diag = rng.rand(d) + np.float64(1.0)
     loc = rng.randn(d)
     sasnorm = tfd.VectorSinhArcsinhDiag(
         loc=loc,
         scale_diag=scale_diag,
-        scale_identity_multiplier=scale_identity_multiplier,
         skewness=3.0,
         validate_args=True)
 
@@ -202,11 +189,9 @@ class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
 
   def test_consistency_random_parameters_with_batch_dim(self):
     b, d = 5, 2
-    scale_diag = rng.rand(b, d)
-    scale_identity_multiplier = np.float64(1.1)
+    scale_diag = rng.rand(b, d) + np.float64(1.1)
     sasnorm = tfd.VectorSinhArcsinhDiag(
         scale_diag=scale_diag,
-        scale_identity_multiplier=scale_identity_multiplier,
         skewness=rng.randn(d) * 0.5,
         tailweight=rng.rand(b, d) + 0.7,
         validate_args=True)
@@ -220,11 +205,9 @@ class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
 
   def test_consistency_random_parameters_no_batch_dims(self):
     d = 3
-    scale_diag = rng.rand(d)
-    scale_identity_multiplier = np.float64(1.1)
+    scale_diag = rng.rand(d) + np.float64(1.1)
     sasnorm = tfd.VectorSinhArcsinhDiag(
         scale_diag=scale_diag,
-        scale_identity_multiplier=scale_identity_multiplier,
         skewness=rng.randn(d) * 0.5,
         tailweight=rng.rand(d) + 0.7,
         validate_args=True)
@@ -238,10 +221,10 @@ class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
 
   def test_pdf_reflected_for_negative_skewness(self):
     sas_pos_skew = tfd.VectorSinhArcsinhDiag(
-        loc=[0.], scale_identity_multiplier=1., skewness=2., validate_args=True)
+        loc=[0.], scale_diag=[1.], skewness=2., validate_args=True)
     sas_neg_skew = tfd.VectorSinhArcsinhDiag(
         loc=[0.],
-        scale_identity_multiplier=1.,
+        scale_diag=[1.],
         skewness=-2.,
         validate_args=True)
     x = np.linspace(-2, 2, num=5).astype(np.float32).reshape(5, 1)
@@ -249,5 +232,5 @@ class VectorSinhArcsinhDiagTest(tfp_test_util.VectorDistributionTestHelpers,
         [sas_pos_skew.prob(x), sas_neg_skew.prob(x[::-1])]))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

@@ -17,21 +17,20 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
-from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class AutogressiveTest(tfp_test_util.VectorDistributionTestHelpers,
-                       tf.test.TestCase):
+                       tfp_test_util.TestCase):
   """Tests the Autoregressive distribution."""
 
   def setUp(self):
@@ -40,7 +39,7 @@ class AutogressiveTest(tfp_test_util.VectorDistributionTestHelpers,
   def _random_scale_tril(self, event_size):
     n = np.int32(event_size * (event_size + 1) // 2)
     p = 2. * self._rng.random_sample(n).astype(np.float32) - 1.
-    return distribution_util.fill_triangular(0.25 * p)
+    return tfp.math.fill_triangular(0.25 * p)
 
   def _normal_fn(self, affine_bijector):
     def _fn(samples):

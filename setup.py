@@ -31,7 +31,8 @@ REQUIRED_PACKAGES = [
     'six >= 1.10.0',
     'numpy >= 1.13.3',
     'decorator',
-    'cloudpickle >= 0.6.1',
+    'cloudpickle >= 1.2.2',
+    'gast >= 0.2'  # For autobatching
 ]
 
 if '--release' in sys.argv:
@@ -98,4 +99,7 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
     keywords='tensorflow probability statistics bayesian machine learning',
+    extras_require={  # e.g. `pip install tfp-nightly[jax]`
+        'jax': ['jax', 'jaxlib'],
+    }
 )

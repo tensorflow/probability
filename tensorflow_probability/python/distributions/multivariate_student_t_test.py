@@ -22,21 +22,22 @@ from __future__ import print_function
 
 from absl.testing import parameterized
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
 class MultivariateStudentTTestFloat32StaticShape(
-    test_case.TestCase, parameterized.TestCase,
+    tfp_test_util.TestCase,
     tfp_test_util.VectorDistributionTestHelpers):
   dtype = tf.float32
   use_static_shape = True
@@ -44,7 +45,7 @@ class MultivariateStudentTTestFloat32StaticShape(
   def _input(self, value):
     """Helper to create inputs with varied dtypes an static shapes."""
     value = tf.cast(value, self.dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         value, shape=value.shape if self.use_static_shape else None)
 
   # pyformat: disable
@@ -110,19 +111,18 @@ class MultivariateStudentTTestFloat32StaticShape(
     self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
 
   def testNonPositiveDf(self):
-    with self.assertRaisesRegexp(tf.errors.InvalidArgumentError,
-                                 "`df` must be positive"):
+    with self.assertRaisesOpError('Argument `df` must be positive.'):
       self.evaluate(
           tfd.MultivariateStudentTLinearOperator(
               loc=self._input([0.]),
               df=self._input(0.),
               scale=tf.linalg.LinearOperatorDiag(
                   self._input([1.]), is_positive_definite=True),
-              validate_args=True).df)
+              validate_args=True).sample())
 
   def testBadScaleDType(self):
     with self.assertRaisesRegexp(TypeError,
-                                 "`scale` must have floating-point dtype."):
+                                 '`scale` must have floating-point dtype.'):
       tfd.MultivariateStudentTLinearOperator(
           loc=[0.],
           df=1.,
@@ -131,7 +131,7 @@ class MultivariateStudentTTestFloat32StaticShape(
 
   def testNotPositiveDefinite(self):
     with self.assertRaisesRegexp(ValueError,
-                                 "`scale` must be positive definite."):
+                                 '`scale` must be positive definite.'):
       tfd.MultivariateStudentTLinearOperator(
           loc=self._input([0.]),
           df=self._input(1.),
@@ -162,7 +162,7 @@ class MultivariateStudentTTestFloat32StaticShape(
         scale=tf.linalg.LinearOperatorDiag(self._input([[1., 1.], [1., 1.]])),
         allow_nan_stats=False)
     with self.assertRaisesRegexp(tf.errors.InvalidArgumentError,
-                                 "mean not defined for components of df <= 1"):
+                                 'Mean not defined for components of df <= 1.'):
       self.evaluate(dist.mean())
 
   def testMode(self):
@@ -213,7 +213,7 @@ class MultivariateStudentTTestFloat32StaticShape(
         allow_nan_stats=False)
     with self.assertRaisesRegexp(
         tf.errors.InvalidArgumentError,
-        "covariance not defined for components of df <= 1"):
+        'Covariance not defined for components of df <= 1.'):
       self.evaluate(dist.covariance())
 
   # pyformat: disable
@@ -270,11 +270,11 @@ class MultivariateStudentTTestFloat32StaticShape(
         allow_nan_stats=False)
     with self.assertRaisesRegexp(
         tf.errors.InvalidArgumentError,
-        "variance not defined for components of df <= 1"):
+        'Variance not defined for components of df <= 1.'):
       self.evaluate(dist.variance())
     with self.assertRaisesRegexp(
         tf.errors.InvalidArgumentError,
-        "standard deviation not defined for components of df <= 1"):
+        'Standard deviation not defined for components of df <= 1.'):
       self.evaluate(dist.stddev())
 
   def testEntropy(self):
@@ -305,11 +305,11 @@ class MultivariateStudentTTestFloat32StaticShape(
          [-1., 2.]]))
     # pyformat: enable
     seed = tfp_test_util.test_seed()
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     dist1 = tfd.MultivariateStudentTLinearOperator(
         loc=[1., 2.], df=5., scale=scale)
     samples1 = self.evaluate(dist1.sample(100, seed=seed))
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     dist2 = tfd.MultivariateStudentTLinearOperator(
         loc=[1., 2.], df=5., scale=scale)
     samples2 = self.evaluate(dist2.sample(100, seed=seed))
@@ -355,7 +355,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     points = tf.concat([x[..., tf.newaxis], y[..., tf.newaxis]], -1)
     log_probs = dist.log_prob(points)
     normalization = tf.exp(tf.reduce_logsumexp(
-        input_tensor=log_probs)) * (spacings[1] - spacings[0])**2
+        log_probs)) * (spacings[1] - spacings[0])**2
     self.assertAllClose(1., self.evaluate(normalization), atol=1e-3)
 
     mode_log_prob = dist.log_prob(dist.mode())
@@ -393,6 +393,37 @@ class MultivariateStudentTTestFloat32StaticShape(
 
     self.assertAllClose(t_log_probs, mvt_log_probs)
 
+  def testAssertsPositiveDf(self):
+    df = tf.Variable(-3.)
+    scale = tf.linalg.LinearOperatorDiag([2., 2.], is_positive_definite=True)
+    self.evaluate(df.initializer)
+    with self.assertRaisesOpError('`df` must be positive.'):
+      d = tfd.MultivariateStudentTLinearOperator(
+          loc=1., df=df, scale=scale, validate_args=True)
+      self.evaluate(d.entropy())
+
+  def testAssertsPositiveDfAfterMutation(self):
+    df = tf.Variable(3.)
+    scale = tf.linalg.LinearOperatorDiag([2., 2.], is_positive_definite=True)
+    self.evaluate(df.initializer)
+    d = tfd.MultivariateStudentTLinearOperator(
+        loc=1., df=df, scale=scale, validate_args=True)
+    with self.assertRaisesOpError('`df` must be positive.'):
+      with tf.control_dependencies([df.assign(-2.)]):
+        self.evaluate(d.sample())
+
+  def testVariableScaleWithDeferredTensor(self):
+    scale = tf.linalg.LinearOperatorDiag(
+        tfp.util.TransformedVariable([2., 2.], tfb.Exp()),
+        is_positive_definite=True)
+    self.evaluate([v.initializer for v in scale.trainable_variables])
+    d = tfd.MultivariateStudentTLinearOperator(
+        loc=1., df=3., scale=scale, validate_args=True)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob(d.sample())
+    self.assertLen(d.trainable_variables, 1)
+    self.assertIsNotNone(tape.gradient(lp, d.trainable_variables))
+
 
 class MultivariateStudentTTestFloat64StaticShape(
     MultivariateStudentTTestFloat32StaticShape):
@@ -406,5 +437,5 @@ class MultivariateStudentTTestFloat32DynamicShape(
   use_static_shape = False
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

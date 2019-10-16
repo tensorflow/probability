@@ -5,6 +5,18 @@
 
 # tfp.optimizer.proximal_hessian_sparse_one_step
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/optimizer/proximal_hessian_sparse.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 One step of (the outer loop of) the minimization algorithm.
 
 ``` python
@@ -23,8 +35,6 @@ tfp.optimizer.proximal_hessian_sparse_one_step(
 ```
 
 
-
-Defined in [`python/optimizer/proximal_hessian_sparse.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/proximal_hessian_sparse.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -55,6 +65,7 @@ This algorithm assumes that `Loss` is convex, at least in a region surrounding
 the optimum.  (If `l2_regularizer > 0`, then only weak convexity is needed.)
 
 #### Args:
+
 
 * <b>`gradient_unregularized_loss`</b>: (Batch of) `Tensor` with the same shape and
   dtype as `x_start` representing the gradient, evaluated at `x_start`, of
@@ -105,14 +116,15 @@ the optimum.  (If `l2_regularizer > 0`, then only weak convexity is needed.)
 
 #### Returns:
 
-  x: (Batch of) `Tensor` having the same shape and dtype as `x_start`,
-    representing the updated value of `x`, that is, `x_start + x_update`.
-  is_converged: scalar, `bool` `Tensor` indicating whether convergence
-    occurred across all batches within the specified number of sweeps.
-  iter: scalar, `int` `Tensor` representing the actual number of coordinate
-    updates made (before achieving convergence).  Since each sweep consists of
-    `tf.size(x_start)` iterations, the maximum number of updates is
-    `maximum_full_sweeps * tf.size(x_start)`.
+
+* <b>`x`</b>: (Batch of) `Tensor` having the same shape and dtype as `x_start`,
+  representing the updated value of `x`, that is, `x_start + x_update`.
+* <b>`is_converged`</b>: scalar, `bool` `Tensor` indicating whether convergence
+  occurred across all batches within the specified number of sweeps.
+* <b>`iter`</b>: scalar, `int` `Tensor` representing the actual number of coordinate
+  updates made (before achieving convergence).  Since each sweep consists of
+  `tf.size(x_start)` iterations, the maximum number of updates is
+  `maximum_full_sweeps * tf.size(x_start)`.
 
 #### References
 

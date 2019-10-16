@@ -21,14 +21,15 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class InvertBijectorTest(tf.test.TestCase):
+class InvertBijectorTest(tfp_test_util.TestCase):
   """Tests the correctness of the Y = Invert(bij) transformation."""
 
   def testBijector(self):
@@ -40,7 +41,7 @@ class InvertBijectorTest(tf.test.TestCase):
         tfb.SoftmaxCentered(),
     ]:
       rev = tfb.Invert(fwd)
-      self.assertEqual("_".join(["invert", fwd.name]), rev.name)
+      self.assertStartsWith(rev.name, "_".join(["invert", fwd.name]))
       x = [[[1., 2.],
             [2., 3.]]]
       self.assertAllClose(
@@ -80,9 +81,11 @@ class InvertBijectorTest(tf.test.TestCase):
         tfd.TransformedDistribution(
             distribution=tfd.Gamma(concentration=1., rate=2.),
             bijector=tfb.Invert(tfb.Exp())))
-    self.assertAllEqual([],
-                        self.evaluate(
-                            tf.shape(input=exp_gamma_distribution.sample())))
+    self.assertAllEqual(
+        [],
+        self.evaluate(
+            tf.shape(
+                exp_gamma_distribution.sample(seed=tfp_test_util.test_seed()))))
 
 
 if __name__ == "__main__":

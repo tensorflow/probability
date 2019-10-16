@@ -5,6 +5,18 @@
 
 # tfp.math.lu_matrix_inverse
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/linalg.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Computes a matrix inverse given the matrix's LU decomposition.
 
 ``` python
@@ -18,13 +30,11 @@ tfp.math.lu_matrix_inverse(
 
 
 
-Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/linalg.py).
-
 <!-- Placeholder for "Used in" -->
 
 This op is conceptually identical to,
 
-````python
+```python
 inv_X = tf.lu_matrix_inverse(*tf.linalg.lu(X))
 tf.assert_near(tf.matrix_inverse(X), inv_X)
 # ==> True
@@ -35,6 +45,7 @@ nor is this condition checked even when `validate_args=True`.
 
 #### Args:
 
+
 * <b>`lower_upper`</b>: `lu` as returned by `tf.linalg.lu`, i.e., if
   `matmul(P, matmul(L, U)) = X` then `lower_upper = L + U - eye`.
 * <b>`perm`</b>: `p` as returned by `tf.linag.lu`, i.e., if
@@ -44,13 +55,14 @@ nor is this condition checked even when `validate_args=True`.
   actually invertible, even when `validate_args=True`.
   Default value: `False` (i.e., don't validate arguments).
 * <b>`name`</b>: Python `str` name given to ops managed by this object.
-  Default value: `None` (i.e., "lu_matrix_inverse").
+  Default value: `None` (i.e., 'lu_matrix_inverse').
 
 
 #### Returns:
 
-  inv_x: The matrix_inv, i.e.,
-    `tf.matrix_inverse(tfp.math.lu_reconstruct(lu, perm))`.
+
+* <b>`inv_x`</b>: The matrix_inv, i.e.,
+  `tf.matrix_inverse(tfp.math.lu_reconstruct(lu, perm))`.
 
 #### Examples
 

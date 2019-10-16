@@ -5,7 +5,24 @@
 
 # tfp.edward2.make_log_joint_fn
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/program_transformations.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Takes Edward probabilistic program and returns its log joint function.
+
+### Aliases:
+
+* `tfp.experimental.edward2.make_log_joint_fn`
+
 
 ``` python
 tfp.edward2.make_log_joint_fn(model)
@@ -13,11 +30,11 @@ tfp.edward2.make_log_joint_fn(model)
 
 
 
-Defined in [`python/edward2/program_transformations.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/program_transformations.py).
-
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
+
 
 * <b>`model`</b>: Python callable which executes the generative process of a
   computable probability distribution using `ed.RandomVariable`s.
@@ -25,9 +42,10 @@ Defined in [`python/edward2/program_transformations.py`](https://github.com/tens
 
 #### Returns:
 
-  A log-joint probability function. Its inputs are `model`'s original inputs
-  and random variables which appear during the program execution. Its output
-  is a scalar tf.Tensor.
+A log-joint probability function. Its inputs are `model`'s original inputs
+and random variables which appear during the program execution. Its output
+is a scalar tf.Tensor.
+
 
 #### Examples
 

@@ -5,7 +5,24 @@
 
 # tfp.edward2.GaussianProcess
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for GaussianProcess.
+
+### Aliases:
+
+* `tfp.experimental.edward2.GaussianProcess`
+
 
 ``` python
 tfp.edward2.GaussianProcess(
@@ -16,22 +33,21 @@ tfp.edward2.GaussianProcess(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See GaussianProcess for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
 Instantiate a GaussianProcess Distribution.
 
-
 #### Args:
+
 
 * <b>`kernel`</b>: `PositiveSemidefiniteKernel`-like instance representing the
   GP's covariance function.
@@ -48,11 +64,11 @@ Instantiate a GaussianProcess Distribution.
   shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
   broadcastable with `[b1, ..., bB]`. Default value: `None` implies
   constant zero function.
-* <b>`observation_noise_variance`</b>: `float` `Tensor` representing the variance
-  of the noise in the Normal likelihood distribution of the model. May be
-  batched, in which case the batch shape must be broadcastable with the
-  shapes of all other batched parameters (`kernel.batch_shape`,
-  `index_points`, etc.).
+* <b>`observation_noise_variance`</b>: `float` `Tensor` representing (batch of)
+  scalar variance(s) of the noise in the Normal likelihood
+  distribution of the model. If batched, the batch shape must be
+  broadcastable with the shapes of all other batched parameters
+  (`kernel.batch_shape`, `index_points`, etc.).
   Default value: `0.`
 * <b>`jitter`</b>: `float` scalar `Tensor` added to the diagonal of the covariance
   matrix to ensure positive definiteness of the covariance matrix.
@@ -72,5 +88,6 @@ Instantiate a GaussianProcess Distribution.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `mean_fn` is not `None` and is not callable.

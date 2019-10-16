@@ -20,18 +20,20 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class CholeskyOuterProductBijectorTest(tf.test.TestCase):
+class CholeskyOuterProductBijectorTest(tfp_test_util.TestCase):
   """Tests the correctness of the Y = X @ X.T transformation."""
 
   def testBijectorMatrix(self):
     bijector = tfb.CholeskyOuterProduct(validate_args=True)
-    self.assertEqual("cholesky_outer_product", bijector.name)
+    self.assertStartsWith(bijector.name, "cholesky_outer_product")
     x = [[[1., 0], [2, 1]], [[np.sqrt(2.), 0], [np.sqrt(8.), 1]]]
     y = np.matmul(x, np.transpose(x, axes=(0, 2, 1)))
     # Fairly easy to compute differentials since we have 2x2.
@@ -73,7 +75,7 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
 
   def testNoBatchDynamicJacobian(self):
     bijector = tfb.CholeskyOuterProduct()
-    x = tf.compat.v1.placeholder_with_default(
+    x = tf1.placeholder_with_default(
         np.eye(2, dtype=np.float32), shape=None)
 
     log_det_jacobian = bijector.forward_log_det_jacobian(x, event_ndims=2)
@@ -96,8 +98,8 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
   def testNoBatchDeferred(self):
     x_ = np.array([[1., 0], [2, 1]])  # np.linalg.cholesky(y)
     y_ = np.array([[1., 2], [2, 5]])  # np.matmul(x, x.T)
-    x = tf.compat.v1.placeholder_with_default(x_, shape=None)
-    y = tf.compat.v1.placeholder_with_default(y_, shape=None)
+    x = tf1.placeholder_with_default(x_, shape=None)
+    y = tf1.placeholder_with_default(y_, shape=None)
     y_actual = tfb.CholeskyOuterProduct().forward(x=x)
     x_actual = tfb.CholeskyOuterProduct().inverse(y=y)
     [y_actual_, x_actual_] = self.evaluate([y_actual, x_actual])
@@ -134,8 +136,8 @@ class CholeskyOuterProductBijectorTest(tf.test.TestCase):
                     [2, 5]],
                    [[9., 3],
                     [3, 5]]])  # np.matmul(x, x.T)
-    x = tf.compat.v1.placeholder_with_default(x_, shape=None)
-    y = tf.compat.v1.placeholder_with_default(y_, shape=None)
+    x = tf1.placeholder_with_default(x_, shape=None)
+    y = tf1.placeholder_with_default(y_, shape=None)
     y_actual = tfb.CholeskyOuterProduct().forward(x)
     x_actual = tfb.CholeskyOuterProduct().inverse(y)
     [y_actual_, x_actual_] = self.evaluate([y_actual, x_actual])

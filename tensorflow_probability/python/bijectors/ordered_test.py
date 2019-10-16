@@ -19,21 +19,20 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
-
-import tensorflow as tf
-import tensorflow_probability as tfp
-
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class OrderedBijectorTest(tf.test.TestCase):
+class OrderedBijectorTest(tfp_test_util.TestCase):
   """Tests correctness of the ordered transformation."""
 
   def setUp(self):
@@ -41,7 +40,7 @@ class OrderedBijectorTest(tf.test.TestCase):
 
   def testBijectorVector(self):
     ordered = tfb.Ordered()
-    self.assertEqual("ordered", ordered.name)
+    self.assertStartsWith(ordered.name, "ordered")
     x = np.asarray([[2., 3, 4], [4., 8, 13]])
     y = [[2., 0, 0], [4., np.log(4.), np.log(5.)]]
     self.assertAllClose(y, self.evaluate(ordered.forward(x)))
@@ -59,12 +58,12 @@ class OrderedBijectorTest(tf.test.TestCase):
 
   def testBijectorUnknownShape(self):
     ordered = tfb.Ordered()
-    self.assertEqual("ordered", ordered.name)
+    self.assertStartsWith(ordered.name, "ordered")
     x_ = np.asarray([[2., 3, 4], [4., 8, 13]], dtype=np.float32)
     y_ = np.asarray(
         [[2., 0, 0], [4., np.log(4.), np.log(5.)]], dtype=np.float32)
-    x = tf.compat.v1.placeholder_with_default(x_, shape=[2, None])
-    y = tf.compat.v1.placeholder_with_default(y_, shape=[2, None])
+    x = tf1.placeholder_with_default(x_, shape=[2, None])
+    y = tf1.placeholder_with_default(y_, shape=[2, None])
     self.assertAllClose(y_, self.evaluate(ordered.forward(x)))
     self.assertAllClose(x_, self.evaluate(ordered.inverse(y)))
     self.assertAllClose(

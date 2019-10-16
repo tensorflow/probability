@@ -19,17 +19,21 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import interpolate as scipy_interpolate
-import tensorflow as tf
+
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class InterpRegular1DGridTest(tf.test.TestCase):
+class InterpRegular1DGridTest(tfp_test_util.TestCase):
   """Test for tfp.math.interp_regular_1d_grid."""
 
   def setUp(self):
+    super(InterpRegular1DGridTest, self).setUp()
     self.rng = np.random.RandomState(42)
 
   def test_on_1d_array_nan_fill_value(self):
@@ -291,10 +295,11 @@ class InterpRegular1DGridTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BatchInterpRegular1DGridTest(tf.test.TestCase):
+class BatchInterpRegular1DGridTest(tfp_test_util.TestCase):
   """Test for 1-D usage of tfp.math.interp_regular_1d_grid."""
 
   def setUp(self):
+    super(BatchInterpRegular1DGridTest, self).setUp()
     self.rng = np.random.RandomState(42)
 
   def test_on_1d_array_nan_fill_value(self):
@@ -569,7 +574,7 @@ class BatchInterpRegular1DGridTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BatchInterpRegularNDGridTest(tf.test.TestCase):
+class BatchInterpRegularNDGridTest(tfp_test_util.TestCase):
 
   def test_2d_scalar_valued_no_leading_dims(self):
     y_ref = [[0., 1.], [2., 3.]]
@@ -900,6 +905,18 @@ class BatchInterpRegularNDGridTest(tf.test.TestCase):
     _, dy_dx_ = self.evaluate(tfp.math.value_and_gradient(func, x))
     self.assertAllEqual([0., 2., 2., 2., 2., 0.], dy_dx_[..., 0])
 
+  def test_float64(self):
+    y_ref = tf.convert_to_tensor([[0., 1.], [2., 3.]], dtype=tf.float64)
+    y = tfp.math.batch_interp_regular_nd_grid(
+        # Interpolate at one single point.
+        x=tf.convert_to_tensor([[0., 0.]], dtype=tf.float64),
+        x_ref_min=tf.convert_to_tensor([0., 0.], dtype=tf.float64),
+        x_ref_max=tf.convert_to_tensor([1., 1.], dtype=tf.float64),
+        y_ref=y_ref,
+        axis=-2)
+    # Test x at the upper left grid point.
+    self.assertEqual(y.dtype, tf.float64)
+    self.assertAllClose([0.0], self.evaluate(y))
 
 if __name__ == '__main__':
   tf.test.main()

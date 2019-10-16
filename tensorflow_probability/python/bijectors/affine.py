@@ -24,17 +24,193 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     "Affine",
 ]
 
 
+# Copied from distribution_util, where it is to be removed, and duplicated here
+# to support Affine until the deprecation window is closed.
+def _make_tril_scale(loc=None,
+                     scale_tril=None,
+                     scale_diag=None,
+                     scale_identity_multiplier=None,
+                     shape_hint=None,
+                     validate_args=False,
+                     assert_positive=False,
+                     name=None):
+  """Creates a LinearOperator representing a lower triangular matrix.
+
+  Args:
+    loc: Floating-point `Tensor`. This is used for inferring shape in the case
+      where only `scale_identity_multiplier` is set.
+    scale_tril: Floating-point `Tensor` representing the diagonal matrix.
+      `scale_diag` has shape [N1, N2, ...  k, k], which represents a k x k lower
+      triangular matrix. When `None` no `scale_tril` term is added to the
+      LinearOperator. The upper triangular elements above the diagonal are
+      ignored.
+    scale_diag: Floating-point `Tensor` representing the diagonal matrix.
+      `scale_diag` has shape [N1, N2, ...  k], which represents a k x k diagonal
+      matrix. When `None` no diagonal term is added to the LinearOperator.
+    scale_identity_multiplier: floating point rank 0 `Tensor` representing a
+      scaling done to the identity matrix. When `scale_identity_multiplier =
+      scale_diag = scale_tril = None` then `scale += IdentityMatrix`. Otherwise
+      no scaled-identity-matrix is added to `scale`.
+    shape_hint: scalar integer `Tensor` representing a hint at the dimension of
+      the identity matrix when only `scale_identity_multiplier` is set.
+    validate_args: Python `bool` indicating whether arguments should be checked
+      for correctness.
+    assert_positive: Python `bool` indicating whether LinearOperator should be
+      checked for being positive definite.
+    name: Python `str` name given to ops managed by this object.
+
+  Returns:
+    `LinearOperator` representing a lower triangular matrix.
+
+  Raises:
+    ValueError:  If only `scale_identity_multiplier` is set and `loc` and
+      `shape_hint` are both None.
+  """
+
+  with tf.name_scope(name or "make_tril_scale"):
+
+    dtype = dtype_util.common_dtype(
+        [loc, scale_tril, scale_diag, scale_identity_multiplier],
+        dtype_hint=tf.float32)
+    loc = tensor_util.convert_nonref_to_tensor(loc, name="loc", dtype=dtype)
+    scale_tril = tensor_util.convert_nonref_to_tensor(
+        scale_tril, name="scale_tril", dtype=dtype)
+    scale_diag = tensor_util.convert_nonref_to_tensor(
+        scale_diag, name="scale_diag", dtype=dtype)
+    scale_identity_multiplier = tensor_util.convert_nonref_to_tensor(
+        scale_identity_multiplier,
+        name="scale_identity_multiplier",
+        dtype=dtype)
+
+  if scale_tril is not None:
+    scale_tril = tf.linalg.band_part(scale_tril, -1, 0)  # Zero out TriU.
+    tril_diag = tf.linalg.diag_part(scale_tril)
+    if scale_diag is not None:
+      tril_diag = tril_diag + scale_diag
+    if scale_identity_multiplier is not None:
+      tril_diag = tril_diag + scale_identity_multiplier[..., tf.newaxis]
+
+    scale_tril = tf.linalg.set_diag(scale_tril, tril_diag)
+
+    return tf.linalg.LinearOperatorLowerTriangular(
+        tril=scale_tril,
+        is_non_singular=True,
+        is_self_adjoint=False,
+        is_positive_definite=assert_positive)
+
+  return _make_diag_scale(
+      loc=loc,
+      scale_diag=scale_diag,
+      scale_identity_multiplier=scale_identity_multiplier,
+      shape_hint=shape_hint,
+      validate_args=validate_args,
+      assert_positive=assert_positive,
+      name=name)
+
+
+# Copied from distribution_util, where it is to be removed, and duplicated here
+# to support Affine until the deprecation window is closed.
+def _make_diag_scale(loc=None,
+                     scale_diag=None,
+                     scale_identity_multiplier=None,
+                     shape_hint=None,
+                     validate_args=False,
+                     assert_positive=False,
+                     name=None,
+                     dtype=None):
+  """Creates a LinearOperator representing a diagonal matrix.
+
+  Args:
+    loc: Floating-point `Tensor`. This is used for inferring shape in the case
+      where only `scale_identity_multiplier` is set.
+    scale_diag: Floating-point `Tensor` representing the diagonal matrix.
+      `scale_diag` has shape [N1, N2, ...  k], which represents a k x k diagonal
+      matrix. When `None` no diagonal term is added to the LinearOperator.
+    scale_identity_multiplier: floating point rank 0 `Tensor` representing a
+      scaling done to the identity matrix. When `scale_identity_multiplier =
+      scale_diag = scale_tril = None` then `scale += IdentityMatrix`. Otherwise
+      no scaled-identity-matrix is added to `scale`.
+    shape_hint: scalar integer `Tensor` representing a hint at the dimension of
+      the identity matrix when only `scale_identity_multiplier` is set.
+    validate_args: Python `bool` indicating whether arguments should be checked
+      for correctness.
+    assert_positive: Python `bool` indicating whether LinearOperator should be
+      checked for being positive definite.
+    name: Python `str` name given to ops managed by this object.
+    dtype: TF `DType` to prefer when converting args to `Tensor`s. Else, we fall
+      back to a compatible dtype across all of `loc`, `scale_diag`, and
+      `scale_identity_multiplier`.
+
+  Returns:
+    `LinearOperator` representing a lower triangular matrix.
+
+  Raises:
+    ValueError:  If only `scale_identity_multiplier` is set and `loc` and
+      `shape_hint` are both None.
+  """
+
+  with tf.name_scope(name or "make_diag_scale"):
+    if dtype is None:
+      dtype = dtype_util.common_dtype(
+          [loc, scale_diag, scale_identity_multiplier],
+          dtype_hint=tf.float32)
+    loc = tensor_util.convert_nonref_to_tensor(loc, name="loc", dtype=dtype)
+    scale_diag = tensor_util.convert_nonref_to_tensor(
+        scale_diag, name="scale_diag", dtype=dtype)
+    scale_identity_multiplier = tensor_util.convert_nonref_to_tensor(
+        scale_identity_multiplier,
+        name="scale_identity_multiplier",
+        dtype=dtype)
+
+    if scale_diag is not None:
+      if scale_identity_multiplier is not None:
+        scale_diag = scale_diag + scale_identity_multiplier[..., tf.newaxis]
+      return tf.linalg.LinearOperatorDiag(
+          diag=scale_diag,
+          is_non_singular=True,
+          is_self_adjoint=True,
+          is_positive_definite=assert_positive)
+
+    if loc is None and shape_hint is None:
+      raise ValueError("Cannot infer `event_shape` unless `loc` or "
+                       "`shape_hint` is specified.")
+
+    num_rows = shape_hint
+    del shape_hint
+    if num_rows is None:
+      num_rows = tf.compat.dimension_value(loc.shape[-1])
+      if num_rows is None:
+        num_rows = tf.shape(loc)[-1]
+
+    if scale_identity_multiplier is None:
+      return tf.linalg.LinearOperatorIdentity(
+          num_rows=num_rows,
+          dtype=dtype,
+          is_self_adjoint=True,
+          is_positive_definite=True,
+          assert_proper_shapes=validate_args)
+
+    return tf.linalg.LinearOperatorScaledIdentity(
+        num_rows=num_rows,
+        multiplier=scale_identity_multiplier,
+        is_non_singular=True,
+        is_self_adjoint=True,
+        is_positive_definite=assert_positive,
+        assert_proper_shapes=validate_args)
+
+
 def _as_tensor(x, name, dtype):
   """Convenience to convert to `Tensor` or leave as `None`."""
-  return None if x is None else tf.convert_to_tensor(
-      value=x, name=name, dtype=dtype)
+  return None if x is None else tf.convert_to_tensor(x, name=name, dtype=dtype)
 
 
 class Affine(bijector.Bijector):
@@ -93,6 +269,12 @@ class Affine(bijector.Bijector):
 
   """
 
+  @deprecation.deprecated(
+      "2020-01-01",
+      "`Affine` bijector is deprecated; please use "
+      "`tfb.Shift(loc)(tfb.Matvec*)` where `tfb.Matvec*` is one of "
+      "`MatvecDiag`, `MatvecTriL`, or `MatvecLinearOperator`.",
+      warn_once=True)
   def __init__(self,
                shift=None,
                scale_identity_multiplier=None,
@@ -168,10 +350,6 @@ class Affine(bijector.Bijector):
       ValueError: if `perturb_diag` is specified but not `perturb_factor`.
       TypeError: if `shift` has different `dtype` from `scale` arguments.
     """
-    self._graph_parents = []
-    self._name = name
-    self._validate_args = validate_args
-
     # Ambiguous definition of low rank update.
     if scale_perturb_diag is not None and scale_perturb_factor is None:
       raise ValueError("When scale_perturb_diag is specified, "
@@ -185,7 +363,9 @@ class Affine(bijector.Bijector):
                                          scale_diag is None and
                                          scale_perturb_factor is None)
 
-    with self._name_scope("init"):
+    with tf.name_scope(name) as name:
+      self._name = name
+      self._validate_args = validate_args
 
       if dtype is None:
         dtype = dtype_util.common_dtype([
@@ -194,14 +374,14 @@ class Affine(bijector.Bijector):
         ], tf.float32)
 
       if shift is not None:
-        shift = tf.convert_to_tensor(value=shift, name="shift", dtype=dtype)
+        shift = tf.convert_to_tensor(shift, name="shift", dtype=dtype)
       self._shift = shift
 
       # When no args are specified, pretend the scale matrix is the identity
       # matrix.
       if (self._is_only_identity_multiplier and
           scale_identity_multiplier is None):
-        scale_identity_multiplier = tf.convert_to_tensor(value=1., dtype=dtype)
+        scale_identity_multiplier = tf.convert_to_tensor(1., dtype=dtype)
 
       # self._create_scale_operator returns a LinearOperator in all cases
       # except if self._is_only_identity_multiplier; in which case it
@@ -216,20 +396,19 @@ class Affine(bijector.Bijector):
           validate_args=validate_args,
           dtype=dtype)
 
-      if scale is not None and not self._is_only_identity_multiplier:
+      if (scale is not None and
+          not self._is_only_identity_multiplier and
+          not dtype_util.SKIP_DTYPE_CHECKS):
         if (shift is not None and
             not dtype_util.base_equal(shift.dtype, scale.dtype)):
           raise TypeError(
-              "shift.dtype({}) is incompatible with scale.dtype({}).".format(
+              "shift.dtype ({}) is incompatible with scale.dtype ({}).".format(
                   shift.dtype, scale.dtype))
 
       self._scale = scale
       self._adjoint = adjoint
       super(Affine, self).__init__(
           forward_min_event_ndims=1,
-          graph_parents=([self._scale] if tf.is_tensor(
-              self._scale) else self._scale.graph_parents +
-                         [self._shift] if self._shift is not None else []),
           is_constant_jacobian=True,
           dtype=dtype,
           validate_args=validate_args,
@@ -286,7 +465,7 @@ class Affine(bijector.Bijector):
         ], identity_multiplier)
       return identity_multiplier
 
-    scale = distribution_util.make_tril_scale(
+    scale = _make_tril_scale(
         loc=shift,
         scale_tril=tril,
         scale_diag=diag,
@@ -329,7 +508,7 @@ class Affine(bijector.Bijector):
       s = (
           tf.math.conj(self._scale) if self.adjoint and
           dtype_util.is_complex(self._scale.dtype) else self._scale)
-      y *= s
+      y = y * s
       if self.shift is not None:
         return y + self.shift
       return y
@@ -337,13 +516,13 @@ class Affine(bijector.Bijector):
                                  if self.validate_args else []):
       y = self.scale.matvec(y, adjoint=self.adjoint)
     if self.shift is not None:
-      y += self.shift
+      y = y + self.shift
     return y
 
   def _inverse(self, y):
     x = y
     if self.shift is not None:
-      x -= self.shift
+      x = x - self.shift
     if self._is_only_identity_multiplier:
       s = (
           tf.math.conj(self._scale) if self.adjoint and
@@ -361,7 +540,7 @@ class Affine(bijector.Bijector):
       # We don't pad in this case and instead let the fldj be applied
       # via broadcast.
       log_abs_diag = tf.math.log(tf.abs(self._scale))
-      event_size = tf.shape(input=x)[-1]
+      event_size = tf.shape(x)[-1]
       event_size = tf.cast(event_size, dtype=log_abs_diag.dtype)
       return log_abs_diag * event_size
     return self.scale.log_abs_determinant()

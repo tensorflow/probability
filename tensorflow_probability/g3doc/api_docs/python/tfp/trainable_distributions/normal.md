@@ -5,23 +5,28 @@
 
 # tfp.trainable_distributions.normal
 
-Constructs a trainable `tfd.Normal` distribution.
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
+Constructs a trainable `tfd.Normal` distribution. (deprecated)
 
 ``` python
 tfp.trainable_distributions.normal(
-    x,
-    layer_fn=tf.compat.v1.layers.dense,
-    loc_fn=(lambda x: x),
-    scale_fn=1.0,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
 
 
-Defined in [`python/trainable_distributions/trainable_distributions_lib.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/trainable_distributions/trainable_distributions_lib.py).
-
 <!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-09-01.
+Instructions for updating:
+`multivariate_normal_tril` is deprecated; use <a href="../../tfp/layers/DistributionLambda.md"><code>tfp.layers.DistributionLambda</code></a> or <a href="../../tfp/util/DeferredTensor.md"><code>tfp.util.DeferredTensor</code></a>.
 
 
 This function creates a Normal distribution parameterized by loc and scale.
@@ -88,6 +93,7 @@ with tf.Session() as sess:
 
 #### Args:
 
+
 * <b>`x`</b>: `Tensor` with floating type. Must have statically defined rank and
   statically known right-most dimension.
 * <b>`layer_fn`</b>: Python `callable` which takes input `x` and `int` scalar `d` and
@@ -109,5 +115,6 @@ with tf.Session() as sess:
 
 
 #### Returns:
+
 
 * <b>`normal`</b>: An instance of `tfd.Normal`.

@@ -5,7 +5,24 @@
 
 # tfp.edward2.Triangular
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for Triangular.
+
+### Aliases:
+
+* `tfp.experimental.edward2.Triangular`
+
 
 ``` python
 tfp.edward2.Triangular(
@@ -16,22 +33,21 @@ tfp.edward2.Triangular(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See Triangular for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
 Initialize a batch of Triangular distributions.
 
-
 #### Args:
+
 
 * <b>`low`</b>: Floating point tensor, lower boundary of the output interval. Must
   have `low < high`.
@@ -57,6 +73,7 @@ Initialize a batch of Triangular distributions.
 
 
 #### Raises:
+
 
 * <b>`InvalidArgumentError`</b>: if `validate_args=True` and one of the following is
   True:

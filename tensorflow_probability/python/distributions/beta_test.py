@@ -16,12 +16,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 
 # Dependency imports
 import numpy as np
+from scipy import special as sp_special
+from scipy import stats as sp_stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
@@ -30,21 +32,8 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 tfd = tfp.distributions
 
 
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-
-special = try_import("scipy.special")
-stats = try_import("scipy.stats")
-
-
 @test_util.run_all_in_graph_and_eager_modes
-class BetaTest(tf.test.TestCase):
+class BetaTest(tfp_test_util.TestCase):
 
   def testSimpleShapes(self):
     a = np.random.rand(3)
@@ -94,13 +83,13 @@ class BetaTest(tf.test.TestCase):
     self.evaluate(dist.prob([.1, .3, .6]))
     self.evaluate(dist.prob([.2, .3, .5]))
     # Either condition can trigger.
-    with self.assertRaisesOpError("sample must be positive"):
+    with self.assertRaisesOpError("Sample must be positive."):
       self.evaluate(dist.prob([-1., 0.1, 0.5]))
-    with self.assertRaisesOpError("sample must be positive"):
+    with self.assertRaisesOpError("Sample must be positive."):
       self.evaluate(dist.prob([0., 0.1, 0.5]))
-    with self.assertRaisesOpError("sample must be less than `1`"):
+    with self.assertRaisesOpError("Sample must be less than `1`."):
       self.evaluate(dist.prob([.1, .2, 1.2]))
-    with self.assertRaisesOpError("sample must be less than `1`"):
+    with self.assertRaisesOpError("Sample must be less than `1`."):
       self.evaluate(dist.prob([.1, .2, 1.0]))
 
   def testPdfTwoBatches(self):
@@ -174,9 +163,7 @@ class BetaTest(tf.test.TestCase):
     b = [2., 4, 1.2]
     dist = tfd.Beta(a, b)
     self.assertEqual(dist.mean().shape, (3,))
-    if not stats:
-      return
-    expected_mean = stats.beta.mean(a, b)
+    expected_mean = sp_stats.beta.mean(a, b)
     self.assertAllClose(expected_mean, self.evaluate(dist.mean()))
 
   def testBetaVariance(self):
@@ -184,9 +171,7 @@ class BetaTest(tf.test.TestCase):
     b = [2., 4, 1.2]
     dist = tfd.Beta(a, b)
     self.assertEqual(dist.variance().shape, (3,))
-    if not stats:
-      return
-    expected_variance = stats.beta.var(a, b)
+    expected_variance = sp_stats.beta.var(a, b)
     self.assertAllClose(expected_variance, self.evaluate(dist.variance()))
 
   def testBetaMode(self):
@@ -234,9 +219,7 @@ class BetaTest(tf.test.TestCase):
     b = [2., 4, 1.2]
     dist = tfd.Beta(a, b)
     self.assertEqual(dist.entropy().shape, (3,))
-    if not stats:
-      return
-    expected_entropy = stats.beta.entropy(a, b)
+    expected_entropy = sp_stats.beta.entropy(a, b)
     self.assertAllClose(expected_entropy, self.evaluate(dist.entropy()))
 
   def testBetaSample(self):
@@ -248,19 +231,17 @@ class BetaTest(tf.test.TestCase):
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000,))
     self.assertFalse(np.any(sample_values < 0.0))
-    if not stats:
-      return
     self.assertLess(
-        stats.kstest(
+        sp_stats.kstest(
             # Beta is a univariate distribution.
             sample_values,
-            stats.beta(a=1., b=2.).cdf)[0],
+            sp_stats.beta(a=1., b=2.).cdf)[0],
         0.01)
     # The standard error of the sample mean is 1 / (sqrt(18 * n))
     self.assertAllClose(
-        sample_values.mean(axis=0), stats.beta.mean(a, b), atol=1e-2)
+        sample_values.mean(axis=0), sp_stats.beta.mean(a, b), atol=1e-2)
     self.assertAllClose(
-        np.cov(sample_values, rowvar=0), stats.beta.var(a, b), atol=1e-1)
+        np.cov(sample_values, rowvar=0), sp_stats.beta.var(a, b), atol=1e-1)
 
   def testBetaFullyReparameterized(self):
     a = tf.constant(1.0)
@@ -277,12 +258,12 @@ class BetaTest(tf.test.TestCase):
     n_val = 100
     seed = tfp_test_util.test_seed()
 
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     beta1 = tfd.Beta(
         concentration1=a_val, concentration0=b_val, name="beta1")
     samples1 = self.evaluate(beta1.sample(n_val, seed=seed))
 
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     beta2 = tfd.Beta(
         concentration1=a_val, concentration0=b_val, name="beta2")
     samples2 = self.evaluate(beta2.sample(n_val, seed=seed))
@@ -298,11 +279,9 @@ class BetaTest(tf.test.TestCase):
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000, 3, 2, 2))
     self.assertFalse(np.any(sample_values < 0.0))
-    if not stats:
-      return
     self.assertAllClose(
         sample_values[:, 1, :].mean(axis=0),
-        stats.beta.mean(a, b)[1, :],
+        sp_stats.beta.mean(a, b)[1, :],
         atol=1e-1)
 
   def testBetaCdf(self):
@@ -314,9 +293,7 @@ class BetaTest(tf.test.TestCase):
       actual = self.evaluate(tfd.Beta(a, b).cdf(x))
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 0. <= x)
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
-      if not stats:
-        return
-      self.assertAllClose(stats.beta.cdf(x, a, b), actual, rtol=1e-4, atol=0)
+      self.assertAllClose(sp_stats.beta.cdf(x, a, b), actual, rtol=1e-4, atol=0)
 
   def testBetaLogCdf(self):
     shape = (30, 40, 50)
@@ -327,9 +304,7 @@ class BetaTest(tf.test.TestCase):
       actual = self.evaluate(tf.exp(tfd.Beta(a, b).log_cdf(x)))
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 0. <= x)
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
-      if not stats:
-        return
-      self.assertAllClose(stats.beta.cdf(x, a, b), actual, rtol=1e-4, atol=0)
+      self.assertAllClose(sp_stats.beta.cdf(x, a, b), actual, rtol=1e-4, atol=0)
 
   def testBetaBetaKL(self):
     for shape in [(10,), (4, 5)]:
@@ -341,12 +316,10 @@ class BetaTest(tf.test.TestCase):
       d1 = tfd.Beta(concentration1=a1, concentration0=b1)
       d2 = tfd.Beta(concentration1=a2, concentration0=b2)
 
-      if not special:
-        return
-      kl_expected = (special.betaln(a2, b2) - special.betaln(a1, b1) +
-                     (a1 - a2) * special.digamma(a1) +
-                     (b1 - b2) * special.digamma(b1) +
-                     (a2 - a1 + b2 - b1) * special.digamma(a1 + b1))
+      kl_expected = (sp_special.betaln(a2, b2) - sp_special.betaln(a1, b1) +
+                     (a1 - a2) * sp_special.digamma(a1) +
+                     (b1 - b2) * sp_special.digamma(b1) +
+                     (a2 - a1 + b2 - b1) * sp_special.digamma(a1 + b1))
 
       kl = tfd.kl_divergence(d1, d2)
       kl_val = self.evaluate(kl)
@@ -357,6 +330,69 @@ class BetaTest(tf.test.TestCase):
       kl_same = self.evaluate(tfd.kl_divergence(d1, d1))
       self.assertAllClose(kl_same, np.zeros_like(kl_expected))
 
+  def testBetaMeanAfterMutation(self):
+    concentration1 = tf.Variable(2.)
+    concentration0 = tf.Variable(3.)
+    self.evaluate(concentration1.initializer)
+    self.evaluate(concentration0.initializer)
+    dist = tfd.Beta(
+        concentration1=concentration1, concentration0=concentration0)
+    with tf.control_dependencies([concentration0.assign(6.)]):
+      mean = self.evaluate(dist.mean())
+      self.assertEqual(mean, 0.25)
+
+  def testGradientThroughConcentration1(self):
+    concentration1 = tf.Variable(3.)
+    d = tfd.Beta(concentration1=concentration1, concentration0=5.)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([1., 2., 4.])
+    grad = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
+
+  def testAssertsPositiveConcentration1(self):
+    concentration1 = tf.Variable([1., 2., -3.])
+    self.evaluate(concentration1.initializer)
+    with self.assertRaisesOpError("Concentration parameter must be positive."):
+      d = tfd.Beta(
+          concentration1=concentration1, concentration0=[5.],
+          validate_args=True)
+      self.evaluate(d.sample())
+
+  def testAssertsPositiveConcentration1AfterMutation(self):
+    concentration1 = tf.Variable([1., 2., 3.])
+    self.evaluate(concentration1.initializer)
+    d = tfd.Beta(concentration1=concentration1, concentration0=[5.],
+                 validate_args=True)
+    with self.assertRaisesOpError("Concentration parameter must be positive."):
+      with tf.control_dependencies([concentration1.assign([1., 2., -3.])]):
+        self.evaluate(d.sample())
+
+  def testGradientThroughConcentration0(self):
+    concentration0 = tf.Variable(3.)
+    d = tfd.Beta(concentration0=concentration0, concentration1=5.)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([1., 2., 4.])
+    grad = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
+
+  def testAssertsPositiveConcentration0(self):
+    concentration0 = tf.Variable([1., 2., -3.])
+    self.evaluate(concentration0.initializer)
+    with self.assertRaisesOpError("Concentration parameter must be positive."):
+      d = tfd.Beta(concentration0=concentration0, concentration1=[5.],
+                   validate_args=True)
+      self.evaluate(d.sample())
+
+  def testAssertsPositiveConcentration0AfterMutation(self):
+    concentration0 = tf.Variable([1., 2., 3.])
+    self.evaluate(concentration0.initializer)
+    d = tfd.Beta(concentration0=concentration0, concentration1=[5.],
+                 validate_args=True)
+    with self.assertRaisesOpError("Concentration parameter must be positive."):
+      with tf.control_dependencies([concentration0.assign([1., 2., -3.])]):
+        self.evaluate(d.sample())
 
 if __name__ == "__main__":
   tf.test.main()

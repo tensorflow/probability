@@ -27,12 +27,14 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
-    "Normal",
+    'Normal',
 ]
 
 
@@ -105,7 +107,7 @@ class Normal(distribution.Distribution):
                scale,
                validate_args=False,
                allow_nan_stats=True,
-               name="Normal"):
+               name='Normal'):
     """Construct Normal distributions with mean and stddev `loc` and `scale`.
 
     The parameters `loc` and `scale` must be shaped in a way that supports
@@ -130,28 +132,24 @@ class Normal(distribution.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([loc, scale], tf.float32)
-      loc = tf.convert_to_tensor(value=loc, name="loc", dtype=dtype)
-      scale = tf.convert_to_tensor(value=scale, name="scale", dtype=dtype)
-      with tf.control_dependencies(
-          [assert_util.assert_positive(scale)] if validate_args else []):
-        self._loc = tf.identity(loc)
-        self._scale = tf.identity(scale)
-        dtype_util.assert_same_float_dtype([self._loc, self._scale])
-    super(Normal, self).__init__(
-        dtype=dtype,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        parameters=parameters,
-        graph_parents=[self._loc, self._scale],
-        name=name)
+      dtype = dtype_util.common_dtype([loc, scale], dtype_hint=tf.float32)
+      self._loc = tensor_util.convert_nonref_to_tensor(
+          loc, dtype=dtype, name='loc')
+      self._scale = tensor_util.convert_nonref_to_tensor(
+          scale, dtype=dtype, name='scale')
+      super(Normal, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(("loc", "scale"),
-            ([tf.convert_to_tensor(value=sample_shape, dtype=tf.int32)] * 2)))
+        zip(('loc', 'scale'),
+            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
 
   @classmethod
   def _params_event_ndims(cls):
@@ -167,14 +165,13 @@ class Normal(distribution.Distribution):
     """Distribution parameter for standard deviation."""
     return self._scale
 
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(input=self.loc), tf.shape(input=self.scale))
+  def _batch_shape_tensor(self, loc=None, scale=None):
+    return prefer_static.broadcast_shape(
+        prefer_static.shape(self.loc if loc is None else loc),
+        prefer_static.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        self.loc.shape,
-        self.scale.shape)
+    return tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -183,13 +180,20 @@ class Normal(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    shape = tf.concat([[n], self.batch_shape_tensor()], 0)
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    shape = tf.concat([[n], self._batch_shape_tensor(loc=loc, scale=scale)],
+                      axis=0)
     sampled = tf.random.normal(
-        shape=shape, mean=0., stddev=1., dtype=self.loc.dtype, seed=seed)
-    return sampled * self.scale + self.loc
+        shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=seed)
+    return sampled * scale + loc
 
   def _log_prob(self, x):
-    return self._log_unnormalized_prob(x) - self._log_normalization()
+    scale = tf.convert_to_tensor(self.scale)
+    log_unnormalized = -0.5 * tf.math.squared_difference(
+        x / scale, self.loc / scale)
+    log_normalization = 0.5 * np.log(2. * np.pi) + tf.math.log(scale)
+    return log_unnormalized - log_normalization
 
   def _log_cdf(self, x):
     return special_math.log_ndtr(self._z(x))
@@ -203,59 +207,69 @@ class Normal(distribution.Distribution):
   def _survival_function(self, x):
     return special_math.ndtr(-self._z(x))
 
-  def _log_unnormalized_prob(self, x):
-    return -0.5 * tf.square(self._z(x))
-
-  def _log_normalization(self):
-    return 0.5 * np.log(2. * np.pi) + tf.math.log(self.scale)
-
   def _entropy(self):
-    # Use broadcasting rules to calculate the full broadcast scale.
-    scale = self.scale * tf.ones_like(self.loc)
-    return 0.5 * np.log(2. * np.pi * np.e) + tf.math.log(scale)
+    log_normalization = 0.5 * np.log(2. * np.pi) + tf.math.log(self.scale)
+    entropy = 0.5 + log_normalization
+    return entropy * tf.ones_like(self.loc)
 
   def _mean(self):
     return self.loc * tf.ones_like(self.scale)
 
   def _quantile(self, p):
-    return self._inv_z(special_math.ndtri(p))
+    return special_math.ndtri(p) * self.scale + self.loc
 
   def _stddev(self):
     return self.scale * tf.ones_like(self.loc)
 
-  def _mode(self):
-    return self._mean()
+  _mode = _mean
 
-  def _z(self, x):
+  def _z(self, x, scale=None):
     """Standardize input `x` to a unit normal."""
-    with tf.name_scope("standardize"):
-      return (x - self.loc) / self.scale
+    with tf.name_scope('standardize'):
+      return (x - self.loc) / (self.scale if scale is None else scale)
 
-  def _inv_z(self, z):
-    """Reconstruct input `x` from a its normalized version."""
-    with tf.name_scope("reconstruct"):
-      return z * self.scale + self.loc
+  def _parameter_control_dependencies(self, is_init):
+    assertions = []
+
+    if is_init:
+      try:
+        self._batch_shape()
+      except ValueError:
+        raise ValueError(
+            'Arguments `loc` and `scale` must have compatible shapes; '
+            'loc.shape={}, scale.shape={}.'.format(
+                self.loc.shape, self.scale.shape))
+      # We don't bother checking the shapes in the dynamic case because
+      # all member functions access both arguments anyway.
+
+    if not self.validate_args:
+      assert not assertions  # Should never happen.
+      return []
+
+    if is_init != tensor_util.is_ref(self.scale):
+      assertions.append(assert_util.assert_positive(
+          self.scale, message='Argument `scale` must be positive.'))
+
+    return assertions
 
 
 @kullback_leibler.RegisterKL(Normal, Normal)
-def _kl_normal_normal(n_a, n_b, name=None):
-  """Calculate the batched KL divergence KL(n_a || n_b) with n_a and n_b Normal.
+def _kl_normal_normal(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b) with a and b Normal.
 
   Args:
-    n_a: instance of a Normal distribution object.
-    n_b: instance of a Normal distribution object.
-    name: (optional) Name to use for created operations.
-      default is "kl_normal_normal".
+    a: instance of a Normal distribution object.
+    b: instance of a Normal distribution object.
+    name: Name to use for created operations.
+      Default value: `None` (i.e., `'kl_normal_normal'`).
 
   Returns:
-    Batchwise KL(n_a || n_b)
+    kl_div: Batchwise KL(a || b)
   """
-  with tf.name_scope(name or "kl_normal_normal"):
-    one = tf.constant(1, dtype=n_a.dtype)
-    two = tf.constant(2, dtype=n_a.dtype)
-    half = tf.constant(0.5, dtype=n_a.dtype)
-    s_a_squared = tf.square(n_a.scale)
-    s_b_squared = tf.square(n_b.scale)
-    ratio = s_a_squared / s_b_squared
-    return (tf.square(n_a.loc - n_b.loc) / (two * s_b_squared) + half *
-            (ratio - one - tf.math.log(ratio)))
+  with tf.name_scope(name or 'kl_normal_normal'):
+    b_scale = tf.convert_to_tensor(b.scale)  # We'll read it thrice.
+    diff_log_scale = tf.math.log(a.scale) - tf.math.log(b_scale)
+    return (
+        0.5 * tf.math.squared_difference(a.loc / b_scale, b.loc / b_scale) +
+        0.5 * tf.math.expm1(2. * diff_log_scale) -
+        diff_log_scale)

@@ -5,7 +5,24 @@
 
 # tfp.edward2.Mixture
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for Mixture.
+
+### Aliases:
+
+* `tfp.experimental.edward2.Mixture`
+
 
 ``` python
 tfp.edward2.Mixture(
@@ -16,15 +33,14 @@ tfp.edward2.Mixture(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See Mixture for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
@@ -38,8 +54,8 @@ properties (the components).
 The `num_classes` of `cat` must be possible to infer at graph construction
 time and match `len(components)`.
 
-
 #### Args:
+
 
 * <b>`cat`</b>: A `Categorical` distribution instance, representing the probabilities
     of `distributions`.
@@ -63,6 +79,7 @@ time and match `len(components)`.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: If cat is not a `Categorical`, or `components` is not
   a list or tuple, or the elements of `components` are not

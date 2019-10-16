@@ -5,6 +5,18 @@
 
 # tfp.optimizer.differential_evolution_minimize
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/optimizer/differential_evolution.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Applies the Differential evolution algorithm to minimize a function.
 
 ``` python
@@ -25,8 +37,6 @@ tfp.optimizer.differential_evolution_minimize(
 ```
 
 
-
-Defined in [`python/optimizer/differential_evolution.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/differential_evolution.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -88,6 +98,7 @@ complete example:
 
 #### Args:
 
+
 * <b>`objective_function`</b>: A Python callable that accepts a batch of possible
   solutions and returns the values of the objective function at those
   arguments as a rank 1 real `Tensor`. This specifies the function to be
@@ -144,6 +155,7 @@ complete example:
 
 #### Returns:
 
+
 * <b>`optimizer_results`</b>: An object containing the following attributes:
   converged: Scalar boolean `Tensor` indicating whether the minimum was
     found within the specified tolerances.
@@ -166,6 +178,7 @@ complete example:
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: If neither the initial population, nor the initial position
   are specified or if both are specified.

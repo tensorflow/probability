@@ -1,6 +1,7 @@
 <div itemscope itemtype="http://developers.google.com/ReferenceObject">
 <meta itemprop="name" content="tfp.sts.Seasonal" />
 <meta itemprop="path" content="Stable" />
+<meta itemprop="property" content="allow_drift"/>
 <meta itemprop="property" content="batch_shape"/>
 <meta itemprop="property" content="constrain_mean_effect_to_zero"/>
 <meta itemprop="property" content="initial_state_prior"/>
@@ -18,15 +19,23 @@
 
 # tfp.sts.Seasonal
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/seasonal.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `Seasonal`
 
 Formal representation of a seasonal effect model.
 
 Inherits From: [`StructuralTimeSeries`](../../tfp/sts/StructuralTimeSeries.md)
-
-
-
-Defined in [`python/sts/seasonal.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/seasonal.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -107,10 +116,13 @@ model = tfp.sts.Sum(components=[day_of_week, hour_of_day],
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/seasonal.py">View source</a>
+
 ``` python
 __init__(
     num_seasons,
     num_steps_per_season=1,
+    allow_drift=True,
     drift_scale_prior=None,
     initial_effect_prior=None,
     constrain_mean_effect_to_zero=True,
@@ -121,7 +133,9 @@ __init__(
 
 Specify a seasonal effects model.
 
+
 #### Args:
+
 
 * <b>`num_seasons`</b>: Scalar Python `int` number of seasons.
 * <b>`num_steps_per_season`</b>: Python `int` number of steps in each
@@ -132,6 +146,13 @@ Specify a seasonal effects model.
   in which num_steps_per_season for each season also varies in different
   cycle (e.g., a 4 years cycle with leap day).
   Default value: 1.
+* <b>`allow_drift`</b>: optional Python `bool` specifying whether the seasonal
+  effects can drift over time.  Setting this to `False`
+  removes the `drift_scale` parameter from the model. This is
+  mathematically equivalent to
+  `drift_scale_prior = tfd.Deterministic(0.)`, but removing drift
+  directly is preferred because it avoids the use of a degenerate prior.
+  Default value: `True`.
 * <b>`drift_scale_prior`</b>: optional `tfd.Distribution` instance specifying a prior
   on the `drift_scale` parameter. If `None`, a heuristic default prior is
   constructed based on the provided `observed_time_series`.
@@ -167,11 +188,18 @@ Specify a seasonal effects model.
 
 ## Properties
 
+<h3 id="allow_drift"><code>allow_drift</code></h3>
+
+Whether the seasonal effects are allowed to drift over time.
+
+
 <h3 id="batch_shape"><code>batch_shape</code></h3>
 
 Static batch shape of models represented by this component.
 
+
 #### Returns:
+
 
 * <b>`batch_shape`</b>: A `tf.TensorShape` giving the broadcast batch shape of
   all model parameters. This should match the batch shape of
@@ -183,25 +211,31 @@ Static batch shape of models represented by this component.
 
 Whether to constrain the mean effect to zero.
 
+
 <h3 id="initial_state_prior"><code>initial_state_prior</code></h3>
 
 Prior distribution on the initial latent state (level and scale).
+
 
 <h3 id="latent_size"><code>latent_size</code></h3>
 
 Python `int` dimensionality of the latent space in this model.
 
+
 <h3 id="name"><code>name</code></h3>
 
 Name of this model component.
+
 
 <h3 id="num_seasons"><code>num_seasons</code></h3>
 
 Number of seasons.
 
+
 <h3 id="num_steps_per_season"><code>num_steps_per_season</code></h3>
 
 Number of steps per season.
+
 
 <h3 id="parameters"><code>parameters</code></h3>
 
@@ -209,9 +243,12 @@ List of Parameter(name, prior, bijector) namedtuples for this model.
 
 
 
+
 ## Methods
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/structural_time_series.py">View source</a>
 
 ``` python
 batch_shape_tensor()
@@ -219,7 +256,9 @@ batch_shape_tensor()
 
 Runtime batch shape of models represented by this component.
 
+
 #### Returns:
+
 
 * <b>`batch_shape`</b>: `int` `Tensor` giving the broadcast batch shape of
   all model parameters. This should match the batch shape of
@@ -228,13 +267,17 @@ Runtime batch shape of models represented by this component.
 
 <h3 id="joint_log_prob"><code>joint_log_prob</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/structural_time_series.py">View source</a>
+
 ``` python
 joint_log_prob(observed_time_series)
 ```
 
 Build the joint density `log p(params) + log p(y|params)` as a callable.
 
+
 #### Args:
+
 
 * <b>`observed_time_series`</b>: Observed `Tensor` trajectories of shape
   `sample_shape + batch_shape + [num_timesteps, 1]` (the trailing
@@ -248,6 +291,7 @@ Build the joint density `log p(params) + log p(y|params)` as a callable.
 
 #### Returns:
 
+
 * <b>`log_joint_fn`</b>: A function taking a `Tensor` argument for each model
   parameter, in canonical order, and returning a `Tensor` log probability
   of shape `batch_shape`. Note that, *unlike* `tfp.Distributions`
@@ -258,6 +302,8 @@ Build the joint density `log p(params) + log p(y|params)` as a callable.
   inference.
 
 <h3 id="make_state_space_model"><code>make_state_space_model</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/structural_time_series.py">View source</a>
 
 ``` python
 make_state_space_model(
@@ -270,7 +316,9 @@ make_state_space_model(
 
 Instantiate this model as a Distribution over specified `num_timesteps`.
 
+
 #### Args:
+
 
 * <b>`num_timesteps`</b>: Python `int` number of timesteps to model.
 * <b>`param_vals`</b>: a list of `Tensor` parameter values in order corresponding to
@@ -285,9 +333,12 @@ Instantiate this model as a Distribution over specified `num_timesteps`.
 
 #### Returns:
 
+
 * <b>`dist`</b>: a `LinearGaussianStateSpaceModel` Distribution object.
 
 <h3 id="prior_sample"><code>prior_sample</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/structural_time_series.py">View source</a>
 
 ``` python
 prior_sample(
@@ -301,7 +352,9 @@ prior_sample(
 
 Sample from the joint prior over model parameters and trajectories.
 
+
 #### Args:
+
 
 * <b>`num_timesteps`</b>: Scalar `int` `Tensor` number of timesteps to model.
 * <b>`initial_step`</b>: Optional scalar `int` `Tensor` specifying the starting
@@ -321,6 +374,7 @@ Sample from the joint prior over model parameters and trajectories.
 
 
 #### Returns:
+
 
 * <b>`trajectories`</b>: `float` `Tensor` of shape
   `trajectories_sample_shape + params_sample_shape + [num_timesteps, 1]`

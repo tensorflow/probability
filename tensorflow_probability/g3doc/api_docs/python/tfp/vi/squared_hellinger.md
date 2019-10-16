@@ -5,6 +5,18 @@
 
 # tfp.vi.squared_hellinger
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/vi/csiszar_divergence.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 The Squared-Hellinger Csiszar-function in log-space.
 
 ``` python
@@ -15,8 +27,6 @@ tfp.vi.squared_hellinger(
 ```
 
 
-
-Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -40,11 +50,13 @@ numerically unstable for `|logu| >> 0`.
 
 #### Args:
 
+
 * <b>`logu`</b>: `float`-like `Tensor` representing `log(u)` from above.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
 
 
 #### Returns:
+
 
 * <b>`squared_hellinger_of_u`</b>: `float`-like `Tensor` of the Csiszar-function
   evaluated at `u = exp(logu)`.

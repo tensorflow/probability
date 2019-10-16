@@ -19,17 +19,16 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
-
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal.monte_carlo import _get_samples
 
-from tensorflow_probability.python.monte_carlo.expectation import _get_samples
 
-tfd = tfp.distributions
-
-
-class GetSamplesTest(tf.test.TestCase):
+class GetSamplesTest(tfp_test_util.TestCase):
   """Test the private method 'get_samples'."""
 
   def test_raises_if_both_z_and_n_are_none(self):
@@ -65,7 +64,7 @@ class GetSamplesTest(tf.test.TestCase):
     self.assertEqual((10,), z.shape)
 
 
-class ExpectationTest(tf.test.TestCase):
+class ExpectationTest(tfp_test_util.TestCase):
 
   def test_works_correctly(self):
     x = tf.constant([-1e6, -100, -10, -1, 1, 10, 100, 1e6])
@@ -218,6 +217,32 @@ class ExpectationTest(tf.test.TestCase):
         rtol=0.03,
         atol=0.)
 
+  def test_works_with_structured_samples(self):
+
+    # Check that we don't accidentally destroy the structure of `samples` when
+    # it's a dict or other non-Tensor object from a joint distribution.
+    p = tfd.JointDistributionNamed({
+        'x': tfd.Normal(0., 1.),
+        'y': tfd.Normal(0., 1.)})
+
+    total_variance_with_reparam = tfp.monte_carlo.expectation(
+        f=lambda d: d['x']**2 + d['y']**2,
+        samples=p.sample(1000, seed=42),
+        log_prob=p.log_prob,
+        use_reparametrization=True)
+    total_variance_without_reparam = tfp.monte_carlo.expectation(
+        f=lambda d: d['x']**2 + d['y']**2,
+        samples=p.sample(1000, seed=42),
+        log_prob=p.log_prob,
+        use_reparametrization=False)
+    [
+        total_variance_with_reparam_,
+        total_variance_without_reparam_
+    ] = self.evaluate([
+        total_variance_with_reparam,
+        total_variance_without_reparam])
+    self.assertAllClose(total_variance_with_reparam_, 2., atol=0.2)
+    self.assertAllClose(total_variance_without_reparam_, 2., atol=0.2)
 
 if __name__ == '__main__':
   tf.test.main()

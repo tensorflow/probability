@@ -5,6 +5,18 @@
 
 # tfp.vi.symmetrized_csiszar_function
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/vi/csiszar_divergence.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Symmetrizes a Csiszar-function in log-space.
 
 ``` python
@@ -16,8 +28,6 @@ tfp.vi.symmetrized_csiszar_function(
 ```
 
 
-
-Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -55,6 +65,7 @@ f-Divergence.
 #### Example:
 
 
+
 When either of the following functions are symmetrized, we obtain the
 Jensen-Shannon Csiszar-function, i.e.,
 
@@ -70,11 +81,11 @@ f_g(u) = f_h(u) = u log(u) - (1 + u) log((1 + u) / 2)
        = jensen_shannon(log(u)).
 ```
 
-* <b>`Warning`</b>: this function makes non-log-space calculations and may therefore be
+Warning: this function makes non-log-space calculations and may therefore be
 numerically unstable for `|logu| >> 0`.
 
-
 #### Args:
+
 
 * <b>`logu`</b>: `float`-like `Tensor` representing `log(u)` from above.
 * <b>`csiszar_function`</b>: Python `callable` representing a Csiszar-function over
@@ -83,6 +94,7 @@ numerically unstable for `|logu| >> 0`.
 
 
 #### Returns:
+
 
 * <b>`symmetrized_g_of_u`</b>: `float`-like `Tensor` of the result of applying the
   symmetrization of `g` evaluated at `u = exp(logu)`.

@@ -21,7 +21,8 @@ from __future__ import print_function
 import time
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
@@ -43,7 +44,7 @@ def mvn(*args, **kwargs):
 
 def text_messages_joint_log_prob(count_data, lambda_1, lambda_2, tau):
   """Joint log probability function."""
-  alpha = (1. / tf.reduce_mean(input_tensor=count_data))
+  alpha = (1. / tf.reduce_mean(count_data))
   rv_lambda = tfd.Exponential(rate=alpha)
 
   rv_tau = tfd.Uniform()
@@ -51,14 +52,14 @@ def text_messages_joint_log_prob(count_data, lambda_1, lambda_2, tau):
   lambda_ = tf.gather(
       [lambda_1, lambda_2],
       indices=tf.cast(
-          tau * tf.cast(tf.size(input=count_data), dtype=tf.float32) <= tf.cast(
-              tf.range(tf.size(input=count_data)), dtype=tf.float32),
+          tau * tf.cast(tf.size(count_data), dtype=tf.float32) <= tf.cast(
+              tf.range(tf.size(count_data)), dtype=tf.float32),
           dtype=tf.int32))
   rv_observation = tfd.Poisson(rate=lambda_)
 
   return (rv_lambda.log_prob(lambda_1) + rv_lambda.log_prob(lambda_2) +
           rv_tau.log_prob(tau) +
-          tf.reduce_sum(input_tensor=rv_observation.log_prob(count_data)))
+          tf.reduce_sum(rv_observation.log_prob(count_data)))
 
 
 def benchmark_text_messages_hmc(
@@ -68,7 +69,7 @@ def benchmark_text_messages_hmc(
   """Runs HMC on the text-messages unnormalized posterior."""
 
   if not tf.executing_eagerly():
-    tf.compat.v1.reset_default_graph()
+    tf1.reset_default_graph()
 
   # Build a static, pretend dataset.
   count_data = tf.cast(
@@ -80,7 +81,7 @@ def benchmark_text_messages_hmc(
   if tf.executing_eagerly():
     count_data = count_data.numpy()
   else:
-    with tf.compat.v1.Session():
+    with tf1.Session():
       count_data = count_data.eval()
 
   # Define a closure over our joint_log_prob.
@@ -93,7 +94,7 @@ def benchmark_text_messages_hmc(
     sample_chain = tfp.mcmc.sample_chain
 
   # Initialize the step_size. (It will be automatically adapted.)
-  step_size = tf.compat.v2.Variable(
+  step_size = tf.Variable(
       name='step_size',
       initial_value=tf.constant(0.05, dtype=tf.float32),
       trainable=False)
@@ -133,8 +134,8 @@ def benchmark_text_messages_hmc(
   # trial.
   is_accepted_tensor = computation()
   if not tf.executing_eagerly():
-    session = tf.compat.v1.Session()
-    session.run(tf.compat.v1.global_variables_initializer())
+    session = tf1.Session()
+    session.run(tf1.global_variables_initializer())
     session.run(is_accepted_tensor)
 
   start_time = time.time()

@@ -5,6 +5,18 @@
 
 # tfp.bijectors.masked_autoregressive_default_template
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/masked_autoregressive.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Build the Masked Autoregressive Density Estimator (Germain et al., 2015).
 
 ``` python
@@ -23,13 +35,11 @@ tfp.bijectors.masked_autoregressive_default_template(
 
 
 
-Defined in [`python/bijectors/masked_autoregressive.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/masked_autoregressive.py).
-
 <!-- Placeholder for "Used in" -->
 
 This will be wrapped in a make_template to ensure the variables are only
-created once. It takes the input and returns the `loc` ("mu" in [Germain et
-al. (2015)][1]) and `log_scale` ("alpha" in [Germain et al. (2015)][1]) from
+created once. It takes the input and returns the `loc` ('mu' in [Germain et
+al. (2015)][1]) and `log_scale` ('alpha' in [Germain et al. (2015)][1]) from
 the MADE network.
 
 Warning: This function uses `masked_dense` to create randomly initialized
@@ -57,6 +67,7 @@ information (for fitting) yet solves the numerical stability problem. I.e.,
 
 #### Args:
 
+
 * <b>`hidden_layers`</b>: Python `list`-like of non-negative integer, scalars
   indicating the number of units in each hidden layer. Default: `[512, 512].
 * <b>`shift_only`</b>: Python `bool` indicating if only the `shift` term shall be
@@ -70,23 +81,25 @@ information (for fitting) yet solves the numerical stability problem. I.e.,
 * <b>`log_scale_clip_gradient`</b>: Python `bool` indicating that the gradient of
   `tf.clip_by_value` should be preserved. Default: `False`.
 * <b>`name`</b>: A name for ops managed by this function. Default:
-  "masked_autoregressive_default_template".
+  'masked_autoregressive_default_template'.
 * <b>`*args`</b>: `tf.layers.dense` arguments.
 * <b>`**kwargs`</b>: `tf.layers.dense` keyword arguments.
 
 
 #### Returns:
 
-* <b>`shift`</b>: `Float`-like `Tensor` of shift terms (the "mu" in
+
+* <b>`shift`</b>: `Float`-like `Tensor` of shift terms (the 'mu' in
   [Germain et al.  (2015)][1]).
-* <b>`log_scale`</b>: `Float`-like `Tensor` of log(scale) terms (the "alpha" in
+* <b>`log_scale`</b>: `Float`-like `Tensor` of log(scale) terms (the 'alpha' in
   [Germain et al. (2015)][1]).
 
 
 #### Raises:
 
-  NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
-    graph execution.
+
+* <b>`NotImplementedError`</b>: if rightmost dimension of `inputs` is unknown prior to
+  graph execution.
 
 #### References
 

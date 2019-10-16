@@ -5,6 +5,18 @@
 
 # tfp.vi.amari_alpha
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/vi/csiszar_divergence.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 The Amari-alpha Csiszar-function in log-space.
 
 ``` python
@@ -17,8 +29,6 @@ tfp.vi.amari_alpha(
 ```
 
 
-
-Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -49,6 +59,7 @@ For more information, see:
 
 #### Args:
 
+
 * <b>`logu`</b>: `float`-like `Tensor` representing `log(u)` from above.
 * <b>`alpha`</b>: `float`-like Python scalar. (See Mathematical Details for meaning.)
 * <b>`self_normalized`</b>: Python `bool` indicating whether `f'(u=1)=0`. When
@@ -59,11 +70,13 @@ For more information, see:
 
 #### Returns:
 
+
 * <b>`amari_alpha_of_u`</b>: `float`-like `Tensor` of the Csiszar-function evaluated
   at `u = exp(logu)`.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `alpha` is `None` or a `Tensor`.
 * <b>`TypeError`</b>: if `self_normalized` is `None` or a `Tensor`.

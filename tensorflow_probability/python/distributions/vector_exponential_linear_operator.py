@@ -184,7 +184,7 @@ class VectorExponentialLinearOperator(
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
       loc = loc if loc is None else tf.convert_to_tensor(
-          value=loc, name="loc", dtype=scale.dtype)
+          loc, name="loc", dtype=scale.dtype)
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale)
 

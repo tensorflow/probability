@@ -19,27 +19,32 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import functools
 
 # Dependency imports
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import normal
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
 
 tfl = tf.linalg
 
 
-def _broadcast_to_shape(x, shape):
-  return x + tf.zeros(shape=shape, dtype=x.dtype)
+def _safe_concat(values):
+  """Concat along axis=0 that works even when some arguments have size 0."""
+  initial_value_shape = prefer_static.shape(values[0])
+  reference_shape = prefer_static.concat(
+      [[-1], initial_value_shape[1:]], axis=0)
+  return tf.concat([tf.reshape(x, reference_shape) for x in values], axis=0)
 
 
 def _check_equal_shape(name,
@@ -139,7 +144,7 @@ def _augment_sample_shape(partial_batch_dist,
   if validate_args:
     runtime_assertions.append(
         assert_util.assert_greater_equal(
-            tf.convert_to_tensor(value=num_broadcast_dims, dtype=tf.int32),
+            tf.convert_to_tensor(num_broadcast_dims, dtype=tf.int32),
             tf.zeros((), dtype=tf.int32),
             message=("Cannot broadcast distribution {} batch shape to "
                      "target batch shape with fewer dimensions.".format(
@@ -159,19 +164,23 @@ def _augment_sample_shape(partial_batch_dist,
 class LinearGaussianStateSpaceModel(distribution.Distribution):
   """Observation distribution from a linear Gaussian state space model.
 
-  The state space model, sometimes called a Kalman filter, posits a
-  latent state vector `z_t` of dimension `latent_size` that evolves
+  A linear Gaussian state space model, sometimes called a Kalman filter, posits
+  a latent state vector `z[t]` of dimension `latent_size` that evolves
   over time following linear Gaussian transitions,
 
-  ```z_{t+1} = F * z_t + N(b; Q)```
+  ```
+  z[t+1] = F * z[t] + N(b; Q)  # latent state
+  x[t] = H * z[t] + N(c; R)    # observed series
+  ```
 
-  for transition matrix `F`, bias `b` and covariance matrix
-  `Q`. At each timestep, we observe a noisy projection of the
-  latent state `x_t = H * z_t + N(c; R)`. The transition and
-  observation models may be fixed or may vary between timesteps.
+  for transition matrix `F`, transition bias `b` and covariance matrix
+  `Q`, and observation matrix `H`, bias `c` and covariance matrix `R`. At each
+  timestep, the model generates an observable vector `x[t]`, a noisy projection
+  of the latent state. The transition and observation models may be fixed or
+  may vary between timesteps.
 
   This Distribution represents the marginal distribution on
-  observations, `p(x)`. The marginal `log_prob` is computed by
+  observations, `p(x)`. The marginal `log_prob` is implemented by
   Kalman filtering [1], and `sample` by an efficient forward
   recursion. Both operations require time linear in `T`, the total
   number of timesteps.
@@ -179,7 +188,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
   #### Shapes
 
   The event shape is `[num_timesteps, observation_size]`, where
-  `observation_size` is the dimension of each observation `x_t`.
+  `observation_size` is the dimension of each observation `x[t]`.
   The observation and transition models must return consistent
   shapes.
 
@@ -225,12 +234,12 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
   #### Examples
 
-  Consider a simple tracking model. The two-dimensional latent state
-  represents the true position of a vehicle, and at each timestep we
+  Consider a simple tracking model, in which a two-dimensional latent state
+  represents the position of a vehicle, and at each timestep we
   see a noisy observation of this position (e.g., a GPS reading). The
   vehicle is assumed to move by a random walk with standard deviation
   `step_std` at each step, and observation noise level `std`. We build
-  the distribution over noisy observations by
+  the marginal distribution over noisy observations as a state space model:
 
   ```python
   ndims = 2
@@ -261,12 +270,17 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
   # Compute the filtered posterior on latent states given observations,
   # and extract the mean and covariance for the current (final) timestep.
   _, filtered_means, filtered_covs, _, _ = model.forward_filter(x)
-  final_step = tfd.MultivariateNormalFullCovariance(
+  current_location_posterior = tfd.MultivariateNormalFullCovariance(
                 loc=filtered_means[..., -1, :],
                 scale=filtered_covs[..., -1, :])
-  ```
 
-  * TODO(davmre): implement and describe full posterior inference / smoothing.
+  # Run a smoothing recursion to extract posterior marginals for locations
+  # at previous timesteps.
+  posterior_means, posterior_covs = model.posterior_marginals(x)
+  initial_location_posterior = tfd.MultivariateNormalFullCovariance(
+                loc=posterior_means[..., 0, :],
+                scale=posterior_covs[..., 0, :])
+  ```
 
   * TODO(davmre): show example of fitting parameters.
   """
@@ -282,7 +296,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
                validate_args=False,
                allow_nan_stats=True,
                name="LinearGaussianStateSpaceModel"):
-    """Initialize a `LinearGaussianStateSpaceModel.
+    """Initialize a `LinearGaussianStateSpaceModel`.
 
     Args:
       num_timesteps: Integer `Tensor` total number of timesteps.
@@ -330,7 +344,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     with tf.name_scope(name) as name:
 
       self.num_timesteps = tf.convert_to_tensor(
-          value=num_timesteps, name="num_timesteps")
+          num_timesteps, name="num_timesteps")
       self.initial_state_prior = initial_state_prior
       self.initial_step = initial_step
       self.final_step = self.initial_step + self.num_timesteps
@@ -347,7 +361,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         """Converts Tensors into LinearOperators."""
         if not isinstance(x, tfl.LinearOperator):
           x = tfl.LinearOperatorFullMatrix(
-              tf.convert_to_tensor(value=x, dtype=dtype),
+              tf.convert_to_tensor(x, dtype=dtype),
               is_square=is_square,
               name=name)
         return x
@@ -378,16 +392,25 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       self.get_observation_noise_for_timestep = _maybe_make_callable(
           observation_noise)
 
+      latent_size = tf.compat.dimension_value(
+          initial_state_prior.event_shape[-1])
+      if latent_size is None:
+        latent_size = distribution_util.prefer_static_value(
+            initial_state_prior.event_shape_tensor())[-1]
       # We call the get_observation_matrix_for_timestep once so that
       # we can infer the observation size. This potentially adds ops
       # to the graph, though will not in typical cases (e.g., where
       # the callable was generated by wrapping a fixed value using
       # _maybe_make_callable above).
-      self.latent_size = distribution_util.prefer_static_value(
-          initial_state_prior.event_shape_tensor())[-1]
-      self.observation_size = distribution_util.prefer_static_value(
-          self.get_observation_matrix_for_timestep(
-              self.initial_step).shape_tensor())[-2]
+      initial_observation_linop = self.get_observation_matrix_for_timestep(
+          self.initial_step)
+      observation_size = tf.compat.dimension_value(
+          initial_observation_linop.shape[-2])
+      if observation_size is None:
+        observation_size = distribution_util.prefer_static_value(
+            initial_observation_linop.shape_tensor())[-2]
+      self._latent_size = latent_size
+      self._observation_size = observation_size
 
       self.runtime_assertions = []
       if validate_args:
@@ -405,40 +428,40 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
             observation_matrix, observation_noise
         ])
 
-        latent_size_ = tf.get_static_value(self.latent_size)
+        latent_size_ = tf.get_static_value(latent_size)
         observation_size_ = tf.get_static_value(
-            self.observation_size)
+            observation_size)
         runtime_assertions = [
             _check_equal_shape(
                 name="transition_matrix",
                 static_shape=transition_matrix.shape[-2:],
                 dynamic_shape=transition_matrix.shape_tensor()[-2:],
                 static_target_shape=[latent_size_, latent_size_],
-                dynamic_target_shape=[self.latent_size, self.latent_size]),
+                dynamic_target_shape=[latent_size, latent_size]),
             _check_equal_shape(
                 name="observation_matrix",
                 static_shape=observation_matrix.shape[-2:],
                 dynamic_shape=observation_matrix.shape_tensor()[-2:],
                 static_target_shape=[observation_size_, latent_size_],
-                dynamic_target_shape=[self.observation_size, self.latent_size]),
+                dynamic_target_shape=[observation_size, latent_size]),
             _check_equal_shape(
                 name="initial_state_prior",
                 static_shape=initial_state_prior.event_shape,
                 dynamic_shape=initial_state_prior.event_shape_tensor(),
                 static_target_shape=[latent_size_],
-                dynamic_target_shape=[self.latent_size]),
+                dynamic_target_shape=[latent_size]),
             _check_equal_shape(
                 name="transition_noise",
                 static_shape=transition_noise.event_shape,
                 dynamic_shape=transition_noise.event_shape_tensor(),
                 static_target_shape=[latent_size_],
-                dynamic_target_shape=[self.latent_size]),
+                dynamic_target_shape=[latent_size]),
             _check_equal_shape(
                 name="observation_noise",
                 static_shape=observation_noise.event_shape,
                 dynamic_shape=observation_noise.event_shape_tensor(),
                 static_target_shape=[observation_size_],
-                dynamic_target_shape=[self.observation_size])]
+                dynamic_target_shape=[observation_size])]
         self.runtime_assertions = [op for op in runtime_assertions
                                    if op is not None]
         _, _ = self._batch_shape(), self._batch_shape_tensor()
@@ -449,7 +472,6 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          graph_parents=[],
           name=name)
 
   def backward_smoothing_pass(self,
@@ -466,39 +488,38 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
     Args:
       filtered_means: Means of the per-timestep filtered marginal
-        distributions p(z_t | x_{:t}), as a Tensor of shape
+        distributions p(z[t] | x[:t]), as a Tensor of shape
         `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
       filtered_covs: Covariances of the per-timestep filtered marginal
-        distributions p(z_t | x_{:t}), as a Tensor of shape
+        distributions p(z[t] | x[:t]), as a Tensor of shape
         `batch_shape + [num_timesteps, latent_size, latent_size]`.
       predicted_means: Means of the per-timestep predictive
-         distributions over latent states, p(z_{t+1} | x_{:t}), as a
+         distributions over latent states, p(z[t+1] | x[:t]), as a
          Tensor of shape `sample_shape(x) + batch_shape +
          [num_timesteps, latent_size]`.
       predicted_covs: Covariances of the per-timestep predictive
-         distributions over latent states, p(z_{t+1} | x_{:t}), as a
+         distributions over latent states, p(z[t+1] | x[:t]), as a
          Tensor of shape `batch_shape + [num_timesteps, latent_size,
          latent_size]`.
 
     Returns:
       posterior_means: Means of the smoothed marginal distributions
-        p(z_t | x_{1:T}), as a Tensor of shape
+        p(z[t] | x[1:T]), as a Tensor of shape
         `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`,
         which is of the same shape as filtered_means.
       posterior_covs: Covariances of the smoothed marginal distributions
-        p(z_t | x_{1:T}), as a Tensor of shape
+        p(z[t] | x[1:T]), as a Tensor of shape
         `batch_shape + [num_timesteps, latent_size, latent_size]`.
         which is of the same shape as filtered_covs.
     """
     with tf.name_scope("backward_pass"):
       filtered_means = tf.convert_to_tensor(
-          value=filtered_means, name="filtered_means")
-      filtered_covs = tf.convert_to_tensor(
-          value=filtered_covs, name="filtered_covs")
+          filtered_means, name="filtered_means")
+      filtered_covs = tf.convert_to_tensor(filtered_covs, name="filtered_covs")
       predicted_means = tf.convert_to_tensor(
-          value=predicted_means, name="predicted_means")
+          predicted_means, name="predicted_means")
       predicted_covs = tf.convert_to_tensor(
-          value=predicted_covs, name="predicted_covs")
+          predicted_covs, name="predicted_covs")
 
       # To scan over time dimension, we need to move 'num_timesteps' from the
       # event shape to the initial dimension of the tensor.
@@ -515,7 +536,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       initial_backward_mean = predicted_means[-1, ...]
       initial_backward_cov = predicted_covs[-1, ...]
 
-      num_timesteps = tf.shape(input=filtered_means)[0]
+      num_timesteps = tf.shape(filtered_means)[0]
       initial_state = BackwardPassState(
           backward_mean=initial_backward_mean,
           backward_cov=initial_backward_cov,
@@ -541,44 +562,52 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
       return (posterior_means, posterior_covs)
 
+  @property
+  def latent_size(self):
+    return self._latent_size
+
+  @property
+  def observation_size(self):
+    return self._observation_size
+
   def _batch_shape_tensor(self):
     # We assume the batch shapes of parameters don't change over time,
     # so use the initial step as a prototype.
-    return tf.broadcast_dynamic_shape(
-        self.initial_state_prior.batch_shape_tensor(),
-        tf.broadcast_dynamic_shape(
+    return functools.reduce(
+        tf.broadcast_dynamic_shape,
+        [
+            self.initial_state_prior.batch_shape_tensor(),
             self.get_transition_matrix_for_timestep(
                 self.initial_step).batch_shape_tensor(),
-            tf.broadcast_dynamic_shape(
-                self.get_transition_noise_for_timestep(
-                    self.initial_step).batch_shape_tensor(),
-                tf.broadcast_dynamic_shape(
-                    self.get_observation_matrix_for_timestep(
-                        self.initial_step).batch_shape_tensor(),
-                    self.get_observation_noise_for_timestep(
-                        self.initial_step).batch_shape_tensor()))))
+            self.get_transition_noise_for_timestep(
+                self.initial_step).batch_shape_tensor(),
+            self.get_observation_matrix_for_timestep(
+                self.initial_step).batch_shape_tensor(),
+            self.get_observation_noise_for_timestep(
+                self.initial_step).batch_shape_tensor(),
+        ])
 
   def _batch_shape(self):
     # We assume the batch shapes of parameters don't change over time,
     # so use the initial step as a prototype.
-    return tf.broadcast_static_shape(
-        self.initial_state_prior.batch_shape,
-        tf.broadcast_static_shape(
+    return functools.reduce(
+        tf.broadcast_static_shape,
+        [
+            self.initial_state_prior.batch_shape,
             self.get_transition_matrix_for_timestep(
                 self.initial_step).batch_shape,
-            tf.broadcast_static_shape(
-                self.get_transition_noise_for_timestep(
-                    self.initial_step).batch_shape,
-                tf.broadcast_static_shape(
-                    self.get_observation_matrix_for_timestep(
-                        self.initial_step).batch_shape,
-                    self.get_observation_noise_for_timestep(
-                        self.initial_step).batch_shape))))
+            self.get_transition_noise_for_timestep(
+                self.initial_step).batch_shape,
+            self.get_observation_matrix_for_timestep(
+                self.initial_step).batch_shape,
+            self.get_observation_noise_for_timestep(
+                self.initial_step).batch_shape,
+        ])
 
   def _event_shape(self):
     return tf.TensorShape([
-        tf.get_static_value(tf.convert_to_tensor(value=self.num_timesteps)),
-        tf.get_static_value(tf.convert_to_tensor(value=self.observation_size))
+        tf.get_static_value(tf.convert_to_tensor(self.num_timesteps)),
+        tf.get_static_value(tf.convert_to_tensor(self.observation_size))
     ])
 
   def _event_shape_tensor(self):
@@ -592,7 +621,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """Draw a joint sample from the prior over latents and observations."""
 
     with tf.name_scope("sample_n_joint"):
-      stream = seed_stream.SeedStream(
+      stream = util.SeedStream(
           seed, salt="LinearGaussianStateSpaceModel_sample_n_joint")
 
       sample_and_batch_shape = distribution_util.prefer_static_value(
@@ -644,13 +673,14 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       (latents, observations) = tf.scan(
           sample_step,
           elems=tf.range(self.initial_step+1, self.final_step),
-          initializer=(initial_latent, initial_observation))
+          initializer=(initial_latent, initial_observation),
+          parallel_iterations=1 if seed is not None else 10)
 
       # Combine the initial sampled timestep with the remaining timesteps.
-      latents = tf.concat([initial_latent[tf.newaxis, ...],
-                           latents], axis=0)
-      observations = tf.concat([initial_observation[tf.newaxis, ...],
-                                observations], axis=0)
+      latents = _safe_concat([initial_latent[tf.newaxis, ...],
+                              latents])
+      observations = _safe_concat([initial_observation[tf.newaxis, ...],
+                                   observations])
 
       # Put dimensions back in order. The samples we've computed are
       # ordered by timestep, with shape `[num_timesteps, num_samples,
@@ -692,7 +722,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     log_likelihoods, _, _, _, _, _, _ = self.forward_filter(x, mask=mask)
 
     # Sum over timesteps to compute the log marginal likelihood.
-    return tf.reduce_sum(input_tensor=log_likelihoods, axis=-1)
+    return tf.reduce_sum(log_likelihoods, axis=-1)
 
   def forward_filter(self, x, mask=None):
     """Run a Kalman filter over a provided sequence of outputs.
@@ -722,33 +752,33 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
     Returns:
       log_likelihoods: Per-timestep log marginal likelihoods `log
-        p(x_t | x_{:t-1})` evaluated at the input `x`, as a `Tensor`
+        p(x[t] | x[:t-1])` evaluated at the input `x`, as a `Tensor`
         of shape `sample_shape(x) + batch_shape + [num_timesteps].`
       filtered_means: Means of the per-timestep filtered marginal
-         distributions p(z_t | x_{:t}), as a Tensor of shape
+         distributions p(z[t] | x[:t]), as a Tensor of shape
         `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
       filtered_covs: Covariances of the per-timestep filtered marginal
-         distributions p(z_t | x_{:t}), as a Tensor of shape
+         distributions p(z[t] | x[:t]), as a Tensor of shape
         `sample_shape(mask) + batch_shape + [num_timesteps, latent_size,
         latent_size]`. Note that the covariances depend only on the model and
         the mask, not on the data, so this may have fewer dimensions than
         `filtered_means`.
       predicted_means: Means of the per-timestep predictive
-         distributions over latent states, p(z_{t+1} | x_{:t}), as a
+         distributions over latent states, p(z[t+1] | x[:t]), as a
          Tensor of shape `sample_shape(x) + batch_shape +
          [num_timesteps, latent_size]`.
       predicted_covs: Covariances of the per-timestep predictive
-         distributions over latent states, p(z_{t+1} | x_{:t}), as a
+         distributions over latent states, p(z[t+1] | x[:t]), as a
          Tensor of shape `sample_shape(mask) + batch_shape +
          [num_timesteps, latent_size, latent_size]`. Note that the covariances
          depend only on the model and the mask, not on the data, so this may
          have fewer dimensions than `predicted_means`.
       observation_means: Means of the per-timestep predictive
-         distributions over observations, p(x_{t} | x_{:t-1}), as a
+         distributions over observations, p(x[t] | x[:t-1]), as a
          Tensor of shape `sample_shape(x) + batch_shape +
          [num_timesteps, observation_size]`.
       observation_covs: Covariances of the per-timestep predictive
-         distributions over observations, p(x_{t} | x_{:t-1}), as a
+         distributions over observations, p(x[t] | x[:t-1]), as a
          Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
          observation_size, observation_size]`. Note that the covariances depend
          only on the model and the mask, not on the data, so this may have fewer
@@ -756,14 +786,14 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """
 
     with tf.name_scope("forward_filter"):
-      x = tf.convert_to_tensor(value=x, name="x")
+      x = tf.convert_to_tensor(x, name="x")
       if mask is not None:
-        mask = tf.convert_to_tensor(value=mask, name="mask", dtype_hint=tf.bool)
+        mask = tf.convert_to_tensor(mask, name="mask", dtype_hint=tf.bool)
 
       # Check event shape statically if possible
-      check_x_shape_op = _check_equal_shape(
-          "x", x.shape[-2:], tf.shape(input=x)[-2:],
-          self.event_shape, self.event_shape_tensor())
+      check_x_shape_op = _check_equal_shape("x", x.shape[-2:],
+                                            tf.shape(x)[-2:], self.event_shape,
+                                            self.event_shape_tensor())
       check_mask_dims_op = None
       check_mask_shape_op = None
       if mask is not None:
@@ -779,8 +809,9 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
                   tensorshape_util.rank(mask.shape),
                   tensorshape_util.rank(x.shape)))
         check_mask_shape_op = _check_equal_shape(
-            "mask", mask.shape[-1:], tf.shape(input=mask)[-1:],
-            self.event_shape[-2:-1], self.event_shape_tensor()[-2:-1])
+            "mask", mask.shape[-1:],
+            tf.shape(mask)[-1:], self.event_shape[-2:-1],
+            self.event_shape_tensor()[-2:-1])
       if self.validate_args:
         runtime_assertions = self.runtime_assertions
         if check_x_shape_op is not None:
@@ -797,28 +828,23 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # event shape. But users can specify inputs that broadcast
       # batch dimensions, so we need to broadcast this against
       # self.batch_shape.
-      if tensorshape_util.is_fully_defined(
-          self.batch_shape) and tensorshape_util.is_fully_defined(x.shape):
-        sample_and_batch_shape = tf.broadcast_static_shape(
-            x.shape[:-2], self.batch_shape)
-      else:
-        sample_and_batch_shape = tf.broadcast_dynamic_shape(
-            tf.shape(input=x)[:-2], self.batch_shape_tensor())
+      batch_shape = self.batch_shape
+      if not tensorshape_util.is_fully_defined(batch_shape):
+        batch_shape = self.batch_shape_tensor()
+      sample_and_batch_shape = functools.reduce(
+          prefer_static.broadcast_shape, [
+              prefer_static.shape(x)[:-2],
+              prefer_static.shape(mask)[:-1] if mask is not None else [],
+              batch_shape
+          ])
 
       # Get the full output shape for covariances. The posterior variances
       # in a LGSSM depend only on the model params (batch shape) and on the
       # missingness pattern (mask shape), so in general this may be smaller
       # than the full `sample_and_batch_shape`.
-      if mask is None:
-        mask_sample_and_batch_shape = self.batch_shape_tensor()
-      else:
-        if (tensorshape_util.is_fully_defined(self.batch_shape) and
-            tensorshape_util.is_fully_defined(mask.shape)):
-          mask_sample_and_batch_shape = tf.broadcast_static_shape(
-              mask.shape[:-1], self.batch_shape)
-        else:
-          mask_sample_and_batch_shape = tf.broadcast_dynamic_shape(
-              tf.shape(input=mask)[:-1], self.batch_shape_tensor())
+      mask_sample_and_batch_shape = prefer_static.broadcast_shape(
+          prefer_static.shape(mask)[:-1] if mask is not None else [],
+          batch_shape)
 
       # To scan over timesteps we need to move `num_timsteps` from the
       # event shape to the initial dimension of the tensor.
@@ -838,11 +864,11 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # a Kalman filter depends on data, so should match the full
       # sample and batch shape. The covariance is data-independent, so
       # only has batch shape.
-      prior_mean = _broadcast_to_shape(
+      prior_mean = tf.broadcast_to(
           self.initial_state_prior.mean()[..., tf.newaxis],
           tf.concat([sample_and_batch_shape,
                      [self.latent_size, 1]], axis=0))
-      prior_cov = _broadcast_to_shape(
+      prior_cov = tf.broadcast_to(
           self.initial_state_prior.covariance(),
           tf.concat([mask_sample_and_batch_shape,
                      [self.latent_size, self.latent_size]], axis=0))
@@ -869,7 +895,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           log_marginal_likelihood=tf.zeros(
               shape=sample_and_batch_shape, dtype=self.dtype),
           timestep=tf.convert_to_tensor(
-              value=self.initial_step, dtype=tf.int32, name="initial_step"))
+              self.initial_step, dtype=tf.int32, name="initial_step"))
 
       update_step_fn = build_kalman_filter_step(
           self.get_transition_matrix_for_timestep,
@@ -952,11 +978,11 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
     Returns:
       smoothed_means: Means of the per-timestep smoothed
-         distributions over latent states, p(x_{t} | x_{:T}), as a
+         distributions over latent states, p(z[t] | x[:T]), as a
          Tensor of shape `sample_shape(x) + batch_shape +
          [num_timesteps, observation_size]`.
       smoothed_covs: Covariances of the per-timestep smoothed
-         distributions over latent states, p(x_{t} | x_{:T}), as a
+         distributions over latent states, p(z[t] | x[:T]), as a
          Tensor of shape `sample_shape(mask) + batch_shape + [num_timesteps,
          observation_size, observation_size]`. Note that the covariances depend
          only on the model and the mask, not on the data, so this may have fewer
@@ -964,7 +990,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """
 
     with tf.name_scope("smooth"):
-      x = tf.convert_to_tensor(value=x, name="x")
+      x = tf.convert_to_tensor(x, name="x")
       (_, filtered_means, filtered_covs,
        predicted_means, predicted_covs, _, _) = self.forward_filter(
            x, mask=mask)
@@ -975,6 +1001,87 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
       return (smoothed_means, smoothed_covs)
 
+  def posterior_sample(self, x, sample_shape, mask=None, seed=None, name=None):
+    """Draws samples from the posterior over latent trajectories.
+
+    This method uses Durbin-Koopman sampling [1], an efficient algorithm to
+    sample from the posterior latents of a linear Gaussian state space model.
+    The cost of drawing a sample is equal to the cost of drawing a prior
+    sample (`.sample(sample_shape)`), plus the cost of Kalman smoothing (
+    `.posterior_marginals(...)` on both the observed time series and the
+    prior sample. This method is significantly more efficient in graph mode,
+    because it uses only the posterior means and can elide the unneeded
+    calculation of marginal covariances.
+
+    [1] Durbin, J. and Koopman, S.J. A simple and efficient simulation
+        smoother for state space time series analysis. _Biometrika_
+        89(3):603-615, 2002.
+        https://www.jstor.org/stable/4140605
+
+    Args:
+      x: a float-type `Tensor` with rightmost dimensions
+        `[num_timesteps, observation_size]` matching
+        `self.event_shape`. Additional dimensions must match or be
+        broadcastable with `self.batch_shape`.
+      sample_shape: `int` `Tensor` shape of samples to draw.
+      mask: optional bool-type `Tensor` with rightmost dimension
+        `[num_timesteps]`; `True` values specify that the value of `x`
+        at that timestep is masked, i.e., not conditioned on. Additional
+        dimensions must match or be broadcastable with `self.batch_shape` and
+        `x.shape[:-2]`.
+        Default value: `None`.
+      seed: Python `int` random seed.
+      name: Python `str` name for ops generated by this method.
+    Returns:
+      latent_posterior_sample: Float `Tensor` of shape
+        `concat([sample_shape, batch_shape, [num_timesteps, latent_size]])`,
+        where `batch_shape` is the broadcast shape of `self.batch_shape`,
+        `x.shape[:-2]`, and `mask.shape[:-1]`, representing `n` samples from
+        the posterior over latent states given the observed value `x`.
+    """
+    with tf.name_scope(name or "posterior_sample"):
+      x = tf.convert_to_tensor(x, name="x")
+      if mask is not None:
+        mask = tf.convert_to_tensor(mask, name="mask", dtype_hint=tf.bool)
+
+      # Get static batch shape if possible.
+      if self.batch_shape.is_fully_defined():
+        batch_shape = tensorshape_util.as_list(self.batch_shape)
+      else:
+        batch_shape = self.batch_shape_tensor()
+
+      # Draw one prior sample per result. If `x` has larger batch shape
+      # than the distribution, we'll need to draw extra samples to match.
+      result_sample_and_batch_shape = prefer_static.concat([
+          distribution_util.expand_to_vector(sample_shape),
+          functools.reduce(prefer_static.broadcast_shape, [
+              prefer_static.shape(x)[:-2],
+              prefer_static.shape(mask)[:-1] if mask is not None else [],
+              batch_shape,
+          ])], axis=0)
+      sample_size = tf.cast(
+          prefer_static.reduce_prod(result_sample_and_batch_shape) /
+          prefer_static.reduce_prod(batch_shape), tf.int32)
+      prior_latent_sample, prior_obs_sample = self._joint_sample_n(
+          sample_size, seed=seed)
+
+      result_shape = prefer_static.concat(
+          [result_sample_and_batch_shape,
+           [self.num_timesteps, self.latent_size]], axis=0)
+      broadcast_observed_shape = prefer_static.concat(
+          [result_sample_and_batch_shape,
+           [self.num_timesteps, self.observation_size]], axis=0)
+      prior_latent_sample = tf.reshape(prior_latent_sample, result_shape)
+      prior_obs_sample = tf.reshape(prior_obs_sample, broadcast_observed_shape)
+
+      # Compute latent posterior means from the sampled and real observations.
+      batch_mean, _ = self.posterior_marginals(
+          tf.stack([prior_obs_sample,
+                    tf.broadcast_to(x, broadcast_observed_shape)],
+                   axis=0), mask=mask)
+      prior_latent_mean, posterior_latent_mean = tf.unstack(batch_mean, axis=0)
+      return posterior_latent_mean + prior_latent_sample - prior_latent_mean
+
   def _mean(self):
     _, observation_mean = self._joint_mean()
     return observation_mean
@@ -983,10 +1090,10 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """Compute prior means for all variables via dynamic programming.
 
     Returns:
-      latent_means: Prior means of latent states `z_t`, as a `Tensor`
+      latent_means: Prior means of latent states `z[t]`, as a `Tensor`
         of shape `batch_shape + [num_timesteps, latent_size]`
       observation_means: Prior covariance matrices of observations
-        `x_t`, as a `Tensor` of shape `batch_shape + [num_timesteps,
+        `x[t]`, as a `Tensor` of shape `batch_shape + [num_timesteps,
         observation_size]`
     """
 
@@ -997,7 +1104,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
       with tf.control_dependencies(self.runtime_assertions):
         # Broadcast to ensure we represent the full batch shape.
-        initial_latent_mean = _broadcast_to_shape(
+        initial_latent_mean = tf.broadcast_to(
             self.initial_state_prior.mean()[..., tf.newaxis],
             tf.concat([self.batch_shape_tensor(),
                        [self.latent_size, 1]], axis=0))
@@ -1020,10 +1127,11 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           initializer=(initial_latent_mean, initial_observation_mean))
 
       # Squish the initial step back on top of the other (scanned) timesteps
-      latent_means = tf.concat([initial_latent_mean[tf.newaxis, ...],
-                                latent_means], axis=0)
-      observation_means = tf.concat([initial_observation_mean[tf.newaxis, ...],
-                                     observation_means], axis=0)
+      latent_means = _safe_concat([initial_latent_mean[tf.newaxis, ...],
+                                   latent_means])
+      observation_means = _safe_concat([
+          initial_observation_mean[tf.newaxis, ...],
+          observation_means])
 
       # Put dimensions back in order. The samples we've computed have
       # shape `[num_timesteps, batch_shape, size, 1]`, where `size`
@@ -1042,18 +1150,18 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """Compute prior covariances for all variables via dynamic programming.
 
     Returns:
-      latent_covs: Prior covariance matrices of latent states `z_t`, as
+      latent_covs: Prior covariance matrices of latent states `z[t]`, as
         a `Tensor` of shape `batch_shape + [num_timesteps,
         latent_size, latent_size]`
       observation_covs: Prior covariance matrices of observations
-        `x_t`, as a `Tensor` of shape `batch_shape + [num_timesteps,
+        `x[t]`, as a `Tensor` of shape `batch_shape + [num_timesteps,
         observation_size, observation_size]`
     """
 
     with tf.name_scope("covariance_joint"):
 
       with tf.control_dependencies(self.runtime_assertions):
-        initial_latent_cov = _broadcast_to_shape(
+        initial_latent_cov = tf.broadcast_to(
             self.initial_state_prior.covariance(),
             tf.concat([self.batch_shape_tensor(),
                        [self.latent_size, self.latent_size]], axis=0))
@@ -1076,10 +1184,10 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           initializer=(initial_latent_cov, initial_observation_cov))
 
       # Squish the initial step back on top of the other (scanned) timesteps
-      latent_covs = tf.concat([initial_latent_cov[tf.newaxis, ...],
-                               latent_covs], axis=0)
-      observation_covs = tf.concat([initial_observation_cov[tf.newaxis, ...],
-                                    observation_covs], axis=0)
+      latent_covs = _safe_concat([initial_latent_cov[tf.newaxis, ...],
+                                  latent_covs])
+      observation_covs = _safe_concat([initial_observation_cov[tf.newaxis, ...],
+                                       observation_covs])
 
       # Put dimensions back in order. The samples we've computed have
       # shape `[num_timesteps, batch_shape, size, size]`, where `size`
@@ -1247,6 +1355,9 @@ def backward_smoothing_update(filtered_mean,
     posterior_cov: `Tensor` with event shape `[latent_size, latent_size]` and
       batch shape `B`, containing sigma(t | 1:T).
   """
+
+  latent_size_is_static_and_scalar = (filtered_cov.shape[-2] == 1)
+
   # Compute backward Kalman gain:
   # J = F * T' * P^{-1}
   # Since both F(iltered) and P(redictive) are cov matrices,
@@ -1256,8 +1367,11 @@ def backward_smoothing_update(filtered_mean,
   #      = (P^{-1} * tmp_gain_cov) '
   #      = (P \ tmp_gain_cov)'
   tmp_gain_cov = transition_matrix.matmul(filtered_cov)
-  predicted_cov_chol = tf.linalg.cholesky(predicted_cov)
-  gain_transpose = tf.linalg.cholesky_solve(predicted_cov_chol, tmp_gain_cov)
+  if latent_size_is_static_and_scalar:
+    gain_transpose = tmp_gain_cov / predicted_cov
+  else:
+    gain_transpose = tf.linalg.cholesky_solve(
+        tf.linalg.cholesky(predicted_cov), tmp_gain_cov)
 
   posterior_mean = (filtered_mean +
                     tf.linalg.matmul(gain_transpose,
@@ -1306,11 +1420,11 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
     Args:
       state: A `KalmanFilterState` object representing the previous
         filter state at time `t-1`.
-      elems_t: A tuple of Tensors `(x_t, mask_t)`, or a `Tensor` `x_t`.
-        `x_t` is a `Tensor` with rightmost shape dimensions
+      elems_t: A tuple of Tensors `(x[t], mask_t)`, or a `Tensor` `x[t]`.
+        `x[t]` is a `Tensor` with rightmost shape dimensions
         `[observation_size, 1]` representing the vector observed at time `t`,
         and `mask_t` is a `Tensor` with rightmost dimensions`[1, 1]`
-        representing the observation mask at time `t`. Both `x_t` and `mask_t`
+        representing the observation mask at time `t`. Both `x[t]` and `mask_t`
         may have batch dimensions, which must be compatible with the batch
         dimensions of `state.predicted_mean` and `state.predictived_cov`
         respectively. If `mask_t` is not provided, it is assumed to be `None`.
@@ -1334,7 +1448,7 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
       # from masked elements will not be selected below, but we need to ensure
       # that any results we incidently compute on masked values are at least
       # finite (not inf or NaN) so that they don't screw up gradient propagation
-      # through `tf1.where`, as described in
+      # through `tf.where`, as described in
       #  https://github.com/tensorflow/tensorflow/issues/2540.
       # We fill with the prior expectation because any fixed value such as zero
       # might be arbitrarily unlikely under the prior, leading to overflow in
@@ -1343,9 +1457,7 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
       x_expected = _propagate_mean(state.predicted_mean,
                                    observation_matrix,
                                    observation_noise) * tf.ones_like(x_t)
-      x_t = tf1.where(
-          tf.broadcast_to(mask_t, tf.shape(input=x_expected)), x_expected,
-          tf.broadcast_to(x_t, tf.shape(input=x_expected)))
+      x_t = tf.where(mask_t, x_expected, x_t)
 
     # Given predicted mean u_{t|t-1} and covariance P_{t|t-1} from the
     # previous step, incorporate the observation x_t, producing the
@@ -1357,21 +1469,16 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
          observation_matrix, observation_noise,
          x_t)
 
-    # Compute the marginal likelihood p(x_{t} | x_{:t-1}) for this
+    # Compute the marginal likelihood p(x[t] | x[:t-1]) for this
     # observation.
     log_marginal_likelihood = observation_dist.log_prob(x_t[..., 0])
 
     if mask_t is not None:
-      filtered_mean = tf1.where(
-          tf.broadcast_to(mask_t, tf.shape(input=filtered_mean)),
-          state.predicted_mean, filtered_mean)
-      filtered_cov = tf1.where(
-          tf.broadcast_to(mask_t, tf.shape(input=filtered_cov)),
-          state.predicted_cov, filtered_cov)
-      log_marginal_likelihood = tf1.where(
-          tf.broadcast_to(mask_t[..., 0, 0],
-                          tf.shape(input=log_marginal_likelihood)),
-          tf.zeros_like(log_marginal_likelihood), log_marginal_likelihood)
+      filtered_mean = tf.where(mask_t, state.predicted_mean, filtered_mean)
+      filtered_cov = tf.where(mask_t, state.predicted_cov, filtered_cov)
+      log_marginal_likelihood = tf.where(
+          mask_t[..., 0, 0], tf.zeros_like(log_marginal_likelihood),
+          log_marginal_likelihood)
 
     # Run the filtered posterior through the transition
     # model to predict the next time step:
@@ -1441,8 +1548,7 @@ def linear_gaussian_update(
   """
 
   # If observations are scalar, we can avoid some matrix ops.
-  observation_size_is_static_and_scalar = (
-      tf.compat.dimension_value(observation_matrix.shape[-2]) == 1)
+  observation_size_is_static_and_scalar = (observation_matrix.shape[-2] == 1)
 
   # Push the predicted mean for the latent state through the
   # observation model
@@ -1645,7 +1751,7 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
       `[observation_size]`.
     full_sample_and_batch_shape: Desired sample and batch shape of the
       returned samples, concatenated in a single `Tensor`.
-    stream: `tfd.SeedStream` instance used to generate a
+    stream: `tfp.util.SeedStream` instance used to generate a
       sequence of random seeds.
     validate_args: if True, perform error checking at runtime.
 

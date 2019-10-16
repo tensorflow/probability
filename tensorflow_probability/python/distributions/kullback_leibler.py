@@ -93,23 +93,24 @@ def kl_divergence(distribution_a, distribution_b,
         "type {} and distribution_b type {}".format(
             type(distribution_a).__name__, type(distribution_b).__name__))
 
-  with tf.name_scope("KullbackLeibler"):
-    kl_t = kl_fn(distribution_a, distribution_b, name=name)
-    if allow_nan_stats:
-      return kl_t
+  name = name or "KullbackLeibler"
+  with tf.name_scope(name):
+    # pylint: disable=protected-access
+    with distribution_a._name_and_control_scope(name + "_a"):
+      with distribution_b._name_and_control_scope(name + "_b"):
+        kl_t = kl_fn(distribution_a, distribution_b, name=name)
+        if allow_nan_stats:
+          return kl_t
 
     # Check KL for NaNs
     kl_t = tf.identity(kl_t, name="kl")
 
     with tf.control_dependencies([
         tf.Assert(
-            tf.logical_not(tf.reduce_any(input_tensor=tf.math.is_nan(kl_t))),
-            [
-                ("KL calculation between {} and {} returned NaN values "
-                 "(and was called with allow_nan_stats=False). Values:".format(
-                     distribution_a.name, distribution_b.name)),
-                kl_t
-            ])
+            tf.logical_not(tf.reduce_any(tf.math.is_nan(kl_t))),
+            [("KL calculation between {} and {} returned NaN values "
+              "(and was called with allow_nan_stats=False). Values:".format(
+                  distribution_a.name, distribution_b.name)), kl_t])
     ]):
       return tf.identity(kl_t, name="checked_kl")
 

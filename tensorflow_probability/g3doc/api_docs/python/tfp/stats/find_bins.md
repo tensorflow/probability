@@ -5,6 +5,18 @@
 
 # tfp.stats.find_bins
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/stats/quantiles.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Bin values into discrete intervals.
 
 ``` python
@@ -20,8 +32,6 @@ tfp.stats.find_bins(
 
 
 
-Defined in [`python/stats/quantiles.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/stats/quantiles.py).
-
 <!-- Placeholder for "Used in" -->
 
 Given `edges = [c0, ..., cK]`, defining intervals
@@ -30,6 +40,7 @@ This function returns `bins`, such that:
 `edges[bins[i]] <= x[i] < edges[bins[i] + 1]`.
 
 #### Args:
+
 
 * <b>`x`</b>:  Numeric `N-D` `Tensor` with `N > 0`.
 * <b>`edges`</b>:  `Tensor` of same `dtype` as `x`.  The first dimension indexes edges
@@ -51,6 +62,7 @@ This function returns `bins`, such that:
 
 #### Returns:
 
+
 * <b>`bins`</b>: `Tensor` with same `shape` as `x` and `dtype`.
   Has whole number values.  `bins[i] = k` means the `x[i]` falls into the
   `kth` bin, ie, `edges[bins[i]] <= x[i] < edges[bins[i] + 1]`.
@@ -58,7 +70,8 @@ This function returns `bins`, such that:
 
 #### Raises:
 
-  ValueError:  If `edges.shape[0]` is determined to be less than 2.
+
+* <b>`ValueError`</b>:  If `edges.shape[0]` is determined to be less than 2.
 
 #### Examples
 

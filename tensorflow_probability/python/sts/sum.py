@@ -21,7 +21,8 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
@@ -213,7 +214,7 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       ValueError: if components have different `num_timesteps`.
     """
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name,
         'AdditiveStateSpaceModel',
         values=[observation_noise_scale, initial_step]) as name:
@@ -252,7 +253,7 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         num_timesteps = component_ssms[0].num_timesteps
       if validate_args and len(static_num_timesteps) != len(component_ssms):
         assertions += [
-            tf.compat.v1.assert_equal(
+            tf1.assert_equal(
                 num_timesteps,
                 ssm.num_timesteps,
                 message='Additive model components must all have '
@@ -413,7 +414,7 @@ class Sum(StructuralTimeSeries):
       ValueError: if components do not have unique names.
     """
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'Sum', values=[observed_time_series]) as name:
       if observed_time_series is not None:
         observed_mean, observed_stddev, _ = (
@@ -439,13 +440,16 @@ class Sum(StructuralTimeSeries):
 
       # Build parameters list for the combined model, by inheriting parameters
       # from the component models in canonical order.
-      parameters = [
-          Parameter('observation_noise_scale', observation_noise_scale_prior,
-                    tfb.Softplus()),
-      ] + [Parameter(name='{}_{}'.format(component.name, parameter.name),
-                     prior=parameter.prior,
-                     bijector=parameter.bijector)
-           for component in components for parameter in component.parameters]
+      parameters = [Parameter('observation_noise_scale',
+                              observation_noise_scale_prior,
+                              tfb.Chain([
+                                  tfb.AffineScalar(scale=observed_stddev),
+                                  tfb.Softplus()]))]
+      for component in components:
+        for parameter in component.parameters:
+          parameters.append(Parameter(
+              name='{}_{}'.format(component.name, parameter.name),
+              prior=parameter.prior, bijector=parameter.bijector))
 
       self._components = components
       self._components_by_name = components_by_name
@@ -491,7 +495,7 @@ class Sum(StructuralTimeSeries):
         Distribution objects, in order corresponding to `self.components`.
     """
 
-    with tf.compat.v1.name_scope('make_component_state_space_models'):
+    with tf1.name_scope('make_component_state_space_models'):
 
       # List the model parameters in canonical order
       param_map = self._canonicalize_param_vals_as_map(param_vals)

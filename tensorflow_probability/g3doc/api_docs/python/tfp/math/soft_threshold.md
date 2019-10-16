@@ -5,6 +5,18 @@
 
 # tfp.math.soft_threshold
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/generic.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Soft Thresholding operator.
 
 ``` python
@@ -16,8 +28,6 @@ tfp.math.soft_threshold(
 ```
 
 
-
-Defined in [`python/math/numeric.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/numeric.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -83,6 +93,7 @@ multivariate case does not have a known closed form like above.)
 
 #### Args:
 
+
 * <b>`x`</b>: `float` `Tensor` representing the input to the SoftThreshold function.
 * <b>`threshold`</b>: nonnegative scalar, `float` `Tensor` representing the radius of
   the interval on which each coordinate of SoftThreshold takes the value
@@ -93,8 +104,9 @@ multivariate case does not have a known closed form like above.)
 
 #### Returns:
 
-  softthreshold: `float` `Tensor` with the same shape and dtype as `x`,
-    representing the value of the SoftThreshold function.
+
+* <b>`softthreshold`</b>: `float` `Tensor` with the same shape and dtype as `x`,
+  representing the value of the SoftThreshold function.
 
 #### References
 

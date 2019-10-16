@@ -5,6 +5,18 @@
 
 # tfp.sts.forecast
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/forecast.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Construct predictive distribution over future observations.
 
 ``` python
@@ -18,14 +30,13 @@ tfp.sts.forecast(
 
 
 
-Defined in [`python/sts/forecast.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/forecast.py).
-
 <!-- Placeholder for "Used in" -->
 
 Given samples from the posterior over parameters, return the predictive
 distribution over future observations for num_steps_forecast timesteps.
 
 #### Args:
+
 
 * <b>`model`</b>: An instance of `StructuralTimeSeries` representing a
   time-series model. This represents a joint distribution over
@@ -46,10 +57,11 @@ distribution over future observations for num_steps_forecast timesteps.
 
 #### Returns:
 
-  forecast_dist: a `tfd.MixtureSameFamily` instance with event shape
-    [num_steps_forecast, 1] and batch shape
-    `concat([sample_shape, model.batch_shape])`, with `num_posterior_draws`
-    mixture components.
+
+* <b>`forecast_dist`</b>: a `tfd.MixtureSameFamily` instance with event shape
+  [num_steps_forecast, 1] and batch shape
+  `concat([sample_shape, model.batch_shape])`, with `num_posterior_draws`
+  mixture components.
 
 #### Examples
 
@@ -70,7 +82,8 @@ Suppose we've built a model and fit it to data using HMC:
 ```
 
 Passing the posterior samples into `forecast`, we construct a forecast
-* <b>`distribution`</b>: 
+distribution:
+
 ```python
   forecast_dist = tfp.sts.forecast(model, observed_time_series,
                                    parameter_samples=samples,

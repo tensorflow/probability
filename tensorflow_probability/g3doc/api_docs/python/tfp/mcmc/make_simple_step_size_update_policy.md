@@ -5,6 +5,12 @@
 
 # tfp.mcmc.make_simple_step_size_update_policy
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Create a function implementing a step-size update policy. (deprecated)
 
 ``` python
@@ -13,6 +19,8 @@ tfp.mcmc.make_simple_step_size_update_policy(
     **kwargs
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 
@@ -36,6 +44,7 @@ inspect the behavior of the chain during adaptation.
 
 #### Args:
 
+
 * <b>`num_adaptation_steps`</b>: Scalar `int` `Tensor` number of initial steps to
   during which to adjust the step size. This may be greater, less than, or
   equal to the number of burnin steps. If `None`, the step size is adapted
@@ -56,6 +65,7 @@ inspect the behavior of the chain during adaptation.
 
 
 #### Returns:
+
 
 * <b>`step_size_simple_update_fn`</b>: Callable that takes args
   `step_size_var, kernel_results` and returns updated step size(s).

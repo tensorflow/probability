@@ -19,17 +19,18 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-# Dependency imports
-import numpy as np
 
-import tensorflow as tf
+# Dependency imports
+
+import numpy as np
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-
-tfd = tfp.distributions
-tfb = tfp.bijectors
 
 
 FakeInnerKernelResults = collections.namedtuple(
@@ -38,7 +39,7 @@ FakeInnerKernelResults = collections.namedtuple(
 
 def _maybe_seed(seed):
   if tf.executing_eagerly():
-    tf.compat.v1.set_random_seed(seed)
+    tf1.set_random_seed(seed)
     return None
   return seed
 
@@ -66,7 +67,7 @@ class FakeInnerKernel(tfp.mcmc.TransitionKernel):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TransformedTransitionKernelTest(tf.test.TestCase):
+class TransformedTransitionKernelTest(tfp_test_util.TestCase):
 
   def setUp(self):
     super(TransformedTransitionKernelTest, self).setUp()
@@ -96,9 +97,9 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
         num_steps_between_results=1,
         parallel_iterations=1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
+    sample_mean = tf.reduce_mean(states, axis=0)
     sample_var = tf.reduce_mean(
-        input_tensor=tf.math.squared_difference(states, sample_mean), axis=0)
+        tf.math.squared_difference(states, sample_mean), axis=0)
     [
         sample_mean_,
         sample_var_,
@@ -141,9 +142,9 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
         num_steps_between_results=1,
         parallel_iterations=1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
+    sample_mean = tf.reduce_mean(states, axis=0)
     sample_var = tf.reduce_mean(
-        input_tensor=tf.math.squared_difference(states, sample_mean), axis=0)
+        tf.math.squared_difference(states, sample_mean), axis=0)
     [
         sample_mean_,
         sample_var_,
@@ -183,9 +184,9 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
         num_steps_between_results=1,
         parallel_iterations=1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
+    sample_mean = tf.reduce_mean(states, axis=0)
     sample_var = tf.reduce_mean(
-        input_tensor=tf.math.squared_difference(states, sample_mean), axis=0)
+        tf.math.squared_difference(states, sample_mean), axis=0)
     [
         sample_mean_,
         sample_var_,
@@ -216,7 +217,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
               np.linalg.cholesky(true_cov),
               z[..., tf.newaxis]),
           axis=-1)
-      return -0.5 * tf.reduce_sum(input_tensor=z**2., axis=-1)
+      return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
     transformed_hmc = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
@@ -243,7 +244,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
         parallel_iterations=1)
     states = tf.stack(states, axis=-1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
+    sample_mean = tf.reduce_mean(states, axis=0)
     x = states - sample_mean
     sample_cov = tf.matmul(x, x, transpose_a=True) / self.dtype(num_results)
     [sample_mean_, sample_cov_, is_accepted_] = self.evaluate([
@@ -252,7 +253,7 @@ class TransformedTransitionKernelTest(tf.test.TestCase):
     self.assertAllClose(true_mean, sample_mean_,
                         atol=0.06, rtol=0.)
     self.assertAllClose(true_cov, sample_cov_,
-                        atol=0., rtol=0.1)
+                        atol=0., rtol=0.16)
 
   def test_bootstrap_requires_xor_args(self):
     def fake_target_log_prob(x):

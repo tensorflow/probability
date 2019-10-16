@@ -18,7 +18,8 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
@@ -156,7 +157,7 @@ class LocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         Default value: "LocalLinearTrendStateSpaceModel".
     """
 
-    with tf.compat.v1.name_scope(name, 'LocalLinearTrendStateSpaceModel',
+    with tf1.name_scope(name, 'LocalLinearTrendStateSpaceModel',
                                  [level_scale, slope_scale]) as name:
 
       # The initial state prior determines the dtype of sampled values.
@@ -282,7 +283,7 @@ class LocalLinearTrend(StructuralTimeSeries):
         Default value: 'LocalLinearTrend'.
     """
 
-    with tf.compat.v1.name_scope(
+    with tf1.name_scope(
         name, 'LocalLinearTrend', values=[observed_time_series]) as name:
 
       _, observed_stddev, observed_initial = (
@@ -325,10 +326,12 @@ class LocalLinearTrend(StructuralTimeSeries):
               initial_slope_prior.stddev()
           ], axis=-1))
 
+      scaled_softplus = tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
+                                   tfb.Softplus()])
       super(LocalLinearTrend, self).__init__(
           parameters=[
-              Parameter('level_scale', level_scale_prior, tfb.Softplus()),
-              Parameter('slope_scale', slope_scale_prior, tfb.Softplus())
+              Parameter('level_scale', level_scale_prior, scaled_softplus),
+              Parameter('slope_scale', slope_scale_prior, scaled_softplus)
           ],
           latent_size=2,
           name=name)

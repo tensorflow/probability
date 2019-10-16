@@ -5,24 +5,28 @@
 
 # tfp.distributions.reduce_weighted_logsumexp
 
-Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`.
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
+Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`. (deprecated)
 
 ``` python
 tfp.distributions.reduce_weighted_logsumexp(
-    logx,
-    w=None,
-    axis=None,
-    keep_dims=False,
-    return_sign=False,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
 
 
-Defined in [`python/internal/distribution_util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/distribution_util.py).
-
 <!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+This function has moved to <a href="../../tfp/math.md"><code>tfp.math</code></a>.
 
 If all weights `w` are known to be positive, it is more efficient to directly
 use `reduce_logsumexp`, i.e., `tf.reduce_logsumexp(logx + tf.log(w))` is more
@@ -41,6 +45,7 @@ avoids overflows caused by taking the exp of large inputs and underflows
 caused by taking the log of small inputs.
 
 #### For example:
+
 
 
 ```python
@@ -66,8 +71,8 @@ du.reduce_weighted_logsumexp(x, w, axis=[0, 1])
 # ==> log(-1+5)
 ```
 
-
 #### Args:
+
 
 * <b>`logx`</b>: The tensor to reduce. Should have numeric type.
 * <b>`w`</b>: The weight tensor. Should have numeric type identical to `logx`.
@@ -80,6 +85,7 @@ du.reduce_weighted_logsumexp(x, w, axis=[0, 1])
 
 
 #### Returns:
+
 
 * <b>`lswe`</b>: The `log(abs(sum(weight * exp(x))))` reduced tensor.
 * <b>`sign`</b>: (Optional) The sign of `sum(weight * exp(x))`.

@@ -5,6 +5,18 @@
 
 # tfp.optimizer.differential_evolution_one_step
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/optimizer/differential_evolution.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Performs one step of the differential evolution algorithm.
 
 ``` python
@@ -21,18 +33,18 @@ tfp.optimizer.differential_evolution_one_step(
 
 
 
-Defined in [`python/optimizer/differential_evolution.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/differential_evolution.py).
-
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
+
 
 * <b>`objective_function`</b>:  A Python callable that accepts a batch of possible
   solutions and returns the values of the objective function at those
   arguments as a rank 1 real `Tensor`. This specifies the function to be
   minimized. The input to this callable may be either a single `Tensor`
   or a Python `list` of `Tensor`s. The signature must match the format of
-  the argument `population`. (i.e. objective_function(*population) must
+  the argument `population`. (i.e., objective_function(*population) must
   return the value of the function to be minimized).
 * <b>`population`</b>:  `Tensor` or Python `list` of `Tensor`s representing the
   current population vectors. Each `Tensor` must be of the same real dtype.
@@ -67,6 +79,7 @@ Defined in [`python/optimizer/differential_evolution.py`](https://github.com/ten
 #### Returns:
 
 A sequence containing the following elements (in order):
+
 * <b>`next_population`</b>: A `Tensor` or Python `list` of `Tensor`s of the same
   structure as the input population. The population at the next generation.
 * <b>`next_population_values`</b>: A `Tensor` of same shape and dtype as input

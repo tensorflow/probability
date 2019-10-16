@@ -5,6 +5,18 @@
 
 # tfp.math.random_rayleigh
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/random_ops.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Generates `Tensor` of positive reals drawn from a Rayleigh distributions.
 
 ``` python
@@ -18,8 +30,6 @@ tfp.math.random_rayleigh(
 ```
 
 
-
-Defined in [`python/math/random_ops.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/random_ops.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -35,6 +45,7 @@ https://en.wikipedia.org/wiki/Rayleigh_distribution)
 
 #### Args:
 
+
 * <b>`shape`</b>: Vector-shaped, `int` `Tensor` representing shape of output.
 * <b>`scale`</b>: (Optional) Positive `float` `Tensor` representing `Rayleigh` scale.
   Default value: `None` (i.e., `scale = 1.`).
@@ -47,6 +58,7 @@ https://en.wikipedia.org/wiki/Rayleigh_distribution)
 
 
 #### Returns:
+
 
 * <b>`rayleigh`</b>: `Tensor` with specified `shape` and `dtype` consisting of positive
   real values drawn from a Rayleigh distribution with specified `scale`.

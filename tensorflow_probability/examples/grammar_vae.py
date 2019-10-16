@@ -150,7 +150,8 @@ class SmilesGrammar(object):
     """
     symbols = []
     for production in tf.unstack(productions, axis=1):
-      lhs, rhs = self.production_rules[tf.argmax(input=production, axis=-1)]
+      lhs, rhs = self.production_rules[
+          tf.argmax(input=tf.squeeze(production), axis=-1)]
       if not symbols:  # first iteration
         if lhs != self.start_symbol:
           raise ValueError("`productions` must begin with `self.start_symbol`.")
@@ -232,7 +233,7 @@ class ProbabilisticGrammar(tf.keras.Model):
       production = ed.OneHotCategorical(logits=logits,
                                         name="production_" + str(t))
       _, rhs = self.grammar.production_rules[tf.argmax(
-          input=production, axis=-1)]
+          input=tf.squeeze(production), axis=-1)]
       for symbol in rhs:
         if symbol in self.grammar.nonterminal_symbols:
           stack.append(symbol)
@@ -284,26 +285,6 @@ class ProbabilisticGrammarVariational(tf.keras.Model):
         name="latent_code_posterior")
 
 
-def make_value_setter(**model_kwargs):
-  """Creates a value-setting interceptor.
-
-  Args:
-    **model_kwargs: dict of str to Tensor. Keys are the names of random variable
-      in the model to which this interceptor is being applied. Values are
-      Tensors to set their value to.
-
-  Returns:
-    set_values: Function which sets the value of intercepted ops.
-  """
-  def set_values(f, *args, **kwargs):
-    """Sets random variable values to its aligned value."""
-    name = kwargs.get("name")
-    if name in model_kwargs:
-      kwargs["value"] = model_kwargs[name]
-    return ed.interceptable(f)(*args, **kwargs)
-  return set_values
-
-
 def main(argv):
   del argv  # unused
   if tf.io.gfile.exists(FLAGS.model_dir):
@@ -351,7 +332,7 @@ def main(argv):
       values.update({"production_" + str(t): production for t, production
                      in enumerate(tf.unstack(productions, axis=1))})
       with ed.tape() as model_tape:
-        with ed.interception(make_value_setter(**values)):
+        with ed.interception(ed.make_value_setter(**values)):
           _ = probabilistic_grammar()
 
       # Compute the ELBO given the variational sample, averaged over the batch

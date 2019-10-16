@@ -5,6 +5,18 @@
 
 # tfp.optimizer.bfgs_minimize
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/optimizer/bfgs.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Applies the BFGS algorithm to minimize a differentiable function.
 
 ``` python
@@ -23,8 +35,6 @@ tfp.optimizer.bfgs_minimize(
 ```
 
 
-
-Defined in [`python/optimizer/bfgs.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/bfgs.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -65,6 +75,7 @@ minimum for a simple two dimensional quadratic objective function.
   http://pages.mtu.edu/~struther/Courses/OLD/Sp2013/5630/Jorge_Nocedal_Numerical_optimization_267490.pdf
 
 #### Args:
+
 
 * <b>`value_and_gradients_function`</b>:  A Python callable that accepts a point as a
   real `Tensor` and returns a tuple of `Tensor`s of real dtype containing
@@ -114,6 +125,7 @@ minimum for a simple two dimensional quadratic objective function.
 
 
 #### Returns:
+
 
 * <b>`optimizer_results`</b>: A namedtuple containing the following items:
   converged: boolean tensor of shape `[...]` indicating for each batch

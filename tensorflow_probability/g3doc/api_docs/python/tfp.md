@@ -6,11 +6,19 @@
 
 # Module: tfp
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Tools for probabilistic reasoning in TensorFlow.
-
-
-
-Defined in [`__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/__init__.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -19,9 +27,13 @@ Defined in [`__init__.py`](https://github.com/tensorflow/probability/tree/master
 
 [`bijectors`](./tfp/bijectors.md) module: Bijective transformations.
 
+[`debugging`](./tfp/debugging.md) module: TensorFlow Probability debugging package.
+
 [`distributions`](./tfp/distributions.md) module: Statistical distributions.
 
 [`edward2`](./tfp/edward2.md) module: Edward2 probabilistic programming language.
+
+[`experimental`](./tfp/experimental.md) module: TensorFlow Probability API-unstable package.
 
 [`glm`](./tfp/glm.md) module: TensorFlow Probability GLM python package.
 
@@ -49,5 +61,4 @@ Defined in [`__init__.py`](https://github.com/tensorflow/probability/tree/master
 
 ## Other Members
 
-<h3 id="__version__"><code>__version__</code></h3>
-
+* `__version__ = '0.9.0-dev'` <a id="__version__"></a>

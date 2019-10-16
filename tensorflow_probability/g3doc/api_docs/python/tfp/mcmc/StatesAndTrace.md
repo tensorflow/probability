@@ -8,15 +8,23 @@
 
 # tfp.mcmc.StatesAndTrace
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/sample.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `StatesAndTrace`
 
 States and auxiliary trace of an MCMC chain.
 
 
-
-
-
-Defined in [`python/mcmc/sample.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/sample.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -24,6 +32,7 @@ The first dimension of all the `Tensor`s in this structure is the same and
 represents the chain length.
 
 #### Attributes:
+
 
 * <b>`all_states`</b>: A `Tensor` or a nested collection of `Tensor`s representing the
   MCMC chain state.
@@ -44,13 +53,16 @@ Create new instance of StatesAndTrace(all_states, trace)
 
 
 
+
 ## Properties
 
 <h3 id="all_states"><code>all_states</code></h3>
 
 
 
+
 <h3 id="trace"><code>trace</code></h3>
+
 
 
 

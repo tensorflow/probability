@@ -5,18 +5,30 @@
 
 # tfp.layers.default_mean_field_normal_fn
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/util.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Creates a function to build Normal distributions with trainable params.
 
 ### Aliases:
 
-* `tfp.layers.default_mean_field_normal_fn`
 * `tfp.layers.util.default_mean_field_normal_fn`
+
 
 ``` python
 tfp.layers.default_mean_field_normal_fn(
     is_singular=False,
-    loc_initializer=tf.compat.v1.initializers.random_normal(stddev=0.1),
-    untransformed_scale_initializer=tf.compat.v1.initializers.random_normal(mean=-3.0, stddev=0.1),
+    loc_initializer=tf1.initializers.random_normal(stddev=0.1),
+    untransformed_scale_initializer=tf1.initializers.random_normal(mean=-3.0, stddev=0.1),
     loc_regularizer=None,
     untransformed_scale_regularizer=None,
     loc_constraint=None,
@@ -26,14 +38,13 @@ tfp.layers.default_mean_field_normal_fn(
 
 
 
-Defined in [`python/layers/util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/util.py).
-
 <!-- Placeholder for "Used in" -->
 
 This function produces a closure which produces `tfd.Normal`
 parameterized by a loc` and `scale` each created using `tf.get_variable`.
 
 #### Args:
+
 
 * <b>`is_singular`</b>: Python `bool` if `True`, forces the special case limit of
   `scale->0`, i.e., a `Deterministic` distribution.
@@ -61,6 +72,7 @@ parameterized by a loc` and `scale` each created using `tf.get_variable`.
 
 
 #### Returns:
+
 
 * <b>`make_normal_fn`</b>: Python `callable` which creates a `tfd.Normal`
   using from args: `dtype, shape, name, trainable, add_variable_fn`.

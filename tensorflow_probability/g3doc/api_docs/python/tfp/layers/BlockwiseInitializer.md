@@ -12,6 +12,18 @@
 
 # tfp.layers.BlockwiseInitializer
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/initializers.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `BlockwiseInitializer`
 
 Initializer which concats other intializers.
@@ -20,17 +32,15 @@ Initializer which concats other intializers.
 
 ### Aliases:
 
-* Class `tfp.layers.BlockwiseInitializer`
 * Class `tfp.layers.initializers.BlockwiseInitializer`
 
-
-
-Defined in [`python/layers/initializers.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/initializers.py).
 
 <!-- Placeholder for "Used in" -->
 
 
 <h2 id="__init__"><code>__init__</code></h2>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/initializers.py">View source</a>
 
 ``` python
 __init__(
@@ -42,7 +52,9 @@ __init__(
 
 Creates the `BlockwiseInitializer`.
 
+
 #### Arguments:
+
 
 * <b>`initializers`</b>: `list` of Keras initializers, e.g., `"glorot_uniform"` or
   `tf.keras.initializers.Constant(0.5413)`.
@@ -59,7 +71,9 @@ Creates the `BlockwiseInitializer`.
 
 
 
+
 <h3 id="sizes"><code>sizes</code></h3>
+
 
 
 
@@ -69,9 +83,12 @@ Creates the `BlockwiseInitializer`.
 
 
 
+
 ## Methods
 
 <h3 id="__call__"><code>__call__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/initializers.py">View source</a>
 
 ``` python
 __call__(
@@ -82,13 +99,17 @@ __call__(
 
 Returns a tensor object initialized as specified by the initializer.
 
+
 #### Args:
+
 
 * <b>`shape`</b>: Shape of the tensor.
 * <b>`dtype`</b>: Optional dtype of the tensor. If not provided will return tensor
  of `tf.float32`.
 
 <h3 id="from_config"><code>from_config</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/initializers.py">View source</a>
 
 ``` python
 @classmethod
@@ -100,13 +121,17 @@ from_config(
 
 Instantiates an initializer from a configuration dictionary.
 
+
 <h3 id="get_config"><code>get_config</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/initializers.py">View source</a>
 
 ``` python
 get_config()
 ```
 
 Returns initializer configuration as a JSON-serializable dict.
+
 
 
 

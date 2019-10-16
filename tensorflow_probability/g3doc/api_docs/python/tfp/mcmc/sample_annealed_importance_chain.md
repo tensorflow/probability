@@ -5,6 +5,18 @@
 
 # tfp.mcmc.sample_annealed_importance_chain
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/sample_annealed_importance.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Runs annealed importance sampling (AIS) to estimate normalizing constants.
 
 ``` python
@@ -20,8 +32,6 @@ tfp.mcmc.sample_annealed_importance_chain(
 ```
 
 
-
-Defined in [`python/mcmc/sample_annealed_importance.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/sample_annealed_importance.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -47,6 +57,7 @@ Note: When running in graph mode, `proposal_log_prob_fn` and
 reduced to two times in the future).
 
 #### Args:
+
 
 * <b>`num_steps`</b>: Integer number of Markov chain updates to run. More
   iterations means more expense, but smoother annealing between q
@@ -76,13 +87,14 @@ reduced to two times in the future).
 
 #### Returns:
 
-  next_state: `Tensor` or Python list of `Tensor`s representing the
-    state(s) of the Markov chain(s) at the final iteration. Has same shape as
-    input `current_state`.
-  ais_weights: Tensor with the estimated weight(s). Has shape matching
-    `target_log_prob_fn(current_state)`.
-  kernel_results: `collections.namedtuple` of internal calculations used to
-    advance the chain.
+
+* <b>`next_state`</b>: `Tensor` or Python list of `Tensor`s representing the
+  state(s) of the Markov chain(s) at the final iteration. Has same shape as
+  input `current_state`.
+* <b>`ais_weights`</b>: Tensor with the estimated weight(s). Has shape matching
+  `target_log_prob_fn(current_state)`.
+* <b>`kernel_results`</b>: `collections.namedtuple` of internal calculations used to
+  advance the chain.
 
 #### Examples
 

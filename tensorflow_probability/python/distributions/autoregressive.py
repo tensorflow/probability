@@ -21,8 +21,8 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import seed_stream
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 class Autoregressive(distribution.Distribution):
@@ -77,7 +77,7 @@ class Autoregressive(distribution.Distribution):
     n = event_size * (event_size + 1) // 2
     p = tf.Variable(tfd.Normal(loc=0., scale=1.).sample(n))
     affine = tfb.Affine(
-        scale_tril=tfd.fill_triangular(0.25 * p))
+        scale_tril=tfp.math.fill_triangular(0.25 * p))
     def _fn(samples):
       scale = tf.exp(affine.forward(samples))
       return tfd.Independent(
@@ -166,7 +166,6 @@ class Autoregressive(distribution.Distribution):
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
-        graph_parents=self._distribution0._graph_parents,  # pylint: disable=protected-access
         name=name)
 
   @property
@@ -198,7 +197,7 @@ class Autoregressive(distribution.Distribution):
     return self.distribution0.event_shape_tensor()
 
   def _sample_n(self, n, seed=None):
-    seed = seed_stream.SeedStream(seed, salt="Autoregressive")()
+    seed = SeedStream(seed, salt="Autoregressive")()
     samples = self.distribution0.sample(n, seed=seed)
     for _ in range(self._num_steps):
       # pylint: disable=not-callable

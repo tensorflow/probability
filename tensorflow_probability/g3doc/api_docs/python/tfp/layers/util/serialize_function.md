@@ -5,6 +5,18 @@
 
 # tfp.layers.util.serialize_function
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/layers/util.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Serializes function for Keras.
 
 ``` python
@@ -12,8 +24,6 @@ tfp.layers.util.serialize_function(func)
 ```
 
 
-
-Defined in [`python/layers/util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers/util.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -26,6 +36,7 @@ bytecode. (Note that both cases are brittle!)
 This serialization mimicks the implementation in `tf.keras.layers.Lambda`.
 
 #### Args:
+
 
 * <b>`func`</b>: Python function to serialize.
 

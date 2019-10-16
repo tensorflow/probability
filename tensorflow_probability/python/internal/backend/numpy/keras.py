@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Numpy implementations of TensorFlow functions."""
+"""Numpy implementations of TensorFlow Keras functions."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
 
 from tensorflow_probability.python.internal.backend.numpy import keras_layers as layers
 
@@ -25,3 +24,4 @@ from tensorflow_probability.python.internal.backend.numpy import keras_layers as
 __all__ = [
     'layers',
 ]
+

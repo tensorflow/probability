@@ -5,6 +5,18 @@
 
 # tfp.vi.csiszar_vimco
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/vi/csiszar_divergence.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Use VIMCO to lower the variance of gradient[csiszar_function(Avg(logu))].
 
 ``` python
@@ -21,8 +33,6 @@ tfp.vi.csiszar_vimco(
 
 
 
-Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
-
 <!-- Placeholder for "Used in" -->
 
 This function generalizes VIMCO [(Mnih and Rezende, 2016)][1] to Csiszar
@@ -32,6 +42,7 @@ Note: if `q.reparameterization_type = tfd.FULLY_REPARAMETERIZED`,
 consider using `monte_carlo_csiszar_f_divergence`.
 
 #### The VIMCO loss is:
+
 
 
 ```none
@@ -63,8 +74,8 @@ This implementation prefers numerical precision over efficiency, i.e.,
 `O(num_draws * num_batch_draws * prod(batch_shape) * prod(event_shape))`.
 (The constant may be fairly large, perhaps around 12.)
 
-
 #### Args:
+
 
 * <b>`f`</b>: Python `callable` representing a Csiszar-function in log-space.
 * <b>`p_log_prob`</b>: Python `callable` representing the natural-log of the
@@ -83,12 +94,14 @@ This implementation prefers numerical precision over efficiency, i.e.,
 
 #### Returns:
 
+
 * <b>`vimco`</b>: The Csiszar f-Divergence generalized VIMCO objective.
 
 
 #### Raises:
 
-  ValueError: if `num_draws < 2`.
+
+* <b>`ValueError`</b>: if `num_draws < 2`.
 
 #### References
 

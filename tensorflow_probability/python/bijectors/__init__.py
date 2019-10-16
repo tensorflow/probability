@@ -26,15 +26,17 @@ from tensorflow_probability.python.bijectors.affine_linear_operator import Affin
 from tensorflow_probability.python.bijectors.affine_scalar import AffineScalar
 from tensorflow_probability.python.bijectors.batch_normalization import BatchNormalization
 from tensorflow_probability.python.bijectors.bijector import Bijector
-from tensorflow_probability.python.bijectors.bijector import ConditionalBijector
 from tensorflow_probability.python.bijectors.blockwise import Blockwise
 from tensorflow_probability.python.bijectors.chain import Chain
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
 from tensorflow_probability.python.bijectors.cholesky_to_inv_cholesky import CholeskyToInvCholesky
+from tensorflow_probability.python.bijectors.correlation_cholesky import CorrelationCholesky
 from tensorflow_probability.python.bijectors.cumsum import Cumsum
 from tensorflow_probability.python.bijectors.discrete_cosine_transform import DiscreteCosineTransform
 from tensorflow_probability.python.bijectors.exp import Exp
 from tensorflow_probability.python.bijectors.expm1 import Expm1
+from tensorflow_probability.python.bijectors.fill_scale_tril import FillScaleTriL
+from tensorflow_probability.python.bijectors.fill_scale_tril import ScaleTriL
 from tensorflow_probability.python.bijectors.fill_triangular import FillTriangular
 from tensorflow_probability.python.bijectors.gumbel import Gumbel
 from tensorflow_probability.python.bijectors.identity import Identity
@@ -48,18 +50,26 @@ from tensorflow_probability.python.bijectors.masked_autoregressive import masked
 from tensorflow_probability.python.bijectors.masked_autoregressive import masked_dense
 from tensorflow_probability.python.bijectors.masked_autoregressive import MaskedAutoregressiveFlow
 from tensorflow_probability.python.bijectors.matrix_inverse_tril import MatrixInverseTriL
-from tensorflow_probability.python.bijectors.matveclu import MatvecLU
 from tensorflow_probability.python.bijectors.normal_cdf import NormalCDF
 from tensorflow_probability.python.bijectors.ordered import Ordered
+from tensorflow_probability.python.bijectors.pad import Pad
 from tensorflow_probability.python.bijectors.permute import Permute
 from tensorflow_probability.python.bijectors.power_transform import PowerTransform
+from tensorflow_probability.python.bijectors.rational_quadratic_spline import RationalQuadraticSpline
 from tensorflow_probability.python.bijectors.real_nvp import real_nvp_default_template
 from tensorflow_probability.python.bijectors.real_nvp import RealNVP
 from tensorflow_probability.python.bijectors.reciprocal import Reciprocal
 from tensorflow_probability.python.bijectors.reshape import Reshape
-from tensorflow_probability.python.bijectors.scale_tril import ScaleTriL
+from tensorflow_probability.python.bijectors.scale import Scale
+from tensorflow_probability.python.bijectors.scale_matvec_diag import ScaleMatvecDiag
+from tensorflow_probability.python.bijectors.scale_matvec_linear_operator import ScaleMatvecLinearOperator
+from tensorflow_probability.python.bijectors.scale_matvec_lu import MatvecLU
+from tensorflow_probability.python.bijectors.scale_matvec_lu import ScaleMatvecLU
+from tensorflow_probability.python.bijectors.scale_matvec_tril import ScaleMatvecTriL
+from tensorflow_probability.python.bijectors.shift import Shift
 from tensorflow_probability.python.bijectors.sigmoid import Sigmoid
 from tensorflow_probability.python.bijectors.sinh_arcsinh import SinhArcsinh
+from tensorflow_probability.python.bijectors.softfloor import Softfloor
 from tensorflow_probability.python.bijectors.softmax_centered import SoftmaxCentered
 from tensorflow_probability.python.bijectors.softplus import Softplus
 from tensorflow_probability.python.bijectors.softsign import Softsign
@@ -85,11 +95,12 @@ __all__ = [
     "Chain",
     "CholeskyOuterProduct",
     "CholeskyToInvCholesky",
-    "ConditionalBijector",
+    "CorrelationCholesky",
     "Cumsum",
     "DiscreteCosineTransform",
     "Exp",
     "Expm1",
+    "FillScaleTriL",
     "FillTriangular",
     "Gumbel",
     "Identity",
@@ -102,14 +113,23 @@ __all__ = [
     "MatvecLU",
     "NormalCDF",
     "Ordered",
+    "Pad",
     "Permute",
     "PowerTransform",
+    "RationalQuadraticSpline",
     "RealNVP",
     "Reciprocal",
     "Reshape",
+    "Scale",
+    "ScaleMatvecDiag",
+    "ScaleMatvecLinearOperator",
+    "ScaleMatvecLU",
+    "ScaleMatvecTriL",
     "ScaleTriL",
+    "Shift",
     "Sigmoid",
     "SinhArcsinh",
+    "Softfloor",
     "SoftmaxCentered",
     "Softplus",
     "Softsign",

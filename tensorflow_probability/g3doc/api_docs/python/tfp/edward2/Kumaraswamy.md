@@ -5,7 +5,24 @@
 
 # tfp.edward2.Kumaraswamy
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for Kumaraswamy.
+
+### Aliases:
+
+* `tfp.experimental.edward2.Kumaraswamy`
+
 
 ``` python
 tfp.edward2.Kumaraswamy(
@@ -16,22 +33,21 @@ tfp.edward2.Kumaraswamy(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See Kumaraswamy for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
 Initialize a batch of Kumaraswamy distributions.
 
-
 #### Args:
+
 
 * <b>`concentration1`</b>: Positive floating-point `Tensor` indicating mean
   number of successes; aka "alpha". Implies `self.dtype` and

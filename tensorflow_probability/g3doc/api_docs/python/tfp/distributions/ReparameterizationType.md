@@ -7,15 +7,29 @@
 
 # tfp.distributions.ReparameterizationType
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/internal/reparameterization.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `ReparameterizationType`
 
 Instances of this class represent how sampling is reparameterized.
 
 
 
+### Aliases:
 
+* Class `tfp.experimental.substrates.jax.distributions.ReparameterizationType`
+* Class `tfp.experimental.substrates.numpy.distributions.ReparameterizationType`
 
-Defined in [`python/internal/reparameterization.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/reparameterization.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -34,6 +48,8 @@ one of two possible properties for samples from a distribution:
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/internal/reparameterization.py">View source</a>
+
 ``` python
 __init__(rep_type)
 ```
@@ -42,9 +58,12 @@ Initialize self.  See help(type(self)) for accurate signature.
 
 
 
+
 ## Methods
 
 <h3 id="__eq__"><code>__eq__</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/internal/reparameterization.py">View source</a>
 
 ``` python
 __eq__(other)
@@ -57,12 +76,14 @@ instances, equality checks if two instances' id() values are equal.
 
 #### Args:
 
+
 * <b>`other`</b>: Object to compare against.
 
 
 #### Returns:
 
 `self is other`.
+
 
 
 

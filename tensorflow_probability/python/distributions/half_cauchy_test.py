@@ -20,10 +20,11 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -33,9 +34,9 @@ tfd = tfp.distributions
 class _HalfCauchyTest(object):
 
   def _create_placeholder_with_default(self, default, name=None):
-    default_ = tf.convert_to_tensor(value=default, dtype=self.dtype)
-    return tf.compat.v1.placeholder_with_default(
-        input=default_,
+    default_ = tf.convert_to_tensor(default, dtype=self.dtype)
+    return tf1.placeholder_with_default(
+        default_,
         shape=default_.shape if self.use_static_shape else None,
         name=name)
 
@@ -48,7 +49,7 @@ class _HalfCauchyTest(object):
     scale = tf.ones(scale_shape)
     self.assertAllEqual(
         expected,
-        self.evaluate(tf.shape(input=tfd.HalfCauchy(loc, scale).sample())))
+        self.evaluate(tf.shape(tfd.HalfCauchy(loc, scale).sample())))
 
   def _test_param_static_shapes(self, sample_shape, expected):
     param_shapes = tfd.HalfCauchy.param_static_shapes(sample_shape)
@@ -107,7 +108,7 @@ class _HalfCauchyTest(object):
       scale = self._create_placeholder_with_default(scale_, name="scale")
       with self.assertRaisesOpError("Condition x > 0"):
         half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
-        self.evaluate(half_cauchy.scale)
+        self.evaluate(half_cauchy.entropy())
 
   def testHalfCauchyPdf(self):
     batch_size = 6
@@ -128,7 +129,7 @@ class _HalfCauchyTest(object):
       else:
         expected_shape = tf.TensorShape(None)
       self.assertEqual(tfp_res.shape, expected_shape)
-      self.assertAllEqual(self.evaluate(tf.shape(input=tfp_res)), (batch_size,))
+      self.assertAllEqual(self.evaluate(tf.shape(tfp_res)), (batch_size,))
       self.assertAllClose(
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
@@ -168,7 +169,7 @@ class _HalfCauchyTest(object):
         expected_shape = tf.TensorShape(None)
       self.assertEqual(tfp_res.shape, expected_shape)
       self.assertAllEqual(
-          self.evaluate(tf.shape(input=tfp_res)), (batch_size, 3))
+          self.evaluate(tf.shape(tfp_res)), (batch_size, 3))
       self.assertAllClose(
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
@@ -190,7 +191,7 @@ class _HalfCauchyTest(object):
       else:
         expected_shape = tf.TensorShape(None)
       self.assertEqual(tfp_res.shape, expected_shape)
-      self.assertAllEqual(self.evaluate(tf.shape(input=tfp_res)), (6, 3))
+      self.assertAllEqual(self.evaluate(tf.shape(tfp_res)), (6, 3))
       self.assertAllClose(
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
@@ -214,7 +215,7 @@ class _HalfCauchyTest(object):
       else:
         expected_shape = tf.TensorShape(None)
       self.assertEqual(tfp_res.shape, expected_shape)
-      self.assertAllEqual(self.evaluate(tf.shape(input=tfp_res)), (batch_size,))
+      self.assertAllEqual(self.evaluate(tf.shape(tfp_res)), (batch_size,))
       self.assertAllClose(
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
@@ -254,7 +255,7 @@ class _HalfCauchyTest(object):
         expected_shape = tf.TensorShape(None)
       self.assertEqual(tfp_res.shape, expected_shape)
       self.assertAllEqual(
-          self.evaluate(tf.shape(input=tfp_res)), (batch_size, 3))
+          self.evaluate(tf.shape(tfp_res)), (batch_size, 3))
       self.assertAllClose(
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
@@ -276,7 +277,7 @@ class _HalfCauchyTest(object):
       else:
         expected_shape = tf.TensorShape(None)
       self.assertEqual(tfp_res.shape, expected_shape)
-      self.assertAllEqual(self.evaluate(tf.shape(input=tfp_res)), (6, 3))
+      self.assertAllEqual(self.evaluate(tf.shape(tfp_res)), (6, 3))
       self.assertAllClose(
           self.evaluate(tfp_res),
           scipy_f(x_, loc_, scale_))
@@ -330,7 +331,7 @@ class _HalfCauchyTest(object):
     else:
       expected_shape = tf.TensorShape(None)
     self.assertEqual(entropy.shape, expected_shape)
-    self.assertAllEqual(self.evaluate(tf.shape(input=entropy)), (batch_size,))
+    self.assertAllEqual(self.evaluate(tf.shape(entropy)), (batch_size,))
     self.assertAllClose(
         self.evaluate(entropy),
         [stats.halfcauchy.entropy(loc_, scale_)] * batch_size)
@@ -351,7 +352,7 @@ class _HalfCauchyTest(object):
     else:
       expected_shape = tf.TensorShape(None)
     self.assertEqual(quantile.shape, expected_shape)
-    self.assertAllEqual(self.evaluate(tf.shape(input=quantile)), (batch_size,))
+    self.assertAllEqual(self.evaluate(tf.shape(quantile)), (batch_size,))
     self.assertAllClose(
         self.evaluate(quantile),
         stats.halfcauchy.ppf(p_, loc_, scale_))
@@ -387,7 +388,7 @@ class _HalfCauchyTest(object):
     scale = self._create_placeholder_with_default(
         [scale_] * batch_size, name="scale")
     n_ = [int(1e5), 2]
-    n = tf.convert_to_tensor(value=n_, dtype=tf.int32, name="n")
+    n = tf.convert_to_tensor(n_, dtype=tf.int32, name="n")
     half_cauchy = tfd.HalfCauchy(loc=loc, scale=scale)
     samples = half_cauchy.sample(n)
     sample_values = self.evaluate(samples)
@@ -493,25 +494,27 @@ class _HalfCauchyTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HalfCauchyTestStaticShapeFloat32(test_case.TestCase, _HalfCauchyTest):
+class HalfCauchyTestStaticShapeFloat32(tfp_test_util.TestCase, _HalfCauchyTest):
   dtype = np.float32
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HalfCauchyTestDynamicShapeFloat32(test_case.TestCase, _HalfCauchyTest):
+class HalfCauchyTestDynamicShapeFloat32(tfp_test_util.TestCase,
+                                        _HalfCauchyTest):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HalfCauchyTestStaticShapeFloat64(test_case.TestCase, _HalfCauchyTest):
+class HalfCauchyTestStaticShapeFloat64(tfp_test_util.TestCase, _HalfCauchyTest):
   dtype = np.float64
   use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HalfCauchyTestDynamicShapeFloat64(test_case.TestCase, _HalfCauchyTest):
+class HalfCauchyTestDynamicShapeFloat64(tfp_test_util.TestCase,
+                                        _HalfCauchyTest):
   dtype = np.float64
   use_static_shape = False
 

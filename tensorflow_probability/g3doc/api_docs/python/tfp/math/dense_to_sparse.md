@@ -5,6 +5,18 @@
 
 # tfp.math.dense_to_sparse
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/sparse.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Converts dense `Tensor` to `SparseTensor`, dropping `ignore_value` cells.
 
 ``` python
@@ -17,11 +29,11 @@ tfp.math.dense_to_sparse(
 
 
 
-Defined in [`python/math/sparse.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/sparse.py).
-
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
+
 
 * <b>`x`</b>: A `Tensor`.
 * <b>`ignore_value`</b>: Entries in `x` equal to this value will be
@@ -32,9 +44,11 @@ Defined in [`python/math/sparse.py`](https://github.com/tensorflow/probability/t
 
 #### Returns:
 
+
 * <b>`sparse_x`</b>: A `tf.SparseTensor` with the same shape as `x`.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: when `x`'s rank is `None`.

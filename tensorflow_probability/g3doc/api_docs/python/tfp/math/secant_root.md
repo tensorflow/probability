@@ -5,6 +5,18 @@
 
 # tfp.math.secant_root
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/root_search.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Finds root(s) of a function of single variable using the secant method.
 
 ``` python
@@ -24,8 +36,6 @@ tfp.math.secant_root(
 
 
 
-Defined in [`python/math/root_search.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/root_search.py).
-
 <!-- Placeholder for "Used in" -->
 
 The [secant method](https://en.wikipedia.org/wiki/Secant_method) is a
@@ -34,6 +44,7 @@ better approximate a root of a function. The secant method can be thought of
 as a finite-difference approximation of Newton's method.
 
 #### Args:
+
 
 * <b>`objective_fn`</b>: Python callable for which roots are searched. It must be a
   callable of a single variable. `objective_fn` must return a `Tensor` of
@@ -86,6 +97,7 @@ as a finite-difference approximation of Newton's method.
 
 #### Returns:
 
+
 * <b>`root_search_results`</b>: A Python `namedtuple` containing the following items:
   estimated_root: `Tensor` containing the last position explored. If the
     search was successful within the specified tolerance, this position is
@@ -98,7 +110,8 @@ as a finite-difference approximation of Newton's method.
 
 #### Raises:
 
-  ValueError: if a non-callable `stopping_policy_fn` is passed.
+
+* <b>`ValueError`</b>: if a non-callable `stopping_policy_fn` is passed.
 
 #### Examples
 

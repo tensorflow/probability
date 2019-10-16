@@ -5,7 +5,18 @@
 
 # tfp.edward2.tape
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Context manager for recording interceptable executions onto a tape.
+
+### Aliases:
+
+* `tfp.experimental.edward2.tape`
+
 
 ``` python
 tfp.edward2.tape(
@@ -13,6 +24,8 @@ tfp.edward2.tape(
     **kwds
 )
 ```
+
+
 
 <!-- Placeholder for "Used in" -->
 
@@ -22,10 +35,11 @@ within this context manager. In addition, the operation must be registered
 
 #### Yields:
 
-  tape: OrderedDict where operations are recorded in sequence. Keys are
-    the `name` keyword argument to the operation (typically, a random
-    variable's `name`) and values are the corresponding output of the
-    operation. If the operation has no name, it is not recorded.
+
+* <b>`tape`</b>: OrderedDict where operations are recorded in sequence. Keys are
+  the `name` keyword argument to the operation (typically, a random
+  variable's `name`) and values are the corresponding output of the
+  operation. If the operation has no name, it is not recorded.
 
 #### Examples
 

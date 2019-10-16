@@ -18,59 +18,49 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 import math
 
 # Dependency imports
+
 import numpy as np
-import tensorflow as tf
+from scipy import stats as sp_stats
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-tfd = tfp.distributions
-
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-stats = try_import("scipy.stats")
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class NormalTest(test_case.TestCase):
+class NormalTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
+    super(NormalTest, self).setUp()
 
   def _testParamShapes(self, sample_shape, expected):
     param_shapes = tfd.Normal.param_shapes(sample_shape)
-    mu_shape, sigma_shape = param_shapes["loc"], param_shapes["scale"]
+    mu_shape, sigma_shape = param_shapes['loc'], param_shapes['scale']
     self.assertAllEqual(expected, self.evaluate(mu_shape))
     self.assertAllEqual(expected, self.evaluate(sigma_shape))
     mu = tf.zeros(mu_shape)
     sigma = tf.ones(sigma_shape)
-    self.assertAllEqual(
-        expected,
-        self.evaluate(tf.shape(input=tfd.Normal(mu, sigma).sample())))
+    self.assertAllEqual(expected,
+                        self.evaluate(tf.shape(tfd.Normal(mu, sigma).sample())))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.Normal.param_static_shapes(sample_shape)
-    mu_shape, sigma_shape = param_shapes["loc"], param_shapes["scale"]
+    mu_shape, sigma_shape = param_shapes['loc'], param_shapes['scale']
     self.assertEqual(expected, mu_shape)
     self.assertEqual(expected, sigma_shape)
 
   def testSampleLikeArgsGetDistDType(self):
     dist = tfd.Normal(0., 1.)
     self.assertEqual(tf.float32, dist.dtype)
-    for method in ("log_prob", "prob", "log_cdf", "cdf",
-                   "log_survival_function", "survival_function", "quantile"):
+    for method in ('log_prob', 'prob', 'log_cdf', 'cdf',
+                   'log_survival_function', 'survival_function', 'quantile'):
       self.assertEqual(tf.float32, getattr(dist, method)(1).dtype)
 
   def testParamShapes(self):
@@ -109,10 +99,8 @@ class NormalTest(test_case.TestCase):
     self.assertAllEqual(normal.batch_shape, pdf.shape)
     self.assertAllEqual(normal.batch_shape, self.evaluate(pdf).shape)
 
-    if not stats:
-      return
-    expected_log_pdf = stats.norm(self.evaluate(mu),
-                                  self.evaluate(sigma)).logpdf(x)
+    expected_log_pdf = sp_stats.norm(self.evaluate(mu),
+                                     self.evaluate(sigma)).logpdf(x)
     self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
     self.assertAllClose(np.exp(expected_log_pdf), self.evaluate(pdf))
 
@@ -145,10 +133,8 @@ class NormalTest(test_case.TestCase):
     self.assertAllEqual(normal.batch_shape, pdf.shape)
     self.assertAllEqual(normal.batch_shape, pdf_values.shape)
 
-    if not stats:
-      return
-    expected_log_pdf = stats.norm(self.evaluate(mu),
-                                  self.evaluate(sigma)).logpdf(x)
+    expected_log_pdf = sp_stats.norm(self.evaluate(mu),
+                                     self.evaluate(sigma)).logpdf(x)
     self.assertAllClose(expected_log_pdf, log_pdf_values)
     self.assertAllClose(np.exp(expected_log_pdf), pdf_values)
 
@@ -167,9 +153,7 @@ class NormalTest(test_case.TestCase):
         self.evaluate(cdf).shape)
     self.assertAllEqual(normal.batch_shape, cdf.shape)
     self.assertAllEqual(normal.batch_shape, self.evaluate(cdf).shape)
-    if not stats:
-      return
-    expected_cdf = stats.norm(mu, sigma).cdf(x)
+    expected_cdf = sp_stats.norm(mu, sigma).cdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0)
 
   def testNormalSurvivalFunction(self):
@@ -188,9 +172,7 @@ class NormalTest(test_case.TestCase):
         self.evaluate(sf).shape)
     self.assertAllEqual(normal.batch_shape, sf.shape)
     self.assertAllEqual(normal.batch_shape, self.evaluate(sf).shape)
-    if not stats:
-      return
-    expected_sf = stats.norm(mu, sigma).sf(x)
+    expected_sf = sp_stats.norm(mu, sigma).sf(x)
     self.assertAllClose(expected_sf, self.evaluate(sf), atol=0)
 
   def testNormalLogCDF(self):
@@ -210,9 +192,7 @@ class NormalTest(test_case.TestCase):
     self.assertAllEqual(normal.batch_shape, cdf.shape)
     self.assertAllEqual(normal.batch_shape, self.evaluate(cdf).shape)
 
-    if not stats:
-      return
-    expected_cdf = stats.norm(mu, sigma).logcdf(x)
+    expected_cdf = sp_stats.norm(mu, sigma).logcdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0, rtol=1e-3)
 
   def testFiniteGradientAtDifficultPoints(self):
@@ -220,8 +200,8 @@ class NormalTest(test_case.TestCase):
       x = np.array([-100., -20., -5., 0., 5., 20., 100.]).astype(dtype)
       return lambda m, s: getattr(tfd.Normal(loc=m, scale=s), attr)(x)
     for dtype in np.float32, np.float64:
-      for attr in ["cdf", "log_cdf", "survival_function",
-                   "log_survival_function", "log_prob", "prob"]:
+      for attr in ['cdf', 'log_cdf', 'survival_function',
+                   'log_survival_function', 'log_prob', 'prob']:
         value, grads = self.evaluate(tfp.math.value_and_gradient(
             make_fn(dtype, attr),
             [tf.constant(0, dtype), tf.constant(1, dtype)]))
@@ -246,13 +226,11 @@ class NormalTest(test_case.TestCase):
     self.assertAllEqual(normal.batch_shape, sf.shape)
     self.assertAllEqual(normal.batch_shape, self.evaluate(sf).shape)
 
-    if not stats:
-      return
-    expected_sf = stats.norm(mu, sigma).logsf(x)
+    expected_sf = sp_stats.norm(mu, sigma).logsf(x)
     self.assertAllClose(expected_sf, self.evaluate(sf), atol=0, rtol=1e-5)
 
   def testNormalEntropyWithScalarInputs(self):
-    # Scipy.stats.norm cannot deal with the shapes in the other test.
+    # Scipy.sp_stats.norm cannot deal with the shapes in the other test.
     mu_v = 2.34
     sigma_v = 4.56
     normal = tfd.Normal(loc=mu_v, scale=sigma_v)
@@ -265,10 +243,8 @@ class NormalTest(test_case.TestCase):
         self.evaluate(entropy).shape)
     self.assertAllEqual(normal.batch_shape, entropy.shape)
     self.assertAllEqual(normal.batch_shape, self.evaluate(entropy).shape)
-    # scipy.stats.norm cannot deal with these shapes.
-    if not stats:
-      return
-    expected_entropy = stats.norm(mu_v, sigma_v).entropy()
+    # scipy.sp_stats.norm cannot deal with these shapes.
+    expected_entropy = sp_stats.norm(mu_v, sigma_v).entropy()
     self.assertAllClose(expected_entropy, self.evaluate(entropy))
 
   def testNormalEntropy(self):
@@ -276,7 +252,7 @@ class NormalTest(test_case.TestCase):
     sigma_v = np.array([[1.0, 2.0, 3.0]]).T
     normal = tfd.Normal(loc=mu_v, scale=sigma_v)
 
-    # scipy.stats.norm cannot deal with these shapes.
+    # scipy.sp_stats.norm cannot deal with these shapes.
     sigma_broadcast = mu_v * sigma_v
     expected_entropy = 0.5 * np.log(2 * np.pi * np.exp(1) * sigma_broadcast**2)
     entropy = normal.entropy()
@@ -322,9 +298,7 @@ class NormalTest(test_case.TestCase):
     self.assertAllEqual(normal.batch_shape, x.shape)
     self.assertAllEqual(normal.batch_shape, self.evaluate(x).shape)
 
-    if not stats:
-      return
-    expected_x = stats.norm(mu, sigma).ppf(p)
+    expected_x = sp_stats.norm(mu, sigma).ppf(p)
     self.assertAllClose(expected_x, self.evaluate(x), atol=0.)
 
   def _baseQuantileFiniteGradientAtDifficultPoints(self, dtype):
@@ -442,9 +416,8 @@ class NormalTest(test_case.TestCase):
     self.assertAllEqual(expected_samples_shape, sample_values.shape)
 
   def testNegativeSigmaFails(self):
-    with self.assertRaisesOpError("Condition x > 0 did not hold"):
-      normal = tfd.Normal(
-          loc=[1.], scale=[-5.], validate_args=True, name="G")
+    with self.assertRaisesOpError('Argument `scale` must be positive.'):
+      normal = tfd.Normal(loc=[1.], scale=[-5.], validate_args=True, name='G')
       self.evaluate(normal.mean())
 
   def testNormalShape(self):
@@ -458,12 +431,12 @@ class NormalTest(test_case.TestCase):
     self.assertEqual(normal.event_shape, tf.TensorShape([]))
 
   def testNormalShapeWithPlaceholders(self):
-    mu = tf.compat.v1.placeholder_with_default(np.float32(5), shape=None)
-    sigma = tf.compat.v1.placeholder_with_default(
+    mu = tf1.placeholder_with_default(np.float32(5), shape=None)
+    sigma = tf1.placeholder_with_default(
         np.float32([1.0, 2.0]), shape=None)
     normal = tfd.Normal(loc=mu, scale=sigma)
 
-    # get_batch_shape should return an "<unknown>" tensor (graph mode only).
+    # get_batch_shape should return an '<unknown>' tensor (graph mode only).
     self.assertEqual(normal.event_shape, ())
     self.assertEqual(normal.batch_shape,
                      tf.TensorShape([2] if tf.executing_eagerly() else None))
@@ -487,16 +460,40 @@ class NormalTest(test_case.TestCase):
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
 
     x = n_a.sample(int(1e5), seed=tfp_test_util.test_seed())
-    kl_sample = tf.reduce_mean(
-        input_tensor=n_a.log_prob(x) - n_b.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(n_a.log_prob(x) - n_b.log_prob(x), axis=0)
     kl_sample_ = self.evaluate(kl_sample)
 
     self.assertEqual(kl.shape, (batch_size,))
     self.assertAllClose(kl_val, kl_expected)
     self.assertAllClose(kl_expected, kl_sample_, atol=0.0, rtol=1e-2)
 
+  def testVariableScale(self):
+    x = tf.Variable(1.)
+    d = tfd.Normal(loc=0., scale=x, validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
+    self.assertIs(x, d.scale)
+    self.assertEqual(0., self.evaluate(d.mean()))
+    with self.assertRaisesOpError('Argument `scale` must be positive.'):
+      with tf.control_dependencies([x.assign(-1.)]):
+        self.evaluate(d.mean())
 
-class NormalEagerGCTest(tf.test.TestCase):
+  def testIncompatibleArgShapesGraph(self):
+    if tf.executing_eagerly(): return
+    scale = tf1.placeholder_with_default(tf.ones([4, 1]), shape=None)
+    with self.assertRaisesRegexp(tf.errors.OpError, r'Incompatible shapes'):
+      d = tfd.Normal(loc=tf.zeros([2, 3]), scale=scale, validate_args=True)
+      self.evaluate(d.mean())
+
+  def testIncompatibleArgShapesEager(self):
+    if not tf.executing_eagerly(): return
+    scale = tf1.placeholder_with_default(tf.ones([4, 1]), shape=None)
+    with self.assertRaisesRegexp(
+        ValueError,
+        r'Arguments `loc` and `scale` must have compatible shapes.'):
+      tfd.Normal(loc=tf.zeros([2, 3]), scale=scale, validate_args=True)
+
+
+class NormalEagerGCTest(tfp_test_util.TestCase):
 
   @test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def testNormalMeanAndMode(self):
@@ -513,5 +510,5 @@ class NormalEagerGCTest(tf.test.TestCase):
     self.assertAllEqual([7., 7, 7], self.evaluate(normal.mode()))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

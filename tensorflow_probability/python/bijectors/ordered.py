@@ -22,7 +22,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 
 
 __all__ = [
@@ -31,8 +30,7 @@ __all__ = [
 
 
 class Ordered(bijector.Bijector):
-  """Bijector which maps a tensor x_k that has increasing elements in the last
-  dimension to an unconstrained tensor y_k.
+  """Maps a vector of increasing elements to an unconstrained vector.
 
   Both the domain and the codomain of the mapping is [-inf, inf], however,
   the input of the forward mapping must be strictly increasing.
@@ -56,20 +54,21 @@ class Ordered(bijector.Bijector):
   """
 
   def __init__(self, validate_args=False, name="ordered"):
-    super(Ordered, self).__init__(
-        forward_min_event_ndims=1,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(Ordered, self).__init__(
+          forward_min_event_ndims=1,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
-    x = self._maybe_assert_valid_x(x)
-    y0 = x[..., 0, tf.newaxis]
-    yk = tf.math.log(x[..., 1:] - x[..., :-1])
-    y = tf.concat([y0, yk], axis=-1)
-    return y
+    with tf.control_dependencies(self._assertions(x)):
+      y0 = x[..., :1]
+      yk = tf.math.log(x[..., 1:] - x[..., :-1])
+      y = tf.concat([y0, yk], axis=-1)
+      return y
 
   def _inverse(self, y):
-    x0 = y[..., 0, tf.newaxis]
+    x0 = y[..., :1]
     xk = tf.exp(y[..., 1:])
     x = tf.concat([x0, xk], axis=-1)
     return tf.cumsum(x, axis=-1)
@@ -83,17 +82,15 @@ class Ordered(bijector.Bijector):
     # |det(Jac)| = prod_{i=1}^{K} exp(y[i]).
     # (1) - Stan Modeling Language User's Guide and Reference Manual
     #       Version 2.17.0 session 35.2
-    return tf.reduce_sum(input_tensor=y[..., 1:], axis=-1)
+    return tf.reduce_sum(y[..., 1:], axis=-1)
 
   def _forward_log_det_jacobian(self, x):
-    x = self._maybe_assert_valid_x(x)
-    return -tf.reduce_sum(
-        input_tensor=tf.math.log(x[..., 1:] - x[..., :-1]), axis=-1)
+    with tf.control_dependencies(self._assertions(x)):
+      return -tf.reduce_sum(tf.math.log(x[..., 1:] - x[..., :-1]), axis=-1)
 
-  def _maybe_assert_valid_x(self, x):
+  def _assertions(self, t):
     if not self.validate_args:
-      return x
-    is_valid = assert_util.assert_positive(
-        x[..., 1:] - x[..., :-1],
-        message="Forward transformation input must be strictly increasing.")
-    return distribution_util.with_dependencies([is_valid], x)
+      return []
+    return [assert_util.assert_positive(
+        t[..., 1:] - t[..., :-1],
+        message="Forward transformation input must be strictly increasing.")]

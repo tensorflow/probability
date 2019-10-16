@@ -15,15 +15,23 @@
 
 # tfp.sts.Autoregressive
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/autoregressive.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `Autoregressive`
 
 Formal representation of an autoregressive model.
 
 Inherits From: [`StructuralTimeSeries`](../../tfp/sts/StructuralTimeSeries.md)
-
-
-
-Defined in [`python/sts/autoregressive.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/autoregressive.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -33,7 +41,7 @@ is a noisy linear combination of previous steps:
 ```python
 level[t+1] = (sum(coefficients * levels[t:t-order:-1]) +
               Normal(0., level_scale))
- ```
+```
 
 The latent state is `levels[t:t-order:-1]`. We observe a noisy realization of
 the current level: `f[t] = level[t] + Normal(0., observation_noise_scale)` at
@@ -51,6 +59,8 @@ stationarity and other mathematical properties of autoregressive processes.
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/autoregressive.py">View source</a>
+
 ``` python
 __init__(
     order,
@@ -65,7 +75,9 @@ __init__(
 
 Specify an autoregressive model.
 
+
 #### Args:
+
 
 * <b>`order`</b>: scalar Python positive `int` specifying the number of past
   timesteps to regress on.
@@ -110,7 +122,9 @@ Specify an autoregressive model.
 
 Static batch shape of models represented by this component.
 
+
 #### Returns:
+
 
 * <b>`batch_shape`</b>: A `tf.TensorShape` giving the broadcast batch shape of
   all model parameters. This should match the batch shape of
@@ -122,13 +136,16 @@ Static batch shape of models represented by this component.
 
 
 
+
 <h3 id="latent_size"><code>latent_size</code></h3>
 
 Python `int` dimensionality of the latent space in this model.
 
+
 <h3 id="name"><code>name</code></h3>
 
 Name of this model component.
+
 
 <h3 id="parameters"><code>parameters</code></h3>
 
@@ -136,9 +153,12 @@ List of Parameter(name, prior, bijector) namedtuples for this model.
 
 
 
+
 ## Methods
 
 <h3 id="batch_shape_tensor"><code>batch_shape_tensor</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/structural_time_series.py">View source</a>
 
 ``` python
 batch_shape_tensor()
@@ -146,7 +166,9 @@ batch_shape_tensor()
 
 Runtime batch shape of models represented by this component.
 
+
 #### Returns:
+
 
 * <b>`batch_shape`</b>: `int` `Tensor` giving the broadcast batch shape of
   all model parameters. This should match the batch shape of
@@ -155,13 +177,17 @@ Runtime batch shape of models represented by this component.
 
 <h3 id="joint_log_prob"><code>joint_log_prob</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/structural_time_series.py">View source</a>
+
 ``` python
 joint_log_prob(observed_time_series)
 ```
 
 Build the joint density `log p(params) + log p(y|params)` as a callable.
 
+
 #### Args:
+
 
 * <b>`observed_time_series`</b>: Observed `Tensor` trajectories of shape
   `sample_shape + batch_shape + [num_timesteps, 1]` (the trailing
@@ -175,6 +201,7 @@ Build the joint density `log p(params) + log p(y|params)` as a callable.
 
 #### Returns:
 
+
 * <b>`log_joint_fn`</b>: A function taking a `Tensor` argument for each model
   parameter, in canonical order, and returning a `Tensor` log probability
   of shape `batch_shape`. Note that, *unlike* `tfp.Distributions`
@@ -185,6 +212,8 @@ Build the joint density `log p(params) + log p(y|params)` as a callable.
   inference.
 
 <h3 id="make_state_space_model"><code>make_state_space_model</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/structural_time_series.py">View source</a>
 
 ``` python
 make_state_space_model(
@@ -197,7 +226,9 @@ make_state_space_model(
 
 Instantiate this model as a Distribution over specified `num_timesteps`.
 
+
 #### Args:
+
 
 * <b>`num_timesteps`</b>: Python `int` number of timesteps to model.
 * <b>`param_vals`</b>: a list of `Tensor` parameter values in order corresponding to
@@ -212,9 +243,12 @@ Instantiate this model as a Distribution over specified `num_timesteps`.
 
 #### Returns:
 
+
 * <b>`dist`</b>: a `LinearGaussianStateSpaceModel` Distribution object.
 
 <h3 id="prior_sample"><code>prior_sample</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/structural_time_series.py">View source</a>
 
 ``` python
 prior_sample(
@@ -228,7 +262,9 @@ prior_sample(
 
 Sample from the joint prior over model parameters and trajectories.
 
+
 #### Args:
+
 
 * <b>`num_timesteps`</b>: Scalar `int` `Tensor` number of timesteps to model.
 * <b>`initial_step`</b>: Optional scalar `int` `Tensor` specifying the starting
@@ -248,6 +284,7 @@ Sample from the joint prior over model parameters and trajectories.
 
 
 #### Returns:
+
 
 * <b>`trajectories`</b>: `float` `Tensor` of shape
   `trajectories_sample_shape + params_sample_shape + [num_timesteps, 1]`

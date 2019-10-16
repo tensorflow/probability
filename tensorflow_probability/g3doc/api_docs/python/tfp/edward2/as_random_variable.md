@@ -5,7 +5,24 @@
 
 # tfp.edward2.as_random_variable
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/generated_random_variables.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Wrap an existing distribution as a traceable random variable.
+
+### Aliases:
+
+* `tfp.experimental.edward2.as_random_variable`
+
 
 ``` python
 tfp.edward2.as_random_variable(
@@ -16,8 +33,6 @@ tfp.edward2.as_random_variable(
 ```
 
 
-
-Defined in [`python/edward2/generated_random_variables.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/generated_random_variables.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -36,6 +51,7 @@ on overriding distribution parameters.
 
 #### Args:
 
+
 * <b>`distribution`</b>: tfd.Distribution governing the distribution of the random
   variable, such as sampling and log-probabilities.
 * <b>`sample_shape`</b>: tf.TensorShape of samples to draw from the random variable.
@@ -47,7 +63,8 @@ on overriding distribution parameters.
 
 #### Returns:
 
-  rv: a `RandomVariable` wrapping the provided distribution.
+
+* <b>`rv`</b>: a `RandomVariable` wrapping the provided distribution.
 
 #### Example
 

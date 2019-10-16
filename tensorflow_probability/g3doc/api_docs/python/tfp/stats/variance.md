@@ -5,6 +5,18 @@
 
 # tfp.stats.variance
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/stats/sample_stats.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Estimate variance using samples.
 
 ``` python
@@ -17,8 +29,6 @@ tfp.stats.variance(
 ```
 
 
-
-Defined in [`python/stats/sample_stats.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/stats/sample_stats.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -42,6 +52,7 @@ when `N = 1`, but is slightly biased.
 
 #### Args:
 
+
 * <b>`x`</b>:  A numeric `Tensor` holding samples.
 * <b>`sample_axis`</b>: Scalar or vector `Tensor` designating axis holding samples, or
   `None` (meaning all axis hold samples).
@@ -52,6 +63,7 @@ when `N = 1`, but is slightly biased.
 
 
 #### Returns:
+
 
 * <b>`var`</b>: A `Tensor` of same `dtype` as the `x`, and rank equal to
   `rank(x) - len(sample_axis)`

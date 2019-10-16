@@ -18,42 +18,28 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-import importlib
 import weakref
 
 # Dependency imports
+import mock
 import numpy as np
 
-import tensorflow as tf
-import tensorflow_probability as tfp
-
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
-
-
-def try_import(name):
-  try:
-    return importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning(
-        "Could not import {}: {}.".format(name, str(e)))
-    return None
-
-
-mock = try_import("mock")
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BaseBijectorTest(tf.test.TestCase):
+class BaseBijectorTest(tfp_test_util.TestCase):
   """Tests properties of the Bijector base-class."""
 
   def testIsAbstract(self):
     with self.assertRaisesRegexp(TypeError,
-                                 ("Can't instantiate abstract class Bijector "
-                                  "with abstract methods __init__")):
+                                 ('Can\'t instantiate abstract class Bijector '
+                                  'with abstract methods __init__')):
       tfb.Bijector()  # pylint: disable=abstract-class-instantiated
 
   def testDefaults(self):
@@ -65,11 +51,10 @@ class BaseBijectorTest(tf.test.TestCase):
         super(_BareBonesBijector, self).__init__(forward_min_event_ndims=0)
 
     bij = _BareBonesBijector()
-    self.assertEqual([], bij.graph_parents)
     self.assertEqual(False, bij.is_constant_jacobian)
     self.assertEqual(False, bij.validate_args)
     self.assertEqual(None, bij.dtype)
-    self.assertEqual("bare_bones_bijector", bij.name)
+    self.assertStartsWith(bij.name, 'bare_bones_bijector')
 
     for shape in [[], [1, 2], [1, 2, 3]]:
       forward_event_shape_ = self.evaluate(
@@ -82,21 +67,21 @@ class BaseBijectorTest(tf.test.TestCase):
       self.assertAllEqual(shape, bij.inverse_event_shape(shape))
 
     with self.assertRaisesRegexp(NotImplementedError,
-                                 "inverse not implemented"):
+                                 'inverse not implemented'):
       bij.inverse(0)
 
     with self.assertRaisesRegexp(NotImplementedError,
-                                 "forward not implemented"):
+                                 'forward not implemented'):
       bij.forward(0)
 
     with self.assertRaisesRegexp(
         NotImplementedError,
-        "Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian.*"):
+        'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian.*'):
       bij.inverse_log_det_jacobian(0, event_ndims=0)
 
     with self.assertRaisesRegexp(
         NotImplementedError,
-        "Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian.*"):
+        'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian.*'):
       bij.forward_log_det_jacobian(0, event_ndims=0)
 
 
@@ -107,33 +92,41 @@ class IntentionallyMissingError(Exception):
 class ForwardOnlyBijector(tfb.Bijector):
   """Bijector with no inverse methods at all."""
 
-  def __init__(self, validate_args=False):
-    super(ForwardOnlyBijector, self).__init__(
-        validate_args=validate_args,
-        forward_min_event_ndims=0,
-        name="forward_only")
+  def __init__(self, scale=2, validate_args=False, name=None):
+    with tf.name_scope(name or 'forward_only') as name:
+      self._scale = tensor_util.convert_nonref_to_tensor(
+          scale,
+          dtype_hint=tf.float32)
+      super(ForwardOnlyBijector, self).__init__(
+          validate_args=validate_args,
+          forward_min_event_ndims=0,
+          name=name)
 
   def _forward(self, x):
-    return 2 * x
+    return self._scale * x
 
   def _forward_log_det_jacobian(self, _):
-    return tf.math.log(2.)
+    return tf.math.log(self._scale)
 
 
 class InverseOnlyBijector(tfb.Bijector):
   """Bijector with no forward methods at all."""
 
-  def __init__(self, validate_args=False):
-    super(InverseOnlyBijector, self).__init__(
-        validate_args=validate_args,
-        forward_min_event_ndims=0,
-        name="inverse_only")
+  def __init__(self, scale=2., validate_args=False, name=None):
+    with tf.name_scope(name or 'inverse_only') as name:
+      self._scale = tensor_util.convert_nonref_to_tensor(
+          scale,
+          dtype_hint=tf.float32)
+      super(InverseOnlyBijector, self).__init__(
+          validate_args=validate_args,
+          forward_min_event_ndims=0,
+          name=name)
 
   def _inverse(self, y):
-    return y / 2.
+    return y / self._scale
 
   def _inverse_log_det_jacobian(self, _):
-    return -tf.math.log(2.)
+    return -tf.math.log(self._scale)
 
 
 class ExpOnlyJacobian(tfb.Bijector):
@@ -144,7 +137,7 @@ class ExpOnlyJacobian(tfb.Bijector):
         validate_args=validate_args,
         is_constant_jacobian=False,
         forward_min_event_ndims=forward_min_event_ndims,
-        name="exp")
+        name='exp')
 
   def _inverse_log_det_jacobian(self, y):
     return -tf.math.log(y)
@@ -161,7 +154,7 @@ class ConstantJacobian(tfb.Bijector):
         validate_args=False,
         is_constant_jacobian=True,
         forward_min_event_ndims=forward_min_event_ndims,
-        name="c")
+        name='c')
 
   def _inverse_log_det_jacobian(self, y):
     return tf.constant(2., y.dtype)
@@ -171,40 +164,40 @@ class ConstantJacobian(tfb.Bijector):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BijectorTestEventNdims(tf.test.TestCase):
+class BijectorTestEventNdims(tfp_test_util.TestCase):
 
   def assertRaisesError(self, msg):
     return self.assertRaisesRegexp(Exception, msg)
 
   def testBijectorNonIntegerEventNdims(self):
     bij = ExpOnlyJacobian()
-    with self.assertRaisesRegexp(ValueError, "Expected integer"):
+    with self.assertRaisesRegexp(ValueError, 'Expected integer'):
       bij.forward_log_det_jacobian(1., event_ndims=1.5)
-    with self.assertRaisesRegexp(ValueError, "Expected integer"):
+    with self.assertRaisesRegexp(ValueError, 'Expected integer'):
       bij.inverse_log_det_jacobian(1., event_ndims=1.5)
 
   def testBijectorArrayEventNdims(self):
     bij = ExpOnlyJacobian()
-    with self.assertRaisesRegexp(ValueError, "Expected scalar"):
+    with self.assertRaisesRegexp(ValueError, 'Expected scalar'):
       bij.forward_log_det_jacobian(1., event_ndims=(1, 2))
-    with self.assertRaisesRegexp(ValueError, "Expected scalar"):
+    with self.assertRaisesRegexp(ValueError, 'Expected scalar'):
       bij.inverse_log_det_jacobian(1., event_ndims=(1, 2))
 
   def testBijectorDynamicEventNdims(self):
-    with self.assertRaisesError("Expected scalar"):
+    with self.assertRaisesError('Expected scalar'):
       bij = ExpOnlyJacobian(validate_args=True)
-      event_ndims = tf.compat.v1.placeholder_with_default((1, 2), shape=None)
+      event_ndims = tf1.placeholder_with_default((1, 2), shape=None)
       self.evaluate(
           bij.forward_log_det_jacobian(1., event_ndims=event_ndims))
-    with self.assertRaisesError("Expected scalar"):
+    with self.assertRaisesError('Expected scalar'):
       bij = ExpOnlyJacobian(validate_args=True)
-      event_ndims = tf.compat.v1.placeholder_with_default((1, 2), shape=None)
+      event_ndims = tf1.placeholder_with_default((1, 2), shape=None)
       self.evaluate(
           bij.inverse_log_det_jacobian(1., event_ndims=event_ndims))
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BijectorCachingTest(tf.test.TestCase):
+class BijectorCachingTest(tfp_test_util.TestCase):
 
   def testCachingOfForwardResults(self):
     forward_only_bijector = ForwardOnlyBijector()
@@ -225,7 +218,7 @@ class BijectorCachingTest(tf.test.TestCase):
     else:
       self.assertIs(y, forward_only_bijector.forward(x))
 
-    # Now, everything should be cached if the argument is y, so these are ok.
+    # Now, everything should be cached if the argument `is y`, so these are ok.
     forward_only_bijector.inverse(y)
     forward_only_bijector.inverse_log_det_jacobian(y, event_ndims=0)
 
@@ -248,7 +241,7 @@ class BijectorCachingTest(tf.test.TestCase):
     else:
       self.assertIs(x, inverse_only_bijector.inverse(y))
 
-    # Now, everything should be cached if the argument is x.
+    # Now, everything should be cached if the argument `is x`.
     inverse_only_bijector.forward(x)
     inverse_only_bijector.forward_log_det_jacobian(x, event_ndims=0)
 
@@ -266,7 +259,7 @@ class BijectorCachingTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BijectorReduceEventDimsTest(tf.test.TestCase):
+class BijectorReduceEventDimsTest(tfp_test_util.TestCase):
   """Test reducing of event dims."""
 
   def testReduceEventNdimsForward(self):
@@ -285,7 +278,7 @@ class BijectorReduceEventDimsTest(tf.test.TestCase):
   def testReduceEventNdimsForwardRaiseError(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
-    with self.assertRaisesRegexp(ValueError, "must be larger than"):
+    with self.assertRaisesRegexp(ValueError, 'must be larger than'):
       bij.forward_log_det_jacobian(x, event_ndims=0)
 
   def testReduceEventNdimsInverse(self):
@@ -304,7 +297,7 @@ class BijectorReduceEventDimsTest(tf.test.TestCase):
   def testReduceEventNdimsInverseRaiseError(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
-    with self.assertRaisesRegexp(ValueError, "must be larger than"):
+    with self.assertRaisesRegexp(ValueError, 'must be larger than'):
       bij.inverse_log_det_jacobian(x, event_ndims=0)
 
   def testReduceEventNdimsForwardConstJacobian(self):
@@ -329,8 +322,8 @@ class BijectorReduceEventDimsTest(tf.test.TestCase):
 
   def testHandlesNonStaticEventNdims(self):
     x_ = [[[1., 2.], [3., 4.]]]
-    x = tf.compat.v1.placeholder_with_default(x_, shape=None)
-    event_ndims = tf.compat.v1.placeholder_with_default(1, shape=None)
+    x = tf1.placeholder_with_default(x_, shape=None)
+    event_ndims = tf1.placeholder_with_default(1, shape=None)
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
     bij.inverse_log_det_jacobian(x, event_ndims=event_ndims)
     ildj = self.evaluate(
@@ -338,76 +331,20 @@ class BijectorReduceEventDimsTest(tf.test.TestCase):
     self.assertAllClose(-np.log(x_), ildj)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BijectorCompositionTest(tf.test.TestCase):
-
-  def testComposeFromChainBijector(self):
-    x = tf.constant([-5., 0., 5.])
-    sigmoid = functools.reduce(lambda chain, f: chain(f), [
-        tfb.Reciprocal(),
-        tfb.AffineScalar(shift=1.),
-        tfb.Exp(),
-        tfb.AffineScalar(scale=-1.),
-    ])
-    self.assertTrue(isinstance(sigmoid, tfb.Chain))
-    self.assertAllClose(
-        *self.evaluate([tf.nn.sigmoid(x), sigmoid.forward(x)]),
-        atol=0, rtol=1e-3)
-
-  def testComposeFromTransformedDistribution(self):
-    actual_log_normal = tfb.Exp()(tfd.TransformedDistribution(
-        distribution=tfd.Normal(0, 1),
-        bijector=tfb.AffineScalar(shift=0.5, scale=2.)))
-    expected_log_normal = tfd.LogNormal(0.5, 2.)
-    x = tf.constant([0.1, 1., 5.])
-    self.assertAllClose(
-        *self.evaluate([actual_log_normal.log_prob(x),
-                        expected_log_normal.log_prob(x)]),
-        atol=0, rtol=1e-3)
-
-  def testComposeFromTDSubclassWithAlternateCtorArgs(self):
-    # This line used to raise an exception.
-    tfb.Identity()(tfd.Chi(df=1., allow_nan_stats=True))
-
-  def testComposeFromNonTransformedDistribution(self):
-    actual_log_normal = tfb.Exp()(tfd.Normal(0.5, 2.))
-    expected_log_normal = tfd.LogNormal(0.5, 2.)
-    x = tf.constant([0.1, 1., 5.])
-    self.assertAllClose(
-        *self.evaluate([actual_log_normal.log_prob(x),
-                        expected_log_normal.log_prob(x)]),
-        atol=0, rtol=1e-3)
-
-  def testComposeFromTensor(self):
-    x = tf.constant([-5., 0., 5.])
-    self.assertAllClose(
-        *self.evaluate([tf.exp(x), tfb.Exp()(x)]),
-        atol=0, rtol=1e-3)
-
-  def testHandlesKwargs(self):
-    x = tfb.Exp()(tfd.Normal(0, 1), event_shape=[4])
-    y = tfd.Independent(tfd.LogNormal(tf.zeros(4), 1), 1)
-    z = tf.constant([[1., 2, 3, 4],
-                     [0.5, 1.5, 2., 2.5]])
-    self.assertAllClose(
-        *self.evaluate([y.log_prob(z), x.log_prob(z)]),
-        atol=0, rtol=1e-3)
-
-
-class BijectorLDJCachingTest(tf.test.TestCase):
+class BijectorLDJCachingTest(tfp_test_util.TestCase):
 
   def testShapeCachingIssue(self):
     if tf.executing_eagerly(): return
     # Exercise the scenario outlined in
     # https://github.com/tensorflow/probability/issues/253 (originally reported
     # internally as b/119756336).
-    x1 = tf.compat.v1.placeholder(tf.float32, shape=[None, 2], name="x1")
-    x2 = tf.compat.v1.placeholder(tf.float32, shape=[None, 2], name="x2")
+    x1 = tf1.placeholder(tf.float32, shape=[None, 2], name='x1')
+    x2 = tf1.placeholder(tf.float32, shape=[None, 2], name='x2')
 
     bij = ConstantJacobian()
 
     bij.forward_log_det_jacobian(x2, event_ndims=1)
-    a = bij.forward_log_det_jacobian(x1, event_ndims=1, name="a_fldj")
+    a = bij.forward_log_det_jacobian(x1, event_ndims=1, name='a_fldj')
 
     x1_value = np.random.uniform(size=[10, 2])
     with self.test_session() as sess:
@@ -415,36 +352,7 @@ class BijectorLDJCachingTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BijectorConstILDJLeakTest(tf.test.TestCase):
-
-  # See discussion in b/129297998.
-  def testConstILDJLeak(self):
-    bij = ConstantJacobian()
-
-    call_fldj = lambda: bij.forward_log_det_jacobian(0., event_ndims=0)
-
-    @tf.function
-    def func1():
-      call_fldj()
-      return call_fldj()
-
-    @tf.function
-    def func2():
-      call_fldj()
-      return call_fldj()
-
-    func1()
-    self.assertLen(bij._constant_ildj, 1)
-    func2()
-    self.assertLen(bij._constant_ildj, 2)
-
-    call_fldj()
-    call_fldj()
-    self.assertLen(bij._constant_ildj, 3)
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class NumpyArrayCaching(tf.test.TestCase):
+class NumpyArrayCaching(tfp_test_util.TestCase):
 
   def test_caches(self):
     if mock is None:
@@ -457,14 +365,14 @@ class NumpyArrayCaching(tf.test.TestCase):
     # We will intercept calls to TF to ensure np.array objects don't get
     # converted to tf.Tensor objects.
 
-    with mock.patch.object(tf, "convert_to_tensor", return_value=x_):
-      with mock.patch.object(tf.compat.v2, "exp", return_value=y_):
+    with mock.patch.object(tf, 'convert_to_tensor', return_value=x_):
+      with mock.patch.object(tf, 'exp', return_value=y_):
         y = b.forward(x_)
         self.assertIsInstance(y, np.ndarray)
         self.assertAllEqual([x_], [k() for k in b._from_x.keys()])
 
-    with mock.patch.object(tf, "convert_to_tensor", return_value=y_):
-      with mock.patch.object(tf.compat.v2.math, "log", return_value=x_):
+    with mock.patch.object(tf, 'convert_to_tensor', return_value=y_):
+      with mock.patch.object(tf.math, 'log', return_value=x_):
         x = b.inverse(y_)
         self.assertIsInstance(x, np.ndarray)
         self.assertIs(x, b.inverse(y))
@@ -472,12 +380,90 @@ class NumpyArrayCaching(tf.test.TestCase):
 
     yt_ = y_.T
     xt_ = x_.T
-    with mock.patch.object(tf, "convert_to_tensor", return_value=yt_):
-      with mock.patch.object(tf.compat.v2.math, "log", return_value=xt_):
+    with mock.patch.object(tf, 'convert_to_tensor', return_value=yt_):
+      with mock.patch.object(tf.math, 'log', return_value=xt_):
         xt = b.inverse(yt_)
         self.assertIsNot(x, xt)
         self.assertIs(xt_, xt)
 
 
-if __name__ == "__main__":
+@test_util.run_all_in_graph_and_eager_modes
+class TfModuleTest(tfp_test_util.TestCase):
+
+  def test_variable_tracking(self):
+    x = tf.Variable(1.)
+    b = ForwardOnlyBijector(scale=x, validate_args=True)
+    self.assertIsInstance(b, tf.Module)
+    self.assertEqual((x,), b.trainable_variables)
+
+  def test_gradient(self):
+    x = tf.Variable(1.)
+    b = InverseOnlyBijector(scale=x, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = b.inverse(1.)
+    g = tape.gradient(loss, b.trainable_variables)
+    self.evaluate(tf1.global_variables_initializer())
+    self.assertEqual((-1.,), self.evaluate(g))
+
+
+class _ConditionalBijector(tfb.Bijector):
+
+  def __init__(self):
+    super(_ConditionalBijector, self).__init__(
+        forward_min_event_ndims=0,
+        is_constant_jacobian=True,
+        validate_args=False,
+        dtype=tf.float32,
+        name='test_bijector')
+
+  # These are not implemented in the base class, but we need to write a stub in
+  # order to mock them out.
+  def _inverse_log_det_jacobian(self, _, arg1, arg2):
+    pass
+
+  def _forward_log_det_jacobian(self, _, arg1, arg2):
+    pass
+
+
+# Test that ensures kwargs from public methods are passed in to
+# private methods.
+@test_util.run_all_in_graph_and_eager_modes
+class ConditionalBijectorTest(tfp_test_util.TestCase):
+
+  def testConditionalBijector(self):
+    b = _ConditionalBijector()
+    arg1 = 'b1'
+    arg2 = 'b2'
+    retval = tf.constant(1.)
+    for name in ['forward', 'inverse']:
+      method = getattr(b, name)
+      with mock.patch.object(b, '_' + name, return_value=retval) as mock_method:
+        method(1., arg1=arg1, arg2=arg2)
+      mock_method.assert_called_once_with(mock.ANY, arg1=arg1, arg2=arg2)
+
+    for name in ['inverse_log_det_jacobian', 'forward_log_det_jacobian']:
+      method = getattr(b, name)
+      with mock.patch.object(b, '_' + name, return_value=retval) as mock_method:
+        method(1., event_ndims=0, arg1=arg1, arg2=arg2)
+      mock_method.assert_called_once_with(mock.ANY, arg1=arg1, arg2=arg2)
+
+  def testNestedCondition(self):
+    b = _ConditionalBijector()
+    arg1 = {'b1': 'c1'}
+    arg2 = {'b2': 'c2'}
+    retval = tf.constant(1.)
+    for name in ['forward', 'inverse']:
+      method = getattr(b, name)
+      with mock.patch.object(b, '_' + name, return_value=retval) as mock_method:
+        method(1., arg1=arg1, arg2=arg2)
+      mock_method.assert_called_once_with(mock.ANY, arg1=arg1, arg2=arg2)
+
+    for name in ['inverse_log_det_jacobian', 'forward_log_det_jacobian']:
+      method = getattr(b, name)
+      with mock.patch.object(b, '_' + name, return_value=retval) as mock_method:
+        method(1., event_ndims=0, arg1=arg1, arg2=arg2)
+      mock_method.assert_called_once_with(mock.ANY, arg1=arg1, arg2=arg2)
+
+
+if __name__ == '__main__':
   tf.test.main()

@@ -12,20 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Copyright 2018 The TensorFlow Probability Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ============================================================================
 book_path: /probability/_book.yaml
 project_path: /probability/_project.yaml
 description: <!--no description-->
@@ -50,8 +36,9 @@ landing_page:
         </ul>
         Since TFP inherits the benefits of TensorFlow, you can build, fit, and
         deploy a model using a single language throughout the lifecycle of model
-        exploration and production. To get started, see the
-        <a href="./overview">TensorFlow Probability Guide</a>.
+        exploration and production. TFP is open source and available
+        <a href="https://github.com/tensorflow/probability">on GitHub</a>. To get
+        started, see the <a href="./overview">TensorFlow Probability Guide</a>.
 
       code_block: |
         <pre class = "prettyprint">
@@ -68,20 +55,44 @@ landing_page:
         # Fit model given data.
         coeffs, linear_response, is_converged, num_iter = tfp.glm.fit(
             model_matrix=features[:, tf.newaxis],
-            response=tf.to_float(labels),
+            response=tf.cast(labels, dtype=tf.float32),
             model=model)
         # ==> coeffs is approximately [1.618] (We're golden!)
         </pre>
         {% dynamic if request.tld != 'cn' %}
         <a class="colab-button" target="_blank" href="https://colab.research.google.com/github/tensorflow/probability/blob/master/tensorflow_probability/g3doc/_index.ipynb">Run in a <span>Notebook</span></a>
         {% dynamic endif %}
-
+  - classname: devsite-landing-row-cards
+    items:
+    - heading: "Learning with confidence (TF Dev Summit '19)"
+      youtube_id: BrwKURU-wpk
+      buttons:
+      - label: Watch the video
+        path: https://www.youtube.com/watch?v=BrwKURU-wpk
+    - heading: "Structural time series modeling in TFP"
+      image_path: /resources/images/tf-logo-card-16x9.png
+      path: https://medium.com/tensorflow/structural-time-series-modeling-in-tensorflow-probability-344edac24083
+      buttons:
+      - label: Read on TensorFlow blog
+        path: https://medium.com/tensorflow/structural-time-series-modeling-in-tensorflow-probability-344edac24083
+    - heading: "Variational autoencoders with TFP"
+      image_path: /resources/images/tf-logo-card-16x9.png
+      path: https://medium.com/tensorflow/variational-autoencoders-with-tensorflow-probability-layers-d06c658931b7
+      buttons:
+      - label: Read on TensorFlow blog
+        path: https://medium.com/tensorflow/variational-autoencoders-with-tensorflow-probability-layers-d06c658931b7
+    - heading: "Regression with probabilistic layers in TFP"
+      image_path: /resources/images/tf-logo-card-16x9.png
+      path: https://medium.com/tensorflow/regression-with-probabilistic-layers-in-tensorflow-probability-e46ff5d37baf
+      buttons:
+      - label: Read on TensorFlow blog
+        path: https://medium.com/tensorflow/regression-with-probabilistic-layers-in-tensorflow-probability-e46ff5d37baf
   - classname: devsite-landing-row-cards
     items:
     - heading: "An introduction to probabilistic programming"
       description: >
         <em>Bayesian Methods for Hackers</em>, an introductory, hands-on tutorial,
-        is now available with examples in TensorFlow Probability. 
+        is now available with examples in TensorFlow Probability.
       image_path: /resources/images/tf-logo-card-16x9.png
       path: https://medium.com/tensorflow/an-introduction-to-probabilistic-programming-now-available-in-tensorflow-probability-6dcc003ca29e
       buttons:
@@ -93,25 +104,12 @@ landing_page:
       buttons:
       - label: Read on TensorFlow blog
         path: https://medium.com/tensorflow/the-trinity-of-errors-in-financial-models-an-introductory-analysis-using-tensorflow-probability-9fdefb4d283d
-    - heading: "Industrial AI: Physics-based, Probabilistic Deep Learning using TensorFlow Probability"
+    - heading: "Industrial AI: physics-based, probabilistic deep learning using TFP"
       image_path: /resources/images/tf-logo-card-16x9.png
       path: https://medium.com/tensorflow/industrial-ai-bhges-physics-based-probabilistic-deep-learning-using-tensorflow-probability-5f215c791863
       buttons:
       - label: Read on TensorFlow blog
         path: https://medium.com/tensorflow/industrial-ai-bhges-physics-based-probabilistic-deep-learning-using-tensorflow-probability-5f215c791863
-  - classname: devsite-landing-row-cards
-    items:
-    - heading: "TFP @ O'Reilly AI SF"
-      youtube_id: GqxmRKplj4w
-      buttons:
-      - label: Watch the video
-        path: https://www.youtube.com/watch?v=GqxmRKplj4w
-    - heading: "Introducing TensorFlow Probability"
-      image_path: /resources/images/tf-logo-card-16x9.png
-      path: https://docs.google.com/presentation/d/1BWhNVHzhFfYiFL8ynX1wFmag8YjzvHeqKkd8Z0G8H7Y
-      buttons:
-      - label: View the presentation
-        path: https://docs.google.com/presentation/d/1BWhNVHzhFfYiFL8ynX1wFmag8YjzvHeqKkd8Z0G8H7Y
     - heading: "TensorFlow Probability on GitHub"
       image_path: /resources/images/github-card-16x9.png
       path: https://github.com/tensorflow/probability

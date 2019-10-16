@@ -22,11 +22,11 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -34,7 +34,7 @@ tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalDiagTest(test_case.TestCase):
+class MultivariateNormalDiagTest(tfp_test_util.TestCase):
   """Well tested because this is a simple override of the base class."""
 
   def setUp(self):
@@ -100,8 +100,8 @@ class MultivariateNormalDiagTest(test_case.TestCase):
   def testSingularScaleRaises(self):
     mu = [-1., 1]
     diag = [1., 0]
-    dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
     with self.assertRaisesOpError("Singular"):
+      dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
       self.evaluate(dist.sample())
 
   def testSampleWithBroadcastScale(self):
@@ -180,29 +180,17 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     self.assertAllClose(
         np.array([[3., 2, 1], [4, 5, 6]]), self.evaluate(mvn.stddev()))
 
-  def testMultivariateNormalDiagWithSoftplusScale(self):
-    mu = [-1.0, 1.0]
-    diag = [-1.0, -2.0]
-    dist = tfd.MultivariateNormalDiagWithSoftplusScale(
-        mu, diag, validate_args=True)
-    samps = self.evaluate(dist.sample(1000, seed=tfp_test_util.test_seed()))
-    cov_mat = self.evaluate(tf.linalg.diag(tf.nn.softplus(diag))**2)
-
-    self.assertAllClose(mu, samps.mean(axis=0), atol=0.1)
-    self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.1)
-
   def testMultivariateNormalDiagNegLogLikelihood(self):
     num_draws = 50
     dims = 3
     x = np.zeros([num_draws, dims], dtype=np.float32)
-    x_pl = tf.compat.v1.placeholder_with_default(
-        input=x, shape=[None, dims], name="x")
-    mu_var = tf.compat.v1.get_variable(
+    x_pl = tf1.placeholder_with_default(input=x, shape=[None, dims], name="x")
+    mu_var = tf1.get_variable(
         name="mu",
         shape=[dims],
         dtype=tf.float32,
-        initializer=tf.compat.v1.initializers.constant(1.))
-    self.evaluate([tf.compat.v1.global_variables_initializer()])
+        initializer=tf1.initializers.constant(1.))
+    self.evaluate([tf1.global_variables_initializer()])
 
     def neg_log_likelihood(mu):
       mvn = tfd.MultivariateNormalDiag(
@@ -231,9 +219,8 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     loc = np.float32(self._rng.rand(1, 1, 2))
     scale_diag = np.float32(self._rng.rand(1, 1, 2))
     mvn = tfd.MultivariateNormalDiag(
-        loc=tf.compat.v1.placeholder_with_default(
-            input=loc, shape=[None, None, 2]),
-        scale_diag=tf.compat.v1.placeholder_with_default(
+        loc=tf1.placeholder_with_default(input=loc, shape=[None, None, 2]),
+        scale_diag=tf1.placeholder_with_default(
             input=scale_diag, shape=[None, None, 2]))
     self.assertListEqual(
         tensorshape_util.as_list(mvn.batch_shape), [None, None])
@@ -245,9 +232,8 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     loc = np.float32(self._rng.rand(2, 3, 2))
     scale_diag = np.float32(self._rng.rand(2, 3, 2))
     mvn = tfd.MultivariateNormalDiag(
-        loc=tf.compat.v1.placeholder_with_default(
-            input=loc, shape=[2, 3, None]),
-        scale_diag=tf.compat.v1.placeholder_with_default(
+        loc=tf1.placeholder_with_default(input=loc, shape=[2, 3, None]),
+        scale_diag=tf1.placeholder_with_default(
             input=scale_diag, shape=[2, 3, None]))
     self.assertListEqual(tensorshape_util.as_list(mvn.batch_shape), [2, 3])
     self.assertListEqual(tensorshape_util.as_list(mvn.event_shape), [None])
@@ -275,6 +261,68 @@ class MultivariateNormalDiagTest(test_case.TestCase):
     x_ = np.tile([1.], 1000)
     p_ = self.evaluate(dist_test.prob(x_))
     self.assertFalse(np.isnan(p_))
+
+  def testVariableLocation(self):
+    loc = tf.Variable([1., 1.])
+    scale_diag = tf.ones(2)
+    d = tfd.MultivariateNormalDiag(
+        loc, scale_diag=scale_diag, validate_args=True)
+    self.evaluate(loc.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, loc))
+
+  def testVariableScaleDiag(self):
+    loc = tf.constant([1., 1.])
+    scale_diag = tf.Variable(tf.ones(2))
+    d = tfd.MultivariateNormalDiag(
+        loc, scale_diag=scale_diag, validate_args=True)
+    self.evaluate(scale_diag.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, scale_diag))
+
+  def testVariableScaleIdentityMultiplier(self):
+    loc = tf.constant([1., 1.])
+    scale_identity_multiplier = tf.Variable(3.14)
+    d = tfd.MultivariateNormalDiag(
+        loc,
+        scale_identity_multiplier=scale_identity_multiplier,
+        validate_args=True)
+    self.evaluate(scale_identity_multiplier.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, scale_identity_multiplier))
+
+  def testVariableScaleDiagAssertions(self):
+    # We test that changing the scale to be non-invertible raises an exception
+    # when validate_args is True. This is really just testing the underlying
+    # LinearOperator instance, but we include it to demonstrate that it works as
+    # expected.
+    loc = tf.constant([1., 1.])
+    scale_diag = tf.Variable(tf.ones(2))
+    d = tfd.MultivariateNormalDiag(
+        loc, scale_diag=scale_diag, validate_args=True)
+    self.evaluate(scale_diag.initializer)
+    with self.assertRaises(Exception):
+      with tf.control_dependencies([scale_diag.assign([1., 0.])]):
+        self.evaluate(d.sample())
+
+  def testVariableScaleIdentityMultiplierAssertions(self):
+    # We test that changing the scale to be non-invertible raises an exception
+    # when validate_args is True. This is really just testing the underlying
+    # LinearOperator instance, but we include it to demonstrate that it works as
+    # expected.
+    loc = tf.constant([1., 1.])
+    scale_identity_multiplier = tf.Variable(np.eye(2, dtype=np.float32))
+    d = tfd.MultivariateNormalDiag(
+        loc,
+        scale_identity_multiplier=scale_identity_multiplier,
+        validate_args=True)
+    self.evaluate(scale_identity_multiplier.initializer)
+    with self.assertRaises(Exception):
+      with tf.control_dependencies([scale_identity_multiplier.assign(0.)]):
+        self.evaluate(d.sample())
 
 
 if __name__ == "__main__":

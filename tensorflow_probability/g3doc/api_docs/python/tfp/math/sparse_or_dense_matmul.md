@@ -5,6 +5,18 @@
 
 # tfp.math.sparse_or_dense_matmul
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/linalg.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Returns (batched) matmul of a SparseTensor (or Tensor) with a Tensor.
 
 ``` python
@@ -19,11 +31,11 @@ tfp.math.sparse_or_dense_matmul(
 
 
 
-Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/linalg.py).
-
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
+
 
 * <b>`sparse_or_dense_a`</b>: `SparseTensor` or `Tensor` representing a (batch of)
   matrices.
@@ -34,12 +46,13 @@ Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/t
   graph.
   Default value: `False` (i.e., no graph assertions are added).
 * <b>`name`</b>: Python `str` prefixed to ops created by this function.
-  Default value: "sparse_or_dense_matmul".
+  Default value: 'sparse_or_dense_matmul'.
 * <b>`**kwargs`</b>: Keyword arguments to `tf.sparse_tensor_dense_matmul` or
   `tf.matmul`.
 
 
 #### Returns:
+
 
 * <b>`product`</b>: A dense (batch of) matrix-shaped Tensor of the same batch shape and
 dtype as `sparse_or_dense_a` and `dense_b`. If `sparse_or_dense_a` or

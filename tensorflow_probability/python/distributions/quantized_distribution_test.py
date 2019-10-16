@@ -20,10 +20,10 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -32,7 +32,7 @@ rng = np.random.RandomState(123)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class QuantizedDistributionTest(test_case.TestCase):
+class QuantizedDistributionTest(tfp_test_util.TestCase):
 
   def _assert_all_finite(self, array):
     self.assertTrue(np.isfinite(array).all())
@@ -107,7 +107,7 @@ class QuantizedDistributionTest(test_case.TestCase):
     self.assertAllClose(0., cdf_n3)
     self.assertAllClose(0., cdf_n2)
     # Uniform had 1/6 of its mass in each of (-3, -2], and (-2, -1], which
-    # were collapsed into (-infty, -1], which is now the "-1" interval.
+    # were collapsed into (-infty, -1], which is now the '-1' interval.
     self.assertAllClose(1 / 3, cdf_n1)
     # The j=0 interval contained mass from (-3, 0], which is 1/2 of the
     # uniform's mass.
@@ -196,7 +196,7 @@ class QuantizedDistributionTest(test_case.TestCase):
     # dist = maximum distance between P[Z <= a] and P[U <= a].
     # We ignore pvalue, since of course this distribution is not exactly, and
     # with so many sample points we would get a false fail.
-    dist, _ = stats.kstest(self.evaluate(z), "uniform")
+    dist, _ = stats.kstest(self.evaluate(z), 'uniform')
 
     # Since the distribution take values (approximately) in [0, 100], the
     # cdf should have jumps (approximately) every 1/100 of the way up.
@@ -319,9 +319,9 @@ class QuantizedDistributionTest(test_case.TestCase):
       return inner_func
 
     for dtype in [np.float32, np.float64]:
-      mu = tf.compat.v2.Variable(0., name="mu", dtype=dtype)
-      sigma = tf.compat.v2.Variable(1., name="sigma", dtype=dtype)
-      self.evaluate(tf.compat.v1.global_variables_initializer())
+      mu = tf.Variable(0., name='mu', dtype=dtype)
+      sigma = tf.Variable(1., name='sigma', dtype=dtype)
+      self.evaluate([mu.initializer, sigma.initializer])
       value, grads = self.evaluate(tfp.math.value_and_gradient(
           quantized_log_prob(dtype), [mu, sigma]))
       self._assert_all_finite(value)
@@ -335,17 +335,17 @@ class QuantizedDistributionTest(test_case.TestCase):
           distribution=tfd.Normal(loc=mu, scale=sigma))
       return qdist.log_prob(x)
 
-    mu = tf.compat.v2.Variable(0.0, name="mu")
-    sigma = tf.compat.v2.Variable(1.0, name="sigma")
+    mu = tf.Variable(0.0, name='mu')
+    sigma = tf.Variable(1.0, name='sigma')
 
-    self.evaluate(tf.compat.v1.global_variables_initializer())
+    self.evaluate([v.initializer for v in [mu, sigma]])
     value, grads = self.evaluate(tfp.math.value_and_gradient(
         quantized_log_prob, [mu, sigma]))
     self._assert_all_finite(value)
     self._assert_all_finite(grads)
 
   def testLowerCutoffMustBeBelowUpperCutoffOrWeRaise(self):
-    with self.assertRaisesOpError("must be strictly less"):
+    with self.assertRaisesOpError('must be strictly less'):
       qdist = tfd.QuantizedDistribution(
           distribution=tfd.Normal(loc=0., scale=1.),
           low=1.,  # not strictly less than high.
@@ -355,8 +355,8 @@ class QuantizedDistributionTest(test_case.TestCase):
       self.evaluate(qdist.sample())
 
   def testCutoffsMustBeIntegerValuedIfValidateArgsTrue(self):
-    low = tf.compat.v1.placeholder_with_default(input=1.5, shape=[])
-    with self.assertRaisesOpError("has non-integer components"):
+    low = tf1.placeholder_with_default(1.5, shape=[])
+    with self.assertRaisesOpError('has non-integer components.'):
       qdist = tfd.QuantizedDistribution(
           distribution=tfd.Normal(loc=0., scale=1.),
           low=low,
@@ -379,7 +379,7 @@ class QuantizedDistributionTest(test_case.TestCase):
     batch_shape = (2, 3)
     qdist = tfd.QuantizedDistribution(
         distribution=tfd.Normal(
-            loc=tf.zeros(batch_shape), scale=tf.zeros(batch_shape)),
+            loc=tf.zeros(batch_shape), scale=tf.ones(batch_shape)),
         low=1.0,
         high=10.0)
 
@@ -395,6 +395,68 @@ class QuantizedDistributionTest(test_case.TestCase):
     y = rng.randint(0, 5, size=batch_shape).astype(np.float32)
     self.assertEqual(batch_shape, qdist.prob(y).shape)
 
+  def testVariableBounds(self):
+    dist = tfd.Normal(0., scale=2.)
+    low = tf.Variable(3.)
+    high = tf.Variable(-2.)
+    self.evaluate([v.initializer for v in [low, high]])
+    with self.assertRaisesOpError('must be strictly less than'):
+      d = tfd.QuantizedDistribution(
+          dist, low=low, high=high, validate_args=True)
+      self.evaluate(d.sample())
 
-if __name__ == "__main__":
+  def testVariableLowAfterMutation(self):
+    dist = tfd.Normal(0., scale=2.)
+    low = tf.Variable(-4.)
+    d = tfd.QuantizedDistribution(dist, low=low, high=5., validate_args=True)
+    self.evaluate(low.initializer)
+    with self.assertRaisesOpError('must be strictly less than'):
+      with tf.control_dependencies([low.assign(6.)]):
+        self.evaluate(d.sample())
+
+  def testVariableHighAfterMutation(self):
+    dist = tfd.Normal(0., scale=2.)
+    high = tf.Variable(5.)
+    d = tfd.QuantizedDistribution(dist, low=-4., high=high, validate_args=True)
+    self.evaluate(high.initializer)
+    with self.assertRaisesOpError('must be strictly less than'):
+      with tf.control_dependencies([high.assign(-6.)]):
+        self.evaluate(d.log_prob(1.))
+
+  def testVariableNonInteger(self):
+    dist = tfd.Normal(0., scale=2.)
+    high = tf.Variable(5.2)
+    d = tfd.QuantizedDistribution(dist, low=-2., high=high, validate_args=True)
+    self.evaluate(high.initializer)
+    with self.assertRaisesOpError('has non-integer components.'):
+      self.evaluate(d.log_prob(0.))
+
+  def testVariableNonIntegerAfterMutation(self):
+    dist = tfd.Normal(0., scale=2.)
+    low = tf.Variable(-2.)
+    d = tfd.QuantizedDistribution(dist, low=low, high=4., validate_args=True)
+    self.evaluate(low.initializer)
+    with self.assertRaisesOpError('has non-integer components.'):
+      with tf.control_dependencies([low.assign(-3.3)]):
+        self.evaluate(d.sample())
+
+  def testVariableNonScalar(self):
+    dist = tfd.Normal(loc=tf.zeros((1, 4)), scale=2.)
+    high = tf.Variable(np.random.randint(10, size=(5, 4)).astype(np.float32),
+                       shape=tf.TensorShape(None))
+    d = tfd.QuantizedDistribution(dist, high=high, validate_args=True)
+    self.evaluate(high.initializer)
+    with self.assertRaisesOpError('adds extra batch dimensions'):
+      self.evaluate(d.sample())
+
+  def testVariableNonScalarAfterMutation(self):
+    dist = tfd.Normal(0., scale=2.)
+    low = tf.Variable(-2., shape=tf.TensorShape(None))
+    d = tfd.QuantizedDistribution(dist, low=low, validate_args=True)
+    self.evaluate(low.initializer)
+    with self.assertRaisesOpError('adds extra batch dimensions'):
+      with tf.control_dependencies([low.assign([[-2., 5., 1.]])]):
+        self.evaluate(d.sample())
+
+if __name__ == '__main__':
   tf.test.main()

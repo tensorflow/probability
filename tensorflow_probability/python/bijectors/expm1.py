@@ -55,10 +55,15 @@ class Expm1(bijector.Bijector):
   def __init__(self,
                validate_args=False,
                name="expm1"):
-    super(Expm1, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(Expm1, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
+
+  @classmethod
+  def _is_increasing(cls):
+    return True
 
   def _forward(self, x):
     """Returns the forward `Bijector` evaluation, i.e., X = g(Y)."""

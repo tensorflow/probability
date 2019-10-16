@@ -5,7 +5,24 @@
 
 # tfp.edward2.LogNormal
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for LogNormal.
+
+### Aliases:
+
+* `tfp.experimental.edward2.LogNormal`
+
 
 ``` python
 tfp.edward2.LogNormal(
@@ -16,15 +33,14 @@ tfp.edward2.LogNormal(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See LogNormal for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
@@ -35,8 +51,8 @@ whose logarithm is normally distributed with mean `loc` and
 standard deviation `scale`. It is constructed as the exponential
 transformation of a Normal distribution.
 
-
 #### Args:
+
 
 * <b>`loc`</b>: Floating-point `Tensor`; the means of the underlying
   Normal distribution(s).

@@ -5,24 +5,28 @@
 
 # tfp.trainable_distributions.multivariate_normal_tril
 
-Constructs a trainable `tfd.MultivariateNormalTriL` distribution.
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
+Constructs a trainable `tfd.MultivariateNormalTriL` distribution. (deprecated)
 
 ``` python
 tfp.trainable_distributions.multivariate_normal_tril(
-    x,
-    dims,
-    layer_fn=tf.compat.v1.layers.dense,
-    loc_fn=(lambda x: x),
-    scale_fn=tfp.trainable_distributions.tril_with_diag_softplus_and_shift,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
 
 
-Defined in [`python/trainable_distributions/trainable_distributions_lib.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/trainable_distributions/trainable_distributions_lib.py).
-
 <!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-09-01.
+Instructions for updating:
+`multivariate_normal_tril` is deprecated; use <a href="../../tfp/layers/DistributionLambda.md"><code>tfp.layers.DistributionLambda</code></a> or <a href="../../tfp/util/DeferredTensor.md"><code>tfp.util.DeferredTensor</code></a>.
 
 This function creates a MultivariateNormal (MVN) with lower-triangular scale
 matrix. By default the MVN is parameterized via affine transformation of input
@@ -94,6 +98,7 @@ with tf.Session() as sess:
 
 #### Args:
 
+
 * <b>`x`</b>: `Tensor` with floating type. Must have statically defined rank and
   statically known right-most dimension.
 * <b>`dims`</b>: Scalar, `int`, `Tensor` indicated the MVN event size, i.e., the
@@ -116,5 +121,6 @@ with tf.Session() as sess:
 
 
 #### Returns:
+
 
 * <b>`mvntril`</b>: An instance of `tfd.MultivariateNormalTriL`.

@@ -5,14 +5,26 @@
 
 # Module: tfp.vi
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/vi/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Methods and objectives for variational inference.
-
-
-
-Defined in [`python/vi/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/__init__.py).
 
 <!-- Placeholder for "Used in" -->
 
+
+## Modules
+
+[`mutual_information`](../tfp/vi/mutual_information.md) module: Mutual information estimators and helpers.
 
 ## Functions
 
@@ -24,9 +36,11 @@ Defined in [`python/vi/__init__.py`](https://github.com/tensorflow/probability/t
 
 [`csiszar_vimco(...)`](../tfp/vi/csiszar_vimco.md): Use VIMCO to lower the variance of gradient[csiszar_function(Avg(logu))].
 
-[`csiszar_vimco_helper(...)`](../tfp/vi/csiszar_vimco_helper.md): Helper to `csiszar_vimco`; computes `log_avg_u`, `log_sooavg_u`.
+[`csiszar_vimco_helper(...)`](../tfp/vi/csiszar_vimco_helper.md): Helper to `csiszar_vimco`; computes `log_avg_u`, `log_sooavg_u`. (deprecated)
 
 [`dual_csiszar_function(...)`](../tfp/vi/dual_csiszar_function.md): Calculates the dual Csiszar-function in log-space.
+
+[`fit_surrogate_posterior(...)`](../tfp/vi/fit_surrogate_posterior.md): Fit a surrogate posterior to a target (unnormalized) log density.
 
 [`jeffreys(...)`](../tfp/vi/jeffreys.md): The Jeffreys Csiszar-function in log-space.
 
@@ -40,7 +54,9 @@ Defined in [`python/vi/__init__.py`](https://github.com/tensorflow/probability/t
 
 [`modified_gan(...)`](../tfp/vi/modified_gan.md): The Modified-GAN Csiszar-function in log-space.
 
-[`monte_carlo_csiszar_f_divergence(...)`](../tfp/vi/monte_carlo_csiszar_f_divergence.md): Monte-Carlo approximation of the Csiszar f-Divergence.
+[`monte_carlo_csiszar_f_divergence(...)`](../tfp/vi/monte_carlo_csiszar_f_divergence.md): Monte-Carlo approximation of the Csiszar f-Divergence. (deprecated)
+
+[`monte_carlo_variational_loss(...)`](../tfp/vi/monte_carlo_variational_loss.md): Monte-Carlo approximation of an f-Divergence variational loss.
 
 [`pearson(...)`](../tfp/vi/pearson.md): The Pearson Csiszar-function in log-space.
 

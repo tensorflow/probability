@@ -23,6 +23,8 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
     "Kumaraswamy",
@@ -61,24 +63,17 @@ class Kumaraswamy(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._graph_parents = []
-    self._name = name
-    self._validate_args = validate_args
-
-    with self._name_scope("init"):
-      concentration1 = self._maybe_assert_valid_concentration(
-          tf.convert_to_tensor(value=concentration1, name="concentration1"),
-          validate_args=validate_args)
-      concentration0 = self._maybe_assert_valid_concentration(
-          tf.convert_to_tensor(value=concentration0, name="concentration0"),
-          validate_args=validate_args)
-
-    self._concentration1 = concentration1
-    self._concentration0 = concentration0
-    super(Kumaraswamy, self).__init__(
-        forward_min_event_ndims=0,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([concentration0, concentration1],
+                                      dtype_hint=tf.float32)
+      self._concentration0 = tensor_util.convert_nonref_to_tensor(
+          concentration0, dtype=dtype, name="concentration0")
+      self._concentration1 = tensor_util.convert_nonref_to_tensor(
+          concentration1, dtype=dtype, name="concentration1")
+      super(Kumaraswamy, self).__init__(
+          forward_min_event_ndims=0,
+          validate_args=validate_args,
+          name=name)
 
   @property
   def concentration1(self):
@@ -90,6 +85,10 @@ class Kumaraswamy(bijector.Bijector):
     """The `b` in: `Y = g(X) = (1 - (1 - X)**(1 / b))**(1 / a)`."""
     return self._concentration0
 
+  @classmethod
+  def _is_increasing(cls):
+    return True
+
   def _forward(self, x):
     x = self._maybe_assert_valid(x)
     return tf.exp(
@@ -98,24 +97,17 @@ class Kumaraswamy(bijector.Bijector):
 
   def _inverse(self, y):
     y = self._maybe_assert_valid(y)
-    return tf.exp(
-        tf.math.log1p(-(1 - y**self.concentration1)**self.concentration0))
+    return -tf.math.expm1(self.concentration0 * tf.math.log1p(
+        -(y ** self.concentration1)))
 
   def _inverse_log_det_jacobian(self, y):
     y = self._maybe_assert_valid(y)
-    return (tf.math.log(self.concentration1) +
-            tf.math.log(self.concentration0) +
-            tf.math.xlogy(self.concentration1 - 1, y) +
-            (self.concentration0 - 1) * tf.math.log1p(-y**self.concentration1))
-
-  def _maybe_assert_valid_concentration(self, concentration, validate_args):
-    """Checks the validity of a concentration parameter."""
-    if not validate_args:
-      return concentration
-    return distribution_util.with_dependencies([
-        assert_util.assert_positive(
-            concentration, message="Concentration parameter must be positive."),
-    ], concentration)
+    concentration1 = tf.convert_to_tensor(self.concentration1)
+    concentration0 = tf.convert_to_tensor(self.concentration0)
+    return (tf.math.log(concentration1) +
+            tf.math.log(concentration0) +
+            tf.math.xlogy(concentration1 - 1, y) +
+            (concentration0 - 1) * tf.math.log1p(-y**concentration1))
 
   def _maybe_assert_valid(self, x):
     if not self.validate_args:
@@ -128,3 +120,17 @@ class Kumaraswamy(bijector.Bijector):
             tf.ones([], self.concentration0.dtype),
             message="sample must be no larger than `1`."),
     ], x)
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if is_init != tensor_util.is_ref(self.concentration0):
+      assertions.append(assert_util.assert_positive(
+          self.concentration0,
+          message="Argument `concentration0` must be positive."))
+    if is_init != tensor_util.is_ref(self.concentration1):
+      assertions.append(assert_util.assert_positive(
+          self.concentration1,
+          message="Argument `concentration1` must be positive."))
+    return assertions

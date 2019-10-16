@@ -20,15 +20,18 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+
 rng = np.random.RandomState(0)
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BincountTest(tf.test.TestCase):
+class BincountTest(tfp_test_util.TestCase):
 
   def test_like_tf_math_bincount_if_axis_is_none(self):
     arr = rng.randint(0, 10, size=(2, 3, 4)).astype(np.int32)
@@ -88,7 +91,7 @@ class BincountTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class FindBinsTest(tf.test.TestCase):
+class FindBinsTest(tfp_test_util.TestCase):
 
   def test_1d_array_no_extend_lower_and_upper_dtype_int64(self):
     x = [-1., 0., 4., 5., 10., 20.]
@@ -195,7 +198,7 @@ class FindBinsTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HistogramTest(tf.test.TestCase):
+class HistogramTest(tfp_test_util.TestCase):
 
   def test_uniform_dist_in_1d_specify_extend_interval_and_dtype(self):
     n_samples = 1000
@@ -355,7 +358,7 @@ class HistogramTest(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class PercentileTestWithLowerInterpolation(tf.test.TestCase):
+class PercentileTestWithLowerInterpolation(tfp_test_util.TestCase):
 
   _interpolation = 'lower'
 
@@ -485,8 +488,7 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
 
   def test_four_dimensional_input_x_static_ndims_but_dynamic_sizes(self):
     x = rng.rand(2, 3, 4, 5)
-    x_ph = tf.compat.v1.placeholder_with_default(
-        input=x, shape=[None, None, None, None])
+    x_ph = tf1.placeholder_with_default(x, shape=[None, None, None, None])
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
           x, q=0.77, interpolation=self._interpolation, axis=axis)
@@ -496,8 +498,7 @@ class PercentileTestWithLowerInterpolation(tf.test.TestCase):
 
   def test_four_dimensional_input_and_keepdims_x_static_ndims_dynamic_sz(self):
     x = rng.rand(2, 3, 4, 5)
-    x_ph = tf.compat.v1.placeholder_with_default(
-        input=x, shape=[None, None, None, None])
+    x_ph = tf1.placeholder_with_default(x, shape=[None, None, None, None])
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
           x,
@@ -659,7 +660,7 @@ class PercentileTestWithHigherInterpolation(
   _interpolation = 'higher'
 
 
-class PercentileTestWithNearestInterpolation(tf.test.TestCase):
+class PercentileTestWithNearestInterpolation(tfp_test_util.TestCase):
   """Test separately because np.round and tf.round make different choices."""
 
   _interpolation = 'nearest'
@@ -695,7 +696,7 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
   def test_2d_q_raises_dynamic(self):
     if tf.executing_eagerly(): return
     x = [1., 5., 3., 2., 4.]
-    q_ph = tf.compat.v1.placeholder_with_default(input=[[0.5]], shape=None)
+    q_ph = tf1.placeholder_with_default([[0.5]], shape=None)
     pct = tfp.stats.percentile(x, q=q_ph, validate_args=True,
                                interpolation=self._interpolation)
     with self.assertRaisesOpError('rank'):
@@ -713,7 +714,7 @@ class PercentileTestWithNearestInterpolation(tf.test.TestCase):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class QuantilesTest(tf.test.TestCase):
+class QuantilesTest(tfp_test_util.TestCase):
   """Test for quantiles. Most functionality tested implicitly via percentile."""
 
   def test_quartiles_of_vector(self):

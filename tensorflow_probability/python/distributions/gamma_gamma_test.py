@@ -17,17 +17,17 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
-import tensorflow as tf
-import tensorflow_probability as tfp
 
+import numpy as np
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-tfd = tfp.distributions
+
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GammaGammaTest(tf.test.TestCase):
+class GammaGammaTest(tfp_test_util.TestCase):
 
   def testGammaGammaShape(self):
     gg = tfd.GammaGamma(
@@ -40,11 +40,36 @@ class GammaGammaTest(tf.test.TestCase):
     self.assertAllEqual(self.evaluate(gg.event_shape_tensor()), [])
     self.assertEqual(gg.event_shape, tf.TensorShape([]))
 
+  def testGammaGammaInvalidArgs(self):
+    with self.assertRaisesOpError('`concentration` must be positive'):
+      gg = tfd.GammaGamma(
+          concentration=-1.,
+          mixing_concentration=2.,
+          mixing_rate=0.5,
+          validate_args=True)
+      self.evaluate(gg.mean())
+
+    with self.assertRaisesOpError('`mixing_concentration` must be positive'):
+      gg = tfd.GammaGamma(
+          concentration=1.,
+          mixing_concentration=-2.,
+          mixing_rate=0.5,
+          validate_args=True)
+      self.evaluate(gg.mean())
+
+    with self.assertRaisesOpError('`mixing_rate` must be positive'):
+      gg = tfd.GammaGamma(
+          concentration=1.,
+          mixing_concentration=2.,
+          mixing_rate=-0.5,
+          validate_args=True)
+      self.evaluate(gg.mean())
+
   def testGammaGammaLogPDF(self):
     batch_size = 5
-    alpha = tf.constant([2.] * batch_size)
-    alpha0 = tf.constant([3.] * batch_size)
-    beta0 = tf.constant([4.] * batch_size)
+    alpha = tf.constant([2.] * batch_size, dtype=np.float32)
+    alpha0 = tf.constant([3.] * batch_size, dtype=np.float32)
+    beta0 = tf.constant([4.] * batch_size, dtype=np.float32)
     x = np.array([6.] * batch_size, dtype=np.float32)
 
     # Let
@@ -84,9 +109,9 @@ class GammaGammaTest(tf.test.TestCase):
 
   def testGammaGammaLogPDFMultidimensional(self):
     batch_size = 6
-    alpha = tf.constant([[2., 4.]] * batch_size)
-    alpha0 = tf.constant([[3., 6.]] * batch_size)
-    beta0 = tf.constant([[4., 8.]] * batch_size)
+    alpha = tf.constant([[2., 4.]] * batch_size, dtype=np.float32)
+    alpha0 = tf.constant([[3., 6.]] * batch_size, dtype=np.float32)
+    beta0 = tf.constant([[4., 8.]] * batch_size, dtype=np.float32)
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
 
     gg = tfd.GammaGamma(
@@ -96,9 +121,9 @@ class GammaGammaTest(tf.test.TestCase):
 
   def testGammaGammaLogPDFMultidimensionalBroadcasting(self):
     batch_size = 6
-    alpha = tf.constant([[2., 4.]] * batch_size)
-    alpha0 = tf.constant(3.0)
-    beta0 = tf.constant([4., 8.])
+    alpha = tf.constant([[2., 4.]] * batch_size, dtype=np.float32)
+    alpha0 = tf.constant(3.0, dtype=np.float32)
+    beta0 = tf.constant([4., 8.], dtype=np.float32)
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
 
     gg = tfd.GammaGamma(
@@ -148,22 +173,21 @@ class GammaGammaTest(tf.test.TestCase):
     self.assertAllClose(self.evaluate(gg.mean()), expected_mean)
 
   def testGammaGammaSample(self):
-    with tf.compat.v1.Session():
-      alpha_v = 2.0
-      alpha0_v = 3.0
-      beta0_v = 5.0
-      n = 100000
+    alpha_v = 2.0
+    alpha0_v = 3.0
+    beta0_v = 5.0
+    n = 100000
 
-      gg = tfd.GammaGamma(
-          concentration=alpha_v,
-          mixing_concentration=alpha0_v,
-          mixing_rate=beta0_v)
-      samples = gg.sample(n, seed=tfp_test_util.test_seed())
-      sample_values = self.evaluate(samples)
-      self.assertEqual(samples.shape, (n,))
-      self.assertEqual(sample_values.shape, (n,))
-      self.assertAllClose(
-          sample_values.mean(), self.evaluate(gg.mean()), rtol=.02)
+    gg = tfd.GammaGamma(
+        concentration=alpha_v,
+        mixing_concentration=alpha0_v,
+        mixing_rate=beta0_v)
+    samples = gg.sample(n, seed=tfp_test_util.test_seed())
+    sample_values = self.evaluate(samples)
+    self.assertEqual(samples.shape, (n,))
+    self.assertEqual(sample_values.shape, (n,))
+    self.assertAllClose(
+        sample_values.mean(), self.evaluate(gg.mean()), rtol=.02)
 
   def testGammaGammaSampleConcentrationCausesBroadcast(self):
     gg = tfd.GammaGamma(concentration=[1., 2.],

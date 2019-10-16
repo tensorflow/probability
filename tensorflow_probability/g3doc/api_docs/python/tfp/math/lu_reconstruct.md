@@ -5,6 +5,18 @@
 
 # tfp.math.lu_reconstruct
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/linalg.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 The inverse LU decomposition, `X == lu_reconstruct(*tf.linalg.lu(X))`.
 
 ``` python
@@ -18,11 +30,11 @@ tfp.math.lu_reconstruct(
 
 
 
-Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/linalg.py).
-
 <!-- Placeholder for "Used in" -->
 
+
 #### Args:
+
 
 * <b>`lower_upper`</b>: `lu` as returned by `tf.linalg.lu`, i.e., if
   `matmul(P, matmul(L, U)) = X` then `lower_upper = L + U - eye`.
@@ -32,13 +44,14 @@ Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/t
   for correctness.
   Default value: `False` (i.e., don't validate arguments).
 * <b>`name`</b>: Python `str` name given to ops managed by this object.
-  Default value: `None` (i.e., "lu_reconstruct").
+  Default value: `None` (i.e., 'lu_reconstruct').
 
 
 #### Returns:
 
-  x: The original input to `tf.linalg.lu`, i.e., `x` as in,
-    `lu_reconstruct(*tf.linalg.lu(x))`.
+
+* <b>`x`</b>: The original input to `tf.linalg.lu`, i.e., `x` as in,
+  `lu_reconstruct(*tf.linalg.lu(x))`.
 
 #### Examples
 

@@ -5,6 +5,18 @@
 
 # tfp.glm.fit_sparse
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/glm/proximal_hessian.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Fits a GLM using coordinate-wise FIM-informed proximal gradient descent.
 
 ``` python
@@ -25,8 +37,6 @@ tfp.glm.fit_sparse(
 
 
 
-Defined in [`python/glm/proximal_hessian.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/proximal_hessian.py).
-
 <!-- Placeholder for "Used in" -->
 
 This function uses a L1- and L2-regularized, second-order quasi-Newton method
@@ -43,6 +53,7 @@ For large, sparse data sets, `model_matrix` should be supplied as a
 `SparseTensor`.
 
 #### Args:
+
 
 * <b>`model_matrix`</b>: (Batch of) matrix-shaped, `float` `Tensor` or `SparseTensor`
   where each row represents a sample's features.  Has shape `[N, n]` where
@@ -84,17 +95,18 @@ For large, sparse data sets, `model_matrix` should be supplied as a
 
 #### Returns:
 
-  model_coefficients: (Batch of) `Tensor` of the same shape and dtype as
-    `model_coefficients_start`, representing the computed model coefficients
-    which minimize the regularized negative log-likelihood.
-  is_converged: scalar, `bool` `Tensor` indicating whether the minimization
-    procedure converged across all batches within the specified number of
-    iterations.  Here convergence means that an iteration of the inner loop
-    (`fit_sparse_one_step`) returns `True` for its `is_converged` output
-    value.
-  iter: scalar, `int` `Tensor` indicating the actual number of iterations of
-    the outer loop of the optimizer completed (i.e., number of calls to
-    `fit_sparse_one_step` before achieving convergence).
+
+* <b>`model_coefficients`</b>: (Batch of) `Tensor` of the same shape and dtype as
+  `model_coefficients_start`, representing the computed model coefficients
+  which minimize the regularized negative log-likelihood.
+* <b>`is_converged`</b>: scalar, `bool` `Tensor` indicating whether the minimization
+  procedure converged across all batches within the specified number of
+  iterations.  Here convergence means that an iteration of the inner loop
+  (`fit_sparse_one_step`) returns `True` for its `is_converged` output
+  value.
+* <b>`iter`</b>: scalar, `int` `Tensor` indicating the actual number of iterations of
+  the outer loop of the optimizer completed (i.e., number of calls to
+  `fit_sparse_one_step` before achieving convergence).
 
 #### Example
 

@@ -5,6 +5,18 @@
 
 # tfp.glm.fit_sparse_one_step
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/glm/proximal_hessian.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 One step of (the outer loop of) the GLM fitting algorithm.
 
 ``` python
@@ -23,8 +35,6 @@ tfp.glm.fit_sparse_one_step(
 ```
 
 
-
-Defined in [`python/glm/proximal_hessian.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/glm/proximal_hessian.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -58,6 +68,7 @@ is based on curvature (Fisher information matrix), which significantly speeds
 up convergence.
 
 #### Args:
+
 
 * <b>`model_matrix`</b>: (Batch of) matrix-shaped, `float` `Tensor` or `SparseTensor`
   where each row represents a sample's features.  Has shape `[N, n]` where
@@ -103,6 +114,7 @@ up convergence.
 
 
 #### Returns:
+
 
 * <b>`model_coefficients`</b>: (Batch of) `Tensor` having the same shape and dtype as
   `model_coefficients_start`, representing the updated value of

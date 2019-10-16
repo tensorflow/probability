@@ -5,6 +5,18 @@
 
 # tfp.sts.one_step_predictive
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/sts/forecast.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Compute one-step-ahead predictive distributions for all timesteps.
 
 ``` python
@@ -17,8 +29,6 @@ tfp.sts.one_step_predictive(
 
 
 
-Defined in [`python/sts/forecast.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/sts/forecast.py).
-
 <!-- Placeholder for "Used in" -->
 
 Given samples from the posterior over parameters, return the predictive
@@ -26,6 +36,7 @@ distribution over observations at each time `T`, given observations up
 through time `T-1`.
 
 #### Args:
+
 
 * <b>`model`</b>: An instance of `StructuralTimeSeries` representing a
   time-series model. This represents a joint distribution over
@@ -45,12 +56,13 @@ through time `T-1`.
 
 #### Returns:
 
-  forecast_dist: a `tfd.MixtureSameFamily` instance with event shape
-    [num_timesteps] and
-    batch shape `concat([sample_shape, model.batch_shape])`, with
-    `num_posterior_draws` mixture components. The `t`th step represents the
-    forecast distribution `p(observed_time_series[t] |
-    observed_time_series[0:t-1], parameter_samples)`.
+
+* <b>`forecast_dist`</b>: a `tfd.MixtureSameFamily` instance with event shape
+  [num_timesteps] and
+  batch shape `concat([sample_shape, model.batch_shape])`, with
+  `num_posterior_draws` mixture components. The `t`th step represents the
+  forecast distribution `p(observed_time_series[t] |
+  observed_time_series[0:t-1], parameter_samples)`.
 
 #### Examples
 

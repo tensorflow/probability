@@ -5,24 +5,31 @@
 
 # tfp.distributions.tridiag
 
-Creates a matrix with values set above, below, and on the diagonal.
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
+Creates a matrix with values set above, below, and on the diagonal. (deprecated)
 
 ``` python
 tfp.distributions.tridiag(
-    below=None,
-    diag=None,
-    above=None,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
 
 
-Defined in [`python/internal/distribution_util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/distribution_util.py).
-
 <!-- Placeholder for "Used in" -->
 
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+This function is deprecated.
+
 #### Example:
+
 
 
 ```python
@@ -35,10 +42,10 @@ tridiag(below=[1., 2., 3.],
 #            [  0.,   0.,   3.,   7.]], dtype=float32)
 ```
 
-* <b>`Warning`</b>: This Op is intended for convenience, not efficiency.
-
+Warning: This Op is intended for convenience, not efficiency.
 
 #### Args:
+
 
 * <b>`below`</b>: `Tensor` of shape `[B1, ..., Bb, d-1]` corresponding to the below
   diagonal part. `None` is logically equivalent to `below = 0`.
@@ -51,9 +58,11 @@ tridiag(below=[1., 2., 3.],
 
 #### Returns:
 
+
 * <b>`tridiag`</b>: `Tensor` with values set above, below and on the diagonal.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if all inputs are `None`.

@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.mcmc.eight_schools_hmc import EightSchoolsHmcBenchmarkTestHarness
 
 
-tf.compat.v1.enable_eager_execution()
+tf1.enable_eager_execution()
 
 
 class EagerEightSchoolsHmcBenchmark(

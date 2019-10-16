@@ -16,15 +16,23 @@
 
 # tfp.mcmc.SimpleStepSizeAdaptation
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/simple_step_size_adaptation.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `SimpleStepSizeAdaptation`
 
 Adapts the inner kernel's `step_size` based on `log_accept_prob`.
 
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
-
-
-
-Defined in [`python/mcmc/simple_step_size_adaptation.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/simple_step_size_adaptation.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -131,6 +139,8 @@ http://andrewgelman.com/2017/12/15/burn-vs-warm-iterative-simulation-algorithms/
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/simple_step_size_adaptation.py">View source</a>
+
 ``` python
 __init__(
     inner_kernel,
@@ -153,38 +163,39 @@ kernel produces kernel results structurally the same as the
 
 #### Args:
 
-  inner_kernel: `TransitionKernel`-like object.
-  num_adaptation_steps: Scalar `int` `Tensor` number of initial steps to
-    during which to adjust the step size. This may be greater, less than, or
-    equal to the number of burnin steps.
-  target_accept_prob: A floating point `Tensor` representing desired
-    acceptance probability. Must be a positive number less than 1. This can
-    either be a scalar, or have shape [num_chains]. Default value: `0.75`
-    (the [center of asymptotically optimal rate for HMC][1]).
-  adaptation_rate: `Tensor` representing amount to scale the current
-    `step_size`.
-  step_size_setter_fn: A callable with the signature
-    `(kernel_results, new_step_size) -> new_kernel_results` where
-    `kernel_results` are the results of the `inner_kernel`, `new_step_size`
-    is a `Tensor` or a nested collection of `Tensor`s with the same
-    structure as returned by the `step_size_getter_fn`, and
-    `new_kernel_results` are a copy of `kernel_results` with the step
-    size(s) set.
-  step_size_getter_fn: A callable with the signature
-    `(kernel_results) -> step_size` where `kernel_results` are the results
-    of the `inner_kernel`, and `step_size` is a floating point `Tensor` or a
-    nested collection of such `Tensor`s.
-  log_accept_prob_getter_fn: A callable with the signature
-    `(kernel_results) -> log_accept_prob` where `kernel_results` are the
-    results of the `inner_kernel`, and `log_accept_prob` is a floating point
-    `Tensor`. `log_accept_prob` can either be a scalar, or have shape
-    [num_chains]. If it's the latter, `step_size` should also have the same
-    leading dimension.
-  validate_args: Python `bool`. When `True` kernel parameters are checked
-    for validity. When `False` invalid inputs may silently render incorrect
-    outputs.
-  name: Python `str` name prefixed to Ops created by this class. Default:
-    'simple_step_size_adaptation'.
+
+* <b>`inner_kernel`</b>: `TransitionKernel`-like object.
+* <b>`num_adaptation_steps`</b>: Scalar `int` `Tensor` number of initial steps to
+  during which to adjust the step size. This may be greater, less than, or
+  equal to the number of burnin steps.
+* <b>`target_accept_prob`</b>: A floating point `Tensor` representing desired
+  acceptance probability. Must be a positive number less than 1. This can
+  either be a scalar, or have shape [num_chains]. Default value: `0.75`
+  (the [center of asymptotically optimal rate for HMC][1]).
+* <b>`adaptation_rate`</b>: `Tensor` representing amount to scale the current
+  `step_size`.
+* <b>`step_size_setter_fn`</b>: A callable with the signature
+  `(kernel_results, new_step_size) -> new_kernel_results` where
+  `kernel_results` are the results of the `inner_kernel`, `new_step_size`
+  is a `Tensor` or a nested collection of `Tensor`s with the same
+  structure as returned by the `step_size_getter_fn`, and
+  `new_kernel_results` are a copy of `kernel_results` with the step
+  size(s) set.
+* <b>`step_size_getter_fn`</b>: A callable with the signature
+  `(kernel_results) -> step_size` where `kernel_results` are the results
+  of the `inner_kernel`, and `step_size` is a floating point `Tensor` or a
+  nested collection of such `Tensor`s.
+* <b>`log_accept_prob_getter_fn`</b>: A callable with the signature
+  `(kernel_results) -> log_accept_prob` where `kernel_results` are the
+  results of the `inner_kernel`, and `log_accept_prob` is a floating point
+  `Tensor`. `log_accept_prob` can either be a scalar, or have shape
+  [num_chains]. If it's the latter, `step_size` should also have the same
+  leading dimension.
+* <b>`validate_args`</b>: Python `bool`. When `True` kernel parameters are checked
+  for validity. When `False` invalid inputs may silently render incorrect
+  outputs.
+* <b>`name`</b>: Python `str` name prefixed to Ops created by this class. Default:
+  'simple_step_size_adaptation'.
 
 #### References
 
@@ -200,11 +211,14 @@ kernel produces kernel results structurally the same as the
 
 
 
+
 <h3 id="name"><code>name</code></h3>
 
 
 
+
 <h3 id="num_adaptation_steps"><code>num_adaptation_steps</code></h3>
+
 
 
 
@@ -214,9 +228,12 @@ Return `dict` of ``__init__`` arguments and their values.
 
 
 
+
 ## Methods
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/simple_step_size_adaptation.py">View source</a>
 
 ``` python
 bootstrap_results(init_state)
@@ -224,7 +241,9 @@ bootstrap_results(init_state)
 
 Returns an object with the same type as returned by `one_step(...)[1]`.
 
+
 #### Args:
+
 
 * <b>`init_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   initial state(s) of the Markov chain(s).
@@ -232,10 +251,13 @@ Returns an object with the same type as returned by `one_step(...)[1]`.
 
 #### Returns:
 
+
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
   `Tensor`s representing internal calculations made within this function.
 
 <h3 id="is_calibrated"><code>is_calibrated</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/simple_step_size_adaptation.py">View source</a>
 
 ``` python
 is_calibrated()
@@ -248,13 +270,18 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 <h3 id="log_accept_prob_getter_fn"><code>log_accept_prob_getter_fn</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/simple_step_size_adaptation.py">View source</a>
+
 ``` python
 log_accept_prob_getter_fn(kernel_results)
 ```
 
 
 
+
 <h3 id="one_step"><code>one_step</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/simple_step_size_adaptation.py">View source</a>
 
 ``` python
 one_step(
@@ -269,6 +296,7 @@ Must be overridden by subclasses.
 
 #### Args:
 
+
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   current state(s) of the Markov chain(s).
 * <b>`previous_kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or
@@ -278,6 +306,7 @@ Must be overridden by subclasses.
 
 #### Returns:
 
+
 * <b>`next_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   next state(s) of the Markov chain(s).
 * <b>`kernel_results`</b>: A (possibly nested) `tuple`, `namedtuple` or `list` of
@@ -285,13 +314,18 @@ Must be overridden by subclasses.
 
 <h3 id="step_size_getter_fn"><code>step_size_getter_fn</code></h3>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/simple_step_size_adaptation.py">View source</a>
+
 ``` python
 step_size_getter_fn(kernel_results)
 ```
 
 
 
+
 <h3 id="step_size_setter_fn"><code>step_size_setter_fn</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/simple_step_size_adaptation.py">View source</a>
 
 ``` python
 step_size_setter_fn(
@@ -299,6 +333,7 @@ step_size_setter_fn(
     new_step_size
 )
 ```
+
 
 
 

@@ -23,10 +23,12 @@ import warnings
 
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.math.gradient import value_and_gradient as tfp_math_value_and_gradients
-
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -64,7 +66,7 @@ def is_namedtuple_like(x):
 
 
 def make_name(super_name, default_super_name, sub_name):
-  """Helper which makes a `str` name; useful for tf.compat.v1.name_scope."""
+  """Helper which makes a `str` name; useful for tf.name_scope."""
   name = super_name if super_name is not None else default_super_name
   if sub_name is not None:
     name += '_' + sub_name
@@ -78,33 +80,23 @@ def _choose_base_case(is_accepted,
   """Helper to `choose` which expand_dims `is_accepted` and applies tf.where."""
   def _expand_is_accepted_like(x):
     """Helper to expand `is_accepted` like the shape of some input arg."""
-    with tf.compat.v1.name_scope('expand_is_accepted_like'):
-      expand_shape = tf.concat([
-          tf.shape(input=is_accepted),
-          tf.ones([tf.rank(x) - tf.rank(is_accepted)], dtype=tf.int32),
-      ],
-                               axis=0)
-      multiples = tf.concat([
-          tf.ones([tf.rank(is_accepted)], dtype=tf.int32),
-          tf.shape(input=x)[tf.rank(is_accepted):],
-      ],
-                            axis=0)
-      m = tf.tile(tf.reshape(is_accepted, expand_shape),
-                  multiples)
-      m.set_shape(m.shape.merge_with(x.shape))
-      return m
+    with tf.name_scope('expand_is_accepted_like'):
+      ndims_pad_right = prefer_static.rank(x) - prefer_static.rank(is_accepted)
+      expand_shape = prefer_static.pad(
+          prefer_static.shape(is_accepted),
+          paddings=[[0, ndims_pad_right]],
+          constant_values=1)
+      return tf.reshape(is_accepted, expand_shape)
   def _where(accepted, rejected):
     if accepted is rejected:
       return accepted
-    accepted = tf.convert_to_tensor(value=accepted, name='accepted')
-    rejected = tf.convert_to_tensor(value=rejected, name='rejected')
-    r = tf.compat.v1.where(
-        _expand_is_accepted_like(accepted), accepted, rejected)
+    accepted = tf.convert_to_tensor(accepted, name='accepted')
+    rejected = tf.convert_to_tensor(rejected, name='rejected')
+    r = tf.where(_expand_is_accepted_like(accepted), accepted, rejected)
     r.set_shape(r.shape.merge_with(accepted.shape.merge_with(rejected.shape)))
     return r
 
-  with tf.compat.v1.name_scope(
-      name, 'choose', values=[is_accepted, accepted, rejected]):
+  with tf.name_scope(name or 'choose'):
     if not is_list_like(accepted):
       return _where(accepted, rejected)
     return [(choose(is_accepted, a, r, name=name) if is_namedtuple_like(a)
@@ -151,17 +143,14 @@ def safe_sum(x, alt_value=-np.inf, name=None):
     TypeError: if `x` is not list-like.
     ValueError: if `x` is empty.
   """
-  with tf.compat.v1.name_scope(name, 'safe_sum', [x, alt_value]):
+  with tf.name_scope(name or 'safe_sum'):
     if not is_list_like(x):
       raise TypeError('Expected list input.')
     if not x:
       raise ValueError('Input should not be empty.')
     in_shape = x[0].shape
-    x = tf.stack(x, axis=-1)
-    x = tf.reduce_sum(input_tensor=x, axis=-1)
-    alt_value = np.array(alt_value, x.dtype.as_numpy_dtype)
-    alt_fill = tf.fill(tf.shape(input=x), value=alt_value)
-    x = tf.compat.v1.where(tf.math.is_finite(x), x, alt_fill)
+    x = tf.add_n(x)
+    x = tf.where(tf.math.is_finite(x), x, tf.constant(alt_value, dtype=x.dtype))
     x.set_shape(x.shape.merge_with(in_shape))
     return x
 
@@ -176,12 +165,10 @@ def set_doc(value):
 
 def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
   """Helper to `maybe_call_fn_and_grads`."""
-  with tf.compat.v1.name_scope(name, 'value_and_gradients',
-                               [fn_arg_list, result, grads]):
+  with tf.name_scope(name or 'value_and_gradients'):
 
     def _convert_to_tensor(x, name):
-      ctt = lambda x_: x_ if x_ is None else tf.convert_to_tensor(
-          value=x_, name=name)
+      ctt = lambda x_: x_ if x_ is None else tf.convert_to_tensor(x_, name=name)
       return [ctt(x_) for x_ in x] if is_list_like(x) else ctt(x)
 
     fn_arg_list = (list(fn_arg_list) if is_list_like(fn_arg_list)
@@ -226,12 +213,11 @@ def maybe_call_fn_and_grads(fn,
                             check_non_none_grads=True,
                             name=None):
   """Calls `fn` and computes the gradient of the result wrt `args_list`."""
-  with tf.compat.v1.name_scope(name, 'maybe_call_fn_and_grads',
-                               [fn_arg_list, result, grads]):
+  with tf.name_scope(name or 'maybe_call_fn_and_grads'):
     fn_arg_list = (list(fn_arg_list) if is_list_like(fn_arg_list)
                    else [fn_arg_list])
     result, grads = _value_and_gradients(fn, fn_arg_list, result, grads)
-    if not all(r.dtype.is_floating
+    if not all(dtype_util.is_floating(r.dtype)
                for r in (result if is_list_like(result) else [result])):  # pylint: disable=superfluous-parens
       raise TypeError('Function result must be a `Tensor` with `float` '
                       '`dtype`.')
@@ -270,12 +256,11 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
   Returns:
     result: `Tensor` representing applying `body_fn` iteratively `n` times.
   """
-  with tf.compat.v1.name_scope(name, 'smart_for_loop',
-                               [loop_num_iter, initial_loop_vars]):
+  with tf.name_scope(name or 'smart_for_loop'):
     loop_num_iter_ = tf.get_static_value(loop_num_iter)
     if (loop_num_iter_ is None or tf.executing_eagerly() or
         control_flow_util.GraphOrParentsInXlaContext(
-            tf.compat.v1.get_default_graph())):
+            tf1.get_default_graph())):
       # Cast to int32 to run the comparison against i in host memory,
       # where while/LoopCond needs it.
       loop_num_iter = tf.cast(loop_num_iter, dtype=tf.int32)
@@ -326,23 +311,18 @@ def trace_scan(loop_fn,
       `Tensor` being a stack of the corresponding `Tensors` in the return value
       of `trace_fn` for each slice of `elems`.
   """
-  with tf.compat.v1.name_scope(
-      name, 'trace_scan', [initial_state, elems]), tf.compat.v1.variable_scope(
-          tf.compat.v1.get_variable_scope()) as vs:
+  with tf.name_scope(name or 'trace_scan'), tf1.variable_scope(
+      tf1.get_variable_scope()) as vs:
     if vs.caching_device is None and not tf.executing_eagerly():
       vs.set_caching_device(lambda op: op.device)
 
     initial_state = tf.nest.map_structure(
-        lambda x: tf.convert_to_tensor(value=x, name='initial_state'),
+        lambda x: tf.convert_to_tensor(x, name='initial_state'),
         initial_state)
-    elems = tf.convert_to_tensor(value=elems, name='elems')
+    elems = tf.convert_to_tensor(elems, name='elems')
 
-    static_length = elems.shape[0]
-    if tf.compat.dimension_value(static_length) is None:
-      length = tf.shape(input=elems)[0]
-    else:
-      length = tf.convert_to_tensor(
-          value=static_length, dtype=tf.int32, name='length')
+    length = prefer_static.size0(elems)
+    static_length = length if prefer_static.is_numpy(length) else None
 
     # This is an TensorArray in part because of XLA, which had trouble with
     # non-statically known indices. I.e. elems[i] errored, but

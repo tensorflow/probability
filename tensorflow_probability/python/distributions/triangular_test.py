@@ -19,11 +19,11 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -34,7 +34,7 @@ class _TriangularTest(object):
 
   def make_tensor(self, x):
     x = tf.cast(x, self._dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=x, shape=x.shape if self._use_static_shape else None)
 
   def _create_triangular_dist(self, low, high, peak):
@@ -84,18 +84,18 @@ class _TriangularTest(object):
     self.assertAllClose(peak, self.evaluate(tri.peak))
 
   def testInvalidDistribution(self):
-    with self.assertRaisesOpError("(low >= high||low >= peak)"):
+    with self.assertRaisesOpError('(low >= high||low >= peak)'):
       tri = tfd.Triangular(
           low=2., high=1., peak=0.5, validate_args=True)
-      self.evaluate(tri.low)
-    with self.assertRaisesOpError("low > peak"):
+      self.evaluate(tri.mean())
+    with self.assertRaisesOpError('low > peak'):
       tri = tfd.Triangular(
           low=0., high=1., peak=-1., validate_args=True)
-      self.evaluate(tri.low)
-    with self.assertRaisesOpError("peak > high"):
+      self.evaluate(tri.mean())
+    with self.assertRaisesOpError('peak > high'):
       tri = tfd.Triangular(
           low=0., high=1., peak=2., validate_args=True)
-      self.evaluate(tri.low)
+      self.evaluate(tri.mean())
 
   def testTriangularPDF(self):
     low = np.arange(1.0, 5.0, dtype=self._dtype)
@@ -343,9 +343,23 @@ class _TriangularTest(object):
     tri = tfd.Triangular(low=low, peak=peak, high=high)
     self.assertAllClose(self.evaluate(tri.prob([0., 1., 4.])), [0, 0.5, 0])
 
+  def testModifiedVariableAssertion(self):
+    low = tf.Variable(0.)
+    peak = tf.Variable(0.5)
+    high = tf.Variable(1.)
+    self.evaluate([low.initializer, peak.initializer, high.initializer])
+    triangular = tfd.Triangular(
+        low=low, peak=peak, high=high, validate_args=True)
+    with self.assertRaisesOpError('low > peak'):
+      with tf.control_dependencies([low.assign(0.6)]):
+        self.evaluate(triangular.mean())
+    with self.assertRaisesOpError('peak > high'):
+      with tf.control_dependencies([low.assign(0.), peak.assign(1.2)]):
+        self.evaluate(triangular.mean())
+
 
 @test_util.run_all_in_graph_and_eager_modes
-class TriangularTestStaticShape(test_case.TestCase, _TriangularTest):
+class TriangularTestStaticShape(tfp_test_util.TestCase, _TriangularTest):
   _dtype = np.float32
   _use_static_shape = True
 
@@ -354,7 +368,7 @@ class TriangularTestStaticShape(test_case.TestCase, _TriangularTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TriangularTestFloat64StaticShape(test_case.TestCase, _TriangularTest):
+class TriangularTestFloat64StaticShape(tfp_test_util.TestCase, _TriangularTest):
   _dtype = np.float64
   _use_static_shape = True
 
@@ -363,7 +377,7 @@ class TriangularTestFloat64StaticShape(test_case.TestCase, _TriangularTest):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class TriangularTestDynamicShape(test_case.TestCase, _TriangularTest):
+class TriangularTestDynamicShape(tfp_test_util.TestCase, _TriangularTest):
   _dtype = np.float32
   _use_static_shape = False
 
@@ -371,5 +385,5 @@ class TriangularTestDynamicShape(test_case.TestCase, _TriangularTest):
     self._rng = np.random.RandomState(123)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

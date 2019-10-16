@@ -22,10 +22,10 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -36,7 +36,7 @@ class _GumbelTest(object):
 
   def make_tensor(self, x):
     x = tf.cast(x, self._dtype)
-    return tf.compat.v1.placeholder_with_default(
+    return tf1.placeholder_with_default(
         input=x, shape=x.shape if self._use_static_shape else None)
 
   def testGumbelShape(self):
@@ -51,9 +51,18 @@ class _GumbelTest(object):
 
   def testInvalidScale(self):
     scale = [-.01, 0., 2.]
-    with self.assertRaisesOpError('Condition x > 0'):
+    with self.assertRaisesOpError('Argument `scale` must be positive.'):
       gumbel = tfd.Gumbel(loc=0., scale=scale, validate_args=True)
-      self.evaluate(gumbel.scale)
+      self.evaluate(gumbel.mean())
+
+    scale = tf.Variable([.01])
+    self.evaluate(scale.initializer)
+    gumbel = tfd.Gumbel(loc=0., scale=scale, validate_args=True)
+    self.assertIs(scale, gumbel.scale)
+    self.evaluate(gumbel.mean())
+    with tf.control_dependencies([scale.assign([-.01])]):
+      with self.assertRaisesOpError('Argument `scale` must be positive.'):
+        self.evaluate(gumbel.mean())
 
   def testGumbelLogPdf(self):
     batch_size = 6
@@ -287,19 +296,19 @@ class _GumbelTest(object):
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GumbelTestStaticShape(test_case.TestCase, _GumbelTest):
+class GumbelTestStaticShape(tfp_test_util.TestCase, _GumbelTest):
   _dtype = np.float32
   _use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GumbelTestFloat64StaticShape(test_case.TestCase, _GumbelTest):
+class GumbelTestFloat64StaticShape(tfp_test_util.TestCase, _GumbelTest):
   _dtype = np.float64
   _use_static_shape = True
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class GumbelTestDynamicShape(test_case.TestCase, _GumbelTest):
+class GumbelTestDynamicShape(tfp_test_util.TestCase, _GumbelTest):
   _dtype = np.float32
   _use_static_shape = False
 

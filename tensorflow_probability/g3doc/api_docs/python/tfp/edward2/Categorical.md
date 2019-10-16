@@ -5,7 +5,24 @@
 
 # tfp.edward2.Categorical
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for Categorical.
+
+### Aliases:
+
+* `tfp.experimental.edward2.Categorical`
+
 
 ``` python
 tfp.edward2.Categorical(
@@ -16,28 +33,27 @@ tfp.edward2.Categorical(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See Categorical for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
 Initialize Categorical distributions using class log-probabilities.
 
-
 #### Args:
 
-* <b>`logits`</b>: An N-D `Tensor`, `N >= 1`, representing the log probabilities
-  of a set of Categorical distributions. The first `N - 1` dimensions
-  index into a batch of independent distributions and the last dimension
-  represents a vector of logits for each class. Only one of `logits` or
-  `probs` should be passed in.
+
+* <b>`logits`</b>: An N-D `Tensor`, `N >= 1`, representing the unnormalized
+  log probabilities of a set of Categorical distributions. The first
+  `N - 1` dimensions index into a batch of independent distributions
+  and the last dimension represents a vector of logits for each class.
+  Only one of `logits` or `probs` should be passed in.
 * <b>`probs`</b>: An N-D `Tensor`, `N >= 1`, representing the probabilities
   of a set of Categorical distributions. The first `N - 1` dimensions
   index into a batch of independent distributions and the last dimension

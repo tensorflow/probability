@@ -26,9 +26,11 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -36,7 +38,7 @@ Root = tfd.JointDistributionCoroutine.Root
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class JointDistributionCoroutineTest(tf.test.TestCase):
+class JointDistributionCoroutineTest(tfp_test_util.TestCase):
 
   def test_batch_and_event_shape_no_plate(self):
     # The joint distribution specified below corresponds to this
@@ -170,21 +172,21 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
 
     z = joint.sample()
 
-    self.assertAllEqual(tf.shape(input=z[0]), [])
-    self.assertAllEqual(tf.shape(input=z[1]), [])
-    self.assertAllEqual(tf.shape(input=z[2]), [])
+    self.assertAllEqual(tf.shape(z[0]), [])
+    self.assertAllEqual(tf.shape(z[1]), [])
+    self.assertAllEqual(tf.shape(z[2]), [])
 
     z = joint.sample(2)
 
-    self.assertAllEqual(tf.shape(input=z[0]), [2])
-    self.assertAllEqual(tf.shape(input=z[1]), [2])
-    self.assertAllEqual(tf.shape(input=z[2]), [2])
+    self.assertAllEqual(tf.shape(z[0]), [2])
+    self.assertAllEqual(tf.shape(z[1]), [2])
+    self.assertAllEqual(tf.shape(z[2]), [2])
 
     z = joint.sample([3, 2])
 
-    self.assertAllEqual(tf.shape(input=z[0]), [3, 2])
-    self.assertAllEqual(tf.shape(input=z[1]), [3, 2])
-    self.assertAllEqual(tf.shape(input=z[2]), [3, 2])
+    self.assertAllEqual(tf.shape(z[0]), [3, 2])
+    self.assertAllEqual(tf.shape(z[1]), [3, 2])
+    self.assertAllEqual(tf.shape(z[2]), [3, 2])
 
   def test_sample_shape_with_plate(self):
     # The joint distribution specified below corresponds to this
@@ -207,24 +209,24 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
 
     z = joint.sample()
 
-    self.assertAllEqual(tf.shape(input=z[0]), [])
-    self.assertAllEqual(tf.shape(input=z[1]), [])
-    self.assertAllEqual(tf.shape(input=z[2]), [20])
-    self.assertAllEqual(tf.shape(input=z[3]), [20])
+    self.assertAllEqual(tf.shape(z[0]), [])
+    self.assertAllEqual(tf.shape(z[1]), [])
+    self.assertAllEqual(tf.shape(z[2]), [20])
+    self.assertAllEqual(tf.shape(z[3]), [20])
 
     z = joint.sample(2)
 
-    self.assertAllEqual(tf.shape(input=z[0]), [2])
-    self.assertAllEqual(tf.shape(input=z[1]), [2])
-    self.assertAllEqual(tf.shape(input=z[2]), [2, 20])
-    self.assertAllEqual(tf.shape(input=z[3]), [2, 20])
+    self.assertAllEqual(tf.shape(z[0]), [2])
+    self.assertAllEqual(tf.shape(z[1]), [2])
+    self.assertAllEqual(tf.shape(z[2]), [2, 20])
+    self.assertAllEqual(tf.shape(z[3]), [2, 20])
 
     z = joint.sample([3, 2])
 
-    self.assertAllEqual(tf.shape(input=z[0]), [3, 2])
-    self.assertAllEqual(tf.shape(input=z[1]), [3, 2])
-    self.assertAllEqual(tf.shape(input=z[2]), [3, 2, 20])
-    self.assertAllEqual(tf.shape(input=z[3]), [3, 2, 20])
+    self.assertAllEqual(tf.shape(z[0]), [3, 2])
+    self.assertAllEqual(tf.shape(z[1]), [3, 2])
+    self.assertAllEqual(tf.shape(z[2]), [3, 2, 20])
+    self.assertAllEqual(tf.shape(z[3]), [3, 2, 20])
 
   def test_log_prob_no_plate(self):
     # The joint distribution specified below corresponds to this
@@ -286,13 +288,73 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
 
     expected_log_prob = (
         np.log(0.5) +
-        tf.reduce_sum(input_tensor=tf.math.log(b * (0.25 + 0.5 * a) +
-                                               (1 - b) * (0.75 -0.5 * a))) +
-        tf.reduce_sum(input_tensor=-0.5 * ((c - a) / (1. + b)) ** 2 -
+        tf.reduce_sum(tf.math.log(b * (0.25 + 0.5 * a) +
+                                  (1 - b) * (0.75 - 0.5 * a))) +
+        tf.reduce_sum(-0.5 * ((c - a) / (1. + b))**2 -
                       0.5 * np.log(2. * np.pi) -
                       tf.math.log((1. + b))))
 
     self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
+
+  def test_detect_missing_root(self):
+    if not tf.executing_eagerly(): return
+    # The joint distribution specified below is intended to
+    # correspond to this graphical model
+    #
+    #       +-----------+
+    #       |           |
+    #  (a)--+--(b)->(c) |
+    #       |           |
+    #       +---------2-+
+
+    def dist():
+      a = yield tfd.Bernoulli(probs=0.5, dtype=tf.float32)  # Missing root
+      b = yield tfd.Sample(tfd.Bernoulli(probs=0.25 + 0.5*a,
+                                         dtype=tf.float32), 2)
+      yield tfd.Independent(tfd.Normal(loc=a, scale=1. + b), 1)
+
+    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+
+    with self.assertRaisesRegexp(
+        Exception,
+        'must be wrapped in `Root`'):
+      self.evaluate(joint.sample())
+
+  def test_check_sample_rank(self):
+    def dist():
+      g = yield Root(tfd.Gamma(2, 2))
+      # The following line lacks a `Root` so that if a shape [3, 5]
+      # sample is requested the distribution below will produce
+      # samples that have too low a rank to be consistent with
+      # the shape.
+      df = yield tfd.Exponential(1.)
+      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
+      yield tfd.Independent(tfd.StudentT(tf.expand_dims(df, -1), loc, 1), 1)
+
+    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+
+    with self.assertRaisesRegexp(
+        Exception,
+        'are not consistent with `sample_shape`'):
+      self.evaluate(joint.sample([3, 5]))
+
+  def test_check_sample_shape(self):
+    def dist():
+      g = yield Root(tfd.Gamma(2, 2))
+      # The following line lacks a `Root` so that if a shape [3, 5]
+      # sample is requested the following line will yield samples
+      # with an appropriate rank but whose shape starts with [2, 2]
+      # rather than [3, 5].
+      df = yield tfd.Exponential([[1., 2.], [3., 4.]])
+      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
+      yield tfd.Independent(tfd.StudentT(tf.expand_dims(df, -1), loc, 1), 1)
+
+    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+
+    with self.assertRaisesRegexp(
+        Exception,
+        'are not consistent with `sample_shape`'):
+      self.evaluate(joint.sample([3, 5]))
 
   def test_log_prob_multiple_samples(self):
     # The joint distribution specified below corresponds to this
@@ -385,22 +447,18 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
 
     a, b, c, d = z  # pylint: disable=unbalanced-tuple-unpacking
 
-    expected_log_prob = (- a +
-                         tf.reduce_sum(
-                             input_tensor=
-                             -0.5 * (b - a) ** 2 +
-                             -0.5 * np.log(2. * np.pi),
-                             axis=-1) -
-                         c +
-                         tf.reduce_sum(
-                             input_tensor=
-                             -0.5 * (d - b) ** 2 / c ** 2 +
-                             -0.5 * tf.math.log(2. * np.pi * c ** 2),
-                             axis=-1))
+    expected_log_prob = (
+        -a +
+        tf.reduce_sum(-0.5 * (b - a)**2 + -0.5 * np.log(2. * np.pi), axis=-1) -
+        c +
+        tf.reduce_sum(-0.5 * (d - b)**2 / c**2 -
+                      0.5 * tf.math.log(2. * np.pi * c**2),
+                      axis=-1))
 
     log_prob = joint.log_prob(z)
 
-    self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
+    self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]),
+                        rtol=1e-5)
 
   def test_log_prob_multiple_roots_and_samples(self):
     # The joint distribution specified below corresponds to this
@@ -427,22 +485,19 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
 
     expanded_c = tf.expand_dims(c, -1)
     expected_log_prob = (
-        - a +
-        tf.reduce_sum(
-            input_tensor=
-            -0.5 * (b - tf.expand_dims(a, -1)) ** 2 +
-            -0.5 * np.log(2. * np.pi),
-            axis=-1) -
+        -a +
+        tf.reduce_sum(-0.5 * (b - tf.expand_dims(a, -1))**2 -
+                      0.5 * np.log(2. * np.pi),
+                      axis=-1) -
         c +
-        tf.reduce_sum(
-            input_tensor=
-            -0.5 * (d - b) ** 2 / expanded_c ** 2 +
-            -0.5 * tf.math.log(2. * np.pi * expanded_c ** 2),
-            axis=-1))
+        tf.reduce_sum(-0.5 * (d - b)**2 / expanded_c**2 -
+                      0.5 * tf.math.log(2. * np.pi * expanded_c**2),
+                      axis=-1))
 
     log_prob = joint.log_prob(z)
 
-    self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
+    self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]),
+                        rtol=1e-5)
 
   def test_sample_dtype_structures_output(self):
     def noncentered_horseshoe_prior(num_features):
@@ -483,12 +538,12 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
     m = tfd.JointDistributionCoroutine(model, sample_dtype=sd)
     self.assertEqual(
         ('tfp.distributions.JointDistributionCoroutine('
-         '"JointDistributionCoroutine/",'
+         '"JointDistributionCoroutine",'
          ' dtype=Model(s=?, w=?))'),
         str(m))
     self.assertEqual(
         ('<tfp.distributions.JointDistributionCoroutine'
-         ' \'JointDistributionCoroutine/\''
+         ' \'JointDistributionCoroutine\''
          ' batch_shape=?'
          ' event_shape=?'
          ' dtype=Model(s=?, w=?)>'),
@@ -496,18 +551,81 @@ class JointDistributionCoroutineTest(tf.test.TestCase):
     m.sample()
     self.assertEqual(
         ('tfp.distributions.JointDistributionCoroutine('
-         '"JointDistributionCoroutine/",'
+         '"JointDistributionCoroutine",'
          ' batch_shape=Model(s=[], w=[]),'
          ' event_shape=Model(s=[100], w=[100]),'
          ' dtype=Model(s=float32, w=float32))'),
         str(m))
     self.assertEqual(
         ('<tfp.distributions.JointDistributionCoroutine'
-         ' \'JointDistributionCoroutine/\''
+         ' \'JointDistributionCoroutine\''
          ' batch_shape=Model(s=[], w=[])'
          ' event_shape=Model(s=[100], w=[100])'
          ' dtype=Model(s=float32, w=float32)>'),
         repr(m))
+
+  def test_latent_dirichlet_allocation(self):
+    """Tests Latent Dirichlet Allocation joint model.
+
+    The LDA generative process can be written as:
+
+    ```none
+    N[i] ~ Poisson(xi)
+    theta[i] ~ Dirichlet(alpha)
+    Z[i] ~ Multinomial(N[i], theta[i])
+    for k in 1...K:
+      X[i,k] ~ Multinomial(Z[i, k], beta[j])
+    ```
+
+    Typically `xi` is specified and `alpha`, `beta` are fit using type-II
+    maximum likelihood estimators.
+
+    Reference: http://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf
+    """
+
+    # Hyperparameters.
+    num_topics = 3
+    num_words = 10
+    avg_doc_length = 5
+    u = tfd.Uniform(low=-1., high=1.)
+    alpha = tfp.util.TransformedVariable(
+        u.sample([num_topics]), tfb.Softplus(), name='alpha')
+    beta = tf.Variable(u.sample([num_topics, num_words]), name='beta')
+
+    # LDA Model.
+    # Note near 1:1 with mathematical specification. The main distinction is the
+    # use of Independent--this lets us easily aggregate multinomials across
+    # topics (and in any "shape" of documents).
+    def lda_model():
+      n = yield Root(tfd.Poisson(rate=avg_doc_length))
+      theta = yield Root(tfd.Dirichlet(concentration=alpha))
+      z = yield tfd.Multinomial(total_count=n, probs=theta)
+      yield tfd.Independent(tfd.Multinomial(total_count=z, logits=beta),
+                            reinterpreted_batch_ndims=1)
+
+    lda = tfd.JointDistributionCoroutine(lda_model)
+
+    # Now, let's sample some "documents" and compute the log-prob of each.
+    docs_shape = [2, 4]  # That is, 8 docs in the shape of [2, 4].
+    [n, theta, z, x] = lda.sample(docs_shape)
+    log_probs = lda.log_prob([n, theta, z, x])
+    self.assertEqual(docs_shape, log_probs.shape)
+
+    # Verify we correctly track trainable variables.
+    self.assertLen(lda.trainable_variables, 2)
+    self.assertIs(alpha.pretransformed_input, lda.trainable_variables[0])
+    self.assertIs(beta, lda.trainable_variables[1])
+
+    # Ensure we can compute gradients.
+    with tf.GradientTape() as tape:
+      # Note: The samples are not taped, hence implicitly "stop_gradient."
+      negloglik = -lda.log_prob([n, theta, z, x])
+    grads = tape.gradient(negloglik, lda.trainable_variables)
+
+    self.assertLen(grads, 2)
+    self.assertAllEqual((alpha.pretransformed_input.shape, beta.shape),
+                        (grads[0].shape, grads[1].shape))
+    self.assertAllNotNone(grads)
 
 
 if __name__ == '__main__':

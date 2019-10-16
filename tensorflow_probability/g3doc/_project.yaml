@@ -21,6 +21,6 @@ description: >
   statistical analysis.
 use_site_branding: true
 hide_from_products_list: true
-content_license: cc3-apache2
+content_license: cc-apache
 buganizer_id: 165902
 include: /_project_included.yaml

@@ -5,19 +5,31 @@
 
 # tfp.mcmc.potential_scale_reduction
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/diagnostic.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Gelman and Rubin (1992)'s potential scale reduction for chain convergence.
 
 ``` python
 tfp.mcmc.potential_scale_reduction(
     chains_states,
     independent_chain_ndims=1,
+    split_chains=False,
+    validate_args=False,
     name=None
 )
 ```
 
 
-
-Defined in [`python/mcmc/diagnostic.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/diagnostic.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -29,6 +41,7 @@ between chains exceeds what one would expect if the chains were identically
 distributed. See [Gelman and Rubin (1992)][1]; [Brooks and Gelman (1998)][2].
 
 #### Some guidelines:
+
 
 
 * The initial state of the chains should be drawn from a distribution
@@ -44,8 +57,8 @@ distributed. See [Gelman and Rubin (1992)][1]; [Brooks and Gelman (1998)][2].
   other statistics are desired, a different diagnostic should be used. See
   [Brooks and Gelman (1998)][2].
 
-
 #### Args:
+
 
 * <b>`chains_states`</b>:  `Tensor` or Python `list` of `Tensor`s representing the
   states of a Markov Chain at each result step.  The `ith` state is
@@ -57,6 +70,11 @@ distributed. See [Gelman and Rubin (1992)][1]; [Brooks and Gelman (1998)][2].
 * <b>`independent_chain_ndims`</b>: Integer type `Tensor` with value `>= 1` giving the
   number of dimensions, from `dim = 1` to `dim = D`, holding independent
   chain results to be tested for convergence.
+* <b>`split_chains`</b>: Python `bool`. If `True`, divide samples from each chain into
+  first and second halves, treating these as separate chains.  This makes
+  R-hat more robust to non-stationary chains, and is recommended in [3].
+* <b>`validate_args`</b>: Whether to add runtime checks of argument validity. If False,
+  and arguments are incorrect, correct behavior is not guaranteed.
 * <b>`name`</b>: `String` name to prepend to created tf.  Default:
   `potential_scale_reduction`.
 
@@ -68,9 +86,11 @@ the state(s).  Same `dtype` as `state`, and shape equal to
 `state.shape[1 + independent_chain_ndims:]`.
 
 
+
 #### Raises:
 
-  ValueError:  If `independent_chain_ndims < 1`.
+
+* <b>`ValueError`</b>:  If `independent_chain_ndims < 1`.
 
 #### Examples
 
@@ -127,3 +147,5 @@ distribution, they will have the same mean, and thus the ratio should be one.
 
 [2]: Andrew Gelman and Donald B. Rubin. Inference from Iterative Simulation
      Using Multiple Sequences. _Statistical Science_, 7(4):457-472, 1992.
+[3]: Vehtari et al.  Rank-normalization, folding, and localization: An
+     improved Rhat for assessing convergence of MCMC.

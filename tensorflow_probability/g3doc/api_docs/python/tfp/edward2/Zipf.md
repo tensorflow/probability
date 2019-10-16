@@ -5,7 +5,24 @@
 
 # tfp.edward2.Zipf
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for Zipf.
+
+### Aliases:
+
+* `tfp.experimental.edward2.Zipf`
+
 
 ``` python
 tfp.edward2.Zipf(
@@ -16,22 +33,21 @@ tfp.edward2.Zipf(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See Zipf for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
 Initialize a batch of Zipf distributions.
 
-
 #### Args:
+
 
 * <b>`power`</b>: `Float` like `Tensor` representing the power parameter. Must be
   strictly greater than `1`.
@@ -64,5 +80,6 @@ Initialize a batch of Zipf distributions.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `power` is not `float` like.

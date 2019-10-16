@@ -5,7 +5,24 @@
 
 # tfp.edward2.StudentTProcess
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for StudentTProcess.
+
+### Aliases:
+
+* `tfp.experimental.edward2.StudentTProcess`
+
 
 ``` python
 tfp.edward2.StudentTProcess(
@@ -16,22 +33,21 @@ tfp.edward2.StudentTProcess(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See StudentTProcess for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
 Instantiate a StudentTProcess Distribution.
 
-
 #### Args:
+
 
 * <b>`df`</b>: Positive Floating-point `Tensor` representing the degrees of freedom.
   Must be greater than 2.
@@ -68,5 +84,6 @@ Instantiate a StudentTProcess Distribution.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `mean_fn` is not `None` and is not callable.

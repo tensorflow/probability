@@ -44,7 +44,7 @@ py_library(
 
 py_test(
     name = "moving_stats_test",
-    size = "small",
+    size = "medium",
     srcs = ["moving_stats_test.py"],
     tags = [
         "nomsan",  # disable to avoid false positives from scipy.
@@ -53,6 +53,7 @@ py_test(
         ":moving_stats",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -62,10 +63,10 @@ py_library(
     deps = [
         ":init",
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions:seed_stream",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -93,7 +94,8 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:uniform",
-        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math:linalg",
     ],
 )
 
@@ -123,6 +125,7 @@ py_test(
         ":statistical_testing",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -142,5 +145,7 @@ py_test(
     deps = [
         ":slicing",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

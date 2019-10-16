@@ -5,7 +5,18 @@
 
 # tfp.edward2.interception
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
 Python context manager for interception.
+
+### Aliases:
+
+* `tfp.experimental.edward2.interception`
+
 
 ``` python
 tfp.edward2.interception(
@@ -14,6 +25,8 @@ tfp.edward2.interception(
 )
 ```
 
+
+
 <!-- Placeholder for "Used in" -->
 
 Upon entry, an interception context manager pushes an interceptor onto a
@@ -21,13 +34,15 @@ thread-local stack. Upon exiting, it pops the interceptor from the stack.
 
 #### Args:
 
+
 * <b>`interceptor`</b>: Function which takes a callable `f` and inputs `*args`,
   `**kwargs`.
 
 
 #### Yields:
 
-  None.
+None.
+
 
 #### Examples
 

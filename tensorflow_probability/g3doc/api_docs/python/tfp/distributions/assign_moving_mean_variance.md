@@ -5,6 +5,18 @@
 
 # tfp.distributions.assign_moving_mean_variance
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/internal/moving_stats.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Compute exponentially weighted moving {mean,variance} of a streaming value.
 
 ``` python
@@ -18,8 +30,6 @@ tfp.distributions.assign_moving_mean_variance(
 ```
 
 
-
-Defined in [`python/distributions/internal/moving_stats.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/internal/moving_stats.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -39,6 +49,7 @@ Parameterization: Finch's `alpha` is `1 - decay`.
 
 #### Args:
 
+
 * <b>`mean_var`</b>: `float`-like `Variable` representing the exponentially weighted
   moving mean. Same shape as `variance_var` and `value`.
 * <b>`variance_var`</b>: `float`-like `Variable` representing the
@@ -52,6 +63,7 @@ Parameterization: Finch's `alpha` is `1 - decay`.
 
 #### Returns:
 
+
 * <b>`mean_var`</b>: `Variable` representing the `value`-updated exponentially weighted
   moving mean.
 * <b>`variance_var`</b>: `Variable` representing the `value`-updated
@@ -60,9 +72,10 @@ Parameterization: Finch's `alpha` is `1 - decay`.
 
 #### Raises:
 
-  TypeError: if `mean_var` does not have float type `dtype`.
-  TypeError: if `mean_var`, `variance_var`, `value`, `decay` have different
-    `base_dtype`.
+
+* <b>`TypeError`</b>: if `mean_var` does not have float type `dtype`.
+* <b>`TypeError`</b>: if `mean_var`, `variance_var`, `value`, `decay` have different
+  `base_dtype`.
 
 #### References
 

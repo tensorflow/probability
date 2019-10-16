@@ -17,18 +17,19 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+
 import numpy as np
 from scipy import stats
-import tensorflow as tf
-import tensorflow_probability as tfp
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
-tfd = tfp.distributions
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class BinomialTest(tf.test.TestCase):
+class BinomialTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -79,13 +80,13 @@ class BinomialTest(tf.test.TestCase):
     self.evaluate(binom.prob([3., 1, 2]))
     self.evaluate(binom.cdf([2., 3, 2]))
     self.evaluate(binom.cdf([3., 1, 2]))
-    with self.assertRaisesOpError("Condition x >= 0.*"):
+    with self.assertRaisesOpError('Condition x >= 0.*'):
       self.evaluate(binom.prob([-1., 4, 2]))
-    with self.assertRaisesOpError("Condition x <= y.*"):
+    with self.assertRaisesOpError('Condition x <= y.*'):
       self.evaluate(binom.prob([7., 3, 0]))
-    with self.assertRaisesOpError("Condition x >= 0.*"):
+    with self.assertRaisesOpError('Condition x >= 0.*'):
       self.evaluate(binom.cdf([-1., 4, 2]))
-    with self.assertRaisesOpError("Condition x <= y.*"):
+    with self.assertRaisesOpError('Condition x <= y.*'):
       self.evaluate(binom.cdf([7., 3, 0]))
 
   def testPmfAndCdfNonIntegerCounts(self):
@@ -97,12 +98,11 @@ class BinomialTest(tf.test.TestCase):
     self.evaluate(binom.prob([3., 1, 2]))
     self.evaluate(binom.cdf([2., 3, 2]))
     self.evaluate(binom.cdf([3., 1, 2]))
-    placeholder = tf.compat.v1.placeholder_with_default(
-        input=[1.0, 2.5, 1.5], shape=[3])
+    placeholder = tf1.placeholder_with_default([1.0, 2.5, 1.5], shape=[3])
     # Both equality and integer checking fail.
-    with self.assertRaisesOpError("cannot contain fractional components."):
+    with self.assertRaisesOpError('cannot contain fractional components.'):
       self.evaluate(binom.prob(placeholder))
-    with self.assertRaisesOpError("cannot contain fractional components."):
+    with self.assertRaisesOpError('cannot contain fractional components.'):
       self.evaluate(binom.cdf(placeholder))
 
     binom = tfd.Binomial(total_count=n, probs=p, validate_args=False)
@@ -235,6 +235,48 @@ class BinomialTest(tf.test.TestCase):
     self.assertAllClose(
         stats.binom.var(counts, probs), sample_variance_, atol=0., rtol=0.20)
 
+  def testParamTensorFromLogits(self):
+    x = tf.constant([-1., 0.5, 1.])
+    d = tfd.Binomial(total_count=1, logits=x, validate_args=True)
+    logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
+    self.assertAllClose(
+        *self.evaluate([logit(d.prob(1.)), d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([d.prob(1.), d.probs_parameter()]),
+        atol=0, rtol=1e-4)
 
-if __name__ == "__main__":
+  def testParamTensorFromProbs(self):
+    x = tf.constant([0.1, 0.5, 0.4])
+    d = tfd.Binomial(total_count=1, probs=x, validate_args=True)
+    logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
+    self.assertAllClose(
+        *self.evaluate([logit(d.prob(1.)), d.logits_parameter()]),
+        atol=0, rtol=1e-4)
+    self.assertAllClose(
+        *self.evaluate([d.prob(1.), d.probs_parameter()]),
+        atol=0, rtol=1e-4)
+
+
+@test_util.run_all_in_graph_and_eager_modes
+class BinomialFromVariableTest(tfp_test_util.TestCase):
+
+  def testAssertionsTotalCount(self):
+    x = tf.Variable([-1.0, 4.0, 1.0])
+    d = tfd.Binomial(total_count=x, logits=[0.0, 0.0, 0.0], validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
+    with self.assertRaisesOpError('`total_count` must be non-negative.'):
+      self.evaluate(d.mean())
+
+  def testAssertionsTotalCountMutation(self):
+    x = tf.Variable([1.0, 4.0, 1.0])
+    d = tfd.Binomial(total_count=x, logits=[0.0, 0.0, 0.0], validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
+    self.evaluate(d.mean())
+    self.evaluate(x.assign(-x))
+    with self.assertRaisesOpError('`total_count` must be non-negative.'):
+      self.evaluate(d.mean())
+
+
+if __name__ == '__main__':
   tf.test.main()

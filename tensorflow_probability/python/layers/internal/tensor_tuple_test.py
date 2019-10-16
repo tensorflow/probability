@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import re
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.layers.internal import tensor_tuple
 
@@ -72,7 +72,7 @@ class CustomConvertToCompositeTensorTest(test_util.TensorFlowTestCase):
     self.assertLen(y, 3)
     for i in range(3):
       self.assertAllEqual(x[i], tf.get_static_value(y[i]))
-    self.assertEqual(not(tf.executing_eagerly()), y._is_graph_tensor())
+    self.assertEqual(not(tf.executing_eagerly()), y._is_graph_tensor)
 
   def test_to_from(self):
     x = MyTuple((1, [2., 3.], [[4, 5], [6, 7]]))
@@ -82,21 +82,21 @@ class CustomConvertToCompositeTensorTest(test_util.TensorFlowTestCase):
     self.assertIsInstance(z, tensor_tuple.TensorTuple)
     self.assertEqual(y._sequence, z._sequence)
 
-  def test_str_repr(self):
+  def disabled_test_str_repr(self):
+    # TODO(b/141554140): Temporarily disabled as tf.Tensor.__repr__() is
+    # changing. Re-enable once cl/270975275 lands.
     x = MyTuple((1, [2., 3.], [[4, 5], [6, 7]]))
     y = ops.convert_to_tensor_or_composite(value=x)
 
     if tf.executing_eagerly():
-      expected = ('(<tf.Tensor: id=, shape=(), dtype=int32, numpy=1>,'
-                  ' <tf.Tensor: id=, shape=(2,), dtype=float32,'
+      expected = ('(<tf.Tensor: shape=(), dtype=int32, numpy=1>,'
+                  ' <tf.Tensor: shape=(2,), dtype=float32,'
                   ' numpy=array([2.,3.], dtype=float32)>,'
-                  ' <tf.Tensor: id=, shape=(2,2), dtype=int32,'
+                  ' <tf.Tensor: shape=(2,2), dtype=int32,'
                   ' numpy=array([[4,5],[6,7]], dtype=int32)>)')
-      regexp1 = re.compile(r'id=\d+')
       regexp2 = re.compile(r'\s+([\d\[\]])')
       def _strip(s):
         s = s.replace('\n', '')
-        s = re.sub(regexp1, r'id=', s)
         s = re.sub(regexp2, r'\1', s)
         return s
       self.assertEqual(expected, _strip(str(y)))

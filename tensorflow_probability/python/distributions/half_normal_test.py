@@ -18,33 +18,24 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import importlib
 # Dependency imports
 import numpy as np
-import tensorflow as tf
+from scipy import stats as sp_stats
+
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf.compat.v1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-stats = try_import("scipy.stats")
-
 tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class HalfNormalTest(test_case.TestCase):
+class HalfNormalTest(tfp_test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
@@ -54,17 +45,22 @@ class HalfNormalTest(test_case.TestCase):
     all_true = np.ones_like(is_finite, dtype=np.bool)
     self.assertAllEqual(all_true, is_finite)
 
+  def assertRaisesError(self, msg):
+    if tf.executing_eagerly():
+      return self.assertRaisesRegexp(Exception, msg)
+    return self.assertRaisesOpError(msg)
+
   def _testParamShapes(self, sample_shape, expected):
     param_shapes = tfd.HalfNormal.param_shapes(sample_shape)
-    scale_shape = param_shapes["scale"]
+    scale_shape = param_shapes['scale']
     self.assertAllEqual(expected, self.evaluate(scale_shape))
     scale = tf.ones(scale_shape)
-    self.assertAllEqual(
-        expected, self.evaluate(tf.shape(input=tfd.HalfNormal(scale).sample())))
+    self.assertAllEqual(expected,
+                        self.evaluate(tf.shape(tfd.HalfNormal(scale).sample())))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.HalfNormal.param_static_shapes(sample_shape)
-    scale_shape = param_shapes["scale"]
+    scale_shape = param_shapes['scale']
     self.assertEqual(expected, scale_shape)
 
   def _testBatchShapes(self, dist, tensor):
@@ -96,9 +92,7 @@ class HalfNormalTest(test_case.TestCase):
     pdf = halfnorm.prob(x)
     self._testBatchShapes(halfnorm, pdf)
 
-    if not stats:
-      return
-    expected_log_pdf = stats.halfnorm(scale=self.evaluate(scale)).logpdf(x)
+    expected_log_pdf = sp_stats.halfnorm(scale=self.evaluate(scale)).logpdf(x)
     self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
     self.assertAllClose(np.exp(expected_log_pdf), self.evaluate(pdf))
 
@@ -114,9 +108,7 @@ class HalfNormalTest(test_case.TestCase):
     pdf = halfnorm.prob(x)
     self._testBatchShapes(halfnorm, pdf)
 
-    if not stats:
-      return
-    expected_log_pdf = stats.halfnorm(scale=self.evaluate(scale)).logpdf(x)
+    expected_log_pdf = sp_stats.halfnorm(scale=self.evaluate(scale)).logpdf(x)
     self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
     self.assertAllClose(np.exp(expected_log_pdf), self.evaluate(pdf))
 
@@ -132,9 +124,7 @@ class HalfNormalTest(test_case.TestCase):
     log_cdf = halfnorm.log_cdf(x)
     self._testBatchShapes(halfnorm, log_cdf)
 
-    if not stats:
-      return
-    expected_logcdf = stats.halfnorm(scale=scale).logcdf(x)
+    expected_logcdf = sp_stats.halfnorm(scale=scale).logcdf(x)
     self.assertAllClose(expected_logcdf, self.evaluate(log_cdf), atol=0)
     self.assertAllClose(np.exp(expected_logcdf), self.evaluate(cdf), atol=0)
 
@@ -150,9 +140,7 @@ class HalfNormalTest(test_case.TestCase):
     log_sf = halfnorm.log_survival_function(x)
     self._testBatchShapes(halfnorm, log_sf)
 
-    if not stats:
-      return
-    expected_logsf = stats.halfnorm(scale=scale).logsf(x)
+    expected_logsf = sp_stats.halfnorm(scale=scale).logsf(x)
     self.assertAllClose(expected_logsf, self.evaluate(log_sf), atol=0)
     self.assertAllClose(np.exp(expected_logsf), self.evaluate(sf), atol=0)
 
@@ -165,24 +153,22 @@ class HalfNormalTest(test_case.TestCase):
     x = halfnorm.quantile(p)
     self._testBatchShapes(halfnorm, x)
 
-    if not stats:
-      return
-    expected_x = stats.halfnorm(scale=scale).ppf(p)
+    expected_x = sp_stats.halfnorm(scale=scale).ppf(p)
     self.assertAllClose(expected_x, self.evaluate(x), atol=0)
 
   def testFiniteGradients(self):
     for dtype in [np.float32, np.float64]:
-      scale = tf.compat.v2.Variable(dtype(3.0))
+      scale = tf.Variable(dtype(3.0))
       x = np.array([0.01, 0.1, 1., 5., 10.]).astype(dtype)
       def half_normal_function(name, x):
         def half_normal(scale):
           return getattr(tfd.HalfNormal(scale=scale), name)(x)
         return half_normal
 
-      self.evaluate(tf.compat.v1.global_variables_initializer())
+      self.evaluate(scale.initializer)
       for func_name in [
-          "cdf", "log_cdf", "survival_function",
-          "log_prob", "prob", "log_survival_function",
+          'cdf', 'log_cdf', 'survival_function',
+          'log_prob', 'prob', 'log_survival_function',
       ]:
         print(func_name)
         value, grads = self.evaluate(tfp.math.value_and_gradient(
@@ -282,8 +268,8 @@ class HalfNormalTest(test_case.TestCase):
     self.assertAllEqual(expected_shape_static, self.evaluate(sample).shape)
 
   def testNegativeSigmaFails(self):
-    with self.assertRaisesOpError("Condition x > 0 did not hold"):
-      halfnorm = tfd.HalfNormal(scale=[-5.], validate_args=True, name="G")
+    with self.assertRaisesError('Argument `scale` must be positive.'):
+      halfnorm = tfd.HalfNormal(scale=[-5.], validate_args=True, name='G')
       self.evaluate(halfnorm.mean())
 
   def testHalfNormalShape(self):
@@ -298,10 +284,10 @@ class HalfNormalTest(test_case.TestCase):
   def testHalfNormalShapeWithPlaceholders(self):
     if tf.executing_eagerly():
       return
-    scale = tf.compat.v1.placeholder_with_default(input=[1., 2], shape=None)
+    scale = tf1.placeholder_with_default([1., 2], shape=None)
     halfnorm = tfd.HalfNormal(scale=scale)
 
-    # get_batch_shape should return an "<unknown>" tensor.
+    # get_batch_shape should return an '<unknown>' tensor.
     self.assertEqual(halfnorm.batch_shape, tf.TensorShape(None))
     self.assertEqual(halfnorm.event_shape, ())
     self.assertAllEqual(self.evaluate(halfnorm.event_shape_tensor()), [])
@@ -324,8 +310,7 @@ class HalfNormalTest(test_case.TestCase):
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(4e5), seed=tfp_test_util.test_seed(hardcoded_seed=0))
-    kl_sample = tf.reduce_mean(
-        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
     self.assertAllEqual(true_kl, kl_)
@@ -335,5 +320,29 @@ class HalfNormalTest(test_case.TestCase):
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
-if __name__ == "__main__":
+  def testGradientThroughScale(self):
+    scale = tf.Variable(2.)
+    d = tfd.HalfNormal(scale=scale, validate_args=True)
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob([1., 2., 3.])
+    grad = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(grad, 1)
+    self.assertAllNotNone(grad)
+
+  def testAssertsPositiveScale(self):
+    scale = tf.Variable([1., 2., -3.])
+    with self.assertRaisesError('Argument `scale` must be positive.'):
+      d = tfd.HalfNormal(scale=scale, validate_args=True)
+      self.evaluate([v.initializer for v in d.variables])
+      self.evaluate(d.sample())
+
+  def testAssertsPositiveScaleAfterMutation(self):
+    scale = tf.Variable([1., 2., 3.])
+    d = tfd.HalfNormal(scale=scale, validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
+    with self.assertRaisesError('Argument `scale` must be positive.'):
+      with tf.control_dependencies([scale.assign([1., 2., -3.])]):
+        self.evaluate(d.sample())
+
+if __name__ == '__main__':
   tf.test.main()

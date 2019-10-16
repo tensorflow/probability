@@ -5,6 +5,18 @@
 
 # tfp.math.lu_solve
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/math/linalg.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Solves systems of linear eqns `A X = RHS`, given LU factorizations.
 
 ``` python
@@ -19,14 +31,13 @@ tfp.math.lu_solve(
 
 
 
-Defined in [`python/math/linalg.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/math/linalg.py).
-
 <!-- Placeholder for "Used in" -->
 
 Note: this function does not verify the implied matrix is actually invertible
 nor is this condition checked even when `validate_args=True`.
 
 #### Args:
+
 
 * <b>`lower_upper`</b>: `lu` as returned by `tf.linalg.lu`, i.e., if
   `matmul(P, matmul(L, U)) = X` then `lower_upper = L + U - eye`.
@@ -40,12 +51,13 @@ nor is this condition checked even when `validate_args=True`.
   actually invertible, even when `validate_args=True`.
   Default value: `False` (i.e., don't validate arguments).
 * <b>`name`</b>: Python `str` name given to ops managed by this object.
-  Default value: `None` (i.e., "lu_solve").
+  Default value: `None` (i.e., 'lu_solve').
 
 
 #### Returns:
 
-  x: The `X` in `A @ X = RHS`.
+
+* <b>`x`</b>: The `X` in `A @ X = RHS`.
 
 #### Examples
 

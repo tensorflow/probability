@@ -5,7 +5,24 @@
 
 # tfp.edward2.Independent
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for Independent.
+
+### Aliases:
+
+* `tfp.experimental.edward2.Independent`
+
 
 ``` python
 tfp.edward2.Independent(
@@ -16,22 +33,21 @@ tfp.edward2.Independent(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See Independent for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
-Construct a `Independent` distribution.
-
+Construct an `Independent` distribution.
 
 #### Args:
+
 
 * <b>`distribution`</b>: The base distribution instance to transform. Typically an
   instance of `Distribution`.
@@ -47,6 +63,7 @@ Construct a `Independent` distribution.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `reinterpreted_batch_ndims` exceeds
   `distribution.batch_ndims`

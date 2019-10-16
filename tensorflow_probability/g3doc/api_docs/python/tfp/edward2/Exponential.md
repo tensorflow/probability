@@ -5,7 +5,24 @@
 
 # tfp.edward2.Exponential
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for Exponential.
+
+### Aliases:
+
+* `tfp.experimental.edward2.Exponential`
+
 
 ``` python
 tfp.edward2.Exponential(
@@ -16,22 +33,21 @@ tfp.edward2.Exponential(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See Exponential for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
 Construct Exponential distribution with parameter `rate`.
 
-
 #### Args:
+
 
 * <b>`rate`</b>: Floating point tensor, equivalent to `1 / mean`. Must contain only
   positive values.

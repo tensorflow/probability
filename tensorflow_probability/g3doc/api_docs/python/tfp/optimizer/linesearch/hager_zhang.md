@@ -5,6 +5,18 @@
 
 # tfp.optimizer.linesearch.hager_zhang
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/optimizer/linesearch/hager_zhang.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 The Hager Zhang line search algorithm.
 
 ``` python
@@ -26,8 +38,6 @@ tfp.optimizer.linesearch.hager_zhang(
 ```
 
 
-
-Defined in [`python/optimizer/linesearch/hager_zhang.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer/linesearch/hager_zhang.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -112,6 +122,7 @@ usage of the line search.
 
 #### Args:
 
+
 * <b>`value_and_gradients_function`</b>: A Python callable that accepts a real scalar
   tensor and returns a namedtuple with the fields 'x', 'f', and 'df' that
   correspond to scalar tensors of real dtype containing the point at which
@@ -181,6 +192,7 @@ usage of the line search.
 
 
 #### Returns:
+
 
 * <b>`results`</b>: A namedtuple containing the following attributes.
   converged: Boolean `Tensor` of shape [n]. Whether a point satisfying

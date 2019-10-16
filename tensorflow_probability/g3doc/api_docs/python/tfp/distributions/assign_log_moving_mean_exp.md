@@ -5,6 +5,18 @@
 
 # tfp.distributions.assign_log_moving_mean_exp
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/internal/moving_stats.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Compute the log of the exponentially weighted moving mean of the exp.
 
 ``` python
@@ -17,8 +29,6 @@ tfp.distributions.assign_log_moving_mean_exp(
 ```
 
 
-
-Defined in [`python/distributions/internal/moving_stats.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/internal/moving_stats.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -45,6 +55,7 @@ update to the tf.Variable is presumed efficient due to being lock-free.)
 
 #### Args:
 
+
 * <b>`log_mean_exp_var`</b>: `float`-like `Variable` representing the log of the
   exponentially weighted moving mean of the exp. Same shape as `log_value`.
 * <b>`log_value`</b>: `float`-like `Tensor` representing a new (streaming) observation.
@@ -56,11 +67,13 @@ update to the tf.Variable is presumed efficient due to being lock-free.)
 
 #### Returns:
 
+
 * <b>`log_mean_exp_var`</b>: A reference to the input 'Variable' tensor with the
   `log_value`-updated log of the exponentially weighted moving mean of exp.
 
 
 #### Raises:
+
 
 * <b>`TypeError`</b>: if `log_mean_exp_var` does not have float type `dtype`.
 * <b>`TypeError`</b>: if `log_mean_exp_var`, `log_value`, `decay` have different

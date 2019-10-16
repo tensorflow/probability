@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import power_transform
 
 
@@ -59,6 +61,7 @@ class Exp(power_transform.PowerTransform):
     """
     # forward_min_event_ndims = 0.
     # No forward_min_event_ndims specified as this is done in PowerTransform.
-    super(Exp, self).__init__(
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(Exp, self).__init__(
+          validate_args=validate_args,
+          name=name)

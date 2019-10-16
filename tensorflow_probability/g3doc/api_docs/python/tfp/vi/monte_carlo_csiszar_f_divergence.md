@@ -5,25 +5,28 @@
 
 # tfp.vi.monte_carlo_csiszar_f_divergence
 
-Monte-Carlo approximation of the Csiszar f-Divergence.
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
+Monte-Carlo approximation of the Csiszar f-Divergence. (deprecated)
 
 ``` python
 tfp.vi.monte_carlo_csiszar_f_divergence(
-    f,
-    p_log_prob,
-    q,
-    num_draws,
-    use_reparametrization=None,
-    seed=None,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
 
 
-Defined in [`python/vi/csiszar_divergence.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi/csiszar_divergence.py).
-
 <!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+`monte_carlo_csiszar_f_divergence` is deprecated. Use `monte_carlo_variational_loss` instead.
 
 A Csiszar-function is a member of,
 
@@ -69,6 +72,7 @@ usually preferable to set `use_reparametrization = True`.
 #### Example Application:
 
 
+
 The Csiszar f-Divergence is a useful framework for variational inference.
 I.e., observe that,
 
@@ -84,8 +88,8 @@ The inequality follows from the fact that the "perspective" of `f`, i.e.,
 BOund (ELBO) as a special case, i.e., `f(u) = -log(u)`, we call this framework
 "Evidence Divergence Bound Optimization" (EDBO).
 
-
 #### Args:
+
 
 * <b>`f`</b>: Python `callable` representing a Csiszar-function in log-space, i.e.,
   takes `p_log_prob(q_samples) - q.log_prob(q_samples)`.
@@ -109,11 +113,13 @@ BOund (ELBO) as a special case, i.e., `f(u) = -log(u)`, we call this framework
 
 #### Returns:
 
+
 * <b>`monte_carlo_csiszar_f_divergence`</b>: `float`-like `Tensor` Monte Carlo
   approximation of the Csiszar f-Divergence.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `q` is not a reparameterized distribution and
   `use_reparametrization = True`. A distribution `q` is said to be

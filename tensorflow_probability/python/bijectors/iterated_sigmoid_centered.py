@@ -73,12 +73,11 @@ class IteratedSigmoidCentered(bijector.Bijector):
   def __init__(self,
                validate_args=False,
                name="iterated_sigmoid"):
-    self._graph_parents = []
-    self._name = name
-    super(IteratedSigmoidCentered, self).__init__(
-        forward_min_event_ndims=1,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      super(IteratedSigmoidCentered, self).__init__(
+          forward_min_event_ndims=1,
+          validate_args=validate_args,
+          name=name)
 
   def _forward_event_shape(self, input_shape):
     if not input_shape[-1:].is_fully_defined():
@@ -116,13 +115,12 @@ class IteratedSigmoidCentered(bijector.Bijector):
     # log-space computation.
     offset = -tf.math.log(
         tf.cast(
-            tf.range(tf.shape(input=x)[-1], 0, delta=-1),
+            tf.range(tf.shape(x)[-1], 0, delta=-1),
             dtype=dtype_util.base_dtype(x.dtype)))
-    z = tf.nn.sigmoid(x + offset)
+    z = tf.math.sigmoid(x + offset)
     y = z * tf.math.cumprod(1 - z, axis=-1, exclusive=True)
-    return tf.concat(
-        [y, 1. - tf.reduce_sum(input_tensor=y, axis=-1, keepdims=True)],
-        axis=-1)
+    return tf.concat([y, 1. - tf.reduce_sum(y, axis=-1, keepdims=True)],
+                     axis=-1)
 
   def _inverse(self, y):
     # As specified in the Stan reference manual, the procedure is as follows:
@@ -131,12 +129,12 @@ class IteratedSigmoidCentered(bijector.Bijector):
     # x_k = logit(z_k) - log(1 / (N - k))
     offset = tf.math.log(
         tf.cast(
-            tf.range(tf.shape(input=y)[-1] - 1, 0, delta=-1),
+            tf.range(tf.shape(y)[-1] - 1, 0, delta=-1),
             dtype=dtype_util.base_dtype(y.dtype)))
     z = y / (1. - tf.math.cumsum(y, axis=-1, exclusive=True))
     return tf.math.log(z[..., :-1]) - tf.math.log1p(-z[..., :-1]) + offset
 
   def _inverse_log_det_jacobian(self, y):
     z = y / (1. - tf.math.cumsum(y, axis=-1, exclusive=True))
-    return tf.reduce_sum(input_tensor=(
-        -tf.math.log(y[..., :-1]) - tf.math.log1p(-z[..., :-1])), axis=-1)
+    return tf.reduce_sum(
+        (-tf.math.log(y[..., :-1]) - tf.math.log1p(-z[..., :-1])), axis=-1)

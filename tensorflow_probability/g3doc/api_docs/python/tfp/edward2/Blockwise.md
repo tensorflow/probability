@@ -5,7 +5,24 @@
 
 # tfp.edward2.Blockwise
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/interceptor.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Create a random variable for Blockwise.
+
+### Aliases:
+
+* `tfp.experimental.edward2.Blockwise`
+
 
 ``` python
 tfp.edward2.Blockwise(
@@ -16,22 +33,21 @@ tfp.edward2.Blockwise(
 
 
 
-Defined in [`python/edward2/interceptor.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2/interceptor.py).
-
 <!-- Placeholder for "Used in" -->
 
 See Blockwise for more details.
 
 #### Returns:
 
-  RandomVariable.
+RandomVariable.
+
 
 #### Original Docstring for Distribution
 
 Construct the `Blockwise` distribution.
 
-
 #### Args:
+
 
 * <b>`distributions`</b>: Python `list` of <a href="../../tfp/distributions/Distribution.md"><code>tfp.distributions.Distribution</code></a>
   instances. All distribution instances must have the same `batch_shape`
@@ -46,6 +62,6 @@ Construct the `Blockwise` distribution.
   outputs.
 * <b>`allow_nan_stats`</b>: Python `bool`, default `True`. When `True`, statistics
   (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
-  result is undefined. When `False`, an exception is raised if one or
-  more of the statistic's batch members are undefined.
+  result is undefined. When `False`, an exception is raised if one or more
+  of the statistic's batch members are undefined.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this class.

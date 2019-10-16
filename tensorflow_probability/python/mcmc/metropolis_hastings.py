@@ -21,11 +21,13 @@ from __future__ import print_function
 import collections
 import warnings
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -134,8 +136,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       warnings.warn('Supplied `TransitionKernel` is already calibrated. '
                     'Composing `MetropolisHastings` `TransitionKernel` '
                     'may not be required.')
-    self._seed_stream = distributions.SeedStream(
-        seed, 'metropolis_hastings_one_step')
+    self._seed_stream = SeedStream(seed, salt='metropolis_hastings_one_step')
     self._parameters = dict(
         inner_kernel=inner_kernel,
         seed=seed,
@@ -182,9 +183,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       ValueError: if `inner_kernel` results doesn't contain the member
         "target_log_prob".
     """
-    with tf.compat.v1.name_scope(
-        name=mcmc_util.make_name(self.name, 'mh', 'one_step'),
-        values=[current_state, previous_kernel_results]):
+    with tf.name_scope(mcmc_util.make_name(self.name, 'mh', 'one_step')):
       # Take one inner step.
       [
           proposed_state,
@@ -218,8 +217,9 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       #       ==> log(u) < log_accept_ratio
       log_uniform = tf.math.log(
           tf.random.uniform(
-              shape=tf.shape(input=proposed_results.target_log_prob),
-              dtype=proposed_results.target_log_prob.dtype.base_dtype,
+              shape=prefer_static.shape(proposed_results.target_log_prob),
+              dtype=dtype_util.base_dtype(
+                  proposed_results.target_log_prob.dtype),
               seed=self._seed_stream()))
       is_accepted = log_uniform < log_accept_ratio
 
@@ -259,9 +259,8 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       ValueError: if `inner_kernel` results doesn't contain the member
         "target_log_prob".
     """
-    with tf.compat.v1.name_scope(
-        name=mcmc_util.make_name(self.name, 'mh', 'bootstrap_results'),
-        values=[init_state]):
+    with tf.name_scope(mcmc_util.make_name(
+        self.name, 'mh', 'bootstrap_results')):
       pkr = self.inner_kernel.bootstrap_results(init_state)
       if not has_target_log_prob(pkr):
         raise ValueError(

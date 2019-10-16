@@ -5,21 +5,28 @@
 
 # tfp.distributions.fill_triangular
 
-Creates a (batch of) triangular matrix from a vector of inputs.
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+</table>
+
+
+
+Creates a (batch of) triangular matrix from a vector of inputs. (deprecated)
 
 ``` python
 tfp.distributions.fill_triangular(
-    x,
-    upper=False,
-    name=None
+    *args,
+    **kwargs
 )
 ```
 
 
 
-Defined in [`python/internal/distribution_util.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/internal/distribution_util.py).
-
 <!-- Placeholder for "Used in" -->
+
+Warning: THIS FUNCTION IS DEPRECATED. It will be removed after 2019-10-01.
+Instructions for updating:
+This function has moved to <a href="../../tfp/math.md"><code>tfp.math</code></a>.
 
 Created matrix can be lower- or upper-triangular. (It is more efficient to
 create the matrix as upper or lower, rather than transpose.)
@@ -32,6 +39,7 @@ If `x.shape` is `[b1, b2, ..., bB, d]` then the output shape is
 `n = int(np.sqrt(0.25 + 2. * m) - 0.5)`.
 
 #### Example:
+
 
 
 ```python
@@ -93,8 +101,8 @@ contains all the entries of x, as desired. The rest is details:
 For additional comparisons, a pure numpy version of this function can be found
 in `distribution_util_test.py`, function `_fill_triangular`.
 
-
 #### Args:
+
 
 * <b>`x`</b>: `Tensor` representing lower (or upper) triangular elements.
 * <b>`upper`</b>: Python `bool` representing whether output matrix should be upper
@@ -104,9 +112,11 @@ in `distribution_util_test.py`, function `_fill_triangular`.
 
 #### Returns:
 
+
 * <b>`tril`</b>: `Tensor` with lower (or upper) triangular elements filled from `x`.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if `x` cannot be mapped to a triangular matrix.

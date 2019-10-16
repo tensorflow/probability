@@ -20,17 +20,17 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 tfd = tfp.distributions
 
 
 @test_util.run_all_in_graph_and_eager_modes
-class ParetoTest(test_case.TestCase):
+class ParetoTest(tfp_test_util.TestCase):
 
   def _scipy_pareto(self, concentration, scale):
     # In scipy pareto is defined with scale = 1, so we need to scale.
@@ -60,17 +60,17 @@ class ParetoTest(test_case.TestCase):
     invalid_scales = [-.01, 0., -2.]
     concentration = 3.
     for scale in invalid_scales:
-      with self.assertRaisesOpError("Condition x > 0"):
+      with self.assertRaisesOpError('`scale` must be positive'):
         pareto = tfd.Pareto(concentration, scale, validate_args=True)
-        self.evaluate(pareto.scale)
+        self.evaluate(pareto.mean())
 
   def testInvalidConcentration(self):
     scale = 1.
     invalid_concentrations = [-.01, 0., -2.]
     for concentration in invalid_concentrations:
-      with self.assertRaisesOpError("Condition x > 0"):
+      with self.assertRaisesOpError('`concentration` must be positive'):
         pareto = tfd.Pareto(concentration, scale, validate_args=True)
-        self.evaluate(pareto.concentration)
+        self.evaluate(pareto.mean())
 
   def testParetoLogPdf(self):
     batch_size = 6
@@ -98,18 +98,18 @@ class ParetoTest(test_case.TestCase):
     concentration = tf.constant([2.] * batch_size)
     pareto = tfd.Pareto(concentration, scale, validate_args=True)
 
-    with self.assertRaisesOpError("not in the support"):
-      x = tf.compat.v1.placeholder_with_default(input=[2., 3., 3.], shape=[3])
+    with self.assertRaisesOpError('not in the support'):
+      x = tf1.placeholder_with_default(input=[2., 3., 3.], shape=[3])
       log_prob = pareto.log_prob(x)
       self.evaluate(log_prob)
 
-    with self.assertRaisesOpError("not in the support"):
-      x = tf.compat.v1.placeholder_with_default(input=[2., 2., 5.], shape=[3])
+    with self.assertRaisesOpError('not in the support'):
+      x = tf1.placeholder_with_default(input=[2., 2., 5.], shape=[3])
       log_prob = pareto.log_prob(x)
       self.evaluate(log_prob)
 
-    with self.assertRaisesOpError("not in the support"):
-      x = tf.compat.v1.placeholder_with_default(input=[1., 3., 5.], shape=[3])
+    with self.assertRaisesOpError('not in the support'):
+      x = tf1.placeholder_with_default(input=[1., 3., 5.], shape=[3])
       log_prob = pareto.log_prob(x)
       self.evaluate(log_prob)
 
@@ -343,5 +343,26 @@ class ParetoTest(test_case.TestCase):
     kl_ = self.evaluate(kl)
     self.assertAllEqual(np.inf, kl_)
 
-if __name__ == "__main__":
+  def testConcentrationVariable(self):
+    c = tf.Variable([1., 2.])
+    self.evaluate(c.initializer)
+    d = tfd.Pareto(concentration=c, scale=1.0, validate_args=True)
+    self.assertIs(d.concentration, c)
+    self.evaluate(d.mean())
+    with self.assertRaisesOpError('`concentration` must be positive'):
+      with tf.control_dependencies([c.assign([-1, 2.])]):
+        self.evaluate(d.mean())
+
+  def testScaleVariable(self):
+    s = tf.Variable([1., 2.])
+    self.evaluate(s.initializer)
+    d = tfd.Pareto(concentration=1.0, scale=s, validate_args=True)
+    self.assertIs(d.scale, s)
+    self.evaluate(d.mean())
+    with self.assertRaisesOpError('`scale` must be positive'):
+      with tf.control_dependencies([s.assign([-1, 2.])]):
+        self.evaluate(d.mean())
+
+
+if __name__ == '__main__':
   tf.test.main()

@@ -5,6 +5,18 @@
 
 # tfp.bijectors.real_nvp_default_template
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/real_nvp.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 Build a scale-and-shift function using a multi-layer neural network.
 
 ``` python
@@ -20,20 +32,19 @@ tfp.bijectors.real_nvp_default_template(
 
 
 
-Defined in [`python/bijectors/real_nvp.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors/real_nvp.py).
-
 <!-- Placeholder for "Used in" -->
 
 This will be wrapped in a make_template to ensure the variables are only
 created once. It takes the `d`-dimensional input x[0:d] and returns the `D-d`
-dimensional outputs `loc` ("mu") and `log_scale` ("alpha").
+dimensional outputs `loc` ('mu') and `log_scale` ('alpha').
 
 The default template does not support conditioning and will raise an
 exception if `condition_kwargs` are passed to it. To use conditioning in
-real nvp bijector, implement a conditioned shift/scale template that
+Real NVP bijector, implement a conditioned shift/scale template that
 handles the `condition_kwargs`.
 
 #### Arguments:
+
 
 * <b>`hidden_layers`</b>: Python `list`-like of non-negative integer, scalars
   indicating the number of units in each hidden layer. Default: `[512, 512].
@@ -42,23 +53,25 @@ handles the `condition_kwargs`.
 * <b>`activation`</b>: Activation function (callable). Explicitly setting to `None`
   implies a linear activation.
 * <b>`name`</b>: A name for ops managed by this function. Default:
-  "real_nvp_default_template".
+  'real_nvp_default_template'.
 * <b>`*args`</b>: `tf.layers.dense` arguments.
 * <b>`**kwargs`</b>: `tf.layers.dense` keyword arguments.
 
 
 #### Returns:
 
-* <b>`shift`</b>: `Float`-like `Tensor` of shift terms ("mu" in
+
+* <b>`shift`</b>: `Float`-like `Tensor` of shift terms ('mu' in
   [Papamakarios et al.  (2016)][1]).
-* <b>`log_scale`</b>: `Float`-like `Tensor` of log(scale) terms ("alpha" in
+* <b>`log_scale`</b>: `Float`-like `Tensor` of log(scale) terms ('alpha' in
   [Papamakarios et al. (2016)][1]).
 
 
 #### Raises:
 
-  NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
-    graph execution, or if `condition_kwargs` is not empty.
+
+* <b>`NotImplementedError`</b>: if rightmost dimension of `inputs` is unknown prior to
+  graph execution, or if `condition_kwargs` is not empty.
 
 #### References
 

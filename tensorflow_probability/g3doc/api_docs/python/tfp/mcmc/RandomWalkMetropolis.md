@@ -14,15 +14,23 @@
 
 # tfp.mcmc.RandomWalkMetropolis
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/random_walk_metropolis.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 ## Class `RandomWalkMetropolis`
 
 Runs one step of the RWM algorithm with symmetric proposal.
 
 Inherits From: [`TransitionKernel`](../../tfp/mcmc/TransitionKernel.md)
-
-
-
-Defined in [`python/mcmc/random_walk_metropolis.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/random_walk_metropolis.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -168,7 +176,7 @@ def cauchy_new_state_fn(scale, dtype):
   cauchy = tfd.Cauchy(loc=dtype(0), scale=dtype(scale))
   def _fn(state_parts, seed):
     next_state_parts = []
-    seed_stream  = tfd.SeedStream(seed, salt='RandomCauchy')
+    seed_stream  = tfp.util.SeedStream(seed, salt='RandomCauchy')
     for sp in state_parts:
       next_state_parts.append(sp + cauchy.sample(
         sample_shape=sp.shape, seed=seed_stream()))
@@ -200,6 +208,8 @@ print('Estimated standard deviation: {}'.format(sample_std_))
 
 <h2 id="__init__"><code>__init__</code></h2>
 
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/random_walk_metropolis.py">View source</a>
+
 ``` python
 __init__(
     target_log_prob_fn,
@@ -211,7 +221,9 @@ __init__(
 
 Initializes this transition kernel.
 
+
 #### Args:
+
 
 * <b>`target_log_prob_fn`</b>: Python callable which takes an argument like
   `current_state` (or `*current_state` if it's a list) and returns its
@@ -221,13 +233,14 @@ Initializes this transition kernel.
   of the input state parts. The perturbation distribution is assumed to be
   a symmetric distribution centered at the input state part.
   Default value: `None` which is mapped to
-    `tfp.mcmc.random_walk_normal_fn()`.
+    <a href="../../tfp/mcmc/random_walk_normal_fn.md"><code>tfp.mcmc.random_walk_normal_fn()</code></a>.
 * <b>`seed`</b>: Python integer to seed the random number generator.
 * <b>`name`</b>: Python `str` name prefixed to Ops created by this function.
   Default value: `None` (i.e., 'rwm_kernel').
 
 
 #### Returns:
+
 
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
   of the Markov chain(s) at each result step. Has same shape as
@@ -237,6 +250,7 @@ Initializes this transition kernel.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if there isn't one `scale` or a list with same length as
   `current_state`.
@@ -256,7 +270,9 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 
 
+
 <h3 id="new_state_fn"><code>new_state_fn</code></h3>
+
 
 
 
@@ -264,7 +280,9 @@ composing them with the <a href="../../tfp/mcmc/MetropolisHastings.md"><code>tfp
 
 Return `dict` of ``__init__`` arguments and their values.
 
+
 <h3 id="seed"><code>seed</code></h3>
+
 
 
 
@@ -274,9 +292,12 @@ Return `dict` of ``__init__`` arguments and their values.
 
 
 
+
 ## Methods
 
 <h3 id="bootstrap_results"><code>bootstrap_results</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/random_walk_metropolis.py">View source</a>
 
 ``` python
 bootstrap_results(init_state)
@@ -284,7 +305,10 @@ bootstrap_results(init_state)
 
 Creates initial `previous_kernel_results` using a supplied `state`.
 
+
 <h3 id="one_step"><code>one_step</code></h3>
+
+<a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/random_walk_metropolis.py">View source</a>
 
 ``` python
 one_step(
@@ -295,7 +319,9 @@ one_step(
 
 Runs one iteration of Random Walk Metropolis with normal proposal.
 
+
 #### Args:
+
 
 * <b>`current_state`</b>: `Tensor` or Python `list` of `Tensor`s representing the
   current state(s) of the Markov chain(s). The first `r` dimensions index
@@ -307,6 +333,7 @@ Runs one iteration of Random Walk Metropolis with normal proposal.
 
 #### Returns:
 
+
 * <b>`next_state`</b>: Tensor or Python list of `Tensor`s representing the state(s)
   of the Markov chain(s) after taking exactly one step. Has same type and
   shape as `current_state`.
@@ -315,6 +342,7 @@ Runs one iteration of Random Walk Metropolis with normal proposal.
 
 
 #### Raises:
+
 
 * <b>`ValueError`</b>: if there isn't one `scale` or a list with same length as
   `current_state`.

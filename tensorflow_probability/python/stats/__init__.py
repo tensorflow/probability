@@ -19,31 +19,49 @@ from __future__ import print_function
 
 # pylint: disable=unused-import,line-too-long,g-importing-member
 
+from tensorflow_probability.python.stats.calibration import brier_decomposition
+from tensorflow_probability.python.stats.calibration import brier_score
+from tensorflow_probability.python.stats.calibration import expected_calibration_error
+from tensorflow_probability.python.stats.leave_one_out import log_loomean_exp
+from tensorflow_probability.python.stats.leave_one_out import log_loosum_exp
+from tensorflow_probability.python.stats.leave_one_out import log_soomean_exp
+from tensorflow_probability.python.stats.leave_one_out import log_soosum_exp
 from tensorflow_probability.python.stats.quantiles import count_integers
 from tensorflow_probability.python.stats.quantiles import find_bins
 from tensorflow_probability.python.stats.quantiles import histogram
 from tensorflow_probability.python.stats.quantiles import percentile
 from tensorflow_probability.python.stats.quantiles import quantiles
+from tensorflow_probability.python.stats.ranking import quantile_auc
 from tensorflow_probability.python.stats.sample_stats import auto_correlation
 from tensorflow_probability.python.stats.sample_stats import cholesky_covariance
 from tensorflow_probability.python.stats.sample_stats import correlation
 from tensorflow_probability.python.stats.sample_stats import covariance
+from tensorflow_probability.python.stats.sample_stats import log_average_probs
 from tensorflow_probability.python.stats.sample_stats import stddev
 from tensorflow_probability.python.stats.sample_stats import variance
 
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
 
-from tensorflow.python.util.all_util import remove_undocumented
+from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'auto_correlation',
-    'count_integers',
+    'brier_decomposition',
+    'brier_score',
     'cholesky_covariance',
     'correlation',
+    'count_integers',
     'covariance',
+    'expected_calibration_error',
     'find_bins',
     'histogram',
+    'log_average_probs',
+    'log_loomean_exp',
+    'log_loosum_exp',
+    'log_soomean_exp',
+    'log_soosum_exp',
     'percentile',
+    'quantile_auc',
     'quantiles',
     'stddev',
     'variance',

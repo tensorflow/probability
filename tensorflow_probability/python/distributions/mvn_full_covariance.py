@@ -24,6 +24,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     "MultivariateNormalFullCovariance",
@@ -111,6 +112,12 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
 
   """
 
+  @deprecation.deprecated(
+      "2019-12-01",
+      "`MultivariateNormalFullCovariance` is deprecated, use "
+      "`MultivariateNormalTriL(loc=loc, "
+      "scale_tril=tf.linalg.cholesky(covariance_matrix))` instead.",
+      warn_once=True)
   def __init__(self,
                loc=None,
                covariance_matrix=None,
@@ -161,12 +168,12 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
       with tf.name_scope("init"):
         dtype = dtype_util.common_dtype([loc, covariance_matrix], tf.float32)
         loc = loc if loc is None else tf.convert_to_tensor(
-            value=loc, name="loc", dtype=dtype)
+            loc, name="loc", dtype=dtype)
         if covariance_matrix is None:
           scale_tril = None
         else:
           covariance_matrix = tf.convert_to_tensor(
-              value=covariance_matrix, name="covariance_matrix", dtype=dtype)
+              covariance_matrix, name="covariance_matrix", dtype=dtype)
           if validate_args:
             covariance_matrix = distribution_util.with_dependencies([
                 assert_util.assert_near(

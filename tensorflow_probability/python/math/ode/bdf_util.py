@@ -38,7 +38,7 @@ def error_ratio(backward_difference, error_coefficient, tol):
 def first_step_size(
     atol,
     first_order_error_coefficient,
-    initial_state,
+    initial_state_vec,
     initial_time,
     ode_fn_vec,
     rtol,
@@ -49,18 +49,18 @@ def first_step_size(
 ):
   """Selects the first step size to use."""
   next_time = initial_time + epsilon
-  first_derivative = ode_fn_vec(initial_time, initial_state)
-  state_dtype = initial_state.dtype
-  next_state = initial_state + first_derivative * epsilon
-  second_derivative = (ode_fn_vec(next_time, next_state) -
+  first_derivative = ode_fn_vec(initial_time, initial_state_vec)
+  state_dtype = initial_state_vec.dtype
+  next_state_vec = initial_state_vec + first_derivative * epsilon
+  second_derivative = (ode_fn_vec(next_time, next_state_vec) -
                        first_derivative) / epsilon
-  tol = tf.cast(atol + rtol * tf.abs(initial_state), state_dtype)
+  tol = tf.cast(atol + rtol * tf.abs(initial_state_vec), state_dtype)
   # Local truncation error of an order one step is
   # `err(step_size) = first_order_error_coefficient * second_derivative *
   #                 * step_size**2`.
   # Choose the largest `step_size` such that `norm(err(step_size) / tol) <= 1`.
   norm = tf.norm(first_order_error_coefficient * second_derivative / tol)
-  step_size = tf.cast(tf.math.rsqrt(norm), tf.abs(initial_state).dtype)
+  step_size = tf.cast(tf.math.rsqrt(norm), tf.abs(initial_state_vec).dtype)
   return tf.clip_by_value(safety_factor * step_size, min_step_size,
                           max_step_size)
 
@@ -130,10 +130,11 @@ def newton(backward_differences, max_num_iters, newton_coefficient, ode_fn_vec,
   def newton_body(iterand):
     """Performs one iteration of Newton's method."""
     next_backward_difference = iterand.next_backward_difference
-    next_state = iterand.next_state
+    next_state_vec = iterand.next_state_vec
 
     rhs = newton_coefficient * step_size_cast * ode_fn_vec(
-        next_time, next_state) - rhs_constant_term - next_backward_difference
+        next_time,
+        next_state_vec) - rhs_constant_term - next_backward_difference
     delta = tf.squeeze(
         tf.linalg.triangular_solve(
             upper,
@@ -142,7 +143,7 @@ def newton(backward_differences, max_num_iters, newton_coefficient, ode_fn_vec,
     num_iters = iterand.num_iters + 1
 
     next_backward_difference += delta
-    next_state += delta
+    next_state_vec += delta
 
     delta_norm = tf.cast(tf.norm(delta), real_dtype)
     lipschitz_const = delta_norm / iterand.prev_delta_norm
@@ -173,7 +174,7 @@ def newton(backward_differences, max_num_iters, newton_coefficient, ode_fn_vec,
             converged=converged,
             finished=finished,
             next_backward_difference=next_backward_difference,
-            next_state=next_state,
+            next_state_vec=next_state_vec,
             num_iters=num_iters,
             prev_delta_norm=delta_norm)
     ]
@@ -182,36 +183,37 @@ def newton(backward_differences, max_num_iters, newton_coefficient, ode_fn_vec,
       converged=False,
       finished=False,
       next_backward_difference=tf.zeros_like(initial_guess),
-      next_state=tf.identity(initial_guess),
+      next_state_vec=tf.identity(initial_guess),
       num_iters=0,
       prev_delta_norm=tf.constant(np.array(-0.), dtype=real_dtype))
   [iterand] = tf.while_loop(lambda iterand: tf.logical_not(iterand.finished),
                             newton_body, [iterand])
   return (iterand.converged, iterand.next_backward_difference,
-          iterand.next_state, iterand.num_iters)
+          iterand.next_state_vec, iterand.num_iters)
 
 
 _NewtonIterand = collections.namedtuple('NewtonIterand', [
     'converged',
     'finished',
     'next_backward_difference',
-    'next_state',
+    'next_state_vec',
     'num_iters',
     'prev_delta_norm',
 ])
 
 
-def newton_qr(jacobian, newton_coefficient, step_size):
+def newton_qr(jacobian_mat, newton_coefficient, step_size):
   """QR factorizes the matrix used in each iteration of Newton's method."""
-  identity = tf.eye(tf.shape(jacobian)[0], dtype=jacobian.dtype)
-  step_size_cast = tf.cast(step_size, jacobian.dtype)
-  newton_matrix = (identity - step_size_cast * newton_coefficient * jacobian)
+  identity = tf.eye(tf.shape(jacobian_mat)[0], dtype=jacobian_mat.dtype)
+  step_size_cast = tf.cast(step_size, jacobian_mat.dtype)
+  newton_matrix = (
+      identity - step_size_cast * newton_coefficient * jacobian_mat)
   factorization = tf.linalg.qr(newton_matrix)
   return factorization.q, factorization.r
 
 
 def update_backward_differences(backward_differences, next_backward_difference,
-                                next_state, order):
+                                next_state_vec, order):
   """Returns the backward differences for the next time."""
   backward_differences_array = tf.TensorArray(
       backward_differences.dtype,
@@ -242,7 +244,7 @@ def update_backward_differences(backward_differences, next_backward_difference,
       lambda k, new_backward_differences_array: k > 0, body,
       [order, new_backward_differences_array])
   new_backward_differences_array = new_backward_differences_array.write(
-      0, next_state)
+      0, next_state_vec)
   new_backward_differences = new_backward_differences_array.stack()
   new_backward_differences.set_shape(tf.TensorShape([MAX_ORDER + 3, None]))
   return new_backward_differences

@@ -5,11 +5,19 @@
 
 # Module: tfp.mcmc
 
+
+<table class="tfo-notebook-buttons tfo-api" align="left">
+
+<td>
+  <a target="_blank" href="https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/mcmc/__init__.py">
+    <img src="https://www.tensorflow.org/images/GitHub-Mark-32px.png" />
+    View source on GitHub
+  </a>
+</td></table>
+
+
+
 TensorFlow Probability MCMC python package.
-
-
-
-Defined in [`python/mcmc/__init__.py`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc/__init__.py).
 
 <!-- Placeholder for "Used in" -->
 
@@ -18,11 +26,15 @@ Defined in [`python/mcmc/__init__.py`](https://github.com/tensorflow/probability
 
 [`class CheckpointableStatesAndTrace`](../tfp/mcmc/CheckpointableStatesAndTrace.md): States and auxiliary trace of an MCMC chain.
 
+[`class DualAveragingStepSizeAdaptation`](../tfp/mcmc/DualAveragingStepSizeAdaptation.md): Adapts the inner kernel's `step_size` based on `log_accept_prob`.
+
 [`class HamiltonianMonteCarlo`](../tfp/mcmc/HamiltonianMonteCarlo.md): Runs one step of Hamiltonian Monte Carlo.
 
 [`class MetropolisAdjustedLangevinAlgorithm`](../tfp/mcmc/MetropolisAdjustedLangevinAlgorithm.md): Runs one step of Metropolis-adjusted Langevin algorithm.
 
 [`class MetropolisHastings`](../tfp/mcmc/MetropolisHastings.md): Runs one step of the Metropolis-Hastings algorithm.
+
+[`class NoUTurnSampler`](../tfp/mcmc/NoUTurnSampler.md): Runs one step of the No U-Turn Sampler.
 
 [`class RandomWalkMetropolis`](../tfp/mcmc/RandomWalkMetropolis.md): Runs one step of the RWM algorithm with symmetric proposal.
 
