@@ -20,7 +20,8 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import affine_linear_operator as affine_linear_operator_bijector
+from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
+from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -184,13 +185,19 @@ class MultivariateNormalLinearOperator(
           loc, dtype=dtype, name='loc')
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale)
+    self._loc = loc
+    self._scale = scale
+
+    bijector = scale_matvec_linear_operator.ScaleMatvecLinearOperator(
+        scale, validate_args=validate_args)
+    if loc is not None:
+      bijector = shift.Shift(shift=loc, validate_args=validate_args)(bijector)
 
     super(MultivariateNormalLinearOperator, self).__init__(
         distribution=normal.Normal(
             loc=tf.zeros([], dtype=dtype),
             scale=tf.ones([], dtype=dtype)),
-        bijector=affine_linear_operator_bijector.AffineLinearOperator(
-            shift=loc, scale=scale, validate_args=validate_args),
+        bijector=bijector,
         batch_shape=batch_shape,
         event_shape=event_shape,
         validate_args=validate_args,
@@ -200,12 +207,12 @@ class MultivariateNormalLinearOperator(
   @property
   def loc(self):
     """The `loc` `Tensor` in `Y = scale @ X + loc`."""
-    return self.bijector.shift
+    return self._loc
 
   @property
   def scale(self):
     """The `scale` `LinearOperator` in `Y = scale @ X + loc`."""
-    return self.bijector.scale
+    return self._scale
 
   @distribution_util.AppendDocstring(_mvn_sample_note)
   def _log_prob(self, x):

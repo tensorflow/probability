@@ -69,7 +69,7 @@ class AffineLinearOperator(bijector.Bijector):
   @deprecation.deprecated(
       '2020-01-01',
       '`AffineLinearOperator` bijector is deprecated; please use '
-      '`tfb.Shift(loc)(tfb.MatvecLinearOperator(...))`.',
+      '`tfb.Shift(loc)(tfb.ScaleMatvecLinearOperator(...))`.',
       warn_once=True)
   def __init__(self,
                shift=None,

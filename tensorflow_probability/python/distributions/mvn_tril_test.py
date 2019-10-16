@@ -151,8 +151,8 @@ class MultivariateNormalTriLTest(tfp_test_util.TestCase):
   def testSingularScaleRaises(self):
     mu = None
     chol = [[1., 0.], [0., 0.]]
-    mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     with self.assertRaisesOpError("Singular operator"):
+      mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
       self.evaluate(mvn.sample())
 
   def testSampleWithSampleShape(self):
