@@ -154,7 +154,7 @@ def _uniform_correlation_like_matrix(num_rows, batch_shape, dtype, seed):
       along the bottom two dimensions is symmetric and has 1s on the
       main diagonal.
   """
-  num_entries = num_rows * (num_rows + 1) / 2
+  num_entries = num_rows * (num_rows + 1) // 2
   ones = tf.ones(shape=[num_entries], dtype=dtype)
   # It seems wasteful to generate random values for the diagonal since
   # I am going to throw them away, but `fill_triangular` fills the
@@ -289,10 +289,8 @@ def _clopper_pearson_confidence_interval(samples, error_rate):
   def p_big_enough(p):
     prob = stats.binom.logsf(successes, n, p)
     return prob - np.log(error_rate / 2.)
-  high_p = optimize.brentq(
-      p_small_enough, float(successes) / n, 1., rtol=1e-9)
-  low_p = optimize.brentq(
-      p_big_enough, 0., float(successes) / n, rtol=1e-9)
+  high_p = optimize.brentq(p_small_enough, successes / n, 1., rtol=1e-9)
+  low_p = optimize.brentq(p_big_enough, 0., successes / n, rtol=1e-9)
   low_interval = low + (high - low) * low_p
   high_interval = low + (high - low) * high_p
   return (low_interval, high_interval)

@@ -127,8 +127,8 @@ class BlockwiseTest(tfp_test_util.TestCase):
     gamma0 = tfd.Gamma(concentration=[1., 2., 3.], rate=1.)
     gamma1 = tfd.Gamma(concentration=[3., 4., 5.], rate=1.)
 
-    normal0 = tfd.Normal(loc=tf.zeros(3.), scale=2.)
-    normal1 = tfd.Normal(loc=tf.ones(3.), scale=[2., 3., 4.])
+    normal0 = tfd.Normal(loc=tf.zeros(3), scale=2.)
+    normal1 = tfd.Normal(loc=tf.ones(3), scale=[2., 3., 4.])
 
     d0 = tfd.Blockwise([
         tfd.Independent(gamma0, reinterpreted_batch_ndims=1),
