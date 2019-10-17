@@ -422,8 +422,8 @@ class GaussianProcess(distribution.Distribution):
           'an argument and returns a `Normal` or '
           '`MultivariateNormalLinearOperator` instance, whose KL can be '
           'computed.')
-    return index_points if index_points is not None else tf.convert_to_tensor(
-        self._index_points)
+    return tf.convert_to_tensor(
+        index_points if index_points is not None else  self._index_points)
 
   def _log_prob(self, value, index_points=None):
     return self.get_marginal_distribution(index_points).log_prob(value)
@@ -484,7 +484,15 @@ class GaussianProcess(distribution.Distribution):
     return self.get_marginal_distribution(index_points).entropy()
 
   def _mean(self, index_points=None):
-    return self.get_marginal_distribution(index_points).mean()
+    index_points = self._get_index_points(index_points)
+    mean = self._mean_fn(index_points)
+    # We need to broadcast with the kernel hparams.
+    batch_shape = self._batch_shape_tensor(index_points=index_points)
+    event_shape = self._event_shape_tensor(index_points=index_points)
+    if self._is_univariate_marginal(index_points):
+      mean = tf.squeeze(mean, axis=-1)
+    mean = tf.broadcast_to(mean, tf.concat([batch_shape, event_shape], axis=0))
+    return mean
 
   def _quantile(self, value, index_points=None):
     return self.get_marginal_distribution(index_points).quantile(value)
