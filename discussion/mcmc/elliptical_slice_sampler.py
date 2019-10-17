@@ -25,7 +25,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions
+from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -192,7 +192,7 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
       kernel_results: `collections.namedtuple` of internal calculations used to
         advance the chain.
     """
-    self._seed_stream = distributions.SeedStream(
+    self._seed_stream = tfp_util.SeedStream(
         seed, salt='elliptical_slice_sampler')
     self._parameters = dict(
         normal_sampler_fn=normal_sampler_fn,

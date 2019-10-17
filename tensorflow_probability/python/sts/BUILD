@@ -321,6 +321,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/sts/internal",
+        "//tensorflow_probability/python/util",
     ],
 )
 
