@@ -21,8 +21,10 @@ from __future__ import print_function
 import collections
 import functools
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.math.ode import base
 from tensorflow_probability.python.math.ode import runge_kutta_util as rk_util
 from tensorflow_probability.python.math.ode import util
@@ -147,6 +149,224 @@ class DormandPrince(base.Solver):
     self._max_step_size_factor = max_step_size_factor
     self._max_num_steps = max_num_steps
 
+  def solve(
+      self,
+      ode_fn,
+      initial_time,
+      initial_state,
+      solution_times,
+      jacobian_fn=None,
+      jacobian_sparsity=None,
+      batch_ndims=None,
+      previous_solver_internal_state=None,
+  ):
+    """Solves a system of ODEs with nested structures."""
+
+    # TODO(b/142672300): Move nesting enabled adjoint method to `Solver`
+    input_state_structure = initial_state
+
+    @tf.custom_gradient
+    def gradient_helper(*flat_initial_state_components):
+      """Inner method that restricts gradient to initial state components."""
+      flat_initial_state = list(flat_initial_state_components)
+      flat_initial_state = [tf.convert_to_tensor(c) for c in flat_initial_state]
+      initial_state = tf.nest.pack_sequence_as(
+          input_state_structure, flat_initial_state)
+
+      results = self._solve(
+          ode_fn,
+          initial_time,
+          initial_state,
+          solution_times,
+          jacobian_fn,
+          jacobian_sparsity,
+          batch_ndims,
+          previous_solver_internal_state,
+      )
+      results = base.Results(
+          times=tf.stop_gradient(results.times),
+          states=results.states,
+          diagnostics=util.stop_gradient_of_real_or_complex_entries(
+              results.diagnostics),
+          solver_internal_state=util.stop_gradient_of_real_or_complex_entries(
+              results.solver_internal_state))
+
+      def grad_fn(*dresults, **kwargs):
+        """Adjoint sensitivity method to compute gradients."""
+        dresults = tf.nest.pack_sequence_as(results, dresults)
+        dstates = dresults.states
+        # The signature grad_fn(*dresults, variables=None) is not valid Python 2
+        # so use kwargs instead.
+        variables = kwargs.pop('variables', [])
+        assert not kwargs  # This assert should never fail.
+        # TODO(b/138304303): Support complex types.
+        with tf.name_scope('{}Gradients'.format(self._name)):
+          get_dtype = lambda x: x.dtype
+          def error_if_complex(dtype):
+            if dtype.is_complex:
+              raise NotImplementedError('The adjoint sensitivity method does '
+                                        'not support complex dtypes.')
+
+          state_dtypes = tf.nest.map_structure(get_dtype, initial_state)
+          tf.nest.map_structure(error_if_complex, state_dtypes)
+          common_state_dtype = dtype_util.common_dtype(initial_state)
+          real_dtype = dtype_util.real_dtype(common_state_dtype)
+
+          # We add initial_time to ensure that we know where to stop.
+          result_times = tf.concat(
+              [[tf.cast(initial_time, real_dtype)], results.times], 0)
+          num_result_times = tf.size(result_times)
+
+          # First two components correspond to reverse and adjoint states.
+          # the last component is adjoint state for variables.
+          terminal_augmented_state = tuple([
+              rk_util.nest_constant(initial_state, 0.0),
+              rk_util.nest_constant(initial_state, 0.0),
+              tuple(
+                  rk_util.nest_constant(variable, 0.0) for variable in variables
+              )
+          ])
+
+          # The XLA compiler does not compile code which slices/indexes using
+          # integer `Tensor`s. `TensorArray`s are used to get around this.
+          result_time_array = tf.TensorArray(
+              results.times.dtype,
+              clear_after_read=False,
+              size=num_result_times,
+              element_shape=[]).unstack(result_times)
+
+          # TensorArray shape should not include time dimension, hence shape[1:]
+          result_state_arrays = [
+              tf.TensorArray(  # pylint: disable=g-complex-comprehension
+                  dtype=component.dtype, size=num_result_times - 1,
+                  element_shape=component.shape[1:]).unstack(component)
+              for component in tf.nest.flatten(results.states)
+          ]
+          result_state_arrays = tf.nest.pack_sequence_as(
+              results.states, result_state_arrays)
+          dresult_state_arrays = [
+              tf.TensorArray(  # pylint: disable=g-complex-comprehension
+                  dtype=component.dtype, size=num_result_times - 1,
+                  element_shape=component.shape[1:]).unstack(component)
+              for component in tf.nest.flatten(dstates)
+          ]
+          dresult_state_arrays = tf.nest.pack_sequence_as(
+              results.states, dresult_state_arrays)
+
+          def augmented_ode_fn(backward_time, augmented_state):
+            """Dynamics function for the augmented system.
+
+            Describes a differential equation that evolves the augmented state
+            backwards in time to compute gradients using the adjoint method.
+            Augmented state consists of 3 components `(state, adjoint_state,
+            vars)` all evaluated at time `backward_time`:
+
+            state: represents the solution of user provided `ode_fn`. The
+              structure coincides with the `initial_state`.
+            adjoint_state: represents the solution of adjoint sensitivity
+              differential equation as discussed below. Has the same structure
+              and shape as `state`.
+            vars: represent the solution of the adjoint equation for variable
+              gradients. Represented as a `Tuple(Tensor, ...)` with as many
+              tensors as there are `variables`.
+
+            Adjoint sensitivity equation describes the gradient of the solution
+            with respect to the value of the solution at previous time t. Its
+            dynamics are given by
+            d/dt[adj(t)] = -1 * adj(t) @ jacobian(ode_fn(t, z), z)
+            Which is computed as:
+            d/dt[adj(t)]_i = -1 * sum_j(adj(t)_j * d/dz_i[ode_fn(t, z)_j)]
+            d/dt[adj(t)]_i = -1 * d/dz_i[sum_j(no_grad_adj_j * ode_fn(t, z)_j)]
+            where in the last line we moved adj(t)_j under derivative by
+            removing gradient from it.
+
+            Adjoint equation for the gradient with respect to every
+            `tf.Variable` theta follows:
+            d/dt[grad_theta(t)] = -1 * adj(t) @ jacobian(ode_fn(t, z), theta)
+            = -1 * d/d theta_i[sum_j(no_grad_adj_j * ode_fn(t, z)_j)]
+
+            Args:
+              backward_time: Floating `Tensor` representing current time.
+              augmented_state: `Tuple(state, adjoint_state, variable_grads)`
+
+            Returns:
+              negative_derivatives: Structure of `Tensor`s equal to backwards
+                time derivative of the `state` componnent.
+              adjoint_ode: Structure of `Tensor`s equal to backwards time
+                derivative of the `adjoint_state` component.
+              adjoint_variables_ode: Structure of `Tensor`s equal to backwards
+                time derivative of the `vars` component.
+            """
+            # The negative signs disappears after the change of variables.
+            # The ODE solver cannot handle the case initial_time > final_time
+            # and hence a change of variables backward_time = -time is used.
+            time = -backward_time
+            state, adjoint_state, _ = augmented_state
+
+            with tf.GradientTape() as tape:
+              tape.watch(variables)
+              tape.watch(state)
+              derivatives = ode_fn(time, state)
+              adjoint_no_grad = tf.nest.map_structure(
+                  tf.stop_gradient, adjoint_state)
+              negative_derivatives = rk_util.weighted_sum([-1.0], [derivatives])
+
+              def dot_prod(tensor_a, tensor_b):
+                return tf.reduce_sum(tensor_a * tensor_b)
+              # See docstring for details.
+              adjoint_dot_derivatives = tf.nest.map_structure(
+                  dot_prod, adjoint_no_grad, derivatives)
+              adjoint_dot_derivatives = tf.squeeze(
+                  tf.add_n(tf.nest.flatten(adjoint_dot_derivatives)))
+
+            adjoint_ode, adjoint_variables_ode = tape.gradient(
+                adjoint_dot_derivatives, (state, tuple(variables)),
+                unconnected_gradients=tf.UnconnectedGradients.ZERO)
+            return negative_derivatives, adjoint_ode, adjoint_variables_ode
+
+          def reverse_to_result_time(n, augmented_state, _):
+            """Integrates the augmented system backwards in time."""
+            lower_bound_of_integration = result_time_array.read(n)
+            upper_bound_of_integration = result_time_array.read(n - 1)
+            _, adjoint_state, adjoint_variable_state = augmented_state
+            initial_state = _read_solution_components(
+                result_state_arrays, input_state_structure, n - 1)
+            initial_adjoint = _read_solution_components(
+                dresult_state_arrays, input_state_structure, n - 1)
+            initial_adjoint_state = rk_util.weighted_sum(
+                [1.0, 1.0], [adjoint_state, initial_adjoint])
+            initial_augmented_state = (
+                initial_state, initial_adjoint_state, adjoint_variable_state)
+            augmented_results = self._solve(
+                ode_fn=augmented_ode_fn,
+                initial_time=-lower_bound_of_integration,
+                initial_state=initial_augmented_state,
+                solution_times=[-upper_bound_of_integration],
+                batch_ndims=batch_ndims
+            )
+            # Results added an extra time dim of size 1, squeeze it.
+            select_result = lambda x: tf.squeeze(x, [0])
+            result_state = augmented_results.states
+            result_state = tf.nest.map_structure(select_result, result_state)
+            status = augmented_results.diagnostics.status
+            return n - 1, result_state, status
+
+          _, augmented_state, _ = tf.while_loop(
+              lambda n, _, status: (n >= 1) & tf.equal(status, 0),
+              reverse_to_result_time,
+              (num_result_times - 1, terminal_augmented_state, 0),
+          )
+          _, adjoint_state, adjoint_variables = augmented_state
+          return adjoint_state, list(adjoint_variables)
+
+      return results, grad_fn
+
+    # TODO(b/140760650): We must use a resource-using variable scope, otherwise
+    # custom_gradient will complain even if there are no variables in `ode_fn`.
+    flat_initial_state = tf.nest.flatten(initial_state)
+    with tf1.variable_scope(tf1.get_variable_scope(), use_resource=True):
+      return gradient_helper(*flat_initial_state)
+
   def _solve(
       self,
       ode_fn,
@@ -166,11 +386,16 @@ class DormandPrince(base.Solver):
 
     with tf.name_scope(self._name):
       # (2) Convert to tensors, determined dtypes.
-      initial_state = tf.convert_to_tensor(initial_state)
-      util.error_if_not_real_or_complex(initial_state, 'initial_state')
+      get_dtype = lambda x: x.dtype
+      error_if_wrong_dtype = functools.partial(
+          util.error_if_not_real_or_complex, identifier='initial_state')
 
-      state_dtype = initial_state.dtype
-      real_dtype = tf.abs(initial_state).dtype
+      initial_state = tf.nest.map_structure(tf.convert_to_tensor, initial_state)
+      tf.nest.map_structure(error_if_wrong_dtype, initial_state)
+
+      state_dtypes = tf.nest.map_structure(get_dtype, initial_state)
+      common_state_dtype = dtype_util.common_dtype(initial_state)
+      real_dtype = dtype_util.real_dtype(common_state_dtype)
 
       initial_time = tf.cast(initial_time, real_dtype)
       max_num_steps = self._max_num_steps
@@ -190,7 +415,8 @@ class DormandPrince(base.Solver):
       solver_internal_state = previous_solver_internal_state
       if solver_internal_state is None:
         initial_derivative = ode_fn(initial_time, initial_state)
-        initial_derivative = tf.convert_to_tensor(initial_derivative)
+        initial_derivative = tf.nest.map_structure(tf.convert_to_tensor,
+                                                   initial_derivative)
         solver_internal_state = _RungeKuttaSolverInternalState(
             current_state=initial_state,
             current_derivative=initial_derivative,
@@ -218,10 +444,13 @@ class DormandPrince(base.Solver):
             dynamic_size=False,
             element_shape=[]).unstack(solution_times)
 
-      solutions_array = tf.TensorArray(
-          state_dtype,
-          size=num_solution_times,
-          dynamic_size=solution_times_by_solver)
+      solutions_arrays = [
+          tf.TensorArray(dtype=component_dtype, size=num_solution_times,
+                         dynamic_size=solution_times_by_solver)
+          for component_dtype in tf.nest.flatten(state_dtypes)
+      ]
+      solutions_arrays = tf.nest.pack_sequence_as(
+          initial_state, solutions_arrays)
 
       rk_step = functools.partial(
           self._step,
@@ -262,28 +491,29 @@ class DormandPrince(base.Solver):
             num_matrix_factorizations=0, status=0)
 
         if solution_times_by_solver:
-          res = _dense_solutions_to_final_time(
+          r = _dense_solutions_to_final_time(
               final_time=final_time,
               solver_state=solver_internal_state,
               diagnostics=diagnostics,
               step_fn=rk_step,
               ode_fn=ode_fn,
               times_array=times_array,
-              solutions_array=solutions_array
+              solutions_arrays=solutions_arrays
           )
-          solver_internal_state, diagnostics, times_array, solutions_array = res
+          solver_internal_state, diagnostics, times_array, solutions_arrays = r
         else:
           def iterate_cond(time_id, *_):
             return time_id < num_solution_times
 
           [
-              _, solver_internal_state, diagnostics, solutions_array
+              _, solver_internal_state, diagnostics, solutions_arrays
           ] = tf.while_loop(iterate_cond, advance_to_solution_time, [
-              0, solver_internal_state, diagnostics, solutions_array
+              0, solver_internal_state, diagnostics, solutions_arrays
           ])
 
         times = times_array.stack()
-        states = solutions_array.stack()
+        stack_components = lambda x: x.stack()
+        states = tf.nest.map_structure(stack_components, solutions_arrays)
         return base.Results(
             times=times,
             states=states,
@@ -337,8 +567,10 @@ class DormandPrince(base.Solver):
       if self._validate_args:
         check_underflow = tf.debugging.assert_greater(
             t0 + dt, t0, 'underflow in dt')
-        check_numerics = tf.debugging.assert_all_finite(
-            y0, 'non-finite values in solution')
+        assert_finite = functools.partial(
+            tf.debugging.assert_all_finite,
+            message='non-finite values in solution')
+        check_numerics = tf.nest.map_structure(assert_finite, y0)
         assertion_ops.append(check_underflow)
         assertion_ops.append(check_numerics)
 
@@ -353,22 +585,24 @@ class DormandPrince(base.Solver):
       max_y_vals = tf.nest.map_structure(tf.math.maximum, abs_y0, abs_y1)
       ones_nest = rk_util.nest_constant(abs_y0)
       error_tol = rk_util.weighted_sum([atol, rtol], [ones_nest, max_y_vals])
-      scaled_errors = tf.nest.map_structure(tf.divide,
-                                            rk_util.abs_square(y1_error),
-                                            rk_util.abs_square(error_tol))
+      def scale_errors(error_component, tol_scale):
+        abs_square_error = rk_util.abs_square(error_component)
+        abs_square_tol_scale = rk_util.abs_square(tol_scale)
+        return tf.divide(abs_square_error, abs_square_tol_scale)
+
+      scaled_errors = tf.nest.map_structure(scale_errors, y1_error, error_tol)
       error_ratio = rk_util.nest_rms_norm(scaled_errors)
       accept_step = error_ratio <= 1
 
     with tf.name_scope('update/state'):
-      y_next = tf.where(accept_step, y1, y0)
-      f_next = tf.where(accept_step, f1, f0)
+      y_next = rk_util.nest_where(accept_step, y1, y0)
+      f_next = rk_util.nest_where(accept_step, f1, f0)
       t_next = tf.where(accept_step, t0 + dt, t0)
 
       new_coefficients = rk_util.rk_fourth_order_interpolation_coefficients(
           y0, y1, k, dt, _TABLEAU)
-      new_and_old_coefficients = zip(new_coefficients, interp_coeff)
-      interp_coeff = [tf.where(accept_step, new_c, old_c)
-                      for new_c, old_c in new_and_old_coefficients]
+      interp_coeff = rk_util.nest_where(
+          accept_step, new_coefficients, interp_coeff)
 
       dt_next = util.next_step_size(
           dt, self.ORDER, error_ratio, safety, dfactor, ifactor)
@@ -480,7 +714,7 @@ def _dense_solutions_to_final_time(
     step_fn,
     ode_fn,
     times_array,
-    solutions_array
+    solutions_arrays
 ):
   """Integrates `solver_state` to `final_time`.
 
@@ -497,37 +731,40 @@ def _dense_solutions_to_final_time(
       the `solver_state`, `diagnostics` and `solver_state`.
     ode_fn: Callable(t, y) -> dy_dt.
     times_array: `TensorArray` where time values are recorded.
-    solutions_array: `TensorArray` where solutions are recorded.
+    solutions_arrays: `TensorArray`s where solutions are recorded.
 
   Returns:
     solver_state: `_RungeKuttaSolverInternalState` holding final solver state.
     diagnostics: `_DopriDiagnostics` holding diagnostic values.
     times_array: `TensorArray` with recorded solution times.
-    solutions_array: `TensorArray` with solution values at time corresponding to
-      times_array.
+    solutions_arrays: `TensorArray`s with solution values at time corresponding
+      to times_array.
   """
 
-  def step_and_record(solver_state, diagnostics, solutions_array, times_array):
-    solutions_array.write(solutions_array.size(), solver_state.current_state)
-    times_array.write(times_array.size(), solver_state.current_time)
+  def step_and_record(solver_state, diagnostics, solutions_arrays, times_array):
+    y = solver_state.current_state
+    time_id = times_array.size()
+    solutions_arrays = _write_solution_components(y, solutions_arrays, time_id)
+    times_array = times_array.write(time_id, solver_state.current_time)
     solver_state, diagnostics = step_fn(solver_state, diagnostics)
-    return (solver_state, diagnostics, solutions_array, times_array)
+    return (solver_state, diagnostics, solutions_arrays, times_array)
 
   def step_cond(solver_internal_state, *_):
     return solver_internal_state.current_time <= final_time
 
   [
-      solver_state, diagnostics, solutions_array, times_array
+      solver_state, diagnostics, solutions_arrays, times_array
   ] = tf.while_loop(step_cond, step_and_record, [
-      solver_state, diagnostics, solutions_array, times_array
+      solver_state, diagnostics, solutions_arrays, times_array
   ])
   # Interpolating the last time point, updating the state and write results.
   y, coefficients = _interpolate_solution_at(final_time, solver_state)
   dy_dt = ode_fn(final_time, y)
-  dy_dt = tf.convert_to_tensor(dy_dt)
+  dy_dt = tf.nest.map_structure(tf.convert_to_tensor, dy_dt)
 
-  times_array = times_array.write(times_array.size(), final_time)
-  solutions_array = solutions_array.write(solutions_array.size(), y)
+  time_id = times_array.size()
+  times_array = times_array.write(time_id, final_time)
+  solutions_arrays = _write_solution_components(y, solutions_arrays, time_id)
   solver_state = _RungeKuttaSolverInternalState(
       current_state=y,
       current_derivative=dy_dt,
@@ -536,14 +773,14 @@ def _dense_solutions_to_final_time(
       step_size=solver_state.step_size,
       interpolating_coefficients=coefficients
   )
-  return solver_state, diagnostics, times_array, solutions_array
+  return solver_state, diagnostics, times_array, solutions_arrays
 
 
 def _advance_to_solution_time(
     time_id,
     solver_state,
     diagnostics,
-    solutions_array,
+    solutions_arrays,
     times_array,
     step_fn
 ):
@@ -557,7 +794,7 @@ def _advance_to_solution_time(
     time_id: Integer `Tensor` - index of target time in `times_array`.
     solver_state: `_DopriSolverInternalState` - solver state.
     diagnostics: `_DopriDiagnostics` - info on the current `_solve` call.
-    solutions_array: `TensorArray` for storing solutions at desired time steps
+    solutions_arrays: `TensorArray`s for storing solutions at desired time steps
     times_array: `TensorArray` that specifies the list times where solutions
       should be obtained.
     step_fn: Partial `Dopri._step` method that performs a single step updating
@@ -577,8 +814,8 @@ def _advance_to_solution_time(
     solver_state, diagnostics = tf.while_loop(
         step_cond, step_fn, (solver_state, diagnostics))
     y, _ = _interpolate_solution_at(times_array[time_id], solver_state)
-    solutions_array = solutions_array.write(time_id, y)
-    return time_id + 1, solver_state, diagnostics, solutions_array
+    solutions_arrays = _write_solution_components(y, solutions_arrays, time_id)
+    return time_id + 1, solver_state, diagnostics, solutions_arrays
 
 
 def _interpolate_solution_at(target_time, solver_state):
@@ -599,3 +836,46 @@ def _interpolate_solution_at(target_time, solver_state):
   t1 = solver_state.current_time
   solution = rk_util.evaluate_interpolation(coefficients, t0, t1, target_time)
   return solution, coefficients
+
+
+def _write_solution_components(solution, solutions_arrays, time_id):
+  """Writes individual `Tensor` components of `solution` to `solutions_arrays`.
+
+  Args:
+    solution: Possibly nested structure of `Tensor`s representing current
+      solution to be written to `solutions_arrays`.
+    solutions_arrays: List of `TensorArray`s where `solution` components are
+      written. Must have the same number of elements as components in
+      `solution`.
+    time_id: Integer `Tensor` representing the index at which `solution`
+      components are written to `solutions_arrays`.
+
+  Returns:
+    updated_arrays: List of `TensorArray`s whose components at index `time_id`
+      now contain components of the `solution`.
+  """
+  tf.nest.assert_same_structure(solution, solutions_arrays)
+  write_solution = lambda array, tensor: array.write(time_id, tensor)
+  updated_arrays = tf.nest.map_structure(
+      write_solution, solutions_arrays, solution)
+  return updated_arrays
+
+
+def _read_solution_components(solutions_arrays, structure, time_id):
+  """Composes `struct` from `time_id` slices of `solutions_arrays`.
+
+  Args:
+    solutions_arrays: List of `TensorArray`s holding components of solutions at
+      different time steps.
+    structure: Possibly nested structure of `Tensor`s representing solution
+      state as defined in corresponding ODE.
+    time_id: Scalar integer indicating which time steo to read.
+
+  Returns:
+    solution: Solution of the same structure as `structure` assembled from
+      components in solutions array.
+  """
+  tf.nest.assert_same_structure(structure, solutions_arrays)
+  read_solution = lambda array: array.read(time_id)
+  solution = tf.nest.map_structure(read_solution, solutions_arrays)
+  return solution

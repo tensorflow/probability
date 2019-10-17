@@ -333,5 +333,122 @@ class GeneralTest(tfp_test_util.TestCase):
     self.assertAllClose(states, states_exact)
 
 
+@test_util.run_all_in_graph_and_eager_modes
+@parameterized.named_parameters(
+    [('dormand_prince', tfp.math.ode.DormandPrince)])
+class NestedStructure(tfp_test_util.TestCase):
+
+  def test_forward_tuple(self, solver):
+    jacobian_diag_a = np.float64([0.5, 1.])
+    jacobian_diag_b = np.float64([1.5, 0.734])
+    initial_time = 0.
+    solution_times = [0.2]
+    initial_state = (np.float64([1., 2.]), np.float64([5.23, 0.2354]))
+
+    def ode_fn(time, state):
+      del time
+      state_a, state_b = state
+      f_a = jacobian_diag_a * state_a
+      f_b = jacobian_diag_b * state_b
+      return f_a, f_b
+
+    solver_instance = solver(rtol=_RTOL, atol=_ATOL)
+    results = solver_instance.solve(
+        ode_fn,
+        initial_time,
+        initial_state,
+        solution_times=solution_times
+    )
+    times, states = self.evaluate([results.times, results.states])
+
+    states_exact_a = initial_state[0] * np.exp(
+        jacobian_diag_a[np.newaxis, :] * times[:, np.newaxis])
+
+    states_exact_b = initial_state[1] * np.exp(
+        jacobian_diag_b[np.newaxis, :] * times[:, np.newaxis])
+
+    self.assertAllClose(states[0], states_exact_a)
+    self.assertAllClose(states[1], states_exact_b)
+
+  def test_gradient_tuple(self, solver):
+    alpha = np.float32(0.7)
+    beta = np.float32(2.2)
+    variable_1 = tf.Variable(alpha, name='alpha')
+    variable_2 = tf.Variable(beta, name='beta')
+
+    def ode_fn(time, state):
+      del time
+      x, y = state
+      return variable_1 * x, (variable_1 + variable_2) * y
+
+    initial_time = 0.
+    initial_x = np.float32(3.2)
+    initial_y = np.float32(-4.2)
+    initial_state = (initial_x, initial_y)
+    final_time = 2.0
+
+    solver_instance = solver(rtol=_RTOL, atol=_ATOL)
+
+    with tf.GradientTape(persistent=True) as tape:
+      tape.watch([variable_1, variable_2])
+      results = solver_instance.solve(
+          ode_fn, initial_time, initial_state, solution_times=[final_time])
+      final_state = results.states
+    self.evaluate([variable_1.initializer, variable_2.initializer])
+    actual_grad_1 = self.evaluate(tape.gradient(final_state[0], [variable_1]))
+    actual_grad_2 = self.evaluate(tape.gradient(final_state[1], [variable_1]))
+    actual_grad_3 = self.evaluate(tape.gradient(final_state[1], [variable_2]))
+
+    expected_grad_1 = (
+        initial_x * final_time * np.exp(alpha * final_time)[np.newaxis])
+    expected_grad_2 = (
+        initial_y * final_time *
+        np.exp((alpha + beta) * final_time)[np.newaxis])
+    expected_grad_3 = expected_grad_2
+    self.assertAllClose(actual_grad_1, expected_grad_1, rtol=1e-4, atol=1e-4)
+    self.assertAllClose(actual_grad_2, expected_grad_2, rtol=1e-4, atol=1e-4)
+    self.assertAllClose(actual_grad_3, expected_grad_3, rtol=1e-4, atol=1e-4)
+
+  def test_forward_multilevel(self, solver):
+    jacobian_diag_a = np.float64([0.5, 1.])
+    jacobian_diag_b = np.float64([1.5, 0.734])
+    jacobian_diag_c = np.float64([-2.5])
+    initial_time = 0.
+    solution_times = [0.2]
+    initial_state = (
+        np.float64([1., 2.]), (np.float64([5., 2.]), np.float64([9.])))
+
+    def ode_fn(time, state):
+      del time
+      state_a, state_b_and_c = state
+      state_b, state_c = state_b_and_c
+      f_a = jacobian_diag_a * state_a
+      f_b = jacobian_diag_b * state_b
+      f_c = jacobian_diag_c * state_c
+      return f_a, (f_b, f_c)
+
+    solver_instance = solver(rtol=_RTOL, atol=_ATOL)
+    results = solver_instance.solve(
+        ode_fn,
+        initial_time,
+        initial_state,
+        solution_times=solution_times
+    )
+    times, states = self.evaluate([results.times, results.states])
+
+    states_exact_a = initial_state[0] * np.exp(
+        jacobian_diag_a[np.newaxis, :] * times[:, np.newaxis])
+
+    states_exact_b = initial_state[1][0] * np.exp(
+        jacobian_diag_b[np.newaxis, :] * times[:, np.newaxis])
+
+    states_exact_c = initial_state[1][1] * np.exp(
+        jacobian_diag_c[np.newaxis, :] * times[:, np.newaxis])
+
+    self.assertAllClose(states[0], states_exact_a)
+    self.assertAllClose(states[1][0], states_exact_b)
+    self.assertAllClose(states[1][1], states_exact_c)
+
+
 if __name__ == '__main__':
   tf.test.main()

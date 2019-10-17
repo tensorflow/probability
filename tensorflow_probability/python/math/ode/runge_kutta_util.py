@@ -79,7 +79,7 @@ def weighted_sum(weights, list_of_states):
       tf.nest.assert_same_structure(state, list_of_states[-1])
     weights_and_states = zip(weights, list_of_states)
     weighted_states = [
-        [w * s_component for s_component in tf.nest.flatten(s)]
+        [tf.cast(w, s_comp.dtype) * s_comp for s_comp in tf.nest.flatten(s)]
         for w, s in weights_and_states if _possibly_nonzero(w)
     ]
     list_of_components = zip(*weighted_states)  # Put same components together.
@@ -137,6 +137,27 @@ def nest_rms_norm(nest):
   return norm
 
 
+def nest_where(accept_step, new_values, old_values):
+  """Returns `new_values` if `accept_step` is True `old_values` otherwise.
+
+  Uses `tf.where` on individual elements to select `new_values` or `old_values`.
+
+  Args:
+    accept_step: Scalar boolean `Tensor` indicating whether to return
+      `new_values`.
+    new_values: Possible nested structure of `Tensor`s.
+    old_values: Possible nested structure of `Tensor`s. Must have the same
+      structure as `new_values`.
+
+  Returns:
+    values: `new_values` if `accept_step` is True and `old_values` otherwise.
+  """
+  tf.nest.assert_same_structure(new_values, old_values)
+  select_new_or_old = lambda x, y: tf.where(accept_step, x, y)
+  values = tf.nest.map_structure(select_new_or_old, new_values, old_values)
+  return values
+
+
 def _fourth_order_interpolation_coefficients(y0, y1, y_mid, f0, f1, dt):
   """Fits coefficients for 4th order polynomial interpolation.
 
@@ -174,7 +195,7 @@ def _fourth_order_interpolation_coefficients(y0, y1, y_mid, f0, f1, dt):
     a = weighted_sum([-2 * dt, 2 * dt, -8, -8, 16], [f0, f1, y0, y1, y_mid])
     b = weighted_sum([5 * dt, -3 * dt, 18, 14, -32], [f0, f1, y0, y1, y_mid])
     c = weighted_sum([-4 * dt, dt, -11, -5, 16], [f0, f1, y0, y1, y_mid])
-    d = dt * f0
+    d = weighted_sum([dt], [f0])
     e = y0
   return [a, b, c, d, e]
 
@@ -196,8 +217,7 @@ def rk_fourth_order_interpolation_coefficients(y0, y1, k, dt, tableau):
     coefficients: List of coefficients that interpolate the solution.
   """
   with tf.name_scope('interp_fit_rk'):
-    dt = tf.cast(dt, y0.dtype)
-    y_mid = y0 + dt * weighted_sum(tableau.c_mid, k)
+    y_mid = weighted_sum([1.0, dt], [y0, weighted_sum(tableau.c_mid, k)])
     f0 = k[0]
     f1 = k[-1]
     return _fourth_order_interpolation_coefficients(y0, y1, y_mid, f0, f1, dt)
@@ -262,23 +282,22 @@ def runge_kutta_step(ode_fn,
       coefficients `k` used for calculating these terms.
   """
   with tf.name_scope(name):
-    y0 = tf.convert_to_tensor(y0, name='y0')
-    f0 = tf.convert_to_tensor(f0, name='f0')
+    y0 = tf.nest.map_structure(tf.convert_to_tensor, y0)
+    f0 = tf.nest.map_structure(tf.convert_to_tensor, f0)
     t0 = tf.convert_to_tensor(t0, name='t0')
     dt = tf.convert_to_tensor(dt, name='dt')
-    dt_cast = tf.cast(dt, y0.dtype)
 
     k = [f0]
-    for alpha_i, beta_i in zip(tableau.a, tableau.b):
-      ti = t0 + alpha_i * dt
-      yi = y0 + dt_cast * weighted_sum(beta_i, k)
+    for a_i, b_i in zip(tableau.a, tableau.b):
+      ti = t0 + a_i * dt
+      yi = weighted_sum([1.0, dt], [y0, weighted_sum(b_i, k)])
       k.append(ode_fn(ti, yi))
 
     if not (tableau.c_sol[-1] == 0 and tableau.c_sol[:-1] == tableau.b[-1]):
       # This property (true for Dormand-Prince) lets us save a few FLOPs.
-      yi = y0 + dt_cast * weighted_sum(tableau.c_sol, k)
+      yi = weighted_sum([1.0, dt], [y0, weighted_sum(tableau.c_sol, k)])
 
-    y1 = tf.identity(yi, name='y1')
-    f1 = tf.identity(k[-1], name='f1')
-    y1_error = dt_cast * weighted_sum(tableau.c_error, k)
+    y1 = yi
+    f1 = k[-1]
+    y1_error = weighted_sum([dt], [weighted_sum(tableau.c_error, k)])
     return y1, f1, y1_error, k
