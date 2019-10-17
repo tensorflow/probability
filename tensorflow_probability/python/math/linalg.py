@@ -930,6 +930,7 @@ def fill_triangular(x, upper=False, name=None):
 
   From this example we see that the resuting matrix is upper-triangular, and
   contains all the entries of x, as desired. The rest is details:
+
   - If `n` is even, `x` doesn't exactly fill an even number of rows (it fills
     `n / 2` rows and half of an additional row), but the whole scheme still
     works.

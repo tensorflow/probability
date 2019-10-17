@@ -383,6 +383,7 @@ class Distribution(_BaseDistribution):
 
   There are three important concepts associated with TensorFlow Distributions
   shapes:
+
   - Event shape describes the shape of a single draw from the distribution;
     it may be dependent across dimensions. For scalar distributions, the event
     shape is `[]`. For a 5-dimensional MultivariateNormal, the event shape is

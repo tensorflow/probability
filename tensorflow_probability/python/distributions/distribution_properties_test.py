@@ -154,6 +154,7 @@ class DistInfo(collections.namedtuple(
   """Sufficient information to instantiate a Distribution.
 
   To wit
+
   - The Python class `cls` giving the class, and
   - A Python dict `params_event_ndims` giving the event dimensions for the
     parameters (so that parameters can be built with predictable batch shapes).
@@ -169,6 +170,7 @@ def instantiable_base_dists():
   """Computes the table of mechanically instantiable base Distributions.
 
   A Distribution is mechanically instantiable if
+
   - The class appears as a symbol binding in `tfp.distributions`;
   - The class defines a `_params_event_ndims` method (necessary
     to generate parameter Tensors with predictable batch shapes); and
@@ -294,6 +296,7 @@ def stringify_slices(slices):
 
   Each returned string (in order) encodes what to do with one dimension of the
   slicee:
+
   - That number for a single integer slice;
   - 'a:b:c' for a start-stop-step slice, omitting any missing components;
   - 'tf.newaxis' for an axis insertion; or

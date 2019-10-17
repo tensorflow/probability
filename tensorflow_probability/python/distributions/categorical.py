@@ -82,6 +82,7 @@ class Categorical(distribution.Distribution):
   #### Pitfalls
 
   The number of classes, `K`, must not exceed:
+
   - the largest integer representable by `self.dtype`, i.e.,
     `2**(mantissa_bits+1)` (IEEE 754),
   - the maximum `Tensor` index, i.e., `2**31-1`.

@@ -67,9 +67,11 @@ class TransformedDistribution(distribution_lib.Distribution):
   distribution is typically an instance of the `Distribution` class.
 
   A `Bijector` is expected to implement the following functions:
+
   - `forward`,
   - `inverse`,
   - `inverse_log_det_jacobian`.
+
   The semantics of these functions are outlined in the `Bijector` documentation.
 
   We now describe how a `TransformedDistribution` alters the input/outputs of a
