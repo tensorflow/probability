@@ -75,7 +75,7 @@ NUTSKernelResults = collections.namedtuple('NUTSKernelResults', [
     'momentum_state_memory',
     'step_size',
     'log_accept_ratio',
-    'leapfrogs_taken',
+    'leapfrogs_taken',  # How many leapfrogs each chain has taken this step
     'is_accepted',
     'reach_max_depth',
     'has_divergence',
@@ -119,7 +119,7 @@ TreeDoublingMetaState = collections.namedtuple(
                             # generalized U turn criteria
         'energy_diff_sum',  # sum of the energy differences (H' - H0) within the
                             # single subtree
-        'leapfrog_count',
+        'leapfrog_count',   # How many leapfrogs each chain has taken
         'continue_tree',
         'not_divergence',
     ])
