@@ -53,6 +53,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions
+from tensorflow_probability.python import util as tfp_util
 
 
 _DifferentialEvolutionOptimizerResults = collections.namedtuple(
@@ -180,7 +181,7 @@ def one_step(
     if population_values is None:
       population_values = objective_function(*population)
     population_size = tf.shape(input=population[0])[0]
-    seed_stream = distributions.SeedStream(seed, salt='one_step')
+    seed_stream = tfp_util.SeedStream(seed, salt='one_step')
     mixing_indices = _get_mixing_indices(population_size, seed=seed_stream())
     # Construct the mutated solution vectors. There is one for each member of
     # the population.
@@ -585,7 +586,7 @@ def _get_starting_population(initial_population,
   if initial_population is not None:
     return [tf.convert_to_tensor(value=part) for part in initial_population]
   # Constructs the population by adding normal noise to the initial position.
-  seed_stream = distributions.SeedStream(seed, salt='get_starting_population')
+  seed_stream = tfp_util.SeedStream(seed, salt='get_starting_population')
   population = []
   for part in initial_position:
     part = tf.convert_to_tensor(value=part)
@@ -640,7 +641,7 @@ def _binary_crossover(population,
     The recombined population.
   """
   sizes = [tf.cast(tf.size(input=x), dtype=tf.float64) for x in population]
-  seed_stream = distributions.SeedStream(seed, salt='binary_crossover')
+  seed_stream = tfp_util.SeedStream(seed, salt='binary_crossover')
   force_crossover_group = distributions.Categorical(sizes).sample(
       [population_size, 1], seed=seed_stream())
   recombinants = []
@@ -739,7 +740,7 @@ def _get_mixing_indices(size, seed=None, name=None):
       name, default_name='get_mixing_indices', values=[size]):
     size = tf.convert_to_tensor(value=size)
     dtype = size.dtype
-    seed_stream = distributions.SeedStream(seed, salt='get_mixing_indices')
+    seed_stream = tfp_util.SeedStream(seed, salt='get_mixing_indices')
     first = tf.random.uniform([size],
                               maxval=size-1,
                               dtype=dtype,

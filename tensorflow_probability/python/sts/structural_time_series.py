@@ -23,7 +23,7 @@ import collections
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions
+from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.sts.internal import util as sts_util
 
@@ -193,7 +193,7 @@ class StructuralTimeSeries(object):
         `params_sample_shape + prior.batch_shape + prior.event_shape`.
     """
 
-    seed = distributions.SeedStream(
+    seed = tfp_util.SeedStream(
         seed, salt='StructuralTimeSeries_prior_sample')
 
     with tf1.name_scope(

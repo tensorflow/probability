@@ -45,6 +45,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/mcmc:kernel",
         "//tensorflow_probability/python/mcmc/internal",
+        "//tensorflow_probability/python/util",
     ],
 )
 
