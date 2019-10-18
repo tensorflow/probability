@@ -115,10 +115,12 @@ TreeDoublingMetaState = collections.namedtuple(
     [
         'candidate_state',  # A namedtuple of TreeDoublingStateCandidate
         'is_accepted',
-        'momentum_sum',     # sum of momentum of the current tree for
+        'momentum_sum',     # Sum of momentum of the current tree for
                             # generalized U turn criteria
-        'energy_diff_sum',  # sum of the energy differences (H' - H0) within the
-                            # single subtree
+        'energy_diff_sum',  # Sum of the energy differences (H' - H0) between
+                            # the states explored within the subtree and the
+                            # initial state. We use this to approximate the
+                            # Metropolis acceptance ratio
         'leapfrog_count',   # How many leapfrogs each chain has taken
         'continue_tree',
         'not_divergence',
@@ -315,7 +317,7 @@ class NoUTurnSampler(TransitionKernel):
       initial_step_state = tf.nest.map_structure(_copy, initial_state)
 
       if MULTINOMIAL_SAMPLE:
-        init_weight = tf.zeros_like(init_energy)
+        init_weight = tf.zeros_like(init_energy)  # log(exp(H0 - H0))
       else:
         init_weight = tf.ones_like(init_energy, dtype=TREE_COUNT_DTYPE)
 
@@ -537,11 +539,25 @@ class NoUTurnSampler(TransitionKernel):
           momentum_state_memory)
 
       last_candidate_state = initial_step_metastate.candidate_state
-      tree_weight = candidate_tree_state.weight
+
+      energy_diff_tree_sum = tf.where(
+          continue_tree_final,
+          energy_diff_tree_sum,
+          tf.zeros_like(energy_diff_tree_sum))
+      energy_diff_sum = (
+          energy_diff_tree_sum + initial_step_metastate.energy_diff_sum)
       if MULTINOMIAL_SAMPLE:
+        tree_weight = tf.where(
+            continue_tree_final,
+            candidate_tree_state.weight,
+            tf.constant(-np.inf, dtype=candidate_tree_state.weight.dtype))
         weight_sum = log_add_exp(tree_weight, last_candidate_state.weight)
         log_accept_thresh = tree_weight - last_candidate_state.weight
       else:
+        tree_weight = tf.where(
+            continue_tree_final,
+            candidate_tree_state.weight,
+            tf.zeros([], dtype=TREE_COUNT_DTYPE))
         weight_sum = tree_weight + last_candidate_state.weight
         log_accept_thresh = tf.math.log(
             tf.cast(tree_weight, tf.float32) /
@@ -644,8 +660,7 @@ class NoUTurnSampler(TransitionKernel):
           candidate_state=new_candidate_state,
           is_accepted=choose_new_state | initial_step_metastate.is_accepted,
           momentum_sum=momentum_tree_cumsum,
-          energy_diff_sum=(
-              energy_diff_tree_sum + initial_step_metastate.energy_diff_sum),
+          energy_diff_sum=energy_diff_sum,
           continue_tree=continue_tree_final & no_u_turns_trajectory,
           not_divergence=final_not_divergence,
           leapfrog_count=(initial_step_metastate.leapfrog_count +
@@ -857,7 +872,7 @@ class NoUTurnSampler(TransitionKernel):
           energy=tf.where(
               _rightmost_expand_to_rank(is_sample_accepted,
                                         prefer_static.rank(next_target)),
-              current_energy, init_energy),
+              current_energy, candidate_tree_state.energy),
           weight=weight_sum)
 
       continue_tree = not_divergent & continue_tree_previous
@@ -902,6 +917,8 @@ def has_not_u_turn_at_all_index(read_indexes, direction, momentum_state_memory,
         tf.gather(x, left_current_index, axis=0)
         for x in momentum_state_memory.state_swap
     ]
+    # Note that in generalized u turn, state_diff is actually the cumulated sum
+    # of the momentum.
     state_diff = [s1 - s2 for s1, s2 in zip(state_right, state_left)]
     if not GENERALIZED_UTURN:
       state_diff = [tf.where(d, m, -m) for d, m in zip(direction, state_diff)]
