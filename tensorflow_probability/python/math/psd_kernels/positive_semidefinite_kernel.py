@@ -320,7 +320,7 @@ class PositiveSemidefiniteKernel(tf.Module):
         with tf.control_dependencies(deps) as deps_scope:
           yield deps_scope
 
-  def apply(self, x1, x2, example_ndims=0):
+  def apply(self, x1, x2, example_ndims=0, name='apply'):
     """Apply the kernel function pairs of inputs.
 
     Args:
@@ -342,6 +342,7 @@ class PositiveSemidefiniteKernel(tf.Module):
         batch shape with input batch shapes works. The kernel batch shape will
         be broadcast against everything to the left of the combined example and
         feature dimensions in the input shapes.
+      name: name to give to the op
 
     Returns:
       `Tensor` containing the results of applying the kernel function to inputs
@@ -426,23 +427,25 @@ class PositiveSemidefiniteKernel(tf.Module):
     # ==> [2, 5]
 
     """
-    with self._name_and_control_scope(self._name):
+    with self._name_and_control_scope(name):
       x1 = tf.convert_to_tensor(x1, name='x1', dtype_hint=self.dtype)
       x2 = tf.convert_to_tensor(x2, name='x2', dtype_hint=self.dtype)
+      return self._call_apply(x1, x2, example_ndims=example_ndims)
 
-      should_expand_dims = (example_ndims == 0)
+  def _call_apply(self, x1, x2, example_ndims):
+    should_expand_dims = (example_ndims == 0)
 
-      if should_expand_dims:
-        example_ndims += 1
-        x1 = tf.expand_dims(x1, -(self.feature_ndims + 1))
-        x2 = tf.expand_dims(x2, -(self.feature_ndims + 1))
+    if should_expand_dims:
+      example_ndims += 1
+      x1 = tf.expand_dims(x1, -(self.feature_ndims + 1))
+      x2 = tf.expand_dims(x2, -(self.feature_ndims + 1))
 
-      result = self._apply(x1, x2, example_ndims=example_ndims)
+    result = self._apply(x1, x2, example_ndims=example_ndims)
 
-      if should_expand_dims:
-        result = tf.squeeze(result, axis=-1)
+    if should_expand_dims:
+      result = tf.squeeze(result, axis=-1)
 
-      return result
+    return result
 
   def _apply(self, x1, x2, example_ndims=1):
     """Apply the kernel function to a pair of (batches of) inputs.
@@ -488,7 +491,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     raise NotImplementedError(
         'Subclasses must provide `_apply` implementation.')
 
-  def matrix(self, x1, x2):
+  def matrix(self, x1, x2, name='matrix'):
     """Construct (batched) matrices from (batches of) collections of inputs.
 
     Args:
@@ -504,6 +507,7 @@ class PositiveSemidefiniteKernel(tf.Module):
         and `F` (the feature shape) must have rank equal to the kernel's
         `feature_ndims` property. Batch shape must broadcast with the batch
         shape of `x1` and with the kernel's batch shape.
+      name: name to give to the op
 
     Returns:
       `Tensor` containing the matrix (possibly batched) of kernel applications
@@ -649,13 +653,19 @@ class PositiveSemidefiniteKernel(tf.Module):
     parameters, to each of a batch of 10 pairs of input lists.
 
     """
-    with self._name_and_control_scope(self._name):
+    with self._name_and_control_scope(name):
       x1 = tf.convert_to_tensor(x1, name='x1', dtype_hint=self.dtype)
       x2 = tf.convert_to_tensor(x2, name='x2', dtype_hint=self.dtype)
+      return self._matrix(x1, x2)
 
-      return self.tensor(x1, x2, x1_example_ndims=1, x2_example_ndims=1)
+  def _matrix(self, x1, x2):
+    x1 = util.pad_shape_with_ones(
+        x1, ndims=1, start=-(self.feature_ndims + 1))
+    x2 = util.pad_shape_with_ones(
+        x2, ndims=1, start=-(self.feature_ndims + 2))
+    return self._call_apply(x1, x2, example_ndims=2)
 
-  def tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
+  def tensor(self, x1, x2, x1_example_ndims, x2_example_ndims, name='tensor'):
     """Construct (batched) tensors from (batches of) collections of inputs.
 
     Args:
@@ -681,6 +691,7 @@ class PositiveSemidefiniteKernel(tf.Module):
         batch shapes and the shape of the final output of the function.
         Everything left of the feature shape and the example dims in `x1` is
         considered "batch shape", and must broadcast as specified above.
+      name: name to give to the op
 
     Returns:
       `Tensor` containing (possibly batched) kernel applications to pairs from
@@ -807,22 +818,25 @@ class PositiveSemidefiniteKernel(tf.Module):
     ```
 
     """
-    with self._name_and_control_scope(self._name):
+    with self._name_and_control_scope(name):
       x1 = tf.convert_to_tensor(x1, name='x1', dtype_hint=self.dtype)
       x2 = tf.convert_to_tensor(x2, name='x2', dtype_hint=self.dtype)
 
-      x1 = util.pad_shape_with_ones(
-          x1,
-          ndims=x2_example_ndims,
-          start=-(self.feature_ndims + 1))
+      return self._tensor(x1, x2, x1_example_ndims, x2_example_ndims)
 
-      x2 = util.pad_shape_with_ones(
-          x2,
-          ndims=x1_example_ndims,
-          start=-(self.feature_ndims + 1 + x2_example_ndims))
+  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
+    x1 = util.pad_shape_with_ones(
+        x1,
+        ndims=x2_example_ndims,
+        start=-(self.feature_ndims + 1))
 
-      return self.apply(
-          x1, x2, example_ndims=(x1_example_ndims + x2_example_ndims))
+    x2 = util.pad_shape_with_ones(
+        x2,
+        ndims=x1_example_ndims,
+        start=-(self.feature_ndims + 1 + x2_example_ndims))
+
+    return self._call_apply(
+        x1, x2, example_ndims=(x1_example_ndims + x2_example_ndims))
 
   def _batch_shape(self):
     raise NotImplementedError('Subclasses must provide batch_shape property.')
