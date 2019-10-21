@@ -150,7 +150,7 @@ def name(dtype):
 def size(dtype):
   """Returns the number of bytes to represent this `dtype`."""
   dtype = tf.as_dtype(dtype)
-  if hasattr(dtype, 'size'):
+  if hasattr(dtype, 'size') and hasattr(dtype, 'as_numpy_dtype'):
     return dtype.size
   return np.dtype(dtype).itemsize
 

@@ -149,7 +149,17 @@ class FloatDTypeTest(tfp_test_util.TestCase):
     self.assertRaises(ValueError, dtype_util.assert_same_float_dtype,
                       [const_int])
 
+  def test_size(self):
+    self.assertEqual(dtype_util.size(tf.int32), 4)
+    self.assertEqual(dtype_util.size(tf.int64), 8)
+    self.assertEqual(dtype_util.size(tf.float32), 4)
+    self.assertEqual(dtype_util.size(tf.float64), 8)
+
+    self.assertEqual(dtype_util.size(np.int32), 4)
+    self.assertEqual(dtype_util.size(np.int64), 8)
+    self.assertEqual(dtype_util.size(np.float32), 4)
+    self.assertEqual(dtype_util.size(np.float64), 8)
+
 
 if __name__ == '__main__':
   tf.test.main()
-
