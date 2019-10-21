@@ -153,7 +153,7 @@ class MultivariateNormalDiagPlusLowRankTest(tfp_test_util.TestCase):
 
     n = int(30e3)
     samps = dist.sample(
-        n, seed=tfp_test_util.test_seed(hardcoded_seed=0, set_eager_seed=False))
+        n, seed=tfp_test_util.test_seed())
     sample_mean = tf.reduce_mean(input_tensor=samps, axis=0)
     x = samps - sample_mean
     sample_covariance = tf.matmul(x, x, transpose_a=True) / n
@@ -314,50 +314,50 @@ class MultivariateNormalDiagPlusLowRankTest(tfp_test_util.TestCase):
         2, "kl_chol_diag_baseline:  analytical:{}  sample:{}".format(
             analytical_kl_chol_diag_baseline_, sample_kl_chol_diag_baseline_))
 
-    self.assertAllClose(true_mean, sample_mean_, atol=0., rtol=0.02)
+    self.assertAllClose(true_mean, sample_mean_, atol=0., rtol=0.05)
     self.assertAllClose(true_mean, analytical_mean_, atol=0., rtol=1e-6)
 
-    self.assertAllClose(true_covariance, sample_covariance_, atol=0., rtol=0.02)
+    self.assertAllClose(true_covariance, sample_covariance_, atol=0., rtol=0.06)
     self.assertAllClose(
         true_covariance, analytical_covariance_, atol=0., rtol=1e-6)
 
-    self.assertAllClose(true_variance, sample_variance_, atol=0., rtol=0.02)
+    self.assertAllClose(true_variance, sample_variance_, atol=0., rtol=0.05)
     self.assertAllClose(true_variance, analytical_variance_, atol=0., rtol=1e-6)
 
-    self.assertAllClose(true_stddev, sample_stddev_, atol=0., rtol=0.02)
+    self.assertAllClose(true_stddev, sample_stddev_, atol=0., rtol=0.05)
     self.assertAllClose(true_stddev, analytical_stddev_, atol=0., rtol=1e-6)
 
     self.assertAllClose(true_scale, scale_, atol=0., rtol=1e-6)
 
     self.assertAllClose(
-        sample_kl_identity_, analytical_kl_identity_, atol=0., rtol=0.02)
+        sample_kl_identity_, analytical_kl_identity_, atol=0., rtol=0.05)
     self.assertAllClose(
-        sample_kl_scaled_, analytical_kl_scaled_, atol=0., rtol=0.02)
+        sample_kl_scaled_, analytical_kl_scaled_, atol=0., rtol=0.05)
     self.assertAllClose(
-        sample_kl_diag_, analytical_kl_diag_, atol=0., rtol=0.02)
+        sample_kl_diag_, analytical_kl_diag_, atol=0., rtol=0.05)
     self.assertAllClose(
-        sample_kl_chol_, analytical_kl_chol_, atol=0., rtol=0.02)
+        sample_kl_chol_, analytical_kl_chol_, atol=0., rtol=0.05)
 
     self.assertAllClose(
         sample_kl_identity_diag_baseline_,
         analytical_kl_identity_diag_baseline_,
         atol=0.,
-        rtol=0.02)
+        rtol=0.05)
     self.assertAllClose(
         sample_kl_scaled_diag_baseline_,
         analytical_kl_scaled_diag_baseline_,
         atol=0.,
-        rtol=0.02)
+        rtol=0.05)
     self.assertAllClose(
         sample_kl_diag_diag_baseline_,
         analytical_kl_diag_diag_baseline_,
         atol=0.,
-        rtol=0.04)
+        rtol=0.05)
     self.assertAllClose(
         sample_kl_chol_diag_baseline_,
         analytical_kl_chol_diag_baseline_,
         atol=0.,
-        rtol=0.02)
+        rtol=0.05)
 
   def testImplicitLargeDiag(self):
     mu = np.array([[1., 2, 3],
