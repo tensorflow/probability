@@ -78,12 +78,12 @@ class VectorLaplaceDiagTest(tfp_test_util.TestCase):
     mu = [-1., 1]
     diag = [1., -2]
     dist = tfd.VectorLaplaceDiag(mu, diag, validate_args=True)
-    seed = tfp_test_util.test_seed(hardcoded_seed=0, set_eager_seed=False)
-    samps = self.evaluate(dist.sample(int(1e4), seed=seed))
+    seed = tfp_test_util.test_seed()
+    samps = self.evaluate(dist.sample(int(2e4), seed=seed))
     cov_mat = 2. * self.evaluate(tf.linalg.diag(diag))**2
 
-    self.assertAllClose(mu, samps.mean(axis=0), atol=0., rtol=0.05)
-    self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.05, rtol=0.05)
+    self.assertAllClose(mu, samps.mean(axis=0), atol=0., rtol=0.10)
+    self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.15, rtol=0.10)
 
   def testSingularScaleRaises(self):
     mu = [-1., 1]
