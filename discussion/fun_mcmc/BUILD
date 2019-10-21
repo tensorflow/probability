@@ -110,6 +110,6 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
-        "//third_party/tensorflow/compiler/jit",
+        # tensorflow/compiler/jit dep,
     ],
 )

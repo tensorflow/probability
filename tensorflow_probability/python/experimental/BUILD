@@ -32,6 +32,7 @@ py_library(
     deps = [
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/experimental/edward2",
+        "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/mcmc",
         "//tensorflow_probability/python/experimental/substrates",
         "//tensorflow_probability/python/experimental/vi",

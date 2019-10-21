@@ -33,6 +33,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.experimental import auto_batching
 from tensorflow_probability.python.experimental import edward2
+from tensorflow_probability.python.experimental import linalg
 from tensorflow_probability.python.experimental import mcmc
 from tensorflow_probability.python.experimental import substrates
 from tensorflow_probability.python.experimental import vi
@@ -42,6 +43,7 @@ from tensorflow.python.util.all_util import remove_undocumented  # pylint: disab
 _allowed_symbols = [
     'auto_batching',
     'edward2',
+    'linalg',
     'mcmc',
     'substrates',
     'vi',
