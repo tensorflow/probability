@@ -45,6 +45,7 @@ TEST_FILENAMES = []
 [py_library(
     name = filename,
     srcs = ["{}.py".format(filename)],
+    srcs_version = "PY2AND3",
     deps = [
         "//tensorflow_probability/python/internal/backend/numpy",
     ],
@@ -64,5 +65,6 @@ TEST_FILENAMES = []
 py_library(
     name = "stats",
     srcs = ["__init__.py"],
+    srcs_version = "PY2AND3",
     deps = [":{}".format(filename) for filename in FILENAMES],
 )
