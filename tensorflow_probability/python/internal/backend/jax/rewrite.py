@@ -43,7 +43,12 @@ def main(argv):
   contents = contents.replace('np.bool', 'onp.bool')
   contents = contents.replace('np.dtype', 'onp.dtype')
   contents = contents.replace('np.generic', 'onp.generic')
+
   contents = contents.replace('np.broadcast', 'onp.broadcast')
+  # so as to fixup np.broadcast_arrays or np.broadcast_to
+  contents = contents.replace('onp.broadcast_arrays', 'np.broadcast_arrays')
+  contents = contents.replace('onp.broadcast_to', 'np.broadcast_to')
+
   contents = contents.replace('JAX_MODE = False', 'JAX_MODE = True')
   contents = contents.replace('NumpyTest', 'JaxTest')
 
