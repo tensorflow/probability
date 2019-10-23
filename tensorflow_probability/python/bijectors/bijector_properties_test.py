@@ -246,9 +246,8 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
             enable_vars=enable_vars))
     bijector_params = {'diag_bijector': underlying}
   elif bijector_name == 'Inline':
-    scale = draw(hps.sampled_from(np.float32([1., -1., 2, -2.])))
-    if enable_vars:
-      scale = tf.Variable(scale, name='scale')
+    scale = draw(tfp_hps.maybe_variable(
+        hps.sampled_from(np.float32([1., -1., 2, -2.])), enable_vars))
     b = tfb.Scale(scale=scale)
 
     bijector_params = dict(
@@ -261,17 +260,21 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
         is_increasing=b._internal_is_increasing,  # pylint: disable=protected-access
     )
   elif bijector_name == 'DiscreteCosineTransform':
-    bijector_params = {'dct_type': draw(hps.integers(min_value=2, max_value=3))}
+    dct_type = hps.integers(min_value=2, max_value=3)
+    bijector_params = {'dct_type': draw(dct_type)}
   elif bijector_name == 'PowerTransform':
-    bijector_params = {'power': draw(hps.floats(min_value=1e-6, max_value=10.))}
+    power = hps.floats(min_value=1e-6, max_value=10.)
+    bijector_params = {'power': draw(power)}
   elif bijector_name == 'Permute':
     event_ndims = draw(hps.integers(min_value=1, max_value=2))
-    axis = draw(hps.integers(min_value=-event_ndims, max_value=-1))
+    axis = hps.integers(min_value=-event_ndims, max_value=-1)
     # This is a permutation of dimensions within an axis.
     # (Contrast with `Transpose` below.)
     bijector_params = {
-        'axis': axis,
-        'permutation': draw(hps.permutations(np.arange(event_dim)))
+        'axis': draw(axis),
+        'permutation': draw(tfp_hps.maybe_variable(
+            hps.permutations(np.arange(event_dim)), enable_vars,
+            dtype=tf.int32))
     }
   elif bijector_name == 'Reshape':
     event_shape_out = draw(tfp_hps.shapes(min_ndims=1))

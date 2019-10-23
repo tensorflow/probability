@@ -409,18 +409,50 @@ def broadcasting_params(draw,
     # instead of this explicit `constrained_tensors` function?
     param_strategy = constrained_tensors(
         constraint_fn_for(param), param_shape, dtype=dtype)
-    params_kwargs[param] = tf.convert_to_tensor(
-        draw(param_strategy), dtype_hint=dtype, name=param)
-    if enable_vars and draw(hps.booleans()):
-      params_kwargs[param] = tf.Variable(params_kwargs[param], name=param)
-      alt_value = tf.convert_to_tensor(
-          draw(param_strategy),
-          dtype_hint=dtype,
-          name='{}_alt_value'.format(param))
-      setattr(params_kwargs[param], '_tfp_alt_value', alt_value)
-      if draw(hps.booleans()):
-        params_kwargs[param] = defer_and_count_usage(params_kwargs[param])
+    params_kwargs[param] = draw(maybe_variable(
+        param_strategy, enable_vars=enable_vars, dtype=dtype, name=param))
   return params_kwargs
+
+
+@hps.composite
+def maybe_variable(draw,
+                   strategy,
+                   enable_vars=False,
+                   dtype=None,
+                   name=None):
+  """Strategy for drawing objects that should sometimes be tf.Variables.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    strategy: Hypothesis strategy for drawing suitable values
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test. If `False`, the returned parameters are
+      never {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}.
+    dtype: Dtype for generated parameters.
+    name: Name for the produced `Tensor`s and `Variable`s, if any.
+
+  Returns:
+    strategy: A Hypothesis strategy for drawing a value, `tf.Variable`,
+      `tfp.util.DeferredTensor`, or `tfp.util.TransformedVariable`.  The
+      `DeferredTensor`s are sometimes instrumented to count how many times they
+      are concretized.
+  """
+  result = tf.convert_to_tensor(draw(strategy), dtype_hint=dtype, name=name)
+  if enable_vars and draw(hps.booleans()):
+    result = tf.Variable(result, name=name)
+    if name is None:
+      alt_name = None
+    else:
+      alt_name = '{}_alt_value'.format(name)
+    alt_value = tf.convert_to_tensor(
+        draw(strategy), dtype_hint=dtype, name=alt_name)
+    # This field provides an acceptable alternate value, to enable tests that
+    # mutate the Variable (once).
+    setattr(result, '_tfp_alt_value', alt_value)
+    if draw(hps.booleans()):
+      result = defer_and_count_usage(result)
+  return result
 
 
 @hps.composite
