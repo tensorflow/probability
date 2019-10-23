@@ -882,7 +882,7 @@ class DistributionParamsAreVarsTest(tfp_test_util.TestCase):
     # than twice (once in the stat itself and up to once in any validation
     # assertions).
     max_permissible = 2 + extra_tensor_conversions_allowed(dist)
-    for stat in data.draw(
+    for stat in sorted(data.draw(
         hps.sets(
             hps.one_of(
                 map(hps.just, [
@@ -890,7 +890,7 @@ class DistributionParamsAreVarsTest(tfp_test_util.TestCase):
                     'variance'
                 ])),
             min_size=3,
-            max_size=3)):
+            max_size=3))):
       hp.note('Testing excessive var usage in {}.{}'.format(dist_name, stat))
       try:
         with tfp_hps.assert_no_excessive_var_usage(
@@ -964,7 +964,7 @@ class DistributionParamsAreVarsTest(tfp_test_util.TestCase):
 
     # Test that all forms of probability evaluation avoid reading distribution
     # parameters more than once.
-    for evaluative in data.draw(
+    for evaluative in sorted(data.draw(
         hps.sets(
             hps.one_of(
                 map(hps.just, [
@@ -972,7 +972,7 @@ class DistributionParamsAreVarsTest(tfp_test_util.TestCase):
                     'log_survival_function', 'survival_function'
                 ])),
             min_size=3,
-            max_size=3)):
+            max_size=3))):
       hp.note('Testing excessive var usage in {}.{}'.format(
           dist_name, evaluative))
       try:
