@@ -30,7 +30,6 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.eager import context  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.eager import def_function  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import combinations as tf_combinations  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import test_combinations as tf_test_combinations  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -277,14 +276,14 @@ class TestCombinationsTest(tfp_test_util.TestCase):
       test_combinations=[
           tfp_test_util.ExecuteFunctionsEagerlyCombination()])
   def test_tf_function_enabled_mode_combination(self):
-    self.assertFalse(def_function.RUN_FUNCTIONS_EAGERLY)
+    self.assertFalse(tf.config.experimental_functions_run_eagerly())
 
   @tf_test_combinations.generate(
       tf_test_combinations.combine(tf_function='disabled'),
       test_combinations=[
           tfp_test_util.ExecuteFunctionsEagerlyCombination()])
   def test_tf_function_disabled_mode_combination(self):
-    self.assertTrue(def_function.RUN_FUNCTIONS_EAGERLY)
+    self.assertTrue(tf.config.experimental_functions_run_eagerly())
 
 
 if __name__ == '__main__':

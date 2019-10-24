@@ -31,7 +31,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.eager import def_function  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import combinations  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import test_combinations  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
@@ -173,7 +172,7 @@ def _tf_function_mode_context(tf_function_mode):
     raise ValueError(
         'Only allowable values for tf_function_mode_context are `enabled` and '
         '`disabled`; but got `{}`'.format(tf_function_mode))
-  original_mode = def_function.RUN_FUNCTIONS_EAGERLY
+  original_mode = tf.config.experimental_functions_run_eagerly()
   try:
     tf.config.experimental_run_functions_eagerly(tf_function_mode == 'disabled')
     yield
