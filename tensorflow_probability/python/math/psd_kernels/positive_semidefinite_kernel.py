@@ -821,7 +821,9 @@ class PositiveSemidefiniteKernel(tf.Module):
     with self._name_and_control_scope(name):
       x1 = tf.convert_to_tensor(x1, name='x1', dtype_hint=self.dtype)
       x2 = tf.convert_to_tensor(x2, name='x2', dtype_hint=self.dtype)
-
+      # Specialize to the matrix computation.
+      if x1_example_ndims == 1 and x2_example_ndims == 1:
+        return self._matrix(x1, x2)
       return self._tensor(x1, x2, x1_example_ndims, x2_example_ndims)
 
   def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
@@ -1013,6 +1015,14 @@ class _SumKernel(PositiveSemidefiniteKernel):
   def _apply(self, x1, x2, example_ndims=0):
     return sum([k.apply(x1, x2, example_ndims) for k in self.kernels])
 
+  def _matrix(self, x1, x2):
+    return sum([k.matrix(x1, x2) for k in self.kernels])
+
+  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
+    return sum([
+        k.tensor(
+            x1, x2, x1_example_ndims, x2_example_ndims) for k in self.kernels])
+
   def _batch_shape(self):
     return functools.reduce(tf.broadcast_static_shape,
                             [k.batch_shape for k in self.kernels])
@@ -1083,6 +1093,16 @@ class _ProductKernel(PositiveSemidefiniteKernel):
     return functools.reduce(
         operator.mul,
         [k.apply(x1, x2, example_ndims) for k in self.kernels])
+
+  def _matrix(self, x1, x2):
+    return functools.reduce(
+        operator.mul, [k.matrix(x1, x2) for k in self.kernels])
+
+  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
+    return functools.reduce(
+        operator.mul,
+        [k.tensor(
+            x1, x2, x1_example_ndims, x2_example_ndims) for k in self.kernels])
 
   def _batch_shape(self):
     return functools.reduce(tf.broadcast_static_shape,

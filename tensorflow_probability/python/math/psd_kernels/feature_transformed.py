@@ -115,6 +115,19 @@ class FeatureTransformed(PositiveSemidefiniteKernel):
             x2, self.feature_ndims, example_ndims),
         example_ndims)
 
+  def _matrix(self, x1, x2):
+    return self._kernel.matrix(
+        self._transformation_fn(x1, self.feature_ndims, 1),
+        self._transformation_fn(x2, self.feature_ndims, 1))
+
+  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
+    return self._kernel.tensor(
+        self._transformation_fn(
+            x1, self.feature_ndims, x1_example_ndims),
+        self._transformation_fn(
+            x2, self.feature_ndims, x2_example_ndims),
+        x1_example_ndims, x2_example_ndims)
+
   @property
   def kernel(self):
     """Base kernel to pass transformed inputs."""
