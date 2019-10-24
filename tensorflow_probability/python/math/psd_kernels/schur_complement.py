@@ -285,21 +285,13 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
     div_mat_chol = util.pad_shape_with_ones(div_mat_chol, example_ndims - 1, -3)
     div_mat_chol_linop = tf.linalg.LinearOperatorLowerTriangular(div_mat_chol)
 
+    # Shape: bc(Bz, Bk, B2) + E1 + [ez]
+    cholinv_kz1 = tf.linalg.matrix_transpose(
+        div_mat_chol_linop.solve(k1z, adjoint_arg=True))
     # Shape: bc(Bz, Bk, B2) + E2 + [ez]
-    kzzinv_kz2 = tf.linalg.matrix_transpose(
-        # Shape: bc(Bz, Bk, B2) + E2[:-1] + [ez] + E2[-1]
-        div_mat_chol_linop.solve(
-            # Shape: bc(Bz, Bk, B2) + E2[:-1] + [ez] + E2[-1]
-            div_mat_chol_linop.solve(k2z, adjoint_arg=True),
-            adjoint=True))
-
-    # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2)
-    k1z_kzzinv_kz2 = tf.reduce_sum(
-        # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2) + [ez]
-        input_tensor=k1z * kzzinv_kz2,
-        axis=-1)  # we can safely always reduce just this one trailing dim,
-                  # since self.fixed_inputs is presumed to have example_ndims
-                  # exactly 1.
+    cholinv_kz2 = tf.linalg.matrix_transpose(
+        div_mat_chol_linop.solve(k2z, adjoint_arg=True))
+    k1z_kzzinv_kz2 = tf.reduce_sum(cholinv_kz1 * cholinv_kz2, axis=-1)
 
     # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2)
     return k12 - k1z_kzzinv_kz2
