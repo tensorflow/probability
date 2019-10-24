@@ -64,6 +64,7 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import Line
 from tensorflow_probability.python.distributions.lkj import LKJ
 from tensorflow_probability.python.distributions.logistic import Logistic
 from tensorflow_probability.python.distributions.lognormal import LogNormal
+from tensorflow_probability.python.distributions.logitnormal import LogitNormal
 from tensorflow_probability.python.distributions.mixture import Mixture
 from tensorflow_probability.python.distributions.mixture_same_family import MixtureSameFamily
 from tensorflow_probability.python.distributions.multinomial import Multinomial
@@ -214,6 +215,7 @@ __all__ = [
     'LKJ',
     'Logistic',
     'LogNormal',
+    'LogitNormal',
     'NegativeBinomial',
     'Normal',
     'Poisson',

@@ -72,6 +72,7 @@ FILENAMES = [
     "lkj",
     "logistic",
     "lognormal",
+    "logitnormal",
     "mixture",
     "mixture_same_family",
     "multinomial",

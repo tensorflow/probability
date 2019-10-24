@@ -76,6 +76,7 @@ py_library(
         ":linear_gaussian_ssm",
         ":lkj",
         ":logistic",
+        ":logitnormal",
         ":lognormal",
         ":mixture",
         ":mixture_same_family",
@@ -794,6 +795,18 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:exp",
+    ],
+)
+
+py_library(
+    name = "logitnormal",
+    srcs = ["logitnormal.py"],
+    deps = [
+        ":normal",
+        ":transformed_distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:sigmoid",
     ],
 )
 
@@ -1993,6 +2006,18 @@ py_test(
     name = "lognormal_test",
     size = "small",
     srcs = ["lognormal_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "logitnormal_test",
+    size = "small",
+    srcs = ["logitnormal_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
