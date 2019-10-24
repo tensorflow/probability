@@ -29,10 +29,10 @@ import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.framework import combinations  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.framework import test_combinations  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.eager import context  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -157,27 +157,50 @@ def _tf_function_mode_context(tf_function_mode):
   exiting the context, the mode is returned to its original state.
 
   Args:
-    tf_function_mode: a Python `str`, either 'disabled' or 'enabled'. If
-    'enabled', `@tf.function`-decorated code behaves as usual (ie, a background
-    graph is created). If 'disabled', `@tf.function`-decorated code will behave
-    as if it had not been `@tf.function`-decorated. Since users will be able to
-    do this (e.g., to debug library code that has been
+    tf_function_mode: a Python `str`, either 'no_tf_function' or ''.
+    If '', `@tf.function`-decorated code behaves as usual (ie, a
+    background graph is created). If 'no_tf_function', `@tf.function`-decorated
+    code will behave as if it had not been `@tf.function`-decorated. Since users
+    will be able to do this (e.g., to debug library code that has been
     `@tf.function`-decorated), we need to ensure our tests cover the behavior
     when this is the case.
 
   Yields:
     None
   """
-  if tf_function_mode not in ['enabled', 'disabled']:
+  if tf_function_mode not in ['', 'no_tf_function']:
     raise ValueError(
-        'Only allowable values for tf_function_mode_context are `enabled` and '
-        '`disabled`; but got `{}`'.format(tf_function_mode))
+        'Only allowable values for tf_function_mode_context are "" '
+        'and "no_tf_function"; but got "{}"'.format(tf_function_mode))
   original_mode = tf.config.experimental_functions_run_eagerly()
   try:
-    tf.config.experimental_run_functions_eagerly(tf_function_mode == 'disabled')
+    tf.config.experimental_run_functions_eagerly(tf_function_mode ==
+                                                 'no_tf_function')
     yield
   finally:
     tf.config.experimental_run_functions_eagerly(original_mode)
+
+
+class EagerGraphCombination(test_combinations.TestCombination):
+  """Run the test in Graph or Eager mode.  Graph is the default.
+
+  The optional `mode` parameter controls the test's execution mode.  Its
+  accepted values are "graph" or "eager" literals.
+  """
+
+  def context_managers(self, kwargs):
+    # TODO(isaprykin): Switch the default to eager.
+    mode = kwargs.pop('mode', 'graph')
+    if mode == 'eager':
+      return [context.eager_mode()]
+    elif mode == 'graph':
+      return [tf1.Graph().as_default(), context.graph_mode()]
+    else:
+      raise ValueError(
+          '`mode` must be "eager" or "graph". Got: "{}"'.format(mode))
+
+  def parameter_modifiers(self):
+    return [test_combinations.OptionalParameter('mode')]
 
 
 class ExecuteFunctionsEagerlyCombination(test_combinations.TestCombination):
@@ -187,13 +210,13 @@ class ExecuteFunctionsEagerlyCombination(test_combinations.TestCombination):
   'tensorflow/python/framework/test_combinations.py' in the TensorFlow code
   base.
 
-  This `TestCombination` supports two values for the `tf_function`
-  combination argument: 'disabled' and 'enabled'. The mode switching is
-  performed using `tf.experimental_run_functions_eagerly(mode)`.
+  This `TestCombination` supports two values for the `tf_function` combination
+  argument: 'no_tf_function' and ''. The mode switching is performed using
+  `tf.experimental_run_functions_eagerly(mode)`.
   """
 
   def context_managers(self, kwargs):
-    mode = kwargs.pop('tf_function', 'enabled')
+    mode = kwargs.pop('tf_function', '')
     return [_tf_function_mode_context(mode)]
 
   def parameter_modifiers(self):
@@ -227,11 +250,11 @@ def test_all_tf_execution_regimes(test_class_or_method=None):
   """
   decorator = test_combinations.generate(
       (test_combinations.combine(mode='graph',
-                                 tf_function='enabled') +
-       test_combinations.combine(mode='eager',
-                                 tf_function=['enabled', 'disabled'])),
+                                 tf_function='') +
+       test_combinations.combine(
+           mode='eager', tf_function=['', 'no_tf_function'])),
       test_combinations=[
-          combinations.EagerGraphCombination(),
+          EagerGraphCombination(),
           ExecuteFunctionsEagerlyCombination(),
       ])
 
@@ -262,7 +285,7 @@ def test_graph_and_eager_modes(test_class_or_method=None):
   """
   decorator = test_combinations.generate(
       test_combinations.combine(mode=['graph', 'eager']),
-      test_combinations=[combinations.EagerGraphCombination()])
+      test_combinations=[EagerGraphCombination()])
 
   if test_class_or_method:
     return decorator(test_class_or_method)

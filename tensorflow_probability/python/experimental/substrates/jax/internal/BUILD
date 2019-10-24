@@ -34,6 +34,7 @@ FILENAMES = [
     "prefer_static",
     "special_math",
     "tensor_util",
+    "test_combinations",
     "test_util",
 ]
 
@@ -48,8 +49,9 @@ TAP_WHITELIST = ["{}_test".format(f) for f in (
 DEPS = {
     "distribution_util": [":prefer_static"],
     "test_util": [
+        ":dtype_util",
+        ":test_combinations",
         "//tensorflow_probability/python/experimental/substrates/jax/util:seed_stream",
-        "//tensorflow_probability/python/experimental/substrates/jax/internal:dtype_util",
     ],
     "special_math": [
         "//tensorflow_probability/python/experimental/substrates/jax/math:gradient",

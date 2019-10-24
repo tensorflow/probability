@@ -34,6 +34,7 @@ FILENAMES = [
     "prefer_static",
     "special_math",
     "tensor_util",
+    "test_combinations",
     "test_util",
 ]
 
@@ -49,6 +50,7 @@ DEPS = {
     "distribution_util": [":prefer_static"],
     "test_util": [
         ":dtype_util",
+        ":test_combinations",
         "//tensorflow_probability/python/experimental/substrates/numpy/util:seed_stream",
     ],
     "special_math": [

@@ -50,7 +50,7 @@ DISABLED_DISTS = ('joint_distribution', 'gaussian_process',
 LIBS = ('bijectors', 'distributions', 'math', 'stats', 'util.seed_stream')
 INTERNALS = ('assert_util', 'distribution_util', 'dtype_util',
              'hypothesis_testlib', 'prefer_static', 'special_math',
-             'tensor_util', 'test_util')
+             'tensor_util', 'test_combinations', 'test_util')
 
 
 def main(argv):

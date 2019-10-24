@@ -284,6 +284,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":dtype_util",
+        ":test_combinations",
         # absl/flags dep,
         # hypothesis dep,
         # numpy dep,
@@ -299,10 +300,35 @@ py_test(
     size = "small",
     srcs = ["test_util_test.py"],
     deps = [
+        ":test_combinations",
         ":test_util",
         # absl/flags dep,
         # absl/testing:flagsaver dep,
         # tensorflow dep,
         "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+py_library(
+    name = "test_combinations",
+    testonly = 1,
+    srcs = ["test_combinations.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/testing:parameterized dep,
+        # six dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "test_combinations_test",
+    size = "small",
+    srcs = ["test_combinations_test.py"],
+    deps = [
+        ":test_combinations",
+        ":test_util",
+        # absl/testing:parameterized dep,
+        # tensorflow dep,
     ],
 )
