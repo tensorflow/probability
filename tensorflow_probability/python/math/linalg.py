@@ -202,9 +202,7 @@ def _swap_m_with_i(vecs, m, i):
 
 
 def _invert_permutation(perm):  # TODO(b/130217510): Remove this function.
-  return tf.cast(
-      tf.math.top_k(perm, k=prefer_static.shape(perm)[-1],
-                    sorted=True).indices[..., ::-1], perm.dtype)
+  return tf.cast(tf.argsort(perm, axis=-1), perm.dtype)
 
 
 def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
