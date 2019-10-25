@@ -21,6 +21,7 @@ from __future__ import print_function
 
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -31,6 +32,14 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
+
+
+def skip_if_no_xla(skip_test_fn):
+  try:
+    tf.function(lambda: tf.constant(0), experimental_compile=True)()
+  except tf.errors.UnimplementedError as e:
+    if 'Could not find compiler' in str(e):
+      skip_test_fn('XLA not available')
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -74,12 +83,7 @@ class LinearOperatorPSDKernelTest(tfp_test_util.TestCase):
     self.assertAllClose(expected, actual)
 
   def test_diag_part_xla(self):
-    try:
-      tf.function(lambda: tf.constant(0), experimental_compile=True)()
-    except tf.errors.UnimplementedError as e:
-      if 'Could not find compiler' in str(e):
-        self.skipTest('XLA not available')
-
+    skip_if_no_xla(self.skipTest)
     kernel = tfp.math.psd_kernels.ExponentiatedQuadratic()
     x1 = tf.random.normal([7, 3, 5, 2])  # square matrix 5x5
     linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1)
@@ -177,18 +181,20 @@ class LinearOperatorPSDKernelTest(tfp_test_util.TestCase):
     expected, actual = self.evaluate([tf.matmul(cov, x), linop.matmul(x)])
     self.assertAllClose(expected, actual)
 
-  def test_matmul_chunked_with_remainder(self):
+  @parameterized.named_parameters(
+      (dict(testcase_name='_{}chunk'.format(n), nchunks=n) for n in (2, 5)))
+  def test_matmul_chunked_with_remainder(self, nchunks):
     kernel = tfp.math.psd_kernels.ExponentiatedQuadratic()
     x1 = tf.random.normal([3, 2, 11])
     x2 = tf.random.normal([5, 1, 17, 11])
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2,
-                                                            num_matmul_parts=7)
+    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(
+        kernel, x1, x2, num_matmul_parts=nchunks)
     cov = kernel.matrix(x1, x2)
     x = tf.random.normal([17, 3])
     expected, actual = self.evaluate([tf.matmul(cov, x), linop.matmul(x)])
     self.assertAllClose(expected, actual)
 
-  def test_matmul_grad(self):
+  def test_matmul_chunked_grad(self):
     kernel = tfp.math.psd_kernels.ExponentiatedQuadratic()
     x1 = tf.random.normal([5, 3])
     x2 = tf.random.normal([7, 3])
@@ -201,6 +207,57 @@ class LinearOperatorPSDKernelTest(tfp_test_util.TestCase):
 
     out_grad = tf.random.normal(tf.shape(y))
     actuals = tape.gradient(y, (x1, x2, x), output_gradients=out_grad)
+
+    with tf.GradientTape() as tape:
+      tape.watch((x1, x2, x))
+      y = tf.matmul(kernel.matrix(x1, x2), x)
+    expecteds = tape.gradient(y, (x1, x2, x), output_gradients=out_grad)
+
+    expecteds, actuals = self.evaluate([expecteds, actuals])
+
+    self.assertEqual(len(expecteds), len(actuals))
+    for expected, actual in zip(expecteds, actuals):
+      self.assertAllClose(expected, actual)
+
+  def test_matmul_xla(self):
+    skip_if_no_xla(self.skipTest)
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic()
+    x1 = tf.random.normal([5, 3])
+    x2 = tf.random.normal([7, 3])
+    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(
+        kernel, x1, x2, num_matmul_parts=3)
+    x = tf.random.normal([7, 2])
+
+    @tf.function(experimental_compile=True)
+    def f():
+      return linop.matmul(x)
+
+    actual = f()
+    expected = tf.matmul(kernel.matrix(x1, x2), x)
+
+    expected, actual = self.evaluate([expected, actual])
+    self.assertAllClose(expected, actual)
+
+  def test_matmul_grad_xla(self):
+    skip_if_no_xla(self.skipTest)
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic()
+    x1 = tf.random.normal([5, 3])
+    x2 = tf.random.normal([7, 3])
+    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(
+        kernel, x1, x2, num_matmul_parts=3)
+    x = tf.random.normal([7, 2])
+
+    @tf.function(experimental_compile=True)
+    def f():
+      with tf.GradientTape() as tape:
+        tape.watch((x1, x2, x))
+        y = linop.matmul(x)
+
+      out_grad = tf.random.normal(tf.shape(y))
+      actuals = tape.gradient(y, (x1, x2, x), output_gradients=out_grad)
+      return y, actuals, out_grad
+
+    y, actuals, out_grad = f()
 
     with tf.GradientTape() as tape:
       tape.watch((x1, x2, x))

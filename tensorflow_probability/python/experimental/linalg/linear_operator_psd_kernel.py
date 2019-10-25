@@ -20,14 +20,108 @@ from __future__ import print_function
 
 import functools
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
+
+
+def _slice(x, begin, size, axis):
+  """Slice wrapper which has XLA-compatible gradients."""
+
+  # Not in an XLA context => don't need a custom gradient, can use pad.
+  if (tf.executing_eagerly() or
+      not control_flow_util.GraphOrParentsInXlaContext(
+          tf1.get_default_graph())):
+    return tf.slice(x, begin, size)
+
+  # TODO(b/143313126): Upstream something like this to TF proper.
+  @tf.custom_gradient
+  def _custom_slice_helper(x):
+    """tf.slice uses tf.pad for backprop, unknown shape breaks XLA."""
+
+    def grad(dy):
+      dshp = tf.shape(x) - tf.shape(dy)
+      z = tf.zeros(
+          tf.where(tf.equal(0, dshp), tf.shape(x), dshp), dtype=x.dtype)
+      dx = tf.roll(tf.concat([dy, z], axis=axis), shift=begin[axis], axis=axis)
+      return dx
+
+    return tf.slice(x, begin, size), grad
+
+  return _custom_slice_helper(x)
+
+
+def _forward_matmul_one_part(kernel,
+                             x1,
+                             x2,
+                             x,
+                             part_size,
+                             part_index,
+                             remainder_part_size=None):
+  """Applies a single chunk of matmul split along the axis defined by `x2`."""
+  x2_ax = tf.rank(x2) - kernel.feature_ndims - 1
+  x2_ax_selector = tf.equal(tf.range(tf.rank(x2)), x2_ax)
+  begin_x2 = tf.where(x2_ax_selector, part_size * part_index, 0)
+  size_x2 = tf.where(
+      x2_ax_selector,
+      part_size if remainder_part_size is None else remainder_part_size,
+      tf.shape(x2))
+
+  x_ax = tf.rank(x) - 2
+  x_ax_selector = tf.equal(tf.range(tf.rank(x)), x_ax)
+  begin_x = tf.where(x_ax_selector, part_size * part_index, 0)
+  size_x = tf.where(
+      x_ax_selector,
+      part_size if remainder_part_size is None else remainder_part_size,
+      tf.shape(x))
+
+  return tf.matmul(
+      kernel.matrix(x1, _slice(x2, begin_x2, size_x2, x2_ax)),
+      _slice(x, begin_x, size_x, x_ax))
+
+
+def _backward_matmul_one_part(dcovx,
+                              kernel,
+                              x1,
+                              x2,
+                              x,
+                              part_size,
+                              part_index,
+                              remainder_part_size=None):
+  """Applies a single chunk of backprop split along the axis defined by `x1`."""
+  # Assume `cov = kernel.matrix(x1, x2)` has shape (A,B), and `x` has shape
+  # (B,C). Then `cov @ x` had shape (A,C), as will `dcovx`. Below, we refer to
+  # the "part" size as P.
+  dcovx_ax = tf.rank(dcovx) - 2
+  dcovx_ax_selector = tf.equal(tf.range(tf.rank(dcovx)), dcovx_ax)
+  begin_dcovx = tf.where(dcovx_ax_selector, part_size * part_index, 0)
+  size_dcovx = tf.where(
+      dcovx_ax_selector,
+      part_size if remainder_part_size is None else remainder_part_size,
+      tf.shape(dcovx))
+  dcovxpart = _slice(dcovx, begin_dcovx, size_dcovx, dcovx_ax)  # PxC
+  dcovpart = tf.matmul(dcovxpart, x, transpose_b=True)  # PxC @ (BxC).T = PxB
+  with tf.GradientTape() as tape:
+    # Here begins the "recomputed" part of the gradient.
+    tape.watch((x1, x2))
+    x1_ax = tf.rank(x1) - kernel.feature_ndims - 1
+    x1_ax_selector = tf.equal(tf.range(tf.rank(x1)), x1_ax)
+    begin_x1 = tf.where(x1_ax_selector, part_size * part_index, 0)
+    size_x1 = tf.where(
+        x1_ax_selector,
+        part_size if remainder_part_size is None else remainder_part_size,
+        tf.shape(x1))
+    covpart = kernel.matrix(_slice(x1, begin_x1, size_x1, x1_ax), x2)  # PxB
+  dx1part, dx2part = tape.gradient(covpart, (x1, x2), output_gradients=dcovpart)
+  dxpart = tf.matmul(covpart, dcovxpart, transpose_a=True)  # (PxB).T @ PxC
+  return dx1part, dx2part, dxpart
 
 
 def _make_chunked_matmul_fn(kernel, num_matmul_parts, operator_shape):
-  """Closure to make custom_gradient happy."""
+  """Closure to make `tf.custom_gradient` happy."""
   # We can't use kwargs with tf.custom_gradient in graph mode, so we close over.
 
   @tf.custom_gradient
@@ -36,15 +130,12 @@ def _make_chunked_matmul_fn(kernel, num_matmul_parts, operator_shape):
     fwd_ax_size = tf.shape(x2)[-kernel.feature_ndims - 1]
     fwd_part_size = fwd_ax_size // num_matmul_parts
     def cond(i, _):
-      niters = (fwd_ax_size + fwd_part_size - 1) // fwd_part_size
-      return i < niters
+      return i < num_matmul_parts
+
     def body(i, covx):
-      contraction_dim_slice = slice(fwd_part_size * i,
-                                    fwd_part_size * (i + 1))
-      slices = (Ellipsis, contraction_dim_slice)
-      slices = slices + (slice(None),) * kernel.feature_ndims
-      return i + 1, covx + tf.matmul(kernel.matrix(x1, x2[slices]),
-                                     x[..., contraction_dim_slice, :])
+      return i + 1, covx + _forward_matmul_one_part(kernel, x1, x2, x,
+                                                    fwd_part_size, i)
+
     result_batch_shape = tf.broadcast_dynamic_shape(
         operator_shape[:-2], tf.shape(x)[:-2])
     result_shape = tf.concat(
@@ -55,39 +146,46 @@ def _make_chunked_matmul_fn(kernel, num_matmul_parts, operator_shape):
         (tf.constant(0), tf.zeros(result_shape, dtype=x.dtype)),
         back_prop=False,
         parallel_iterations=1)
+    covx = covx + _forward_matmul_one_part(
+        kernel,
+        x1,
+        x2,
+        x,
+        fwd_part_size,
+        num_matmul_parts,
+        remainder_part_size=fwd_ax_size - (num_matmul_parts * fwd_part_size))
+    del result_batch_shape, result_shape
 
     def grad_fn(dcovx):
       """Chunk-at-a-time backprop."""
-      # `dcovx` matches result_shape.
-      # `cov` shp (A,B), `x` shp (B,C), `covx`, `dcovx` shp (A,C).
-      # Backward, we partition along the A axis.
+      # Backward, we partition along the `x1`-defined axis.
       bwd_ax_size = tf.shape(x1)[-kernel.feature_ndims - 1]
       bwd_part_size = bwd_ax_size // num_matmul_parts
       def bw_cond(i, *_):
-        niters = (bwd_ax_size + bwd_part_size - 1) // bwd_part_size
-        return i < niters
+        return i < num_matmul_parts
+
       def bw_body(i, dx1, dx2, dx):
         """tf.while_loop body for backprop."""
-        contraction_dim_slice = slice(bwd_part_size * i,
-                                      bwd_part_size * (i + 1))
-        dcovxpart = dcovx[..., contraction_dim_slice, :]  # PxC
-        dcovpart = tf.matmul(dcovxpart, x, transpose_b=True)  # PxC @ CxB => PxB
-        with tf.GradientTape() as tape:
-          tape.watch((x1, x2))
-          slices = (Ellipsis, contraction_dim_slice)
-          slices = slices + (slice(None),) * kernel.feature_ndims
-          covpart = kernel.matrix(x1[slices], x2)  # PxB
-        dx1part, dx2part = tape.gradient(covpart, (x1, x2),
-                                         output_gradients=dcovpart)
-        dxpart = tf.matmul(covpart, dcovxpart, transpose_a=True)  # BxP @ PxC
+        dx1part, dx2part, dxpart = _backward_matmul_one_part(
+            dcovx, kernel, x1, x2, x, bwd_part_size, i)
         return i + 1, dx1 + dx1part, dx2 + dx2part, dx + dxpart
 
-      return tf.while_loop(
+      _, dx1, dx2, dx = tf.while_loop(
           bw_cond,
           bw_body,
           tuple(tf.zeros_like(t) for t in (0, x1, x2, x)),
           back_prop=False,
-          parallel_iterations=1)[1:]
+          parallel_iterations=1)
+      dx1part, dx2part, dxpart = _backward_matmul_one_part(
+          dcovx,
+          kernel,
+          x1,
+          x2,
+          x,
+          bwd_part_size,
+          num_matmul_parts,
+          remainder_part_size=bwd_ax_size - (num_matmul_parts * bwd_part_size))
+      return dx1 + dx1part, dx2 + dx2part, dx + dxpart
 
     return covx, grad_fn
 
