@@ -30,12 +30,14 @@ from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-def _set_seed(seed):
+def _set_seed():
   """Helper which uses graph seed if using TFE."""
   # TODO(b/68017812): Deprecate once TFE supports seed.
+  seed_stream = tfp_test_util.test_seed_stream()
   if tf.executing_eagerly():
+    tf1.set_random_seed(seed_stream())
     return None
-  return seed
+  return seed_stream()
 
 
 @test_util.run_all_in_graph_and_eager_modes
@@ -67,7 +69,8 @@ class DefaultExchangeProposedFnTest(tfp_test_util.TestCase):
     fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
 
     exchanges_lens = self.generate_exchanges(
-        fn, num_replica=num_replica, seed=_set_seed(123))
+        fn, num_replica=num_replica,
+        seed=_set_seed())
 
     # All exchanges_lens, if proposed, will be 1.
     self.assertAllClose(
@@ -82,7 +85,8 @@ class DefaultExchangeProposedFnTest(tfp_test_util.TestCase):
     fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
 
     exchanges_lens = self.generate_exchanges(
-        fn, num_replica=num_replica, seed=_set_seed(312))
+        fn, num_replica=num_replica,
+        seed=_set_seed())
 
     # No exchanges_lens 1 - prob_exchange of the time.
     self.assertAllClose(
@@ -100,7 +104,8 @@ class DefaultExchangeProposedFnTest(tfp_test_util.TestCase):
     fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
 
     exchanges_lens = self.generate_exchanges(
-        fn, num_replica=num_replica, seed=_set_seed(42))
+        fn, num_replica=num_replica,
+        seed=_set_seed())
 
     # All exchanges_lens, if proposed, will be 1.
     self.assertAllClose(
@@ -115,7 +120,8 @@ class DefaultExchangeProposedFnTest(tfp_test_util.TestCase):
     fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
 
     exchanges_lens = self.generate_exchanges(
-        fn, num_replica=num_replica, seed=_set_seed(1))
+        fn, num_replica=num_replica,
+        seed=_set_seed())
 
     # All exchanges_lens, if proposed, will be 2.
     self.assertAllClose(
@@ -130,7 +136,8 @@ class DefaultExchangeProposedFnTest(tfp_test_util.TestCase):
     fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
 
     exchanges_lens = self.generate_exchanges(
-        fn, num_replica=num_replica, seed=_set_seed(667))
+        fn, num_replica=num_replica,
+        seed=_set_seed())
 
     # All exchanges_lens, if proposed, will be 7.  And prob_exchange is 1.
     self.assertAllClose(
@@ -145,7 +152,8 @@ class DefaultExchangeProposedFnTest(tfp_test_util.TestCase):
     fn = tfp.mcmc.default_exchange_proposed_fn(prob_exchange)
 
     exchanges_lens = self.generate_exchanges(
-        fn, num_replica=num_replica, seed=_set_seed(665))
+        fn, num_replica=num_replica,
+        seed=_set_seed())
 
     # All exchanges_lens, if proposed, will be 7.  And prob_exchange is 0.
     self.assertAllClose(
@@ -181,11 +189,12 @@ class REMCTest(tfp_test_util.TestCase):
         target_log_prob_fn=tf.function(target.log_prob, autograph=False),
         inverse_temperatures=inverse_temperatures,
         make_kernel_fn=make_kernel_fn,
-        seed=_set_seed(1))
+        seed=_set_seed())
 
     samples = tfp.mcmc.sample_chain(
         num_results=num_results,
-        current_state=target.sample(seed=_set_seed(1)),
+        current_state=target.sample(
+            seed=_set_seed()),
         kernel=remc,
         num_burnin_steps=50,
         trace_fn=None,
@@ -278,7 +287,7 @@ class REMCTest(tfp_test_util.TestCase):
         # Verified that test fails if inverse_temperatures = [1.]
         inverse_temperatures=inverse_temperatures,
         make_kernel_fn=make_kernel_fn,
-        seed=_set_seed(888))
+        seed=_set_seed())
 
     def _trace_log_accept_ratio(state, results):
       del state
@@ -342,7 +351,7 @@ class REMCTest(tfp_test_util.TestCase):
         target_log_prob_fn=tf.function(target_log_prob, autograph=False),
         inverse_temperatures=[1., 0.9, 0.8],
         make_kernel_fn=make_kernel_fn,
-        seed=_set_seed(3))
+        seed=_set_seed())
 
     states = tfp.mcmc.sample_chain(
         num_results=num_results,
@@ -391,7 +400,7 @@ class REMCTest(tfp_test_util.TestCase):
             lambda x: target.copy().log_prob(x), autograph=False),
         inverse_temperatures=[1., 0.9, 0.8],
         make_kernel_fn=make_kernel_fn,
-        seed=_set_seed(700))
+        seed=_set_seed())
 
     num_results = 500
     states = tfp.mcmc.sample_chain(
@@ -443,7 +452,7 @@ class REMCTest(tfp_test_util.TestCase):
         target_log_prob_fn=tf.function(target_log_prob, autograph=False),
         inverse_temperatures=[1., 0.9, 0.8],
         make_kernel_fn=make_kernel_fn,
-        seed=_set_seed(96))
+        seed=_set_seed())
 
     states = tfp.mcmc.sample_chain(
         num_results=num_results,
@@ -486,7 +495,7 @@ class REMCTest(tfp_test_util.TestCase):
           inverse_temperatures=10.**tf.linspace(
               0., -2., tf.random.uniform([], maxval=10, dtype=tf.int32)),
           make_kernel_fn=make_kernel_fn,
-          seed=_set_seed(13))
+          seed=_set_seed())
 
   def testKernelResultsHaveCorrectThingsWhenExchangeAdjacentOnly(self):
     target = tfd.Normal(0., 1.)
@@ -503,14 +512,15 @@ class REMCTest(tfp_test_util.TestCase):
         target_log_prob_fn=tf.function(target.log_prob, autograph=False),
         inverse_temperatures=inverse_temperatures,
         make_kernel_fn=make_kernel_fn,
-        seed=_set_seed(1))
+        seed=_set_seed())
 
     num_results = 400
     num_replicas = len(inverse_temperatures)
 
     samples, kernel_results = tfp.mcmc.sample_chain(
         num_results=num_results,
-        current_state=target.sample(seed=_set_seed(1)),
+        current_state=target.sample(
+            seed=_set_seed()),
         kernel=remc,
         num_burnin_steps=20,
         trace_fn=lambda _, results: results,
@@ -537,9 +547,14 @@ class REMCTest(tfp_test_util.TestCase):
     # Default exchange proposed function is to exchange every time.  There are
     # two exchanges possible, and they are mutually exclusive, so each is
     # proposed about 1/2 the time.
-    self.assertAllClose([0.5, 0.5],
-                        np.mean(kernel_results.is_exchange_proposed, axis=0),
-                        rtol=0.1)
+    self.assertAllClose(
+        np.mean(kernel_results.is_exchange_proposed, axis=0),
+        [0.5, 0.5],
+        # Treating exchange proposals as Bernoulli(p=.5), the below tolerance is
+        # set so that only about .1% of random test runs (with num_results set
+        # to 400 above), the measured proposal rate will fall outside the
+        # implied bounds, which are [0.418, 0.582].
+        rtol=0.165)
 
     # P[ExchangeAccepted | ExchangeProposed]
     conditional_accept_prob = (
@@ -575,14 +590,15 @@ class REMCTest(tfp_test_util.TestCase):
         inverse_temperatures=inverse_temperatures,
         make_kernel_fn=make_kernel_fn,
         exchange_proposed_fn=exchange_proposed_fn,
-        seed=_set_seed(1))
+        seed=_set_seed())
 
     num_results = 10
     num_replicas = len(inverse_temperatures)
 
     samples, kernel_results = tfp.mcmc.sample_chain(
         num_results=num_results,
-        current_state=target.sample(seed=_set_seed(1)),
+        current_state=target.sample(
+            seed=_set_seed()),
         kernel=remc,
         num_burnin_steps=20,
         trace_fn=lambda _, results: results,
@@ -619,7 +635,7 @@ class REMCTest(tfp_test_util.TestCase):
         target_log_prob_fn=tf.function(target_log_prob, autograph=False),
         inverse_temperatures=inverse_temperatures,
         make_kernel_fn=make_kernel_fn,
-        seed=_set_seed(1))
+        seed=_set_seed())
 
     num_results = 6
     n_batch = 5
