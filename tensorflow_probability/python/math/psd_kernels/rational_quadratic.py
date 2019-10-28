@@ -106,6 +106,7 @@ class RationalQuadratic(PositiveSemidefiniteKernel):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = util.maybe_get_common_dtype(
           [amplitude, scale_mixture_rate, length_scale])
@@ -118,7 +119,11 @@ class RationalQuadratic(PositiveSemidefiniteKernel):
           length_scale, name='length_scale', dtype=dtype)
 
       super(RationalQuadratic, self).__init__(
-          feature_ndims, dtype=dtype, name=name, validate_args=validate_args)
+          feature_ndims,
+          dtype=dtype,
+          name=name,
+          validate_args=validate_args,
+          parameters=parameters)
 
   def _apply(self, x1, x2, example_ndims=0):
     difference = util.sum_rightmost_ndims_preserving_shape(

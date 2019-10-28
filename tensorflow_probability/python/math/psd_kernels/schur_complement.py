@@ -202,6 +202,7 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
       name: Python `str` name prefixed to Ops created by this class.
         Default value: `"SchurComplement"`
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [base_kernel, fixed_inputs, diag_shift], tf.float32)
@@ -213,7 +214,10 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
       self._cholesky_bijector = invert.Invert(
           cholesky_outer_product.CholeskyOuterProduct())
       super(SchurComplement, self).__init__(
-          base_kernel.feature_ndims, dtype=dtype, name=name)
+          base_kernel.feature_ndims,
+          dtype=dtype,
+          name=name,
+          parameters=parameters)
 
   def _is_fixed_inputs_empty(self):
     # If fixed_inputs are `None` or have size 0, we consider this empty and fall

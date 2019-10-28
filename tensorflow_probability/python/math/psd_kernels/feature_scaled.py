@@ -63,7 +63,7 @@ class FeatureScaled(FeatureTransformed):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
-
+    parameters = dict(locals())
     with tf.name_scope(name):
       self._scale_diag = tensor_util.convert_nonref_to_tensor(
           scale_diag, name='scale_diag')
@@ -83,7 +83,8 @@ class FeatureScaled(FeatureTransformed):
           kernel,
           transformation_fn=rescale_input,
           validate_args=validate_args,
-          name=name)
+          name=name,
+          parameters=parameters)
 
   @property
   def scale_diag(self):

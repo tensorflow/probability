@@ -60,6 +60,7 @@ class KumaraswamyTransformed(FeatureTransformed):
         Kumaraswamy bijector.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name):
       self._concentration1 = tensor_util.convert_nonref_to_tensor(
           concentration1, name='concentration1')
@@ -84,7 +85,8 @@ class KumaraswamyTransformed(FeatureTransformed):
       super(KumaraswamyTransformed, self).__init__(
           kernel,
           transformation_fn=transform_by_kumaraswamy,
-          validate_args=validate_args)
+          validate_args=validate_args,
+          parameters=parameters)
 
   @property
   def concentration1(self):

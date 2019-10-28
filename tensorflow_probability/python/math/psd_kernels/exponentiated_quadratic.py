@@ -68,6 +68,7 @@ class ExponentiatedQuadratic(PositiveSemidefiniteKernel):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals())
     with tf.name_scope(name):
       dtype = util.maybe_get_common_dtype(
           [amplitude, length_scale])
@@ -76,7 +77,11 @@ class ExponentiatedQuadratic(PositiveSemidefiniteKernel):
       self._length_scale = tensor_util.convert_nonref_to_tensor(
           length_scale, name='length_scale', dtype=dtype)
       super(ExponentiatedQuadratic, self).__init__(
-          feature_ndims, dtype=dtype, name=name, validate_args=validate_args)
+          feature_ndims,
+          dtype=dtype,
+          name=name,
+          validate_args=validate_args,
+          parameters=parameters)
 
   @property
   def amplitude(self):

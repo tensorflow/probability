@@ -178,7 +178,12 @@ class PositiveSemidefiniteKernel(tf.Module):
 
   """
 
-  def __init__(self, feature_ndims, dtype=None, name=None, validate_args=False):
+  def __init__(self,
+               feature_ndims,
+               dtype=None,
+               name=None,
+               validate_args=False,
+               parameters=None):
     """Construct a PositiveSemidefiniteKernel (subclass) instance.
 
     Args:
@@ -191,6 +196,7 @@ class PositiveSemidefiniteKernel(tf.Module):
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
+      parameters: Python `dict` of constructor arguments.
 
     Raises:
       ValueError: if `feature_ndims` is not an integer greater than 0
@@ -218,6 +224,11 @@ class PositiveSemidefiniteKernel(tf.Module):
       name = tf.name_scope(name or type(self).__name__).name
     self._name = name
     self._validate_args = validate_args
+    if parameters is not None:
+      # Ensure no `self` references.
+      parameters = {k: v for k, v in parameters.items()
+                    if v is not self and not k.startswith('__')}
+    self._parameters = self._no_dependency(parameters)
     self._initial_parameter_control_dependencies = tuple(
         d for d in self._parameter_control_dependencies(is_init=True)
         if d is not None)
@@ -990,6 +1001,7 @@ class _SumKernel(PositiveSemidefiniteKernel):
       ValueError: `kernels` is an empty list, or `kernels` don't all have the
       same `feature_ndims`.
     """
+    parameters = dict(locals())
     if not kernels:
       raise ValueError("Can't create _SumKernel over empty list.")
     if len(set([k.feature_ndims for k in kernels])) > 1:
@@ -1005,7 +1017,8 @@ class _SumKernel(PositiveSemidefiniteKernel):
         dtype=util.maybe_get_common_dtype(
             [None if k.dtype is None else k for k in kernels]),
         name=name,
-        validate_args=any([k.validate_args for k in kernels]))
+        validate_args=any([k.validate_args for k in kernels]),
+        parameters=parameters)
 
   @property
   def kernels(self):
@@ -1067,6 +1080,7 @@ class _ProductKernel(PositiveSemidefiniteKernel):
       ValueError: `kernels` is an empty list, or `kernels` don't all have the
       same `feature_ndims`.
     """
+    parameters = dict(locals())
     if not kernels:
       raise ValueError("Can't create _ProductKernel over empty list.")
     if len(set([k.feature_ndims for k in kernels])) > 1:
@@ -1082,7 +1096,8 @@ class _ProductKernel(PositiveSemidefiniteKernel):
         dtype=util.maybe_get_common_dtype(
             [None if k.dtype is None else k for k in kernels]),
         name=name,
-        validate_args=any([k.validate_args for k in kernels]))
+        validate_args=any([k.validate_args for k in kernels]),
+        parameters=parameters)
 
   @property
   def kernels(self):

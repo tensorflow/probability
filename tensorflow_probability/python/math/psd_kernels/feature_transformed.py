@@ -82,6 +82,7 @@ class FeatureTransformed(PositiveSemidefiniteKernel):
       kernel,
       transformation_fn,
       validate_args=False,
+      parameters=None,
       name='FeatureTransformed'):
     """Construct an FeatureTransformed kernel instance.
 
@@ -96,8 +97,10 @@ class FeatureTransformed(PositiveSemidefiniteKernel):
         `transformation_fn` must be broadcastable with parameters of `kernel`.
       validate_args: If `True`, parameters are checked for validity despite
         possibly degrading runtime performance
+      parameters: When subclassing, a dict of constructor arguments.
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name):
       self._kernel = kernel
       self._transformation_fn = transformation_fn
@@ -105,7 +108,8 @@ class FeatureTransformed(PositiveSemidefiniteKernel):
           feature_ndims=kernel.feature_ndims,
           dtype=kernel.dtype,
           name=name,
-          validate_args=validate_args)
+          validate_args=validate_args,
+          parameters=parameters)
 
   def _apply(self, x1, x2, example_ndims=0):
     return self._kernel.apply(

@@ -105,6 +105,7 @@ class KernelPropertiesTest(tfp_test_util.TestCase):
 
     # Check that we pick up all relevant kernel parameters.
     wrt_vars = [xs] + list(kernel.variables)
+    self.evaluate([v.initializer for v in kernel.variables])
 
     with tf.GradientTape() as tape:
       with tfp_hps.assert_no_excessive_var_usage(
@@ -113,6 +114,11 @@ class KernelPropertiesTest(tfp_test_util.TestCase):
         diag = kernel.apply(xs, xs, example_ndims=example_ndims)
     grads = tape.gradient(diag, wrt_vars)
     assert_no_none_grad(kernel, 'apply', wrt_vars, grads)
+
+    self.assertAllClose(
+        diag,
+        type(kernel)(**kernel._parameters).apply(
+            xs, xs, example_ndims=example_ndims))
 
 
 CONSTRAINTS = {
