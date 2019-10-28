@@ -247,14 +247,18 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
   with tf.name_scope(name or 'pivoted_cholesky'):
     dtype = dtype_util.common_dtype([matrix, diag_rtol],
                                     dtype_hint=tf.float32)
-    matrix = tf.convert_to_tensor(matrix, name='matrix', dtype=dtype)
+    if not isinstance(matrix, tf.linalg.LinearOperator):
+      matrix = tf.convert_to_tensor(matrix, name='matrix', dtype=dtype)
     if tensorshape_util.rank(matrix.shape) is None:
       raise NotImplementedError('Rank of `matrix` must be known statically')
+    if isinstance(matrix, tf.linalg.LinearOperator):
+      matrix_shape = tf.cast(matrix.shape_tensor(), tf.int64)
+    else:
+      matrix_shape = prefer_static.shape(matrix, out_type=tf.int64)
 
     max_rank = tf.convert_to_tensor(
         max_rank, name='max_rank', dtype=tf.int64)
-    max_rank = tf.minimum(max_rank,
-                          prefer_static.shape(matrix, out_type=tf.int64)[-1])
+    max_rank = tf.minimum(max_rank, matrix_shape[-1])
     diag_rtol = tf.convert_to_tensor(
         diag_rtol, dtype=dtype, name='diag_rtol')
     matrix_diag = tf.linalg.diag_part(matrix)
@@ -298,7 +302,10 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
       # Update perm: Swap perm[...,m] with perm[...,maxi]. Step 3 above.
       perm = _swap_m_with_i(perm, m, maxi)
       # Step 4.
-      row = batch_gather(matrix, perm[..., m:m + 1], axis=-2)
+      if callable(getattr(matrix, 'row', None)):
+        row = matrix.row(perm[..., m])[..., tf.newaxis, :]
+      else:
+        row = batch_gather(matrix, perm[..., m:m + 1], axis=-2)
       row = batch_gather(row, perm[..., m + 1:])
       # Step 5.
       prev_rows = pchol[..., :m, :]
@@ -330,8 +337,7 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
       return m + 1, pchol, perm, matrix_diag
 
     m = np.int64(0)
-    pchol = tf.zeros_like(matrix[..., :max_rank, :])
-    matrix_shape = prefer_static.shape(matrix, out_type=tf.int64)
+    pchol = tf.zeros(matrix_shape, dtype=matrix.dtype)[..., :max_rank, :]
     perm = tf.broadcast_to(
         prefer_static.range(matrix_shape[-1]), matrix_shape[:-1])
     _, pchol, _, _ = tf.while_loop(

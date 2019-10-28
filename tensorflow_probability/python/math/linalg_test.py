@@ -224,6 +224,17 @@ class _PivotedCholesky(tfp_test_util.TestCase):
           tfp.math.pivoted_cholesky(mat, max_rank=rank, diag_rtol=-1),
           atol=1e-4)
 
+  def testLinopKernel(self):
+    x = tf.random.uniform([10, 2], dtype=self.dtype)
+    masked_shape = x.shape if self.use_static_shape else [None] * len(x.shape)
+    x = tf1.placeholder_with_default(x, shape=masked_shape)
+    k = tfp.math.psd_kernels.ExponentiatedQuadratic()
+    expected = tfp.math.pivoted_cholesky(k.matrix(x, x), max_rank=3)
+    actual = tfp.math.pivoted_cholesky(
+        tfp.experimental.linalg.LinearOperatorPSDKernel(k, x), max_rank=3)
+    expected, actual = self.evaluate([expected, actual])
+    self.assertAllClose(expected, actual)
+
 
 @test_util.run_all_in_graph_and_eager_modes
 class PivotedCholesky32Static(_PivotedCholesky):
