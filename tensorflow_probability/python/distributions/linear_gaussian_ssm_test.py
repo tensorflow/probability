@@ -1294,9 +1294,7 @@ class _KalmanStepsTest(object):
         self.get_observation_matrix_for_timestep,
         self.get_observation_noise_for_timestep)
     obs_mean, obs_cov = self.evaluate(
-        pushforward_step(_=None,  # Loop body ignores previous observations.
-                         latent_t_mean_cov=(
-                             0, latent_mean_tensor, latent_cov_tensor)))
+        pushforward_step(0, latent_mean_tensor, latent_cov_tensor))
 
     self.assertAllClose(obs_mean,
                         np.dot(self.observation_matrix, latent_mean_) +

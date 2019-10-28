@@ -36,6 +36,8 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
 
+from tensorflow.python.ops import parallel_for  # pylint: disable=g-direct-tensorflow-import
+
 tfl = tf.linalg
 
 
@@ -1230,21 +1232,13 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       latent_covs = distribution_util.move_dimension(
           latent_covs, source_idx=-3, dest_idx=0)
 
-      (initial_observation_mean,
-       initial_observation_cov) = pushforward_latents_step(
-           _=None,  # Loop body ignores previous observations.
-           latent_t_mean_cov=(self.initial_step,
-                              latent_means[self.initial_step],
-                              latent_covs[self.initial_step]))
-
-      # TODO(davmre) this loop is embarassingly parallel; replace with `pfor`.
-      timesteps = tf.range(self.initial_step,
-                           self.initial_step + self.num_timesteps)
-      observation_means, observation_covs = tf.scan(
-          pushforward_latents_step,
-          elems=(timesteps, latent_means, latent_covs),
-          initializer=(initial_observation_mean, initial_observation_cov),
-          parallel_iterations=10000)
+      def pfor_body(t):
+        return pushforward_latents_step(
+            t=self.initial_step + t,
+            latent_mean=tf.gather(latent_means, t),
+            latent_cov=tf.gather(latent_covs, t))
+      observation_means, observation_covs = parallel_for.pfor(
+          pfor_body, self.num_timesteps)
 
       observation_means = distribution_util.move_dimension(
           observation_means[..., 0], source_idx=0, dest_idx=-2)
@@ -1809,10 +1803,8 @@ def build_pushforward_latents_step(get_observation_matrix_for_timestep,
     covariance at time `t`, given latent mean and covariance at time `t`.
   """
 
-  def pushforward_latents_step(_, latent_t_mean_cov):
+  def pushforward_latents_step(t, latent_mean, latent_cov):
     """Loop body fn to pushforward latents to observations at a time step."""
-    t, latent_mean, latent_cov = latent_t_mean_cov
-
     observation_matrix = get_observation_matrix_for_timestep(t)
     observation_noise = get_observation_noise_for_timestep(t)
     observation_mean = _propagate_mean(latent_mean,
