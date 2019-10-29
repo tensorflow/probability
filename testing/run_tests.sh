@@ -70,7 +70,7 @@ find_version_str() {
 install_python_packages() {
   # Ensure newer than 18.x pip version, which is necessary after tf-nightly
   # switched to manylinux2010.
-  pip install --upgrade pip>=19.2
+  pip install --upgrade 'pip>=19.2'
 
   # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
   TF_VERSION_STR=$(find_version_str tf-nightly)
