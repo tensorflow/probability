@@ -24,6 +24,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 
@@ -84,7 +85,8 @@ def _forward_matmul_one_part(kernel,
 
 
 def _backward_matmul_one_part(dcovx,
-                              kernel,
+                              kernel_fn,
+                              kernel_args,
                               x1,
                               x2,
                               x,
@@ -104,9 +106,10 @@ def _backward_matmul_one_part(dcovx,
       tf.shape(dcovx))
   dcovxpart = _slice(dcovx, begin_dcovx, size_dcovx, dcovx_ax)  # PxC
   dcovpart = tf.matmul(dcovxpart, x, transpose_b=True)  # PxC @ (BxC).T = PxB
-  with tf.GradientTape() as tape:
+  with tf.GradientTape(watch_accessed_variables=False) as tape:
     # Here begins the "recomputed" part of the gradient.
-    tape.watch((x1, x2))
+    tape.watch((x1, x2, kernel_args))
+    kernel = kernel_fn(*kernel_args)
     x1_ax = tf.rank(x1) - kernel.feature_ndims - 1
     x1_ax_selector = tf.equal(tf.range(tf.rank(x1)), x1_ax)
     begin_x1 = tf.where(x1_ax_selector, part_size * part_index, 0)
@@ -115,18 +118,25 @@ def _backward_matmul_one_part(dcovx,
         part_size if remainder_part_size is None else remainder_part_size,
         tf.shape(x1))
     covpart = kernel.matrix(_slice(x1, begin_x1, size_x1, x1_ax), x2)  # PxB
-  dx1part, dx2part = tape.gradient(covpart, (x1, x2), output_gradients=dcovpart)
+  dx1part, dx2part, dkernel_args = tape.gradient(
+      covpart, (x1, x2, kernel_args), output_gradients=dcovpart)
   dxpart = tf.matmul(covpart, dcovxpart, transpose_a=True)  # (PxB).T @ PxC
-  return dx1part, dx2part, dxpart
+  dxpart = tf.reduce_sum(dxpart, axis=tf.range(tf.rank(dxpart) - tf.rank(x)))
+  return dx1part, dx2part, dxpart, dkernel_args
 
 
-def _make_chunked_matmul_fn(kernel, num_matmul_parts, operator_shape):
-  """Closure to make `tf.custom_gradient` happy."""
+def _chunked_matmul(kernel_fn, kernel_args, x1, x2, x, num_matmul_parts,
+                    operator_shape):
+  """Implements while-loop matmul with recomputed gradients."""
   # We can't use kwargs with tf.custom_gradient in graph mode, so we close over.
+  kernel_args_structure = tf.nest.pack_sequence_as(
+      kernel_args, [0] * len(tf.nest.flatten(kernel_args)))
 
   @tf.custom_gradient
-  def _chunked_matmul(x1, x2, x):
+  def _chunked_matmul_cgrad(x1, x2, x, *kernel_args):
     """Chunk-at-a-time matrix multiplication and backprop."""
+    kernel_args = tf.nest.pack_sequence_as(kernel_args_structure, kernel_args)
+    kernel = kernel_fn(*kernel_args)
     fwd_ax_size = tf.shape(x2)[-kernel.feature_ndims - 1]
     fwd_part_size = fwd_ax_size // num_matmul_parts
     def cond(i, _):
@@ -164,41 +174,50 @@ def _make_chunked_matmul_fn(kernel, num_matmul_parts, operator_shape):
       def bw_cond(i, *_):
         return i < num_matmul_parts
 
-      def bw_body(i, dx1, dx2, dx):
+      def bw_body(i, dx1, dx2, dx, dkernel_args):
         """tf.while_loop body for backprop."""
-        dx1part, dx2part, dxpart = _backward_matmul_one_part(
-            dcovx, kernel, x1, x2, x, bwd_part_size, i)
-        return i + 1, dx1 + dx1part, dx2 + dx2part, dx + dxpart
+        dx1part, dx2part, dxpart, dkernel_argspart = _backward_matmul_one_part(
+            dcovx, kernel_fn, kernel_args, x1, x2, x, bwd_part_size, i)
+        dx1, dx2, dx, dkernel_args = tf.nest.pack_sequence_as(
+            (dx1, dx2, dx, dkernel_args),
+            [a + b for a, b in zip(  # pylint: disable=g-complex-comprehension
+                tf.nest.flatten((dx1, dx2, dx, dkernel_args)),
+                tf.nest.flatten((dx1part, dx2part, dxpart, dkernel_argspart)))])
+        return i + 1, dx1, dx2, dx, dkernel_args
 
-      _, dx1, dx2, dx = tf.while_loop(
+      _, dx1, dx2, dx, dkernel_args = tf.while_loop(
           bw_cond,
           bw_body,
-          tuple(tf.zeros_like(t) for t in (0, x1, x2, x)),
+          tf.nest.map_structure(tf.zeros_like, (0, x1, x2, x, kernel_args)),
           back_prop=False,
           parallel_iterations=1)
-      dx1part, dx2part, dxpart = _backward_matmul_one_part(
+      dx1rem, dx2rem, dxrem, dkernel_argsrem = _backward_matmul_one_part(
           dcovx,
-          kernel,
+          kernel_fn,
+          kernel_args,
           x1,
           x2,
           x,
           bwd_part_size,
           num_matmul_parts,
           remainder_part_size=bwd_ax_size - (num_matmul_parts * bwd_part_size))
-      return dx1 + dx1part, dx2 + dx2part, dx + dxpart
+      return tuple(a + b for a, b in zip(
+          tf.nest.flatten((dx1, dx2, dx, dkernel_args)),
+          tf.nest.flatten((dx1rem, dx2rem, dxrem, dkernel_argsrem))))
 
     return covx, grad_fn
 
-  return _chunked_matmul
+  return _chunked_matmul_cgrad(x1, x2, x, *tf.nest.flatten(kernel_args))
 
 
 class LinearOperatorPSDKernel(tf.linalg.LinearOperator):
   """A `tf.linalg.LinearOperator` representing a kernel covariance matrix."""
 
   def __init__(self,
-               kernel,
+               kernel_fn,
                x1,
                x2=None,
+               kernel_args=None,
                num_matmul_parts=None,
                is_non_singular=None,
                is_self_adjoint=None,
@@ -226,10 +245,18 @@ class LinearOperatorPSDKernel(tf.linalg.LinearOperator):
     activations.
 
     Args:
-      kernel: A `tfp.math.psd_kernels.PositiveSemidefiniteKernel` instance.
+      kernel_fn: A Python callable which takes `*kernel_args` and returns an
+        instance of `tfp.math.psd_kernels.PositiveSemidefiniteKernel`. As a
+        convenience, an instance may be passed instead of a function, but in
+        this case gradients to kernel hyperparameters will not be available when
+        using `num_matmul_parts`, and `kernel_args` must be `None`.
       x1: A floating point `Tensor`, the row index points.
       x2: Optional, a floating point `Tensor`, the column index points. If not
         provided, uses `x1`.
+      kernel_args: A tuple of arguments (which may themselves be `tf.nest`
+        compatible structures) to be passed to `kernel_fn`. This argument
+        identifies the set of tensors which will have gradients in a
+        `num_matmul_parts`-chunked matmul/backprop.
       num_matmul_parts: An optional Python `int` specifying the number of
         partitions into which the matrix should be broken when applying this
         linear operator. (An extra remainder partition is implied for uneven
@@ -246,8 +273,19 @@ class LinearOperatorPSDKernel(tf.linalg.LinearOperator):
       is_square:  Expect that this operator acts like square [batch] matrices.
       name: Optional name for related ops.
     """
-    dtype = dtype_util.common_dtype([kernel, x1, x2], dtype_hint=tf.float64)
-    self._kernel = kernel
+    if not callable(kernel_fn):
+      kernel = kernel_fn
+      kernel_fn = lambda: kernel
+      if kernel_args is not None:
+        raise ValueError('Cannot pass a kernel instance for `kernel_fn` while '
+                         'also specifying `kernel_args`.')
+    if kernel_args is None:
+      kernel_args = ()
+    dtype = dtype_util.common_dtype([kernel_fn(*kernel_args), x1, x2],
+                                    dtype_hint=tf.float64)
+    self._kernel_fn = kernel_fn
+    self._kernel_args = tf.nest.map_structure(
+        tensor_util.convert_nonref_to_tensor, kernel_args)
     self._x1 = tensor_util.convert_nonref_to_tensor(x1, dtype=dtype)
     self._x2 = tensor_util.convert_nonref_to_tensor(x2, dtype=dtype)
     self._num_matmul_parts = tensor_util.convert_nonref_to_tensor(
@@ -278,8 +316,15 @@ class LinearOperatorPSDKernel(tf.linalg.LinearOperator):
         name=name or 'LinearOperatorPSDKernel')
 
   @property
-  def kernel(self):
-    return self._kernel
+  def kernel_fn(self):
+    return self._kernel_fn
+
+  @property
+  def kernel_args(self):
+    return self._kernel_args
+
+  def _kernel(self):
+    return self.kernel_fn(*self.kernel_args)  # pylint: disable=not-callable
 
   @property
   def x1(self):
@@ -289,44 +334,56 @@ class LinearOperatorPSDKernel(tf.linalg.LinearOperator):
   def x2(self):
     return self._x2
 
-  def _x1_x2_axis(self):
+  def _x1_x2(self):
     x1 = tf.convert_to_tensor(self.x1)
     x2 = x1 if self.x2 is None else tf.convert_to_tensor(self.x2)
-    return x1, x2, -self.kernel.feature_ndims - 1
+    return x1, x2
+
+  def _x1_x2_axis_kernel(self):
+    x1, x2 = self._x1_x2()
+    kernel = self._kernel()
+    return x1, x2, -kernel.feature_ndims - 1, kernel
 
   def _matmul(self, x, adjoint=False, adjoint_arg=False):
-    x1, x2, _ = self._x1_x2_axis()
-    if self._num_matmul_parts is None:
-      return tf.matmul(self.kernel.matrix(x1, x2), x,
-                       adjoint_a=adjoint, adjoint_b=adjoint_arg)
+    x1, x2 = self._x1_x2()
+    if (self._num_matmul_parts is None or
+        prefer_static.equal(self._num_matmul_parts, 1)):
+      return tf.matmul(
+          self._kernel().matrix(x1, x2),
+          x,
+          adjoint_a=adjoint,
+          adjoint_b=adjoint_arg)
 
     if adjoint or adjoint_arg:
       raise NotImplementedError(
           '`adjoint`, `adjoint_arg` NYI when `num_matmul_parts` specified.')
 
-    return _make_chunked_matmul_fn(
-        kernel=self.kernel,
+    return _chunked_matmul(
+        kernel_fn=self.kernel_fn,
+        kernel_args=self.kernel_args,
+        x1=x1,
+        x2=x2,
+        x=x,
         num_matmul_parts=self._num_matmul_parts,
-        operator_shape=self.shape_tensor())(
-            x1, x2, x)
+        operator_shape=self.shape_tensor())
 
   def _shape(self):
-    x1, x2, axis = self._x1_x2_axis()
-    return functools.reduce(tf.broadcast_static_shape,
-                            (self.kernel.batch_shape, x1.shape[:axis],
-                             x2.shape[:axis])).concatenate(
-                                 [x1.shape[axis], x2.shape[axis]])
+    x1, x2, axis, kernel = self._x1_x2_axis_kernel()
+    return functools.reduce(
+        tf.broadcast_static_shape,
+        (kernel.batch_shape, x1.shape[:axis], x2.shape[:axis])).concatenate(
+            [x1.shape[axis], x2.shape[axis]])
 
   def _shape_tensor(self):
-    x1, x2, axis = self._x1_x2_axis()
-    batch_shape = functools.reduce(tf.broadcast_dynamic_shape,
-                                   (self.kernel.batch_shape_tensor(),
-                                    tf.shape(x1)[:axis], tf.shape(x2)[:axis]))
+    x1, x2, axis, kernel = self._x1_x2_axis_kernel()
+    batch_shape = functools.reduce(
+        tf.broadcast_dynamic_shape,
+        (kernel.batch_shape_tensor(), tf.shape(x1)[:axis], tf.shape(x2)[:axis]))
     return tf.concat([batch_shape, [tf.shape(x1)[axis], tf.shape(x2)[axis]]],
                      axis=0)
 
   def _diag_part(self):
-    x1, x2, axis = self._x1_x2_axis()
+    x1, x2, axis, kernel = self._x1_x2_axis_kernel()
     ax_minsize = tf.minimum(tf.shape(x1)[axis], tf.shape(x2)[axis])
 
     def slice_of(xn):
@@ -336,7 +393,7 @@ class LinearOperatorPSDKernel(tf.linalg.LinearOperator):
           tf.shape(xn))
       return tf.slice(xn, begin=tf.zeros_like(tf.shape(xn)), size=slice_size)
 
-    return self.kernel.apply(slice_of(x1), slice_of(x2))
+    return kernel.apply(slice_of(x1), slice_of(x2))
 
   def row(self, index):
     """Gets a row from the dense operator.
@@ -351,13 +408,13 @@ class LinearOperatorPSDKernel(tf.linalg.LinearOperator):
         scalar `index`, analogous to gather for non-scalar.
     """
     index = tf.convert_to_tensor(index, dtype_hint=tf.int64)
-    x1, x2, axis = self._x1_x2_axis()
+    x1, x2, axis, kernel = self._x1_x2_axis_kernel()
     batch_shp = tf.broadcast_dynamic_shape(tf.shape(x1)[:axis], tf.shape(index))
     x1 = tf.broadcast_to(x1,
                          tf.concat([batch_shp, tf.shape(x1)[axis:]], axis=0))
     x1_row = tf.broadcast_to(index, tf.shape(x1)[:axis])
     x1 = tf.gather(x1, x1_row[..., tf.newaxis], batch_dims=len(x1.shape[:axis]))
-    return self.kernel.matrix(x1, x2)[..., 0, :]
+    return kernel.matrix(x1, x2)[..., 0, :]
 
   def col(self, index):
     """Gets a column from the dense operator.
@@ -372,11 +429,10 @@ class LinearOperatorPSDKernel(tf.linalg.LinearOperator):
         `index`, analogous to gather for non-scalar.
     """
     index = tf.convert_to_tensor(index, dtype_hint=tf.int64)
-    x1, x2, axis = self._x1_x2_axis()
+    x1, x2, axis, kernel = self._x1_x2_axis_kernel()
     batch_shp = tf.broadcast_dynamic_shape(tf.shape(x2)[:axis], tf.shape(index))
     x2 = tf.broadcast_to(x2,
                          tf.concat([batch_shp, tf.shape(x2)[axis:]], axis=0))
-    x2_col = tf.broadcast_to(index,
-                             tf.shape(x2)[:-self.kernel.feature_ndims - 1])
+    x2_col = tf.broadcast_to(index, tf.shape(x2)[:axis])
     x2 = tf.gather(x2, x2_col[..., tf.newaxis], batch_dims=len(x2.shape[:axis]))
-    return self.kernel.matrix(x1, x2)[..., 0]
+    return kernel.matrix(x1, x2)[..., 0]
