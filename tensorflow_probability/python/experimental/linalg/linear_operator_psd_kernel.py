@@ -139,12 +139,21 @@ def _chunked_matmul(kernel_fn, kernel_args, x1, x2, x, num_matmul_parts,
     kernel = kernel_fn(*kernel_args)
     fwd_ax_size = tf.shape(x2)[-kernel.feature_ndims - 1]
     fwd_part_size = fwd_ax_size // num_matmul_parts
+
+    dist_ctx = tf.distribute.get_replica_context()
+    replica_id = dist_ctx.replica_id_in_sync_group
+    num_replicas = dist_ctx.num_replicas_in_sync
+    replica_num_parts = num_matmul_parts // num_replicas + tf.cast(
+        num_matmul_parts % num_replicas > replica_id, num_matmul_parts.dtype)
+    replica_begin = ((num_matmul_parts // num_replicas) * replica_id +
+                     tf.minimum(replica_id, num_matmul_parts % num_replicas))
+
     def cond(i, _):
-      return i < num_matmul_parts
+      return i < replica_begin + replica_num_parts
 
     def body(i, covx):
-      return i + 1, covx + _forward_matmul_one_part(kernel, x1, x2, x,
-                                                    fwd_part_size, i)
+      return i + 1, covx + _forward_matmul_one_part(
+          kernel, x1, x2, x, fwd_part_size, i)
 
     result_batch_shape = tf.broadcast_dynamic_shape(
         operator_shape[:-2], tf.shape(x)[:-2])
@@ -152,11 +161,12 @@ def _chunked_matmul(kernel_fn, kernel_args, x1, x2, x, num_matmul_parts,
         [result_batch_shape, [operator_shape[-2], tf.shape(x)[-1]]],
         axis=0)
     _, covx = tf.while_loop(
-        cond, body,
-        (tf.constant(0), tf.zeros(result_shape, dtype=x.dtype)),
+        cond,
+        body, (replica_begin, tf.zeros(result_shape, dtype=x.dtype)),
         back_prop=False,
         parallel_iterations=1)
-    covx = covx + _forward_matmul_one_part(
+
+    remainder = _forward_matmul_one_part(
         kernel,
         x1,
         x2,
@@ -164,6 +174,9 @@ def _chunked_matmul(kernel_fn, kernel_args, x1, x2, x, num_matmul_parts,
         fwd_part_size,
         num_matmul_parts,
         remainder_part_size=fwd_ax_size - (num_matmul_parts * fwd_part_size))
+
+    covx = dist_ctx.all_reduce(tf.distribute.ReduceOp.SUM, covx) + remainder
+
     del result_batch_shape, result_shape
 
     def grad_fn(dcovx):
@@ -171,8 +184,17 @@ def _chunked_matmul(kernel_fn, kernel_args, x1, x2, x, num_matmul_parts,
       # Backward, we partition along the `x1`-defined axis.
       bwd_ax_size = tf.shape(x1)[-kernel.feature_ndims - 1]
       bwd_part_size = bwd_ax_size // num_matmul_parts
+
+      dist_ctx = tf.distribute.get_replica_context()
+      replica_id = dist_ctx.replica_id_in_sync_group
+      num_replicas = dist_ctx.num_replicas_in_sync
+      replica_num_parts = num_matmul_parts // num_replicas + tf.cast(
+          num_matmul_parts % num_replicas > replica_id, num_matmul_parts.dtype)
+      replica_begin = ((num_matmul_parts // num_replicas) * replica_id +
+                       tf.minimum(replica_id, num_matmul_parts % num_replicas))
+
       def bw_cond(i, *_):
-        return i < num_matmul_parts
+        return i < replica_begin + replica_num_parts
 
       def bw_body(i, dx1, dx2, dx, dkernel_args):
         """tf.while_loop body for backprop."""
@@ -188,7 +210,8 @@ def _chunked_matmul(kernel_fn, kernel_args, x1, x2, x, num_matmul_parts,
       _, dx1, dx2, dx, dkernel_args = tf.while_loop(
           bw_cond,
           bw_body,
-          tf.nest.map_structure(tf.zeros_like, (0, x1, x2, x, kernel_args)),
+          (replica_begin,) + tf.nest.map_structure(tf.zeros_like,
+                                                   (x1, x2, x, kernel_args)),
           back_prop=False,
           parallel_iterations=1)
       dx1rem, dx2rem, dxrem, dkernel_argsrem = _backward_matmul_one_part(
@@ -201,9 +224,11 @@ def _chunked_matmul(kernel_fn, kernel_args, x1, x2, x, num_matmul_parts,
           bwd_part_size,
           num_matmul_parts,
           remainder_part_size=bwd_ax_size - (num_matmul_parts * bwd_part_size))
-      return tuple(a + b for a, b in zip(
-          tf.nest.flatten((dx1, dx2, dx, dkernel_args)),
-          tf.nest.flatten((dx1rem, dx2rem, dxrem, dkernel_argsrem))))
+      flat_xdevice = tf.nest.flatten((dx1, dx2, dx, dkernel_args))
+      flat_remainder = tf.nest.flatten((dx1rem, dx2rem, dxrem, dkernel_argsrem))
+      return tuple(
+          dist_ctx.all_reduce(tf.distribute.ReduceOp.SUM, a) + b
+          for a, b in zip(flat_xdevice, flat_remainder))
 
     return covx, grad_fn
 
