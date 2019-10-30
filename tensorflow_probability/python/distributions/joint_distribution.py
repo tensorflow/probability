@@ -323,7 +323,8 @@ class JointDistribution(distribution_lib.Distribution):
 
   def _call_sample_n(self, sample_shape, seed, name, value=None):
     with self._name_and_control_scope(name):
-      return self._sample_n(sample_shape, seed, value)
+      return self._sample_n(
+          sample_shape, seed=seed() if callable(seed) else seed, value=value)
 
 
 def maybe_check_wont_broadcast(flat_xs, validate_args):

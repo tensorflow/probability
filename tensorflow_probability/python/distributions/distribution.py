@@ -824,7 +824,8 @@ class Distribution(_BaseDistribution):
       sample_shape = tf.cast(sample_shape, tf.int32, name='sample_shape')
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, 'sample_shape')
-      samples = self._sample_n(n, seed, **kwargs)
+      samples = self._sample_n(
+          n, seed=seed() if callable(seed) else seed, **kwargs)
       batch_event_shape = tf.shape(samples)[1:]
       final_shape = tf.concat([sample_shape, batch_event_shape], 0)
       samples = tf.reshape(samples, final_shape)
@@ -839,7 +840,7 @@ class Distribution(_BaseDistribution):
 
     Args:
       sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
-      seed: Python integer seed for RNG
+      seed: Python integer or `tfp.util.SeedStream` instance, for seeding PRNG.
       name: name to give to the op.
       **kwargs: Named arguments forwarded to subclass implementation.
 

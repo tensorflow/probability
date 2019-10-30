@@ -589,7 +589,8 @@ class ConditionalDistributionTest(tfp_test_util.TestCase):
       def _event_shape(self):
         return self._static_event_shape
 
-      def _sample_n(self, unused_shape, unused_seed, arg1, arg2):
+      def _sample_n(self, unused_shape, seed, arg1, arg2):
+        del seed  # Unused.
         raise ValueError(arg1, arg2)
 
       def _log_prob(self, _, arg1, arg2):
