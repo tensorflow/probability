@@ -223,7 +223,7 @@ def rk_fourth_order_interpolation_coefficients(y0, y1, k, dt, tableau):
     return _fourth_order_interpolation_coefficients(y0, y1, y_mid, f0, f1, dt)
 
 
-def evaluate_interpolation(coefficients, t0, t1, t):
+def evaluate_interpolation(coefficients, t0, t1, t, validate_args=False):
   """Evaluates the value of polynomial interpolation at the given time point.
 
   Args:
@@ -232,6 +232,8 @@ def evaluate_interpolation(coefficients, t0, t1, t):
     t0: Scalar floating `Tensor` giving the start of the interval.
     t1: Scalar floating `Tensor` giving the end of the interval.
     t: Scalar floating `Tensor` giving the desired interpolation point.
+    validate_args: Python `bool` indicating whether to validate inputs.
+      Default value: False.
 
   Returns:
     interpolated_value: Polynomial interpolation at time `t`.
@@ -246,10 +248,12 @@ def evaluate_interpolation(coefficients, t0, t1, t):
     t0 = tf.convert_to_tensor(t0)
     t1 = tf.convert_to_tensor(t1)
     t = tf.convert_to_tensor(t)
-    assert_op = tf.Assert(
-        (t0 <= t) & (t <= t1),
-        ['invalid interpolation, fails `t0 <= t <= t1`:', t0, t, t1])
-    with tf.control_dependencies([assert_op]):
+    assert_ops = []
+    if validate_args:
+      assert_ops.append(tf.Assert(
+          (t0 <= t) & (t <= t1),
+          ['invalid interpolation, fails `t0 <= t <= t1`:', t0, t, t1]))
+    with tf.control_dependencies(assert_ops):
       x = tf.cast((t - t0) / (t1 - t0), dtype)
     xs = [tf.constant(1, dtype), x]
     for _ in range(2, len(coefficients)):

@@ -337,6 +337,7 @@ class DormandPrince(base.Solver):
                 [1.0, 1.0], [adjoint_state, initial_adjoint])
             initial_augmented_state = (
                 initial_state, initial_adjoint_state, adjoint_variable_state)
+            # TODO(b/143624114).
             augmented_results = self._solve(
                 ode_fn=augmented_ode_fn,
                 initial_time=-lower_bound_of_integration,
@@ -355,6 +356,7 @@ class DormandPrince(base.Solver):
               lambda n, _, status: (n >= 1) & tf.equal(status, 0),
               reverse_to_result_time,
               (num_result_times - 1, terminal_augmented_state, 0),
+              back_prop=False
           )
           _, adjoint_state, adjoint_variables = augmented_state
           return adjoint_state, list(adjoint_variables)
@@ -465,7 +467,8 @@ class DormandPrince(base.Solver):
       advance_to_solution_time = functools.partial(
           _advance_to_solution_time,
           times_array=solution_times,
-          step_fn=rk_step
+          step_fn=rk_step,
+          validate_args=self._validate_args
       )
 
       assert_ops = self._assert_ops(
@@ -498,7 +501,8 @@ class DormandPrince(base.Solver):
               step_fn=rk_step,
               ode_fn=ode_fn,
               times_array=times_array,
-              solutions_arrays=solutions_arrays
+              solutions_arrays=solutions_arrays,
+              validate_args=self._validate_args
           )
           solver_internal_state, diagnostics, times_array, solutions_arrays = r
         else:
@@ -509,7 +513,7 @@ class DormandPrince(base.Solver):
               _, solver_internal_state, diagnostics, solutions_arrays
           ] = tf.while_loop(iterate_cond, advance_to_solution_time, [
               0, solver_internal_state, diagnostics, solutions_arrays
-          ])
+          ], back_prop=False)
 
         times = times_array.stack()
         stack_components = lambda x: x.stack()
@@ -714,7 +718,8 @@ def _dense_solutions_to_final_time(
     step_fn,
     ode_fn,
     times_array,
-    solutions_arrays
+    solutions_arrays,
+    validate_args=False
 ):
   """Integrates `solver_state` to `final_time`.
 
@@ -732,6 +737,8 @@ def _dense_solutions_to_final_time(
     ode_fn: Callable(t, y) -> dy_dt.
     times_array: `TensorArray` where time values are recorded.
     solutions_arrays: `TensorArray`s where solutions are recorded.
+    validate_args: Python `bool` indicating whether to validate inputs.
+      Default value: False.
 
   Returns:
     solver_state: `_RungeKuttaSolverInternalState` holding final solver state.
@@ -756,9 +763,10 @@ def _dense_solutions_to_final_time(
       solver_state, diagnostics, solutions_arrays, times_array
   ] = tf.while_loop(step_cond, step_and_record, [
       solver_state, diagnostics, solutions_arrays, times_array
-  ])
+  ], back_prop=False)
   # Interpolating the last time point, updating the state and write results.
-  y, coefficients = _interpolate_solution_at(final_time, solver_state)
+  y, coefficients = _interpolate_solution_at(
+      final_time, solver_state, validate_args)
   dy_dt = ode_fn(final_time, y)
   dy_dt = tf.nest.map_structure(tf.convert_to_tensor, dy_dt)
 
@@ -782,7 +790,8 @@ def _advance_to_solution_time(
     diagnostics,
     solutions_arrays,
     times_array,
-    step_fn
+    step_fn,
+    validate_args=False
 ):
   """Advances solution to the next time point, integrating as necessary.
 
@@ -799,6 +808,9 @@ def _advance_to_solution_time(
       should be obtained.
     step_fn: Partial `Dopri._step` method that performs a single step updating
       the `solver_state`, `diagnostics` and `solver_state`.
+    validate_args: Python `bool` indicating whether to validate inputs.
+      Default value: False.
+
   Returns:
     time_id: Integer index of next target time.
     solver_state: Updated solver state.
@@ -812,13 +824,14 @@ def _advance_to_solution_time(
       return times_array[time_id] >= solver_state.current_time
 
     solver_state, diagnostics = tf.while_loop(
-        step_cond, step_fn, (solver_state, diagnostics))
-    y, _ = _interpolate_solution_at(times_array[time_id], solver_state)
+        step_cond, step_fn, (solver_state, diagnostics), back_prop=False)
+    y, _ = _interpolate_solution_at(
+        times_array[time_id], solver_state, validate_args)
     solutions_arrays = _write_solution_components(y, solutions_arrays, time_id)
     return time_id + 1, solver_state, diagnostics, solutions_arrays
 
 
-def _interpolate_solution_at(target_time, solver_state):
+def _interpolate_solution_at(target_time, solver_state, validate_args=False):
   """Computes the solution at `target_time` using 4th order interpolation.
 
   Args:
@@ -827,6 +840,9 @@ def _interpolate_solution_at(target_time, solver_state):
       `solver_state`: `solver_state.last_step_start` <= `target_time` <=
       `solver_state.current_time`.
     solver_state: `_DopriSolverInternalState` - solver state.
+    validate_args: Python `bool` indicating whether to validate inputs.
+      Default value: False.
+
   Returns:
     solution: Solution at `target_time` obtained by interpolation.
     coefficients: Interpolating coefficients used to construct the solution.
@@ -834,7 +850,8 @@ def _interpolate_solution_at(target_time, solver_state):
   coefficients = solver_state.interpolating_coefficients
   t0 = solver_state.last_step_start
   t1 = solver_state.current_time
-  solution = rk_util.evaluate_interpolation(coefficients, t0, t1, target_time)
+  solution = rk_util.evaluate_interpolation(
+      coefficients, t0, t1, target_time, validate_args)
   return solution, coefficients
 
 
