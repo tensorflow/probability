@@ -63,7 +63,7 @@ class VectorDiffeomixtureTest(tfp_test_util.VectorDistributionTestHelpers,
         num_samples=int(3e5),
         radius=2.,
         center=0.,
-        rtol=0.015)
+        rtol=0.025)
     # Larger ball centered at component1's mean.
     self.run_test_sample_consistent_log_prob(
         self.evaluate,
@@ -71,7 +71,7 @@ class VectorDiffeomixtureTest(tfp_test_util.VectorDistributionTestHelpers,
         num_samples=int(3e5),
         radius=4.,
         center=2.,
-        rtol=0.015)
+        rtol=0.025)
 
   def testSampleProbConsistentBroadcastMixNonStandardBase(self):
     dims = 4
@@ -101,10 +101,10 @@ class VectorDiffeomixtureTest(tfp_test_util.VectorDistributionTestHelpers,
         num_samples=int(5e5),
         radius=2.,
         center=1.,
-        rtol=0.025)
+        rtol=0.05)
     # Larger ball centered at component1's mean.
     self.run_test_sample_consistent_log_prob(
-        self.evaluate, vdm, radius=4., center=3., rtol=0.01)
+        self.evaluate, vdm, radius=4., center=3., rtol=0.025)
 
   def testSampleProbConsistentBroadcastMixBatch(self):
     dims = 4
@@ -137,7 +137,7 @@ class VectorDiffeomixtureTest(tfp_test_util.VectorDistributionTestHelpers,
         num_samples=int(3e5),
         radius=2.,
         center=0.,
-        rtol=0.01)
+        rtol=0.025)
     # Larger ball centered at component1's mean.
     self.run_test_sample_consistent_log_prob(
         self.evaluate,
@@ -145,7 +145,7 @@ class VectorDiffeomixtureTest(tfp_test_util.VectorDistributionTestHelpers,
         num_samples=int(3e5),
         radius=4.,
         center=2.,
-        rtol=0.01)
+        rtol=0.025)
 
   def testSampleProbConsistentBroadcastMixTwoBatchDims(self):
     dims = 4
@@ -173,7 +173,7 @@ class VectorDiffeomixtureTest(tfp_test_util.VectorDistributionTestHelpers,
         num_samples=int(3e5),
         radius=2.,
         center=0.,
-        rtol=0.01)
+        rtol=0.02)
     # Larger ball centered at component1's mean.
     self.run_test_sample_consistent_log_prob(
         self.evaluate,
@@ -181,7 +181,7 @@ class VectorDiffeomixtureTest(tfp_test_util.VectorDistributionTestHelpers,
         num_samples=int(3e5),
         radius=3.,
         center=loc_1,
-        rtol=0.02)
+        rtol=0.025)
 
   def testMeanCovarianceNoBatch(self):
     dims = 3
@@ -309,7 +309,8 @@ class VectorDiffeomixtureTest(tfp_test_util.VectorDistributionTestHelpers,
         quadrature_size=8,
         validate_args=True)
     self.run_test_sample_consistent_mean_covariance(
-        self.evaluate, vdm, num_samples=int(1e6), rtol=0.01, cov_atol=0.025)
+        self.evaluate, vdm, num_samples=int(1e6), rtol=0.01,
+        cov_atol=0.05)
 
   def testMeanCovarianceBatch(self):
     dims = 3
@@ -374,7 +375,7 @@ class VectorDiffeomixtureTest(tfp_test_util.VectorDistributionTestHelpers,
         num_samples=int(3e5),
         radius=4.,
         center=2.,
-        rtol=0.005)
+        rtol=0.02)
 
 
 if __name__ == "__main__":

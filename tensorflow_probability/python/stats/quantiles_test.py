@@ -558,7 +558,7 @@ class PercentileTestWithLinearInterpolation(
 
   def test_grads_at_sample_pts_with_no_preserve_gradients(self):
     dist = tfp.distributions.Normal(np.float64(0), np.float64(1))
-    x = dist.sample(10001, seed=0)
+    x = dist.sample(10001, seed=tfp_test_util.test_seed_stream())
     # 50th quantile will lie exactly on a data point.
     # 49.123... will not
     q = tf.constant(np.array([50, 49.123456789]))  # Percentiles, in [0, 100]
@@ -594,13 +594,29 @@ class PercentileTestWithLinearInterpolation(
     # This is due to preserve_gradient == False.
     self.assertAllEqual(0., d_sample_pct_dq[0])
 
-    # Tolerance at the other point is terrible (2x), but this is a sample
-    # quantile based gradient.
-    self.assertAllClose(
-        d_analytic_pct_dq[1], d_sample_pct_dq[1], atol=0, rtol=2)
-    # The absolute values are close though (but tiny).
-    self.assertAllClose(
-        d_analytic_pct_dq[1], d_sample_pct_dq[1], atol=0.05, rtol=0)
+  def test_grads_at_non_sample_pts_with_no_preserve_gradients(self):
+    # Here we use linspace, *not* random samples.  Why?  Because we want the
+    # quantiles to be nicely spaced all of the time...we don't want sudden jumps
+    x = tf.linspace(0., 100., num=100)
+    q = tf.constant(50.1234)  # Not a sample point
+
+    sample_pct, d_sample_pct_dq = tfp.math.value_and_gradient(
+        lambda q_: tfp.stats.percentile(  # pylint: disable=g-long-lambda
+            x, q_, interpolation='linear', preserve_gradients=False),
+        q)
+
+    [
+        sample_pct,
+        d_sample_pct_dq,
+    ] = self.evaluate([
+        sample_pct,
+        d_sample_pct_dq,
+    ])
+
+    # Since `x` is evenly distributed between 0 and 100, the percentiles are as
+    # well.
+    self.assertAllClose(50.1234, sample_pct)
+    self.assertAllClose(1, d_sample_pct_dq)
 
   def test_grads_at_sample_pts_with_yes_preserve_gradients(self):
     dist = tfp.distributions.Normal(np.float64(0), np.float64(1))
@@ -638,10 +654,29 @@ class PercentileTestWithLinearInterpolation(
     # This is due to preserve_gradient == True.
     self.assertNotEqual(0., d_sample_pct_dq[0])
 
-    # Tolerance is terrible (2x), but this is a sample quantile based gradient.
-    self.assertAllClose(d_analytic_pct_dq, d_sample_pct_dq, atol=0, rtol=2)
-    # The absolute values are close though (but tiny).
-    self.assertAllClose(d_analytic_pct_dq, d_sample_pct_dq, atol=0.1, rtol=0)
+  def test_grads_at_non_sample_pts_with_yes_preserve_gradients(self):
+    # Here we use linspace, *not* random samples.  Why?  Because we want the
+    # quantiles to be nicely spaced all of the time...we don't want sudden jumps
+    x = tf.linspace(0., 100., num=100)
+    q = tf.constant(50.1234)  # Not a sample point
+
+    sample_pct, d_sample_pct_dq = tfp.math.value_and_gradient(
+        lambda q_: tfp.stats.percentile(  # pylint: disable=g-long-lambda
+            x, q_, interpolation='linear', preserve_gradients=True),
+        q)
+
+    [
+        sample_pct,
+        d_sample_pct_dq,
+    ] = self.evaluate([
+        sample_pct,
+        d_sample_pct_dq,
+    ])
+
+    # Since `x` is evenly distributed between 0 and 100, the percentiles are as
+    # well.
+    self.assertAllClose(50.1234, sample_pct)
+    self.assertAllClose(1, d_sample_pct_dq)
 
 
 class PercentileTestWithMidpointInterpolation(

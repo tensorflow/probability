@@ -470,7 +470,7 @@ class DiscreteScalarDistributionTestHelpers(object):
 
   def run_test_sample_consistent_log_prob(
       self, sess_run_fn, dist,
-      num_samples=int(1e5), num_threshold=int(1e3), seed=42,
+      num_samples=int(1e5), num_threshold=int(1e3), seed=None,
       batch_size=None,
       rtol=1e-2, atol=0.):
     """Tests that sample/log_prob are consistent with each other.
@@ -512,7 +512,7 @@ class DiscreteScalarDistributionTestHelpers(object):
       raise ValueError('num_threshold({}) must be at least 1.'.format(
           num_threshold))
     # Histogram only supports vectors so we call it once per batch coordinate.
-    y = dist.sample(num_samples, seed=seed)
+    y = dist.sample(num_samples, seed=test_seed_stream(hardcoded_seed=seed))
     y = tf.reshape(y, shape=[num_samples, -1])
     if batch_size is None:
       batch_size = tf.reduce_prod(input_tensor=dist.batch_shape_tensor())
@@ -533,7 +533,7 @@ class DiscreteScalarDistributionTestHelpers(object):
 
   def run_test_sample_consistent_mean_variance(
       self, sess_run_fn, dist,
-      num_samples=int(1e5), seed=24,
+      num_samples=int(1e5), seed=None,
       rtol=1e-2, atol=0.):
     """Tests that sample/mean/variance are consistent with each other.
 
@@ -556,7 +556,9 @@ class DiscreteScalarDistributionTestHelpers(object):
       atol: Python `float`-type indicating the admissible absolute error between
         analytical and sample statistics.
     """
-    x = tf.cast(dist.sample(num_samples, seed=seed), dtype=tf.float32)
+    x = tf.cast(dist.sample(num_samples,
+                            seed=test_seed_stream(hardcoded_seed=seed)),
+                dtype=tf.float32)
     sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
     sample_variance = tf.reduce_mean(
         input_tensor=tf.square(x - sample_mean), axis=0)
@@ -632,7 +634,7 @@ class VectorDistributionTestHelpers(object):
       num_samples=int(1e5),
       radius=1.,
       center=0.,
-      seed=42,
+      seed=None,
       rtol=1e-2,
       atol=0.):
     """Tests that sample/log_prob are mutually consistent.
@@ -715,7 +717,7 @@ class VectorDistributionTestHelpers(object):
 
     def monte_carlo_hypersphere_volume(dist, num_samples, radius, center):
       # https://en.wikipedia.org/wiki/Importance_sampling
-      x = dist.sample(num_samples, seed=seed)
+      x = dist.sample(num_samples, seed=test_seed_stream(hardcoded_seed=seed))
       x = tf.identity(x)  # Invalidate bijector cacheing.
       inverse_log_prob = tf.exp(-dist.log_prob(x))
       importance_weights = tf1.where(
@@ -751,7 +753,7 @@ class VectorDistributionTestHelpers(object):
       sess_run_fn,
       dist,
       num_samples=int(1e5),
-      seed=24,
+      seed=None,
       rtol=1e-2,
       atol=0.1,
       cov_rtol=None,
@@ -782,7 +784,7 @@ class VectorDistributionTestHelpers(object):
         between analytical and sample covariance. Default: atol.
     """
 
-    x = dist.sample(num_samples, seed=seed)
+    x = dist.sample(num_samples, seed=test_seed_stream(hardcoded_seed=seed))
     sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
     sample_covariance = tf.reduce_mean(
         input_tensor=_vec_outer_square(x - sample_mean), axis=0)

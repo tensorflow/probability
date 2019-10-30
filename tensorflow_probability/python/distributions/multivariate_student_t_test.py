@@ -296,7 +296,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     dist = tfd.MultivariateStudentTLinearOperator(
         loc=self._input([1., 2.]), df=self._input(5.), scale=scale)
     self.run_test_sample_consistent_mean_covariance(
-        sess_run_fn=self.evaluate, dist=dist)
+        num_samples=int(1e6), sess_run_fn=self.evaluate, dist=dist)
 
   def testSamplingDeterministic(self):
     # pyformat: disable
@@ -361,7 +361,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     mode_log_prob = dist.log_prob(dist.mode())
     self.assertTrue(np.all(self.evaluate(mode_log_prob >= log_probs)))
 
-  @parameterized.parameters(1., 3., 10.)
+  @parameterized.parameters(1., 3., 5.)
   def testHypersphereVolume(self, radius):
     # pyformat: disable
     scale = tf.linalg.LinearOperatorFullMatrix(
