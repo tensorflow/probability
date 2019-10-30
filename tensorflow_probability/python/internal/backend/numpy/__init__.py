@@ -43,10 +43,11 @@ from tensorflow_probability.python.internal.backend.numpy.ops import *  # pylint
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
+Assert = debugging.Assert
+Module = compat.v2.Module
+TensorArray = compat.v2.TensorArray
+Variable = compat.v2.Variable
+check_numerics = debugging.check_numerics
 eye = linalg.eye
 function = compat.function
 matmul = linalg.matmul
-Module = compat.v2.Module
-Variable = compat.v2.Variable
-Assert = debugging.Assert
-check_numerics = debugging.check_numerics

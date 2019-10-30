@@ -49,6 +49,7 @@ py_library(
         ":random_generators",
         ":sets_lib",
         ":sparse_lib",
+        ":tensor_array_ops",
         ":test_lib",
         # tensorflow dep,
     ],
@@ -234,6 +235,26 @@ py_library(
 )
 
 py_library(
+    name = "tensor_array_ops",
+    srcs = ["tensor_array_ops.py"],
+    deps = [
+        ":_utils",
+        # numpy dep,
+    ],
+)
+
+py_test(
+    name = "tensor_array_ops_test",
+    srcs = ["tensor_array_ops_test.py"],
+    tags = ["tfp_numpy"],
+    deps = [
+        ":tensor_array_ops",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
     name = "random_generators",
     srcs = ["random_generators.py"],
     deps = [
@@ -294,6 +315,7 @@ py_library(
         ":_utils",
         ":initializers",
         ":ops",
+        ":tensor_array_ops",
     ],
 )
 
@@ -303,6 +325,7 @@ py_library(
     deps = [
         ":_utils",
         ":ops",
+        ":tensor_array_ops",
         # tensorflow dep,
     ],
 )

@@ -48,6 +48,8 @@ FILENAMES = [
     "random_generators",
     "sets_lib",
     "sparse_lib",
+    "tensor_array_ops",
+    "tensor_array_ops_test",
     "test_lib",
     "v1",
     "v2",
@@ -106,6 +108,23 @@ py_library(
 )
 
 # [internal] load python3.bzl
+
+py_test(
+    name = "tensor_array_ops_test",
+    srcs = ["tensor_array_ops_test.py"],
+    main = "tensor_array_ops_test.py",
+    tags = ["tfp_jax"],
+    deps = [
+        ":jax",
+        ":jax_testlib",
+        # absl/testing:parameterized dep,
+        # hypothesis dep,
+        # jax dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
 
 py_test(
     name = "jax_test",

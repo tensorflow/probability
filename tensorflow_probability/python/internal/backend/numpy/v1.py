@@ -19,13 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 import contextlib
+
 # Dependency imports
+
 import numpy as np
 import six
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import initializers
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
@@ -35,9 +35,13 @@ from tensorflow_probability.python.internal.backend.numpy.ops import Module
 from tensorflow_probability.python.internal.backend.numpy.ops import name_scope
 from tensorflow_probability.python.internal.backend.numpy.ops import Tensor
 from tensorflow_probability.python.internal.backend.numpy.ops import Variable
+from tensorflow_probability.python.internal.backend.numpy.tensor_array_ops import TensorArray
 
 
 __all__ = [
+    'Module',
+    'Session',
+    'TensorArray',
     'assert_equal',
     'assert_greater',
     'assert_greater_equal',
@@ -62,8 +66,6 @@ __all__ = [
     'logging',
     'name_scope',
     'placeholder_with_default',
-    'Module',
-    'Session',
     'set_random_seed',
 ]
 
