@@ -41,7 +41,7 @@ from tensorflow_probability.python.internal.backend import numpy as numpy_backen
 ALLOW_NAN = False
 ALLOW_INFINITY = False
 
-MODE_JAX = False
+JAX_MODE = False
 
 
 def _add_jax_prng_key_as_seed():
@@ -646,7 +646,7 @@ class NumpyTest(tfp_test_util.TestCase):
                             strategy_list,
                             jax_disabled=False,
                             **_):
-    if jax_disabled and MODE_JAX:
+    if jax_disabled and JAX_MODE:
       logging.warning('The test for %s is disabled for JAX.',
                       numpy_function.__name__)
     elif not strategy_list:
@@ -665,7 +665,7 @@ class NumpyTest(tfp_test_util.TestCase):
                       jax_disabled=False,
                       assert_shape_only=False,
                       jax_kwargs=lambda: {}):
-    if jax_disabled and MODE_JAX:
+    if jax_disabled and JAX_MODE:
       self.skipTest('Test is disabled for JAX')
     for strategy in strategy_list:
       @hp.settings(deadline=None,
@@ -680,7 +680,7 @@ class NumpyTest(tfp_test_util.TestCase):
           args = (args,)
         tensorflow_value = self.evaluate(
             tf_fn(*_maybe_convert_to_tensors(args)))
-        kwargs = jax_kwargs() if MODE_JAX else {}
+        kwargs = jax_kwargs() if JAX_MODE else {}
         numpy_value = np_fn(*args, **kwargs)
         if assert_shape_only:
 

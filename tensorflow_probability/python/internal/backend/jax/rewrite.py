@@ -35,9 +35,9 @@ def main(argv):
   contents = contents.replace('scipy.linalg', 'jax.scipy.linalg')
   contents = contents.replace('scipy.special', 'jax.scipy.special')
   contents = contents.replace(
-      'MODE_JAX = False',
-      'MODE_JAX = True\n'
-      'from jax.config import config; config.update("jax_enable_x64", True)')
+      'tf.test.main()',
+      'from jax.config import config; config.update("jax_enable_x64", True); '
+      'tf.test.main()')
   contents = contents.replace('\nimport numpy as np',
                               '\nimport numpy as onp\nimport jax.numpy as np')
   contents = contents.replace('np.bool', 'onp.bool')
