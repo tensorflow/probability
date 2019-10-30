@@ -527,7 +527,7 @@ class QuantizedDistribution(distributions.Distribution):
     with tf.name_scope('check_integer'):
       value = tf.convert_to_tensor(value, name='value')
       dependencies = []
-      if not self.validate_args:
+      if self.validate_args:
         dependencies.append(distribution_util.assert_integer_form(
             value, message='value has non-integer components.'))
       with tf.control_dependencies(dependencies):
