@@ -30,7 +30,6 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 def _broadcast_cat_event_and_params(event, params, base_dtype):
@@ -203,34 +202,13 @@ class Categorical(distribution.Distribution):
     return dict(logits=1, probs=1)
 
   @property
-  @deprecation.deprecated(
-      '2019-10-01', 'The `num_categories` property is deprecated.  Use '
-      '`tf.shape(self.probs if self.logits is None else self.logits)[-1]` '
-      'instead.')
-  # Note this function has graph side-effects which is why it must be
-  # deprecated.
-  def num_categories(self):
-    """Scalar `int32` tensor: the number of categories."""
-    with self._name_and_control_scope('num_categories'):
-      # Note: its safe to use `convert_to_tensor` because either
-      # `self._num_categories()` has no graph side-effects or already hit our
-      # assertions checks. Ideally we'd use tf.identity but cannot because of
-      # its failure to preserve static value; b/135200956.
-      return tf.convert_to_tensor(
-          self._num_categories(), dtype_hint=tf.int32, name='num_categories')
-
-  @property
   def logits(self):
     """Input argument `logits`."""
-    if self._logits is None:
-      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
-    if self._probs is None:
-      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self, x=None):
@@ -366,22 +344,6 @@ class Categorical(distribution.Distribution):
       # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
       # so we pre-emptively convert-to-tensor.
       return tf.shape(tf.convert_to_tensor(x))[-1]
-
-  @deprecation.deprecated(
-      '2019-10-01',
-      ('The `logits` property will return `None` when the distribution is '
-       'parameterized with `logits=None`. Use `logits_parameter()` instead.'),
-      warn_once=True)
-  def _logits_deprecated_behavior(self):
-    return self.logits_parameter()
-
-  @deprecation.deprecated(
-      '2019-10-01',
-      ('The `probs` property will return `None` when the distribution is '
-       'parameterized with `probs=None`. Use `probs_parameter()` instead.'),
-      warn_once=True)
-  def _probs_deprecated_behavior(self):
-    return self.probs_parameter()
 
   def _parameter_control_dependencies(self, is_init):
     return maybe_assert_categorical_param_correctness(

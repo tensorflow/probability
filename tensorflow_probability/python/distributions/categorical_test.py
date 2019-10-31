@@ -26,6 +26,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -63,10 +64,14 @@ class CategoricalTest(test_util.TestCase):
                           self.evaluate(dist.batch_shape_tensor()))
       self.assertAllEqual([], dist.event_shape)
       self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
-      self.assertEqual(10, self.evaluate(dist.num_categories))
-      # num_categories is available as a constant because the shape is
+      num_categories = tf.shape(
+          dist.probs if dist.logits is None else dist.logits)[-1]
+      self.assertEqual(10, self.evaluate(num_categories))
+      # The number of categories is available as a constant because the shape is
       # known at graph build time.
-      self.assertEqual(10, tf.get_static_value(dist.num_categories))
+      num_categories = prefer_static.shape(
+          dist.probs if dist.logits is None else dist.logits)[-1]
+      self.assertEqual(10, tf.get_static_value(num_categories))
 
     for batch_shape in ([], [1], [2, 3, 4]):
       dist = make_categorical(
@@ -78,7 +83,9 @@ class CategoricalTest(test_util.TestCase):
                           self.evaluate(dist.batch_shape_tensor()))
       self.assertAllEqual([], dist.event_shape)
       self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
-      self.assertEqual(10, self.evaluate(dist.num_categories))
+      num_categories = tf.shape(
+          dist.probs if dist.logits is None else dist.logits)[-1]
+      self.assertEqual(10, self.evaluate(num_categories))
 
   def testDtype(self):
     dist = make_categorical([], 5, dtype=tf.int32)
