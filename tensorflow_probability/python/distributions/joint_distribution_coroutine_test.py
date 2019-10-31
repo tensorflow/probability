@@ -57,10 +57,10 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    # Neither `event_shape` nor `batch_shape` can be determined
-    # without the underlying distributions being cached.
-    self.assertAllEqual(joint.event_shape, None)
-    self.assertAllEqual(joint.batch_shape, None)
+    # Properties `event_shape` and `batch_shape` should be defined
+    # even before any sampling calls have occurred.
+    self.assertAllEqual(joint.event_shape, [[], [], []])
+    self.assertAllEqual(joint.batch_shape, [[], [], []])
 
     ds, _ = joint.sample_distributions()
     self.assertLen(ds, 3)
@@ -78,8 +78,6 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertAllEqual(event_shape[1], [])
     self.assertAllEqual(event_shape[2], [])
 
-    self.assertAllEqual(joint.event_shape, [[], [], []])
-
     is_batch_scalar = joint.is_scalar_batch()
     self.assertAllEqual(is_batch_scalar[0], True)
     self.assertAllEqual(is_batch_scalar[1], True)
@@ -89,8 +87,6 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertAllEqual(batch_shape[0], [])
     self.assertAllEqual(batch_shape[1], [])
     self.assertAllEqual(batch_shape[2], [])
-
-    self.assertAllEqual(joint.batch_shape, [[], [], []])
 
   def test_batch_and_event_shape_with_plate(self):
     # The joint distribution specified below corresponds to this
@@ -111,10 +107,10 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    # Neither `event_shape` nor `batch_shape` can be determined
-    # without the underlying distributions being cached.
-    self.assertAllEqual(joint.event_shape, None)
-    self.assertAllEqual(joint.batch_shape, None)
+    # Properties `event_shape` and `batch_shape` should be defined
+    # even before any sampling calls have occurred.
+    self.assertAllEqual(joint.event_shape, [[], [], [20], [20]])
+    self.assertAllEqual(joint.batch_shape, [[], [], [], []])
 
     ds, _ = joint.sample_distributions()
     self.assertLen(ds, 4)
@@ -135,8 +131,6 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertAllEqual(event_shape[2], [20])
     self.assertAllEqual(event_shape[3], [20])
 
-    self.assertAllEqual(joint.event_shape, [[], [], [20], [20]])
-
     is_batch = joint.is_scalar_batch()
     self.assertAllEqual(is_batch[0], True)
     self.assertAllEqual(is_batch[1], True)
@@ -148,8 +142,6 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertAllEqual(batch_shape[1], [])
     self.assertAllEqual(batch_shape[2], [])
     self.assertAllEqual(batch_shape[3], [])
-
-    self.assertAllEqual(joint.batch_shape, [[], [], [], []])
 
   def test_sample_shape_no_plate(self):
     # The joint distribution specified below corresponds to this
@@ -538,19 +530,6 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertEqual(
         ('tfp.distributions.JointDistributionCoroutine('
          '"JointDistributionCoroutine",'
-         ' dtype=Model(s=?, w=?))'),
-        str(m))
-    self.assertEqual(
-        ('<tfp.distributions.JointDistributionCoroutine'
-         ' \'JointDistributionCoroutine\''
-         ' batch_shape=?'
-         ' event_shape=?'
-         ' dtype=Model(s=?, w=?)>'),
-        repr(m))
-    m.sample()
-    self.assertEqual(
-        ('tfp.distributions.JointDistributionCoroutine('
-         '"JointDistributionCoroutine",'
          ' batch_shape=Model(s=[], w=[]),'
          ' event_shape=Model(s=[100], w=[100]),'
          ' dtype=Model(s=float32, w=float32))'),
@@ -626,6 +605,26 @@ class JointDistributionCoroutineTest(test_util.TestCase):
                         (grads[0].shape, grads[1].shape))
     self.assertAllNotNone(grads)
 
+  def test_cache_doesnt_leak_graph_tensors(self):
+    if not tf.executing_eagerly():
+      return
+
+    def dist():
+      random_rank = tf.cast(3.5 + tf.random.uniform([]), tf.int32)
+      yield Root(tfd.Normal(loc=0., scale=tf.ones([random_rank])))
+    joint = tfd.JointDistributionCoroutine(dist)
+
+    @tf.function(autograph=False)
+    def get_batch_shapes():
+      return joint.batch_shape_tensor()
+
+    # Calling the tf.function will put graph Tensors in
+    # `joint._single_sample_distributions`
+    _ = get_batch_shapes()
+
+    # Referring to sampled distributions in eager mode should produce an eager
+    # result. Graph Tensors will throw an error.
+    _ = [s.numpy() for s in joint.batch_shape_tensor()]
 
 if __name__ == '__main__':
   tf.test.main()

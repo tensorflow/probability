@@ -593,8 +593,7 @@ def fit_with_hmc(model,
 
         # Set step sizes using the unconstrained variational distribution.
         if initial_step_size is None:
-          q_dists_by_name = variational_posterior._model_unflatten(  # pylint: disable=protected-access
-              variational_posterior._most_recently_built_distributions)  # pylint: disable=protected-access
+          q_dists_by_name, _ = variational_posterior.sample_distributions()
           initial_step_size = [
               q_dists_by_name[p.name].distribution.stddev()
               for p in model.parameters]

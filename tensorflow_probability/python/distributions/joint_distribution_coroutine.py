@@ -159,7 +159,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     with tf.name_scope(name or 'JointDistributionCoroutine') as name:
       self._sample_dtype = sample_dtype
       self._model = model
-      self._most_recently_built_distributions = None
+      self._single_sample_distributions = {}
       super(JointDistributionCoroutine, self).__init__(
           dtype=sample_dtype,
           reparameterization_type=None,  # Ignored; we'll override.

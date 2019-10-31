@@ -284,19 +284,6 @@ class JointDistributionSequentialTest(test_util.TestCase):
     lp = d.log_prob(x)
     self.assertEqual(sample_shape * 3, lp.shape)
 
-  def test_only_memoize_non_user_input(self):
-    d = tfd.JointDistributionSequential(
-        [
-            lambda: tfd.Bernoulli(logits=0.),
-            lambda c: tfd.Normal(loc=tf.cast(c, tf.float32), scale=1.),
-        ],
-        validate_args=True)
-    self.assertEqual([tf.int32, None], d.dtype)
-    d.sample(value=[1., None])  # For the *potential* side-effect
-    self.assertEqual([tf.int32, None], d.dtype)
-    d.sample()  # For the *actual* side-effect
-    self.assertEqual([tf.int32, tf.float32], d.dtype)
-
   def test_argspec(self):
     argspec = tf_inspect.getfullargspec(Dummy)
     self.assertAllEqual(['me', 'arg1', 'arg2', 'arg3'], argspec.args)

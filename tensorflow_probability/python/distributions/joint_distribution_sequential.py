@@ -197,9 +197,12 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       self._model_trackable = model
       self._model = self._no_dependency(model)
       self._build(model)
-      self._most_recently_built_distributions = [
+
+      self._single_sample_distributions = {}
+      self._get_single_sample_distributions(candidate_dists=[
           None if a else d() for d, a
-          in zip(self._dist_fn_wrapped, self._dist_fn_args)]
+          in zip(self._dist_fn_wrapped, self._dist_fn_args)])
+
       self._always_use_specified_sample_shape = False
       super(JointDistributionSequential, self).__init__(
           dtype=None,  # Ignored; we'll override.
