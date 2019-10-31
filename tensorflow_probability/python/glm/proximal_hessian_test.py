@@ -216,7 +216,7 @@ class _ProximalHessianTest(object):
     # true coefficients.
     self.assertAllEqual(is_converged_, True)
     self.assertAllClose(
-        model_coefficients_, model_coefficients_true_, atol=0.1, rtol=0.1)
+        model_coefficients_, model_coefficients_true_, atol=0.2, rtol=0.2)
 
   def testFitGLMFromData_SimilarModel(self):
     # Run fit_sparse where the loss function is negative log likelihood of a
