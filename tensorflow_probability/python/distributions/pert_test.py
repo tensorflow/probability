@@ -27,14 +27,13 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PERTTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PERTTest(test_util.TestCase):
 
   def _generate_boilerplate_param(self):
     temperature = np.array([1., 2., 4., 10.])
@@ -113,7 +112,7 @@ class PERTTest(tfp_test_util.TestCase):
     num_samples = 300000
     temperature, low, peak, high = 2., 1., 7., 10.
     dist = tfd.PERT(low, peak, high, temperature)
-    samples = dist.sample(num_samples, seed=tfp_test_util.test_seed())
+    samples = dist.sample(num_samples, seed=test_util.test_seed())
 
     check_cdf_agrees = st.assert_true_cdf_equal_by_dkwm(
         samples, dist.cdf, false_fail_rate=1e-6)

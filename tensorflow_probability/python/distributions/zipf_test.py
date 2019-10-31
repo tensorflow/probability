@@ -23,14 +23,13 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ZipfTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ZipfTest(test_util.TestCase):
 
   def assertBetween(self, x, minimum, maximum):
     self.assertGreaterEqual(x, minimum)
@@ -345,7 +344,7 @@ class ZipfTest(tfp_test_util.TestCase):
       power = tf.constant(power_v, dtype=power_dtype)
       for dtype in [tf.int32, tf.int64, tf.float32, tf.float64]:
         zipf = tfd.Zipf(power=power, dtype=dtype)
-        samples = zipf.sample(n, seed=tfp_test_util.test_seed())
+        samples = zipf.sample(n, seed=test_util.test_seed())
         sample_values = self.evaluate(samples)
         self.assertEqual((n,), samples.shape)
         self.assertEqual((n,), sample_values.shape)
@@ -363,14 +362,14 @@ class ZipfTest(tfp_test_util.TestCase):
 
       for dtype in [tf.int32, tf.int64, tf.float32, tf.float64]:
         zipf = tfd.Zipf(power=power, dtype=dtype, validate_args=True)
-        samples = zipf.sample(n, seed=tfp_test_util.test_seed())
+        samples = zipf.sample(n, seed=test_util.test_seed())
         self.evaluate(samples)
 
   def testZipfSampleMultidimensionalMean(self):
     power_v = np.array([np.arange(5, 15, dtype=np.float32)])  # 1 x 10
     zipf = tfd.Zipf(power=power_v)
     n = int(100e3)
-    samples = zipf.sample(n, seed=tfp_test_util.test_seed())
+    samples = zipf.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual((n, 1, 10,), samples.shape)
     self.assertEqual((n, 1, 10,), sample_values.shape)
@@ -383,7 +382,7 @@ class ZipfTest(tfp_test_util.TestCase):
     power_v = np.array([np.arange(5, 10, dtype=np.float32)])  # 1 x 5
     zipf = tfd.Zipf(power=power_v)
     n = int(100e4)
-    samples = zipf.sample(n, seed=tfp_test_util.test_seed())
+    samples = zipf.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual((n, 1, 5), samples.shape)
     self.assertEqual((n, 1, 5), sample_values.shape)
@@ -395,7 +394,7 @@ class ZipfTest(tfp_test_util.TestCase):
   # Test that sampling with the same seed twice gives the same results.
   def testZipfSampleMultipleTimes(self):
     n = 1000
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
     power = 1.5
 
     zipf1 = tfd.Zipf(power=power, name="zipf1")
@@ -411,7 +410,7 @@ class ZipfTest(tfp_test_util.TestCase):
   def testZipfSample_AvoidsInfiniteLoop(self):
     zipf = tfd.Zipf(power=1.)
     n = 1000
-    self.evaluate(zipf.sample(n, seed=tfp_test_util.test_seed()))
+    self.evaluate(zipf.sample(n, seed=test_util.test_seed()))
 
 
 if __name__ == "__main__":

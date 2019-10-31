@@ -27,17 +27,15 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 _maybe_seed = lambda s: tf1.set_random_seed(s) if tf.executing_eagerly(
 ) else s
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SampleAnnealedImportanceTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SampleAnnealedImportanceTest(test_util.TestCase):
 
   def setUp(self):
     self._shape_param = 5.

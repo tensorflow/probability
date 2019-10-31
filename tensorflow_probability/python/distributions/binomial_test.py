@@ -23,13 +23,11 @@ from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BinomialTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BinomialTest(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -198,7 +196,7 @@ class BinomialTest(tfp_test_util.TestCase):
     counts = np.float32([4, 11., 20.])
     dist = tfd.Binomial(total_count=counts, probs=probs)
     n = int(1e5)
-    x = dist.sample(n, seed=tfp_test_util.test_seed())
+    x = dist.sample(n, seed=test_util.test_seed())
     sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)
     [
         sample_mean_,
@@ -219,7 +217,7 @@ class BinomialTest(tfp_test_util.TestCase):
     probs = self._rng.rand(4).astype(np.float32)
     dist = tfd.Binomial(total_count=counts, probs=probs)
     n = int(1e5)
-    x = dist.sample(n, seed=tfp_test_util.test_seed())
+    x = dist.sample(n, seed=test_util.test_seed())
     sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)
     [
         sample_mean_,
@@ -258,8 +256,8 @@ class BinomialTest(tfp_test_util.TestCase):
         atol=0, rtol=1e-4)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BinomialFromVariableTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BinomialFromVariableTest(test_util.TestCase):
 
   def testAssertionsTotalCount(self):
     x = tf.Variable([-1.0, 4.0, 1.0])

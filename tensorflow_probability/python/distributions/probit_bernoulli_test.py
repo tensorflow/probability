@@ -29,8 +29,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
@@ -46,8 +45,8 @@ def entropy(p):
   return -q * np.log(q) - p * np.log(p)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ProbitBernoulliTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ProbitBernoulliTest(test_util.TestCase):
 
   def testP(self):
     p = [0.2, 0.4]
@@ -233,7 +232,7 @@ class ProbitBernoulliTest(tfp_test_util.TestCase):
     # In this test we're just interested in verifying there isn't a crash
     # owing to mismatched types. b/30940152
     dist = tfd.ProbitBernoulli(np.log([.2, .4]))
-    x = dist.sample(1, seed=tfp_test_util.test_seed())
+    x = dist.sample(1, seed=test_util.test_seed())
     self.assertAllEqual((1, 2), tensorshape_util.as_list(x.shape))
 
   def testNotReparameterized(self):
@@ -319,8 +318,8 @@ class ProbitBernoulliTest(tfp_test_util.TestCase):
         *self.evaluate([d.prob(1.), d.probs_parameter()]), atol=0, rtol=1e-4)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ProbitBernoulliFromVariableTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ProbitBernoulliFromVariableTest(test_util.TestCase):
 
   def testGradientProbits(self):
     x = tf.Variable([-1., 1])

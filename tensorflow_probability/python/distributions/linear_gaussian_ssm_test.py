@@ -37,14 +37,13 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import kalm
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import KalmanFilterState
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfl = tf.linalg
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _IIDNormalTest(object):
 
   def setUp(self):
@@ -167,26 +166,26 @@ class _IIDNormalTest(object):
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTestStatic32(_IIDNormalTest, tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class IIDNormalTestStatic32(_IIDNormalTest, test_util.TestCase):
   use_static_shape = True
   dtype = np.float32
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTestStatic64(_IIDNormalTest, tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class IIDNormalTestStatic64(_IIDNormalTest, test_util.TestCase):
   use_static_shape = True
   dtype = np.float64
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IIDNormalTestDynamic32(_IIDNormalTest, tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class IIDNormalTestDynamic32(_IIDNormalTest, test_util.TestCase):
   use_static_shape = False
   dtype = np.float32
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SanityChecks(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SanityChecks(test_util.TestCase):
 
   def test_deterministic_system(self):
 
@@ -364,8 +363,8 @@ class SanityChecks(tfp_test_util.TestCase):
         result_shape)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BatchTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BatchTest(test_util.TestCase):
   """Test that methods broadcast batch dimensions for each parameter."""
 
   def setUp(self):
@@ -564,7 +563,7 @@ class BatchTest(tfp_test_util.TestCase):
     self.assertAllClose(pushforward_covs_, observation_covs_)
 
 
-class MissingObservationsTests(tfp_test_util.TestCase):
+class MissingObservationsTests(test_util.TestCase):
 
   # One test requires derivative with respect to
   # transition_noise.scale_diag so we allow this to be
@@ -802,8 +801,8 @@ class MissingObservationsTests(tfp_test_util.TestCase):
            x=observed_time_series, mask=big_mask)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class KalmanSmootherTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class KalmanSmootherTest(test_util.TestCase):
 
   def build_kf(self):
     # Define a simple model with 3D latents and 2D observations.
@@ -935,7 +934,7 @@ class KalmanSmootherTest(tfp_test_util.TestCase):
 
     sample_shape = [5000, 2]
     posterior_samples = kf.posterior_sample(
-        obs, sample_shape, seed=tfp_test_util.test_seed(), mask=mask)
+        obs, sample_shape, seed=test_util.test_seed(), mask=mask)
     self.assertAllEqual(posterior_samples.shape,
                         sample_shape + [1, 1, 5, 3])
     posterior_mean, posterior_covs = kf.posterior_marginals(obs, mask=mask)
@@ -952,7 +951,7 @@ class KalmanSmootherTest(tfp_test_util.TestCase):
     self.assertAllClose(posterior_covs_, empirical_covs_, atol=3e-2)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _KalmanStepsTest(object):
 
   def setUp(self):
@@ -1305,8 +1304,8 @@ class _KalmanStepsTest(object):
                         np.diag(self.observation_noise_scale_diag**2))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class KalmanStepsTestStatic(tfp_test_util.TestCase, _KalmanStepsTest):
+@test_util.test_all_tf_execution_regimes
+class KalmanStepsTestStatic(test_util.TestCase, _KalmanStepsTest):
 
   use_static_shape = True
 
@@ -1317,8 +1316,8 @@ class KalmanStepsTestStatic(tfp_test_util.TestCase, _KalmanStepsTest):
     return tf.convert_to_tensor(value=tensor)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class KalmanStepsTestDynamic(tfp_test_util.TestCase, _KalmanStepsTest):
+@test_util.test_all_tf_execution_regimes
+class KalmanStepsTestDynamic(test_util.TestCase, _KalmanStepsTest):
 
   use_static_shape = False
 
@@ -1330,7 +1329,7 @@ class KalmanStepsTestDynamic(tfp_test_util.TestCase, _KalmanStepsTest):
         input=tf.convert_to_tensor(value=tensor), shape=None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _AugmentSampleShapeTest(object):
 
   def testAugmentsShape(self):
@@ -1373,9 +1372,8 @@ class _AugmentSampleShapeTest(object):
                                 validate_args=True))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AugmentSampleShapeTestStatic(tfp_test_util.TestCase,
-                                   _AugmentSampleShapeTest):
+@test_util.test_all_tf_execution_regimes
+class AugmentSampleShapeTestStatic(test_util.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
     return self.assertRaisesRegexp(Exception, msg)
@@ -1391,8 +1389,8 @@ class AugmentSampleShapeTestStatic(tfp_test_util.TestCase,
     return x
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AugmentSampleShapeTestDynamic(tfp_test_util.TestCase,
+@test_util.test_all_tf_execution_regimes
+class AugmentSampleShapeTestDynamic(test_util.TestCase,
                                     _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):

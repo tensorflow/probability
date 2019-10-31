@@ -26,9 +26,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfpk = tfp.math.psd_kernels
 
@@ -41,8 +39,8 @@ def skip_if_no_xla(skip_test_fn):
       skip_test_fn('XLA not available')
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LinearOperatorPSDKernelTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class LinearOperatorPSDKernelTest(test_util.TestCase):
   """Tests for tfp.experimental.linalg.LinearOperatorPSDKernel."""
 
   def test_shape(self):

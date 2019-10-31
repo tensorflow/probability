@@ -25,8 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
@@ -40,8 +39,8 @@ def random_samples(shape):
   return np.random.uniform(size=list(shape))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class EmpiricalScalarTest(tfp_test_util.VectorDistributionTestHelpers):
+@test_util.test_all_tf_execution_regimes
+class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
 
   def testSamples(self):
     for samples_shape in ([2], [2, 4], [4, 2, 4]):
@@ -260,8 +259,8 @@ class EmpiricalScalarTest(tfp_test_util.VectorDistributionTestHelpers):
                           np.sqrt(expected_variance))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class EmpiricalVectorTest(tfp_test_util.VectorDistributionTestHelpers):
+@test_util.test_all_tf_execution_regimes
+class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
 
   def testSamples(self):
     for samples_shape in ([2, 4], [4, 2, 4], [2, 2, 2, 4]):
@@ -493,9 +492,9 @@ class EmpiricalVectorTest(tfp_test_util.VectorDistributionTestHelpers):
                           np.sqrt(expected_variance))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class EmpiricalNdTest(tfp_test_util.VectorDistributionTestHelpers,
-                      tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
+                      test_util.TestCase):
 
   def testSamples(self):
     for samples_shape in ([4, 2, 4], [4, 2, 2, 4]):
@@ -670,22 +669,22 @@ class EmpiricalNdTest(tfp_test_util.VectorDistributionTestHelpers,
 
 
 class EmpiricalScalarStaticShapeTest(
-    EmpiricalScalarTest, tfp_test_util.TestCase):
+    EmpiricalScalarTest, test_util.TestCase):
   static_shape = True
 
 
 class EmpiricalScalarDynamicShapeTest(
-    EmpiricalScalarTest, tfp_test_util.TestCase):
+    EmpiricalScalarTest, test_util.TestCase):
   static_shape = False
 
 
 class EmpiricalVectorStaticShapeTest(
-    EmpiricalVectorTest, tfp_test_util.TestCase):
+    EmpiricalVectorTest, test_util.TestCase):
   static_shape = True
 
 
 class EmpiricalVectorDynamicShapeTest(
-    EmpiricalVectorTest, tfp_test_util.TestCase):
+    EmpiricalVectorTest, test_util.TestCase):
   static_shape = False
 
 

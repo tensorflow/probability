@@ -30,8 +30,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.auto_batching import backend_test_lib as backend_test
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst
 from tensorflow_probability.python.experimental.auto_batching import tf_backend
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 # TODO(b/127689162): Restore testing complex dtypes.
 
@@ -49,8 +48,8 @@ def var_init(max_stack_depth, initial_value):
       initial_value, TF_BACKEND.full_mask(initial_value.shape[0]))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TFVariableTest(tfp_test_util.TestCase, backend_test.VariableTestCase):
+@test_util.test_all_tf_execution_regimes
+class TFVariableTest(test_util.TestCase, backend_test.VariableTestCase):
 
   def testTFSmoke(self):
     """Test the property on specific example, without relying on Hypothesis."""

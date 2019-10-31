@@ -24,16 +24,15 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DeferredTensorTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DeferredTensorTest(test_util.TestCase):
 
   def test_docstring_example(self):
     trainable_normal = tfd.Normal(
@@ -125,8 +124,8 @@ class DeferredTensorTest(tfp_test_util.TestCase):
       self.assertAllEqual([[-1., 0.], [-2., 0.], [-3., 0.]], y_)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TransformedVariableTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TransformedVariableTest(test_util.TestCase):
 
   def test_docstring_1(self):
     trainable_normal = tfd.Normal(
@@ -211,8 +210,8 @@ class TransformedVariableTest(tfp_test_util.TestCase):
     # Different vars have no deps so we needn't test cross-talk.
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DeferredTensorBehavesLikeTensorTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DeferredTensorBehavesLikeTensorTest(test_util.TestCase):
 
   def testArrayPriority(self):
     x = tfp.util.DeferredTensor(tf.Variable(0.), tf.math.exp)

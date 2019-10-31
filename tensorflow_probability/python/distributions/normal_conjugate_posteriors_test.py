@@ -25,12 +25,11 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NormalTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class NormalTest(test_util.TestCase):
 
   def testNormalConjugateKnownSigmaPosterior(self):
     with tf1.Session():
@@ -158,7 +157,7 @@ class NormalTest(tfp_test_util.TestCase):
     self.assertAllClose(candidate_posterior_prec_, posterior_prec_, atol=1e-5)
 
   def testMVNConjugateLinearUpdateSupportsBatchShape(self):
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     num_latents = 2
     num_outputs = 4
     batch_shape = [3, 1]
@@ -192,7 +191,7 @@ class NormalTest(tfp_test_util.TestCase):
         candidate_posterior_prec=posterior_prec.to_dense())
 
   def testMVNConjugateLinearUpdatePreservesStructuredLinops(self):
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     num_outputs = 4
 
     prior_scale = tf.linalg.LinearOperatorScaledIdentity(num_outputs, 4.)

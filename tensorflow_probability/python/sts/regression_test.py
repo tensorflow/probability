@@ -24,20 +24,19 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import SparseLinearRegression
 from tensorflow_probability.python.sts import Sum
 
-from tensorflow.python.framework import test_util
 from tensorflow.python.platform import test
 
 tfl = tf.linalg
 
 
-class _LinearRegressionTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class _LinearRegressionTest(test_util.TestCase):
 
-  @test_util.run_in_graph_and_eager_modes
   def test_basic_statistics(self):
     # Verify that this model constructs a distribution with mean
     # `matmul(design_matrix, weights)` and stddev 0.
@@ -109,7 +108,6 @@ class _LinearRegressionTest(tfp_test_util.TestCase):
     self.assertAllClose(*self.evaluate((true_weights, learnable_weights)),
                         atol=0.2)
 
-  @test_util.run_in_graph_and_eager_modes
   def test_scalar_priors_broadcast(self):
 
     batch_shape = [4, 3]
@@ -156,9 +154,9 @@ class _LinearRegressionTest(tfp_test_util.TestCase):
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-class _SparseLinearRegressionTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class _SparseLinearRegressionTest(test_util.TestCase):
 
-  @test_util.run_in_graph_and_eager_modes
   def test_builds_without_errors(self):
     batch_shape = [4, 3]
     num_timesteps = 10

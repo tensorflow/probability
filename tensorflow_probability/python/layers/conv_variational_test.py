@@ -25,8 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 from tensorflow.python.keras import testing_utils
 from tensorflow.python.layers import utils as tf_layers_util
 from tensorflow.python.ops import nn_ops
@@ -178,7 +177,7 @@ class MockKLDivergence(object):
     return self.result
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class ConvVariational(object):
 
   def maybe_transpose_inputs(self, inputs):
@@ -725,13 +724,13 @@ class ConvVariational(object):
     self.assertAllNotNone(grads)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ConvVariationalTestChannelsFirst(tfp_test_util.TestCase, ConvVariational):
+@test_util.test_all_tf_execution_regimes
+class ConvVariationalTestChannelsFirst(test_util.TestCase, ConvVariational):
   data_format = 'channels_first'
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ConvVariationalTestChannelsLast(tfp_test_util.TestCase, ConvVariational):
+@test_util.test_all_tf_execution_regimes
+class ConvVariationalTestChannelsLast(test_util.TestCase, ConvVariational):
   data_format = 'channels_last'
 
 if __name__ == '__main__':

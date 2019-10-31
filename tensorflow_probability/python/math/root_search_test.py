@@ -25,12 +25,11 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RootSearchTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class RootSearchTest(test_util.TestCase):
 
   def test_secant_finds_all_roots_from_one_initial_position(self):
     f = lambda x: (63 * x**5 - 70 * x**3 + 15 * x) / 8.

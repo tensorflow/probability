@@ -29,13 +29,11 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.distributions import lkj
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CorrelationCholeskyBijectorTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CorrelationCholeskyBijectorTest(test_util.TestCase):
   """Tests the correctness of the CorrelationCholesky bijector."""
 
   def testBijector(self):
@@ -203,7 +201,7 @@ class CorrelationCholeskyBijectorTest(tfp_test_util.TestCase):
         rtol=1e-5)
 
   @parameterized.parameters(itertools.product([2, 3, 4, 5, 6, 7], [1., 2., 3.]))
-  @tfp_test_util.numpy_disable_gradient_test
+  @test_util.numpy_disable_gradient_test
   def testJacobianWithLKJSamples(self, dimension, concentration):
     bijector = tfb.CorrelationCholesky()
     lkj_dist = lkj.LKJ(

@@ -24,15 +24,14 @@ from scipy import stats as sp_stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LaplaceTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class LaplaceTest(test_util.TestCase):
 
   def testLaplaceShape(self):
     loc = tf.constant([3.0] * 5)
@@ -190,7 +189,7 @@ class LaplaceTest(tfp_test_util.TestCase):
     scale = tf.constant(scale_v)
     n = 100000
     laplace = tfd.Laplace(loc=loc, scale=scale)
-    samples = laplace.sample(n, seed=tfp_test_util.test_seed())
+    samples = laplace.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -219,7 +218,7 @@ class LaplaceTest(tfp_test_util.TestCase):
     scale_v = np.array([np.arange(1, 11, dtype=np.float32)]).T  # 10 x 1
     laplace = tfd.Laplace(loc=loc_v, scale=scale_v)
     n = 10000
-    samples = laplace.sample(n, seed=tfp_test_util.test_seed())
+    samples = laplace.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 10, 100))
     self.assertEqual(sample_values.shape, (n, 10, 100))
@@ -254,7 +253,7 @@ class LaplaceTest(tfp_test_util.TestCase):
   def testLaplacePdfOfSampleMultiDims(self):
     laplace = tfd.Laplace(loc=[7., 11.], scale=[[5.], [6.]])
     num = 50000
-    samples = laplace.sample(num, seed=tfp_test_util.test_seed())
+    samples = laplace.sample(num, seed=test_util.test_seed())
     pdfs = laplace.prob(samples)
     sample_vals, pdf_vals = self.evaluate([samples, pdfs])
     self.assertEqual(samples.shape, (num, 2, 2))
@@ -326,7 +325,7 @@ class LaplaceTest(tfp_test_util.TestCase):
 
     kl = tfd.kl_divergence(a, b)
 
-    x = a.sample(int(1e4), seed=tfp_test_util.test_seed())
+    x = a.sample(int(1e4), seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(
         input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 

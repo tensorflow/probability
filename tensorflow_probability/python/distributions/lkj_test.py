@@ -27,9 +27,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,
+from tensorflow_probability.python.internal import test_util
 
 
 def _det_ok_mask(x, det_bounds, input_output_cholesky=False):
@@ -71,9 +69,9 @@ volume_bounds = {
         0.40: (00.4145900446719042, 0.482655106057178)}}
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 @parameterized.parameters(np.float32, np.float64)
-class LKJTest(tfp_test_util.TestCase):
+class LKJTest(test_util.TestCase):
 
   def testNormConst2D(self, dtype):
     expected = 2.
@@ -161,7 +159,7 @@ class LKJTest(tfp_test_util.TestCase):
           dtype=dtype,
           input_output_cholesky=input_output_cholesky,
           target_discrepancy=0.05,
-          seed=tfp_test_util.test_seed())
+          seed=test_util.test_seed())
 
   def _testSampleConsistentLogProbInterval(self,
                                            concentrations,
@@ -271,7 +269,7 @@ class LKJTest(tfp_test_util.TestCase):
           input_output_cholesky=input_output_cholesky,
           false_fail_rate=5e-7,
           target_discrepancy=0.11,
-          seed=tfp_test_util.test_seed())
+          seed=test_util.test_seed())
 
   def testSampleConsistentLogProbInterval4(self, dtype):
     # The hardcoded volume boundaries are (5e-7)-confidence intervals
@@ -291,7 +289,7 @@ class LKJTest(tfp_test_util.TestCase):
           input_output_cholesky=input_output_cholesky,
           false_fail_rate=5e-7,
           target_discrepancy=0.22,
-          seed=tfp_test_util.test_seed())
+          seed=test_util.test_seed())
 
   def testSampleConsistentLogProbInterval5(self, dtype):
     # The hardcoded volume boundaries are (5e-7)-confidence intervals
@@ -312,7 +310,7 @@ class LKJTest(tfp_test_util.TestCase):
           input_output_cholesky=input_output_cholesky,
           false_fail_rate=5e-7,
           target_discrepancy=0.41,
-          seed=tfp_test_util.test_seed())
+          seed=test_util.test_seed())
 
   def testDimensionGuard(self, dtype):
     testee_lkj = tfd.LKJ(
@@ -373,7 +371,7 @@ class LKJTest(tfp_test_util.TestCase):
         self.evaluate(d.mean())
 
 
-class LKJTestGraphOnly(tfp_test_util.TestCase):
+class LKJTestGraphOnly(test_util.TestCase):
 
   def testDimensionGuardDynamicShape(self):
     if tf.executing_eagerly():

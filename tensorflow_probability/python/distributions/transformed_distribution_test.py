@@ -28,9 +28,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 class DummyMatrixTransform(tfb.Bijector):
@@ -89,8 +87,8 @@ class _ChooseLocation(tfp.bijectors.Bijector):
     return tf.gather(self._loc, z)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TransformedDistributionTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TransformedDistributionTest(test_util.TestCase):
 
   def _cls(self):
     return tfd.TransformedDistribution
@@ -110,7 +108,7 @@ class TransformedDistributionTest(tfp_test_util.TestCase):
     sp_dist = stats.lognorm(s=sigma, scale=np.exp(mu))
 
     # sample
-    sample = log_normal.sample(100000, seed=tfp_test_util.test_seed())
+    sample = log_normal.sample(100000, seed=test_util.test_seed())
     self.assertAllEqual([], log_normal.event_shape)
     self.assertAllEqual([], self.evaluate(log_normal.event_shape_tensor()))
     self.assertAllClose(
@@ -139,7 +137,7 @@ class TransformedDistributionTest(tfp_test_util.TestCase):
     sp_normal = stats.norm(mu, sigma)
 
     # sample
-    sample = abs_normal.sample(100000, seed=tfp_test_util.test_seed())
+    sample = abs_normal.sample(100000, seed=test_util.test_seed())
     self.assertAllEqual([], abs_normal.event_shape)
     sample_ = self.evaluate(sample)
     self.assertAllEqual([], self.evaluate(abs_normal.event_shape_tensor()))
@@ -234,7 +232,7 @@ class TransformedDistributionTest(tfp_test_util.TestCase):
     log_normal = self._cls()(
         distribution=tfd.Normal(loc=mu, scale=sigma), bijector=exp_forward_only)
 
-    sample = log_normal.sample([2, 3], seed=tfp_test_util.test_seed())
+    sample = log_normal.sample([2, 3], seed=test_util.test_seed())
     sample_val, log_pdf_val = self.evaluate(
         [sample, log_normal.log_prob(sample)])
     expected_log_pdf = stats.lognorm.logpdf(
@@ -265,7 +263,7 @@ class TransformedDistributionTest(tfp_test_util.TestCase):
         distribution=tfd.Normal(loc=mu, scale=sigma), bijector=log_forward_only)
 
     sample = exp_normal.sample(
-        [2, 3], seed=tfp_test_util.test_seed(hardcoded_seed=42))
+        [2, 3], seed=test_util.test_seed(hardcoded_seed=42))
     sample_val, log_pdf_val = self.evaluate(
         [sample, exp_normal.log_prob(sample)])
     expected_log_pdf = sample_val + stats.norm.logpdf(
@@ -383,7 +381,7 @@ class TransformedDistributionTest(tfp_test_util.TestCase):
     self.assertAllClose(base_log_prob - ildj, log_prob_, rtol=1e-6, atol=0.)
 
 
-class ScalarToMultiTest(tfp_test_util.TestCase):
+class ScalarToMultiTest(test_util.TestCase):
 
   def _cls(self):
     return tfd.TransformedDistribution
@@ -449,7 +447,7 @@ class ScalarToMultiTest(tfp_test_util.TestCase):
       self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.event_shape)
       self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
 
-    x = self.evaluate(fake_mvn_static.sample(5, seed=tfp_test_util.test_seed()))
+    x = self.evaluate(fake_mvn_static.sample(5, seed=test_util.test_seed()))
     for unsupported_fn in (fake_mvn_static.log_cdf, fake_mvn_static.cdf,
                            fake_mvn_static.survival_function,
                            fake_mvn_static.log_survival_function):
@@ -460,7 +458,7 @@ class ScalarToMultiTest(tfp_test_util.TestCase):
     num_samples = 7e3
     for fake_mvn in [fake_mvn_static, fake_mvn_dynamic]:
       # Ensure sample works by checking first, second moments.
-      y = fake_mvn.sample(int(num_samples), seed=tfp_test_util.test_seed())
+      y = fake_mvn.sample(int(num_samples), seed=test_util.test_seed())
       x = y[0:5, ...]
       sample_mean = tf.reduce_mean(input_tensor=y, axis=0)
       centered_y = tf.transpose(a=y - sample_mean, perm=[1, 2, 0])
@@ -604,7 +602,7 @@ class ScalarToMultiTest(tfp_test_util.TestCase):
     num_samples = 5e3
     for fake_mvn in [fake_mvn_static, fake_mvn_dynamic]:
       # Ensure sample works by checking first, second moments.
-      y = fake_mvn.sample(int(num_samples), seed=tfp_test_util.test_seed())
+      y = fake_mvn.sample(int(num_samples), seed=test_util.test_seed())
       x = y[0:5, ...]
       [
           x_,

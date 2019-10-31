@@ -29,8 +29,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 tfd = tfp.distributions
@@ -58,7 +57,7 @@ def scipy_trunc_norm_dist(loc, scale, low, high):
   return sp_stats.truncnorm(a, b, loc=loc, scale=scale)
 
 
-class _TruncatedNormalTestCase(tfp_test_util.TestCase):
+class _TruncatedNormalTestCase(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -100,7 +99,7 @@ class _TruncatedNormalTestCase(tfp_test_util.TestCase):
     self.assertAllClose(hist_a, hist_b, rtol=rtol, atol=atol)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
 
   def _testParamShapes(self, desired_shape):
@@ -167,7 +166,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     ub = [[1.0, 11.0], [5., 20.]]
     dist = tfd.TruncatedNormal(
         loc=[[0., 10.], [0., 10.]], scale=[[1., 1.], [5., 5.]], low=lb, high=ub)
-    x = self.evaluate(dist.sample(n, seed=tfp_test_util.test_seed()))
+    x = self.evaluate(dist.sample(n, seed=test_util.test_seed()))
     self.assertEqual(x.shape, (n, 2, 2))
 
     means = np.mean(x, axis=0)
@@ -190,7 +189,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
   def testMomentsEmpirically(self, loc, scale, low, high):
     n = int(2e5)
     dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
-    x = self.evaluate(dist.sample(n, seed=tfp_test_util.test_seed()))
+    x = self.evaluate(dist.sample(n, seed=test_util.test_seed()))
     empirical_mean = np.mean(x)
     empirical_var = np.var(x)
     expected_mean = self.evaluate(dist.mean())
@@ -284,7 +283,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
 
       n = int(2e5)
       return tf.reduce_mean(
-          input_tensor=tf.abs(dist.sample(n, seed=tfp_test_util.test_seed())))
+          input_tensor=tf.abs(dist.sample(n, seed=test_util.test_seed())))
 
     err = self.compute_max_gradient_error(f, [loc, scale, low, high], delta=0.1)
 
@@ -349,7 +348,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
       self.assertLess(err, 0.005)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 @parameterized.parameters(
     (0.0, 1.0),
     (10.0, 1.0),
@@ -383,7 +382,7 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase):
     self.assertAllLessEqual(truncated_samples, ub)
 
     normal_samples = self.evaluate(normal_dist.sample(
-        n, seed=tfp_test_util.test_seed())).flatten()
+        n, seed=test_util.test_seed())).flatten()
     # Rejection sample the normal distribution
     rejection_samples = normal_samples[normal_samples >= lb]
     rejection_samples = rejection_samples[rejection_samples <= ub]
@@ -421,7 +420,7 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase):
     self.assertAllClose(tr_cdf, n_cdf, rtol=1e-4, atol=1e-4)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 @parameterized.parameters(
     (0., 1., -1., 1.),
     (1., 1., 0., 2.),
@@ -442,7 +441,7 @@ class TruncatedNormalTestCompareWithScipy(_TruncatedNormalTestCase):
     n = int(1000000)
     tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
     tf_samples = self.evaluate(tf_dist.sample(
-        n, seed=tfp_test_util.test_seed())).flatten()
+        n, seed=test_util.test_seed())).flatten()
     self.assertAllGreaterEqual(tf_samples, low)
     self.assertAllLessEqual(tf_samples, high)
 

@@ -29,14 +29,13 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 TestTransitionKernelResults = collections.namedtuple(
     'TestTransitionKernelResults', 'counter_1, counter_2')
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class TestTransitionKernel(tfp.mcmc.TransitionKernel):
 
   def one_step(self, current_state, previous_kernel_results):
@@ -51,7 +50,7 @@ class TestTransitionKernel(tfp.mcmc.TransitionKernel):
     return True
 
 
-class SampleChainTest(tfp_test_util.TestCase):
+class SampleChainTest(test_util.TestCase):
 
   def setUp(self):
     self._shape_param = 5.

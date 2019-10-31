@@ -25,23 +25,21 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def _set_seed():
   """Helper which uses graph seed if using TFE."""
   # TODO(b/68017812): Deprecate once TFE supports seed.
-  seed_stream = tfp_test_util.test_seed_stream()
+  seed_stream = test_util.test_seed_stream()
   if tf.executing_eagerly():
     tf1.set_random_seed(seed_stream())
     return None
   return seed_stream()
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DefaultExchangeProposedFnTest(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class DefaultExchangeProposedFnTest(test_util.TestCase):
 
   def setUp(self):
     tf1.set_random_seed(123)
@@ -163,8 +161,8 @@ class DefaultExchangeProposedFnTest(tfp_test_util.TestCase):
         1 - prob_exchange, np.mean([e == 0 for e in exchanges_lens]), atol=0.05)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class REMCTest(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class REMCTest(test_util.TestCase):
 
   def setUp(self):
     tf1.set_random_seed(123)

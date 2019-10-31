@@ -26,8 +26,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
@@ -191,7 +190,7 @@ class _GumbelTest(object):
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale))
 
-    samples = gumbel.sample(n, seed=tfp_test_util.test_seed())
+    samples = gumbel.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual((n,), sample_values.shape)
     self.assertAllClose(
@@ -211,7 +210,7 @@ class _GumbelTest(object):
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale))
 
-    samples = gumbel.sample(n, seed=tfp_test_util.test_seed())
+    samples = gumbel.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertAllClose(
         stats.gumbel_r.mean(loc=loc, scale=scale),
@@ -229,7 +228,7 @@ class _GumbelTest(object):
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale))
 
-    samples = gumbel.sample(n, seed=tfp_test_util.test_seed())
+    samples = gumbel.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertAllClose(
         stats.gumbel_r.var(loc=loc, scale=scale),
@@ -261,7 +260,7 @@ class _GumbelTest(object):
 
     kl = tfd.kl_divergence(a, b)
 
-    x = a.sample(int(1e5), seed=tfp_test_util.test_seed())
+    x = a.sample(int(1e5), seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(
         input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 
@@ -295,20 +294,20 @@ class _GumbelTest(object):
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GumbelTestStaticShape(tfp_test_util.TestCase, _GumbelTest):
+@test_util.test_all_tf_execution_regimes
+class GumbelTestStaticShape(test_util.TestCase, _GumbelTest):
   _dtype = np.float32
   _use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GumbelTestFloat64StaticShape(tfp_test_util.TestCase, _GumbelTest):
+@test_util.test_all_tf_execution_regimes
+class GumbelTestFloat64StaticShape(test_util.TestCase, _GumbelTest):
   _dtype = np.float64
   _use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GumbelTestDynamicShape(tfp_test_util.TestCase, _GumbelTest):
+@test_util.test_all_tf_execution_regimes
+class GumbelTestDynamicShape(test_util.TestCase, _GumbelTest):
   _dtype = np.float32
   _use_static_shape = False
 

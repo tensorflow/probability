@@ -30,8 +30,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
@@ -62,8 +61,8 @@ def generalized_paretos(draw, batch_shape=None):
   return dist
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GeneralizedParetoTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class GeneralizedParetoTest(test_util.TestCase):
 
   @hp.given(generalized_paretos())
   @tfp_hps.tfp_hp_settings(default_max_examples=5)
@@ -148,7 +147,7 @@ class GeneralizedParetoTest(tfp_test_util.TestCase):
     conc = np.float32(0.07)
     n = 100000
     dist = tfd.GeneralizedPareto(loc=loc, scale=scale, concentration=conc)
-    samples = dist.sample(n, seed=tfp_test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual((n,), samples.shape)
     self.assertEqual((n,), sample_values.shape)
@@ -179,7 +178,7 @@ class GeneralizedParetoTest(tfp_test_util.TestCase):
 
     dist = tfd.GeneralizedPareto(loc=loc, scale=scale, concentration=conc)
     n = 10000
-    samples = dist.sample(n, seed=tfp_test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual((n, 3, 5, 7), samples.shape)
     self.assertEqual((n, 3, 5, 7), sample_values.shape)
@@ -205,7 +204,7 @@ class GeneralizedParetoTest(tfp_test_util.TestCase):
     dist = tfd.GeneralizedPareto(
         loc=0, scale=[[2.], [3.]], concentration=[-.37, .11])
     num = 50000
-    samples = dist.sample(num, seed=tfp_test_util.test_seed())
+    samples = dist.sample(num, seed=test_util.test_seed())
     pdfs = dist.prob(samples)
     sample_vals, pdf_vals = self.evaluate([samples, pdfs])
     self.assertEqual((num, 2, 2), samples.shape)

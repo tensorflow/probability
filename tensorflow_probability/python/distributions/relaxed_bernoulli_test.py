@@ -26,13 +26,11 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RelaxedBernoulliTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class RelaxedBernoulliTest(test_util.TestCase):
 
   def testP(self):
     """Tests that parameter P is set correctly. Note that dist.p != dist.pdf."""
@@ -134,7 +132,7 @@ class RelaxedBernoulliTest(tfp_test_util.TestCase):
     p = [0.2, 0.6, 0.5]
     dist = tfd.RelaxedBernoulli(temperature, probs=p)
     n = 10000
-    samples = dist.sample(n, seed=tfp_test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     self.assertEqual(samples.dtype, tf.float32)
     sample_values = self.evaluate(samples)
     self.assertAllInRange(sample_values, 0., 1.)
@@ -177,8 +175,8 @@ class RelaxedBernoulliTest(tfp_test_util.TestCase):
       d.sample()
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RelaxedBernoulliFromVariableTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class RelaxedBernoulliFromVariableTest(test_util.TestCase):
 
   def testGradientLogits(self):
     x = tf.Variable([-1., 1])

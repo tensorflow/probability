@@ -25,13 +25,12 @@ from scipy import stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class Chi2Test(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class Chi2Test(test_util.TestCase):
 
   def testChi2LogPDF(self):
     batch_size = 6
@@ -109,7 +108,7 @@ class Chi2Test(tfp_test_util.TestCase):
 
     kl = tfd.kl_divergence(a, b)
 
-    x = a.sample(int(1e5), seed=tfp_test_util.test_seed())
+    x = a.sample(int(1e5), seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])

@@ -25,15 +25,14 @@ from scipy import stats as sp_stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DirichletTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DirichletTest(test_util.TestCase):
 
   def testSimpleShapes(self):
     alpha = np.random.rand(3)
@@ -152,7 +151,7 @@ class DirichletTest(tfp_test_util.TestCase):
     alpha = np.array([[1., 2, 3],
                       [2.5, 4, 0.01]], dtype=np.float32)
     dist = tfd.Dirichlet(alpha)  # batch_shape=[2], event_shape=[3]
-    x = dist.sample(int(250e3), seed=tfp_test_util.test_seed())
+    x = dist.sample(int(250e3), seed=test_util.test_seed())
     sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean[None, ...]
     sample_cov = tf.reduce_mean(
@@ -254,7 +253,7 @@ class DirichletTest(tfp_test_util.TestCase):
 
     d1 = tfd.Dirichlet(conc1)
     d2 = tfd.Dirichlet(conc2)
-    x = d1.sample(int(1e4), seed=tfp_test_util.test_seed())
+    x = d1.sample(int(1e4), seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(d1.log_prob(x) - d2.log_prob(x), axis=0)
     kl_actual = tfd.kl_divergence(d1, d2)
 
@@ -287,8 +286,8 @@ class DirichletTest(tfp_test_util.TestCase):
                         d[1:0].batch_shape)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DirichletFromVariableTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DirichletFromVariableTest(test_util.TestCase):
 
   def testGradients(self):
     x = tf.Variable([1., 1.1, 1.2])

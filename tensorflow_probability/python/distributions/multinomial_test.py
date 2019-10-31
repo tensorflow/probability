@@ -22,15 +22,14 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint:disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultinomialTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MultinomialTest(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -241,7 +240,7 @@ class MultinomialTest(tfp_test_util.TestCase):
     n = np.array([[10., 9.], [8., 7.], [6., 5.]], dtype=np.float32)
     # batch_shape=[3, 2], event_shape=[3]
     dist = tfd.Multinomial(n, theta)
-    x = dist.sample(int(1000e3), seed=tfp_test_util.test_seed())
+    x = dist.sample(int(1000e3), seed=test_util.test_seed())
     sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean[tf.newaxis, ...]
     sample_cov = tf.reduce_mean(
@@ -278,7 +277,7 @@ class MultinomialTest(tfp_test_util.TestCase):
         total_count=[7., 6., 5.],
         logits=tf.math.log(2. * self._rng.rand(4, 3, 2).astype(np.float32)))
     n = int(3e4)
-    x = dist.sample(n, seed=tfp_test_util.test_seed())
+    x = dist.sample(n, seed=test_util.test_seed())
     sample_mean = tf.reduce_mean(x, axis=0)
     # Cyclically rotate event dims left.
     x_centered = tf.transpose(a=x - sample_mean, perm=[1, 2, 3, 0])
@@ -306,7 +305,7 @@ class MultinomialTest(tfp_test_util.TestCase):
         total_count=5.,
         logits=tf.math.log(2. * self._rng.rand(4).astype(np.float32)))
     n = int(5e3)
-    x = dist.sample(n, seed=tfp_test_util.test_seed())
+    x = dist.sample(n, seed=test_util.test_seed())
     sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean  # Already transposed to [n, 2].
     sample_covariance = tf.matmul(
@@ -362,8 +361,8 @@ class MultinomialTest(tfp_test_util.TestCase):
         atol=0, rtol=1e-4)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultinomialFromVariableTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MultinomialFromVariableTest(test_util.TestCase):
 
   def testGradientLogits(self):
     x = tf.Variable([-1., 0., 1])

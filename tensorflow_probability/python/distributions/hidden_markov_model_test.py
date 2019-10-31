@@ -26,18 +26,17 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 # pylint: disable=no-member
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _HiddenMarkovModelTest(
-    tfp_test_util.VectorDistributionTestHelpers,
-    tfp_test_util.DiscreteScalarDistributionTestHelpers,
-    tfp_test_util.TestCase):
+    test_util.VectorDistributionTestHelpers,
+    test_util.DiscreteScalarDistributionTestHelpers,
+    test_util.TestCase):
 
   @staticmethod
   def make_placeholders(constants):
@@ -118,7 +117,7 @@ class _HiddenMarkovModelTest(
                                              scale=observation_scale),
                                   num_steps=num_steps)
 
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
     s1 = self.evaluate(model.sample(5, seed=seed))
     if tf.executing_eagerly():
       tf.random.set_seed(seed)
@@ -149,7 +148,7 @@ class _HiddenMarkovModelTest(
         self.evaluate, model,
         num_samples=100000,
         center=0.5, radius=0.5,
-        rtol=0.05, seed=tfp_test_util.test_seed())
+        rtol=0.05, seed=test_util.test_seed())
 
   def test_broadcast_initial_probs(self):
     initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
@@ -174,7 +173,7 @@ class _HiddenMarkovModelTest(
         self.evaluate, model,
         num_samples=100000,
         center=0.5, radius=1.,
-        rtol=0.02, seed=tfp_test_util.test_seed())
+        rtol=0.02, seed=test_util.test_seed())
 
   def test_broadcast_transitions(self):
     initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
@@ -202,7 +201,7 @@ class _HiddenMarkovModelTest(
         self.evaluate, model,
         num_samples=100000,
         center=0.5, radius=1.,
-        rtol=2e-2, seed=tfp_test_util.test_seed())
+        rtol=2e-2, seed=test_util.test_seed())
 
   def test_broadcast_observations(self):
     initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
@@ -230,7 +229,7 @@ class _HiddenMarkovModelTest(
         self.evaluate, model,
         num_samples=100000,
         center=0.5, radius=1.,
-        rtol=2e-2, seed=tfp_test_util.test_seed())
+        rtol=2e-2, seed=test_util.test_seed())
 
   def test_edge_case_sample_n_no_transitions(self):
     initial_prob_data = tf.constant([0.5, 0.5], dtype=self.dtype)

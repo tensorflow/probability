@@ -24,11 +24,9 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import SmoothSeasonal
 from tensorflow_probability.python.sts import SmoothSeasonalStateSpaceModel
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 class _SmoothSeasonalStateSpaceModelTest(object):
@@ -140,23 +138,23 @@ class _SmoothSeasonalStateSpaceModelTest(object):
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class SmoothSeasonalStateSpaceModelTestStaticShape32(
-    tfp_test_util.TestCase, _SmoothSeasonalStateSpaceModelTest):
+    test_util.TestCase, _SmoothSeasonalStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class SmoothSeasonalStateSpaceModelTestDynamicShape32(
-    tfp_test_util.TestCase, _SmoothSeasonalStateSpaceModelTest):
+    test_util.TestCase, _SmoothSeasonalStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class SmoothSeasonalStateSpaceModelTestStaticShape64(
-    tfp_test_util.TestCase, _SmoothSeasonalStateSpaceModelTest):
+    test_util.TestCase, _SmoothSeasonalStateSpaceModelTest):
   dtype = np.float64
   use_static_shape = True
 

@@ -24,10 +24,9 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 tfl = tf.linalg
 
@@ -110,23 +109,23 @@ class _LocalLinearTrendStateSpaceModelTest(object):
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LocalLinearTrendStateSpaceModelTestStaticShape32(
-    tfp_test_util.TestCase, _LocalLinearTrendStateSpaceModelTest):
+    test_util.TestCase, _LocalLinearTrendStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LocalLinearTrendStateSpaceModelTestDynamicShape32(
-    tfp_test_util.TestCase, _LocalLinearTrendStateSpaceModelTest):
+    test_util.TestCase, _LocalLinearTrendStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LocalLinearTrendStateSpaceModelTestStaticShape64(
-    tfp_test_util.TestCase, _LocalLinearTrendStateSpaceModelTest):
+    test_util.TestCase, _LocalLinearTrendStateSpaceModelTest):
   dtype = np.float64
   use_static_shape = True
 

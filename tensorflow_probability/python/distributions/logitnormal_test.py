@@ -24,20 +24,19 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LogitNormalTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class LogitNormalTest(test_util.TestCase):
 
   def testLogitNormalMeanApprox(self):
     loc, scale = [0., 1.5], 0.4
     dist = tfd.LogitNormal(loc=loc, scale=scale)
-    x = dist.sample(6000, seed=tfp_test_util.test_seed())
+    x = dist.sample(6000, seed=test_util.test_seed())
     mean_sample = tf.reduce_mean(x, axis=0)
     [mean_sample_, mean_approx_] = self.evaluate([
         mean_sample, dist.mean_approx()])
@@ -63,7 +62,7 @@ class LogitNormalTest(tfp_test_util.TestCase):
     kl_expected_from_formula = ((mu_a - mu_b)**2 / (2 * sigma_b**2) + 0.5 * (
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
 
-    x = ln_a.sample(int(1e5), seed=tfp_test_util.test_seed())
+    x = ln_a.sample(int(1e5), seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(ln_a.log_prob(x) - ln_b.log_prob(x), axis=0)
     kl_sample_ = self.evaluate(kl_sample)
 

@@ -28,8 +28,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -45,9 +44,8 @@ class Dummy(object):
     pass
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class JointDistributionSequentialTest(
-    tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class JointDistributionSequentialTest(test_util.TestCase):
 
   def test_sample_log_prob(self):
     d = tfd.JointDistributionSequential(
@@ -70,7 +68,7 @@ class JointDistributionSequentialTest(
         ),
         d._resolve_graph())
 
-    xs = d.sample(seed=tfp_test_util.test_seed())
+    xs = d.sample(seed=test_util.test_seed())
     self.assertLen(xs, 5)
     # We'll verify the shapes work as intended when we plumb these back into the
     # respective log_probs.
@@ -225,8 +223,8 @@ class JointDistributionSequentialTest(
         validate_args=True)
 
     d0, d1 = d[:1], d[1:]
-    x0 = d0.sample(seed=tfp_test_util.test_seed())
-    x1 = d1.sample(seed=tfp_test_util.test_seed())
+    x0 = d0.sample(seed=test_util.test_seed())
+    x1 = d1.sample(seed=test_util.test_seed())
 
     self.assertLen(x0, 3)
     self.assertEqual([1], x0[0].shape)
@@ -249,7 +247,7 @@ class JointDistributionSequentialTest(
             lambda df, loc, _, scale: tfd.StudentT(df, loc, scale),
         ],
         validate_args=True)
-    x = d.sample([2, 3], seed=tfp_test_util.test_seed())
+    x = d.sample([2, 3], seed=test_util.test_seed())
     self.assertLen(x, 6)
     self.assertEqual((2, 3, 2), x[0].shape)
     self.assertEqual((2, 3), x[1].shape)
@@ -274,7 +272,7 @@ class JointDistributionSequentialTest(
     # The following enables the nondefault sample shape behavior.
     d._always_use_specified_sample_shape = True
     sample_shape = (2, 3)
-    x = d.sample(sample_shape, seed=tfp_test_util.test_seed())
+    x = d.sample(sample_shape, seed=test_util.test_seed())
     self.assertLen(x, 6)
     self.assertEqual(sample_shape + (2,), x[0].shape)
     self.assertEqual(sample_shape * 2, x[1].shape)  # Has 1 arg.

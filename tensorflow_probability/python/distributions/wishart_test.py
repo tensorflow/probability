@@ -27,9 +27,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def make_pd(start, n):
@@ -52,8 +50,8 @@ def wishart_var(df, x):
       d[..., np.newaxis], d[..., np.newaxis, :]))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class WishartTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class WishartTest(test_util.TestCase):
 
   def testEntropy(self):
     scale = make_pd(1., 2)
@@ -149,7 +147,7 @@ class WishartTest(tfp_test_util.TestCase):
       return
     scale = make_pd(1., 2)
     df = 4
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     chol_w = tfd.WishartTriL(
         df, scale_tril=chol(scale), input_output_cholesky=False)
@@ -176,7 +174,7 @@ class WishartTest(tfp_test_util.TestCase):
     df = 4.
     chol_w = tfd.WishartTriL(
         df=df, scale_tril=chol(make_pd(1., 3)), input_output_cholesky=False)
-    x = chol_w.sample(10000, seed=tfp_test_util.test_seed(hardcoded_seed=42))
+    x = chol_w.sample(10000, seed=test_util.test_seed(hardcoded_seed=42))
     self.assertAllEqual((10000, 3, 3), x.shape)
 
     moment1_estimate = self.evaluate(tf.reduce_mean(x, axis=[0]))
@@ -195,7 +193,7 @@ class WishartTest(tfp_test_util.TestCase):
   def testSampleMultipleTimes(self):
     df = 4.
     n_val = 100
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     tf1.set_random_seed(seed)
     chol_w1 = tfd.WishartTriL(
@@ -421,7 +419,7 @@ class WishartTest(tfp_test_util.TestCase):
     scale_tril = np.reshape(np.concatenate([scale_tril]*3, axis=0),
                             batch_shape + [dims, dims])
     wishart = tfd.WishartTriL(df=5, scale_tril=scale_tril)
-    x = wishart.sample(sample_shape, seed=tfp_test_util.test_seed())
+    x = wishart.sample(sample_shape, seed=test_util.test_seed())
     x_ = self.evaluate(x)
     expected_shape = sample_shape + batch_shape + [dims, dims]
     self.assertAllEqual(expected_shape, x.shape)

@@ -24,15 +24,14 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 rng = np.random.RandomState(123)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class QuantizedDistributionTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class QuantizedDistributionTest(test_util.TestCase):
 
   def _assert_all_finite(self, array):
     self.assertTrue(np.isfinite(array).all())
@@ -163,7 +162,7 @@ class QuantizedDistributionTest(tfp_test_util.TestCase):
 
     qdist = tfd.QuantizedDistribution(distribution=normal, low=0., high=None)
 
-    samps = qdist.sample(5000, seed=tfp_test_util.test_seed())
+    samps = qdist.sample(5000, seed=test_util.test_seed())
     samps_v = self.evaluate(samps)
 
     # With low = 0, the interval j=0 is (-infty, 0], which holds 1/2
@@ -189,7 +188,7 @@ class QuantizedDistributionTest(tfp_test_util.TestCase):
     # integers.  Hence, F(X) (see below) will not be uniform exactly.
     qdist = tfd.QuantizedDistribution(distribution=tfd.Exponential(rate=0.01))
     # X ~ QuantizedExponential
-    x = qdist.sample(10000, seed=tfp_test_util.test_seed())
+    x = qdist.sample(10000, seed=test_util.test_seed())
     # Z = F(X), should be Uniform.
     z = qdist.cdf(x)
     # Compare the CDF of Z to that of a Uniform.
@@ -213,7 +212,7 @@ class QuantizedDistributionTest(tfp_test_util.TestCase):
     n_samples = 10000
     stddev_err_bound = 1 / (2 * np.sqrt(n_samples))
     samps = self.evaluate(qdist.sample(
-        (n_samples,), seed=tfp_test_util.test_seed(hardcoded_seed=42)))
+        (n_samples,), seed=test_util.test_seed(hardcoded_seed=42)))
     # The smallest value the samples can take on is 1, which corresponds to
     # the interval (0, 1].  Recall we use ceiling in the sampling definition.
     self.assertLess(0.5, samps.min())
@@ -388,7 +387,7 @@ class QuantizedDistributionTest(tfp_test_util.TestCase):
     self.assertEqual((), qdist.event_shape)
     self.assertAllEqual((), self.evaluate(qdist.event_shape_tensor()))
 
-    samps = qdist.sample(10, seed=tfp_test_util.test_seed())
+    samps = qdist.sample(10, seed=test_util.test_seed())
     self.assertEqual((10,) + batch_shape, samps.shape)
     self.assertAllEqual((10,) + batch_shape, self.evaluate(samps).shape)
 

@@ -26,8 +26,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 class _RandomRademacher(object):
@@ -50,14 +49,14 @@ class _RandomRademacher(object):
         atol=0.05, rtol=0.)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RandomRademacherDynamic32(tfp_test_util.TestCase, _RandomRademacher):
+@test_util.test_all_tf_execution_regimes
+class RandomRademacherDynamic32(test_util.TestCase, _RandomRademacher):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RandomRademacherDynamic64(tfp_test_util.TestCase, _RandomRademacher):
+@test_util.test_all_tf_execution_regimes
+class RandomRademacherDynamic64(test_util.TestCase, _RandomRademacher):
   dtype = np.float64
   use_static_shape = True
 
@@ -95,14 +94,14 @@ class _RandomRayleigh(object):
                         atol=0.05, rtol=0.)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RandomRayleighDynamic32(tfp_test_util.TestCase, _RandomRayleigh):
+@test_util.test_all_tf_execution_regimes
+class RandomRayleighDynamic32(test_util.TestCase, _RandomRayleigh):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RandomRayleighDynamic64(tfp_test_util.TestCase, _RandomRayleigh):
+@test_util.test_all_tf_execution_regimes
+class RandomRayleighDynamic64(test_util.TestCase, _RandomRayleigh):
   dtype = np.float64
   use_static_shape = True
 

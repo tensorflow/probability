@@ -26,19 +26,16 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MultivariateStudentTTestFloat32StaticShape(
-    tfp_test_util.TestCase,
-    tfp_test_util.VectorDistributionTestHelpers):
+    test_util.TestCase, test_util.VectorDistributionTestHelpers):
   dtype = tf.float32
   use_static_shape = True
 
@@ -304,7 +301,7 @@ class MultivariateStudentTTestFloat32StaticShape(
         [[2., -1.],
          [-1., 2.]]))
     # pyformat: enable
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
     tf1.set_random_seed(seed)
     dist1 = tfd.MultivariateStudentTLinearOperator(
         loc=[1., 2.], df=5., scale=scale)
@@ -333,7 +330,7 @@ class MultivariateStudentTTestFloat32StaticShape(
         loc=self._input([0., 0.]),
         df=self._input([1e-1, 1e-5, 1e-10, 1e-20]),
         scale=scale)
-    samples = dist.sample(int(2e5), seed=tfp_test_util.test_seed())
+    samples = dist.sample(int(2e5), seed=test_util.test_seed())
     log_probs = dist.log_prob(samples)
     samples, log_probs = self.evaluate([samples, log_probs])
     self.assertTrue(np.all(np.isfinite(samples)))

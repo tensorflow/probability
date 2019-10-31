@@ -23,10 +23,8 @@ import hypothesis as hp
 from hypothesis import strategies as hps
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
@@ -61,8 +59,8 @@ def assert_no_none_grad(kernel, method, wrt_vars, grads):
           method, var, kernel))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class KernelPropertiesTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class KernelPropertiesTest(test_util.TestCase):
 
   @parameterized.named_parameters(dict(testcase_name=kname, kernel_name=kname)
                                   for kname in TF2_FRIENDLY_KERNELS)

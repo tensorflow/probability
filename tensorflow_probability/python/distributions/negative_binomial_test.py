@@ -23,16 +23,14 @@ from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 # In all tests that follow, we use scipy.stats.nbinom, which
 # represents a Negative Binomial distribution, with success and failure
 # probabilities flipped.
-@test_util.run_all_in_graph_and_eager_modes
-class NegativeBinomialTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class NegativeBinomialTest(test_util.TestCase):
 
   def testNegativeBinomialShape(self):
     probs = [.1] * 5
@@ -190,7 +188,7 @@ class NegativeBinomialTest(tfp_test_util.TestCase):
     n = int(100e3)
     negbinom = tfd.NegativeBinomial(total_count=total_count, probs=probs)
 
-    samples = negbinom.sample(n, seed=tfp_test_util.test_seed())
+    samples = negbinom.sample(n, seed=test_util.test_seed())
     self.assertEqual([n, 2], samples.shape)
 
     sample_mean = tf.reduce_mean(samples, axis=0)
@@ -254,8 +252,8 @@ class NegativeBinomialTest(tfp_test_util.TestCase):
         atol=0, rtol=1e-4)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NegativeBinomialFromVariableTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class NegativeBinomialFromVariableTest(test_util.TestCase):
 
   def testAssertionsProbsMutation(self):
     x = tf.Variable([0.1, 0.7, 0.0])

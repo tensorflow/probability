@@ -26,12 +26,11 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ScaleBijectorTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
   """Tests correctness of the Y = scale @ x transformation."""
 
   def testName(self):
@@ -82,7 +81,7 @@ class ScaleBijectorTest(tfp_test_util.TestCase):
         upper_x=dtype(2.),
         eval_func=self.evaluate)
 
-  @tfp_test_util.jax_disable_variable_test
+  @test_util.jax_disable_variable_test
   def testVariableGradients(self):
     b = tfb.Scale(scale=tf.Variable(2.))
 

@@ -25,9 +25,9 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class TupleDistribution(tfd.Distribution):
@@ -107,8 +107,8 @@ class NamedTupleDistribution(tfd.Distribution):
         a=None, b=tf.TensorShape([3, None]), c=tf.TensorShape(None))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DistributionStrReprTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DistributionStrReprTest(test_util.TestCase):
 
   def testStrWorksCorrectlyScalar(self):
     normal = tfd.Normal(loc=np.float16(0), scale=1)
@@ -280,8 +280,8 @@ class DistributionStrReprTest(tfp_test_util.TestCase):
         ' dtype=MyType(a=float16, b=?, c=int32)>')
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DistributionTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DistributionTest(test_util.TestCase):
 
   def testParamShapesAndFromParams(self):
     classes = [
@@ -521,7 +521,7 @@ class Dummy(tfd.Distribution):
     return self._mean_
 
 
-class ParametersTest(tfp_test_util.TestCase):
+class ParametersTest(test_util.TestCase):
 
   def testParameters(self):
     d = Dummy(1., arg2=2.)
@@ -530,7 +530,7 @@ class ParametersTest(tfp_test_util.TestCase):
                      actual_d_parameters)
     self.assertEqual(actual_d_parameters, d.parameters)
 
-  @test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
+  @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def testNoSelfRefs(self):
     d = Dummy(1., arg2=2.)
     self.assertAllEqual(1. + 2., self.evaluate(d.mean()))
@@ -546,8 +546,8 @@ class ParametersTest(tfp_test_util.TestCase):
                     err=1e-5)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TfModuleTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TfModuleTest(test_util.TestCase):
 
   def test_variable_tracking_works(self):
     scale = tf.Variable(1.)
@@ -566,8 +566,8 @@ class TfModuleTest(tfp_test_util.TestCase):
     self.assertEqual((1.,), self.evaluate(g))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ConditionalDistributionTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ConditionalDistributionTest(test_util.TestCase):
 
   def _GetFakeDistribution(self):
     class _FakeDistribution(tfd.Distribution):

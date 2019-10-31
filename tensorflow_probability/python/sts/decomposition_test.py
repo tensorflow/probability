@@ -20,20 +20,19 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfl = tf.linalg
 
 
-class _DecompositionTest(tfp_test_util.TestCase):
+class _DecompositionTest(test_util.TestCase):
 
   def _build_model_and_params(self,
                               num_timesteps,
                               param_batch_shape,
                               num_posterior_draws=10):
-    seed = tfp_test_util.test_seed_stream()
+    seed = test_util.test_seed_stream()
     np.random.seed(seed() % (2**32))
     observed_time_series = self._build_tensor(
         np.random.randn(*(param_batch_shape +
@@ -150,7 +149,7 @@ class _DecompositionTest(tfp_test_util.TestCase):
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class DecompositionTestStatic32(_DecompositionTest):
   dtype = np.float32
   use_static_shape = True

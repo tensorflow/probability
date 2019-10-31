@@ -26,8 +26,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def _assert_sparse_tensor_value(test_case_instance, expected, actual):
@@ -42,8 +41,8 @@ def _assert_sparse_tensor_value(test_case_instance, expected, actual):
   test_case_instance.assertAllEqual(expected.dense_shape, actual.dense_shape)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SparseTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SparseTest(test_util.TestCase):
   # Copied (with modifications) from:
   # tensorflow/contrib/layers/python/ops/sparse_ops.py.
 

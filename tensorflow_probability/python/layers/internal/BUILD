@@ -78,5 +78,6 @@ py_test(
     deps = [
         ":tensor_tuple",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

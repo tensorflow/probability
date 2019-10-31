@@ -22,17 +22,16 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.ode import runge_kutta_util as rk_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 @parameterized.named_parameters([
     ('float64', tf.float64),
     ('complex128', tf.complex128),
 ])
-class RungeKuttaUtilTest(tfp_test_util.TestCase):
+class RungeKuttaUtilTest(test_util.TestCase):
 
   def test_polynomial_fit(self, dtype):
     """Asserts that interpolation of 4th order polynomial is exact."""

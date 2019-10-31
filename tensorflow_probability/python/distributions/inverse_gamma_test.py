@@ -23,14 +23,13 @@ from scipy import stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class InverseGammaTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class InverseGammaTest(test_util.TestCase):
 
   def testInverseGammaShape(self):
     alpha = tf.constant([3.0] * 5)
@@ -191,7 +190,7 @@ class InverseGammaTest(tfp_test_util.TestCase):
     n = 100000
     inv_gamma = tfd.InverseGamma(concentration=alpha, scale=beta)
     samples = inv_gamma.sample(
-        n, seed=tfp_test_util.test_seed(hardcoded_seed=137))
+        n, seed=test_util.test_seed(hardcoded_seed=137))
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -222,7 +221,7 @@ class InverseGammaTest(tfp_test_util.TestCase):
     beta_v = np.array([np.arange(1, 11, dtype=np.float32)]).T  # 10 x 1
     inv_gamma = tfd.InverseGamma(concentration=alpha_v, scale=beta_v)
     n = 10000
-    samples = inv_gamma.sample(n, seed=tfp_test_util.test_seed())
+    samples = inv_gamma.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 10, 100))
     self.assertEqual(sample_values.shape, (n, 10, 100))
@@ -256,7 +255,7 @@ class InverseGammaTest(tfp_test_util.TestCase):
   def testInverseGammaPdfOfSampleMultiDims(self):
     inv_gamma = tfd.InverseGamma(concentration=[7., 11.], scale=[[5.], [6.]])
     num = 50000
-    samples = inv_gamma.sample(num, seed=tfp_test_util.test_seed())
+    samples = inv_gamma.sample(num, seed=test_util.test_seed())
     pdfs = inv_gamma.prob(samples)
     sample_vals, pdf_vals = self.evaluate([samples, pdfs])
     self.assertEqual(samples.shape, (num, 2, 2))

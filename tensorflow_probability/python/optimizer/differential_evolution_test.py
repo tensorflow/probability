@@ -25,12 +25,11 @@ from scipy.stats import special_ortho_group
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DifferentialEvolutionTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DifferentialEvolutionTest(test_util.TestCase):
   """Tests for Differential Evolution optimization algorithm."""
 
   def test_quadratic_bowl_2d(self):
@@ -198,8 +197,8 @@ class DifferentialEvolutionTest(tfp_test_util.TestCase):
         rosenbrock,
         initial_position=start,
         func_tolerance=1e-12,
-        max_iterations=150,
-        seed=9374))
+        max_iterations=200,
+        seed=test_util.test_seed_stream()))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, [1.0, 1.0], 1e-5)
 

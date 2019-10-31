@@ -25,14 +25,13 @@ from scipy import stats as sp_stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GammaTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class GammaTest(test_util.TestCase):
 
   def testGammaShape(self):
     alpha = tf.constant([3.0] * 5)
@@ -187,7 +186,7 @@ class GammaTest(tfp_test_util.TestCase):
     beta = tf.constant(beta_v)
     n = 100000
     gamma = tfd.Gamma(concentration=alpha, rate=beta)
-    samples = gamma.sample(n, seed=tfp_test_util.test_seed())
+    samples = gamma.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -208,7 +207,7 @@ class GammaTest(tfp_test_util.TestCase):
     beta = tf.constant(beta_v)
     n = 100000
     gamma = tfd.Gamma(concentration=alpha, rate=beta)
-    samples = gamma.sample(n, seed=tfp_test_util.test_seed())
+    samples = gamma.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -222,7 +221,7 @@ class GammaTest(tfp_test_util.TestCase):
         sp_stats.gamma.var(alpha_v, scale=1 / beta_v),
         atol=.15)
 
-  @tfp_test_util.numpy_disable_gradient_test
+  @test_util.numpy_disable_gradient_test
   def testGammaFullyReparameterized(self):
     alpha = tf.constant(4.0)
     beta = tf.constant(3.0)
@@ -237,7 +236,7 @@ class GammaTest(tfp_test_util.TestCase):
     beta_v = np.array([np.arange(1, 11, dtype=np.float32)]).T  # 10 x 1
     gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v)
     n = 10000
-    samples = gamma.sample(n, seed=tfp_test_util.test_seed())
+    samples = gamma.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 10, 100))
     self.assertEqual(sample_values.shape, (n, 10, 100))
@@ -272,7 +271,7 @@ class GammaTest(tfp_test_util.TestCase):
   def testGammaPdfOfSampleMultiDims(self):
     gamma = tfd.Gamma(concentration=[7., 11.], rate=[[5.], [6.]])
     num = 50000
-    samples = gamma.sample(num, seed=tfp_test_util.test_seed())
+    samples = gamma.sample(num, seed=test_util.test_seed())
     pdfs = gamma.prob(samples)
     sample_vals, pdf_vals = self.evaluate([samples, pdfs])
     self.assertEqual(samples.shape, (num, 2, 2))
@@ -326,7 +325,7 @@ class GammaTest(tfp_test_util.TestCase):
     # Build graph.
     g0 = tfd.Gamma(concentration=alpha0, rate=beta0)
     g1 = tfd.Gamma(concentration=alpha1, rate=beta1)
-    x = g0.sample(int(1e4), seed=tfp_test_util.test_seed())
+    x = g0.sample(int(1e4), seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(g0.log_prob(x) - g1.log_prob(x), axis=0)
     kl_actual = tfd.kl_divergence(g0, g1)
 
@@ -345,8 +344,8 @@ class GammaTest(tfp_test_util.TestCase):
     self.assertAllClose(kl_expected, kl_actual_, atol=0., rtol=1e-6)
     self.assertAllClose(kl_sample_, kl_actual_, atol=0., rtol=1e-1)
 
-  @tfp_test_util.numpy_disable_gradient_test
-  @tfp_test_util.jax_disable_variable_test
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_variable_test
   def testGradientThroughConcentration(self):
     concentration = tf.Variable(3.)
     d = tfd.Gamma(concentration=concentration, rate=5.)
@@ -356,7 +355,7 @@ class GammaTest(tfp_test_util.TestCase):
     self.assertLen(grad, 1)
     self.assertAllNotNone(grad)
 
-  @tfp_test_util.jax_disable_variable_test
+  @test_util.jax_disable_variable_test
   def testAssertsPositiveConcentration(self):
     concentration = tf.Variable([1., 2., -3.])
     self.evaluate(concentration.initializer)

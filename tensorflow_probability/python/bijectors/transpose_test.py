@@ -27,8 +27,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 class _TransposeBijectorTest(object):
@@ -252,15 +251,13 @@ class _TransposeBijectorTest(object):
         _ = self.evaluate(bijector.forward(x))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TransposeBijectorDynamicTest(_TransposeBijectorTest,
-                                   tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TransposeBijectorDynamicTest(_TransposeBijectorTest, test_util.TestCase):
   is_static = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TransposeBijectorStaticTest(_TransposeBijectorTest,
-                                  tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TransposeBijectorStaticTest(_TransposeBijectorTest, test_util.TestCase):
   is_static = True
 
 

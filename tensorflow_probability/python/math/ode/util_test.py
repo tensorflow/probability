@@ -22,19 +22,18 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.ode import util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 @parameterized.named_parameters([
     ('', False, False),
     ('use_pfor', False, True),
     ('use_automatic_differentiation', True, False),
     ('use_automatic_differentiation_and_pfor', True, True),
 ])
-class JacobianTest(tfp_test_util.TestCase):
+class JacobianTest(test_util.TestCase):
 
   def test_right_mult_by_jacobian_mat(self, use_automatic_differentiation,
                                       use_pfor):

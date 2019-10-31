@@ -34,7 +34,7 @@ import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal.backend import numpy as numpy_backend
 
 
@@ -610,7 +610,7 @@ def _maybe_convert_to_tensors(args):
       convert(arg) if isinstance(arg, np.ndarray) else arg for arg in args)
 
 
-class NumpyTest(tfp_test_util.TestCase):
+class NumpyTest(test_util.TestCase):
 
   def test_convert_to_tensor(self):
     convert_to_tensor = numpy_backend.convert_to_tensor

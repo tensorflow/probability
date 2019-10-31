@@ -27,9 +27,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def make_bernoulli(batch_shape, dtype=tf.int32):
@@ -43,8 +41,8 @@ def entropy(p):
   return -q * np.log(q) - p * np.log(p)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BernoulliTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BernoulliTest(test_util.TestCase):
 
   def testP(self):
     p = [0.2, 0.4]
@@ -228,7 +226,7 @@ class BernoulliTest(tfp_test_util.TestCase):
     # In this test we're just interested in verifying there isn't a crash
     # owing to mismatched types. b/30940152
     dist = tfd.Bernoulli(np.log([.2, .4]))
-    x = dist.sample(1, seed=tfp_test_util.test_seed())
+    x = dist.sample(1, seed=test_util.test_seed())
     self.assertAllEqual((1, 2), tensorshape_util.as_list(x.shape))
 
   def testNotReparameterized(self):
@@ -322,8 +320,8 @@ class _MakeSlicer(object):
 make_slicer = _MakeSlicer()
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BernoulliSlicingTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BernoulliSlicingTest(test_util.TestCase):
 
   def testScalarSlice(self):
     logits = self.evaluate(tf.random.normal([]))
@@ -445,8 +443,8 @@ class BernoulliSlicingTest(tfp_test_util.TestCase):
     self.assertAllEqual((3, 1, 5, 2, 4), b2.batch_shape)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BernoulliFromVariableTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BernoulliFromVariableTest(test_util.TestCase):
 
   def testGradientLogits(self):
     x = tf.Variable([-1., 1])

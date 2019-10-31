@@ -23,12 +23,11 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CholeskyOuterProductBijectorTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CholeskyOuterProductBijectorTest(test_util.TestCase):
   """Tests the correctness of the Y = X @ X.T transformation."""
 
   def testBijectorMatrix(self):

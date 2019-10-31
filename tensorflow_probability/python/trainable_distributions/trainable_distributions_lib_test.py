@@ -24,13 +24,11 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TestMVNTriL(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TestMVNTriL(test_util.TestCase):
 
   def setUp(self):
     np.random.seed(142)
@@ -116,8 +114,8 @@ class TestMVNTriL(tfp_test_util.TestCase):
     self.assertAllEqual(expected_scale_, scale_)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TestBernoulli(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TestBernoulli(test_util.TestCase):
 
   def setUp(self):
     np.random.seed(142)
@@ -175,8 +173,8 @@ class TestBernoulli(tfp_test_util.TestCase):
     self.assertAllClose(np.sum(x_, axis=-1), logits_, atol=0, rtol=1e-3)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TestNormal(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TestNormal(test_util.TestCase):
 
   def setUp(self):
     np.random.seed(142)
@@ -234,8 +232,8 @@ class TestNormal(tfp_test_util.TestCase):
     self.assertAllClose(np.sum(x_, axis=-1), loc_, atol=0, rtol=1e-3)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TestPoisson(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TestPoisson(test_util.TestCase):
 
   def setUp(self):
     np.random.seed(142)
@@ -293,8 +291,8 @@ class TestPoisson(tfp_test_util.TestCase):
     self.assertAllClose(np.sum(x_, axis=-1), log_rate_, atol=0, rtol=1e-3)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TestMakePositiveFunctions(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TestMakePositiveFunctions(test_util.TestCase):
 
   def softplus(self, x):
     return np.log1p(np.exp(x))

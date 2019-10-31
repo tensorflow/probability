@@ -26,16 +26,14 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 rng = np.random.RandomState(42)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SoftmaxCenteredBijectorTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SoftmaxCenteredBijectorTest(test_util.TestCase):
   """Tests correctness of the Y = g(X) = exp(X) / sum(exp(X)) transformation."""
 
   def testBijectorVector(self):
@@ -129,7 +127,7 @@ class SoftmaxCenteredBijectorTest(tfp_test_util.TestCase):
     bijector_test_util.assert_bijective_and_finite(
         softmax, x, y, eval_func=self.evaluate, event_ndims=1)
 
-  @tfp_test_util.numpy_disable_gradient_test
+  @test_util.numpy_disable_gradient_test
   def testTheoreticalFldj(self):
     softmax = tfb.SoftmaxCentered()
     x = np.linspace(-15, 15, num=10).reshape(5, 2).astype(np.float64)

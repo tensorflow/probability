@@ -90,13 +90,11 @@ def main(argv):
   replacements.update({
       'self._maybe_assert_dtype': '# self._maybe_assert_dtype',
       'SKIP_DTYPE_CHECKS = False': 'SKIP_DTYPE_CHECKS = True',
-      '@test_util.run_all_in_graph_and_eager_modes': (
-          '# @test_util.run_all_in_graph_and_eager_modes'),
-      '@tfp_test_util.test_all_tf_execution_regimes': (
-          '# @tfp_test_util.test_all_tf_execution_regimes'),
-      '@tfp_test_util.test_graph_and_eager_modes': (
-          '# @tfp_test_util.test_graph_and_eager_modes'),
-      'TestCombinationsTest(tfp_test_util.TestCase)': (
+      '@test_util.test_all_tf_execution_regimes': (
+          '# @test_util.test_all_tf_execution_regimes'),
+      '@test_util.test_graph_and_eager_modes': (
+          '# @test_util.test_graph_and_eager_modes'),
+      'TestCombinationsTest(test_util.TestCase)': (
           'TestCombinationsDoNotTest(object)')
   })
 

@@ -28,9 +28,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 _RATE = 1.01
@@ -128,8 +126,8 @@ class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
     return self.inner_kernel.is_calibrated()
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SimpleStepSizeAdaptationTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SimpleStepSizeAdaptationTest(test_util.TestCase):
 
   def testTurnOnStoreParametersInKernelResults(self):
     kernel = FakeWrapperKernel(FakeSteppedKernel(step_size=0.5))
@@ -350,7 +348,7 @@ class SimpleStepSizeAdaptationTest(tfp_test_util.TestCase):
       _impl()
 
   def testExample(self):
-    tf1.random.set_random_seed(tfp_test_util.test_seed())
+    tf1.random.set_random_seed(test_util.test_seed())
     target_log_prob_fn = tfd.Normal(loc=0., scale=1.).log_prob
     num_burnin_steps = 500
     num_results = 500
@@ -361,7 +359,7 @@ class SimpleStepSizeAdaptationTest(tfp_test_util.TestCase):
         target_log_prob_fn=target_log_prob_fn,
         num_leapfrog_steps=2,
         step_size=step_size,
-        seed=_set_seed(tfp_test_util.test_seed()))
+        seed=_set_seed(test_util.test_seed()))
     kernel = tfp.mcmc.SimpleStepSizeAdaptation(
         inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8))
 
@@ -378,8 +376,8 @@ class SimpleStepSizeAdaptationTest(tfp_test_util.TestCase):
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SimpleStepSizeAdaptationStaticBroadcastingTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SimpleStepSizeAdaptationStaticBroadcastingTest(test_util.TestCase):
   use_static_shape = True
 
   @parameterized.parameters(
@@ -446,7 +444,7 @@ class SimpleStepSizeAdaptationStaticBroadcastingTest(tfp_test_util.TestCase):
     self.assertAllClose(new_step_size, step_size)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class SimpleStepSizeAdaptationDynamicBroadcastingTest(
     SimpleStepSizeAdaptationStaticBroadcastingTest):
   use_static_shape = False

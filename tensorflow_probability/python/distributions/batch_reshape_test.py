@@ -24,12 +24,10 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _BatchReshapeTest(object):
 
   def make_wishart(self, dims, new_batch_shape, old_batch_shape):
@@ -62,7 +60,7 @@ class _BatchReshapeTest(object):
       return
 
     dims = 2
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
     new_batch_shape = [4]
     old_batch_shape = [2, 2]
     wishart, reshape_wishart = self.make_wishart(
@@ -197,7 +195,7 @@ class _BatchReshapeTest(object):
       # document that the test is not intended to run in eager mode.
       return
 
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     new_batch_shape = [2, 2]
     old_batch_shape = [4]
@@ -330,7 +328,7 @@ class _BatchReshapeTest(object):
       return
 
     dims = 3
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
     new_batch_shape = [2, 1]
     old_batch_shape = [2]
     mvn, reshape_mvn = self.make_mvn(
@@ -588,15 +586,15 @@ class _BatchReshapeTest(object):
       self.evaluate(poisson_141_reshaped.log_prob(x_114))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BatchReshapeStaticTest(_BatchReshapeTest, tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BatchReshapeStaticTest(_BatchReshapeTest, test_util.TestCase):
 
   dtype = np.float32
   is_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BatchReshapeDynamicTest(_BatchReshapeTest, tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BatchReshapeDynamicTest(_BatchReshapeTest, test_util.TestCase):
 
   dtype = np.float64
   is_static_shape = False

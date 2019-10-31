@@ -24,16 +24,15 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import AdditiveStateSpaceModel
 from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 tfl = tf.linalg
 
 
-class _AdditiveStateSpaceModelTest(tfp_test_util.TestCase):
+class _AdditiveStateSpaceModelTest(test_util.TestCase):
 
   def test_identity(self):
 
@@ -421,7 +420,7 @@ class _AdditiveStateSpaceModelTest(tfp_test_util.TestCase):
                 dtype=dtype)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class AdditiveStateSpaceModelTestStaticShape32(_AdditiveStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
@@ -450,7 +449,7 @@ class AdditiveStateSpaceModelTestDynamicShape32(_AdditiveStateSpaceModelTest):
     self.assertEqual(num_timesteps, self.evaluate(additive_ssm.num_timesteps))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class AdditiveStateSpaceModelTestStaticShape64(_AdditiveStateSpaceModelTest):
   dtype = np.float64
   use_static_shape = True

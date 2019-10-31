@@ -28,9 +28,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 FakeInnerKernelResults = collections.namedtuple(
@@ -66,8 +64,8 @@ class FakeInnerKernel(tfp.mcmc.TransitionKernel):
         target_log_prob=self._parameters['target_log_prob_fn'](init_state))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TransformedTransitionKernelTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TransformedTransitionKernelTest(test_util.TestCase):
 
   def setUp(self):
     super(TransformedTransitionKernelTest, self).setUp()

@@ -25,13 +25,11 @@ from scipy import special
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SigmoidBijectorTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SigmoidBijectorTest(test_util.TestCase):
   """Tests correctness of the Y = g(X) = (1 + exp(-X))^-1 transformation."""
 
   def testBijector(self):

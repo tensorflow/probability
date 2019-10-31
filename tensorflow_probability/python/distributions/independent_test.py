@@ -27,13 +27,11 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IndependentDistributionTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class IndependentDistributionTest(test_util.TestCase):
 
   def setUp(self):
     super(IndependentDistributionTest, self).setUp()
@@ -52,7 +50,7 @@ class IndependentDistributionTest(tfp_test_util.TestCase):
         reinterpreted_batch_ndims=1,
         validate_args=True)
 
-    x = ind.sample([4, 5], seed=tfp_test_util.test_seed(hardcoded_seed=42))
+    x = ind.sample([4, 5], seed=test_util.test_seed(hardcoded_seed=42))
     log_prob_x = ind.log_prob(x)
     x_, actual_log_prob_x = self.evaluate([x, log_prob_x])
 
@@ -74,7 +72,7 @@ class IndependentDistributionTest(tfp_test_util.TestCase):
         reinterpreted_batch_ndims=1,
         validate_args=True)
 
-    x = ind.sample([4, 5], seed=tfp_test_util.test_seed())
+    x = ind.sample([4, 5], seed=test_util.test_seed())
     log_prob_x = ind.log_prob(x)
     x_, actual_log_prob_x = self.evaluate([x, log_prob_x])
 
@@ -113,7 +111,7 @@ class IndependentDistributionTest(tfp_test_util.TestCase):
         reinterpreted_batch_ndims=1,
         validate_args=True)
 
-    x = ind.sample(int(n_samp), seed=tfp_test_util.test_seed(hardcoded_seed=42))
+    x = ind.sample(int(n_samp), seed=test_util.test_seed(hardcoded_seed=42))
     sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
     sample_var = tf.reduce_mean(
         input_tensor=tf.math.squared_difference(x, sample_mean), axis=0)
@@ -281,7 +279,7 @@ class IndependentDistributionTest(tfp_test_util.TestCase):
         input=logits, shape=logits.shape if static_shape else None)
     ind = tfd.Independent(
         distribution=tfd.Bernoulli(logits=logits_ph), validate_args=True)
-    x = ind.sample(sample_shape, seed=tfp_test_util.test_seed())
+    x = ind.sample(sample_shape, seed=test_util.test_seed())
     log_prob_x = ind.log_prob(x)
     [
         x_,

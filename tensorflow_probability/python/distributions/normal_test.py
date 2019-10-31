@@ -28,13 +28,13 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NormalTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class NormalTest(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
@@ -459,7 +459,7 @@ class NormalTest(tfp_test_util.TestCase):
     kl_expected = ((mu_a - mu_b)**2 / (2 * sigma_b**2) + 0.5 * (
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
 
-    x = n_a.sample(int(1e5), seed=tfp_test_util.test_seed())
+    x = n_a.sample(int(1e5), seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(n_a.log_prob(x) - n_b.log_prob(x), axis=0)
     kl_sample_ = self.evaluate(kl_sample)
 
@@ -493,9 +493,9 @@ class NormalTest(tfp_test_util.TestCase):
       tfd.Normal(loc=tf.zeros([2, 3]), scale=scale, validate_args=True)
 
 
-class NormalEagerGCTest(tfp_test_util.TestCase):
+class NormalEagerGCTest(test_util.TestCase):
 
-  @test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
+  @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def testNormalMeanAndMode(self):
     # Mu will be broadcast to [7, 7, 7].
     mu = [7.]

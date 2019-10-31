@@ -25,8 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 def raise_exception():
@@ -41,8 +40,8 @@ def raise_exception_in_eager_mode(value):
   return f
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GetStaticValueTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class GetStaticValueTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       dict(testcase_name='_True',
@@ -81,8 +80,8 @@ class GetStaticValueTest(tfp_test_util.TestCase):
       self.assertIsNone(static_predicate)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PredicatesTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PredicatesTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       dict(testcase_name='_greater_true',
@@ -183,8 +182,8 @@ class PredicatesTest(tfp_test_util.TestCase):
     self.assertAllCloseAccordingToType(expected, actual)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CondTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CondTest(test_util.TestCase):
 
   def test_true(self):
     x = tf.constant(2)
@@ -211,8 +210,8 @@ class CondTest(tfp_test_util.TestCase):
       prefer_static.cond(True, lambda: x)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CaseTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CaseTest(test_util.TestCase):
 
   def test_true(self):
     x = tf.constant(0)
@@ -248,8 +247,8 @@ class CaseTest(tfp_test_util.TestCase):
     self.assertEqual(self.evaluate(z), 3)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ShapeTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ShapeTest(test_util.TestCase):
 
   def test_shape(self):
     vector_value = [0., 1.]
@@ -308,8 +307,8 @@ class ShapeTest(tfp_test_util.TestCase):
       self.assertEqual(self.evaluate(rank), expected_rank)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SetDiff1DTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SetDiff1DTest(test_util.TestCase):
 
   def test_static(self):
     self.assertAllEqual(
@@ -337,26 +336,26 @@ class SetDiff1DTest(tfp_test_util.TestCase):
         self.evaluate(prefer_static.setdiff1d([1, 2], x)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SizeTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SizeTest(test_util.TestCase):
 
   def test_static(self):
     self.assertAllEqual(
         3 * 4 * 5,
         prefer_static.size(
-            tf.random.normal([3, 4, 5], seed=tfp_test_util.test_seed())))
+            tf.random.normal([3, 4, 5], seed=test_util.test_seed())))
 
   def test_dynamic(self):
     if tf.executing_eagerly(): return
     x = tf1.placeholder_with_default(
-        tf.random.normal([3, 4, 5], seed=tfp_test_util.test_seed()), shape=None)
+        tf.random.normal([3, 4, 5], seed=test_util.test_seed()), shape=None)
     self.assertAllEqual(
         3 * 4 * 5,
         self.evaluate(prefer_static.size(x)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NonNegativeAxisTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class NonNegativeAxisTest(test_util.TestCase):
 
   def test_static_scalar_positive_index(self):
     positive_axis = prefer_static.non_negative_axis(axis=2, rank=4)
@@ -370,7 +369,7 @@ class NonNegativeAxisTest(tfp_test_util.TestCase):
     positive_axis = prefer_static.non_negative_axis(axis=[0, -2], rank=4)
     self.assertAllEqual([0, 2], positive_axis)
 
-  @tfp_test_util.jax_disable_variable_test
+  @test_util.jax_disable_variable_test
   def test_dynamic_vector_index(self):
     axis = tf.Variable([0, -2])
     positive_axis = prefer_static.non_negative_axis(axis=axis, rank=4)
@@ -378,8 +377,8 @@ class NonNegativeAxisTest(tfp_test_util.TestCase):
     self.assertAllEqual([0, 2], self.evaluate(positive_axis))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BroadcastShapeTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BroadcastShapeTest(test_util.TestCase):
 
   def test_static(self):
     self.assertAllEqual(
@@ -401,8 +400,8 @@ class BroadcastShapeTest(tfp_test_util.TestCase):
     self.assertAllEqual([3, 2, 5], self.evaluate(shape))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PadTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PadTest(test_util.TestCase):
 
   def test_num_paddings_dynamic(self):
     n = tf1.placeholder_with_default(2, shape=None)
@@ -417,8 +416,8 @@ class PadTest(tfp_test_util.TestCase):
     self.assertAllEqual([2, 3, 1, 1], x)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SmartWhereTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SmartWhereTest(test_util.TestCase):
 
   def test_static_scalar_condition(self):
     fn_calls = [0, 0]

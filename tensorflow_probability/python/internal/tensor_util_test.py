@@ -26,8 +26,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 tfd = tfp.distributions
@@ -53,8 +52,8 @@ tf.register_tensor_conversion_function(
     conversion_func=lambda d, *_, **__: tf.convert_to_tensor(d.x))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ConvertNonrefToTensorTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ConvertNonrefToTensorTest(test_util.TestCase):
 
   def test_np_object(self):
     x = np.array(0.)
@@ -99,7 +98,7 @@ class ConvertNonrefToTensorTest(tfp_test_util.TestCase):
     self.assertEqual([1.], self.evaluate(g))
 
 
-class IsRefTest(tfp_test_util.TestCase):
+class IsRefTest(test_util.TestCase):
 
   def test_various_types(self):
     self.assertFalse(tensor_util.is_ref(0.))

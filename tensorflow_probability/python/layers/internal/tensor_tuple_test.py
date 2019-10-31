@@ -22,10 +22,10 @@ import re
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.layers.internal import tensor_tuple
 
 from tensorflow.python.framework import ops  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 class MyTuple(object):
@@ -48,8 +48,8 @@ tf.register_tensor_conversion_function(
     MyTuple, conversion_func=lambda x, *_, **__: tensor_tuple.TensorTuple(x))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CustomConvertToCompositeTensorTest(test_util.TensorFlowTestCase):
+@test_util.test_all_tf_execution_regimes
+class CustomConvertToCompositeTensorTest(test_util.TestCase):
 
   def test_iter(self):
     x = MyTuple((1, [2., 3.], [[4, 5], [6, 7]]))

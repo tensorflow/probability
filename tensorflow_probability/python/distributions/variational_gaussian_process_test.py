@@ -27,8 +27,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability import distributions as tfd
 from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 def _np_kernel_matrix_fn(amp, length_scale, x, y):
@@ -256,15 +255,15 @@ class _VariationalGaussianProcessTest(object):
     self.assertAllClose([], tf.shape(input=loss))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class VariationalGaussianProcessStaticTest(
-    _VariationalGaussianProcessTest, tfp_test_util.TestCase):
+    _VariationalGaussianProcessTest, test_util.TestCase):
   is_static = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class VariationalGaussianProcessDynamicTest(
-    _VariationalGaussianProcessTest, tfp_test_util.TestCase):
+    _VariationalGaussianProcessTest, test_util.TestCase):
   is_static = False
 
 

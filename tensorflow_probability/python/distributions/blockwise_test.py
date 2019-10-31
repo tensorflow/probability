@@ -22,14 +22,13 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BlockwiseTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BlockwiseTest(test_util.TestCase):
 
   def testDocstring1(self):
     d = tfd.Blockwise(
@@ -196,8 +195,8 @@ class BlockwiseTest(tfp_test_util.TestCase):
     self.assertAllClose(blockwise_kl_, mvn_kl_)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BlockwiseTestStaticParams(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BlockwiseTestStaticParams(test_util.TestCase):
   use_static_shape = True
 
   def _input(self, value):
@@ -252,8 +251,8 @@ class BlockwiseTestStaticParams(tfp_test_util.TestCase):
       self.assertAllEqual(batch_shape, flat.batch_shape)
     self.assertAllEqual(batch_shape, self.evaluate(flat.batch_shape_tensor()))
 
-    base_sample = self.evaluate(base.sample(3, seed=tfp_test_util.test_seed()))
-    flat_sample = self.evaluate(flat.sample(3, seed=tfp_test_util.test_seed()))
+    base_sample = self.evaluate(base.sample(3, seed=test_util.test_seed()))
+    flat_sample = self.evaluate(flat.sample(3, seed=test_util.test_seed()))
     self.assertAllEqual([3] + batch_shape + [num_elements], flat_sample.shape)
     base_sample = flat_sample.reshape(base_sample.shape)
 
@@ -343,9 +342,9 @@ class BlockwiseTestStaticParams(tfp_test_util.TestCase):
       self.assertAllEqual(batch_shape, flat.batch_shape)
     self.assertAllEqual(batch_shape, self.evaluate(flat.batch_shape_tensor()))
 
-    base_sample = self.evaluate(base.sample(3, seed=tfp_test_util.test_seed()))
+    base_sample = self.evaluate(base.sample(3, seed=test_util.test_seed()))
     base_sample_list = tf.nest.flatten(base_sample)
-    flat_sample = self.evaluate(flat.sample(3, seed=tfp_test_util.test_seed()))
+    flat_sample = self.evaluate(flat.sample(3, seed=test_util.test_seed()))
     self.assertAllEqual([3] + batch_shape + [num_elements], flat_sample.shape)
 
     split_points = np.cumsum([0] + nums_elements)
@@ -413,8 +412,8 @@ class BlockwiseTestStaticParams(tfp_test_util.TestCase):
     self.assertAllEqual(batch_shape, self.evaluate(flat.batch_shape_tensor()))
 
     base_sample_list = self.evaluate(
-        [base.sample(3, seed=tfp_test_util.test_seed()) for base in bases])
-    flat_sample = self.evaluate(flat.sample(3, seed=tfp_test_util.test_seed()))
+        [base.sample(3, seed=test_util.test_seed()) for base in bases])
+    flat_sample = self.evaluate(flat.sample(3, seed=test_util.test_seed()))
     self.assertAllEqual([3] + batch_shape + [num_elements], flat_sample.shape)
 
     split_points = np.cumsum([0] + nums_elements)

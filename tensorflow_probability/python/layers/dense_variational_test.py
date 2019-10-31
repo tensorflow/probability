@@ -25,8 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 from tensorflow.python.keras import testing_utils  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
@@ -101,8 +100,8 @@ class MockKLDivergence(object):
     return self.result
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DenseVariational(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DenseVariational(test_util.TestCase):
 
   def _testKerasLayer(self, layer_class):
     def kernel_posterior_fn(dtype, shape, name, trainable, add_variable_fn):

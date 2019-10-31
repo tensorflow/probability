@@ -25,12 +25,11 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class KumaraswamyTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class KumaraswamyTest(test_util.TestCase):
   """Tests correctness of the Kumaraswamy bijector."""
 
   def testBijector(self):
@@ -89,7 +88,7 @@ class KumaraswamyTest(tfp_test_util.TestCase):
         bijector, x, y, eval_func=self.evaluate, event_ndims=0,
         rtol=1e-3)
 
-  @tfp_test_util.jax_disable_variable_test
+  @test_util.jax_disable_variable_test
   def testVariableConcentration1(self):
     x = tf.Variable(1.)
     b = tfb.Kumaraswamy(concentration0=1., concentration1=x, validate_args=True)
@@ -101,7 +100,7 @@ class KumaraswamyTest(tfp_test_util.TestCase):
       with tf.control_dependencies([x.assign(-1.)]):
         self.evaluate(b.forward(1.))
 
-  @tfp_test_util.jax_disable_variable_test
+  @test_util.jax_disable_variable_test
   def testVariableConcentration0(self):
     x = tf.Variable(1.)
     b = tfb.Kumaraswamy(concentration0=x, concentration1=1., validate_args=True)
@@ -129,8 +128,8 @@ class KumaraswamyTest(tfp_test_util.TestCase):
                           validate_args=True)
       self.evaluate(b.forward_event_shape_tensor(tf.constant([1, 2, 3])))
 
-  @tfp_test_util.numpy_disable_gradient_test
-  @tfp_test_util.jax_disable_variable_test
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_variable_test
   def testGradient(self):
     x = tf.Variable(1.)
     y = tf.Variable(2.)

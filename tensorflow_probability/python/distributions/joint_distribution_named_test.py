@@ -25,13 +25,11 @@ import collections
 from absl.testing import parameterized
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class JointDistributionNamedTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class JointDistributionNamedTest(test_util.TestCase):
 
   def test_dict_sample_log_prob(self):
     # pylint: disable=bad-whitespace
@@ -54,7 +52,7 @@ class JointDistributionNamedTest(tfp_test_util.TestCase):
         ),
         d._resolve_graph())
 
-    xs = d.sample(seed=tfp_test_util.test_seed())
+    xs = d.sample(seed=test_util.test_seed())
     self.assertLen(xs, 5)
     # We'll verify the shapes work as intended when we plumb these back into the
     # respective log_probs.
@@ -117,7 +115,7 @@ class JointDistributionNamedTest(tfp_test_util.TestCase):
         ),
         d._resolve_graph())
 
-    xs = d.sample(seed=tfp_test_util.test_seed())
+    xs = d.sample(seed=test_util.test_seed())
     self.assertLen(xs, 5)
     # We'll verify the shapes work as intended when we plumb these back into the
     # respective log_probs.
@@ -271,8 +269,8 @@ class JointDistributionNamedTest(tfp_test_util.TestCase):
     # pylint: enable=bad-whitespace
 
     d0, d1 = d[:1], d[1:]
-    x0 = d0.sample(seed=tfp_test_util.test_seed())
-    x1 = d1.sample(seed=tfp_test_util.test_seed())
+    x0 = d0.sample(seed=test_util.test_seed())
+    x1 = d1.sample(seed=test_util.test_seed())
 
     self.assertLen(x0, 3)
     self.assertEqual([1], x0['s'].shape)
@@ -295,7 +293,7 @@ class JointDistributionNamedTest(tfp_test_util.TestCase):
         x    =          tfd.StudentT),
                                    validate_args=False)
     # pylint: enable=bad-whitespace
-    x = d.sample([2, 3], seed=tfp_test_util.test_seed())
+    x = d.sample([2, 3], seed=test_util.test_seed())
     self.assertLen(x, 6)
     self.assertEqual((2, 3, 2), x['e'].shape)
     self.assertEqual((2, 3), x['scale'].shape)
@@ -320,7 +318,7 @@ class JointDistributionNamedTest(tfp_test_util.TestCase):
     # The following enables the nondefault sample shape behavior.
     d._always_use_specified_sample_shape = True
     sample_shape = (2, 3)
-    x = d.sample(sample_shape, seed=tfp_test_util.test_seed())
+    x = d.sample(sample_shape, seed=test_util.test_seed())
     self.assertLen(x, 6)
     self.assertEqual(sample_shape + (2,), x['e'].shape)
     self.assertEqual(sample_shape * 2, x['scale'].shape)  # Has 1 arg.

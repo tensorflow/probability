@@ -25,14 +25,13 @@ from scipy import stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LogisticTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class LogisticTest(test_util.TestCase):
 
   def testReparameterizable(self):
     batch_size = 6
@@ -146,7 +145,7 @@ class LogisticTest(tfp_test_util.TestCase):
     scale_ = 1.0
     dist = tfd.Logistic(loc_, scale_)
     n = int(15e3)
-    samples = dist.sample(n, seed=tfp_test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     self.assertEqual(samples.shape, (n, 3))
     samples_ = self.evaluate(samples)
     for i in range(3):

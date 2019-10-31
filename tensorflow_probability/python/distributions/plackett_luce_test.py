@@ -25,8 +25,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -41,8 +40,8 @@ def make_plackett_luce(batch_shape,
   return tfd.PlackettLuce(scores, dtype=dtype, validate_args=True)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PlackettLuceTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PlackettLuceTest(test_util.TestCase):
 
   def setUp(self):
     super(PlackettLuceTest, self).setUp()
@@ -134,7 +133,7 @@ class PlackettLuceTest(tfp_test_util.TestCase):
     dist = tfd.PlackettLuce(scores)
     n = 100
     k = scores.shape[-1]
-    samples = dist.sample(n, seed=tfp_test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     self.assertEqual(samples.dtype, tf.int32)
     sample_values = self.evaluate(samples)
     self.assertAllEqual([n, 1, 2, k], sample_values.shape)
@@ -143,8 +142,8 @@ class PlackettLuceTest(tfp_test_util.TestCase):
     self.assertTrue(np.all(np.sum(sample_values, axis=-1) == (k-1)*k//2))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PlackettLuceFromVariableTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PlackettLuceFromVariableTest(test_util.TestCase):
 
   def testAssertionsProbsAfterMutation(self):
     x = tf.Variable([0.25, 0.25, 0.5])

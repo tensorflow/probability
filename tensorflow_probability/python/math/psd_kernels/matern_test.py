@@ -25,11 +25,10 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-class _MaternTestCase(tfp_test_util.TestCase):
+class _MaternTestCase(test_util.TestCase):
   """Mixin test for Matern type kernels.
 
   Subclasses must specify _kernel_type and _numpy_kernel.
@@ -147,7 +146,7 @@ class _MaternTestCase(tfp_test_util.TestCase):
         self.evaluate(grads))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaternOneHalfTest(_MaternTestCase):
 
   _kernel_type = tfp.math.psd_kernels.MaternOneHalf
@@ -157,7 +156,7 @@ class MaternOneHalfTest(_MaternTestCase):
     return amplitude**2 * np.exp(-norm)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaternThreeHalvesTest(_MaternTestCase):
 
   _kernel_type = tfp.math.psd_kernels.MaternThreeHalves
@@ -167,7 +166,7 @@ class MaternThreeHalvesTest(_MaternTestCase):
     return amplitude**2 * (1 + norm) * np.exp(-norm)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaternFiveHalvesTest(_MaternTestCase):
 
   _kernel_type = tfp.math.psd_kernels.MaternFiveHalves

@@ -26,13 +26,11 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.gradient import batch_jacobian
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _IteratedSigmoidCenteredBijectorTest(object):
   """Tests correctness of Stick breaking transformation."""
 
@@ -110,8 +108,8 @@ class _IteratedSigmoidCenteredBijectorTest(object):
     bijector_test_util.assert_bijective_and_finite(
         iterated_sigmoid, x, y, eval_func=self.evaluate, event_ndims=1)
 
-  @tfp_test_util.numpy_disable_gradient_test
-  @tfp_test_util.jax_disable_test_missing_functionality(
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_test_missing_functionality(
       "https://github.com/google/jax/issues/1212")
   def testJacobianConsistent(self):
     bijector = tfb.IteratedSigmoidCentered()
@@ -128,13 +126,13 @@ class _IteratedSigmoidCenteredBijectorTest(object):
 
 
 class IteratedSigmoidCenteredBijectorTestFloat32(
-    tfp_test_util.TestCase,
+    test_util.TestCase,
     _IteratedSigmoidCenteredBijectorTest):
   dtype = np.float32
 
 
 class IteratedSigmoidCenteredBijectorTestFloat64(
-    tfp_test_util.TestCase,
+    test_util.TestCase,
     _IteratedSigmoidCenteredBijectorTest):
   dtype = np.float64
 

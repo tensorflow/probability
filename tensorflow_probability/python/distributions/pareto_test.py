@@ -24,13 +24,12 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ParetoTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ParetoTest(test_util.TestCase):
 
   def _scipy_pareto(self, concentration, scale):
     # In scipy pareto is defined with scale = 1, so we need to scale.
@@ -249,7 +248,7 @@ class ParetoTest(tfp_test_util.TestCase):
     concentration = 3.
     n = int(100e3)
     pareto = tfd.Pareto(concentration, scale)
-    samples = pareto.sample(n, seed=tfp_test_util.test_seed())
+    samples = pareto.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -265,7 +264,7 @@ class ParetoTest(tfp_test_util.TestCase):
     n = int(400e3)
     pareto = tfd.Pareto(concentration, scale)
     samples = pareto.sample(
-        n, seed=tfp_test_util.test_seed(hardcoded_seed=123456))
+        n, seed=test_util.test_seed(hardcoded_seed=123456))
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -280,7 +279,7 @@ class ParetoTest(tfp_test_util.TestCase):
     concentration = 3.
     pareto = tfd.Pareto(concentration, scale)
     n = int(100e3)
-    samples = pareto.sample(n, seed=tfp_test_util.test_seed())
+    samples = pareto.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 1, 20))
     self.assertEqual(sample_values.shape, (n, 1, 20))
@@ -296,7 +295,7 @@ class ParetoTest(tfp_test_util.TestCase):
     pareto = tfd.Pareto(concentration, scale)
     n = int(800e3)
     samples = pareto.sample(
-        n, seed=tfp_test_util.test_seed(hardcoded_seed=123456))
+        n, seed=test_util.test_seed(hardcoded_seed=123456))
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 1, 10))
     self.assertEqual(sample_values.shape, (n, 1, 10))
@@ -323,7 +322,7 @@ class ParetoTest(tfp_test_util.TestCase):
 
     x = a.sample(
         int(1e5),
-        seed=tfp_test_util.test_seed(hardcoded_seed=0, set_eager_seed=False))
+        seed=test_util.test_seed(hardcoded_seed=0, set_eager_seed=False))
     kl_sample = tf.reduce_mean(
         input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 

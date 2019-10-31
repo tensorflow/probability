@@ -31,9 +31,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def run_nuts_chain(
@@ -165,8 +163,8 @@ def assert_mvn_target_conservation(event_size, batch_size, **kwargs):
           check_leapfrogs, check_movement, check_enough_power)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NutsTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class NutsTest(test_util.TestCase):
 
   @parameterized.parameters(itertools.product([2, 3], [1, 2, 3]))
   def testLeapfrogStepCounter(self, tree_depth, unrolled_leapfrog_steps):
@@ -190,7 +188,7 @@ class NutsTest(tfp_test_util.TestCase):
                      self.evaluate(extra.leapfrogs_taken))
 
   def testReproducibility(self):
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
     s1 = self.evaluate(run_nuts_chain(2, 5, 10, seed=seed)[0])
     if tf.executing_eagerly():
       tf.random.set_seed(seed)
@@ -307,7 +305,7 @@ class NutsTest(tfp_test_util.TestCase):
             ]),
             name=name)
 
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     wishart = tfd.Wishart(dim, scale=tf.eye(dim), input_output_cholesky=True)
     chol_precision = wishart.sample(seed=strm())
     mvn = MVNCholPrecisionTriL(

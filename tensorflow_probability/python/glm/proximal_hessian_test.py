@@ -24,14 +24,12 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 class _ProximalHessianTest(object):
 
   # https://tminka.github.io/papers/logreg/minka-logreg.pdf
@@ -387,25 +385,25 @@ class _ProximalHessianTest(object):
     self._test_compare_batch_to_single_instance(use_sparse_tensor=True)
 
 
-class ProximalHessianTestStaticShapeFloat32(tfp_test_util.TestCase,
+class ProximalHessianTestStaticShapeFloat32(test_util.TestCase,
                                             _ProximalHessianTest):
   dtype = tf.float32
   use_static_shape = True
 
 
-class ProximalHessianTestDynamicShapeFloat32(tfp_test_util.TestCase,
+class ProximalHessianTestDynamicShapeFloat32(test_util.TestCase,
                                              _ProximalHessianTest):
   dtype = tf.float32
   use_static_shape = False
 
 
-class ProximalHessianTestStaticShapeFloat64(tfp_test_util.TestCase,
+class ProximalHessianTestStaticShapeFloat64(test_util.TestCase,
                                             _ProximalHessianTest):
   dtype = tf.float64
   use_static_shape = True
 
 
-class ProximalHessianTestDynamicShapeFloat64(tfp_test_util.TestCase,
+class ProximalHessianTestDynamicShapeFloat64(test_util.TestCase,
                                              _ProximalHessianTest):
   dtype = tf.float64
   use_static_shape = False

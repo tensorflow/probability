@@ -30,10 +30,8 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
@@ -284,9 +282,8 @@ def assert_shapes_unchanged(target_shaped_dict, possibly_bcast_dict):
         tensorshape_util.as_list(possibly_bcast_dict[param].shape))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class StochasticProcessParamsAreVarsTest(
-    tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class StochasticProcessParamsAreVarsTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': sname, 'process_name': sname}
@@ -301,7 +298,7 @@ class StochasticProcessParamsAreVarsTest(
   def testProcess(self, process_name, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
       return
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
     process = data.draw(stochastic_processes(
         process_name=process_name, enable_vars=True))
     self.evaluate([var.initializer for var in process.variables])

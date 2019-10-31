@@ -24,17 +24,16 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,
+from tensorflow_probability.python.internal import test_util
 
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 @parameterized.parameters(np.float32, np.float64)
-class CholeksyLKJTest(tfp_test_util.TestCase):
+class CholeksyLKJTest(test_util.TestCase):
 
   def testLogProbMatchesTransformedDistribution(self, dtype):
     dtype = np.float64
@@ -47,7 +46,7 @@ class CholeksyLKJTest(tfp_test_util.TestCase):
           distribution=tfd.LKJ(concentration=concentration, dimension=dims))
 
       # Choose input that has well conditioned matrices.
-      x = self.evaluate(cholesky_lkj.sample(10, seed=tfp_test_util.test_seed()))
+      x = self.evaluate(cholesky_lkj.sample(10, seed=test_util.test_seed()))
       self.assertAllClose(
           self.evaluate(cholesky_lkj.log_prob(x)),
           self.evaluate(transformed_lkj.log_prob(x)))

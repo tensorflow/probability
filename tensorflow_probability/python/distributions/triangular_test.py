@@ -24,8 +24,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
@@ -289,7 +288,7 @@ class _TriangularTest(object):
     peak = np.array([0.] * 4, dtype=self._dtype)
     tri = self._create_triangular_dist(low, high, peak)
     num_samples = int(3e6)
-    samples = tri.sample(num_samples, seed=tfp_test_util.test_seed())
+    samples = tri.sample(num_samples, seed=test_util.test_seed())
 
     detectable_discrepancies = self.evaluate(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
@@ -310,7 +309,7 @@ class _TriangularTest(object):
     peak = (high - low) / 3 + low
     tri = tfd.Triangular(low=low, high=high, peak=peak)
     n = int(100e3)
-    samples = tri.sample(n, seed=tfp_test_util.test_seed())
+    samples = tri.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 1, 20))
     self.assertEqual(sample_values.shape, (n, 1, 20))
@@ -326,7 +325,7 @@ class _TriangularTest(object):
     peak = (high - low) / 3 + low
     tri = tfd.Triangular(low=low, high=high, peak=peak)
     n = int(100e3)
-    samples = tri.sample(n, seed=tfp_test_util.test_seed())
+    samples = tri.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 1, 20))
     self.assertEqual(sample_values.shape, (n, 1, 20))
@@ -358,8 +357,8 @@ class _TriangularTest(object):
         self.evaluate(triangular.mean())
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TriangularTestStaticShape(tfp_test_util.TestCase, _TriangularTest):
+@test_util.test_all_tf_execution_regimes
+class TriangularTestStaticShape(test_util.TestCase, _TriangularTest):
   _dtype = np.float32
   _use_static_shape = True
 
@@ -367,8 +366,8 @@ class TriangularTestStaticShape(tfp_test_util.TestCase, _TriangularTest):
     self._rng = np.random.RandomState(123)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TriangularTestFloat64StaticShape(tfp_test_util.TestCase, _TriangularTest):
+@test_util.test_all_tf_execution_regimes
+class TriangularTestFloat64StaticShape(test_util.TestCase, _TriangularTest):
   _dtype = np.float64
   _use_static_shape = True
 
@@ -376,8 +375,8 @@ class TriangularTestFloat64StaticShape(tfp_test_util.TestCase, _TriangularTest):
     self._rng = np.random.RandomState(123)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TriangularTestDynamicShape(tfp_test_util.TestCase, _TriangularTest):
+@test_util.test_all_tf_execution_regimes
+class TriangularTestDynamicShape(test_util.TestCase, _TriangularTest):
   _dtype = np.float32
   _use_static_shape = False
 

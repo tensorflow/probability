@@ -26,9 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 class _ReshapeBijectorTest(object):
@@ -221,8 +219,8 @@ class _ReshapeBijectorTest(object):
     raise NotImplementedError('Subclass failed to implement `build_shapes`.')
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ReshapeBijectorTestStatic(tfp_test_util.TestCase, _ReshapeBijectorTest):
+@test_util.test_all_tf_execution_regimes
+class ReshapeBijectorTestStatic(test_util.TestCase, _ReshapeBijectorTest):
 
   def build_shapes(self, shape_in, shape_out):
     return shape_in, shape_out
@@ -333,7 +331,7 @@ class ReshapeBijectorTestStatic(tfp_test_util.TestCase, _ReshapeBijectorTest):
       with tf.control_dependencies([shape_out.assign([-2, 10])]):
         self.evaluate(reshape.forward([0]))
 
-  @tfp_test_util.numpy_disable_test_missing_functionality('b/142265598')
+  @test_util.numpy_disable_test_missing_functionality('b/142265598')
   def testConcretizationLimits(self):
     shape_out = tfp_hps.defer_and_count_usage(tf.Variable([1]))
     reshape = tfb.Reshape(shape_out, validate_args=True)
@@ -348,7 +346,7 @@ class ReshapeBijectorTestStatic(tfp_test_util.TestCase, _ReshapeBijectorTest):
         getattr(reshape, method)(x, event_ndims=1)
 
 
-class ReshapeBijectorTestDynamic(tfp_test_util.TestCase, _ReshapeBijectorTest):
+class ReshapeBijectorTestDynamic(test_util.TestCase, _ReshapeBijectorTest):
 
   def build_shapes(self, shape_in, shape_out):
     shape_in = np.array(shape_in, np.int32)

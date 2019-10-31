@@ -27,13 +27,11 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalTriLTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MultivariateNormalTriLTest(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -142,7 +140,7 @@ class MultivariateNormalTriLTest(tfp_test_util.TestCase):
 
     n = tf.constant(100000)
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
-    samples = mvn.sample(n, seed=tfp_test_util.test_seed())
+    samples = mvn.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, [int(100e3), 2])
     self.assertAllClose(sample_values.mean(axis=0), mu, atol=1e-2)
@@ -163,7 +161,7 @@ class MultivariateNormalTriLTest(tfp_test_util.TestCase):
 
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     samples_val = self.evaluate(mvn.sample(
-        (10, 11, 12), seed=tfp_test_util.test_seed()))
+        (10, 11, 12), seed=test_util.test_seed()))
 
     # Check sample shape
     self.assertEqual((10, 11, 12, 3, 5, 2), samples_val.shape)
@@ -188,7 +186,7 @@ class MultivariateNormalTriLTest(tfp_test_util.TestCase):
 
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     n = tf.constant(100000)
-    samples = mvn.sample(n, seed=tfp_test_util.test_seed())
+    samples = mvn.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     self.assertEqual(samples.shape, (100000, 3, 5, 2))
@@ -322,7 +320,7 @@ class MultivariateNormalTriLTest(tfp_test_util.TestCase):
         validate_args=True)
 
     n = int(10e3)
-    samps = dist.sample(n, seed=tfp_test_util.test_seed())
+    samps = dist.sample(n, seed=test_util.test_seed())
     sample_mean = tf.reduce_mean(input_tensor=samps, axis=0)
     x = samps - sample_mean
     sample_covariance = tf.matmul(x, x, transpose_a=True) / n
@@ -425,8 +423,8 @@ class _MakeSlicer(object):
 make_slicer = _MakeSlicer()
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalTriLSlicingTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MultivariateNormalTriLSlicingTest(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)

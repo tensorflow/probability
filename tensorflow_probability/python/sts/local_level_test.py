@@ -24,15 +24,11 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import LocalLevelStateSpaceModel
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
-tfl = tf.linalg
-
-
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _LocalLevelStateSpaceModelTest(object):
 
   def test_logprob(self):
@@ -87,7 +83,7 @@ class _LocalLevelStateSpaceModelTest(object):
     self.assertAllEqual(self.evaluate(tf.shape(input=y))[:-2], batch_shape)
 
   def test_joint_sample(self):
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     batch_shape = [4, 2]
 
     level_scale = self._build_placeholder(2 * np.ones(batch_shape))
@@ -146,23 +142,23 @@ class _LocalLevelStateSpaceModelTest(object):
         input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LocalLevelStateSpaceModelTestStaticShape32(
-    tfp_test_util.TestCase, _LocalLevelStateSpaceModelTest):
+    test_util.TestCase, _LocalLevelStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LocalLevelStateSpaceModelTestDynamicShape32(
-    tfp_test_util.TestCase, _LocalLevelStateSpaceModelTest):
+    test_util.TestCase, _LocalLevelStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LocalLevelStateSpaceModelTestStaticShape64(
-    tfp_test_util.TestCase, _LocalLevelStateSpaceModelTest):
+    test_util.TestCase, _LocalLevelStateSpaceModelTest):
   dtype = np.float64
   use_static_shape = True
 

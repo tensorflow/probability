@@ -24,13 +24,11 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MatrixInverseTriLBijectorTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MatrixInverseTriLBijectorTest(test_util.TestCase):
   """Tests the correctness of the Y = inv(tril) transformation."""
 
   # The inverse of 0 is undefined, as the numbers above the main
@@ -164,7 +162,7 @@ class MatrixInverseTriLBijectorTest(tfp_test_util.TestCase):
     with self.assertRaisesOpError(nonsingular_error_msg):
       self.evaluate(inv.inverse_log_det_jacobian(x_, event_ndims=2))
 
-  @tfp_test_util.numpy_disable_gradient_test
+  @test_util.numpy_disable_gradient_test
   def testJacobian(self):
     bijector = tfb.MatrixInverseTriL()
     batch_size = 5

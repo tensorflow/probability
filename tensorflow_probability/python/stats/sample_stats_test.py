@@ -24,15 +24,13 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 rng = np.random.RandomState(0)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _AutoCorrelationTest(object):
 
   @property
@@ -219,8 +217,8 @@ class _AutoCorrelationTest(object):
     self.assertLess(np.abs(rxx_[1:]).mean(), 0.02)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AutoCorrelationTestStaticShapeFloat32(tfp_test_util.TestCase,
+@test_util.test_all_tf_execution_regimes
+class AutoCorrelationTestStaticShapeFloat32(test_util.TestCase,
                                             _AutoCorrelationTest):
 
   @property
@@ -232,8 +230,8 @@ class AutoCorrelationTestStaticShapeFloat32(tfp_test_util.TestCase,
     return True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AutoCorrelationTestStaticShapeComplex64(tfp_test_util.TestCase,
+@test_util.test_all_tf_execution_regimes
+class AutoCorrelationTestStaticShapeComplex64(test_util.TestCase,
                                               _AutoCorrelationTest):
 
   @property
@@ -245,8 +243,8 @@ class AutoCorrelationTestStaticShapeComplex64(tfp_test_util.TestCase,
     return True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AutoCorrelationTestDynamicShapeFloat32(tfp_test_util.TestCase,
+@test_util.test_all_tf_execution_regimes
+class AutoCorrelationTestDynamicShapeFloat32(test_util.TestCase,
                                              _AutoCorrelationTest):
 
   @property
@@ -258,8 +256,8 @@ class AutoCorrelationTestDynamicShapeFloat32(tfp_test_util.TestCase,
     return False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CovarianceTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CovarianceTest(test_util.TestCase):
 
   def _np_cov_1d(self, x, y):
     return ((x - x.mean(axis=0)) * (y - y.mean(axis=0))).mean(axis=0)
@@ -413,8 +411,8 @@ class CovarianceTest(tfp_test_util.TestCase):
     tfp.stats.covariance(x)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CorrelationTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CorrelationTest(test_util.TestCase):
 
   def _np_corr_1d(self, x, y):
     assert x.ndim == y.ndim == 1
@@ -473,8 +471,8 @@ class CorrelationTest(tfp_test_util.TestCase):
               self._np_corr_1d(x_i[:, m], y_i[:, n]), corr_i[m, n])
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CholeskyCovarianceTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CholeskyCovarianceTest(test_util.TestCase):
 
   def test_batch_vector_sampaxis1_eventaxis2(self):
     # x.shape = [2, 5000, 2],
@@ -502,8 +500,8 @@ class CholeskyCovarianceTest(tfp_test_util.TestCase):
     self.assertAllClose(2 * np.eye(2), chol[1, ...], atol=0.06)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class VarianceTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class VarianceTest(test_util.TestCase):
   """Light test:  Most methods tested implicitly by CovarianceTest."""
 
   def test_independent_uniform_samples(self):
@@ -522,8 +520,8 @@ class VarianceTest(tfp_test_util.TestCase):
     self.assertAllClose(np.var(x), var)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class StddevTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class StddevTest(test_util.TestCase):
   """Light test:  Most methods tested implicitly by VarianceTest."""
 
   def test_independent_uniform_samples(self):
@@ -542,8 +540,8 @@ class StddevTest(tfp_test_util.TestCase):
     self.assertAllClose(np.std(x, axis=(1, -1)), stddev)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LogAverageProbsTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class LogAverageProbsTest(test_util.TestCase):
 
   def test_mathematical_correctness_bernoulli(self):
     logits = tf.random.normal([10, 3, 4], seed=42)

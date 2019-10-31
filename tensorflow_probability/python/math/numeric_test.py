@@ -25,12 +25,11 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class Log1pSquareTest32(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class Log1pSquareTest32(test_util.TestCase):
 
   dtype = tf.float32
 
@@ -59,13 +58,13 @@ class Log1pSquareTest32(tfp_test_util.TestCase):
     self.assertAllClose(expected_dydx, dydx_)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class Log1pSquareTest64(Log1pSquareTest32):
   dtype = tf.float64
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ClipByValuePreserveGrad32(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ClipByValuePreserveGrad32(test_util.TestCase):
 
   dtype = tf.float32
 
@@ -90,7 +89,7 @@ class ClipByValuePreserveGrad32(tfp_test_util.TestCase):
     self.assertAllClose(expected_dydx, dydx_)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class ClipByValuePreserveGrad64(ClipByValuePreserveGrad32):
 
   dtype = tf.float64

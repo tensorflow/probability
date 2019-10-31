@@ -24,16 +24,12 @@ from scipy import special
 from scipy import stats
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-
-tfd = tfp.distributions
+from tensorflow_probability import distributions as tfd
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ChiTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ChiTest(test_util.TestCase):
 
   def testChiLogPDF(self):
     df = np.arange(1, 6, dtype=np.float64)
@@ -116,7 +112,7 @@ class ChiTest(tfp_test_util.TestCase):
 
     x = a.sample(
         int(8e5),
-        seed=tfp_test_util.test_seed())
+        seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])

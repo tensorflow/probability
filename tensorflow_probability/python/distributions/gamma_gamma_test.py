@@ -21,13 +21,11 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GammaGammaTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class GammaGammaTest(test_util.TestCase):
 
   def testGammaGammaShape(self):
     gg = tfd.GammaGamma(
@@ -182,7 +180,7 @@ class GammaGammaTest(tfp_test_util.TestCase):
         concentration=alpha_v,
         mixing_concentration=alpha0_v,
         mixing_rate=beta0_v)
-    samples = gg.sample(n, seed=tfp_test_util.test_seed())
+    samples = gg.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -194,7 +192,7 @@ class GammaGammaTest(tfp_test_util.TestCase):
                         mixing_concentration=1.,
                         mixing_rate=1.)
     n = 3
-    samples = self.evaluate(gg.sample(n, seed=tfp_test_util.test_seed()))
+    samples = self.evaluate(gg.sample(n, seed=test_util.test_seed()))
     self.assertAllEqual((n, 2), samples.shape)
 
   def testGammaGammaSampleMultidimensional(self):
@@ -207,7 +205,7 @@ class GammaGammaTest(tfp_test_util.TestCase):
         concentration=alpha_v,
         mixing_concentration=alpha0_v,
         mixing_rate=beta0_v)
-    samples = gg.sample(n, seed=tfp_test_util.test_seed())
+    samples = gg.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     expected_shape = (n, beta0_v.shape[0], alpha_v.shape[-1])
     self.assertEqual(samples.shape, expected_shape)

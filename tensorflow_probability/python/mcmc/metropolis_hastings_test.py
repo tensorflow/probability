@@ -26,9 +26,8 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.internal.util import is_list_like
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 InnerKernelResultsWithoutCorrection = collections.namedtuple(
 
@@ -130,8 +129,8 @@ def make_bootstrap_results_fn(true_kernel_results):
   return bootstrap_results
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MetropolisHastingsTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MetropolisHastingsTest(test_util.TestCase):
 
   def setUp(self):
     self.dtype = np.float32

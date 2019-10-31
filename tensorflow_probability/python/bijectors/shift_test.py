@@ -23,12 +23,11 @@ from __future__ import print_function
 from absl.testing import parameterized
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ShiftTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ShiftTest(test_util.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       dict(testcase_name='static', is_static=True),

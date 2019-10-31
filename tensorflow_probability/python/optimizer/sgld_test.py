@@ -25,14 +25,14 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import diag_jacobian
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class StochasticGradientLangevinDynamicsOptimizerTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
 
   def testBasic(self):
     if tf.executing_eagerly():
@@ -165,7 +165,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(tfp_test_util.TestCase):
             [3. - 3. * grads_scaled, 4. - 3. * grads_scaled],
             self.evaluate(var1))
 
-  @test_util.run_deprecated_v1
+  @tf_test_util.run_deprecated_v1
   def testGradWrtRef(self):
     if tf.executing_eagerly():
       return

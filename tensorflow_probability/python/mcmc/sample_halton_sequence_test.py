@@ -26,9 +26,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import monte_carlo
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def _set_seed(seed):
@@ -40,8 +38,8 @@ def _set_seed(seed):
   return seed
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class HaltonSequenceTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class HaltonSequenceTest(test_util.TestCase):
 
   def test_known_values_small_bases(self):
     # The first five elements of the non-randomized Halton sequence
@@ -164,7 +162,7 @@ class HaltonSequenceTest(tfp_test_util.TestCase):
 
     samples = tfp.mcmc.sample_halton_sequence(
         dim, num_results=replicas * num_results,
-        seed=tfp_test_util.test_seed_stream())
+        seed=test_util.test_seed_stream())
     samples = tf.reshape(samples, [replicas, num_results, dim])
     values = self.evaluate(
         tf.reduce_mean(tf.reduce_sum(samples, axis=-1)**2, axis=-1))
@@ -207,10 +205,10 @@ class HaltonSequenceTest(tfp_test_util.TestCase):
 
     sample_lo = tfp.mcmc.sample_halton_sequence(
         dim, num_results=replica * num_results_lo,
-        seed=tfp_test_util.test_seed_stream())
+        seed=test_util.test_seed_stream())
     sample_hi = tfp.mcmc.sample_halton_sequence(
         dim, num_results=replica * num_results_hi,
-        seed=tfp_test_util.test_seed_stream())
+        seed=test_util.test_seed_stream())
 
     sample_lo = tf.reshape(sample_lo, [replica, -1, dim])
     sample_hi = tf.reshape(sample_hi, [replica, -1, dim])

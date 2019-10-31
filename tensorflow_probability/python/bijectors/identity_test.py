@@ -25,13 +25,11 @@ import weakref
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IdentityTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class IdentityTest(test_util.TestCase):
   """Tests correctness of the Y = g(X) = X transformation."""
 
   def testBijector(self):

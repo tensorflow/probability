@@ -32,7 +32,6 @@ from tensorflow_probability.python.distributions import Normal
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 def _logit(x):
@@ -40,7 +39,7 @@ def _logit(x):
   return np.log(x) - np.log1p(-x)
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class ShapesFromLocAndScaleTest(test_util.TestCase):
 
   def test_static_loc_static_scale_non_matching_event_size_raises(self):
@@ -141,7 +140,7 @@ class ShapesFromLocAndScaleTest(test_util.TestCase):
     self.assertAllEqual([3], event_shape_)
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class GetBroadcastShapeTest(test_util.TestCase):
 
   def test_all_static_shapes_work(self):
@@ -162,7 +161,7 @@ class GetBroadcastShapeTest(test_util.TestCase):
     self.assertAllEqual([2, 5, 3], bcast_shape)
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MixtureStddevTest(test_util.TestCase):
 
   def test_mixture_dev(self):
@@ -197,7 +196,7 @@ class MixtureStddevTest(test_util.TestCase):
     self.assertAllClose(expected_devs, self.evaluate(mix_dev))
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class PadMixtureDimensionsTest(test_util.TestCase):
 
   def test_pad_mixture_dimensions_mixture(self):
@@ -325,7 +324,7 @@ class _PadTest(object):
         x1_both_, atol=0., rtol=1e-6)
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class PadStaticTest(_PadTest, test_util.TestCase):
 
   @property
@@ -333,7 +332,7 @@ class PadStaticTest(_PadTest, test_util.TestCase):
     return True
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class PadDynamicTest(_PadTest, test_util.TestCase):
 
   @property
@@ -341,7 +340,7 @@ class PadDynamicTest(_PadTest, test_util.TestCase):
     return False
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class PickScalarConditionTest(test_util.TestCase):
 
   def test_pick_scalar_condition_static(self):
@@ -388,7 +387,7 @@ class PickScalarConditionTest(test_util.TestCase):
     self.assertAllEqual(neg_, neg)
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class TestMoveDimension(test_util.TestCase):
 
   def test_move_dimension_static_shape(self):
@@ -484,7 +483,7 @@ class TestMoveDimension(test_util.TestCase):
     self.assertAllEqual(x_perm5_, [200, 30, 6, 4, 1])
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class AssertCloseTest(test_util.TestCase):
 
   def testAssertIntegerForm(self):
@@ -519,7 +518,7 @@ class AssertCloseTest(test_util.TestCase):
         self.evaluate(tf.identity(w))
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaybeGetStaticTest(test_util.TestCase):
 
   def testGetStaticInt(self):
@@ -553,7 +552,7 @@ class MaybeGetStaticTest(test_util.TestCase):
         None, distribution_util.maybe_get_static_value(x, dtype=np.float64))
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class GetLogitsAndProbsTest(test_util.TestCase):
 
   def testImproperArguments(self):
@@ -703,7 +702,7 @@ class GetLogitsAndProbsTest(test_util.TestCase):
       self.evaluate(logit)
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class EmbedCheckCategoricalEventShapeTest(test_util.TestCase):
 
   def testTooSmall(self):
@@ -744,7 +743,7 @@ class EmbedCheckCategoricalEventShapeTest(test_util.TestCase):
       distribution_util.embed_check_categorical_event_shape(param)
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class EmbedCheckIntegerCastingClosedTest(test_util.TestCase):
 
   def testCorrectlyAssertsNonnegative(self):
@@ -788,7 +787,7 @@ class EmbedCheckIntegerCastingClosedTest(test_util.TestCase):
       self.evaluate(x_checked)
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class DynamicShapeTest(test_util.TestCase):
 
   def testSameDynamicShape(self):
@@ -860,7 +859,7 @@ class DynamicShapeTest(test_util.TestCase):
             multidimensional1, multidimensional3)))
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class RotateTransposeTest(test_util.TestCase):
 
   def _np_rotate_transpose(self, x, shift):
@@ -895,7 +894,7 @@ class RotateTransposeTest(test_util.TestCase):
             self.evaluate(distribution_util.rotate_transpose(x, shift)))
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class PickVectorTest(test_util.TestCase):
 
   def testCorrectlyPicksVector(self):
@@ -913,7 +912,7 @@ class PickVectorTest(test_util.TestCase):
                             tf.constant(False), x, y))  # No eval.
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class PreferStaticRankTest(test_util.TestCase):
 
   def testNonEmptyConstantTensor(self):
@@ -959,7 +958,7 @@ class PreferStaticRankTest(test_util.TestCase):
     self.assertAllEqual(0, self.evaluate(rank))
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class PreferStaticShapeTest(test_util.TestCase):
 
   def testNonEmptyConstantTensor(self):
@@ -1002,7 +1001,7 @@ class PreferStaticShapeTest(test_util.TestCase):
     self.assertAllEqual([], self.evaluate(shape))
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class PreferStaticValueTest(test_util.TestCase):
 
   def testNonEmptyConstantTensor(self):
@@ -1055,7 +1054,7 @@ class GenNewSeedTest(test_util.TestCase):
     self.assertIsNone(distribution_util.gen_new_seed(None, 'salt'))
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class ArgumentsTest(test_util.TestCase):
 
   def testNoArguments(self):
@@ -1113,7 +1112,7 @@ class ArgumentsTest(test_util.TestCase):
                      foo(1, 2, 3, *[1, 2, 3], unicorn=None))
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class ExpandToVectorTest(test_util.TestCase):
 
   def _check_static(self, expected, actual, dtype=np.int32):
@@ -1213,7 +1212,7 @@ class ExpandToVectorTest(test_util.TestCase):
         self.evaluate(_expand_tensor([[1, 2]], shape=None, validate_args=True))
 
 
-@tf_test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class WithDependenciesTestCase(test_util.TestCase):
 
   def testTupleDependencies(self):

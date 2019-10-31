@@ -27,8 +27,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -40,8 +39,8 @@ def make_categorical(batch_shape, num_classes, dtype=tf.int32):
   return tfd.Categorical(logits, dtype=dtype)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CategoricalTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CategoricalTest(test_util.TestCase):
 
   def testP(self):
     p = [0.2, 0.8]
@@ -365,7 +364,7 @@ class CategoricalTest(tfp_test_util.TestCase):
     histograms = [[[0.2, 0.8], [0.4, 0.6]]]
     dist = tfd.Categorical(tf.math.log(histograms) - 50.)
     n = 10000
-    samples = dist.sample(n, seed=tfp_test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     tensorshape_util.set_shape(samples, [n, 1, 2])
     self.assertEqual(samples.dtype, tf.int32)
     sample_values = self.evaluate(samples)
@@ -379,7 +378,7 @@ class CategoricalTest(tfp_test_util.TestCase):
   def testSampleWithSampleShape(self):
     histograms = [[[0.2, 0.8], [0.4, 0.6]]]
     dist = tfd.Categorical(tf.math.log(histograms) - 50.)
-    samples = dist.sample((100, 100), seed=tfp_test_util.test_seed())
+    samples = dist.sample((100, 100), seed=test_util.test_seed())
     prob = dist.prob(samples)
     prob_val = self.evaluate(prob)
     self.assertAllClose(
@@ -501,8 +500,8 @@ class CategoricalTest(tfp_test_util.TestCase):
         atol=0, rtol=1e-4)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CategoricalFromVariableTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CategoricalFromVariableTest(test_util.TestCase):
 
   def testGradientLogits(self):
     x = tf.Variable([-1., 0., 1])

@@ -26,16 +26,14 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CauchyTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CauchyTest(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
@@ -189,7 +187,7 @@ class CauchyTest(tfp_test_util.TestCase):
     expected_cdf = sp_stats.cauchy(loc, scale).logcdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0, rtol=1e-5)
 
-  @tfp_test_util.numpy_disable_gradient_test
+  @test_util.numpy_disable_gradient_test
   def testFiniteGradientAtDifficultPoints(self):
     for dtype in [np.float32, np.float64]:
       loc = tf.Variable(dtype(0.0))

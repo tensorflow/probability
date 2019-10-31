@@ -24,13 +24,11 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalDiagPlusLowRankTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
   """Well tested because this is a simple override of the base class."""
 
   def setUp(self):
@@ -151,9 +149,9 @@ class MultivariateNormalDiagPlusLowRankTest(tfp_test_util.TestCase):
 
     scale = dist.scale.to_dense()
 
-    n = int(30e3)
+    n = int(70e3)
     samps = dist.sample(
-        n, seed=tfp_test_util.test_seed())
+        n, seed=test_util.test_seed())
     sample_mean = tf.reduce_mean(input_tensor=samps, axis=0)
     x = samps - sample_mean
     sample_covariance = tf.matmul(x, x, transpose_a=True) / n
@@ -180,7 +178,7 @@ class MultivariateNormalDiagPlusLowRankTest(tfp_test_util.TestCase):
         loc=np.array([-1., 0.25, 1.25], dtype=np.float32),
         scale_diag=np.array([1.5, 0.5, 1.], dtype=np.float32),
         validate_args=True)
-    samps = baseline.sample(n, seed=tfp_test_util.test_seed())
+    samps = baseline.sample(n, seed=test_util.test_seed())
 
     sample_kl_identity_diag_baseline = tf.reduce_mean(
         input_tensor=baseline.log_prob(samps) - mvn_identity.log_prob(samps),

@@ -27,9 +27,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import layers as tfpl
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfk = tf.keras
 
@@ -51,8 +49,10 @@ def _vec_pad(x, value=0):
   return tf.pad(tensor=x, paddings=paddings, constant_values=value)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class EndToEndTest(tfp_test_util.TestCase):
+# TODO(b/143642032): Figure out how to solve issues with save/load, so that we
+# can decorate all of these tests with @test_util.test_all_tf_execution_regimes
+@test_util.test_graph_and_eager_modes
+class EndToEndTest(test_util.TestCase):
   """Test tfp.layers work in all three Keras APIs.
 
   For end-to-end tests we fit a Variational Autoencoder (VAE) because this
@@ -283,8 +283,8 @@ class EndToEndTest(tfp_test_util.TestCase):
     self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DistributionLambdaSerializationTest(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class DistributionLambdaSerializationTest(test_util.TestCase):
 
   def assertSerializable(self, model, batch_size=1):
     """Assert that a model can be saved/loaded via Keras Model.save/load_model.
@@ -402,8 +402,8 @@ class DistributionLambdaSerializationTest(tfp_test_util.TestCase):
     self.assertExportable(model, batch_size=2)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DistributionLambdaVariableCreation(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class DistributionLambdaVariableCreation(test_util.TestCase):
 
   def test_variable_creation(self):
     conv1 = tfkl.Convolution2D(filters=1, kernel_size=[1, 3])
@@ -436,8 +436,8 @@ class DistributionLambdaVariableCreation(tfp_test_util.TestCase):
               validation_data=(x_test, x_test))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class KLDivergenceAddLoss(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class KLDivergenceAddLoss(test_util.TestCase):
 
   def test_approx_kl(self):
     # TODO(b/120320323): Enable this test in eager.
@@ -482,8 +482,8 @@ class KLDivergenceAddLoss(tfp_test_util.TestCase):
               steps_per_epoch=1)  # Usually `n // batch_size`.
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalTriLTest(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class MultivariateNormalTriLTest(test_util.TestCase):
 
   def _check_distribution(self, t, x):
     self.assertIsInstance(x, tfd.MultivariateNormalTriL)
@@ -548,8 +548,8 @@ class MultivariateNormalTriLTest(tfp_test_util.TestCase):
                         atol=1e-2, rtol=1e-3)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class OneHotCategoricalTest(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class OneHotCategoricalTest(test_util.TestCase):
 
   def _check_distribution(self, t, x):
     self.assertIsInstance(x, tfd.OneHotCategorical)
@@ -605,8 +605,8 @@ class OneHotCategoricalTest(tfp_test_util.TestCase):
               shuffle=True)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CategoricalMixtureOfOneHotCategoricalTest(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class CategoricalMixtureOfOneHotCategoricalTest(test_util.TestCase):
 
   def _check_distribution(self, t, x):
     self.assertIsInstance(x, tfd.MixtureSameFamily)
@@ -696,7 +696,7 @@ class CategoricalMixtureOfOneHotCategoricalTest(tfp_test_util.TestCase):
     # strictly need--is another end-to-end test.)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 class _IndependentLayerTest(object):
   """Base class for testing independent distribution layers.
 
@@ -809,7 +809,7 @@ class _IndependentLayerTest(object):
     self.assertEqual(self.dtype, model(x).dtype.as_numpy_dtype)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 class _IndependentBernoulliTest(_IndependentLayerTest):
   layer_class = tfpl.IndependentBernoulli
   dist_class = tfd.Bernoulli
@@ -819,15 +819,15 @@ class _IndependentBernoulliTest(_IndependentLayerTest):
                       tf.concat([batch_shape, [-1]], axis=-1))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IndependentBernoulliTestDynamicShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class IndependentBernoulliTestDynamicShape(test_util.TestCase,
                                            _IndependentBernoulliTest):
   dtype = np.float64
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IndependentBernoulliTestStaticShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class IndependentBernoulliTestStaticShape(test_util.TestCase,
                                           _IndependentBernoulliTest):
   dtype = np.float32
   use_static_shape = True
@@ -867,7 +867,7 @@ class IndependentBernoulliTestStaticShape(tfp_test_util.TestCase,
                         atol=0.15, rtol=0.15)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 class _IndependentLogisticTest(_IndependentLayerTest):
   layer_class = tfpl.IndependentLogistic
   dist_class = tfd.Logistic
@@ -880,15 +880,15 @@ class _IndependentLogisticTest(_IndependentLayerTest):
     ], -1)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IndependentLogisticTestDynamicShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class IndependentLogisticTestDynamicShape(test_util.TestCase,
                                           _IndependentLogisticTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IndependentLogisticTestStaticShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class IndependentLogisticTestStaticShape(test_util.TestCase,
                                          _IndependentLogisticTest):
   dtype = np.float64
   use_static_shape = True
@@ -917,7 +917,7 @@ class IndependentLogisticTestStaticShape(tfp_test_util.TestCase,
     self.assertEqual(self.dtype, out.dtype)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 class _IndependentNormalTest(_IndependentLayerTest):
   layer_class = tfpl.IndependentNormal
   dist_class = tfd.Normal
@@ -965,15 +965,15 @@ class _IndependentNormalTest(_IndependentLayerTest):
     self.assertEqual(self.dtype, out.dtype)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IndependentNormalTestDynamicShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class IndependentNormalTestDynamicShape(test_util.TestCase,
                                         _IndependentNormalTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IndependentNormalTestStaticShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class IndependentNormalTestStaticShape(test_util.TestCase,
                                        _IndependentNormalTest):
   dtype = np.float64
   use_static_shape = True
@@ -1002,7 +1002,7 @@ class IndependentNormalTestStaticShape(tfp_test_util.TestCase,
     self.assertEqual(self.dtype, out.dtype)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 class _IndependentPoissonTest(_IndependentLayerTest):
   layer_class = tfpl.IndependentPoisson
   dist_class = tfd.Poisson
@@ -1012,15 +1012,15 @@ class _IndependentPoissonTest(_IndependentLayerTest):
                       tf.concat([batch_shape, [-1]], axis=-1))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IndependentPoissonTestDynamicShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class IndependentPoissonTestDynamicShape(test_util.TestCase,
                                          _IndependentPoissonTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IndependentPoissonTestStaticShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class IndependentPoissonTestStaticShape(test_util.TestCase,
                                         _IndependentPoissonTest):
   dtype = np.float64
   use_static_shape = True
@@ -1055,7 +1055,7 @@ class IndependentPoissonTestStaticShape(tfp_test_util.TestCase,
               shuffle=True)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 class _MixtureLayerTest(object):
   """Base class for testing mixture (same-family) distribution layers.
 
@@ -1178,7 +1178,7 @@ class _MixtureLayerTest(object):
     self.assertEqual(self.dtype, model(x).dtype.as_numpy_dtype)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 class _MixtureLogisticTest(_MixtureLayerTest):
   layer_class = tfpl.MixtureLogistic
   dist_class = tfd.Logistic
@@ -1234,21 +1234,21 @@ class _MixtureLogisticTest(_MixtureLayerTest):
     self.assertEqual(15, self.evaluate(tf.convert_to_tensor(value=params_size)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MixtureLogisticTestDynamicShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class MixtureLogisticTestDynamicShape(test_util.TestCase,
                                       _MixtureLogisticTest):
   dtype = np.float64
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MixtureLogisticTestStaticShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class MixtureLogisticTestStaticShape(test_util.TestCase,
                                      _MixtureLogisticTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 class _MixtureNormalTest(_MixtureLayerTest):
   layer_class = tfpl.MixtureNormal
   dist_class = tfd.Normal
@@ -1304,21 +1304,21 @@ class _MixtureNormalTest(_MixtureLayerTest):
     self.assertEqual(15, self.evaluate(tf.convert_to_tensor(value=params_size)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MixtureNormalTestDynamicShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class MixtureNormalTestDynamicShape(test_util.TestCase,
                                     _MixtureNormalTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MixtureNormalTestStaticShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class MixtureNormalTestStaticShape(test_util.TestCase,
                                    _MixtureNormalTest):
   dtype = np.float64
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 class _MixtureSameFamilyTest(object):
 
   def _build_tensor(self, ndarray, dtype=None):
@@ -1420,22 +1420,22 @@ class _MixtureSameFamilyTest(object):
     self.assertEqual(15, self.evaluate(tf.convert_to_tensor(value=params_size)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MixtureSameFamilyTestDynamicShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class MixtureSameFamilyTestDynamicShape(test_util.TestCase,
                                         _MixtureSameFamilyTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MixtureSameFamilyTestStaticShape(tfp_test_util.TestCase,
+@test_util.test_graph_and_eager_modes
+class MixtureSameFamilyTestStaticShape(test_util.TestCase,
                                        _MixtureSameFamilyTest):
   dtype = np.float64
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class VariationalGaussianProcessEndToEnd(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class VariationalGaussianProcessEndToEnd(test_util.TestCase):
 
   def testEndToEnd(self):
     np.random.seed(43)
@@ -1516,8 +1516,8 @@ class VariationalGaussianProcessEndToEnd(tfp_test_util.TestCase):
     self.assertEqual(dtype, vgp.dtype)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class JointDistributionLayer(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class JointDistributionLayer(test_util.TestCase):
 
   def test_works(self):
     x = tf.keras.Input(shape=())

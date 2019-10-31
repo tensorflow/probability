@@ -28,13 +28,12 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _VonMisesTest(object):
 
   def make_tensor(self, x):
@@ -128,7 +127,7 @@ class _VonMisesTest(object):
       concentrations = tf.cast(tf.constant(np.logspace(-3, 3, n)), self.dtype)
       von_mises = tfd.VonMises(locs, concentrations)
       x = tf.constant(self.evaluate(
-          von_mises.sample(seed=tfp_test_util.test_seed())))
+          von_mises.sample(seed=test_util.test_seed())))
       cdf = von_mises.cdf(x)
 
       self.assertLess(
@@ -222,7 +221,7 @@ class _VonMisesTest(object):
         concentration=self.make_tensor(np.array([[0.8, 0.0, 0.5]])))
 
     kl_actual = tfd.kl_divergence(d1, d2)
-    x = d1.sample(int(1e5), seed=tfp_test_util.test_seed(hardcoded_seed=0))
+    x = d1.sample(int(1e5), seed=test_util.test_seed(hardcoded_seed=0))
     kl_sample = tf.reduce_mean(
         input_tensor=d1.log_prob(x) - d2.log_prob(x), axis=0)
     kl_same = tfd.kl_divergence(d1, d1)
@@ -244,7 +243,7 @@ class _VonMisesTest(object):
         self.make_tensor(locs_v), self.make_tensor(concentrations_v))
 
     n = 10000
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
     samples = von_mises.sample(n, seed=seed)
 
     expected_mean = von_mises.mean()
@@ -270,7 +269,7 @@ class _VonMisesTest(object):
     von_mises = tfd.VonMises(self.make_tensor(1.0), self.make_tensor(0.0))
 
     n = 10000
-    samples = von_mises.sample(n, seed=tfp_test_util.test_seed())
+    samples = von_mises.sample(n, seed=test_util.test_seed())
 
     # For circular uniform distribution, the mean is not well-defined,
     # so only checking the variance.
@@ -291,7 +290,7 @@ class _VonMisesTest(object):
                              self.make_tensor(concentrations_v))
     n = 10000
     sample_values = self.evaluate(
-        von_mises.sample(n, seed=tfp_test_util.test_seed()))
+        von_mises.sample(n, seed=test_util.test_seed()))
     self.assertEqual(sample_values.shape, (n, 50))
 
     fails = 0
@@ -309,7 +308,7 @@ class _VonMisesTest(object):
     von_mises = tfd.VonMises(self.make_tensor(locs_v), self.make_tensor(0.))
     n = 10000
     sample_values = self.evaluate(
-        von_mises.sample(n, seed=tfp_test_util.test_seed(hardcoded_seed=137)))
+        von_mises.sample(n, seed=test_util.test_seed(hardcoded_seed=137)))
     self.assertEqual(sample_values.shape, (n, 50))
 
     fails = 0
@@ -333,7 +332,7 @@ class _VonMisesTest(object):
 
     def loss(loc, concentration):
       von_mises = tfd.VonMises(loc, concentration)
-      samples = von_mises.sample(n, seed=tfp_test_util.test_seed())
+      samples = von_mises.sample(n, seed=test_util.test_seed())
       return tf.reduce_mean(input_tensor=samples, axis=0)
 
     _, [grad_loc, grad_concentration] = self.evaluate(
@@ -351,7 +350,7 @@ class _VonMisesTest(object):
 
     def loss(loc, concentration):
       von_mises = tfd.VonMises(loc, concentration)
-      samples = von_mises.sample(n, seed=tfp_test_util.test_seed())
+      samples = von_mises.sample(n, seed=test_util.test_seed())
       return tf.reduce_mean(input_tensor=1. - tf.cos(samples - loc), axis=0)
 
     _, [grad_loc, grad_concentration] = self.evaluate(
@@ -377,7 +376,7 @@ class _VonMisesTest(object):
     concentration = self.make_tensor([min_value, 1., max_value, np.nan, np.nan])
     von_mises = tfd.VonMises(loc, concentration)
 
-    samples = von_mises.sample(seed=tfp_test_util.test_seed())
+    samples = von_mises.sample(seed=test_util.test_seed())
     # Check that it does not end up in an infinite loop.
     self.assertEqual(self.evaluate(samples).shape, (5,))
 
@@ -391,12 +390,12 @@ class _VonMisesTest(object):
         _ = self.evaluate(d.entropy())
 
 
-class VonMisesTestStaticShapeFloat32(tfp_test_util.TestCase, _VonMisesTest):
+class VonMisesTestStaticShapeFloat32(test_util.TestCase, _VonMisesTest):
   dtype = tf.float32
   use_static_shape = True
 
 
-class VonMisesTestDynamicShapeFloat64(tfp_test_util.TestCase, _VonMisesTest):
+class VonMisesTestDynamicShapeFloat64(test_util.TestCase, _VonMisesTest):
   dtype = tf.float64
   use_static_shape = False
 

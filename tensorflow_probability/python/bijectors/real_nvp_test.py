@@ -26,12 +26,11 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RealNVPTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class RealNVPTest(test_util.TestCase):
 
   def testBijectorWithTrivialTransform(self):
     flat_x_ = np.random.normal(0., 1., 8).astype(np.float32)
@@ -161,10 +160,10 @@ class RealNVPTest(tfp_test_util.TestCase):
       rnvp.forward([1., 2.])
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class RealNVPTestKwargs(
-    tfp_test_util.VectorDistributionTestHelpers,
-    tfp_test_util.TestCase):
+    test_util.VectorDistributionTestHelpers,
+    test_util.TestCase):
 
   @property
   def _real_nvp_kwargs(self):
@@ -275,7 +274,7 @@ class RealNVPTestKwargs(
         rtol=0.1)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class NICETest(RealNVPTestKwargs):
 
   @property
@@ -288,7 +287,7 @@ class NICETest(RealNVPTestKwargs):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class RealNVPConstantShiftScaleTest(RealNVPTestKwargs):
 
   @property
@@ -323,7 +322,7 @@ def _make_gated_bijector_fn():
   return tf1.make_template('gated_bijector', _bijector_fn)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class GatedTest(RealNVPTestKwargs):
 
   @property

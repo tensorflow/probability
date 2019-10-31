@@ -27,14 +27,13 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalDiagTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MultivariateNormalDiagTest(test_util.TestCase):
   """Well tested because this is a simple override of the base class."""
 
   def setUp(self):
@@ -91,7 +90,7 @@ class MultivariateNormalDiagTest(tfp_test_util.TestCase):
     diag = [1., -2]
     dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
     samps = self.evaluate(
-        dist.sample(int(1e3), seed=tfp_test_util.test_seed(hardcoded_seed=0)))
+        dist.sample(int(1e3), seed=test_util.test_seed(hardcoded_seed=0)))
     cov_mat = self.evaluate(tf.linalg.diag(diag))**2
 
     self.assertAllClose(mu, samps.mean(axis=0), atol=0., rtol=0.05)
@@ -118,7 +117,7 @@ class MultivariateNormalDiagTest(tfp_test_util.TestCase):
     self.assertAllClose(mu, self.evaluate(mean))
 
     n = int(1e3)
-    samps = self.evaluate(dist.sample(n, seed=tfp_test_util.test_seed()))
+    samps = self.evaluate(dist.sample(n, seed=test_util.test_seed()))
     cov_mat = self.evaluate(tf.linalg.diag(diag))**2
     sample_cov = np.matmul(
         samps.transpose([1, 2, 0]), samps.transpose([1, 0, 2])) / n

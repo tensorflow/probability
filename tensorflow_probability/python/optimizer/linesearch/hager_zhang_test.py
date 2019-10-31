@@ -25,8 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def _is_exact_wolfe(x, f_x, df_x, f_0, df_0, delta, sigma):
@@ -45,8 +44,8 @@ def _is_approx_wolfe(_, f_x, df_x, f_0, df_0, delta, sigma, epsilon):
 ValueAndGradient = collections.namedtuple('ValueAndGradient', ['x', 'f', 'df'])
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class HagerZhangTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class HagerZhangTest(test_util.TestCase):
   """Tests for Hager Zhang line search algorithm."""
 
   def test_quadratic(self):

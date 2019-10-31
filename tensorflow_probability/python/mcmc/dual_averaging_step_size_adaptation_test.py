@@ -28,9 +28,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 _INITIAL_T = 10.0
@@ -137,8 +135,8 @@ class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
     return self.inner_kernel.is_calibrated()
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DualAveragingStepSizeAdaptationTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
 
   def testTurnOnStoreParametersInKernelResults(self):
     kernel = FakeWrapperKernel(FakeSteppedKernel(step_size=0.5))
@@ -276,7 +274,7 @@ class DualAveragingStepSizeAdaptationTest(tfp_test_util.TestCase):
       _impl()
 
   def testExample(self):
-    tf1.random.set_random_seed(tfp_test_util.test_seed())
+    tf1.random.set_random_seed(test_util.test_seed())
     target_dist = tfd.JointDistributionSequential([
         tfd.Normal(0., 1.5),
         tfd.Independent(
@@ -291,7 +289,7 @@ class DualAveragingStepSizeAdaptationTest(tfp_test_util.TestCase):
         target_log_prob_fn=lambda *args: target_dist.log_prob(args),
         num_leapfrog_steps=2,
         step_size=target_dist.stddev(),
-        seed=_set_seed(tfp_test_util.test_seed()))
+        seed=_set_seed(test_util.test_seed()))
     kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
         inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8))
 
@@ -308,9 +306,8 @@ class DualAveragingStepSizeAdaptationTest(tfp_test_util.TestCase):
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DualAveragingStepSizeAdaptationStaticBroadcastingTest(
-    tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DualAveragingStepSizeAdaptationStaticBroadcastingTest(test_util.TestCase):
   use_static_shape = True
 
   @parameterized.parameters(
@@ -380,13 +377,13 @@ class DualAveragingStepSizeAdaptationStaticBroadcastingTest(
     self.assertAllClose(new_step_size, step_size)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class DualAveragingStepSizeAdaptationDynamicBroadcastingTest(
     DualAveragingStepSizeAdaptationStaticBroadcastingTest):
   use_static_shape = False
 
 
-class TfFunctionTest(tfp_test_util.TestCase):
+class TfFunctionTest(test_util.TestCase):
 
   def testDtypeIssue(self):
     # Test issue https://github.com/tensorflow/probability/issues/543

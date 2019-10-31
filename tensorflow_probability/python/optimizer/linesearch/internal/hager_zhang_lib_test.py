@@ -22,10 +22,9 @@ import collections
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.optimizer.linesearch.internal import hager_zhang_lib as hzl
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 # Define value and gradient namedtuple
@@ -85,8 +84,8 @@ def test_function_x_y_dy(x, y, dy, eps=0.01):
       np.concatenate([x1, x2], axis=-1), np.concatenate([y1, y2], axis=-1))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class HagerZhangLibTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class HagerZhangLibTest(test_util.TestCase):
 
   def test_secant2_batching_vs_mapping(self):
     # We build a simple example function with 2 batches, one where the wolfe

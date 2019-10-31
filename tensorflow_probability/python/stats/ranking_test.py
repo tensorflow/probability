@@ -25,15 +25,14 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AurocAuprcTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class AurocAuprcTest(test_util.TestCase):
 
   @parameterized.parameters(
       ('ROC', ((.7, .8), (.6, .5)), ((.2, .4), (.6, .7))),
@@ -55,9 +54,9 @@ class AurocAuprcTest(tfp_test_util.TestCase):
         negative_means, scale=0.2, low=0., high=1.)
 
     positive_trials = dist_positive.sample(
-        num_positive_trials, seed=tfp_test_util.test_seed())
+        num_positive_trials, seed=test_util.test_seed())
     negative_trials = dist_negative.sample(
-        num_negative_trials, seed=tfp_test_util.test_seed())
+        num_negative_trials, seed=test_util.test_seed())
 
     positive_trials_, negative_trials_ = self.evaluate(
         [positive_trials, negative_trials])

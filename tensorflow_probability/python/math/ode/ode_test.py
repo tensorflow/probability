@@ -24,17 +24,16 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 _RTOL = 1e-8
 _ATOL = 1e-12
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 @parameterized.named_parameters([
     ('bdf', tfp.math.ode.BDF),
     ('dormand_prince', tfp.math.ode.DormandPrince)])
-class NonStiffTest(tfp_test_util.TestCase):
+class NonStiffTest(test_util.TestCase):
 
   def test_zero_dims(self, solver):
     ode_fn = lambda time, state: -state
@@ -183,9 +182,9 @@ class NonStiffTest(tfp_test_util.TestCase):
     self.assertAllClose(states, states_exact)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 @parameterized.named_parameters([('bdf', tfp.math.ode.BDF)])
-class StiffTest(tfp_test_util.TestCase):
+class StiffTest(test_util.TestCase):
 
   def test_van_der_pol(self, solver):
 
@@ -217,7 +216,7 @@ class StiffTest(tfp_test_util.TestCase):
 @parameterized.named_parameters([
     ('bdf', tfp.math.ode.BDF),
     ('dormand_prince', tfp.math.ode.DormandPrince)])
-class GradientTest(tfp_test_util.TestCase):
+class GradientTest(test_util.TestCase):
 
   def test_linear_dense(self, solver):
     initial_time = 0.
@@ -270,11 +269,11 @@ class GradientTest(tfp_test_util.TestCase):
     self.assertAllClose(grad, grad_exact, rtol=1e-3, atol=1e-3)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 @parameterized.named_parameters([
     ('bdf', tfp.math.ode.BDF),
     ('dormand_prince', tfp.math.ode.DormandPrince)])
-class GeneralTest(tfp_test_util.TestCase):
+class GeneralTest(test_util.TestCase):
 
   def test_bad_initial_state_dtype(self, solver):
     ode_fn = lambda time, state: -state
@@ -333,10 +332,10 @@ class GeneralTest(tfp_test_util.TestCase):
     self.assertAllClose(states, states_exact)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 @parameterized.named_parameters(
     [('dormand_prince', tfp.math.ode.DormandPrince)])
-class NestedStructure(tfp_test_util.TestCase):
+class NestedStructure(test_util.TestCase):
 
   def test_forward_tuple(self, solver):
     jacobian_diag_a = np.float64([0.5, 1.])

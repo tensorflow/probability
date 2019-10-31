@@ -25,13 +25,11 @@ from scipy import stats as sp_stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class UniformTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class UniformTest(test_util.TestCase):
 
   def testUniformRange(self):
     a = 3.0
@@ -143,7 +141,7 @@ class UniformTest(tfp_test_util.TestCase):
     n = tf.constant(100000)
     uniform = tfd.Uniform(low=a, high=b)
 
-    samples = uniform.sample(n, seed=tfp_test_util.test_seed())
+    samples = uniform.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000, 2))
     self.assertAllClose(
@@ -167,7 +165,7 @@ class UniformTest(tfp_test_util.TestCase):
 
     n_v = 100000
     n = tf.constant(n_v)
-    samples = uniform.sample(n, seed=tfp_test_util.test_seed())
+    samples = uniform.sample(n, seed=test_util.test_seed())
     self.assertEqual(samples.shape, (n_v, batch_size, 2))
 
     sample_values = self.evaluate(samples)
@@ -225,7 +223,7 @@ class UniformTest(tfp_test_util.TestCase):
     a = 10.0
     b = [11.0, 100.0]
     uniform = tfd.Uniform(a, b)
-    samps = uniform.sample(10, seed=tfp_test_util.test_seed())
+    samps = uniform.sample(10, seed=test_util.test_seed())
     self.assertTrue(self.evaluate(tf.reduce_all(uniform.prob(samps) > 0)))
 
   def testUniformBroadcasting(self):
@@ -242,7 +240,7 @@ class UniformTest(tfp_test_util.TestCase):
     b = [11.0, 20.0]
     uniform = tfd.Uniform(a, b)
 
-    pdf = uniform.prob(uniform.sample((2, 3), seed=tfp_test_util.test_seed()))
+    pdf = uniform.prob(uniform.sample((2, 3), seed=test_util.test_seed()))
     # pylint: disable=bad-continuation
     expected_pdf = [
         [[1.0, 0.1], [1.0, 0.1], [1.0, 0.1]],
@@ -251,7 +249,7 @@ class UniformTest(tfp_test_util.TestCase):
     # pylint: enable=bad-continuation
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
-    pdf = uniform.prob(uniform.sample(seed=tfp_test_util.test_seed()))
+    pdf = uniform.prob(uniform.sample(seed=test_util.test_seed()))
     expected_pdf = [1.0, 0.1]
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
@@ -260,7 +258,7 @@ class UniformTest(tfp_test_util.TestCase):
     b = tf.constant(0.8)
     _, [grad_a, grad_b] = tfp.math.value_and_gradient(
         lambda a_, b_: (  # pylint: disable=g-long-lambda
-            tfd.Uniform(a_, b_).sample(100, seed=tfp_test_util.test_seed())),
+            tfd.Uniform(a_, b_).sample(100, seed=test_util.test_seed())),
         [a, b])
     self.assertIsNotNone(grad_a)
     self.assertIsNotNone(grad_b)
@@ -297,7 +295,7 @@ class UniformTest(tfp_test_util.TestCase):
 
     # This is essentially an approximated integral from the direct definition
     # of KL divergence.
-    x = a.sample(int(1e4), seed=tfp_test_util.test_seed())
+    x = a.sample(int(1e4), seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(
         input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
 

@@ -24,9 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 def _np_kernel_matrix_fn(amp, len_scale, x, y):
@@ -38,8 +36,8 @@ def _np_kernel_matrix_fn(amp, len_scale, x, y):
 np.random.seed(42)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class _GaussianProcessRegressionModelTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class _GaussianProcessRegressionModelTest(test_util.TestCase):
 
   def testShapes(self):
     # 5x5 grid of index points in R^2 and flatten to 25x2

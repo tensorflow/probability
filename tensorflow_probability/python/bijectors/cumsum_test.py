@@ -25,13 +25,11 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class _CumsumBijectorTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class _CumsumBijectorTest(test_util.TestCase):
   """Tests correctness of the cumsum bijector."""
 
   def testInvalidAxis(self):
@@ -54,7 +52,7 @@ class _CumsumBijectorTest(tfp_test_util.TestCase):
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=1)
 
-  @tfp_test_util.numpy_disable_gradient_test
+  @test_util.numpy_disable_gradient_test
   def testJacobian(self):
     self._checkEqualTheoreticalFldj(np.expand_dims(np.arange(5.), -1))
     self._checkEqualTheoreticalFldj(np.reshape([np.arange(5.)] * 2, [5, 2]))

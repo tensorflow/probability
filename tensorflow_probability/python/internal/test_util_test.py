@@ -28,10 +28,9 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_combinations
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.eager import context  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 FLAGS = flags.FLAGS
@@ -48,42 +47,42 @@ def _maybe_jax(x):
   return x
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SeedSettingTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SeedSettingTest(test_util.TestCase):
 
   def testTypeCorrectness(self):
-    assert isinstance(tfp_test_util.test_seed_stream(), SeedStream)
+    assert isinstance(test_util.test_seed_stream(), SeedStream)
     assert isinstance(
-        tfp_test_util.test_seed_stream(hardcoded_seed=7), SeedStream)
-    assert isinstance(tfp_test_util.test_seed_stream(salt='foo'), SeedStream)
+        test_util.test_seed_stream(hardcoded_seed=7), SeedStream)
+    assert isinstance(test_util.test_seed_stream(salt='foo'), SeedStream)
 
-  @flagsaver.flagsaver(vary_seed=False)
   def testSameness(self):
-    self.assertAllEqual(tfp_test_util.test_seed(), tfp_test_util.test_seed())
-    self.assertAllEqual(tfp_test_util.test_seed_stream()(),
-                        tfp_test_util.test_seed_stream()())
-    with flagsaver.flagsaver(fixed_seed=None):
-      x = 47
-      expected = _maybe_jax(x)
-      self.assertAllEqual(expected, tfp_test_util.test_seed(hardcoded_seed=x))
+    with flagsaver.flagsaver(vary_seed=False):
+      self.assertAllEqual(test_util.test_seed(), test_util.test_seed())
+      self.assertAllEqual(test_util.test_seed_stream()(),
+                          test_util.test_seed_stream()())
+      with flagsaver.flagsaver(fixed_seed=None):
+        x = 47
+        expected = _maybe_jax(x)
+        self.assertAllEqual(expected, test_util.test_seed(hardcoded_seed=x))
 
-  @flagsaver.flagsaver(vary_seed=True, fixed_seed=None)
   def testVariation(self):
-    self.assertFalse(
-        np.all(tfp_test_util.test_seed() == tfp_test_util.test_seed()))
-    self.assertFalse(
-        np.all(tfp_test_util.test_seed_stream()() ==
-               tfp_test_util.test_seed_stream()()))
-    x = 47
-    expect_not = _maybe_jax(x)
-    self.assertFalse(
-        np.all(expect_not == tfp_test_util.test_seed(hardcoded_seed=x)))
+    with flagsaver.flagsaver(vary_seed=True, fixed_seed=None):
+      self.assertFalse(
+          np.all(test_util.test_seed() == test_util.test_seed()))
+      self.assertFalse(
+          np.all(test_util.test_seed_stream()() ==
+                 test_util.test_seed_stream()()))
+      x = 47
+      expect_not = _maybe_jax(x)
+      self.assertFalse(
+          np.all(expect_not == test_util.test_seed(hardcoded_seed=x)))
 
   def testFixing(self):
     expected = _maybe_jax(58)
     with flagsaver.flagsaver(fixed_seed=58):
-      self.assertAllEqual(expected, tfp_test_util.test_seed())
-      self.assertAllEqual(expected, tfp_test_util.test_seed(hardcoded_seed=47))
+      self.assertAllEqual(expected, test_util.test_seed())
+      self.assertAllEqual(expected, test_util.test_seed(hardcoded_seed=47))
 
 
 class _TestCaseTest(object):
@@ -182,13 +181,13 @@ class _TestCaseTest(object):
       self.assertAllNotNone(has_nones)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TestCaseTestFloat32(_TestCaseTest, tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TestCaseTestFloat32(_TestCaseTest, test_util.TestCase):
   dtype = tf.float32
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TestCaseTestFloat64(_TestCaseTest, tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TestCaseTestFloat64(_TestCaseTest, test_util.TestCase):
   dtype = tf.float64
 
 
@@ -196,8 +195,8 @@ class TestCaseTestFloat64(_TestCaseTest, tfp_test_util.TestCase):
 # The are following are 'pretend' test case classes, which are actually examined
 # in unit tests below, to verify (and document) the generated test names.
 #
-@tfp_test_util.test_all_tf_execution_regimes
-class PretendTestCaseClass(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PretendTestCaseClass(test_util.TestCase):
 
   def test_snake_case_name(self):
     self.skipTest('Fake test')
@@ -206,8 +205,8 @@ class PretendTestCaseClass(tfp_test_util.TestCase):
     self.skipTest('Fake test')
 
 
-@tfp_test_util.test_all_tf_execution_regimes
-class PretendParameterizedTestCaseClass(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PretendParameterizedTestCaseClass(test_util.TestCase):
 
   @parameterized.named_parameters([dict(testcase_name='p123', p='123')])
   def test_snake_case_name(self, p):
@@ -220,8 +219,8 @@ class PretendParameterizedTestCaseClass(tfp_test_util.TestCase):
     self.skipTest('Fake test')
 
 
-@tfp_test_util.test_graph_and_eager_modes
-class PretendTestCaseClassGraphAndEagerOnly(tfp_test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class PretendTestCaseClassGraphAndEagerOnly(test_util.TestCase):
 
   def test_snake_case_name(self):
     self.skipTest('Fake test')
@@ -230,7 +229,7 @@ class PretendTestCaseClassGraphAndEagerOnly(tfp_test_util.TestCase):
     self.skipTest('Fake test')
 
 
-class TestCombinationsTest(tfp_test_util.TestCase):
+class TestCombinationsTest(test_util.TestCase):
 
   #
   # These tests check that the generated names are as expected.
@@ -278,27 +277,27 @@ class TestCombinationsTest(tfp_test_util.TestCase):
   #
   @test_combinations.generate(
       test_combinations.combine(mode='graph'),
-      test_combinations=[tfp_test_util.EagerGraphCombination()])
+      test_combinations=[test_util.EagerGraphCombination()])
   def test_graph_mode_combination(self):
     self.assertFalse(context.executing_eagerly())
 
   @test_combinations.generate(
       test_combinations.combine(mode='eager'),
-      test_combinations=[tfp_test_util.EagerGraphCombination()])
+      test_combinations=[test_util.EagerGraphCombination()])
   def test_eager_mode_combination(self):
     self.assertTrue(context.executing_eagerly())
 
   @test_combinations.generate(
       test_combinations.combine(tf_function=''),
       test_combinations=[
-          tfp_test_util.ExecuteFunctionsEagerlyCombination()])
+          test_util.ExecuteFunctionsEagerlyCombination()])
   def test_tf_function_enabled_mode_combination(self):
     self.assertFalse(tf.config.experimental_functions_run_eagerly())
 
   @test_combinations.generate(
       test_combinations.combine(tf_function='no_tf_function'),
       test_combinations=[
-          tfp_test_util.ExecuteFunctionsEagerlyCombination()])
+          test_util.ExecuteFunctionsEagerlyCombination()])
   def test_tf_function_disabled_mode_combination(self):
     self.assertTrue(tf.config.experimental_functions_run_eagerly())
 

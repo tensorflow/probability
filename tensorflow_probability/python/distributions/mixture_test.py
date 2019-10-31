@@ -29,9 +29,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def _swap_first_last_axes(array):
@@ -150,8 +148,8 @@ def make_multivariate_mixture(batch_shape, num_components, event_shape,
   return tfd.Mixture(cat, components, use_static_graph=use_static_graph)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MixtureTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MixtureTest(test_util.TestCase):
   use_static_graph = False
 
   def testShapes(self):
@@ -540,7 +538,7 @@ class MixtureTest(tfp_test_util.TestCase):
     sigmas = [0.1, 5.0, 3.0, 0.2, 4.0]
 
     n = 100
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     tf1.set_random_seed(seed)
     components = [

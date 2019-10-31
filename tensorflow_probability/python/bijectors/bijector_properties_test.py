@@ -29,9 +29,8 @@ from tensorflow_probability.python.bijectors import hypothesis_testlib as biject
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
                   'TF execution mode to use')
@@ -431,8 +430,8 @@ def assert_no_none_grad(bijector, method, wrt_vars, grads):
           'Missing' if expect_grad else 'Unexpected', method, var, bijector))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BijectorPropertiesTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BijectorPropertiesTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': bname, 'bijector_name': bname}

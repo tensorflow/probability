@@ -28,13 +28,9 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.bijectors.masked_autoregressive import _gen_mask
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-
+from tensorflow_probability.python.internal import test_util
 
 tfk = tf.keras
-
 tfkl = tf.keras.layers
 
 
@@ -88,8 +84,8 @@ def _masked_autoregressive_gated_bijector_fn(hidden_units,
   return _bijector_fn
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GenMaskTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class GenMaskTest(test_util.TestCase):
 
   def test346Exclusive(self):
     expected_mask = np.array(
@@ -114,9 +110,9 @@ class GenMaskTest(tfp_test_util.TestCase):
     self.assertAllEqual(expected_mask, mask)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
-                                   tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
+                                   test_util.TestCase):
 
   event_shape = [4]
 
@@ -264,7 +260,7 @@ class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
       maf.forward([1., 2.])
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaskedAutoregressiveFlowShiftOnlyTest(MaskedAutoregressiveFlowTest):
 
   @property
@@ -278,7 +274,7 @@ class MaskedAutoregressiveFlowShiftOnlyTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaskedAutoregressiveFlowShiftOnlyLayerTest(MaskedAutoregressiveFlowTest):
 
   @property
@@ -292,7 +288,7 @@ class MaskedAutoregressiveFlowShiftOnlyLayerTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaskedAutoregressiveFlowUnrollLoopTest(MaskedAutoregressiveFlowTest):
 
   @property
@@ -308,7 +304,7 @@ class MaskedAutoregressiveFlowUnrollLoopTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaskedAutoregressiveFlowUnrollLoopLayerTest(MaskedAutoregressiveFlowTest):
 
   @property
@@ -324,7 +320,7 @@ class MaskedAutoregressiveFlowUnrollLoopLayerTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaskedAutoregressive2DTest(MaskedAutoregressiveFlowTest):
   event_shape = [3, 2]
 
@@ -343,7 +339,7 @@ class MaskedAutoregressive2DTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaskedAutoregressiveGatedTest(MaskedAutoregressiveFlowTest):
 
   @property
@@ -357,7 +353,7 @@ class MaskedAutoregressiveGatedTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaskedAutoregressive2DLayerTest(MaskedAutoregressiveFlowTest):
   event_shape = [3, 2]
 
@@ -376,8 +372,8 @@ class MaskedAutoregressive2DLayerTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AutoregressiveNetworkTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class AutoregressiveNetworkTest(test_util.TestCase):
 
   def _count_trainable_params(self, layer):
     ret = 0

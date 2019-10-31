@@ -23,13 +23,12 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PoissonTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PoissonTest(test_util.TestCase):
 
   def _make_poisson(self,
                     rate,
@@ -262,7 +261,7 @@ class PoissonTest(tfp_test_util.TestCase):
     # within `k` std. deviations of actual up to rtol precision.
     n = int(100e3)
     poisson = self._make_poisson(rate=lam)
-    samples = poisson.sample(n, seed=tfp_test_util.test_seed())
+    samples = poisson.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -276,7 +275,7 @@ class PoissonTest(tfp_test_util.TestCase):
     # Choosing `n >= (k/rtol)**2, roughly ensures our sample mean should be
     # within `k` std. deviations of actual up to rtol precision.
     n = int(100e3)
-    samples = poisson.sample(n, seed=tfp_test_util.test_seed())
+    samples = poisson.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 1, 50))
     self.assertEqual(sample_values.shape, (n, 1, 50))
@@ -290,7 +289,7 @@ class PoissonTest(tfp_test_util.TestCase):
     # variance should be within `k` std. deviations of actual up to rtol
     # precision.
     n = int(300e3)
-    samples = poisson.sample(n, seed=tfp_test_util.test_seed())
+    samples = poisson.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 1, 10))
     self.assertEqual(sample_values.shape, (n, 1, 10))
@@ -324,7 +323,7 @@ class PoissonTest(tfp_test_util.TestCase):
         self.evaluate(dist.sample())
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class PoissonLogRateTest(PoissonTest):
 
   def _make_poisson(self,

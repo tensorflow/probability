@@ -27,8 +27,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 # pylint: disable=g-error-prone-assert-raises
 
 # This file is testing new assertions, which must of necessity appear in
@@ -36,8 +35,8 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 # violated.
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class StatisticalTestingTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class StatisticalTestingTest(test_util.TestCase):
 
   def assert_design_soundness(self, dtype, min_num_samples, min_discrepancy):
     thresholds = [1e-5, 1e-2, 1.1e-1, 0.9, 1., 1.02, 2., 10., 1e2, 1e5, 1e10]
@@ -481,7 +480,7 @@ class StatisticalTestingTest(tfp_test_util.TestCase):
 
   @parameterized.parameters(np.float32, np.float64)
   def test_random_projections(self, dtype):
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     rng = np.random.RandomState(seed=strm() % 2**31)
     num_samples = 57000
 

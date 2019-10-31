@@ -24,14 +24,13 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability import distributions as tfd
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts.internal import missing_values_util
 from tensorflow_probability.python.sts.internal import util as sts_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalUtilsTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MultivariateNormalUtilsTest(test_util.TestCase):
 
   def test_factored_joint_mvn_diag_full(self):
     batch_shape = [3, 2]
@@ -145,7 +144,7 @@ class MultivariateNormalUtilsTest(tfp_test_util.TestCase):
                                       mvn3.covariance()))
 
 
-class _UtilityTests(tfp_test_util.TestCase):
+class _UtilityTests(test_util.TestCase):
 
   def test_broadcast_batch_shape(self):
     batch_shapes = ([2], [3, 2], [1, 2])
@@ -299,7 +298,7 @@ class UtilityTestsDynamicFloat32(_UtilityTests):
   dtype = np.float32
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class UtilityTestsStaticFloat64(_UtilityTests):
   use_static_shape = True
   dtype = np.float64

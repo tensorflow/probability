@@ -25,20 +25,19 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class OptimizationTests(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class OptimizationTests(test_util.TestCase):
 
   def test_variational_em(self):
 
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     num_samples = 10000
     mu, sigma = 3., 5.
@@ -100,7 +99,7 @@ class OptimizationTests(tfp_test_util.TestCase):
       _ = yield tfd.Normal(b[1] + l[1, 0] * z, l[1, 1], name='x')
     q = tfd.JointDistributionCoroutine(trainable_q_fn)
 
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
     loss_curve = tfp.vi.fit_surrogate_posterior(
         p_log_prob, q, num_steps=1000, sample_size=100,
         optimizer=tf.optimizers.Adam(learning_rate=0.1),
@@ -158,7 +157,7 @@ class OptimizationTests(tfp_test_util.TestCase):
         surrogate_posterior=q,
         optimizer=tf.optimizers.Adam(learning_rate=0.1),
         num_steps=100,
-        seed=tfp_test_util.test_seed(),
+        seed=test_util.test_seed(),
         sample_size=1,
         trace_fn=lambda loss, grads, variables: (loss, q.sample(seed=42)[0]))
 

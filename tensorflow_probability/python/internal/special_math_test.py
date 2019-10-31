@@ -29,9 +29,8 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import special_math
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 def _check_strictly_increasing(array_1d):
@@ -56,8 +55,8 @@ GridSpec = collections.namedtuple("GridSpec", ["min", "max", "shape"])
 ErrorSpec = collections.namedtuple("ErrorSpec", ["rtol", "atol"])
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NdtriTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class NdtriTest(test_util.TestCase):
 
   def assertAllFinite(self, x):
     is_finite = np.isfinite(x)
@@ -108,8 +107,8 @@ class NdtriTest(tfp_test_util.TestCase):
     self._baseNdtriFiniteGradientTest(np.float64)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NdtrTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class NdtrTest(test_util.TestCase):
   _use_log = False
   # Grid min/max chosen to ensure 0 < cdf(x) < 1.
   _grid32 = GridSpec(min=-12.9, max=5., shape=[100])
@@ -178,7 +177,7 @@ class NdtrTest(tfp_test_util.TestCase):
     self._test_grid(np.float64, self._grid64, self._error64)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LogNdtrTestLower(NdtrTest):
   _use_log = True
   _grid32 = GridSpec(
@@ -195,7 +194,7 @@ class LogNdtrTestLower(NdtrTest):
 # scipy.sp_special.log_ndtr becomes zero very early, before 10,
 # (due to ndtr becoming 1).  We approximate Log[1 + epsilon] as epsilon, and
 # avoid this issue.
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LogNdtrTestMid(NdtrTest):
   _use_log = True
   _grid32 = GridSpec(
@@ -209,7 +208,7 @@ class LogNdtrTestMid(NdtrTest):
   _error64 = ErrorSpec(rtol=0.1, atol=1e-7)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LogNdtrTestUpper(NdtrTest):
   _use_log = True
   _grid32 = GridSpec(
@@ -224,8 +223,8 @@ class LogNdtrTestUpper(NdtrTest):
   _error64 = ErrorSpec(rtol=1e-6, atol=1e-14)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NdtrGradientTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class NdtrGradientTest(test_util.TestCase):
   _use_log = False
   _grid = GridSpec(min=-100., max=100., shape=[1, 2, 3, 8])
   _error32 = ErrorSpec(rtol=1e-4, atol=0)
@@ -294,13 +293,13 @@ class NdtrGradientTest(tfp_test_util.TestCase):
     self._test_grad_finite(np.float64)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LogNdtrGradientTest(NdtrGradientTest):
   _use_log = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ErfInvTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ErfInvTest(test_util.TestCase):
 
   def testErfInvValues(self):
     x = np.linspace(0., 1., 50).astype(np.float64)
@@ -318,8 +317,8 @@ class ErfInvTest(tfp_test_util.TestCase):
       special_math.erfinv(x)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LogCDFLaplaceTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class LogCDFLaplaceTest(test_util.TestCase):
   # Note that scipy.stats.laplace does not have a stable Log CDF, so we cannot
   # rely on scipy to cross check the extreme values.
 

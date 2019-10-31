@@ -24,13 +24,11 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.diagnostic import _reduce_variance
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _EffectiveSampleSizeTest(object):
 
   @property
@@ -305,8 +303,8 @@ class _EffectiveSampleSizeTest(object):
     self.assertGreater(ess_, 100.)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class EffectiveSampleSizeStaticTest(tfp_test_util.TestCase,
+@test_util.test_all_tf_execution_regimes
+class EffectiveSampleSizeStaticTest(test_util.TestCase,
                                     _EffectiveSampleSizeTest):
 
   @property
@@ -314,8 +312,8 @@ class EffectiveSampleSizeStaticTest(tfp_test_util.TestCase,
     return True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class EffectiveSampleSizeDynamicTest(tfp_test_util.TestCase,
+@test_util.test_all_tf_execution_regimes
+class EffectiveSampleSizeDynamicTest(test_util.TestCase,
                                      _EffectiveSampleSizeTest):
 
   @property
@@ -323,7 +321,7 @@ class EffectiveSampleSizeDynamicTest(tfp_test_util.TestCase,
     return False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _PotentialScaleReductionTest(object):
 
   @property
@@ -509,8 +507,8 @@ class _PotentialScaleReductionTest(object):
               validate_args=True))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PotentialScaleReductionStaticTest(tfp_test_util.TestCase,
+@test_util.test_all_tf_execution_regimes
+class PotentialScaleReductionStaticTest(test_util.TestCase,
                                         _PotentialScaleReductionTest):
 
   @property
@@ -526,8 +524,8 @@ class PotentialScaleReductionStaticTest(tfp_test_util.TestCase,
           np.random.rand(2, 3, 4), independent_chain_ndims=0)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PotentialScaleReductionDynamicTest(tfp_test_util.TestCase,
+@test_util.test_all_tf_execution_regimes
+class PotentialScaleReductionDynamicTest(test_util.TestCase,
                                          _PotentialScaleReductionTest):
 
   @property
@@ -540,7 +538,7 @@ class PotentialScaleReductionDynamicTest(tfp_test_util.TestCase,
     return self.assertRaisesOpError(msg)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _ReduceVarianceTest(object):
 
   @property
@@ -593,18 +591,16 @@ class _ReduceVarianceTest(object):
         x_=np.random.randn(2, 3, 4, 5), axis=1, biased=False, keepdims=False)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ReduceVarianceTestStaticShape(tfp_test_util.TestCase,
-                                    _ReduceVarianceTest):
+@test_util.test_all_tf_execution_regimes
+class ReduceVarianceTestStaticShape(test_util.TestCase, _ReduceVarianceTest):
 
   @property
   def use_static_shape(self):
     return True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ReduceVarianceTestDynamicShape(tfp_test_util.TestCase,
-                                     _ReduceVarianceTest):
+@test_util.test_all_tf_execution_regimes
+class ReduceVarianceTestDynamicShape(test_util.TestCase, _ReduceVarianceTest):
 
   @property
   def use_static_shape(self):

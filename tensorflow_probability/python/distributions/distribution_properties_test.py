@@ -40,9 +40,7 @@ from tensorflow_probability.python.bijectors import hypothesis_testlib as biject
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
@@ -612,7 +610,7 @@ def quantized_distributions(draw,
     # this, we set `low` and `high` to `None` for distributions not implementing
     # `quantile`.
 
-    # seed = tfp_test_util.test_seed(hardcoded_seed=123)
+    # seed = test_util.test_seed(hardcoded_seed=123)
     # low = (None if low_quantile is None
     #        else underlying.sample(low_quantile.shape, seed=seed))
     # high = (None if high_quantile is None else
@@ -905,8 +903,8 @@ def extra_tensor_conversions_allowed(dist):
   return 0
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DistributionParamsAreVarsTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DistributionParamsAreVarsTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
@@ -916,7 +914,7 @@ class DistributionParamsAreVarsTest(tfp_test_util.TestCase):
   def testDistribution(self, dist_name, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
       return
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
     dist = data.draw(distributions(dist_name=dist_name, enable_vars=True))
     batch_shape = dist.batch_shape
     batch_shape2 = data.draw(tfp_hps.broadcast_compatible_shape(batch_shape))
@@ -1079,8 +1077,8 @@ def no_tf_rank_errors():
       raise
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ReproducibilityTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ReproducibilityTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
@@ -1091,7 +1089,7 @@ class ReproducibilityTest(tfp_test_util.TestCase):
   def testDistribution(self, dist_name, data):
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'): return
     dist = data.draw(distributions(dist_name=dist_name, enable_vars=False))
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
     s1 = self.evaluate(dist.sample(50, seed=seed))
     if tf.executing_eagerly():
       tf.random.set_seed(seed)
@@ -1099,11 +1097,11 @@ class ReproducibilityTest(tfp_test_util.TestCase):
     self.assertAllEqual(s1, s2)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DistributionSlicingTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DistributionSlicingTest(test_util.TestCase):
 
   def _test_slicing(self, data, dist):
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     batch_shape = dist.batch_shape
     slices = data.draw(valid_slices(batch_shape))
     slice_str = 'dist[{}]'.format(', '.join(stringify_slices(slices)))
@@ -1211,11 +1209,11 @@ class DistributionSlicingTest(tfp_test_util.TestCase):
     self.assertAllClose(dist.log_prob(samps)[0], dist[0].log_prob(samps[0]))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DistributionsWorkWithAutoVectorizationTest(tfp_test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
 
   def _test_vectorization(self, dist_name, dist):
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     num_samples = 3
     if dist_name in SAMPLE_AUTOVECTORIZATION_IS_BROKEN:
