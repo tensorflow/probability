@@ -76,7 +76,7 @@ VAR_USAGES = {}
 
 def usage_counting_identity(var):
   key = (id(var), var.name)
-  VAR_USAGES[key] = VAR_USAGES.get(key, []) + [traceback.format_stack(limit=15)]
+  VAR_USAGES[key] = VAR_USAGES.get(key, []) + [traceback.format_stack(limit=25)]
   return tf.identity(var)
 
 
@@ -297,7 +297,7 @@ def tensors_in_support(draw, support, batch_shape=None, event_dim=None):
 
 
 @hps.composite
-def shapes(draw, min_ndims=0, max_ndims=3, min_lastdimsize=1):
+def shapes(draw, min_ndims=0, max_ndims=3, min_lastdimsize=1, max_side=None):
   """Strategy for drawing TensorShapes with some control over rank/dim sizes.
 
   Args:
@@ -306,6 +306,7 @@ def shapes(draw, min_ndims=0, max_ndims=3, min_lastdimsize=1):
     max_ndims: Python `int` giving the maximum rank.
     min_lastdimsize: Python `int`.  The trailing dimension will always be at
       least this large.  Ignored if the rank turns out to be 0.
+    max_side: Python `int` giving the maximum size of each dimension
 
   Returns:
     shapes: A strategy for drawing fully-specified TensorShapes obeying
@@ -318,9 +319,12 @@ def shapes(draw, min_ndims=0, max_ndims=3, min_lastdimsize=1):
     def resize_lastdim(x):
       return x[:-1] + (max(x[-1], min_lastdimsize),)
 
-    shape = draw(
-        hpnp.array_shapes(min_dims=rank, max_dims=rank).map(resize_lastdim).map(
-            tf.TensorShape))
+    if max_side is None:
+      # Apparently we can't pass an explicit None to the Hypothesis strategy?
+      shps = hpnp.array_shapes(min_dims=rank, max_dims=rank)
+    else:
+      shps = hpnp.array_shapes(min_dims=rank, max_dims=rank, max_side=max_side)
+    shape = draw(shps.map(resize_lastdim).map(tf.TensorShape))
   return shape
 
 

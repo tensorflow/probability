@@ -24,6 +24,8 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -102,9 +104,10 @@ class BatchReshape(distribution_lib.Distribution):
     parameters = dict(locals())
     name = name or 'BatchReshape' + distribution.name
     with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([batch_shape], dtype_hint=tf.int32)
       # The unexpanded batch shape may contain up to one dimension of -1.
-      self._batch_shape_unexpanded = tf.convert_to_tensor(
-          batch_shape, dtype=tf.int32, name='batch_shape')
+      self._batch_shape_unexpanded = tensor_util.convert_nonref_to_tensor(
+          batch_shape, dtype=dtype, name='batch_shape')
       validate_init_args_statically(distribution, self._batch_shape_unexpanded)
       batch_shape, batch_shape_static, runtime_assertions = calculate_reshape(
           distribution.batch_shape_tensor(), self._batch_shape_unexpanded,
