@@ -60,6 +60,7 @@ py_test(
 py_library(
     name = "statistical_testing",
     srcs = ["statistical_testing.py"],
+    srcs_version = "PY2AND3",
     deps = [
         ":init",
         # tensorflow dep,
@@ -89,6 +90,7 @@ py_library(
     srcs = [
         "correlation_matrix_volumes_lib.py",
     ],
+    srcs_version = "PY2AND3",
     deps = [
         ":init",
         # numpy dep,
@@ -102,7 +104,7 @@ py_library(
 py_binary(
     name = "correlation_matrix_volumes",
     srcs = ["correlation_matrix_volumes.py"],
-    python_version = "PY2",
+    python_version = "PY3",
     deps = [
         ":correlation_matrix_volumes_py",
         ":init",

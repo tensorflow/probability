@@ -12,20 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Copyright 2018 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
 """Estimating the volume of the correlation matrices with bounded determinant.
 
 Why?  Because lkj_test.py tests the sampler for the LKJ distribution
@@ -276,6 +262,10 @@ def _clopper_pearson_confidence_interval(samples, error_rate):
   n = len(samples)
   low = np.amin(samples)
   high = np.amax(samples)
+  if low == high:
+    msg = ("Cannot compute Clopper-Pearson interval: all samples "
+           "are equal to {}.".format(low))
+    raise ValueError(msg)
   successes = np.count_nonzero(samples - low)
   failures = np.count_nonzero(samples - high)
   if successes + failures != n:
