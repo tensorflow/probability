@@ -400,6 +400,7 @@ logical_not = _prefer_static(tf.logical_not, nptf.logical_not)
 logical_or = _prefer_static(tf.logical_or, nptf.logical_or)
 maximum = _prefer_static(tf.maximum, nptf.maximum)
 minimum = _prefer_static(tf.minimum, nptf.minimum)
+one_hot = _prefer_static(tf.one_hot, nptf.one_hot)
 ones = _prefer_static(tf.ones, nptf.ones)
 pad = _prefer_static(tf.pad, nptf.pad)
 range = _prefer_static(tf.range, nptf.range)  # pylint: disable=redefined-builtin
