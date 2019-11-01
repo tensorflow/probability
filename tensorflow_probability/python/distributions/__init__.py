@@ -131,7 +131,6 @@ from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
 from tensorflow_probability.python.math.generic import softplus_inverse as _softplus_inverse
 from tensorflow_probability.python.math.linalg import fill_triangular as _fill_triangular
 from tensorflow_probability.python.math.linalg import fill_triangular_inverse as _fill_triangular_inverse
-from tensorflow_probability.python.util.seed_stream import SeedStream as _SeedStream
 
 # Module management:
 from tensorflow_probability.python.distributions.kullback_leibler import augment_kl_xent_docs
@@ -149,13 +148,6 @@ fill_triangular_inverse = _deprecated(_fill_triangular_inverse)
 softplus_inverse = _deprecated(_softplus_inverse)
 
 reduce_weighted_logsumexp = _deprecated(_reduce_weighted_logsumexp)
-
-
-class SeedStream(_SeedStream):
-
-  __init__ = deprecation.deprecated(
-      '2019-10-01', 'SeedStream has moved to `tfp.util.SeedStream`.')(
-          _SeedStream.__init__)
 
 
 del deprecation, _deprecated
@@ -222,7 +214,6 @@ __all__ = [
     'PoissonLogNormalQuadratureCompound',
     'ProbitBernoulli',
     'Sample',
-    'SeedStream',
     'SinhArcsinh',
     'StudentT',
     'StudentTProcess',
