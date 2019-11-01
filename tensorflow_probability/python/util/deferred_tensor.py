@@ -430,14 +430,16 @@ class TransformedVariable(DeferredTensor):
 
     if callable(initial_value):
       initial_value = initial_value()
+    initial_value = tf.convert_to_tensor(
+        initial_value, dtype_hint=bijector.dtype, dtype=dtype)
     super(TransformedVariable, self).__init__(
         pretransformed_input=tf.Variable(
-            initial_value=bijector.inverse(tf.convert_to_tensor(
-                initial_value, dtype_hint=bijector.dtype, dtype=dtype)),
+            initial_value=bijector.inverse(initial_value),
             name=name,
             dtype=dtype,
             **kwargs),
         transform_fn=bijector,
+        shape=initial_value.shape,
         name=bijector.name)
     self._bijector = bijector
 

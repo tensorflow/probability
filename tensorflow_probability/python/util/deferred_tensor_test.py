@@ -190,6 +190,39 @@ class TransformedVariableTest(test_util.TestCase):
           repr(x),
           '<TransformedVariable: dtype=float32, shape=[], fn="exp">')
 
+  def test_shape_changing_bijector(self):
+    num_tril_nonzero = lambda num_rows: num_rows * (num_rows + 1) // 2
+    num_tril_rows = lambda nnz: (  # pylint: disable=g-long-lambda
+        np.sqrt(0.25 + 2. * nnz) - 0.5).astype(np.int32)
+    pad_eye = tfb.Inline(
+        forward_fn=lambda x: tf.concat([  # pylint: disable=g-long-lambda
+            tfb.FillScaleTriL().inverse(
+                tf.eye(num_tril_rows(tf.compat.dimension_value(x.shape[-1])),
+                       batch_shape=tf.shape(x)[:-2]))[..., tf.newaxis, :],
+            x,
+        ], axis=tf.rank(x) - 2),
+        inverse_fn=lambda y: y[..., 1:, :],
+        inverse_log_det_jacobian_fn=lambda y, event_ndims: 0.,
+        forward_event_shape_fn=lambda in_shape: in_shape + tf.one_hot(  # pylint: disable=g-long-lambda
+            tf.size(in_shape) - 2, depth=tf.size(in_shape), dtype=tf.int32),
+        inverse_event_shape_fn=lambda out_shape: out_shape - tf.one_hot(  # pylint: disable=g-long-lambda
+            tf.size(out_shape) - 2, depth=tf.size(out_shape), dtype=tf.int32),
+        forward_min_event_ndims=2,
+        inverse_min_event_ndims=2,
+        is_constant_jacobian=True,
+        name='PadEyeBijector')
+    scale_tril = tfp.util.TransformedVariable(
+        tf.eye(3, batch_shape=[5, 1, 4]),
+        bijector=tfb.Chain([tfb.FillScaleTriL(), pad_eye]))
+    self.assertAllEqual((5, 1, 4, 3, 3), scale_tril.shape)
+    self.assertAllEqual((5, 1, 4 - 1, num_tril_nonzero(3)),
+                        scale_tril.pretransformed_input.shape)
+    self.evaluate([v.initializer for v in scale_tril.trainable_variables])
+    shape_, scale_tril_ = self.evaluate([
+        tf.shape(scale_tril), tf.convert_to_tensor(scale_tril)])
+    self.assertAllEqual((5, 1, 4, 3, 3), shape_)
+    self.assertAllEqual((5, 1, 4, 3, 3), scale_tril_.shape)
+
   def test_nested_transformed_variable(self):
     x = tfp.util.TransformedVariable(0.25, tfb.Exp())
     self.evaluate(x.initializer)
