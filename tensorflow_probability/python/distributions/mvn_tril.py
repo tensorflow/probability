@@ -78,7 +78,7 @@ class MultivariateNormalTriL(
 
   Trainable (batch) lower-triangular matrices can be created with
   `tfp.distributions.matrix_diag_transform()` and/or
-  `tfp.distributions.fill_triangular()`
+  `tfp.math.fill_triangular()`
 
   #### Examples
 

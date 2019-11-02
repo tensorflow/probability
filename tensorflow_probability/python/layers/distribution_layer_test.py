@@ -925,7 +925,7 @@ class _IndependentNormalTest(_IndependentLayerTest):
   def _distribution_to_params(self, distribution, batch_shape):
     return tf.concat([
         tf.reshape(distribution.loc, tf.concat([batch_shape, [-1]], axis=-1)),
-        tfd.softplus_inverse(tf.reshape(
+        tfp.math.softplus_inverse(tf.reshape(
             distribution.scale, tf.concat([batch_shape, [-1]], axis=-1)))
     ], -1)
 
@@ -1194,7 +1194,7 @@ class _MixtureLogisticTest(_MixtureLayerTest):
         distribution.mixture_distribution.logits,
         tf.reshape(tf.concat([
             tf.reshape(cd.loc, batch_and_n_shape),
-            tf.reshape(tfd.softplus_inverse(cd.scale), batch_and_n_shape)
+            tf.reshape(tfp.math.softplus_inverse(cd.scale), batch_and_n_shape)
         ], axis=-1), params_shape),
     ], axis=-1)
 
@@ -1264,7 +1264,7 @@ class _MixtureNormalTest(_MixtureLayerTest):
         distribution.mixture_distribution.logits,
         tf.reshape(tf.concat([
             tf.reshape(cd.loc, batch_and_n_shape),
-            tf.reshape(tfd.softplus_inverse(cd.scale), batch_and_n_shape)
+            tf.reshape(tfp.math.softplus_inverse(cd.scale), batch_and_n_shape)
         ], axis=-1), params_shape),
     ], axis=-1)
 
