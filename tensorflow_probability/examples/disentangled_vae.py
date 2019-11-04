@@ -110,6 +110,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.examples import sprites_dataset
+from tensorflow.contrib import checkpoint as contrib_checkpoint
 
 tfd = tfp.distributions
 
@@ -1104,7 +1105,7 @@ def main(argv):
 
   checkpoint = tf.train.Checkpoint(model=model, global_step=global_step,
                                    optimizer=optimizer)
-  checkpoint_manager = tf.contrib.checkpoint.CheckpointManager(
+  checkpoint_manager = contrib_checkpoint.CheckpointManager(
       checkpoint, directory=FLAGS.model_dir, max_to_keep=5)
   checkpoint.restore(checkpoint_manager.latest_checkpoint)
 
