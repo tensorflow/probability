@@ -37,8 +37,8 @@ tfkl = tf.keras.layers
 def _logit_avg_expit(t):
   """Computes `logit(mean(expit(t)))` in a numerically stable manner."""
   log_avg_prob = (
-      tf.reduce_logsumexp(input_tensor=-tf.nn.softplus(-t), axis=0) -
-      tf.math.log(tf.cast(tf.shape(input=t)[0], t.dtype)))
+      tf.reduce_logsumexp(-tf.nn.softplus(-t), axis=0) -
+      tf.math.log(tf.cast(tf.shape(t)[0], t.dtype)))
   return log_avg_prob - tf.math.log1p(-tf.exp(log_avg_prob))
 
 
@@ -46,7 +46,7 @@ def _vec_pad(x, value=0):
   """Prepends a column of zeros to a matrix."""
   paddings = tf.concat(
       [tf.zeros([tf.rank(x) - 1, 2], dtype=tf.int32), [[1, 0]]], axis=0)
-  return tf.pad(tensor=x, paddings=paddings, constant_values=value)
+  return tf.pad(x, paddings=paddings, constant_values=value)
 
 
 # TODO(b/143642032): Figure out how to solve issues with save/load, so that we
@@ -95,6 +95,8 @@ class EndToEndTest(test_util.TestCase):
                                       reinterpreted_batch_ndims=1)),
     ])
 
+    beta = tf.Variable(0.9, name='beta')  # "beta" as in beta-VAE.
+
     encoder_model = tfk.Sequential([
         tfkl.InputLayer(input_shape=self.input_shape),
         tfkl.Flatten(),
@@ -102,8 +104,7 @@ class EndToEndTest(test_util.TestCase):
         tfpl.MultivariateNormalTriL(
             self.encoded_size,
             activity_regularizer=tfpl.KLDivergenceRegularizer(
-                lambda: prior_model(0.),
-                weight=0.9)),  # "beta" as in beta-VAE.
+                prior_model, weight=beta)),
     ])
 
     decoder_model = tfk.Sequential([
@@ -118,16 +119,12 @@ class EndToEndTest(test_util.TestCase):
         # nightly.
         outputs=decoder_model(encoder_model.outputs[0], training=False))
 
-    # Attach prior weights to model.
-    self.assertLen(vae_model.trainable_weights, 4)
-    vae_model._trainable_weights.extend(prior_model.trainable_variables)
-    self.assertLen(vae_model.trainable_weights, 4 + 1)
+    self.assertLen(vae_model.trainable_weights, 4 + 1 + 1)
 
     def accuracy(x, rv_x):
-      if hasattr(rv_x, '_tfp_distribution'):
-        rv_x = rv_x._tfp_distribution
+      rv_x = getattr(rv_x, '_tfp_distribution', rv_x)
       return tf.reduce_mean(
-          input_tensor=tf.cast(tf.equal(x, rv_x.mode()), x.dtype),
+          tf.cast(tf.equal(x, rv_x.mode()), x.dtype),
           axis=tf.range(-rv_x.event_shape.ndims, 0))
 
     vae_model.compile(
@@ -140,28 +137,36 @@ class EndToEndTest(test_util.TestCase):
                   verbose=True,
                   validation_data=(self.x_test, self.x_test),
                   shuffle=True)
-    yhat = vae_model(tf.convert_to_tensor(value=self.x_test))
+    yhat = vae_model(tf.convert_to_tensor(self.x_test))
     self.assertIsInstance(yhat, tfd.Independent)
     self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
 
   def test_keras_functional_api(self):
     """Test `DistributionLambda`s are composable via Keras functional API."""
 
+    beta = tf.Variable(  # 0 vars since not trainable.
+        0.9, trainable=False, name='beta')  # "beta" as in beta-VAE
+
     encoder_model = [
         tfkl.Flatten(),
-        tfkl.Dense(10, activation='relu'),
-        tfkl.Dense(tfpl.MultivariateNormalTriL.params_size(
+        tfkl.Dense(10, activation='relu'),  # 2 vars
+        tfkl.Dense(tfpl.MultivariateNormalTriL.params_size(  # 2 vars
             self.encoded_size)),
         tfpl.MultivariateNormalTriL(self.encoded_size),
         tfpl.KLDivergenceAddLoss(
-            tfd.Independent(tfd.Normal(loc=[0., 0], scale=1),
-                            reinterpreted_batch_ndims=1),
-            weight=0.9),  # "beta" as in beta-VAE.
+            tfd.Independent(
+                tfd.Normal(
+                    loc=tf.Variable([0., 0.]),  # 1 var
+                    scale=tfp.util.TransformedVariable(  # 1 var
+                        1., bijector=tfb.Exp())),
+                reinterpreted_batch_ndims=1),
+            weight=beta),
     ]
 
     decoder_model = [
-        tfkl.Dense(10, activation='relu'),
-        tfkl.Dense(tfpl.IndependentBernoulli.params_size(self.input_shape)),
+        tfkl.Dense(10, activation='relu'),  # 2 vars
+        tfkl.Dense(tfpl.IndependentBernoulli.params_size(  # 2 vars
+            self.input_shape)),
         tfpl.IndependentBernoulli(self.input_shape, tfd.Bernoulli.logits),
     ]
 
@@ -174,13 +179,16 @@ class EndToEndTest(test_util.TestCase):
         optimizer=tf.optimizers.Adam(),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[])
+    self.assertLen(vae_model.trainable_weights,
+                   (2 + 2) + (2 + 2) + (1 + 1) + 0)
+    self.evaluate([v.initializer for v in vae_model.variables])
     vae_model.fit(self.x, self.x,
                   batch_size=25,
                   epochs=1,
                   verbose=True,
                   validation_data=(self.x_test, self.x_test),
                   shuffle=True)
-    yhat = vae_model(tf.convert_to_tensor(value=self.x_test))
+    yhat = vae_model(tf.convert_to_tensor(self.x_test))
     self.assertIsInstance(yhat, tfd.Independent)
     self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
 
@@ -236,7 +244,7 @@ class EndToEndTest(test_util.TestCase):
                   batch_size=25,
                   epochs=1,
                   validation_data=(self.x_test, self.x_test))
-    yhat = vae_model(tf.convert_to_tensor(value=self.x_test))
+    yhat = vae_model(tf.convert_to_tensor(self.x_test))
     self.assertIsInstance(yhat, tfd.Independent)
     self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
 
@@ -251,9 +259,8 @@ class EndToEndTest(test_util.TestCase):
         tfpl.MultivariateNormalTriL(self.encoded_size,
                                     lambda s: s.sample(num_draws, seed=42)),
         tfpl.KLDivergenceAddLoss(
-            # TODO(b/119756336): Due to eager/graph Jacobian graph caching bug
-            # we add here the capability for deferred construction of the prior.
-            lambda: tfd.MultivariateNormalDiag(loc=tf.zeros(self.encoded_size)),
+            tfd.MultivariateNormalDiag(
+                loc=tf.Variable(tf.zeros([self.encoded_size]))),
             weight=0.9),  # "beta" as in beta-VAE.
     ])
 
@@ -273,12 +280,15 @@ class EndToEndTest(test_util.TestCase):
         optimizer=tf.optimizers.Adam(),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[])
+    self.assertLen(encoder_model.trainable_variables, (2 + 2) + 1)
+    self.assertLen(decoder_model.trainable_variables, 2 + 2)
+    self.assertLen(vae_model.trainable_variables, (2 + 2) + (2 + 2) + 1)
     vae_model.fit(self.x, self.x,
                   batch_size=25,
                   epochs=1,
                   steps_per_epoch=1,  # Usually `n // batch_size`.
                   validation_data=(self.x_test, self.x_test))
-    yhat = vae_model(tf.convert_to_tensor(value=self.x_test))
+    yhat = vae_model(tf.convert_to_tensor(self.x_test))
     self.assertIsInstance(yhat, tfd.Independent)
     self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
 
@@ -381,7 +391,7 @@ class DistributionLambdaSerializationTest(test_util.TestCase):
 
   def test_serialization_closure_over_lambdas_tensors_and_numpy_array(self):
     num_components = np.array(3)
-    one = tf.convert_to_tensor(value=1)
+    one = tf.convert_to_tensor(1)
     mk_ind_norm = lambda event_shape: tfpl.IndependentNormal(event_shape + one)
     def make_distribution(t):
       return tfpl.MixtureSameFamily.new(
@@ -459,7 +469,7 @@ class KLDivergenceAddLoss(test_util.TestCase):
         tfd.MultivariateNormalTriL(loc, scale_tril), prior)
 
     x = tf.concat(
-        [loc, tfb.ScaleTriL().inverse(scale_tril)], axis=0)[tf.newaxis]
+        [loc, tfb.FillScaleTriL().inverse(scale_tril)], axis=0)[tf.newaxis]
 
     y = model(x)
     self.assertEqual(1, len(model.losses))
@@ -488,7 +498,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
   def _check_distribution(self, t, x):
     self.assertIsInstance(x, tfd.MultivariateNormalTriL)
     t_back = tf.concat([
-        x.loc, tfb.ScaleTriL().inverse(x.scale.to_dense())], axis=-1)
+        x.loc, tfb.FillScaleTriL().inverse(x.scale.to_dense())], axis=-1)
     self.assertAllClose(*self.evaluate([t, t_back]), atol=1e-6, rtol=1e-5)
 
   def test_new(self):
@@ -554,7 +564,7 @@ class OneHotCategoricalTest(test_util.TestCase):
   def _check_distribution(self, t, x):
     self.assertIsInstance(x, tfd.OneHotCategorical)
     [t_, x_logits_, x_probs_, mean_] = self.evaluate([
-        t, x.logits, x.probs, x.mean()])
+        t, x.logits_parameter(), x.probs_parameter(), x.mean()])
     self.assertAllClose(t_, x_logits_, atol=1e-6, rtol=1e-5)
     self.assertAllClose(x_probs_, mean_, atol=1e-6, rtol=1e-5)
 
@@ -627,7 +637,7 @@ class CategoricalMixtureOfOneHotCategoricalTest(test_util.TestCase):
         t_back,
         x.mean(),
         x.log_mean(),
-        tf.reduce_mean(input_tensor=x.sample(int(10e3), seed=42), axis=0),
+        tf.reduce_mean(x.sample(int(10e3), seed=42), axis=0),
     ])
     self.assertAllClose(t_, t_back_, atol=1e-6, rtol=1e-5)
     self.assertAllClose(x_mean_, np.exp(x_log_mean_), atol=1e-6, rtol=1e-5)
@@ -717,7 +727,7 @@ class _IndependentLayerTest(object):
     ndarray = np.asarray(ndarray).astype(
         dtype if dtype is not None else self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _check_distribution(self, t, x, batch_shape):
     self.assertIsInstance(x, tfd.Independent)
@@ -911,7 +921,7 @@ class IndependentLogisticTestStaticShape(test_util.TestCase,
     x = np.random.randn(*([1] + input_shape)).astype(self.dtype)
     self.assertEqual((1, 2), encoder.predict_on_batch(x).shape)
 
-    out = encoder(tf.convert_to_tensor(value=x))
+    out = encoder(tf.convert_to_tensor(x))
     self.assertEqual((1, 2), out.shape)
     self.assertEqual((1, 2), self.evaluate(out).shape)
     self.assertEqual(self.dtype, out.dtype)
@@ -936,7 +946,7 @@ class _IndependentNormalTest(_IndependentLayerTest):
 
     def reshape(x):
       return tf.reshape(
-          x, tf.concat([tf.shape(input=x)[:-1], [-1, params_size]], 0))
+          x, tf.concat([tf.shape(x)[:-1], [-1, params_size]], 0))
 
     # Test a Sequential model where the input to IndependentNormal does not have
     # a statically-known shape.
@@ -956,7 +966,7 @@ class _IndependentNormalTest(_IndependentLayerTest):
     x = np.random.randn(*([1] + input_shape)).astype(self.dtype)
     self.assertEqual((1, 3, 2), encoder.predict_on_batch(x).shape)
 
-    out = encoder(tf.convert_to_tensor(value=x))
+    out = encoder(tf.convert_to_tensor(x))
     if tf.executing_eagerly():
       self.assertEqual((1, 3, 2), out.shape)
     elif self.use_static_shape:
@@ -996,7 +1006,7 @@ class IndependentNormalTestStaticShape(test_util.TestCase,
     x = np.random.randn(*([1] + input_shape)).astype(self.dtype)
     self.assertEqual((1, 2), encoder.predict_on_batch(x).shape)
 
-    out = encoder(tf.convert_to_tensor(value=x))
+    out = encoder(tf.convert_to_tensor(x))
     self.assertEqual((1, 2), out.shape)
     self.assertEqual((1, 2), self.evaluate(out).shape)
     self.assertEqual(self.dtype, out.dtype)
@@ -1076,7 +1086,7 @@ class _MixtureLayerTest(object):
     ndarray = np.asarray(ndarray).astype(
         dtype if dtype is not None else self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _check_distribution(self, t, x, batch_shape):
     self.assertIsInstance(x, tfd.MixtureSameFamily)
@@ -1187,7 +1197,7 @@ class _MixtureLogisticTest(_MixtureLayerTest):
     """Given a self.layer_class instance, return a tensor of its parameters."""
     params_shape = tf.concat([batch_shape, [-1]], axis=0)
     batch_and_n_shape = tf.concat(
-        [tf.shape(input=distribution.mixture_distribution.logits), [-1]],
+        [tf.shape(distribution.mixture_distribution.logits), [-1]],
         axis=0)
     cd = distribution.components_distribution.distribution
     return tf.concat([
@@ -1203,9 +1213,9 @@ class _MixtureLogisticTest(_MixtureLayerTest):
     n = 2000
     t = self.evaluate(tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1]))
     r = 2 * (1 - tf.cos(t))
-    x = tf.convert_to_tensor(value=self.evaluate(
+    x = tf.convert_to_tensor(self.evaluate(
         r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
-    y = tf.convert_to_tensor(value=self.evaluate(
+    y = tf.convert_to_tensor(self.evaluate(
         r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
 
     # Model the distribution of y given x with a Mixture Density Network.
@@ -1231,7 +1241,7 @@ class _MixtureLogisticTest(_MixtureLayerTest):
               epochs=1,
               steps_per_epoch=n // batch_size)
 
-    self.assertEqual(15, self.evaluate(tf.convert_to_tensor(value=params_size)))
+    self.assertEqual(15, self.evaluate(tf.convert_to_tensor(params_size)))
 
 
 @test_util.test_graph_and_eager_modes
@@ -1257,7 +1267,7 @@ class _MixtureNormalTest(_MixtureLayerTest):
     """Given a self.layer_class instance, return a tensor of its parameters."""
     params_shape = tf.concat([batch_shape, [-1]], axis=0)
     batch_and_n_shape = tf.concat(
-        [tf.shape(input=distribution.mixture_distribution.logits), [-1]],
+        [tf.shape(distribution.mixture_distribution.logits), [-1]],
         axis=0)
     cd = distribution.components_distribution.distribution
     return tf.concat([
@@ -1273,9 +1283,9 @@ class _MixtureNormalTest(_MixtureLayerTest):
     n = 2000
     t = self.evaluate(tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1]))
     r = 2 * (1 - tf.cos(t))
-    x = tf.convert_to_tensor(value=self.evaluate(
+    x = tf.convert_to_tensor(self.evaluate(
         r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
-    y = tf.convert_to_tensor(value=self.evaluate(
+    y = tf.convert_to_tensor(self.evaluate(
         r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
 
     # Model the distribution of y given x with a Mixture Density Network.
@@ -1301,7 +1311,7 @@ class _MixtureNormalTest(_MixtureLayerTest):
               epochs=1,
               steps_per_epoch=n // batch_size)
 
-    self.assertEqual(15, self.evaluate(tf.convert_to_tensor(value=params_size)))
+    self.assertEqual(15, self.evaluate(tf.convert_to_tensor(params_size)))
 
 
 @test_util.test_graph_and_eager_modes
@@ -1326,7 +1336,7 @@ class _MixtureSameFamilyTest(object):
     ndarray = np.asarray(ndarray).astype(
         dtype if dtype is not None else self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _check_distribution(self, t, x, batch_shape):
     self.assertIsInstance(x, tfd.MixtureSameFamily)
@@ -1335,9 +1345,9 @@ class _MixtureSameFamilyTest(object):
 
     shape = tf.concat([batch_shape, [-1]], axis=0)
     batch_and_n_shape = tf.concat(
-        [tf.shape(input=x.mixture_distribution.logits), [-1]], axis=0)
+        [tf.shape(x.mixture_distribution.logits), [-1]], axis=0)
     cd = x.components_distribution
-    scale_tril = tfb.ScaleTriL(diag_shift=np.array(1e-5, self.dtype))
+    scale_tril = tfb.FillScaleTriL(diag_shift=np.array(1e-5, self.dtype))
     t_back = tf.concat([
         x.mixture_distribution.logits,
         tf.reshape(tf.concat([
@@ -1387,9 +1397,9 @@ class _MixtureSameFamilyTest(object):
     n = 2000
     t = self.evaluate(tfd.Uniform(low=-np.pi, high=np.pi).sample([n, 1]))
     r = 2 * (1 - tf.cos(t))
-    x = tf.convert_to_tensor(value=self.evaluate(
+    x = tf.convert_to_tensor(self.evaluate(
         r * tf.sin(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
-    y = tf.convert_to_tensor(value=self.evaluate(
+    y = tf.convert_to_tensor(self.evaluate(
         r * tf.cos(t) + tfd.Normal(loc=0., scale=0.1).sample([n, 1])))
 
     # Model the distribution of y given x with a Mixture Density Network.
@@ -1417,7 +1427,7 @@ class _MixtureSameFamilyTest(object):
               epochs=1,
               steps_per_epoch=1)  # Usually `n // batch_size`.
 
-    self.assertEqual(15, self.evaluate(tf.convert_to_tensor(value=params_size)))
+    self.assertEqual(15, self.evaluate(tf.convert_to_tensor(params_size)))
 
 
 @test_util.test_graph_and_eager_modes
@@ -1460,8 +1470,8 @@ class VariationalGaussianProcessEndToEnd(test_util.TestCase):
       def __init__(self, **kwargs):
         super(KernelFn, self).__init__(**kwargs)
 
-        self._amplitude = self.add_variable(
-            initializer=tf1.initializers.constant(.54),
+        self._amplitude = self.add_weight(
+            initializer=tf.initializers.constant(.54),
             dtype=dtype,
             name='amplitude')
 
@@ -1470,7 +1480,7 @@ class VariationalGaussianProcessEndToEnd(test_util.TestCase):
 
       @property
       def kernel(self):
-        return tfp.positive_semidefinite_kernels.ExponentiatedQuadratic(
+        return tfp.math.psd_kernels.ExponentiatedQuadratic(
             amplitude=tf.nn.softplus(self._amplitude))
 
     num_inducing_points = 50
@@ -1478,7 +1488,7 @@ class VariationalGaussianProcessEndToEnd(test_util.TestCase):
     # Add a leading dimension for the event_shape.
     eyes = np.expand_dims(np.eye(num_inducing_points), 0)
     variational_inducing_observations_scale_initializer = (
-        tf1.initializers.constant(1e-3 * eyes))
+        tf.initializers.constant(1e-3 * eyes))
 
     model = tf.keras.Sequential([
         tf.keras.layers.InputLayer(input_shape=[1], dtype=dtype),
@@ -1488,16 +1498,13 @@ class VariationalGaussianProcessEndToEnd(test_util.TestCase):
             num_inducing_points=num_inducing_points,
             kernel_provider=KernelFn(dtype=dtype),
             inducing_index_points_initializer=(
-                tf1.initializers.constant(
+                tf.initializers.constant(
                     np.linspace(*x_range,
                                 num=num_inducing_points,
                                 dtype=dtype)[..., np.newaxis])),
             variational_inducing_observations_scale_initializer=(
                 variational_inducing_observations_scale_initializer)),
     ])
-
-    if not tf.executing_eagerly():
-      self.evaluate(tf1.global_variables_initializer())
 
     batch_size = 64
     kl_weight = np.float64(batch_size) / n
@@ -1506,10 +1513,13 @@ class VariationalGaussianProcessEndToEnd(test_util.TestCase):
         optimizer=tf.optimizers.Adam(learning_rate=0.02),
         loss=loss)
 
+    if not tf.executing_eagerly():
+      self.evaluate([v.initializer for v in model.variables])
+
     # This should have no issues
     model.fit(x, y, epochs=5, batch_size=batch_size, verbose=False)
 
-    vgp = model(x0[..., None])
+    vgp = model(x0[..., tf.newaxis])
     num_samples = 7
     samples_ = self.evaluate(vgp.sample(num_samples))
     self.assertAllEqual(samples_.shape, (7, 1000, 1))

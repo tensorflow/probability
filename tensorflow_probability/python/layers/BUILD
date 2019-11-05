@@ -150,6 +150,7 @@ py_library(
         "//tensorflow_probability/python/distributions:poisson",
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/distributions:variational_gaussian_process",
+        "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/layers/internal",
     ],
 )

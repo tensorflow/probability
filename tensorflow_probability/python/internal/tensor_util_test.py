@@ -98,6 +98,7 @@ class ConvertNonrefToTensorTest(test_util.TestCase):
     self.assertEqual([1.], self.evaluate(g))
 
 
+@test_util.test_all_tf_execution_regimes
 class IsRefTest(test_util.TestCase):
 
   def test_various_types(self):
@@ -108,6 +109,69 @@ class IsRefTest(test_util.TestCase):
     self.assertTrue(tensor_util.is_ref(FakeModule(0.)))
     self.assertTrue(tensor_util.is_ref(FakeModule(tf.Variable(0.))))
     self.assertTrue(tensor_util.is_ref(tf.Variable(0.)))
+
+
+@test_util.test_all_tf_execution_regimes
+class VariableTrackingUtils(test_util.TestCase):
+
+  def test_discover_trainable_variables(self):
+    expected_vars = (
+        tf.Variable(0., name='a'),
+        tf.Variable(1., name='b'),
+        tf.Variable(2., name='d'),
+    )
+    input_ = [
+        tf.constant(1),
+        expected_vars[0],
+        (
+            tf.constant(2),
+            expected_vars[1],
+            {
+                'c': tf.constant(3),
+                'd': expected_vars[2],
+                'e': tf.Variable(3., name='e', trainable=False),
+            },
+        ),
+    ]
+    actual_vars = tensor_util.discover_trainable_variables(input_)
+    self.assertAllIs(expected_vars, actual_vars)
+
+  def test_discover_variables(self):
+    expected_vars = (
+        tf.Variable(0., name='a'),
+        tf.Variable(1., name='b'),
+        tf.Variable(2., name='d'),
+        tf.Variable(3., name='e', trainable=False),
+    )
+    input_ = [
+        tf.constant(1),
+        expected_vars[0],
+        (
+            tf.constant(2),
+            expected_vars[1],
+            {
+                'c': tf.constant(3),
+                'd': expected_vars[2],
+                'e': expected_vars[3],
+            },
+        ),
+    ]
+    actual_vars = tensor_util.discover_variables(input_)
+    self.assertAllIs(expected_vars, actual_vars)
+
+  def test_is_variable(self):
+    self.assertTrue(tensor_util.is_variable(tf.Variable(0.)))
+    self.assertTrue(tensor_util.is_variable(tf.Variable(0., trainable=False)))
+
+  def test_is_trainable_variable(self):
+    self.assertTrue(tensor_util.is_trainable_variable(tf.Variable(0.)))
+    self.assertFalse(tensor_util.is_trainable_variable(
+        tf.Variable(0., trainable=False)))
+
+  def test_is_module(self):
+    m = FakeModule(1.)
+    self.assertTrue(tensor_util.is_module(m))
+    self.assertFalse(tensor_util.is_module(tf.Variable(0.)))
 
 
 if __name__ == '__main__':

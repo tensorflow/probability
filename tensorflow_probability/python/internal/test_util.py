@@ -116,6 +116,25 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
         .format([i for i, x in enumerate(each_not_none) if not x]))
     raise AssertionError(msg)
 
+  def assertAllIs(self, a, b):
+    """Assert that each element of `a` `is` `b`.
+
+    Args:
+      a: A Python iterable collection, whose entries must be elementwise `is b`.
+      b: A Python iterable collection, whose entries must be elementwise `is a`.
+    """
+    if len(a) != len(b):
+      raise AssertionError(
+          'Arguments `a` and `b` must have the same number of elements '
+          'but found len(a)={} and len(b)={}.'.format(len(a), len(b)))
+    each_is = [a is b for a, b in zip(a, b)]
+    if all(each_is):
+      return
+    msg = (
+        'For each element expected `a is b` but found `not is` in positions {}'
+        .format([i for i, x in enumerate(each_is) if not x]))
+    raise AssertionError(msg)
+
   def compute_max_gradient_error(self, f, args, delta=1e-3):
     """Wrapper around TF's gradient_checker_v2.
 
