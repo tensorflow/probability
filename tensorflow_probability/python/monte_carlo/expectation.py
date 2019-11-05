@@ -120,10 +120,10 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
   KL-divergence, the following is preferred:
 
   ```python
-  approx_kl_p_q = bf.monte_carlo_csiszar_f_divergence(
-      f=bf.kl_reverse,
+  approx_kl_p_q = bf.monte_carlo_variational_loss(
       p_log_prob=q.log_prob,
       q=p,
+      discrepancy_fn=bf.kl_reverse,
       num_draws=num_draws)
   ```
 

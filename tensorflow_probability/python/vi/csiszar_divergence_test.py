@@ -814,7 +814,7 @@ class CsiszarVIMCOTest(test_util.TestCase):
       x = q.sample(sample_shape=[num_draws, num_batch_draws], seed=seed)
       x = tf.stop_gradient(x)
       logu = p.log_prob(x) - q.log_prob(x)
-      f_log_sum_u = f(tfp.vi.csiszar_vimco_helper(logu)[0])
+      f_log_sum_u = f(tfp.stats.log_soomean_exp(logu, axis=0)[::-1][0])
       q_log_prob_x = q.log_prob(x)
 
     grad_vimco = tape.gradient(vimco, s)

@@ -175,7 +175,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
   ```python
     import functools
     forward_kl_loss = functools.partial(
-      tfp.vi.monte_carlo_csiszar_f_divergence, tfp.vi.kl_forward)
+      tfp.vi.monte_carlo_variational_loss, discrepancy_fn=tfp.vi.kl_forward)
     losses = tfp.vi.fit_surrogate_posterior(
         conditioned_log_prob,
         surrogate_posterior=q,
