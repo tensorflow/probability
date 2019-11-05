@@ -55,7 +55,7 @@ find_version_str() {
   PKG_NAME=$1
   # These are nightly builds we'd like to avoid for some reason; separated by
   # regex OR operator.
-  BAD_NIGHTLY_DATES="20190915\|20190916\|20191030"
+  BAD_NIGHTLY_DATES="20190915\|20190916\|20191030\|20191105"
   # This will fail to find version 'X" and log available version strings to
   # stderr. We then sort, remove bad versions and take the last entry. This
   # allows us to avoid hardcoding the main version number, which would then need
@@ -86,15 +86,15 @@ install_python_packages() {
   # Upgrade numpy to the latest to address issues that happen when testing with
   # Python 3 (https://github.com/tensorflow/tensorflow/issues/16488).
   pip install -U numpy
+
+  # Print out all versions, as an FYI in the logs.
+  python --version
+  pip --version
+  pip freeze
 }
 
 call_with_log_folding install_bazel
 call_with_log_folding install_python_packages
-
-# Print out all versions, as an FYI in the logs.
-python --version
-pip --version
-pip freeze
 
 # Get a shard of tests.
 shard_tests=$(bazel query 'tests(//tensorflow_probability/...)' |
