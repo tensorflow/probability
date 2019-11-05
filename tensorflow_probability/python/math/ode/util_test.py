@@ -49,11 +49,45 @@ class JacobianTest(test_util.TestCase):
     ode_fn_vec = util.get_ode_fn_vec(ode_fn, state_shape)
     jacobian_fn_mat = util.get_jacobian_fn_mat(
         None if use_automatic_differentiation else jacobian, ode_fn_vec,
-        state_shape, use_pfor)
+        state_shape, use_pfor, dtype=tf.float32)
     result = util.right_mult_by_jacobian_mat(jacobian_fn_mat, ode_fn_vec, time,
                                              state_vec, vec)
 
     self.assertAllClose(self.evaluate(result), np.dot(vec, jacobian))
+
+
+@test_util.test_all_tf_execution_regimes
+class NestedJacobianTest(test_util.TestCase):
+
+  def test_structured_jacobian_mat(self):
+    """Test that structured jacobian gets flattened correctly."""
+    state = [
+        tf.constant([1., 2.]),
+        tf.constant([3.]),
+        tf.constant([[4., 5.], [6., 7.]])
+    ]
+    state_shape = [tf.shape(s) for s in state]
+    mat = tf.convert_to_tensor(np.random.randn(7, 7), dtype=tf.float32)
+
+    with tf.GradientTape(persistent=True) as tape:
+      tape.watch(state)
+      state_vec = util.get_state_vec(state)
+      tape.watch(state_vec)
+      new_state_vec = tf.matmul(mat, state_vec[..., tf.newaxis])[..., 0]
+      new_state = util.get_state_from_vec(new_state_vec, state_shape)
+
+    jacobian_mat = self.evaluate(tape.jacobian(new_state_vec, state_vec))
+    jacobian = [
+        [self.evaluate(tape.jacobian(y, x)) for x in state] for y in new_state
+    ]
+    jacobian_mat2 = self.evaluate(
+        util.get_jacobian_fn_mat(
+            jacobian_fn=jacobian,
+            ode_fn_vec=None,
+            state_shape=state_shape,
+            use_pfor=False,
+            dtype=tf.float32)(None))
+    self.assertAllEqual(jacobian_mat, jacobian_mat2)
 
 
 if __name__ == '__main__':

@@ -34,6 +34,7 @@ py_library(
     deps = [
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -47,6 +48,7 @@ py_library(
         ":util",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -126,6 +128,7 @@ py_test(
     name = "ode_test",
     size = "large",
     srcs = ["ode_test.py"],
+    shard_count = 6,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -140,6 +143,7 @@ py_library(
     srcs = ["util.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math:gradient",
     ],
 )
