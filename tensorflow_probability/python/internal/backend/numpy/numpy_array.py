@@ -300,7 +300,7 @@ squeeze = utils.copy_docstring(
     lambda input, axis=None, name=None: np.squeeze(input, axis))
 
 stack = utils.copy_docstring(
-    tf.stack, lambda values, axis=0, name=None: np.stack(values, axis))
+    tf.stack, lambda values, axis=0, name='stack': np.stack(values, axis))
 
 tile = utils.copy_docstring(
     tf.tile,
