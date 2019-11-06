@@ -112,7 +112,6 @@ from tensorflow_probability.python.distributions.deprecated_linalg import matrix
 from tensorflow_probability.python.distributions.deprecated_linalg import tridiag
 from tensorflow_probability.python.distributions.internal.moving_stats import assign_log_moving_mean_exp
 from tensorflow_probability.python.distributions.internal.moving_stats import assign_moving_mean_variance
-from tensorflow_probability.python.distributions.internal.moving_stats import moving_mean_variance
 from tensorflow_probability.python.distributions.kullback_leibler import RegisterKL
 from tensorflow_probability.python.distributions.kullback_leibler import kl_divergence
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import mvn_conjugate_linear_update
@@ -262,7 +261,6 @@ __all__ = [
     'normal_conjugates_known_scale_predictive',
     'assign_moving_mean_variance',
     'assign_log_moving_mean_exp',
-    'moving_mean_variance',
     'quadrature_scheme_softmaxnormal_gauss_hermite',
     'quadrature_scheme_softmaxnormal_quantiles',
     'quadrature_scheme_lognormal_gauss_hermite',
