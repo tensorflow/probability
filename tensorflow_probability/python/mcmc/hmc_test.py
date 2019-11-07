@@ -915,10 +915,10 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
     y = w.dot(x) + noise
     return y[0], x, w[0]
 
-  def make_weights_prior(self, dims, log_sigma):
+  def make_weights_prior(self, dims, sigma):
     return tfd.MultivariateNormalDiag(
-        loc=tf.zeros([dims], dtype=log_sigma.dtype),
-        scale_identity_multiplier=tf.math.exp(log_sigma))
+        loc=tf.zeros([dims], dtype=sigma.dtype),
+        scale_identity_multiplier=sigma)
 
   def make_response_likelihood(self, w, x):
     if tensorshape_util.rank(w.shape) == 1:
@@ -938,55 +938,59 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
                                        weights_prior_true_scale)
     tf1.logging.vlog(1, 'w0: %s', w0)
 
-    log_sigma = tf.Variable(
-        name='log_sigma', initial_value=np.array(0, dtype))
+    sigma = tfp.util.TransformedVariable(
+        name='sigma', initial_value=np.array(1, dtype), bijector=tfb.Exp())
 
     optimizer = tf.optimizers.SGD(learning_rate=0.01)
 
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[dims], dtype=tf.float32),
+        tf.TensorSpec(shape=[], dtype=tf.float32),
+    ])
     def mcem_iter(weights_chain_start, step_size):
+      prior = self.make_weights_prior(dims, sigma)
+
+      def unnormalized_posterior_log_prob(w):
+        likelihood = self.make_response_likelihood(w, x)
+        return (prior.log_prob(w) +
+                tf.reduce_sum(likelihood.log_prob(y), axis=-1))  # [m]
+
+      def trace_fn(_, pkr):
+        return (pkr.inner_results.log_accept_ratio,
+                pkr.inner_results.accepted_results.step_size)
+
+      num_results = 2
+      weights, (log_accept_ratio, step_size) = tfp.mcmc.sample_chain(
+          num_results=num_results,
+          num_burnin_steps=0,
+          current_state=weights_chain_start,
+          kernel=tfp.mcmc.SimpleStepSizeAdaptation(
+              tfp.mcmc.HamiltonianMonteCarlo(
+                  target_log_prob_fn=unnormalized_posterior_log_prob,
+                  num_leapfrog_steps=2,
+                  step_size=step_size,
+                  state_gradients_are_stopped=True,
+              ),
+              # Adapt for the entirety of the trajectory.
+              num_adaptation_steps=2),
+          trace_fn=trace_fn,
+          parallel_iterations=1)
+
+      # We do an optimization step to propagate `sigma` after two HMC
+      # steps to propagate `weights`.
       with tf.GradientTape() as tape:
-        prior = self.make_weights_prior(dims, log_sigma)
-
-        def unnormalized_posterior_log_prob(w):
-          likelihood = self.make_response_likelihood(w, x)
-          return (prior.log_prob(w) +
-                  tf.reduce_sum(likelihood.log_prob(y), axis=-1))  # [m]
-
-        def trace_fn(_, pkr):
-          return (pkr.inner_results.log_accept_ratio,
-                  pkr.inner_results.accepted_results.step_size)
-
-        num_results = 2
-        weights, (log_accept_ratio, step_size) = tfp.mcmc.sample_chain(
-            num_results=num_results,
-            num_burnin_steps=0,
-            current_state=weights_chain_start,
-            kernel=tfp.mcmc.SimpleStepSizeAdaptation(
-                tfp.mcmc.HamiltonianMonteCarlo(
-                    target_log_prob_fn=unnormalized_posterior_log_prob,
-                    num_leapfrog_steps=2,
-                    step_size=step_size,
-                    state_gradients_are_stopped=True,
-                ),
-                # Adapt for the entirety of the trajectory.
-                num_adaptation_steps=2),
-            trace_fn=trace_fn,
-            parallel_iterations=1)
-
-        # We do an optimization step to propagate `log_sigma` after two HMC
-        # steps to propagate `weights`.
-        # TODO(b/75979076): Need to re-evaluate log_prob due to GradientTape not
-        # working with raw graph-mode while_loop.
         loss = -tf.reduce_mean(unnormalized_posterior_log_prob(weights))
 
       avg_acceptance_ratio = tf.math.exp(tfp.math.reduce_logmeanexp(
           tf.minimum(log_accept_ratio, 0.)))
 
-      train_op = optimizer.apply_gradients(
-          [[tape.gradient(loss, log_sigma), log_sigma]])
+      optimizer.apply_gradients([[
+          tape.gradient(loss, sigma.pretransformed_input),
+          sigma.pretransformed_input
+      ]])
 
-      weights_prior_estimated_scale = tf.math.exp(log_sigma)
-      return (train_op, weights_prior_estimated_scale, weights[-1], loss,
+      weights_prior_estimated_scale = tf.identity(sigma)
+      return (weights_prior_estimated_scale, weights[-1], loss,
               step_size[-1], avg_acceptance_ratio)
 
     if not tf.executing_eagerly():
@@ -1004,7 +1008,6 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
 
     for iter_ in range(num_iters):
       [
-          _,
           weights_prior_estimated_scale_[iter_],
           weights_[iter_ + 1],
           loss_[iter_],
