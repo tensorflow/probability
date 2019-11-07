@@ -410,6 +410,7 @@ reduce_prod = _prefer_static(tf.reduce_prod, nptf.reduce_prod)
 reduce_sum = _prefer_static(tf.reduce_sum, nptf.reduce_sum)
 reshape = _prefer_static(tf.reshape, nptf.reshape)
 sort = _prefer_static(tf.sort, nptf.sort)
+split = _prefer_static(tf.split, nptf.split)
 sqrt = _prefer_static(tf.sqrt, nptf.sqrt)
 stack = _prefer_static(tf.stack, nptf.stack)
 tensor_scatter_nd_add = _prefer_static(
