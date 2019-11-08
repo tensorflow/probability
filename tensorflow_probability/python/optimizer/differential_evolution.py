@@ -264,20 +264,20 @@ def minimize(objective_function,
       return -(tf.math.cos(x) * tf.math.cos(y) *
                tf.math.exp(-(x-np.pi)**2 - (y-np.pi)**2))
 
-    optim_results = tfp.optimizers.differential_evolution_minimize(
+    optim_results = tfp.optimizer.differential_evolution_minimize(
         easom_fn,
         initial_population=initial_population,
         seed=43210)
 
-    print (optim_results.converged)
-    print (optim_results.position)  # Should be (close to) [pi, pi].
-    print (optim_results.objective_value)    # Should be -1.
+    print(optim_results.converged)
+    print(optim_results.position)  # Should be (close to) [pi, pi].
+    print(optim_results.objective_value)    # Should be -1.
 
 
     # With a single starting point
     initial_position = (tf.constant(1.0), tf.constant(1.0))
 
-    optim_results = tfp.optimizers.differential_evolution_minimize(
+    optim_results = tfp.optimizer.differential_evolution_minimize(
         easom_fn,
         initial_position=initial_position,
         population_size=40,

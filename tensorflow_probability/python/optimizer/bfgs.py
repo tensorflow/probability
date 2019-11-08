@@ -95,22 +95,22 @@ def minimize(value_and_gradients_function,
     scales = np.array([2.0, 3.0])  # The scales along the two axes.
 
     # The objective function and the gradient.
-    def quadratic(x):
-      value = tf.reduce_sum(scales * (x - minimum) ** 2)
-      return value, tf.gradients(value, x)[0]
+    def quadratic_loss_and_gradient(x):
+      return tfp.math.value_and_gradient(
+          lambda x: tf.reduce_sum(
+              scales * tf.math.squared_difference(x, minimum), axis=-1),
+          x)
 
     start = tf.constant([0.6, 0.8])  # Starting point for the search.
     optim_results = tfp.optimizer.bfgs_minimize(
-        quadratic, initial_position=start, tolerance=1e-8)
+        quadratic_loss_and_gradient, initial_position=start, tolerance=1e-8)
 
-    with tf.Session() as session:
-      results = session.run(optim_results)
-      # Check that the search converged
-      assert(results.converged)
-      # Check that the argmin is close to the actual value.
-      np.testing.assert_allclose(results.position, minimum)
-      # Print out the total number of function evaluations it took. Should be 6.
-      print ("Function evaluations: %d" % results.num_objective_evaluations)
+    # Check that the search converged
+    assert(optim_results.converged)
+    # Check that the argmin is close to the actual value.
+    np.testing.assert_allclose(optim_results.position, minimum)
+    # Print out the total number of function evaluations it took. Should be 5.
+    print ("Function evaluations: %d" % optim_results.num_objective_evaluations)
   ```
 
   ### References:
@@ -257,10 +257,10 @@ def minimize(value_and_gradients_function,
           initial_inv_hessian, state.objective_gradient)
 
       actual_serch_direction = tf1.where(needs_reset,
-                                                  search_direction_reset,
-                                                  search_direction)
+                                         search_direction_reset,
+                                         search_direction)
       actual_inv_hessian = tf1.where(needs_reset, initial_inv_hessian,
-                                              state.inverse_hessian_estimate)
+                                     state.inverse_hessian_estimate)
 
       # Replace the hessian estimate in the state, in case it had to be reset.
       current_state = bfgs_utils.update_fields(

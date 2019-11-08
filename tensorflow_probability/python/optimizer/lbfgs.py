@@ -106,21 +106,22 @@ def minimize(value_and_gradients_function,
     scales = np.arange(ndims, dtype='float64') + 1.0
 
     # The objective function and the gradient.
-    def quadratic(x):
-      value = tf.reduce_sum(scales * (x - minimum) ** 2)
-      return value, tf.gradients(value, x)[0]
-
+    def quadratic_loss_and_gradient(x):
+      return tfp.math.value_and_gradient(
+          lambda x: tf.reduce_sum(
+              scales * tf.math.squared_difference(x, minimum), axis=-1),
+          x)
     start = np.arange(ndims, 0, -1, dtype='float64')
     optim_results = tfp.optimizer.lbfgs_minimize(
-        quadratic, initial_position=start, num_correction_pairs=10,
+        quadratic_loss_and_gradient,
+        initial_position=start,
+        num_correction_pairs=10,
         tolerance=1e-8)
 
-    with tf.Session() as session:
-      results = session.run(optim_results)
-      # Check that the search converged
-      assert(results.converged)
-      # Check that the argmin is close to the actual value.
-      np.testing.assert_allclose(results.position, minimum)
+    # Check that the search converged
+    assert(optim_results.converged)
+    # Check that the argmin is close to the actual value.
+    np.testing.assert_allclose(optim_results.position, minimum)
   ```
 
   ### References:
