@@ -259,23 +259,24 @@ def case(pred_fn_pairs, default=None, exclusive=False, name='smart_case'):
       cond, pred_fn_pairs, default, exclusive, name, allow_python_preds=True)
 
 
-def size0(x):
+def size0(x, name=None):
   """Returns the size of the first dimension (0 if scalar)."""
-  # First, ensure hasattr(x, 'shape').
-  x_ = tf.get_static_value(x)
-  if x_ is not None:
-    x = np.array(x_)
-  if not hasattr(x, 'shape'):
-    x = tf.convert_to_tensor(x)
-  # Next, try to read shape[0].
-  ndims = tensorshape_util.rank(x.shape)
-  if ndims is None or ndims == 0:
-    n = ndims
-  else:
-    n = tf.compat.dimension_value(x.shape[0])
-  if n is not None:
-    return np.int32(n)
-  return pad(shape(x)[:1], paddings=[[0, 1]], constant_values=0)[0]
+  with tf.name_scope(name or 'size0'):
+    # First, ensure hasattr(x, 'shape').
+    x_ = tf.get_static_value(x)
+    if x_ is not None:
+      x = np.array(x_)
+    if not hasattr(x, 'shape'):
+      x = tf.convert_to_tensor(x)
+    # Next, try to read shape[0].
+    ndims = tensorshape_util.rank(x.shape)
+    if ndims is None or ndims == 0:
+      n = ndims
+    else:
+      n = tf.compat.dimension_value(x.shape[0])
+    if n is not None:
+      return np.int32(n)
+    return pad(shape(x)[:1], paddings=[[0, 1]], constant_values=0)[0]
 
 
 def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin

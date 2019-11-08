@@ -22,6 +22,7 @@ import six
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 __all__ = [
@@ -280,7 +281,8 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
           next_target_grad_parts,
       ] = tf.while_loop(
           cond=lambda i, *_: i < self.num_steps,
-          body=lambda i, *args: [i + 1] + list(self._one_step(*args)),  # pylint: disable=no-value-for-parameter
+          body=lambda i, *args: [i + 1] + list(_one_step(  # pylint: disable=no-value-for-parameter,g-long-lambda
+              self.target_fn, self.step_sizes, *args)),
           loop_vars=[
               tf.zeros_like(self.num_steps, name='iter'),
               half_next_momentum_parts,
@@ -304,45 +306,49 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
           next_target_grad_parts,
       )
 
-  def _one_step(
-      self, half_next_momentum_parts, state_parts, target, target_grad_parts):
-    """Body of integrator while loop."""
-    with tf.name_scope('leapfrog_integrate_one_step'):
-      next_state_parts = [
-          x + tf.cast(eps, x.dtype) * tf.cast(v, x.dtype)  # pylint: disable=g-complex-comprehension
-          for x, eps, v in zip(state_parts,
-                               self.step_sizes,
-                               half_next_momentum_parts)
-      ]
 
-      [next_target, next_target_grad_parts] = mcmc_util.maybe_call_fn_and_grads(
-          self.target_fn, next_state_parts)
-      if any(g is None for g in next_target_grad_parts):
-        raise ValueError(
-            'Encountered `None` gradient.\n'
-            '  state_parts: {}\n'
-            '  next_state_parts: {}\n'
-            '  next_target_grad_parts: {}'.format(
-                state_parts,
-                next_state_parts,
-                next_target_grad_parts))
+def _one_step(
+    target_fn,
+    step_sizes,
+    half_next_momentum_parts,
+    state_parts,
+    target,
+    target_grad_parts):
+  """Body of integrator while loop."""
+  with tf.name_scope('leapfrog_integrate_one_step'):
+    next_state_parts = [
+        x + tf.cast(eps, x.dtype) * tf.cast(v, x.dtype)  # pylint: disable=g-complex-comprehension
+        for x, eps, v
+        in zip(state_parts, step_sizes, half_next_momentum_parts)
+    ]
 
-      next_target.set_shape(target.shape)
-      for ng, g in zip(next_target_grad_parts, target_grad_parts):
-        ng.set_shape(g.shape)
+    [next_target, next_target_grad_parts] = mcmc_util.maybe_call_fn_and_grads(
+        target_fn, next_state_parts)
+    if any(g is None for g in next_target_grad_parts):
+      raise ValueError(
+          'Encountered `None` gradient.\n'
+          '  state_parts: {}\n'
+          '  next_state_parts: {}\n'
+          '  next_target_grad_parts: {}'.format(
+              state_parts,
+              next_state_parts,
+              next_target_grad_parts))
 
-      next_half_next_momentum_parts = [
-          v + tf.cast(eps, v.dtype) * tf.cast(g, v.dtype)  # pylint: disable=g-complex-comprehension
-          for v, eps, g in zip(half_next_momentum_parts,
-                               self.step_sizes,
-                               next_target_grad_parts)]
+    tensorshape_util.set_shape(next_target, target.shape)
+    for ng, g in zip(next_target_grad_parts, target_grad_parts):
+      tensorshape_util.set_shape(ng, g.shape)
 
-      return [
-          next_half_next_momentum_parts,
-          next_state_parts,
-          next_target,
-          next_target_grad_parts,
-      ]
+    next_half_next_momentum_parts = [
+        v + tf.cast(eps, v.dtype) * tf.cast(g, v.dtype)  # pylint: disable=g-complex-comprehension
+        for v, eps, g
+        in zip(half_next_momentum_parts, step_sizes, next_target_grad_parts)]
+
+    return [
+        next_half_next_momentum_parts,
+        next_state_parts,
+        next_target,
+        next_target_grad_parts,
+    ]
 
 
 def process_args(target_fn, momentum_parts, state_parts,

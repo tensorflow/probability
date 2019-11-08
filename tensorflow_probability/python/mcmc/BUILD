@@ -295,6 +295,9 @@ py_library(
     deps = [
         ":kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -307,9 +310,11 @@ py_test(
     srcs = ["replica_exchange_mc_test.py"],
     shard_count = 6,
     deps = [
+        # absl/logging dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

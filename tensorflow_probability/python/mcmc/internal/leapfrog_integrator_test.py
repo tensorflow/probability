@@ -68,7 +68,7 @@ class LeapfrogIntegratorTest(test_util.TestCase):
 
     integrator = leapfrog_impl.SimpleLeapfrogIntegrator(
         target_fn,
-        step_sizes=[0.1 / event_size],
+        step_sizes=[0.09 / event_size],
         num_steps=1000)
 
     [[new_m], [_], log_prob_1, [_]] = integrator([m], [x])

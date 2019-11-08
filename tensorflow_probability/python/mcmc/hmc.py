@@ -756,12 +756,9 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
   def bootstrap_results(self, init_state):
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'hmc', 'bootstrap_results')):
-      if not mcmc_util.is_list_like(init_state):
-        init_state = [init_state]
+      init_state, _ = mcmc_util.prepare_state_parts(init_state)
       if self.state_gradients_are_stopped:
         init_state = [tf.stop_gradient(x) for x in init_state]
-      else:
-        init_state = [tf.convert_to_tensor(x) for x in init_state]
       [
           init_target_log_prob,
           init_grads_target_log_prob,
@@ -771,6 +768,12 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
             log_acceptance_correction=tf.zeros_like(init_target_log_prob),
             target_log_prob=init_target_log_prob,
             grads_target_log_prob=init_grads_target_log_prob,
+            # TODO(b/142590314): Try to use the following code once we commit to
+            # a tensorization policy.
+            # step_size=mcmc_util.prepare_state_parts(
+            #    self.step_size,
+            #    dtype=init_target_log_prob.dtype,
+            #    name='step_size')[0],
             step_size=tf.nest.map_structure(
                 lambda x: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
                     x,
@@ -885,22 +888,13 @@ def _prepare_args(target_log_prob_fn,
                   maybe_expand=False,
                   state_gradients_are_stopped=False):
   """Helper which processes input args to meet list-like assumptions."""
-  state_parts = list(state) if mcmc_util.is_list_like(state) else [state]
-  state_parts = [tf.convert_to_tensor(s, name='current_state')
-                 for s in state_parts]
+  state_parts, _ = mcmc_util.prepare_state_parts(state, name='current_state')
   if state_gradients_are_stopped:
     state_parts = [tf.stop_gradient(x) for x in state_parts]
   target_log_prob, grads_target_log_prob = mcmc_util.maybe_call_fn_and_grads(
-      target_log_prob_fn,
-      state_parts,
-      target_log_prob,
-      grads_target_log_prob)
-  step_sizes = (list(step_size) if mcmc_util.is_list_like(step_size)
-                else [step_size])
-  step_sizes = [
-      tf.convert_to_tensor(s, name='step_size', dtype=target_log_prob.dtype)
-      for s in step_sizes
-  ]
+      target_log_prob_fn, state_parts, target_log_prob, grads_target_log_prob)
+  step_sizes, _ = mcmc_util.prepare_state_parts(
+      step_size, dtype=target_log_prob.dtype, name='step_size')
   if len(step_sizes) == 1:
     step_sizes *= len(state_parts)
   if len(state_parts) != len(step_sizes):
