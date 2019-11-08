@@ -125,31 +125,9 @@ from tensorflow_probability.python.internal.reparameterization import FULLY_REPA
 from tensorflow_probability.python.internal.reparameterization import NOT_REPARAMETERIZED
 from tensorflow_probability.python.internal.reparameterization import ReparameterizationType
 
-# Deprecated:
-from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp as _reduce_weighted_logsumexp
-from tensorflow_probability.python.math.generic import softplus_inverse as _softplus_inverse
-from tensorflow_probability.python.math.linalg import fill_triangular as _fill_triangular
-from tensorflow_probability.python.math.linalg import fill_triangular_inverse as _fill_triangular_inverse
-
 # Module management:
 from tensorflow_probability.python.distributions.kullback_leibler import augment_kl_xent_docs
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
-
-
-_deprecated = deprecation.deprecated(
-    '2019-10-01',
-    'This function has moved to `tfp.math`.')
-
-fill_triangular = _deprecated(_fill_triangular)
-
-fill_triangular_inverse = _deprecated(_fill_triangular_inverse)
-
-softplus_inverse = _deprecated(_softplus_inverse)
-
-reduce_weighted_logsumexp = _deprecated(_reduce_weighted_logsumexp)
-
-
-del deprecation, _deprecated
 
 
 import sys as _sys  # pylint: disable=g-import-not-at-top
@@ -250,11 +228,7 @@ __all__ = [
     'Zipf',
     'kl_divergence',
     'RegisterKL',
-    'fill_triangular',
-    'fill_triangular_inverse',
     'matrix_diag_transform',
-    'reduce_weighted_logsumexp',
-    'softplus_inverse',
     'tridiag',
     'mvn_conjugate_linear_update',
     'normal_conjugates_known_scale_posterior',
