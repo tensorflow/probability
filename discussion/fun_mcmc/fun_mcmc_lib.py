@@ -92,12 +92,15 @@ __all__ = [
     'random_walk_metropolis_init',
     'RandomWalkMetropolisExtra',
     'RandomWalkMetropolisState',
+    'running_approximate_auto_covariance_init',
+    'running_approximate_auto_covariance_step',
     'running_covariance_init',
     'running_covariance_step',
     'running_mean_init',
     'running_mean_step',
     'running_variance_init',
     'running_variance_step',
+    'RunningApproximateAutoCovarianceState',
     'RunningCovarianceState',
     'RunningMeanState',
     'RunningVarianceState',
@@ -1482,7 +1485,7 @@ RunningVarianceState = collections.namedtuple('RunningVarianceState',
 
 
 def running_variance_init(shape: IntTensor,
-                          dtype: tf.DType) -> RunningVarianceState:
+                          dtype: DTypeNest) -> RunningVarianceState:
   """Initializes the `RunningVarianceState`.
 
   Args:
@@ -1499,12 +1502,11 @@ def running_variance_init(shape: IntTensor,
   )
 
 
-# TODO(b/141892260): g-bare-generic here is a Pylint bug.
 def running_variance_step(
     state: RunningVarianceState,
     vec: FloatNest,
     axis: Union[int,
-                List[int]] = None) -> Tuple[RunningVarianceState, Tuple[()]]:  # pylint: disable=g-bare-generic
+                List[int]] = None) -> Tuple[RunningVarianceState, Tuple[()]]:
   """Updates the `RunningVarianceState`.
 
   As a computational convenience, this allows computing both independent
@@ -1583,7 +1585,7 @@ RunningCovarianceState = collections.namedtuple('RunningCovarianceState',
 
 
 def running_covariance_init(shape: IntTensor,
-                            dtype: tf.DType) -> RunningCovarianceState:
+                            dtype: DTypeNest) -> RunningCovarianceState:
   """Initializes the `RunningCovarianceState`.
 
   Args:
@@ -1609,12 +1611,11 @@ def running_covariance_init(shape: IntTensor,
   )
 
 
-# TODO(b/141892260): g-bare-generic here is a Pylint bug.
 def running_covariance_step(
     state: RunningCovarianceState,
     vec: FloatTensor,
     axis: Union[int,
-                List[int]] = None) -> Tuple[RunningCovarianceState, Tuple[()]]:  # pylint: disable=g-bare-generic
+                List[int]] = None) -> Tuple[RunningCovarianceState, Tuple[()]]:
   """Updates the `RunningCovarianceState`.
 
   As a computational convenience, this allows computing both independent
@@ -1702,7 +1703,7 @@ RunningMeanState = collections.namedtuple('RunningMeanState',
                                           'num_points, mean')
 
 
-def running_mean_init(shape: IntTensor, dtype: tf.DType) -> RunningMeanState:
+def running_mean_init(shape: IntTensor, dtype: DTypeNest) -> RunningMeanState:
   """Initializes the `RunningMeanState`.
 
   Args:
@@ -1718,12 +1719,11 @@ def running_mean_init(shape: IntTensor, dtype: tf.DType) -> RunningMeanState:
   )
 
 
-# TODO(b/141892260): g-bare-generic here is a Pylint bug.
 def running_mean_step(
     state: RunningMeanState,
     vec: FloatTensor,
     axis: Union[int, List[int]] = None
-) -> Tuple[RunningMeanState, Tuple[()]]:  # pylint: disable=g-bare-generic
+) -> Tuple[RunningMeanState, Tuple[()]]:
   """Updates the `RunningMeanState`.
 
   As a computational convenience, this allows computing both independent
@@ -1870,3 +1870,173 @@ def potential_scale_reduction_extract(
 
   return util.map_tree(_psr_part, state.num_points, state.mean, state.variance,
                        independent_chain_ndims)
+
+
+RunningApproximateAutoCovarianceState = collections.namedtuple(
+    'RunningApproximateAutoCovarianceState', 'buffer, num_steps, '
+    'mean, auto_covariance')
+
+
+def running_approximate_auto_covariance_init(
+    max_lags: int,
+    state_shape: IntTensor,
+    dtype: DTypeNest,
+    axis: Union[int, List[int]] = None,
+) -> RunningApproximateAutoCovarianceState:
+  """Initializes `RunningApproximateAutoCovarianceState`.
+
+  Args:
+    max_lags: Maximum lag for the computed auto-covariance.
+    state_shape: Shape of the sequence elements that the auto-covariance is
+      computed over. Note that this is before the averaging by the `axis`
+      argument.
+    dtype: DType of the state.
+    axis: Axes to average over. See `running_approximate_auto_covariance_step`
+      for details.
+
+  Returns:
+    state: `RunningApproximateAutoCovarianceState`.
+  """
+  if axis is None:
+    mean_shape = state_shape
+  else:
+    # TODO(siege): Can this be done without doing the surrogate computation?
+    mean_shape = util.map_tree_up_to(
+        dtype, lambda s: tf.shape(tf.reduce_sum(tf.zeros(s), axis)),
+        state_shape)
+
+  def _shape_with_lags(shape):
+    if isinstance(shape, (tuple, list)):
+      return [max_lags + 1] + list(shape)
+    else:
+      return tf.concat([[max_lags + 1],
+                        tf.convert_to_tensor(shape, tf.int32)],
+                       axis=0)
+
+  return RunningApproximateAutoCovarianceState(
+      buffer=util.map_tree_up_to(
+          dtype, lambda d, s: tf.zeros(_shape_with_lags(s), dtype=d), dtype,
+          state_shape),
+      num_steps=tf.zeros([], dtype=tf.int32),
+      mean=util.map_tree_up_to(dtype, lambda d, s: tf.zeros(s, dtype=d), dtype,
+                               mean_shape),
+      auto_covariance=util.map_tree_up_to(
+          dtype, lambda d, s: tf.zeros(_shape_with_lags(s), dtype=d), dtype,
+          mean_shape),
+  )
+
+
+def running_approximate_auto_covariance_step(
+    state: RunningApproximateAutoCovarianceState,
+    vec: TensorNest,
+    axis: Union[int, List[int]] = None,
+) -> Tuple[RunningApproximateAutoCovarianceState, Tuple[()]]:
+  """Updates `RunningApproximateAutoCovarianceState`.
+
+  This computes a running auto-covariance of a sequence using a biased
+  approximation. The algorithm effectively performs `max_lags + 1` separate
+  covariance estimates, except with the running mean terms replaced by a shared
+  mean computed at lag 0. This is not mathematically correct for lag > 0, but
+  empirically the bias is manageable. The bias is large when the `max_lags` is
+  large compared to the sequence length: a factor of about 3x is often adequate.
+
+  This used a very naive algorithm based on keeping the last `max_lags + 1`
+  elements of the sequence as part of the state. The time complexity is
+  `O(max_lags * sequence_length)`, so this should only be used instead of the
+  versions based on FFT when the memory requrements for materializing the whole
+  sequence are excessive.
+
+  For convenience, this function supports computing the average auto-correlation
+  across dimensions of the elements by specifying the `axis` argument. This must
+  either be `None` or refer to the leading dimensions of `vec`. For example:
+
+  - vec shape: [3, 4], axis=None -> auto_covariance shape: [max_lags + 1, 3, 4]
+  - vec shape: [3, 4], axis=0 -> auto_covariance shape: [max_lags + 1, 4]
+  - vec shape: [3, 4], axis=[0, 1] -> auto_covariance shape: [max_lags + 1]
+
+  Args:
+    state: `RunningApproximateAutoCovarianceState`
+    vec: An element of a sequence. This must have the same shape as was passed
+      to `running_approximate_auto_covariance_init`.
+    axis: If not `None`, treat these axes as being axes to average over.
+
+  Returns:
+    state: `RunningApproximateAutoCovarianceState`.
+    extra: Empty tuple.
+  """
+
+  def _one_part(vec, buf, mean, auto_cov):
+    """Compute the auto-covariance for one part."""
+    buf_size = tf.shape(buf)[0]
+    tail_idx = tf.range(0, buf_size - 1)
+    num_steps = state.num_steps - tf.range(buf_size)
+    num_steps = tf.maximum(0, num_steps)
+
+    buf = tf.gather(buf, tail_idx)
+    buf = tf.concat([vec[tf.newaxis], buf], 0)
+    centered_buf = buf - mean
+    centered_vec = vec - mean
+
+    num_steps_0 = num_steps[0]
+    # Need to broadcast on the right with autocov.
+    if isinstance(auto_cov.shape, tuple) and isinstance(num_steps.shape, tuple):
+      steps_shape = ([-1] + [1] * (len(auto_cov.shape) - len(num_steps.shape)))
+    else:
+      steps_shape = tf.concat(
+          [[-1],
+           tf.ones(
+               [tf.rank(auto_cov) - tf.rank(num_steps)],
+               dtype=tf.int32,
+           )],
+          axis=0,
+      )
+    num_steps = tf.reshape(num_steps, steps_shape)
+
+    # pyformat: disable
+    if axis is None:
+      additional_points = 1
+      additional_points_f = 1
+      # This assumes `additional_points` is the same for every step,
+      # verified by the buf update logic above.
+      num_points_f = additional_points_f * tf.cast(num_steps, mean.dtype)
+
+      auto_cov = ((
+          num_points_f * (num_points_f + additional_points_f) * auto_cov +
+          num_points_f * centered_vec * centered_buf) /
+                  tf.square(num_points_f + additional_points_f))
+    else:
+      vec_shape = tf.shape(vec)
+      additional_points = tf.math.reduce_prod(tf.gather(vec_shape, axis))
+      additional_points_f = tf.cast(additional_points, vec.dtype)
+      num_points_f = additional_points_f * tf.cast(num_steps, mean.dtype)
+      buf_axis = util.map_tree(lambda a: a + 1, axis)
+
+      auto_cov = (
+          num_points_f * (num_points_f + additional_points_f) * auto_cov +
+          num_points_f * tf.reduce_sum(centered_vec * centered_buf, buf_axis) -
+          tf.reduce_sum(vec, axis) * tf.reduce_sum(buf, buf_axis) +
+          additional_points_f * tf.reduce_sum(vec * buf, buf_axis)) / (
+              tf.square(num_points_f + additional_points_f))
+      centered_vec = tf.reduce_sum(centered_vec, axis)
+    # pyformat: enable
+    num_points_0_f = additional_points_f * tf.cast(num_steps_0, mean.dtype)
+    mean = mean + centered_vec / (num_points_0_f + additional_points_f)
+    return buf, auto_cov, mean
+
+  new_buffer_auto_cov_mean = util.map_tree(_one_part, vec, state.buffer,
+                                           state.mean, state.auto_covariance)
+
+  new_buffer = util.map_tree_up_to(state.buffer, lambda x: x[0],
+                                   new_buffer_auto_cov_mean)
+  new_auto_cov = util.map_tree_up_to(state.buffer, lambda x: x[1],
+                                     new_buffer_auto_cov_mean)
+  new_mean = util.map_tree_up_to(state.buffer, lambda x: x[2],
+                                 new_buffer_auto_cov_mean)
+
+  state = RunningApproximateAutoCovarianceState(
+      num_steps=state.num_steps + 1,
+      buffer=new_buffer,
+      auto_covariance=new_auto_cov,
+      mean=new_mean,
+  )
+  return state, ()

@@ -41,6 +41,10 @@ util = backend.util
 real_tf.enable_v2_behavior()
 
 
+def _test_seed():
+  return tfp_test_util.test_seed() % (2**32 - 1)
+
+
 def _no_compile(fn):
   return fn
 
@@ -134,6 +138,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     return seed
 
   def testTraceSingle(self):
+
     def fun(x):
       if x is None:
         x = 0.
@@ -146,6 +151,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual([0., 2., 4., 6., 8.], e_trace)
 
   def testTraceNested(self):
+
     def fun(x, y):
       if x is None:
         x = 0.
@@ -160,6 +166,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual([2., 4., 6., 8., 10.], y_trace)
 
   def testTraceTrace(self):
+
     def fun(x):
       return fun_mcmc.trace(x, lambda x: (x + 1., ()), 2, lambda *args: ())
 
@@ -196,6 +203,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertEqual((), extra)
 
   def testCallPotentialFnMissingExtra(self):
+
     def potential(x):
       return x
 
@@ -214,6 +222,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertEqual((), extra)
 
   def testCallTransitionOperatorMissingExtra(self):
+
     def potential(x):
       return x
 
@@ -222,6 +231,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
 
   @_skip_on_jax  # JAX backend cant' catch this error yet.
   def testCallTransitionOperatorBadArgs(self):
+
     def potential(x, y, z):
       del z
       return (x, y), ()
@@ -292,6 +302,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
   def testIntegratorStep(self, method, num_tlp_calls, num_tlp_calls_jax=None):
 
     tlp_call_counter = [0]
+
     def target_log_prob_fn(q):
       tlp_call_counter[0] += 1
       return -q**2, 1.
@@ -324,13 +335,14 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
       fun_mcmc.blanes_3_stage_step,
   )
   def testIntegratorStepReversible(self, method):
+
     def target_log_prob_fn(q):
       return -q**2, []
 
     def kinetic_energy_fn(p):
       return p**2., []
 
-    seed = self._make_seed(tfp_test_util.test_seed())
+    seed = self._make_seed(_test_seed())
 
     state_fwd, _ = method(
         integrator_step_state=fun_mcmc.IntegratorStepState(
@@ -350,13 +362,14 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(1., state_rev.state, atol=1e-6)
 
   def testMclachlanIntegratorStepReversible(self):
+
     def target_log_prob_fn(q):
       return -q**2, []
 
     def kinetic_energy_fn(p):
       return p**2., []
 
-    seed = self._make_seed(tfp_test_util.test_seed())
+    seed = self._make_seed(_test_seed())
 
     state_fwd, _ = _fwd_mclachlan_optimal_4th_order_step(
         integrator_step_state=fun_mcmc.IntegratorStepState(
@@ -376,29 +389,25 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(1., state_rev.state, atol=1e-6)
 
   def testMetropolisHastingsStep(self):
-    seed = self._make_seed(tfp_test_util.test_seed())
+    seed = self._make_seed(_test_seed())
 
     accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
-        current_state=0., proposed_state=1., energy_change=-np.inf,
-        seed=seed)
+        current_state=0., proposed_state=1., energy_change=-np.inf, seed=seed)
     self.assertAllEqual(1., accepted)
     self.assertAllEqual(True, mh_extra.is_accepted)
 
     accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
-        current_state=0., proposed_state=1., energy_change=np.inf,
-        seed=seed)
+        current_state=0., proposed_state=1., energy_change=np.inf, seed=seed)
     self.assertAllEqual(0., accepted)
     self.assertAllEqual(False, mh_extra.is_accepted)
 
     accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
-        current_state=0., proposed_state=1., energy_change=np.nan,
-        seed=seed)
+        current_state=0., proposed_state=1., energy_change=np.nan, seed=seed)
     self.assertAllEqual(0., accepted)
     self.assertAllEqual(False, mh_extra.is_accepted)
 
     accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
-        current_state=None, proposed_state=1., energy_change=np.nan,
-        seed=seed)
+        current_state=None, proposed_state=1., energy_change=np.nan, seed=seed)
     self.assertAllEqual(1., accepted)
     self.assertAllEqual(False, mh_extra.is_accepted)
 
@@ -437,7 +446,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
         current_state=current,
         proposed_state=proposed,
         energy_change=-np.inf,
-        seed=self._make_seed(tfp_test_util.test_seed()))
+        seed=self._make_seed(_test_seed()))
     self.assertAllEqual(True, mh_extra.is_accepted)
     self.assertAllEqual(
         util.flatten_tree(proposed), util.flatten_tree(accepted))
@@ -457,7 +466,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
 
     def kernel(hmc_state, seed):
       if backend.get_backend() == backend.TENSORFLOW:
-        hmc_seed = tfp_test_util.test_seed()
+        hmc_seed = _test_seed()
       else:
         hmc_seed, seed = util.split_seed(seed, 2)
       hmc_state, hmc_extra = fun_mcmc.hamiltonian_monte_carlo(
@@ -469,9 +478,9 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
       return (hmc_state, seed), hmc_extra
 
     if backend.get_backend() == backend.TENSORFLOW:
-      seed = tfp_test_util.test_seed()
+      seed = _test_seed()
     else:
-      seed = self._make_seed(tfp_test_util.test_seed())
+      seed = self._make_seed(_test_seed())
 
     # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
     # for the jit to do anything.
@@ -522,7 +531,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
         step_size=step_size,
         num_integrator_steps=num_leapfrog_steps,
         target_log_prob_fn=target_log_prob_fn,
-        seed=tfp_test_util.test_seed()))
+        seed=_test_seed()))
 
     _, chain = fun_mcmc.trace(
         state=fun_mcmc.HamiltonianMonteCarloState(state),
@@ -535,7 +544,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     sample_mean = tf.reduce_mean(chain, axis=[0, 1])
     sample_cov = tfp.stats.covariance(chain, sample_axis=[0, 1])
 
-    true_samples = target_dist.sample(4096, seed=tfp_test_util.test_seed())
+    true_samples = target_dist.sample(4096, seed=_test_seed())
 
     true_mean = tf.reduce_mean(true_samples, axis=0)
     true_cov = tfp.stats.covariance(chain, sample_axis=[0, 1])
@@ -543,14 +552,12 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(true_mean, sample_mean, rtol=0.1, atol=0.1)
     self.assertAllClose(true_cov, sample_cov, rtol=0.1, atol=0.1)
 
-  @parameterized.parameters(
-      (tf.function, 1),
-      (_no_compile, 3)
-  )
+  @parameterized.parameters((tf.function, 1), (_no_compile, 3))
   @_skip_on_jax  # `trace` doesn't have an efficient path in JAX yet.
   def testHMCCountTargetLogProb(self, compile_fn, expected_count):
 
     counter = [0]
+
     @compile_fn
     def target_log_prob_fn(x):
       counter[0] += 1
@@ -564,13 +571,14 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
           step_size=0.1,
           num_integrator_steps=3,
           target_log_prob_fn=target_log_prob_fn,
-          seed=tfp_test_util.test_seed())
+          seed=_test_seed())
 
       fun_mcmc.trace(
           state=fun_mcmc.HamiltonianMonteCarloState(tf.zeros([1])),
           fn=kernel,
           num_steps=4,
           trace_fn=lambda *args: ())
+
     trace()
 
     self.assertEqual(expected_count, counter[0])
@@ -579,6 +587,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
   def testHMCCountTargetLogProbEfficient(self):
 
     counter = [0]
+
     def target_log_prob_fn(x):
       counter[0] += 1
       return -tf.square(x), []
@@ -591,13 +600,11 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
           step_size=0.1,
           num_integrator_steps=3,
           target_log_prob_fn=target_log_prob_fn,
-          seed=self._make_seed(tfp_test_util.test_seed()))
+          seed=self._make_seed(_test_seed()))
 
       fun_mcmc.trace(
           state=fun_mcmc.hamiltonian_monte_carlo_init(
-              state=tf.zeros([1]),
-              target_log_prob_fn=target_log_prob_fn
-          ),
+              state=tf.zeros([1]), target_log_prob_fn=target_log_prob_fn),
           fn=kernel,
           num_steps=4,
           trace_fn=lambda *args: ())
@@ -657,9 +664,9 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
           (fun_mcmc.HamiltonianMonteCarloState(state), step_size, 0),
           kernel,
           num_adapt_steps + num_steps,
-          trace_fn=lambda state, extra: (state[0].state_extra[0], extra.
-                                         log_accept_ratio))
-      true_samples = target_dist.sample(4096, seed=tfp_test_util.test_seed())
+          trace_fn=lambda state, extra:  # pylint: disable=g-long-lambda
+          (state[0].state_extra[0], extra.log_accept_ratio))
+      true_samples = target_dist.sample(4096, seed=_test_seed())
       return chain, log_accept_ratio_trace, true_samples
 
     chain, log_accept_ratio_trace, true_samples = computation(state)
@@ -705,10 +712,15 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     def kernel(state, pkr):
       return fun_mcmc.transition_kernel_wrapper(state, pkr, TestKernel())
 
-    (final_state, final_kr), _ = fun_mcmc.trace(({
-        'x': 0.,
-        'y': 1.
-    }, None), kernel, 2, trace_fn=lambda *args: ())
+    (final_state, final_kr), _ = fun_mcmc.trace(
+        ({
+            'x': 0.,
+            'y': 1.
+        }, None),
+        kernel,
+        2,
+        trace_fn=lambda *args: (),
+    )
     self.assertAllEqual({
         'x': 2.,
         'y': 3.
@@ -759,25 +771,29 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
       # For the integrator trace, we'll grab the final value.
       return util.map_tree(
           lambda x: x[idx] if len(x.shape) == 1 else x[-1, idx], state)
+
     self.assertAllClose(get_batch(state_1, 0), get_batch(state_1_2, 0))
     self.assertAllClose(get_batch(state_2, 0), get_batch(state_1_2, 1))
 
     # Ragged traces should be equal up to the number of steps for the batch
     # element.
     def get_slice(state, num, idx):
-      return util.map_tree(
-          lambda x: x[:num, idx], state[1].integrator_trace)
+      return util.map_tree(lambda x: x[:num, idx], state[1].integrator_trace)
+
     self.assertAllClose(get_slice(state_1, 1, 0), get_slice(state_1_2, 1, 0))
     self.assertAllClose(get_slice(state_2, 2, 0), get_slice(state_1_2, 2, 1))
 
   def testAdam(self):
+
     def loss_fn(x, y):
       return tf.square(x - 1.) + tf.square(y - 2.), []
 
     _, [(x, y), loss] = fun_mcmc.trace(
         fun_mcmc.adam_init([tf.zeros([]), tf.zeros([])]),
         lambda adam_state: fun_mcmc.adam_step(  # pylint: disable=g-long-lambda
-            adam_state, loss_fn, learning_rate=0.01),
+            adam_state,
+            loss_fn,
+            learning_rate=0.01),
         num_steps=1000,
         trace_fn=lambda state, extra: [state.state, extra.loss])
 
@@ -786,13 +802,16 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(0., loss[-1], atol=1e-3)
 
   def testGradientDescent(self):
+
     def loss_fn(x, y):
       return tf.square(x - 1.) + tf.square(y - 2.), []
 
     _, [(x, y), loss] = fun_mcmc.trace(
         fun_mcmc.GradientDescentState([tf.zeros([]), tf.zeros([])]),
         lambda gd_state: fun_mcmc.gradient_descent_step(  # pylint: disable=g-long-lambda
-            gd_state, loss_fn, learning_rate=0.01),
+            gd_state,
+            loss_fn,
+            learning_rate=0.01),
         num_steps=1000,
         trace_fn=lambda state, extra: [state.state, extra.loss])
 
@@ -818,7 +837,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
 
     def kernel(rwm_state, seed):
       if backend.get_backend() == backend.TENSORFLOW:
-        rwm_seed = tfp_test_util.test_seed()
+        rwm_seed = _test_seed()
       else:
         rwm_seed, seed = util.split_seed(seed, 2)
       rwm_state, rwm_extra = fun_mcmc.random_walk_metropolis(
@@ -829,9 +848,9 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
       return (rwm_state, seed), rwm_extra
 
     if backend.get_backend() == backend.TENSORFLOW:
-      seed = tfp_test_util.test_seed()
+      seed = _test_seed()
     else:
-      seed = self._make_seed(tfp_test_util.test_seed())
+      seed = self._make_seed(_test_seed())
 
     # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
     # for the jit to do anything.
@@ -845,7 +864,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     chain = chain[500:]
 
     sample_mean = tf.reduce_mean(tf.one_hot(chain, 4), axis=[0, 1])
-    self.assertAllClose(tf.nn.softmax(target_logits), sample_mean, atol=0.1)
+    self.assertAllClose(tf.nn.softmax(target_logits), sample_mean, atol=0.11)
 
   @parameterized.named_parameters(
       ('Basic', (10, 3), None),
@@ -856,7 +875,8 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
       ('Aggregated02', (10, 4, 5, 3), (0, 2)),
   )
   def testRunningMean(self, shape, aggregation):
-    data = tf.convert_to_tensor(np.random.randn(*shape))
+    rng = np.random.RandomState(_test_seed())
+    data = tf.convert_to_tensor(rng.randn(*shape))
 
     def kernel(rms, idx):
       rms, _ = fun_mcmc.running_mean_step(rms, data[idx], axis=aggregation)
@@ -883,7 +903,8 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
       ('Aggregated02', (10, 4, 5, 3), (0, 2)),
   )
   def testRunningVariance(self, shape, aggregation):
-    data = tf.convert_to_tensor(np.random.randn(*shape))
+    rng = np.random.RandomState(_test_seed())
+    data = tf.convert_to_tensor(rng.randn(*shape))
 
     true_aggregation = (0,) + (() if aggregation is None else tuple(
         [a + 1 for a in util.flatten_tree(aggregation)]))
@@ -910,7 +931,8 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
       ('Aggregated01', (10, 4, 5, 3), (0, 1)),
   )
   def testRunningCovariance(self, shape, aggregation):
-    data = tf.convert_to_tensor(np.random.randn(*shape))
+    rng = np.random.RandomState(_test_seed())
+    data = tf.convert_to_tensor(rng.randn(*shape))
 
     true_aggregation = (0,) + (() if aggregation is None else tuple(
         [a + 1 for a in util.flatten_tree(aggregation)]))
@@ -938,9 +960,9 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
       ('BatchedVector', (10, 5, 20, 7), 2),
   )
   def testPotentialScaleReduction(self, chain_shape, independent_chain_ndims):
-    chain_means = np.random.randn(*((1,) + chain_shape[1:])).astype(np.float32)
-    chains = 0.4 * np.random.randn(*chain_shape).astype(
-        np.float32) + chain_means
+    rng = np.random.RandomState(_test_seed())
+    chain_means = rng.randn(*((1,) + chain_shape[1:])).astype(np.float32)
+    chains = 0.4 * rng.randn(*chain_shape).astype(np.float32) + chain_means
 
     true_rhat = tfp.mcmc.potential_scale_reduction(
         chains, independent_chain_ndims=independent_chain_ndims)
@@ -958,6 +980,83 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
         psrs, independent_chain_ndims=independent_chain_ndims)
     self.assertAllClose(true_rhat, running_rhat)
 
+  @parameterized.named_parameters(
+      ('Basic', (), None, None),
+      ('Batched1', (2,), 1, None),
+      ('Batched2', (3, 2), 1, None),
+      ('Aggregated0', (3, 2), 1, 0),
+      ('Aggregated01', (3, 4, 2), 1, (0, 1)),
+  )
+  def testRunningApproximateAutoCovariance(self, state_shape, event_ndims,
+                                           aggregation):
+    # We'll use HMC as the source of our chain.
+    # While HMC is being sampled, we also compute the running autocovariance.
+    step_size = 0.2
+    num_steps = 1000
+    num_leapfrog_steps = 10
+    max_lags = 300
+
+    state = tf.constant(np.zeros(state_shape).astype(np.float32))
+
+    def target_log_prob_fn(x):
+      lp = -0.5 * tf.square(x)
+      if event_ndims is None:
+        return lp, ()
+      else:
+        return tf.reduce_sum(lp, -1), ()
+
+    def kernel(hmc_state, raac_state, seed):
+      if backend.get_backend() == backend.TENSORFLOW:
+        hmc_seed = _test_seed()
+      else:
+        hmc_seed, seed = util.split_seed(seed, 2)
+      hmc_state, hmc_extra = fun_mcmc.hamiltonian_monte_carlo(
+          hmc_state,
+          step_size=step_size,
+          num_integrator_steps=num_leapfrog_steps,
+          target_log_prob_fn=target_log_prob_fn,
+          seed=hmc_seed)
+      raac_state, _ = fun_mcmc.running_approximate_auto_covariance_step(
+          raac_state, hmc_state.state, axis=aggregation)
+      return (hmc_state, raac_state, seed), hmc_extra
+
+    if backend.get_backend() == backend.TENSORFLOW:
+      seed = _test_seed()
+    else:
+      seed = self._make_seed(_test_seed())
+
+    # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
+    # for the jit to do anything.
+    (_, raac_state, _), chain = tf.function(lambda state, seed: fun_mcmc.trace(  # pylint: disable=g-long-lambda
+        state=(
+            fun_mcmc.HamiltonianMonteCarloState(state),
+            fun_mcmc.running_approximate_auto_covariance_init(
+                max_lags=max_lags,
+                state_shape=state_shape,
+                dtype=state.dtype,
+                axis=aggregation),
+            seed,
+        ),
+        fn=kernel,
+        num_steps=num_steps,
+        trace_fn=lambda state, extra: state[0].state))(state, seed)
+
+    true_aggregation = (0,) + (() if aggregation is None else tuple(
+        [a + 1 for a in util.flatten_tree(aggregation)]))
+    true_variance = np.array(
+        tf.math.reduce_variance(np.array(chain), true_aggregation))
+    true_autocov = np.array(
+        tfp.stats.auto_correlation(np.array(chain), axis=0, max_lags=max_lags))
+    if aggregation is not None:
+      true_autocov = tf.reduce_mean(
+          true_autocov, [a + 1 for a in util.flatten_tree(aggregation)])
+
+    self.assertAllClose(true_variance, raac_state.auto_covariance[0], 1e-5)
+    self.assertAllClose(
+        true_autocov,
+        raac_state.auto_covariance / raac_state.auto_covariance[0],
+        atol=0.1)
+
 
 class FunMCMCTestJAX(FunMCMCTestTensorFlow):
 
@@ -967,6 +1066,7 @@ class FunMCMCTestJAX(FunMCMCTestTensorFlow):
 
   def _make_seed(self, seed):
     return jax_random.PRNGKey(seed)
+
 
 if __name__ == '__main__':
   tf.test.main()
