@@ -36,6 +36,7 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import buil
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import kalman_transition
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import KalmanFilterState
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
+from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -45,9 +46,6 @@ tfl = tf.linalg
 
 @test_util.test_all_tf_execution_regimes
 class _IIDNormalTest(object):
-
-  def setUp(self):
-    pass
 
   def _build_iid_normal_model(self, num_timesteps, latent_size,
                               observation_size, transition_variance,
@@ -362,13 +360,61 @@ class SanityChecks(test_util.TestCase):
         tensorshape_util.as_list(variance_.shape),
         result_shape)
 
+  def testExcessiveConcretizationOfParams(self):
+    # TODO(b/140579567): Bring the number of concretizations down to more
+    # reasonable numbers.
+    latent_size = 5
+    transition_std = 3.0
+    observation_std = 5.0
+
+    num_timesteps = tfp_hps.defer_and_count_usage(
+        tf.Variable(1, name='num_timesteps'))
+    transition_matrix = tfp_hps.defer_and_count_usage(
+        tf.Variable(np.eye(latent_size), name='transition_matrix'))
+    transition_noise_scale = tfp_hps.defer_and_count_usage(
+        tf.Variable(
+            np.full([latent_size], transition_std),
+            name='transition_noise_scale'))
+    observation_matrix = tfp_hps.defer_and_count_usage(
+        tf.Variable(np.eye(latent_size), name='observation_matrix'))
+    observation_noise_scale = tfp_hps.defer_and_count_usage(
+        tf.Variable(
+            np.full([latent_size], observation_std),
+            name='observation_noise_scale'))
+    initial_state_prior_scale = tfp_hps.defer_and_count_usage(
+        tf.Variable(
+            np.full([latent_size], observation_std),
+            name='initial_state_prior_scale'))
+
+    model = tfd.LinearGaussianStateSpaceModel(
+        num_timesteps=num_timesteps,
+        transition_matrix=transition_matrix,
+        transition_noise=tfd.MultivariateNormalDiag(
+            scale_diag=transition_noise_scale),
+        observation_matrix=observation_matrix,
+        observation_noise=tfd.MultivariateNormalDiag(
+            scale_diag=observation_noise_scale),
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            scale_diag=initial_state_prior_scale),
+        validate_args=True)
+
+    for method in ('batch_shape_tensor', 'event_shape_tensor', 'mean',
+                   'sample'):
+      with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=2):
+        getattr(model, method)()
+
+    for method in ('log_prob', 'prob'):
+      with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=7):
+        getattr(model, method)(np.ones((1, latent_size)))
+
+    for method in ('variance',):
+      with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=4):
+        getattr(model, method)()
+
 
 @test_util.test_all_tf_execution_regimes
 class BatchTest(test_util.TestCase):
   """Test that methods broadcast batch dimensions for each parameter."""
-
-  def setUp(self):
-    pass
 
   def _build_random_model(self,
                           num_timesteps,
@@ -795,7 +841,7 @@ class MissingObservationsTests(test_util.TestCase):
     big_mask = np.random.randn(*np.concatenate(
         [[1, 2, 3], sample_shape, [num_timesteps]], axis=0)) > 0
     with self.assertRaisesRegexp(ValueError,
-                                 "mask cannot have higher rank than x"):
+                                 'mask cannot have higher rank than x'):
       (log_likelihoods, filtered_means, filtered_covs, _, _, _,
        _) = model.forward_filter(
            x=observed_time_series, mask=big_mask)
@@ -941,7 +987,7 @@ class KalmanSmootherTest(test_util.TestCase):
     empirical_mean = tf.reduce_mean(posterior_samples, axis=[0, 1])
     centered_samples = posterior_samples - posterior_mean
     empirical_covs = tf.einsum(
-        "nm...tb,nm...td->...tbd",
+        'nm...tb,nm...td->...tbd',
         centered_samples, centered_samples) / np.prod(sample_shape)
 
     (empirical_mean_, empirical_covs_,
@@ -954,7 +1000,7 @@ class KalmanSmootherTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class _KalmanStepsTest(object):
 
-  def setUp(self):
+  def setUp(self):  # pylint: disable=g-missing-super-call
     # Define a simple model with 2D latents and 1D observations.
 
     self.transition_matrix = np.asarray([[1., .5], [-.2, .3]], dtype=np.float32)
@@ -1310,6 +1356,7 @@ class KalmanStepsTestStatic(test_util.TestCase, _KalmanStepsTest):
   use_static_shape = True
 
   def setUp(self):
+    super(KalmanStepsTestStatic, self).setUp()
     return _KalmanStepsTest.setUp(self)
 
   def build_tensor(self, tensor):
@@ -1322,6 +1369,7 @@ class KalmanStepsTestDynamic(test_util.TestCase, _KalmanStepsTest):
   use_static_shape = False
 
   def setUp(self):
+    super(KalmanStepsTestDynamic, self).setUp()
     return _KalmanStepsTest.setUp(self)
 
   def build_tensor(self, tensor):
@@ -1356,7 +1404,7 @@ class _AugmentSampleShapeTest(object):
 
     full_batch_shape, dist = self.build_inputs([5, 4, 2, 3], [1, 3])
 
-    with self.assertRaisesError("Broadcasting is not supported"):
+    with self.assertRaisesError('Broadcasting is not supported'):
       self.maybe_evaluate(
           _augment_sample_shape(dist, full_batch_shape,
                                 validate_args=True))
@@ -1366,7 +1414,7 @@ class _AugmentSampleShapeTest(object):
     full_batch_shape, dist = self.build_inputs([5, 4, 2, 3], [6, 5, 4, 2, 3])
 
     with self.assertRaisesError(
-        "(Broadcasting is not supported|Cannot broadcast)"):
+        '(Broadcasting is not supported|Cannot broadcast)'):
       self.maybe_evaluate(
           _augment_sample_shape(dist, full_batch_shape,
                                 validate_args=True))
@@ -1413,5 +1461,58 @@ class AugmentSampleShapeTestDynamic(test_util.TestCase,
     return self.evaluate(x)
 
 
-if __name__ == "__main__":
+@test_util.test_all_tf_execution_regimes
+class LinearGaussianStateSpaceModelFromVariableTest(test_util.TestCase):
+
+  def testGradientTransitionMatrix(self):
+    transition_matrix = tf.Variable([[1.]])
+    observation_matrix = tf.constant([[1.]])
+
+    self.evaluate(transition_matrix.initializer)
+    d = tfd.LinearGaussianStateSpaceModel(
+        transition_matrix=transition_matrix,
+        transition_noise=tfd.MultivariateNormalDiag(
+            scale_diag=[1.]),
+        observation_matrix=observation_matrix,
+        observation_noise=tfd.MultivariateNormalDiag(
+            scale_diag=[1.]),
+        num_timesteps=2,
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            scale_diag=[1.]),
+        validate_args=True)
+
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob(tf.zeros([2, 1]))
+    g = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(g, 1)
+    self.assertAllNotNone(g)
+
+  def testGradientObservationMatrix(self):
+    transition_matrix = tf.constant([[1.]])
+    observation_matrix = tf.Variable([[1.]])
+
+    self.evaluate(observation_matrix.initializer)
+    d = tfd.LinearGaussianStateSpaceModel(
+        transition_matrix=transition_matrix,
+        transition_noise=tfd.MultivariateNormalDiag(
+            scale_diag=[1.]),
+        observation_matrix=observation_matrix,
+        observation_noise=tfd.MultivariateNormalDiag(
+            scale_diag=[1.]),
+        num_timesteps=2,
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            scale_diag=[1.]),
+        validate_args=True)
+
+    with tf.GradientTape() as tape:
+      loss = -d.log_prob(tf.zeros([2, 1]))
+    g = tape.gradient(loss, d.trainable_variables)
+    self.assertLen(g, 1)
+    self.assertAllNotNone(g)
+
+
+if __name__ == '__main__':
+  # Need to enable V2 control flow so we can use GradientTape for the graph-mode
+  # tests. See b/75979076.
+  tf1.enable_control_flow_v2()
   tf.test.main()
