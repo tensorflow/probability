@@ -824,7 +824,7 @@ class Bijector(tf.Module):
     if isinstance(value, Bijector):
       return chain.Chain([self, value], name=name, **kwargs)
 
-    return self._call_forward(value, name=name or 'forward', **kwargs)
+    return self.forward(value, name=name or 'forward', **kwargs)
 
   def _forward_event_shape_tensor(self, input_shape):
     """Subclass implementation for `forward_event_shape_tensor` function."""

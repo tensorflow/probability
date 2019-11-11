@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
+
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
@@ -84,6 +86,11 @@ class InvertBijectorTest(test_util.TestCase):
         self.evaluate(
             tf.shape(
                 exp_gamma_distribution.sample(seed=test_util.test_seed()))))
+
+  def testInvertCallStillWorks(self):
+    x = [1., 2.]
+    self.assertAllClose(np.log(x), tfb.Invert(tfb.Exp())(x),
+                        atol=1e-5, rtol=1e-5)
 
 
 if __name__ == "__main__":
