@@ -46,7 +46,6 @@ from tensorflow_probability.python.distributions import poisson as poisson_lib
 from tensorflow_probability.python.distributions import transformed_distribution as transformed_distribution_lib
 from tensorflow_probability.python.distributions import variational_gaussian_process as variational_gaussian_process_lib
 from tensorflow_probability.python.internal import distribution_util as dist_util
-from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.layers.internal import distribution_tensor_coercible as dtc
 from tensorflow_probability.python.layers.internal import tensor_tuple as tensor_tuple
 from tensorflow.python.keras.utils import tf_utils as keras_tf_utils  # pylint: disable=g-direct-tensorflow-import
@@ -97,7 +96,8 @@ def _event_size(event_shape, name=None):
       return tf.reduce_prod(event_shape)
 
 
-class DistributionLambda(tf.keras.layers.Lambda):
+# We mix-in `tf.Module` since Keras base class doesn't track tf.Modules.
+class DistributionLambda(tf.keras.layers.Lambda, tf.Module):
   """Keras layer enabling plumbing TFP distributions through Keras models.
 
   A `DistributionLambda` is minimially characterized by a function that returns
@@ -204,10 +204,14 @@ class DistributionLambda(tf.keras.layers.Lambda):
     super(DistributionLambda, self).__init__(_fn, **kwargs)
 
     # We need to ensure Keras tracks variables (eg, from activity regularizers
-    # for type-II MLE). Note: this must happen after the call to super.
+    # for type-II MLE). To accomplish this, we add the built distribution and
+    # kwargs as members so `vars` picks them up (this is how tf.Module
+    # implements its introspection).
     # Note also that we track all variables to support the user pattern:
     # `v.initializer for v in model.variable]`.
-    self._extra_variables = tensor_util.discover_variables(kwargs)
+    self._most_recently_built_distribution = None
+    self._kwargs = kwargs
+
     self._make_distribution_fn = make_distribution_fn
     self._convert_to_tensor_fn = convert_to_tensor_fn
 
@@ -215,6 +219,25 @@ class DistributionLambda(tf.keras.layers.Lambda):
     # API has a different way of injecting `_keras_history` than the
     # `keras.Sequential` way.
     self._enter_dunder_call = False
+
+  @property
+  def trainable_weights(self):
+    # We will append additional weights to what is already discovered from
+    # tensorflow/python/keras/engine/base_layer.py.
+    # Note: that in Keras-land "weights" is the source of truth for "variables."
+    from_keras = super(DistributionLambda, self).trainable_weights
+    from_module = list(tf.Module.trainable_variables.fget(self))
+    return self._dedup_weights(from_keras + from_module)
+
+  @property
+  def non_trainable_weights(self):
+    # We will append additional weights to what is already discovered from
+    # tensorflow/python/keras/engine/base_layer.py.
+    # Note: that in Keras-land "weights" is the source of truth for "variables."
+    from_keras = super(DistributionLambda, self).non_trainable_weights
+    from_module = [v for v in tf.Module.variables.fget(self)
+                   if not getattr(v, 'trainable', True)]
+    return self._dedup_weights(from_keras + from_module)
 
   def __call__(self, inputs, *args, **kwargs):
     self._enter_dunder_call = True
@@ -226,6 +249,9 @@ class DistributionLambda(tf.keras.layers.Lambda):
   def call(self, inputs, *args, **kwargs):
     distribution, value = super(DistributionLambda, self).call(
         inputs, *args, **kwargs)
+    # We always save the most recently built distribution for variable tracking
+    # purposes.
+    self._most_recently_built_distribution = distribution
     if self._enter_dunder_call:
       # Its critical to return both distribution and concretization
       # so Keras can inject `_keras_history` to both. This is what enables
@@ -1137,8 +1163,8 @@ class IndependentPoisson(DistributionLambda):
     return dict(list(base_config.items()) + list(config.items()))
 
 
-# We mix-in `tf.Module` since Keras `Regularizer` base class doesn't track
-# variables.
+# We mix-in `tf.Module` since Keras `Regularizer` base class tracks neither
+# tf.Variables nor tf.Modules.
 class KLDivergenceRegularizer(tf.keras.regularizers.Regularizer, tf.Module):
   """Regularizer that adds a KL divergence penalty to the model loss.
 

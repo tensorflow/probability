@@ -131,6 +131,9 @@ class EndToEndTest(test_util.TestCase):
         optimizer=tf.optimizers.Adam(learning_rate=0.5),
         loss=lambda x, rv_x: -rv_x.log_prob(x),
         metrics=[accuracy])
+
+    self.evaluate([v.initializer for v in vae_model.variables])
+
     vae_model.fit(self.x, self.x,
                   batch_size=25,
                   epochs=1,
@@ -291,6 +294,23 @@ class EndToEndTest(test_util.TestCase):
     yhat = vae_model(tf.convert_to_tensor(self.x_test))
     self.assertIsInstance(yhat, tfd.Independent)
     self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
+
+  def test_side_variable_is_auto_tracked(self):
+    # `s` is the "side variable".
+    s = tfp.util.TransformedVariable(1., tfb.Softplus())
+    prior = tfd.Normal(tf.Variable(0.), 1.)
+    linear_regression = tf.keras.Sequential([
+        tf.keras.layers.Dense(1),
+        tfp.layers.DistributionLambda(
+            lambda t: tfd.Normal(t, s),
+            activity_regularizer=tfpl.KLDivergenceRegularizer(prior)),
+    ])
+    linear_regression.build(tf.TensorShape([1, 3]))
+    self.assertLen(linear_regression.trainable_variables, 4)
+    self.assertIn(id(s.pretransformed_input),
+                  [id(x) for x in linear_regression.trainable_variables])
+    self.assertIn(id(prior.loc),
+                  [id(x) for x in linear_regression.trainable_variables])
 
 
 @test_util.test_graph_and_eager_modes
