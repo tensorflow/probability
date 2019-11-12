@@ -48,7 +48,7 @@ class ScaleMatvecLinearOperator(bijector.Bijector):
   bijector = ScaleMatvecLinearOperator(scale)
   # In this case, `forward` is equivalent to:
   # y = scale @ x
-  y = bijector.forward(x)  # [0., 4, 10]
+  y = bijector.forward(x)  # [1., 4, 9]
 
   tril = [[1., 0, 0],
           [2, 1, 0],
@@ -57,7 +57,7 @@ class ScaleMatvecLinearOperator(bijector.Bijector):
   bijector = ScaleMatvecLinearOperator(scale)
   # In this case, `forward` is equivalent to:
   # np.squeeze(np.matmul(tril, np.expand_dims(x, -1)), -1)
-  y = bijector.forward(x)  # [3., 7, 11]
+  y = bijector.forward(x)  # [1., 4, 10]
   ```
 
   """
