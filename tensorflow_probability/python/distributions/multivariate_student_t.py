@@ -142,13 +142,13 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
 
     Raises:
       TypeError: if not `scale.dtype.is_floating`.
-      ValueError: if not `scale.is_positive_definite`.
+      ValueError: if not `scale.is_non_singular`.
     """
     parameters = dict(locals())
     if not dtype_util.is_floating(scale.dtype):
       raise TypeError('`scale` must have floating-point dtype.')
-    if validate_args and not scale.is_positive_definite:
-      raise ValueError('`scale` must be positive definite.')
+    if validate_args and not scale.is_non_singular:
+      raise ValueError('`scale` must be non-singular.')
 
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([df, loc, scale], dtype_hint=tf.float32)

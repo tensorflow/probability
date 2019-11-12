@@ -128,7 +128,7 @@ class MultivariateStudentTTestFloat32StaticShape(
 
   def testNotPositiveDefinite(self):
     with self.assertRaisesRegexp(ValueError,
-                                 '`scale` must be positive definite.'):
+                                 '`scale` must be non-singular.'):
       tfd.MultivariateStudentTLinearOperator(
           loc=self._input([0.]),
           df=self._input(1.),
