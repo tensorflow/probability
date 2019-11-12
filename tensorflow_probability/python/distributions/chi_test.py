@@ -38,7 +38,7 @@ class ChiTest(test_util.TestCase):
     df = df.reshape((len(df), 1))
     x = x.reshape((1, len(x)))
 
-    chi = tfd.Chi(df=df)
+    chi = tfd.Chi(df=df, validate_args=True)
     expected_log_pdf = stats.chi.logpdf(x, df)
 
     log_pdf = chi.log_prob(x)
@@ -64,7 +64,7 @@ class ChiTest(test_util.TestCase):
     df = df.reshape((len(df), 1))
     x = x.reshape((1, len(x)))
 
-    chi = tfd.Chi(df=df)
+    chi = tfd.Chi(df=df, validate_args=True)
     expected_cdf = stats.chi.cdf(x, df)
 
     cdf = chi.cdf(x)
@@ -74,21 +74,21 @@ class ChiTest(test_util.TestCase):
   def testChiMean(self):
     df = np.arange(1, 6, dtype=np.float64)
     expected_mean = stats.chi.mean(df)
-    chi = tfd.Chi(df=df)
+    chi = tfd.Chi(df=df, validate_args=True)
     self.assertEqual(chi.mean().shape, df.shape)
     self.assertAllClose(self.evaluate(chi.mean()), expected_mean)
 
   def testChiVariance(self):
     df = np.arange(1, 6, dtype=np.float64)
     expected_variances = stats.chi.var(df)
-    chi = tfd.Chi(df=df)
+    chi = tfd.Chi(df=df, validate_args=True)
     self.assertEqual(chi.variance().shape, df.shape)
     self.assertAllClose(self.evaluate(chi.variance()), expected_variances)
 
   def testChiEntropy(self):
     df = np.arange(1, 6, dtype=np.float64)
     expected_entropy = stats.chi.entropy(df)
-    chi = tfd.Chi(df=df)
+    chi = tfd.Chi(df=df, validate_args=True)
     self.assertEqual(chi.entropy().shape, df.shape)
     self.assertAllClose(self.evaluate(chi.entropy()), expected_entropy)
 
@@ -102,8 +102,8 @@ class ChiTest(test_util.TestCase):
     a_df = a_df.reshape((len(a_df), 1))
     b_df = b_df.reshape((1, len(b_df)))
 
-    a = tfd.Chi(df=a_df)
-    b = tfd.Chi(df=b_df)
+    a = tfd.Chi(df=a_df, validate_args=True)
+    b = tfd.Chi(df=b_df, validate_args=True)
 
     true_kl = (0.5 * special.digamma(0.5 * a_df) * (a_df - b_df) +
                special.gammaln(0.5 * b_df) - special.gammaln(0.5 * a_df))

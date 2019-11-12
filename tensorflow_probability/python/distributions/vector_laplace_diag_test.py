@@ -113,12 +113,15 @@ class VectorLaplaceDiagTest(test_util.TestCase):
     self.assertAllClose([cov_mat, cov_mat], sample_cov, atol=0.10, rtol=0.05)
 
   def testCovariance(self):
-    vla = tfd.VectorLaplaceDiag(loc=tf.zeros([2, 3], dtype=tf.float32))
+    vla = tfd.VectorLaplaceDiag(
+        loc=tf.zeros([2, 3], dtype=tf.float32), validate_args=True)
     self.assertAllClose(2. * np.diag(np.ones([3], dtype=np.float32)),
                         self.evaluate(vla.covariance()))
 
     vla = tfd.VectorLaplaceDiag(
-        loc=tf.zeros([3], dtype=tf.float32), scale_identity_multiplier=[3., 2.])
+        loc=tf.zeros([3], dtype=tf.float32),
+        scale_identity_multiplier=[3., 2.],
+        validate_args=True)
     self.assertAllEqual([2], vla.batch_shape)
     self.assertAllEqual([3], vla.event_shape)
     self.assertAllClose(
@@ -127,7 +130,9 @@ class VectorLaplaceDiagTest(test_util.TestCase):
         self.evaluate(vla.covariance()))
 
     vla = tfd.VectorLaplaceDiag(
-        loc=tf.zeros([3], dtype=tf.float32), scale_diag=[[3., 2, 1], [4, 5, 6]])
+        loc=tf.zeros([3], dtype=tf.float32),
+        scale_diag=[[3., 2, 1], [4, 5, 6]],
+        validate_args=True)
     self.assertAllEqual([2], vla.batch_shape)
     self.assertAllEqual([3], vla.event_shape)
     self.assertAllClose(
@@ -136,34 +141,44 @@ class VectorLaplaceDiagTest(test_util.TestCase):
         self.evaluate(vla.covariance()))
 
   def testVariance(self):
-    vla = tfd.VectorLaplaceDiag(loc=tf.zeros([2, 3], dtype=tf.float32))
+    vla = tfd.VectorLaplaceDiag(
+        loc=tf.zeros([2, 3], dtype=tf.float32), validate_args=True)
     self.assertAllClose(2. * np.ones([3], dtype=np.float32),
                         self.evaluate(vla.variance()))
 
     vla = tfd.VectorLaplaceDiag(
-        loc=tf.zeros([3], dtype=tf.float32), scale_identity_multiplier=[3., 2.])
+        loc=tf.zeros([3], dtype=tf.float32),
+        scale_identity_multiplier=[3., 2.],
+        validate_args=True)
     self.assertAllClose(2. * np.array([[3., 3, 3], [2, 2, 2]])**2.,
                         self.evaluate(vla.variance()))
 
     vla = tfd.VectorLaplaceDiag(
-        loc=tf.zeros([3], dtype=tf.float32), scale_diag=[[3., 2, 1], [4, 5, 6]])
+        loc=tf.zeros([3], dtype=tf.float32),
+        scale_diag=[[3., 2, 1], [4, 5, 6]],
+        validate_args=True)
     self.assertAllClose(2. * np.array([[3., 2, 1], [4, 5, 6]])**2.,
                         self.evaluate(vla.variance()))
 
   def testStddev(self):
-    vla = tfd.VectorLaplaceDiag(loc=tf.zeros([2, 3], dtype=tf.float32))
+    vla = tfd.VectorLaplaceDiag(
+        loc=tf.zeros([2, 3], dtype=tf.float32), validate_args=True)
     self.assertAllClose(
         np.sqrt(2) * np.ones([3], dtype=np.float32),
         self.evaluate(vla.stddev()))
 
     vla = tfd.VectorLaplaceDiag(
-        loc=tf.zeros([3], dtype=tf.float32), scale_identity_multiplier=[3., 2.])
+        loc=tf.zeros([3], dtype=tf.float32),
+        scale_identity_multiplier=[3., 2.],
+        validate_args=True)
     self.assertAllClose(
         np.sqrt(2) * np.array([[3., 3, 3], [2, 2, 2]]),
         self.evaluate(vla.stddev()))
 
     vla = tfd.VectorLaplaceDiag(
-        loc=tf.zeros([3], dtype=tf.float32), scale_diag=[[3., 2, 1], [4, 5, 6]])
+        loc=tf.zeros([3], dtype=tf.float32),
+        scale_diag=[[3., 2, 1], [4, 5, 6]],
+        validate_args=True)
     self.assertAllClose(
         np.sqrt(2) * np.array([[3., 2, 1], [4, 5, 6]]),
         self.evaluate(vla.stddev()))

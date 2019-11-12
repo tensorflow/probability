@@ -54,7 +54,8 @@ class _GaussianProcessTest(object):
         kernel,
         batched_index_points,
         observation_noise_variance=observation_noise_variance,
-        jitter=1e-5)
+        jitter=1e-5,
+        validate_args=True)
 
     batch_shape = [2, 4, 3, 6]
     event_shape = [25]
@@ -103,7 +104,8 @@ class _GaussianProcessTest(object):
         kernel,
         index_points,
         observation_noise_variance=observation_noise_variance,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     def _kernel_fn(x, y):
       return amp ** 2 * np.exp(-.5 * (np.squeeze((x - y)**2)) / (len_scale**2))
@@ -122,7 +124,8 @@ class _GaussianProcessTest(object):
     mean_fn = lambda x: x[:, 0]**2
     kernel = psd_kernels.ExponentiatedQuadratic()
     index_points = np.expand_dims(np.random.uniform(-1., 1., 10), -1)
-    gp = tfd.GaussianProcess(kernel, index_points, mean_fn=mean_fn)
+    gp = tfd.GaussianProcess(
+        kernel, index_points, mean_fn=mean_fn, validate_args=True)
     expected_mean = mean_fn(index_points)
     self.assertAllClose(expected_mean,
                         self.evaluate(gp.mean()))
@@ -142,7 +145,8 @@ class _GaussianProcessTest(object):
     kernel_1 = psd_kernels.ExponentiatedQuadratic()
     kernel_2 = psd_kernels.ExpSinSquared()
 
-    gp1 = tfd.GaussianProcess(kernel_1, index_points_1, mean_fn, jitter=1e-5)
+    gp1 = tfd.GaussianProcess(
+        kernel_1, index_points_1, mean_fn, jitter=1e-5, validate_args=True)
     gp2 = gp1.copy(index_points=index_points_2,
                    kernel=kernel_2)
 
@@ -185,7 +189,8 @@ class _GaussianProcessTest(object):
         kernel=kernel,
         mean_fn=mean_fn,
         observation_noise_variance=observation_noise_variance,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     index_points = np.random.uniform(-1., 1., [10, 1])
 
@@ -213,7 +218,8 @@ class _GaussianProcessTest(object):
       gp.mean()
 
   def testMarginalHasCorrectTypes(self):
-    gp = tfd.GaussianProcess(kernel=psd_kernels.ExponentiatedQuadratic())
+    gp = tfd.GaussianProcess(
+        kernel=psd_kernels.ExponentiatedQuadratic(), validate_args=True)
 
     self.assertIsInstance(
         gp.get_marginal_distribution(

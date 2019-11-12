@@ -536,7 +536,7 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
     cov = tf.matmul(x, x, transpose_b=True)
     chol = tf.linalg.cholesky(cov)
     loc = tf.random.normal([4, 1, 3, 1])
-    mvn = tfd.MultivariateNormalTriL(loc, chol)
+    mvn = tfd.MultivariateNormalTriL(loc, chol, validate_args=True)
     self.assertAllEqual((4, 5, 3), mvn.batch_shape)
     self.assertAllEqual((2,), mvn.event_shape)
     mvn2 = mvn[:, 3:, ..., ::-1, tf.newaxis]

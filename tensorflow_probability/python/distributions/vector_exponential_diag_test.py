@@ -106,13 +106,16 @@ class VectorExponentialDiagTest(test_util.TestCase):
     self.assertAllClose([cov_mat, cov_mat], sample_cov, atol=0.10, rtol=0.05)
 
   def testCovariance(self):
-    vex = tfd.VectorExponentialDiag(loc=tf.ones([2, 3], dtype=tf.float32))
+    vex = tfd.VectorExponentialDiag(
+        loc=tf.ones([2, 3], dtype=tf.float32), validate_args=True)
     self.assertAllClose(
         np.diag(np.ones([3], dtype=np.float32)),
         self.evaluate(vex.covariance()))
 
     vex = tfd.VectorExponentialDiag(
-        loc=tf.ones([3], dtype=tf.float32), scale_identity_multiplier=[3., 2.])
+        loc=tf.ones([3], dtype=tf.float32),
+        scale_identity_multiplier=[3., 2.],
+        validate_args=True)
     self.assertAllEqual([2], vex.batch_shape)
     self.assertAllEqual([3], vex.event_shape)
     self.assertAllClose(
@@ -121,7 +124,9 @@ class VectorExponentialDiagTest(test_util.TestCase):
         self.evaluate(vex.covariance()))
 
     vex = tfd.VectorExponentialDiag(
-        loc=tf.ones([3], dtype=tf.float32), scale_diag=[[3., 2, 1], [4, 5, 6]])
+        loc=tf.ones([3], dtype=tf.float32),
+        scale_diag=[[3., 2, 1], [4, 5, 6]],
+        validate_args=True)
     self.assertAllEqual([2], vex.batch_shape)
     self.assertAllEqual([3], vex.event_shape)
     self.assertAllClose(
@@ -130,32 +135,42 @@ class VectorExponentialDiagTest(test_util.TestCase):
         self.evaluate(vex.covariance()))
 
   def testVariance(self):
-    vex = tfd.VectorExponentialDiag(loc=tf.zeros([2, 3], dtype=tf.float32))
+    vex = tfd.VectorExponentialDiag(
+        loc=tf.zeros([2, 3], dtype=tf.float32), validate_args=True)
     self.assertAllClose(
         np.ones([3], dtype=np.float32), self.evaluate(vex.variance()))
 
     vex = tfd.VectorExponentialDiag(
-        loc=tf.ones([3], dtype=tf.float32), scale_identity_multiplier=[3., 2.])
+        loc=tf.ones([3], dtype=tf.float32),
+        scale_identity_multiplier=[3., 2.],
+        validate_args=True)
     self.assertAllClose(
         np.array([[3., 3, 3], [2., 2, 2]])**2., self.evaluate(vex.variance()))
 
     vex = tfd.VectorExponentialDiag(
-        loc=tf.ones([3], dtype=tf.float32), scale_diag=[[3., 2, 1], [4., 5, 6]])
+        loc=tf.ones([3], dtype=tf.float32),
+        scale_diag=[[3., 2, 1], [4., 5, 6]],
+        validate_args=True)
     self.assertAllClose(
         np.array([[3., 2, 1], [4., 5, 6]])**2., self.evaluate(vex.variance()))
 
   def testStddev(self):
-    vex = tfd.VectorExponentialDiag(loc=tf.zeros([2, 3], dtype=tf.float32))
+    vex = tfd.VectorExponentialDiag(
+        loc=tf.zeros([2, 3], dtype=tf.float32), validate_args=True)
     self.assertAllClose(
         np.ones([3], dtype=np.float32), self.evaluate(vex.stddev()))
 
     vex = tfd.VectorExponentialDiag(
-        loc=tf.zeros([3], dtype=tf.float32), scale_identity_multiplier=[3., 2.])
+        loc=tf.zeros([3], dtype=tf.float32),
+        scale_identity_multiplier=[3., 2.],
+        validate_args=True)
     self.assertAllClose(
         np.array([[3., 3, 3], [2., 2, 2]]), self.evaluate(vex.stddev()))
 
     vex = tfd.VectorExponentialDiag(
-        loc=tf.zeros([3], dtype=tf.float32), scale_diag=[[3., 2, 1], [4, 5, 6]])
+        loc=tf.zeros([3], dtype=tf.float32),
+        scale_diag=[[3., 2, 1], [4, 5, 6]],
+        validate_args=True)
     self.assertAllClose(
         np.array([[3., 2, 1], [4., 5, 6]]), self.evaluate(vex.stddev()))
 

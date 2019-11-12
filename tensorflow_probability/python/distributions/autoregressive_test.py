@@ -44,7 +44,9 @@ class AutogressiveTest(test_util.VectorDistributionTestHelpers,
       scale = tf.exp(affine_bijector.forward(samples))
       return tfd.Independent(
           tfd.Normal(loc=0., scale=scale, validate_args=True),
-          reinterpreted_batch_ndims=1)
+          reinterpreted_batch_ndims=1,
+          validate_args=True)
+
     return _fn
 
   def testSampleAndLogProbConsistency(self):
@@ -52,7 +54,8 @@ class AutogressiveTest(test_util.VectorDistributionTestHelpers,
     event_size = 2
     batch_event_shape = np.concatenate([batch_shape, [event_size]], axis=0)
     sample0 = tf.zeros(batch_event_shape)
-    affine = tfb.Affine(scale_tril=self._random_scale_tril(event_size))
+    affine = tfb.Affine(
+        scale_tril=self._random_scale_tril(event_size), validate_args=True)
     ar = tfd.Autoregressive(
         self._normal_fn(affine), sample0, validate_args=True)
     if tf.executing_eagerly():
@@ -73,7 +76,8 @@ class AutogressiveTest(test_util.VectorDistributionTestHelpers,
     event_size = np.int32(2)
     batch_event_shape = np.concatenate([batch_shape, [event_size]], axis=0)
     sample0 = tf.zeros(batch_event_shape)
-    affine = tfb.Affine(scale_tril=self._random_scale_tril(event_size))
+    affine = tfb.Affine(
+        scale_tril=self._random_scale_tril(event_size), validate_args=True)
     ar = tfd.Autoregressive(
         self._normal_fn(affine), sample0, validate_args=True)
     ar_flow = tfb.MaskedAutoregressiveFlow(

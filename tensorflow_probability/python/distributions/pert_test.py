@@ -46,14 +46,20 @@ class PERTTest(test_util.TestCase):
 
   # Shape and broadcast testing
   def testPertShape(self):
-    dist = tfd.PERT(low=[3.0], peak=[10.0], high=[11.0], temperature=[4.0])
+    dist = tfd.PERT(
+        low=[3.0],
+        peak=[10.0],
+        high=[11.0],
+        temperature=[4.0],
+        validate_args=True)
     self.assertEqual(([1]), self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([1]), dist.batch_shape)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), dist.event_shape)
 
   def testBroadcastingtemperature(self):
-    dist = tfd.PERT(low=1., peak=2., high=3., temperature=[1., 4., 10.])
+    dist = tfd.PERT(
+        low=1., peak=2., high=3., temperature=[1., 4., 10.], validate_args=True)
     self.assertEqual([3], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([3]), dist.batch_shape)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
@@ -61,7 +67,11 @@ class PERTTest(test_util.TestCase):
 
   def testBroadcastingParam(self):
     dist = tfd.PERT(
-        low=1., peak=[2., 3., 4., 5., 6., 7., 8., 9.], high=10., temperature=4.)
+        low=1.,
+        peak=[2., 3., 4., 5., 6., 7., 8., 9.],
+        high=10.,
+        temperature=4.,
+        validate_args=True)
     self.assertEqual([8], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([8]), dist.batch_shape)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
@@ -80,7 +90,8 @@ class PERTTest(test_util.TestCase):
     self.assertEqual(tf.TensorShape([]), dist.event_shape)
 
   def testEdgeRangeOutput(self):
-    dist = tfd.PERT(low=3.0, peak=10.0, high=11.0, temperature=4.0)
+    dist = tfd.PERT(
+        low=3.0, peak=10.0, high=11.0, temperature=4.0, validate_args=True)
     self.assertEqual(True, self.evaluate(tf.math.is_nan(dist.prob(1.))))
     self.assertEqual(True, self.evaluate(tf.math.is_nan(dist.log_prob(1.))))
     self.assertEqual(1., self.evaluate(dist.cdf(11.)))
@@ -97,13 +108,13 @@ class PERTTest(test_util.TestCase):
   # Statistical property testing
   def testMean(self):
     temperature, low, peak, high, a, b = self._generate_boilerplate_param()
-    dist = tfd.PERT(low, peak, high, temperature)
+    dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
     expected_mean = sp_stats.beta.mean(a, b, low, high - low)
     self.assertAllClose(expected_mean, self.evaluate(dist.mean()))
 
   def testVariance(self):
     temperature, low, peak, high, a, b = self._generate_boilerplate_param()
-    dist = tfd.PERT(low, peak, high, temperature)
+    dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
     expected_var = sp_stats.beta.var(a, b, low, high - low)
     self.assertAllClose(expected_var, self.evaluate(dist.variance()))
 
@@ -111,7 +122,7 @@ class PERTTest(test_util.TestCase):
   def testSampleEmpiricalCDF(self):
     num_samples = 300000
     temperature, low, peak, high = 2., 1., 7., 10.
-    dist = tfd.PERT(low, peak, high, temperature)
+    dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
     samples = dist.sample(num_samples, seed=test_util.test_seed())
 
     check_cdf_agrees = st.assert_true_cdf_equal_by_dkwm(

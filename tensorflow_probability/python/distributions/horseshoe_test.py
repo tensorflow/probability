@@ -38,7 +38,9 @@ class _HorseshoeTest(object):
     self.assertAllEqual(expected, self.evaluate(scale_shape))
     scale = self._test_param(np.ones(self.evaluate(scale_shape)))
     self.assertAllEqual(
-        expected, self.evaluate(tf.shape(tfd.Horseshoe(scale).sample())))
+        expected,
+        self.evaluate(
+            tf.shape(tfd.Horseshoe(scale, validate_args=True).sample())))
 
   def _test_param_static_shapes(self, sample_shape, expected):
     param_shapes = tfd.Horseshoe.param_static_shapes(sample_shape)
@@ -61,7 +63,7 @@ class _HorseshoeTest(object):
   def testHorseshoeMeanAndMode(self):
     scale = self._test_param([11., 12., 13.])
 
-    dist = tfd.Horseshoe(scale=scale)
+    dist = tfd.Horseshoe(scale=scale, validate_args=True)
 
     self.assertAllEqual((3,), self.evaluate(dist.mean()).shape)
     self.assertAllEqual([0., 0., 0.], self.evaluate(dist.mean()))
@@ -72,7 +74,7 @@ class _HorseshoeTest(object):
   def testHorseshoeSample(self):
     scale = self.dtype(2.6)
     n = 100000
-    dist = tfd.Horseshoe(scale=scale)
+    dist = tfd.Horseshoe(scale=scale, validate_args=True)
 
     sample = dist.sample(n, seed=test_util.test_seed())
     self.assertEqual(self.evaluate(sample).shape, (n,))
@@ -96,7 +98,7 @@ class _HorseshoeTest(object):
     batch_size = 2
     scale = self._test_param([[2.8, 3.1]] * batch_size)
     n = 100000
-    dist = tfd.Horseshoe(scale=scale)
+    dist = tfd.Horseshoe(scale=scale, validate_args=True)
 
     sample = dist.sample(n, seed=test_util.test_seed())
     self.assertEqual(self.evaluate(sample).shape, (n, batch_size, 2))
@@ -123,7 +125,7 @@ class _HorseshoeTest(object):
 
   def testHorseshoeShape(self):
     scale = self._test_param([6.0] * 5)
-    dist = tfd.Horseshoe(scale=scale)
+    dist = tfd.Horseshoe(scale=scale, validate_args=True)
 
     self.assertEqual(self.evaluate(dist.batch_shape_tensor()), [5])
     if self.use_static_shape or tf.executing_eagerly():
@@ -144,7 +146,7 @@ class _HorseshoeTest(object):
     """
     scale = self._test_param([.5, .8, 1.0, 2.0, 3.0])
     x = self._test_param(np.logspace(-8, 8, 9).reshape((-1, 1)))
-    horseshoe = tfd.Horseshoe(scale=scale)
+    horseshoe = tfd.Horseshoe(scale=scale, validate_args=True)
 
     log_pdf = horseshoe.log_prob(x)
     self._test_batch_shapes(horseshoe, log_pdf[0])
@@ -162,7 +164,7 @@ class _HorseshoeTest(object):
 
   def testHorseshoeLogPDFWithMonteCarlo(self):
     scale = self._test_param([.5, .8, 1.0, 2.0, 3.0])
-    horseshoe = tfd.Horseshoe(scale=scale)
+    horseshoe = tfd.Horseshoe(scale=scale, validate_args=True)
     x = self._test_param(np.linspace(.1, 10.1, 11).reshape((-1, 1)))
     horseshoe_log_pdf = self.evaluate(horseshoe.log_prob(x))
     num_mc_samples = int(1.5e6)
@@ -184,7 +186,8 @@ class _HorseshoeTest(object):
         horseshoe_log_prob,
         horseshoe_log_prob_gradient,
     ] = tfp.math.value_and_gradient(
-        lambda x_: tfd.Horseshoe(scale=scale).log_prob(x_), x)
+        lambda x_: tfd.Horseshoe(scale=scale, validate_args=True).log_prob(x_),
+        x)
     # The expected derivative of log_prob can be explicitly derived from
     # PDF formula as shown in Horseshoe class docstring; it will have a
     # relatively simple form assuming PDF is known.
@@ -213,7 +216,7 @@ class _HorseshoeTest(object):
     Returns:
       scale_mle: max log-likelihood estimate for scale.
     """
-    dist = tfd.Horseshoe(scale=scale_candidates)
+    dist = tfd.Horseshoe(scale=scale_candidates, validate_args=True)
     dims = tf.shape(scale_candidates)
     num_candidates = dims[-1]
     original_batch_shape = dims[:-1]

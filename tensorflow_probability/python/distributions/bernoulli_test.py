@@ -33,7 +33,7 @@ from tensorflow_probability.python.internal import test_util
 def make_bernoulli(batch_shape, dtype=tf.int32):
   p = np.random.uniform(size=list(batch_shape))
   p = tf.constant(p, dtype=tf.float32)
-  return tfd.Bernoulli(probs=p, dtype=dtype)
+  return tfd.Bernoulli(probs=p, dtype=dtype, validate_args=True)
 
 
 def entropy(p):
@@ -46,17 +46,17 @@ class BernoulliTest(test_util.TestCase):
 
   def testP(self):
     p = [0.2, 0.4]
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     self.assertAllClose(p, self.evaluate(dist.probs))
 
   def testLogits(self):
     logits = [-42., 42.]
-    dist = tfd.Bernoulli(logits=logits)
+    dist = tfd.Bernoulli(logits=logits, validate_args=True)
     self.assertAllClose(logits, self.evaluate(dist.logits))
     self.assertAllClose(sp_special.expit(logits), self.evaluate(dist.probs))
 
     p = [0.01, 0.99, 0.42]
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     self.assertAllClose(sp_special.logit(p), self.evaluate(dist.logits))
 
   def testInvalidP(self):
@@ -74,7 +74,7 @@ class BernoulliTest(test_util.TestCase):
 
     valid_ps = [0.0, 0.5, 1.0]
     for p in valid_ps:
-      dist = tfd.Bernoulli(probs=p)
+      dist = tfd.Bernoulli(probs=p, validate_args=True)
       self.assertEqual(p, self.evaluate(dist.probs))  # Should not fail
 
   def testShapes(self):
@@ -96,9 +96,9 @@ class BernoulliTest(test_util.TestCase):
     self.assertEqual(dist.probs.dtype, dist.stddev().dtype)
     self.assertEqual(dist.probs.dtype, dist.entropy().dtype)
     self.assertEqual(dist.probs.dtype, dist.prob(0).dtype)
-    self.assertEqual(dist.probs.dtype, dist.prob(0.5).dtype)
+    self.assertEqual(dist.probs.dtype, dist.prob(1).dtype)
     self.assertEqual(dist.probs.dtype, dist.log_prob(0).dtype)
-    self.assertEqual(dist.probs.dtype, dist.log_prob(0.5).dtype)
+    self.assertEqual(dist.probs.dtype, dist.log_prob(1).dtype)
 
     dist64 = make_bernoulli([], tf.int64)
     self.assertEqual(dist64.dtype, tf.int64)
@@ -106,11 +106,11 @@ class BernoulliTest(test_util.TestCase):
     self.assertEqual(dist64.dtype, dist64.mode().dtype)
 
   def testFloatMode(self):
-    dist = tfd.Bernoulli(probs=.6, dtype=tf.float32)
+    dist = tfd.Bernoulli(probs=.6, dtype=tf.float32, validate_args=True)
     self.assertEqual(np.float32(1), self.evaluate(dist.mode()))
 
   def _testPmf(self, **kwargs):
-    dist = tfd.Bernoulli(**kwargs)
+    dist = tfd.Bernoulli(validate_args=True, **kwargs)
     # pylint: disable=bad-continuation
     xs = [
         0,
@@ -134,7 +134,7 @@ class BernoulliTest(test_util.TestCase):
 
   def testPmfCorrectBroadcastDynamicShape(self):
     p = tf1.placeholder_with_default([0.2, 0.3, 0.4], shape=None)
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     event1 = [1, 0, 1]
     event2 = [[1, 0, 1]]
     self.assertAllClose(
@@ -166,7 +166,7 @@ class BernoulliTest(test_util.TestCase):
 
   def testBroadcasting(self):
     probs = lambda p: tf1.placeholder_with_default(p, shape=None)
-    dist = lambda p: tfd.Bernoulli(probs=probs(p))
+    dist = lambda p: tfd.Bernoulli(probs=probs(p), validate_args=True)
     self.assertAllClose(np.log(0.5), self.evaluate(dist(0.5).log_prob(1)))
     self.assertAllClose(
         np.log([0.5, 0.5, 0.5]), self.evaluate(dist(0.5).log_prob([1, 1, 1])))
@@ -175,29 +175,29 @@ class BernoulliTest(test_util.TestCase):
 
   def testPmfShapes(self):
     probs = lambda p: tf1.placeholder_with_default(p, shape=None)
-    dist = lambda p: tfd.Bernoulli(probs=probs(p))
+    dist = lambda p: tfd.Bernoulli(probs=probs(p), validate_args=True)
     self.assertEqual(
         2, len(self.evaluate(dist([[0.5], [0.5]]).log_prob(1)).shape))
 
-    dist = tfd.Bernoulli(probs=0.5)
+    dist = tfd.Bernoulli(probs=0.5, validate_args=True)
     self.assertEqual(2, len(self.evaluate(dist.log_prob([[1], [1]])).shape))
 
-    dist = tfd.Bernoulli(probs=0.5)
+    dist = tfd.Bernoulli(probs=0.5, validate_args=True)
     self.assertEqual((), dist.log_prob(1).shape)
     self.assertEqual((1), dist.log_prob([1]).shape)
     self.assertEqual((2, 1), dist.log_prob([[1], [1]]).shape)
 
-    dist = tfd.Bernoulli(probs=[[0.5], [0.5]])
+    dist = tfd.Bernoulli(probs=[[0.5], [0.5]], validate_args=True)
     self.assertEqual((2, 1), dist.log_prob(1).shape)
 
   def testBoundaryConditions(self):
-    dist = tfd.Bernoulli(probs=1.0)
+    dist = tfd.Bernoulli(probs=1.0, validate_args=True)
     self.assertAllClose(np.nan, self.evaluate(dist.log_prob(0)))
     self.assertAllClose([np.nan], [self.evaluate(dist.log_prob(1))])
 
   def testEntropyNoBatch(self):
     p = 0.2
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     self.assertAllClose(self.evaluate(dist.entropy()), entropy(p))
 
   def testEntropyWithBatch(self):
@@ -210,7 +210,7 @@ class BernoulliTest(test_util.TestCase):
 
   def testSampleN(self):
     p = [0.2, 0.6]
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     n = 100000
     samples = dist.sample(n)
     tensorshape_util.set_shape(samples, [n, 2])
@@ -225,19 +225,19 @@ class BernoulliTest(test_util.TestCase):
     self.assertEqual(set([0, 1]), set(sample_values.flatten()))
     # In this test we're just interested in verifying there isn't a crash
     # owing to mismatched types. b/30940152
-    dist = tfd.Bernoulli(np.log([.2, .4]))
+    dist = tfd.Bernoulli(np.log([.2, .4]), validate_args=True)
     x = dist.sample(1, seed=test_util.test_seed())
     self.assertAllEqual((1, 2), tensorshape_util.as_list(x.shape))
 
   def testNotReparameterized(self):
     p = tf.constant([0.2, 0.6])
     _, grad_p = tfp.math.value_and_gradient(
-        lambda x: tfd.Bernoulli(probs=x).sample(100), p)
+        lambda x: tfd.Bernoulli(probs=x, validate_args=True).sample(100), p)
     self.assertIsNone(grad_p)
 
   def testSampleDeterministicScalarVsVector(self):
     p = [0.2, 0.6]
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     n = 1000
     def _maybe_seed():
       if tf.executing_eagerly():
@@ -255,13 +255,13 @@ class BernoulliTest(test_util.TestCase):
 
   def testMean(self):
     p = np.array([[0.2, 0.7], [0.5, 0.4]], dtype=np.float32)
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     self.assertAllEqual(self.evaluate(dist.mean()), p)
 
   def testVarianceAndStd(self):
     var = lambda p: p * (1. - p)
     p = [[0.2, 0.7], [0.5, 0.4]]
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     self.assertAllClose(
         self.evaluate(dist.variance()),
         np.array([[var(0.2), var(0.7)], [var(0.5), var(0.4)]],
@@ -277,8 +277,8 @@ class BernoulliTest(test_util.TestCase):
     a_p = np.array([0.6] * batch_size, dtype=np.float32)
     b_p = np.array([0.4] * batch_size, dtype=np.float32)
 
-    a = tfd.Bernoulli(probs=a_p)
-    b = tfd.Bernoulli(probs=b_p)
+    a = tfd.Bernoulli(probs=a_p, validate_args=True)
+    b = tfd.Bernoulli(probs=b_p, validate_args=True)
 
     kl = tfd.kl_divergence(a, b)
     kl_val = self.evaluate(kl)
@@ -325,7 +325,7 @@ class BernoulliSlicingTest(test_util.TestCase):
 
   def testScalarSlice(self):
     logits = self.evaluate(tf.random.normal([]))
-    dist = tfd.Bernoulli(logits=logits)
+    dist = tfd.Bernoulli(logits=logits, validate_args=True)
     self.assertAllEqual([], dist.batch_shape)
     self.assertAllEqual([1], dist[tf.newaxis].batch_shape)
     self.assertAllEqual([], dist[...].batch_shape)
@@ -333,10 +333,11 @@ class BernoulliSlicingTest(test_util.TestCase):
 
   def testSlice(self):
     logits = self.evaluate(tf.random.normal([20, 3, 1, 5]))
-    dist = tfd.Bernoulli(logits=logits)
+    dist = tfd.Bernoulli(logits=logits, validate_args=True)
     batch_shape = tensorshape_util.as_list(dist.batch_shape)
     dist_noshape = tfd.Bernoulli(
-        logits=tf1.placeholder_with_default(logits, shape=None))
+        logits=tf1.placeholder_with_default(logits, shape=None),
+        validate_args=True)
 
     def check(*slicers):
       for ds, assert_static_shape in (dist, True), (dist_noshape, False):
@@ -382,7 +383,7 @@ class BernoulliSlicingTest(test_util.TestCase):
   def testSliceSequencePreservesOrigVarGradLinkage(self):
     logits = tf.Variable(tf.random.normal([20, 3, 1, 5]))
     self.evaluate(logits.initializer)
-    dist = tfd.Bernoulli(logits=logits)
+    dist = tfd.Bernoulli(logits=logits, validate_args=True)
     for slicer in [make_slicer[:5], make_slicer[..., -1], make_slicer[:, 1::2]]:
       with tf.GradientTape() as tape:
         dist = slicer(dist)
@@ -395,7 +396,7 @@ class BernoulliSlicingTest(test_util.TestCase):
   def testSliceThenCopyPreservesOrigVarGradLinkage(self):
     logits = tf.Variable(tf.random.normal([20, 3, 1, 5]))
     self.evaluate(logits.initializer)
-    dist = tfd.Bernoulli(logits=logits)
+    dist = tfd.Bernoulli(logits=logits, validate_args=True)
     dist = dist[:5]
     with tf.GradientTape() as tape:
       dist = dist.copy(name='bern2')
@@ -417,14 +418,14 @@ class BernoulliSlicingTest(test_util.TestCase):
   def testCopyUnknownRank(self):
     logits = tf1.placeholder_with_default(
         tf.random.normal([20, 3, 1, 5]), shape=None)
-    dist = tfd.Bernoulli(logits=logits, name='b1')
+    dist = tfd.Bernoulli(logits=logits, name='b1', validate_args=True)
     self.assertIn('b1', dist.name)
     dist = dist.copy(name='b2')
     self.assertIn('b2', dist.name)
 
   def testSliceCopyOverrideNameSliceAgainCopyOverrideLogitsSliceAgain(self):
     logits = tf.random.normal([20, 3, 2, 5])
-    dist = tfd.Bernoulli(logits=logits, name='b1')
+    dist = tfd.Bernoulli(logits=logits, name='b1', validate_args=True)
     self.assertIn('b1', dist.name)
     dist = dist[:10].copy(name='b2')
     self.assertAllEqual((10, 3, 2, 5), dist.batch_shape)
@@ -437,7 +438,8 @@ class BernoulliSlicingTest(test_util.TestCase):
     self.assertIn('b3', dist.name)
 
   def testDocstrSliceExample(self):
-    b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]))  # batch shape [3, 5, 7, 9]
+    # batch shape [3, 5, 7, 9]
+    b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]), validate_args=True)
     self.assertAllEqual((3, 5, 7, 9), b.batch_shape)
     b2 = b[:, tf.newaxis, ..., -2:, 1::2]  # batch shape [3, 1, 5, 2, 4]
     self.assertAllEqual((3, 1, 5, 2, 4), b2.batch_shape)

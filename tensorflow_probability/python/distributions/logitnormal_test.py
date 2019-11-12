@@ -35,7 +35,7 @@ class LogitNormalTest(test_util.TestCase):
 
   def testLogitNormalMeanApprox(self):
     loc, scale = [0., 1.5], 0.4
-    dist = tfd.LogitNormal(loc=loc, scale=scale)
+    dist = tfd.LogitNormal(loc=loc, scale=scale, validate_args=True)
     x = dist.sample(6000, seed=test_util.test_seed())
     mean_sample = tf.reduce_mean(x, axis=0)
     [mean_sample_, mean_approx_] = self.evaluate([
@@ -49,14 +49,14 @@ class LogitNormalTest(test_util.TestCase):
     mu_b = np.array([-3.0] * batch_size)
     sigma_b = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
 
-    ln_a = tfd.LogitNormal(loc=mu_a, scale=sigma_a)
-    ln_b = tfd.LogitNormal(loc=mu_b, scale=sigma_b)
+    ln_a = tfd.LogitNormal(loc=mu_a, scale=sigma_a, validate_args=True)
+    ln_b = tfd.LogitNormal(loc=mu_b, scale=sigma_b, validate_args=True)
 
     kl = tfd.kl_divergence(ln_a, ln_b)
     kl_val = self.evaluate(kl)
 
-    normal_a = tfd.Normal(loc=mu_a, scale=sigma_a)
-    normal_b = tfd.Normal(loc=mu_b, scale=sigma_b)
+    normal_a = tfd.Normal(loc=mu_a, scale=sigma_a, validate_args=True)
+    normal_b = tfd.Normal(loc=mu_b, scale=sigma_b, validate_args=True)
     kl_expected_from_normal = tfd.kl_divergence(normal_a, normal_b)
 
     kl_expected_from_formula = ((mu_a - mu_b)**2 / (2 * sigma_b**2) + 0.5 * (

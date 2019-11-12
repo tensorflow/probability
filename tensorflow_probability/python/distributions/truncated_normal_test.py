@@ -125,8 +125,9 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     low = tf.zeros(tn_param_shapes['low'])
     sample_shape = self.evaluate(
         tf.shape(
-            input=tfd.TruncatedNormal(loc=loc, scale=scale, low=low,
-                                      high=high).sample()))
+            input=tfd.TruncatedNormal(
+                loc=loc, scale=scale, low=low, high=high,
+                validate_args=True).sample()))
     self.assertAllEqual(desired_shape, sample_shape)
 
   def testParamShapes(self):
@@ -146,7 +147,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     scale = tf1.placeholder_with_default(input=[1., 2], shape=None)
     ub = tf1.placeholder_with_default(input=[10., 11.], shape=None)
     lb = tf1.placeholder_with_default(input=[-1.], shape=None)
-    dist = tfd.TruncatedNormal(loc, scale, lb, ub)
+    dist = tfd.TruncatedNormal(loc, scale, lb, ub, validate_args=True)
 
     self.assertEqual(dist.batch_shape, tf.TensorShape(None))
     self.assertEqual(dist.event_shape, ())
@@ -155,7 +156,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     self.assertAllEqual(self.evaluate(dist.sample(5)).shape, [5, 2])
 
     ub = tf1.placeholder_with_default(input=[[5., 11.]], shape=None)
-    dist = tfd.TruncatedNormal(loc, scale, lb, ub)
+    dist = tfd.TruncatedNormal(loc, scale, lb, ub, validate_args=True)
     self.assertAllEqual(self.evaluate(dist.sample(5)).shape, [5, 1, 2])
 
   def testBatchSampling(self):
@@ -165,7 +166,11 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     lb = [[-1.0, 9.0], [0., 8.]]
     ub = [[1.0, 11.0], [5., 20.]]
     dist = tfd.TruncatedNormal(
-        loc=[[0., 10.], [0., 10.]], scale=[[1., 1.], [5., 5.]], low=lb, high=ub)
+        loc=[[0., 10.], [0., 10.]],
+        scale=[[1., 1.], [5., 5.]],
+        low=lb,
+        high=ub,
+        validate_args=True)
     x = self.evaluate(dist.sample(n, seed=test_util.test_seed()))
     self.assertEqual(x.shape, (n, 2, 2))
 
@@ -188,7 +193,8 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
       (2., 1.5, 0.1, 1.9))
   def testMomentsEmpirically(self, loc, scale, low, high):
     n = int(2e5)
-    dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
+    dist = tfd.TruncatedNormal(
+        loc=loc, scale=scale, low=low, high=high, validate_args=True)
     x = self.evaluate(dist.sample(n, seed=test_util.test_seed()))
     empirical_mean = np.mean(x)
     empirical_var = np.var(x)
@@ -260,7 +266,8 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
       (2., 1.5, 0.1, 1.9),
       (-2., 0.2, -1.5, -0.5))
   def testMode(self, loc, scale, low, high):
-    dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
+    dist = tfd.TruncatedNormal(
+        loc=loc, scale=scale, low=low, high=high, validate_args=True)
     mode = np.asscalar(self.evaluate(dist.mode()))
     if loc < low:
       expected_mode = low
@@ -279,7 +286,8 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     self.evaluate([v.initializer for v in (loc, scale, low, high)])
 
     def f(loc, scale, low, high):
-      dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
+      dist = tfd.TruncatedNormal(
+          loc=loc, scale=scale, low=low, high=high, validate_args=True)
 
       n = int(2e5)
       return tf.reduce_mean(
@@ -316,7 +324,8 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     self.evaluate([v.initializer for v in (loc, scale, low, high)])
 
     def f(loc, scale):
-      dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
+      dist = tfd.TruncatedNormal(
+          loc=loc, scale=scale, low=low, high=high, validate_args=True)
       func = getattr(dist, fn_name)
       return tf.reduce_mean(func(x))
 
@@ -336,7 +345,8 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     self.evaluate([v.initializer for v in (loc, scale, low, high)])
 
     def f(loc, scale):
-      dist = tfd.TruncatedNormal(loc=loc, scale=scale, low=low, high=high)
+      dist = tfd.TruncatedNormal(
+          loc=loc, scale=scale, low=low, high=high, validate_args=True)
       func = getattr(dist, fn_name)
       return func()
 
@@ -360,9 +370,12 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase):
   """
 
   def constructDists(self, loc, scale):
-    truncated_dist = tfd.TruncatedNormal(loc=loc, scale=scale,
-                                         low=loc - (10. * scale),
-                                         high=loc + (10. * scale))
+    truncated_dist = tfd.TruncatedNormal(
+        loc=loc,
+        scale=scale,
+        low=loc - (10. * scale),
+        high=loc + (10. * scale),
+        validate_args=True)
     normal_dist = tfd.Normal(loc=loc, scale=scale)
     return truncated_dist, normal_dist
 
@@ -431,9 +444,8 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase):
 class TruncatedNormalTestCompareWithScipy(_TruncatedNormalTestCase):
 
   def constructDists(self, loc, scale, low, high):
-    tf_dist = tfd.TruncatedNormal(loc=loc, scale=scale,
-                                  low=low,
-                                  high=high)
+    tf_dist = tfd.TruncatedNormal(
+        loc=loc, scale=scale, low=low, high=high, validate_args=True)
     sp_dist = scipy_trunc_norm_dist(loc, scale, low, high)
     return tf_dist, sp_dist
 

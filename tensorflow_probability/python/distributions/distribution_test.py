@@ -111,7 +111,7 @@ class NamedTupleDistribution(tfd.Distribution):
 class DistributionStrReprTest(test_util.TestCase):
 
   def testStrWorksCorrectlyScalar(self):
-    normal = tfd.Normal(loc=np.float16(0), scale=1)
+    normal = tfd.Normal(loc=np.float16(0), scale=1, validate_args=True)
     self.assertEqual(
         str(normal),
         'tfp.distributions.Normal('
@@ -120,7 +120,7 @@ class DistributionStrReprTest(test_util.TestCase):
         'event_shape=[], '
         'dtype=float16)')
 
-    chi2 = tfd.Chi2(df=np.float32([1., 2.]), name='silly')
+    chi2 = tfd.Chi2(df=np.float32([1., 2.]), name='silly', validate_args=True)
     self.assertEqual(
         str(chi2),
         'tfp.distributions.Chi2('
@@ -134,7 +134,8 @@ class DistributionStrReprTest(test_util.TestCase):
     if tf.executing_eagerly():
       return
 
-    exp = tfd.Exponential(rate=tf1.placeholder_with_default(1., shape=None))
+    exp = tfd.Exponential(
+        rate=tf1.placeholder_with_default(1., shape=None), validate_args=True)
     self.assertEqual(
         str(exp),
         'tfp.distributions.Exponential("Exponential", '
@@ -144,7 +145,7 @@ class DistributionStrReprTest(test_util.TestCase):
 
   def testStrWorksCorrectlyMultivariate(self):
     mvn_static = tfd.MultivariateNormalDiag(
-        loc=np.zeros([2, 2]), name='MVN')
+        loc=np.zeros([2, 2]), name='MVN', validate_args=True)
     self.assertEqual(
         str(mvn_static),
         'tfp.distributions.MultivariateNormalDiag('
@@ -161,7 +162,8 @@ class DistributionStrReprTest(test_util.TestCase):
     mvn_dynamic = tfd.MultivariateNormalDiag(
         loc=tf1.placeholder_with_default(
             np.ones((3, 3), dtype=np.float32), shape=[None, 3]),
-        name='MVN2')
+        name='MVN2',
+        validate_args=True)
     self.assertEqual(
         str(mvn_dynamic),
         'tfp.distributions.MultivariateNormalDiag('
@@ -171,7 +173,8 @@ class DistributionStrReprTest(test_util.TestCase):
         'dtype=float32)')
 
   def testReprWorksCorrectlyScalar(self):
-    normal = tfd.Normal(loc=np.float16(0), scale=np.float16(1))
+    normal = tfd.Normal(
+        loc=np.float16(0), scale=np.float16(1), validate_args=True)
     self.assertEqual(
         repr(normal),
         '<tfp.distributions.Normal'
@@ -180,7 +183,7 @@ class DistributionStrReprTest(test_util.TestCase):
         ' event_shape=[]'
         ' dtype=float16>')
 
-    chi2 = tfd.Chi2(df=np.float32([1., 2.]), name='silly')
+    chi2 = tfd.Chi2(df=np.float32([1., 2.]), name='silly', validate_args=True)
     self.assertEqual(
         repr(chi2),
         '<tfp.distributions.Chi2'
@@ -194,7 +197,8 @@ class DistributionStrReprTest(test_util.TestCase):
     if tf.executing_eagerly():
       return
 
-    exp = tfd.Exponential(rate=tf1.placeholder_with_default(1., shape=None))
+    exp = tfd.Exponential(
+        rate=tf1.placeholder_with_default(1., shape=None), validate_args=True)
     self.assertEqual(
         repr(exp),
         '<tfp.distributions.Exponential'
@@ -205,7 +209,7 @@ class DistributionStrReprTest(test_util.TestCase):
 
   def testReprWorksCorrectlyMultivariate(self):
     mvn_static = tfd.MultivariateNormalDiag(
-        loc=np.zeros([2, 2]), name='MVN')
+        loc=np.zeros([2, 2]), name='MVN', validate_args=True)
     self.assertEqual(
         repr(mvn_static),
         '<tfp.distributions.MultivariateNormalDiag'
@@ -222,7 +226,8 @@ class DistributionStrReprTest(test_util.TestCase):
     mvn_dynamic = tfd.MultivariateNormalDiag(
         loc=tf1.placeholder_with_default(
             np.ones((3, 3), dtype=np.float32), shape=[None, 3]),
-        name='MVN2')
+        name='MVN2',
+        validate_args=True)
     self.assertEqual(
         repr(mvn_dynamic),
         '<tfp.distributions.MultivariateNormalDiag'
@@ -539,7 +544,8 @@ class ParametersTest(test_util.TestCase):
     if not tf.executing_eagerly(): return
     @tf.function
     def normal_differential_entropy(scale):
-      return tfd.Normal(0., scale).entropy()
+      return tfd.Normal(0., scale, validate_args=True).entropy()
+
     scale = 0.25
     self.assertNear(0.5 * np.log(2. * np.pi * np.e * scale**2.),
                     normal_differential_entropy(scale).numpy(),

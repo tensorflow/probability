@@ -294,9 +294,10 @@ class JointDistributionSequentialTest(test_util.TestCase):
   def test_invalid_structure_raises_error(self):
     with self.assertRaisesWithPredicateMatch(
         TypeError, 'Unable to unflatten like `model` with type "model".'):
-      tfd.JointDistributionSequential(collections.namedtuple('model', 'a b')(
-          a=tfd.Normal(0, 1),
-          b=tfd.Normal(1, 2)))
+      tfd.JointDistributionSequential(
+          collections.namedtuple('model',
+                                 'a b')(a=tfd.Normal(0, 1), b=tfd.Normal(1, 2)),
+          validate_args=True)
 
   def test_simple_example_with_dynamic_shapes(self):
     dist = tfd.JointDistributionSequential([
@@ -338,14 +339,16 @@ class JointDistributionSequentialTest(test_util.TestCase):
     # Note near 1:1 with mathematical specification. The main distinction is the
     # use of Independent--this lets us easily aggregate multinomials across
     # topics (and in any "shape" of documents).
-    lda = tfd.JointDistributionSequential([
-        tfd.Poisson(rate=avg_doc_length),                              # n
-        tfd.Dirichlet(concentration=alpha),                            # theta
-        lambda theta, n: tfd.Multinomial(total_count=n, probs=theta),  # z
-        lambda z: tfd.Independent(                                     # x  pylint: disable=g-long-lambda
-            tfd.Multinomial(total_count=z, logits=beta),
-            reinterpreted_batch_ndims=1),
-    ])
+    lda = tfd.JointDistributionSequential(
+        [
+            tfd.Poisson(rate=avg_doc_length),  # n
+            tfd.Dirichlet(concentration=alpha),  # theta
+            lambda theta, n: tfd.Multinomial(total_count=n, probs=theta),  # z
+            lambda z: tfd.Independent(  # x  pylint: disable=g-long-lambda
+                tfd.Multinomial(total_count=z, logits=beta),
+                reinterpreted_batch_ndims=1),
+        ],
+        validate_args=True)
 
     # Now, let's sample some "documents" and compute the log-prob of each.
     docs_shape = [2, 4]  # That is, 8 docs in the shape of [2, 4].

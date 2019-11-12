@@ -37,7 +37,7 @@ class Chi2Test(test_util.TestCase):
     df = tf.constant([2.0] * batch_size, dtype=np.float64)
     df_v = 2.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float64)
-    chi2 = tfd.Chi2(df=df)
+    chi2 = tfd.Chi2(df=df, validate_args=True)
     expected_log_pdf = stats.chi2.logpdf(x, df_v)
 
     log_pdf = chi2.log_prob(x)
@@ -62,7 +62,7 @@ class Chi2Test(test_util.TestCase):
     df_v = 2.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float64)
 
-    chi2 = tfd.Chi2(df=df)
+    chi2 = tfd.Chi2(df=df, validate_args=True)
     expected_cdf = stats.chi2.cdf(x, df_v)
 
     cdf = chi2.cdf(x)
@@ -72,21 +72,21 @@ class Chi2Test(test_util.TestCase):
   def testChi2Mean(self):
     df_v = np.array([1., 3, 5], dtype=np.float64)
     expected_mean = stats.chi2.mean(df_v)
-    chi2 = tfd.Chi2(df=df_v)
+    chi2 = tfd.Chi2(df=df_v, validate_args=True)
     self.assertEqual(chi2.mean().shape, (3,))
     self.assertAllClose(self.evaluate(chi2.mean()), expected_mean)
 
   def testChi2Variance(self):
     df_v = np.array([1., 3, 5], np.float64)
     expected_variances = stats.chi2.var(df_v)
-    chi2 = tfd.Chi2(df=df_v)
+    chi2 = tfd.Chi2(df=df_v, validate_args=True)
     self.assertEqual(chi2.variance().shape, (3,))
     self.assertAllClose(self.evaluate(chi2.variance()), expected_variances)
 
   def testChi2Entropy(self):
     df_v = np.array([1., 3, 5], dtype=np.float64)
     expected_entropy = stats.chi2.entropy(df_v)
-    chi2 = tfd.Chi2(df=df_v)
+    chi2 = tfd.Chi2(df=df_v, validate_args=True)
     self.assertEqual(chi2.entropy().shape, (3,))
     self.assertAllClose(self.evaluate(chi2.entropy()), expected_entropy)
 
@@ -98,8 +98,8 @@ class Chi2Test(test_util.TestCase):
     a_df = a_df.reshape((len(a_df), 1))
     b_df = b_df.reshape((1, len(b_df)))
 
-    a = tfd.Chi2(df=a_df)
-    b = tfd.Chi2(df=b_df)
+    a = tfd.Chi2(df=a_df, validate_args=True)
+    b = tfd.Chi2(df=b_df, validate_args=True)
 
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 110

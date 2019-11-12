@@ -40,10 +40,11 @@ class CholeksyLKJTest(test_util.TestCase):
     for dims in (3, 4, 5):
       concentration = np.linspace(2., 5., 10, dtype=dtype)
       cholesky_lkj = tfd.CholeskyLKJ(
-          concentration=concentration, dimension=dims)
+          concentration=concentration, dimension=dims, validate_args=True)
       transformed_lkj = tfd.TransformedDistribution(
           bijector=tfb.Invert(tfb.CholeskyOuterProduct()),
-          distribution=tfd.LKJ(concentration=concentration, dimension=dims))
+          distribution=tfd.LKJ(concentration=concentration, dimension=dims),
+          validate_args=True)
 
       # Choose input that has well conditioned matrices.
       x = self.evaluate(cholesky_lkj.sample(10, seed=test_util.test_seed()))

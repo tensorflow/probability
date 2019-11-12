@@ -332,7 +332,9 @@ class Beta(distribution.Distribution):
       return []
     return [
         assert_util.assert_positive(x, message="Sample must be positive."),
-        assert_util.assert_less(x, 1., message="Sample must be less than `1`.")]
+        assert_util.assert_less(
+            x, tf.ones([], x.dtype), message="Sample must be less than `1`.")
+    ]
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

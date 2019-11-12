@@ -95,14 +95,15 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
   def testProbs(self):
     temperature = 1.0
     probs = [0.1, 0.5, 0.4]
-    dist = tfd.RelaxedOneHotCategorical(temperature, probs=probs)
+    dist = tfd.RelaxedOneHotCategorical(
+        temperature, probs=probs, validate_args=True)
     self.assertAllClose(probs, self.evaluate(dist.probs))
     self.assertAllEqual([3], dist.probs.shape)
 
   def testLogits(self):
     temperature = 1.0
     logits = [2.0, 3.0, -4.0]
-    dist = tfd.RelaxedOneHotCategorical(temperature, logits)
+    dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
     # check p for ExpRelaxed base distribution
     self.assertAllClose(logits, self.evaluate(dist.logits))
     self.assertAllEqual([3], dist.logits.shape)
@@ -110,7 +111,7 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
   def testParamBroadcasting(self):
     temperature = [1.0, 1.4]
     logits = [2.0, 3.0, -4.0]
-    dist = tfd.RelaxedOneHotCategorical(temperature, logits)
+    dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
     self.assertAllEqual([2], dist.batch_shape)
     self.assertAllEqual([3], dist.event_shape)
 
@@ -118,24 +119,24 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     temperature = 1.4
     # single logit
     logits = [.3, .1, .4]
-    dist = tfd.RelaxedOneHotCategorical(temperature, logits)
+    dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
     self.assertAllEqual([3], self.evaluate(dist.sample()).shape)
     self.assertAllEqual([5, 3], self.evaluate(dist.sample(5)).shape)
     # multiple distributions
     logits = [[2.0, 3.0, -4.0], [.3, .1, .4]]
-    dist = tfd.RelaxedOneHotCategorical(temperature, logits)
+    dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
     self.assertAllEqual([2, 3], self.evaluate(dist.sample()).shape)
     self.assertAllEqual([5, 2, 3], self.evaluate(dist.sample(5)).shape)
     # multiple distributions
     logits = np.random.uniform(size=(4, 1, 3)).astype(np.float32)
-    dist = tfd.RelaxedOneHotCategorical(temperature, logits)
+    dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
     self.assertAllEqual([4, 1, 3], self.evaluate(dist.sample()).shape)
     self.assertAllEqual([5, 4, 1, 3], self.evaluate(dist.sample(5)).shape)
 
   def testPdf(self):
     temperature = .4
     logits = np.array([[.3, .1, .4]]).astype(np.float32)
-    dist = tfd.RelaxedOneHotCategorical(temperature, logits)
+    dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
     x = self.evaluate(dist.sample())
     pdf = self.evaluate(dist.prob(x))
     expected_pdf = analytical_pdf(x, temperature, logits)
@@ -144,7 +145,8 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     # variable batch size
     logits = np.array([[.3, .1, .4], [.6, -.1, 2.]]).astype(np.float32)
     temperatures = np.array([0.4, 2.3]).astype(np.float32)
-    dist = tfd.RelaxedOneHotCategorical(temperatures, logits)
+    dist = tfd.RelaxedOneHotCategorical(
+        temperatures, logits, validate_args=True)
     x = self.evaluate(dist.sample())
     pdf = self.evaluate(dist.prob(x))
     expected_pdf = analytical_pdf(x, temperatures, logits)
@@ -153,7 +155,8 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     # broadcast logits over temparatures
     logits = np.array([.3, .1, .4]).astype(np.float32)
     temperatures = np.array([0.4, 2.3]).astype(np.float32)
-    dist = tfd.RelaxedOneHotCategorical(temperatures, logits)
+    dist = tfd.RelaxedOneHotCategorical(
+        temperatures, logits, validate_args=True)
     x = self.evaluate(dist.sample())
     pdf = self.evaluate(dist.prob(x))
     expected_pdf = analytical_pdf(x, temperatures, logits)
@@ -214,7 +217,8 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     # check that sampling and log_prob work for a range of dtypes
     for dtype in (tf.float16, tf.float32, tf.float64):
       logits = tf.random.uniform(shape=[3, 3], dtype=dtype)
-      dist = tfd.RelaxedOneHotCategorical(temperature=0.5, logits=logits)
+      dist = tfd.RelaxedOneHotCategorical(
+          temperature=0.5, logits=logits, validate_args=True)
       dist.log_prob(dist.sample())
 
   def testParamTensorFromLogits(self):

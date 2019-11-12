@@ -44,7 +44,8 @@ class _VonMisesTest(object):
   def testVonMisesShape(self):
     loc = self.make_tensor([.1] * 5)
     concentration = self.make_tensor([.2] * 5)
-    von_mises = tfd.VonMises(loc=loc, concentration=concentration)
+    von_mises = tfd.VonMises(
+        loc=loc, concentration=concentration, validate_args=True)
 
     self.assertEqual([
         5,
@@ -67,7 +68,9 @@ class _VonMisesTest(object):
     concentrations_v = .2
     x = np.array([2., 3., 4., 5., 6., 7.])
     von_mises = tfd.VonMises(
-        self.make_tensor(locs_v), self.make_tensor(concentrations_v))
+        self.make_tensor(locs_v),
+        self.make_tensor(concentrations_v),
+        validate_args=True)
     expected_log_prob = sp_stats.vonmises.logpdf(
         x, concentrations_v, loc=locs_v)
     log_prob = von_mises.log_prob(self.make_tensor(x))
@@ -75,7 +78,8 @@ class _VonMisesTest(object):
 
   def testVonMisesLogPdfUniform(self):
     x = np.array([2., 3., 4., 5., 6., 7.])
-    von_mises = tfd.VonMises(self.make_tensor(.1), self.make_tensor(0.))
+    von_mises = tfd.VonMises(
+        self.make_tensor(.1), self.make_tensor(0.), validate_args=True)
     log_prob = von_mises.log_prob(self.make_tensor(x))
     expected_log_prob = np.array([-np.log(2. * np.pi)] * 6)
     self.assertAllClose(expected_log_prob, self.evaluate(log_prob))
@@ -85,14 +89,17 @@ class _VonMisesTest(object):
     concentrations_v = .2
     x = np.array([2., 3., 4., 5., 6., 7.])
     von_mises = tfd.VonMises(
-        self.make_tensor(locs_v), self.make_tensor(concentrations_v))
+        self.make_tensor(locs_v),
+        self.make_tensor(concentrations_v),
+        validate_args=True)
     prob = von_mises.prob(self.make_tensor(x))
     expected_prob = sp_stats.vonmises.pdf(x, concentrations_v, loc=locs_v)
     self.assertAllClose(expected_prob, self.evaluate(prob))
 
   def testVonMisesPdfUniform(self):
     x = np.array([2., 3., 4., 5., 6., 7.])
-    von_mises = tfd.VonMises(self.make_tensor(1.), self.make_tensor(0.))
+    von_mises = tfd.VonMises(
+        self.make_tensor(1.), self.make_tensor(0.), validate_args=True)
     prob = von_mises.prob(self.make_tensor(x))
     expected_prob = np.array([1. / (2. * np.pi)] * 6)
     self.assertAllClose(expected_prob, self.evaluate(prob))
@@ -102,14 +109,17 @@ class _VonMisesTest(object):
     concentrations_v = np.reshape(np.logspace(-3., 3., 20), [1, -1, 1])
     x = np.reshape(np.linspace(-10., 10., 20), [1, 1, -1])
     von_mises = tfd.VonMises(
-        self.make_tensor(locs_v), self.make_tensor(concentrations_v))
+        self.make_tensor(locs_v),
+        self.make_tensor(concentrations_v),
+        validate_args=True)
     cdf = von_mises.cdf(self.make_tensor(x))
     expected_cdf = sp_stats.vonmises.cdf(x, concentrations_v, loc=locs_v)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=1e-4, rtol=1e-4)
 
   def testVonMisesCdfUniform(self):
     x = np.linspace(-np.pi, np.pi, 20)
-    von_mises = tfd.VonMises(self.make_tensor(0.), self.make_tensor(0.))
+    von_mises = tfd.VonMises(
+        self.make_tensor(0.), self.make_tensor(0.), validate_args=True)
     cdf = von_mises.cdf(self.make_tensor(x))
     expected_cdf = (x + np.pi) / (2. * np.pi)
     self.assertAllClose(expected_cdf, self.evaluate(cdf))
@@ -151,14 +161,17 @@ class _VonMisesTest(object):
 
     eps = 1e-3
     dcdf_dloc_diff = self.evaluate(
-        (tfd.VonMises(loc + eps, concentration).cdf(x) - tfd.VonMises(
-            loc - eps, concentration).cdf(x)) / (2 * eps))
+        (tfd.VonMises(loc + eps, concentration, validate_args=True).cdf(x) -
+         tfd.VonMises(loc - eps, concentration, validate_args=True).cdf(x)) /
+        (2 * eps))
     dcdf_dconcentration_diff = self.evaluate(
-        (tfd.VonMises(loc, concentration + eps).cdf(x) - tfd.VonMises(
-            loc, concentration - eps).cdf(x)) / (2 * eps))
+        (tfd.VonMises(loc, concentration + eps, validate_args=True).cdf(x) -
+         tfd.VonMises(loc, concentration - eps, validate_args=True).cdf(x)) /
+        (2 * eps))
     dcdf_dx_diff = self.evaluate(
-        (tfd.VonMises(loc, concentration).cdf(x + eps) - tfd.VonMises(
-            loc, concentration).cdf(x - eps)) / (2 * eps))
+        (tfd.VonMises(loc, concentration, validate_args=True).cdf(x + eps) -
+         tfd.VonMises(loc, concentration, validate_args=True).cdf(x - eps)) /
+        (2 * eps))
 
     self.assertAlmostEqual(dcdf_dloc, dcdf_dloc_diff, places=3)
     self.assertAlmostEqual(
@@ -169,12 +182,14 @@ class _VonMisesTest(object):
     locs_v = np.array([-2., -1., 0.3, 3.2]).reshape([-1, 1])
     concentrations_v = np.array([0.01, 0.01, 1.0, 10.0]).reshape([1, -1])
     von_mises = tfd.VonMises(
-        self.make_tensor(locs_v), self.make_tensor(concentrations_v))
+        self.make_tensor(locs_v),
+        self.make_tensor(concentrations_v),
+        validate_args=True)
     expected_entropy = sp_stats.vonmises.entropy(concentrations_v, loc=locs_v)
     self.assertAllClose(expected_entropy, self.evaluate(von_mises.entropy()))
 
   def testVonMisesEntropyUniform(self):
-    von_mises = tfd.VonMises(-3., 0.)
+    von_mises = tfd.VonMises(-3., 0., validate_args=True)
     expected_entropy = np.log(2. * np.pi)
     self.assertAllClose(expected_entropy, self.evaluate(von_mises.entropy()))
 
@@ -182,14 +197,18 @@ class _VonMisesTest(object):
     locs_v = np.array([-3., -2., -1., 0.3, 2.3])
     concentrations_v = np.array([0.0, 0.1, 1.0, 2.0, 10.0])
     von_mises = tfd.VonMises(
-        self.make_tensor(locs_v), self.make_tensor(concentrations_v))
+        self.make_tensor(locs_v),
+        self.make_tensor(concentrations_v),
+        validate_args=True)
     self.assertAllClose(locs_v, self.evaluate(von_mises.mean()))
 
   def testVonMisesVariance(self):
     locs_v = np.array([-3., -2., -1., 0.3, 2.3])
     concentrations_v = np.array([0.0, 0.1, 1.0, 2.0, 10.0])
     von_mises = tfd.VonMises(
-        self.make_tensor(locs_v), self.make_tensor(concentrations_v))
+        self.make_tensor(locs_v),
+        self.make_tensor(concentrations_v),
+        validate_args=True)
     expected_vars = 1.0 - sp_special.i1(concentrations_v) / sp_special.i0(
         concentrations_v)
     self.assertAllClose(expected_vars, self.evaluate(von_mises.variance()))
@@ -198,7 +217,9 @@ class _VonMisesTest(object):
     locs_v = np.array([-3., -2., -1., 0.3, 2.3]).reshape([1, -1])
     concentrations_v = np.array([0.0, 0.1, 1.0, 2.0, 10.0]).reshape([-1, 1])
     von_mises = tfd.VonMises(
-        self.make_tensor(locs_v), self.make_tensor(concentrations_v))
+        self.make_tensor(locs_v),
+        self.make_tensor(concentrations_v),
+        validate_args=True)
     expected_stddevs = (np.sqrt(1.0 - sp_special.i1(concentrations_v)
                                 / sp_special.i0(concentrations_v))
                         + np.zeros_like(locs_v))
@@ -208,17 +229,21 @@ class _VonMisesTest(object):
     locs_v = np.array([-3., -2., -1., 0.3, 2.3])
     concentrations_v = np.array([0.0, 0.1, 1.0, 2.0, 10.0])
     von_mises = tfd.VonMises(
-        self.make_tensor(locs_v), self.make_tensor(concentrations_v))
+        self.make_tensor(locs_v),
+        self.make_tensor(concentrations_v),
+        validate_args=True)
     expected_modes = locs_v
     self.assertAllClose(expected_modes, self.evaluate(von_mises.mode()))
 
   def testVonMisesVonMisesKL(self):
     d1 = tfd.VonMises(
         loc=self.make_tensor(np.array([[0.05, 0.1, 0.2]])),
-        concentration=self.make_tensor(np.array([[0.0, 0.3, 0.4]])))
+        concentration=self.make_tensor(np.array([[0.0, 0.3, 0.4]])),
+        validate_args=True)
     d2 = tfd.VonMises(
         loc=self.make_tensor(np.array([[0.7, 0.5, 0.3], [0.1, 0.3, 0.5]])),
-        concentration=self.make_tensor(np.array([[0.8, 0.0, 0.5]])))
+        concentration=self.make_tensor(np.array([[0.8, 0.0, 0.5]])),
+        validate_args=True)
 
     kl_actual = tfd.kl_divergence(d1, d2)
     x = d1.sample(int(1e5), seed=test_util.test_seed(hardcoded_seed=0))
@@ -240,7 +265,9 @@ class _VonMisesTest(object):
     locs_v = np.array([-1., 0.3, 2.3])
     concentrations_v = np.array([1.0, 2.0, 10.0])
     von_mises = tfd.VonMises(
-        self.make_tensor(locs_v), self.make_tensor(concentrations_v))
+        self.make_tensor(locs_v),
+        self.make_tensor(concentrations_v),
+        validate_args=True)
 
     n = 10000
     seed = test_util.test_seed()
@@ -266,7 +293,8 @@ class _VonMisesTest(object):
     self.assertAllClose(expected_variance_val, actual_variance_val, rtol=0.1)
 
   def testVonMisesSampleVarianceUniform(self):
-    von_mises = tfd.VonMises(self.make_tensor(1.0), self.make_tensor(0.0))
+    von_mises = tfd.VonMises(
+        self.make_tensor(1.0), self.make_tensor(0.0), validate_args=True)
 
     n = 10000
     samples = von_mises.sample(n, seed=test_util.test_seed())
@@ -286,8 +314,10 @@ class _VonMisesTest(object):
     # We are fixing the location to zero. The reason is that for loc != 0,
     # scipy's von Mises distribution CDF becomes shifted, so it's no longer
     # in [0, 1], but is in something like [-0.3, 0.7]. This breaks kstest.
-    von_mises = tfd.VonMises(self.make_tensor(0.0),
-                             self.make_tensor(concentrations_v))
+    von_mises = tfd.VonMises(
+        self.make_tensor(0.0),
+        self.make_tensor(concentrations_v),
+        validate_args=True)
     n = 10000
     sample_values = self.evaluate(
         von_mises.sample(n, seed=test_util.test_seed()))
@@ -305,7 +335,8 @@ class _VonMisesTest(object):
 
   def testVonMisesSampleUniformKsTest(self):
     locs_v = np.linspace(-10., 10., 50)
-    von_mises = tfd.VonMises(self.make_tensor(locs_v), self.make_tensor(0.))
+    von_mises = tfd.VonMises(
+        self.make_tensor(locs_v), self.make_tensor(0.), validate_args=True)
     n = 10000
     sample_values = self.evaluate(
         von_mises.sample(n, seed=test_util.test_seed(hardcoded_seed=137)))
@@ -331,7 +362,7 @@ class _VonMisesTest(object):
     n = 1000
 
     def loss(loc, concentration):
-      von_mises = tfd.VonMises(loc, concentration)
+      von_mises = tfd.VonMises(loc, concentration, validate_args=True)
       samples = von_mises.sample(n, seed=test_util.test_seed())
       return tf.reduce_mean(input_tensor=samples, axis=0)
 
@@ -349,7 +380,7 @@ class _VonMisesTest(object):
     n = 1000
 
     def loss(loc, concentration):
-      von_mises = tfd.VonMises(loc, concentration)
+      von_mises = tfd.VonMises(loc, concentration, validate_args=True)
       samples = von_mises.sample(n, seed=test_util.test_seed())
       return tf.reduce_mean(input_tensor=1. - tf.cos(samples - loc), axis=0)
 
@@ -374,7 +405,7 @@ class _VonMisesTest(object):
     min_value = np.finfo(dtype_util.as_numpy_dtype(self.dtype)).min
     max_value = np.finfo(dtype_util.as_numpy_dtype(self.dtype)).max
     concentration = self.make_tensor([min_value, 1., max_value, np.nan, np.nan])
-    von_mises = tfd.VonMises(loc, concentration)
+    von_mises = tfd.VonMises(loc, concentration, validate_args=False)
 
     samples = von_mises.sample(seed=test_util.test_seed())
     # Check that it does not end up in an infinite loop.

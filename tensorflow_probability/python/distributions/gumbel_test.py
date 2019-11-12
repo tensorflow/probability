@@ -41,7 +41,7 @@ class _GumbelTest(object):
   def testGumbelShape(self):
     loc = np.array([3.0] * 5, dtype=self._dtype)
     scale = np.array([3.0] * 5, dtype=self._dtype)
-    gumbel = tfd.Gumbel(loc=loc, scale=scale)
+    gumbel = tfd.Gumbel(loc=loc, scale=scale, validate_args=True)
 
     self.assertEqual((5,), self.evaluate(gumbel.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([5]), gumbel.batch_shape)
@@ -70,7 +70,8 @@ class _GumbelTest(object):
     x = np.array([2., 3., 4., 5., 6., 7.], dtype=self._dtype)
     gumbel = tfd.Gumbel(
         loc=self.make_tensor(loc),
-        scale=self.make_tensor(scale))
+        scale=self.make_tensor(scale),
+        validate_args=True)
     log_pdf = gumbel.log_prob(self.make_tensor(x))
     self.assertAllClose(
         stats.gumbel_r.logpdf(x, loc=loc, scale=scale),
@@ -88,7 +89,8 @@ class _GumbelTest(object):
 
     gumbel = tfd.Gumbel(
         loc=self.make_tensor(loc),
-        scale=self.make_tensor(scale))
+        scale=self.make_tensor(scale),
+        validate_args=True)
     log_pdf = gumbel.log_prob(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(log_pdf), stats.gumbel_r.logpdf(x, loc=loc, scale=scale))
@@ -105,7 +107,8 @@ class _GumbelTest(object):
 
     gumbel = tfd.Gumbel(
         loc=self.make_tensor(loc),
-        scale=self.make_tensor(scale))
+        scale=self.make_tensor(scale),
+        validate_args=True)
 
     log_cdf = gumbel.log_cdf(self.make_tensor(x))
     self.assertAllClose(
@@ -123,7 +126,8 @@ class _GumbelTest(object):
 
     gumbel = tfd.Gumbel(
         loc=self.make_tensor(loc),
-        scale=self.make_tensor(scale))
+        scale=self.make_tensor(scale),
+        validate_args=True)
 
     log_cdf = gumbel.log_cdf(self.make_tensor(x))
     self.assertAllClose(
@@ -142,7 +146,8 @@ class _GumbelTest(object):
 
     gumbel = tfd.Gumbel(
         loc=self.make_tensor(loc),
-        scale=self.make_tensor(scale))
+        scale=self.make_tensor(scale),
+        validate_args=True)
     self.assertAllClose(self.evaluate(gumbel.mean()),
                         stats.gumbel_r.mean(loc=loc, scale=scale))
 
@@ -153,7 +158,8 @@ class _GumbelTest(object):
 
     gumbel = tfd.Gumbel(
         loc=self.make_tensor(loc),
-        scale=self.make_tensor(scale))
+        scale=self.make_tensor(scale),
+        validate_args=True)
 
     self.assertAllClose(self.evaluate(gumbel.variance()),
                         stats.gumbel_r.var(loc=loc, scale=scale))
@@ -165,7 +171,8 @@ class _GumbelTest(object):
 
     gumbel = tfd.Gumbel(
         loc=self.make_tensor(loc),
-        scale=self.make_tensor(scale))
+        scale=self.make_tensor(scale),
+        validate_args=True)
 
     self.assertAllClose(self.evaluate(gumbel.stddev()),
                         stats.gumbel_r.std(loc=loc, scale=scale))
@@ -177,7 +184,8 @@ class _GumbelTest(object):
 
     gumbel = tfd.Gumbel(
         loc=self.make_tensor(loc),
-        scale=self.make_tensor(scale))
+        scale=self.make_tensor(scale),
+        validate_args=True)
 
     self.assertAllClose(self.evaluate(gumbel.mode()), self.evaluate(gumbel.loc))
 
@@ -188,7 +196,8 @@ class _GumbelTest(object):
 
     gumbel = tfd.Gumbel(
         loc=self.make_tensor(loc),
-        scale=self.make_tensor(scale))
+        scale=self.make_tensor(scale),
+        validate_args=True)
 
     samples = gumbel.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -208,7 +217,8 @@ class _GumbelTest(object):
 
     gumbel = tfd.Gumbel(
         loc=self.make_tensor(loc),
-        scale=self.make_tensor(scale))
+        scale=self.make_tensor(scale),
+        validate_args=True)
 
     samples = gumbel.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -226,7 +236,8 @@ class _GumbelTest(object):
 
     gumbel = tfd.Gumbel(
         loc=self.make_tensor(loc),
-        scale=self.make_tensor(scale))
+        scale=self.make_tensor(scale),
+        validate_args=True)
 
     samples = gumbel.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -248,8 +259,8 @@ class _GumbelTest(object):
     b_loc = b_loc.reshape((1, 1, len(b_loc), 1))
     b_scale = b_scale.reshape((1, 1, 1, len(b_scale)))
 
-    a = tfd.Gumbel(loc=a_loc, scale=a_scale)
-    b = tfd.Gumbel(loc=b_loc, scale=b_scale)
+    a = tfd.Gumbel(loc=a_loc, scale=a_scale, validate_args=True)
+    b = tfd.Gumbel(loc=b_loc, scale=b_scale, validate_args=True)
 
     true_kl = (np.log(b_scale) - np.log(a_scale)
                + np.euler_gamma * (a_scale / b_scale - 1.)

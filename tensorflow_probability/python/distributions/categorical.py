@@ -276,7 +276,7 @@ class Categorical(distribution.Distribution):
     logits = self.logits_parameter()
     if self.validate_args:
       k = distribution_util.embed_check_integer_casting_closed(
-          k, target_dtype=tf.int32)
+          k, target_dtype=self.dtype)
     k, logits = _broadcast_cat_event_and_params(
         k, logits, base_dtype=dtype_util.base_dtype(self.dtype))
     return -tf.nn.sparse_softmax_cross_entropy_with_logits(

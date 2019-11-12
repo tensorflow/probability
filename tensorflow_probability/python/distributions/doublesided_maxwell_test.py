@@ -103,7 +103,7 @@ class DoublesidedMaxwellTest(test_util.TestCase):
     loc = [7.]
     sigma = [1., 2., 3.]
 
-    dsmaxwell = tfd.DoublesidedMaxwell(loc=loc, scale=sigma)
+    dsmaxwell = tfd.DoublesidedMaxwell(loc=loc, scale=sigma, validate_args=True)
 
     self.assertAllEqual((3,), dsmaxwell.mean().shape)
     self.assertAllEqual([7., 7., 7.], self.evaluate(dsmaxwell.mean()))
@@ -113,7 +113,7 @@ class DoublesidedMaxwellTest(test_util.TestCase):
     loc = [1., 2., 3.]
     sigma = [7.]
 
-    dsmaxwell = tfd.DoublesidedMaxwell(loc=loc, scale=sigma)
+    dsmaxwell = tfd.DoublesidedMaxwell(loc=loc, scale=sigma, validate_args=True)
 
     self.assertAllEqual((3,), dsmaxwell.variance().shape)
     self.assertAllClose([147., 147, 147], self.evaluate(dsmaxwell.variance()))
@@ -123,7 +123,7 @@ class DoublesidedMaxwellTest(test_util.TestCase):
     loc = [1., 2., 3.]
     sigma = [7.]
 
-    dsmaxwell = tfd.DoublesidedMaxwell(loc=loc, scale=sigma)
+    dsmaxwell = tfd.DoublesidedMaxwell(loc=loc, scale=sigma, validate_args=True)
 
     self.assertAllEqual((3,), dsmaxwell.stddev().shape)
     std = np.sqrt(147)
@@ -135,7 +135,7 @@ class DoublesidedMaxwellTest(test_util.TestCase):
     loc = [1., 2., 3.]
     sigma = [7.]
 
-    dsmaxwell = tfd.DoublesidedMaxwell(loc=loc, scale=sigma)
+    dsmaxwell = tfd.DoublesidedMaxwell(loc=loc, scale=sigma, validate_args=True)
 
     n = 10
     samples = dsmaxwell.sample(n, seed=100)

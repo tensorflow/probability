@@ -78,7 +78,8 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points,
         observations,
         observation_noise_variance,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     batch_shape = [2, 4, 6, 3]
     event_shape = [25]
@@ -148,7 +149,8 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observations=observations,
         observation_noise_variance=observation_noise_variance,
         mean_fn=mean_fn,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     self.assertAllClose(expected_predictive_covariance_with_noise,
                         self.evaluate(gprm.covariance()))
@@ -165,7 +167,8 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_noise_variance=observation_noise_variance,
         predictive_noise_variance=0.,
         mean_fn=mean_fn,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     self.assertAllClose(expected_predictive_covariance_no_noise,
                         self.evaluate(gprm_no_predictive_noise.covariance()))
@@ -188,13 +191,15 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         kernel,
         index_points,
         mean_fn=mean_fn,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     gprm_nones = tfd.GaussianProcessRegressionModel(
         kernel,
         index_points,
         mean_fn=mean_fn,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     gprm_zero_shapes = tfd.GaussianProcessRegressionModel(
         kernel,
@@ -202,7 +207,8 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=tf.ones([5, 0, 1], tf.float64),
         observations=tf.ones([5, 0], tf.float64),
         mean_fn=mean_fn,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     for gprm in [gprm_nones, gprm_zero_shapes]:
       self.assertAllClose(self.evaluate(gp.mean()), self.evaluate(gprm.mean()))
@@ -229,20 +235,20 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
           kernel,
           index_points,
           observation_index_points=None,
-          observations=observations)
+          observations=observations,
+          validate_args=True)
     with self.assertRaises(ValueError):
       tfd.GaussianProcessRegressionModel(
           kernel,
           index_points,
           observation_index_points,
-          observations=None)
+          observations=None,
+          validate_args=True)
 
     # If specified, mean_fn must be a callable.
     with self.assertRaises(ValueError):
       tfd.GaussianProcessRegressionModel(
-          kernel,
-          index_points,
-          mean_fn=0.)
+          kernel, index_points, mean_fn=0., validate_args=True)
 
     # Observation index point and observation counts must be broadcastable.
     # Errors based on conditions of dynamic shape in graph mode cannot be
@@ -253,7 +259,8 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
             kernel,
             index_points,
             observation_index_points=np.ones([2, 2, 2]),
-            observations=np.ones([5, 5]))
+            observations=np.ones([5, 5]),
+            validate_args=True)
 
   def testCopy(self):
     # 5 random index points in R^2
@@ -290,7 +297,8 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=observation_index_points_1,
         observations=observations_1,
         mean_fn=mean_fn,
-        jitter=1e-5)
+        jitter=1e-5,
+        validate_args=True)
     gprm2 = gprm1.copy(
         kernel=kernel_2,
         index_points=index_points_2,
@@ -384,6 +392,7 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points=observation_index_points,
         observations=observations,
         jitter=jitter,
+        validate_args=True,
         **noise_kwargs)
 
     # 'Property' means what was passed to CTOR. 'Parameter' is the effective

@@ -36,7 +36,7 @@ class GeometricTest(test_util.TestCase):
 
   def testGeometricShape(self):
     probs = tf.constant([.1] * 5)
-    geom = tfd.Geometric(probs=probs)
+    geom = tfd.Geometric(probs=probs, validate_args=True)
 
     self.assertEqual([
         5,
@@ -61,7 +61,7 @@ class GeometricTest(test_util.TestCase):
     probs = tf.constant([.2] * batch_size)
     probs_v = .2
     x = np.array([2., 3., 4., 5., 6., 7.], dtype=np.float32)
-    geom = tfd.Geometric(probs=probs)
+    geom = tfd.Geometric(probs=probs, validate_args=True)
     expected_log_prob = stats.geom.logpmf(x, probs_v, loc=-1)
     log_prob = geom.log_prob(x)
     self.assertEqual([
@@ -88,7 +88,7 @@ class GeometricTest(test_util.TestCase):
     with self.assertRaisesOpError('Condition x >= 0'):
       self.evaluate(geom.log_prob([-1.]))
 
-    geom = tfd.Geometric(probs=probs)
+    geom = tfd.Geometric(probs=probs, validate_args=False)
     log_prob = geom.log_prob(x)
     self.assertEqual([
         6,
@@ -103,7 +103,7 @@ class GeometricTest(test_util.TestCase):
     probs = tf.constant([[.2, .3, .5]] * batch_size)
     probs_v = np.array([.2, .3, .5])
     x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=np.float32).T
-    geom = tfd.Geometric(probs=probs)
+    geom = tfd.Geometric(probs=probs, validate_args=True)
     expected_log_prob = stats.geom.logpmf(x, probs_v, loc=-1)
     log_prob = geom.log_prob(x)
     log_prob_values = self.evaluate(log_prob)
@@ -119,9 +119,9 @@ class GeometricTest(test_util.TestCase):
     batch_size = 6
     probs = tf.constant([[.2, .4, .5]] * batch_size)
     probs_v = np.array([.2, .4, .5])
-    x = np.array([[2., 3., 4., 5.5, 6., 7.]], dtype=np.float32).T
+    x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=np.float32).T
 
-    geom = tfd.Geometric(probs=probs)
+    geom = tfd.Geometric(probs=probs, validate_args=True)
     expected_cdf = stats.geom.cdf(x, probs_v, loc=-1)
 
     cdf = geom.cdf(x)
@@ -130,35 +130,35 @@ class GeometricTest(test_util.TestCase):
 
   def testGeometricEntropy(self):
     probs_v = np.array([.1, .3, .25], dtype=np.float32)
-    geom = tfd.Geometric(probs=probs_v)
+    geom = tfd.Geometric(probs=probs_v, validate_args=True)
     expected_entropy = stats.geom.entropy(probs_v, loc=-1)
     self.assertEqual([3], geom.entropy().shape)
     self.assertAllClose(expected_entropy, self.evaluate(geom.entropy()))
 
   def testGeometricMean(self):
     probs_v = np.array([.1, .3, .25])
-    geom = tfd.Geometric(probs=probs_v)
+    geom = tfd.Geometric(probs=probs_v, validate_args=True)
     expected_means = stats.geom.mean(probs_v, loc=-1)
     self.assertEqual([3], geom.mean().shape)
     self.assertAllClose(expected_means, self.evaluate(geom.mean()))
 
   def testGeometricVariance(self):
     probs_v = np.array([.1, .3, .25])
-    geom = tfd.Geometric(probs=probs_v)
+    geom = tfd.Geometric(probs=probs_v, validate_args=True)
     expected_vars = stats.geom.var(probs_v, loc=-1)
     self.assertEqual([3], geom.variance().shape)
     self.assertAllClose(expected_vars, self.evaluate(geom.variance()))
 
   def testGeometricStddev(self):
     probs_v = np.array([.1, .3, .25])
-    geom = tfd.Geometric(probs=probs_v)
+    geom = tfd.Geometric(probs=probs_v, validate_args=True)
     expected_stddevs = stats.geom.std(probs_v, loc=-1)
     self.assertEqual([3], geom.stddev().shape)
     self.assertAllClose(self.evaluate(geom.stddev()), expected_stddevs)
 
   def testGeometricMode(self):
     probs_v = np.array([.1, .3, .25])
-    geom = tfd.Geometric(probs=probs_v)
+    geom = tfd.Geometric(probs=probs_v, validate_args=True)
     self.assertEqual([
         3,
     ],
@@ -169,7 +169,7 @@ class GeometricTest(test_util.TestCase):
     probs_v = [.3, .9]
     probs = tf.constant(probs_v)
     n = tf.constant(100000)
-    geom = tfd.Geometric(probs=probs)
+    geom = tfd.Geometric(probs=probs, validate_args=True)
 
     samples = geom.sample(n, seed=test_util.test_seed())
     self.assertEqual([100000, 2], samples.shape)
@@ -191,7 +191,7 @@ class GeometricTest(test_util.TestCase):
     probs_v = [.3, .9]
     probs = tf.constant([probs_v] * batch_size)
 
-    geom = tfd.Geometric(probs=probs)
+    geom = tfd.Geometric(probs=probs, validate_args=True)
 
     n = 400000
     samples = geom.sample(n, seed=test_util.test_seed())

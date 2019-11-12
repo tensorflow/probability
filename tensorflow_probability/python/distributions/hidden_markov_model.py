@@ -207,8 +207,8 @@ class HiddenMarkovModel(distribution.Distribution):
                 "`event_dim`s")
         ]
 
-      if (transition_distribution.batch_shape is not None and
-          tensorshape_util.rank(transition_distribution.batch_shape) == 0):
+      if (tensorshape_util.dims(transition_distribution.batch_shape) is not None
+          and tensorshape_util.rank(transition_distribution.batch_shape) == 0):
         raise ValueError(
             "`transition_distribution` can't have scalar batches")
       elif validate_args:
@@ -220,7 +220,8 @@ class HiddenMarkovModel(distribution.Distribution):
                 "batches")
         ]
 
-      if (observation_distribution.batch_shape is not None and
+      if (tensorshape_util.dims(
+          observation_distribution.batch_shape) is not None and
           tensorshape_util.rank(observation_distribution.batch_shape) == 0):
         raise ValueError(
             "`observation_distribution` can't have scalar batches")
@@ -236,12 +237,16 @@ class HiddenMarkovModel(distribution.Distribution):
       # Infer number of hidden states and check consistency
       # between transitions and observations
       with tf.control_dependencies(self._runtime_assertions):
-        self._num_states = ((transition_distribution.batch_shape and
-                             transition_distribution.batch_shape[-1]) or
+        self._num_states = ((tensorshape_util.dims(
+            transition_distribution.batch_shape) is not None and
+                             tensorshape_util.as_list(
+                                 transition_distribution.batch_shape)[-1]) or
                             transition_distribution.batch_shape_tensor()[-1])
 
-        observation_states = ((observation_distribution.batch_shape and
-                               observation_distribution.batch_shape[-1]) or
+        observation_states = ((tensorshape_util.dims(
+            observation_distribution.batch_shape) is not None and
+                               tensorshape_util.as_list(
+                                   observation_distribution.batch_shape)[-1]) or
                               observation_distribution.batch_shape_tensor()[-1])
 
       if (tf.is_tensor(self._num_states) or tf.is_tensor(observation_states)):

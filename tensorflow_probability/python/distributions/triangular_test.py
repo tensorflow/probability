@@ -40,7 +40,8 @@ class _TriangularTest(object):
     return tfd.Triangular(
         low=self.make_tensor(low),
         high=self.make_tensor(high),
-        peak=self.make_tensor(peak))
+        peak=self.make_tensor(peak),
+        validate_args=True)
 
   def _scipy_triangular(self, low, high, peak):
     # Scipy triangular specifies a triangular distribution
@@ -57,7 +58,7 @@ class _TriangularTest(object):
     low = self._dtype(0.)
     high = self._dtype(1.)
     peak = self._dtype(0.5)
-    tri = tfd.Triangular(low=low, high=high, peak=peak)
+    tri = tfd.Triangular(low=low, high=high, peak=peak, validate_args=True)
     self.assertAllEqual([], self.evaluate(tri.event_shape_tensor()))
     self.assertAllEqual([], self.evaluate(tri.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), tri.event_shape)
@@ -67,7 +68,7 @@ class _TriangularTest(object):
     low = np.zeros(shape=(2, 3), dtype=self._dtype)
     high = np.ones(shape=(1, 3), dtype=self._dtype)
     peak = self._dtype(0.5)
-    tri = tfd.Triangular(low=low, high=high, peak=peak)
+    tri = tfd.Triangular(low=low, high=high, peak=peak, validate_args=True)
     self.assertAllEqual([], self.evaluate(tri.event_shape_tensor()))
     self.assertAllEqual([2, 3], self.evaluate(tri.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), tri.event_shape)
@@ -307,7 +308,7 @@ class _TriangularTest(object):
     low = np.array([np.arange(1, 21, dtype=self._dtype)])
     high = low + 3.
     peak = (high - low) / 3 + low
-    tri = tfd.Triangular(low=low, high=high, peak=peak)
+    tri = tfd.Triangular(low=low, high=high, peak=peak, validate_args=True)
     n = int(100e3)
     samples = tri.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -323,7 +324,7 @@ class _TriangularTest(object):
     low = np.array([np.arange(1, 21, dtype=self._dtype)])
     high = low + 3.
     peak = (high - low) / 3 + low
-    tri = tfd.Triangular(low=low, high=high, peak=peak)
+    tri = tfd.Triangular(low=low, high=high, peak=peak, validate_args=True)
     n = int(100e3)
     samples = tri.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -339,7 +340,7 @@ class _TriangularTest(object):
     low = self._dtype(0.)
     peak = self._dtype(1.)
     high = self._dtype(4.)
-    tri = tfd.Triangular(low=low, peak=peak, high=high)
+    tri = tfd.Triangular(low=low, peak=peak, high=high, validate_args=True)
     self.assertAllClose(self.evaluate(tri.prob([0., 1., 4.])), [0, 0.5, 0])
 
   def testModifiedVariableAssertion(self):

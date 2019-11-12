@@ -673,7 +673,7 @@ class VariationalGaussianProcess(
         posterior_predictive_cov, self._predictive_noise_variance)
 
     scale = tf.linalg.LinearOperatorLowerTriangular(
-        tf.linalg.cholesky(posterior_predictive_cov))
+        tf.linalg.cholesky(posterior_predictive_cov), is_non_singular=True)
 
     loc = (self._mean_fn(self._index_points) +
            kzt.matvec(self._kzz_inv_varloc, adjoint=True))

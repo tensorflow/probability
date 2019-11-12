@@ -484,7 +484,7 @@ class StudentTProcess(distribution.Distribution):
     if not self.validate_args:
       return []
     assertions = []
-    if is_init != tensor_util.is_mutable(self.df):
+    if is_init != tensor_util.is_ref(self.df):
       assertions.append(
           assert_util.assert_greater(
               self.df, dtype_util.as_numpy_dtype(self.df.dtype)(2.),

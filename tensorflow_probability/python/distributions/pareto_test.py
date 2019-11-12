@@ -38,7 +38,7 @@ class ParetoTest(test_util.TestCase):
   def testParetoShape(self):
     scale = tf.constant([2.] * 5)
     concentration = tf.constant([2.] * 5)
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
 
     self.assertEqual(self.evaluate(pareto.batch_shape_tensor()), (5,))
     self.assertEqual(pareto.batch_shape, tf.TensorShape([5]))
@@ -48,7 +48,7 @@ class ParetoTest(test_util.TestCase):
   def testParetoShapeBroadcast(self):
     scale = tf.constant([[3., 2.]])
     concentration = tf.constant([[4.], [5.], [6.]])
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
 
     self.assertAllEqual(self.evaluate(pareto.batch_shape_tensor()), (3, 2))
     self.assertAllEqual(pareto.batch_shape, tf.TensorShape([3, 2]))
@@ -78,7 +78,7 @@ class ParetoTest(test_util.TestCase):
     concentration = tf.constant([2.])
     concentration_v = 2.
     x = [3., 3.1, 4., 5., 6., 7.]
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     log_prob = pareto.log_prob(x)
     self.assertEqual(log_prob.shape, (6,))
     self.assertAllClose(
@@ -121,7 +121,7 @@ class ParetoTest(test_util.TestCase):
 
     x = np.array([[6., 7., 9.2, 5., 6., 7.]], dtype=np.float32).T
 
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     log_prob = pareto.log_prob(x)
     self.assertEqual(log_prob.shape, (6, 3))
     self.assertAllClose(
@@ -141,7 +141,7 @@ class ParetoTest(test_util.TestCase):
     concentration = tf.constant([2.])
     concentration_v = 2.
     x = [3., 3.1, 4., 5., 6., 7.]
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     log_cdf = pareto.log_cdf(x)
     self.assertEqual(log_cdf.shape, (6,))
     self.assertAllClose(
@@ -163,7 +163,7 @@ class ParetoTest(test_util.TestCase):
 
     x = np.array([[6., 7., 9.2, 5., 6., 7.]], dtype=np.float32).T
 
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     log_cdf = pareto.log_cdf(x)
     self.assertEqual(log_cdf.shape, (6, 3))
     self.assertAllClose(
@@ -181,21 +181,27 @@ class ParetoTest(test_util.TestCase):
     concentration = tf.constant(3.)
     # Check the gradient on the undefined portion.
     x = scale - 1
-    self.assertAlmostEqual(self.evaluate(tfp.math.value_and_gradient(
-        tfd.Pareto(concentration, scale).prob, x)[1]), 0.)
+    self.assertAlmostEqual(
+        self.evaluate(
+            tfp.math.value_and_gradient(
+                tfd.Pareto(concentration, scale, validate_args=False).prob,
+                x)[1]), 0.)
 
   def testParetoCDFGradientZeroOutsideSupport(self):
     scale = tf.constant(1.)
     concentration = tf.constant(3.)
     # Check the gradient on the undefined portion.
     x = scale - 1
-    self.assertAlmostEqual(self.evaluate(tfp.math.value_and_gradient(
-        tfd.Pareto(concentration, scale).cdf, x)[1]), 0.)
+    self.assertAlmostEqual(
+        self.evaluate(
+            tfp.math.value_and_gradient(
+                tfd.Pareto(concentration, scale, validate_args=False).cdf,
+                x)[1]), 0.)
 
   def testParetoMean(self):
     scale = [1.4, 2., 2.5]
     concentration = [2., 3., 2.5]
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     self.assertEqual(pareto.mean().shape, (3,))
     self.assertAllClose(
         self.evaluate(pareto.mean()),
@@ -204,7 +210,7 @@ class ParetoTest(test_util.TestCase):
   def testParetoMeanInf(self):
     scale = [1.4, 2., 2.5]
     concentration = [0.4, 0.9, 0.99]
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     self.assertEqual(pareto.mean().shape, (3,))
 
     self.assertTrue(
@@ -213,7 +219,7 @@ class ParetoTest(test_util.TestCase):
   def testParetoVariance(self):
     scale = [1.4, 2., 2.5]
     concentration = [2., 3., 2.5]
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     self.assertEqual(pareto.variance().shape, (3,))
     self.assertAllClose(
         self.evaluate(pareto.variance()),
@@ -222,7 +228,7 @@ class ParetoTest(test_util.TestCase):
   def testParetoVarianceInf(self):
     scale = [1.4, 2., 2.5]
     concentration = [0.4, 0.9, 0.99]
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     self.assertEqual(pareto.variance().shape, (3,))
     self.assertTrue(
         np.all(np.isinf(self.evaluate(pareto.variance()))))
@@ -230,7 +236,7 @@ class ParetoTest(test_util.TestCase):
   def testParetoStd(self):
     scale = [1.4, 2., 2.5]
     concentration = [2., 3., 2.5]
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     self.assertEqual(pareto.stddev().shape, (3,))
     self.assertAllClose(
         self.evaluate(pareto.stddev()),
@@ -239,7 +245,7 @@ class ParetoTest(test_util.TestCase):
   def testParetoMode(self):
     scale = [0.4, 1.4, 2., 2.5]
     concentration = [1., 2., 3., 2.5]
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     self.assertEqual(pareto.mode().shape, (4,))
     self.assertAllClose(self.evaluate(pareto.mode()), scale)
 
@@ -247,7 +253,7 @@ class ParetoTest(test_util.TestCase):
     scale = 4.
     concentration = 3.
     n = int(100e3)
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     samples = pareto.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
@@ -262,7 +268,7 @@ class ParetoTest(test_util.TestCase):
     scale = 1.
     concentration = 3.
     n = int(400e3)
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     samples = pareto.sample(
         n, seed=test_util.test_seed(hardcoded_seed=123456))
     sample_values = self.evaluate(samples)
@@ -277,7 +283,7 @@ class ParetoTest(test_util.TestCase):
   def testParetoSampleMultidimensionalMean(self):
     scale = np.array([np.arange(1, 21, dtype=np.float32)])
     concentration = 3.
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     n = int(100e3)
     samples = pareto.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -292,7 +298,7 @@ class ParetoTest(test_util.TestCase):
   def testParetoSampleMultidimensionalVariance(self):
     scale = np.array([np.arange(1, 11, dtype=np.float32)])
     concentration = 4.
-    pareto = tfd.Pareto(concentration, scale)
+    pareto = tfd.Pareto(concentration, scale, validate_args=True)
     n = int(800e3)
     samples = pareto.sample(
         n, seed=test_util.test_seed(hardcoded_seed=123456))
@@ -312,8 +318,10 @@ class ParetoTest(test_util.TestCase):
     b_scale = 1.0
     b_concentration = np.arange(2.0, 10.0, 2)
 
-    a = tfd.Pareto(concentration=a_concentration, scale=a_scale)
-    b = tfd.Pareto(concentration=b_concentration, scale=b_scale)
+    a = tfd.Pareto(
+        concentration=a_concentration, scale=a_scale, validate_args=True)
+    b = tfd.Pareto(
+        concentration=b_concentration, scale=b_scale, validate_args=True)
 
     true_kl = (b_concentration * (np.log(a_scale) - np.log(b_scale)) +
                np.log(a_concentration) - np.log(b_concentration) +
@@ -335,8 +343,8 @@ class ParetoTest(test_util.TestCase):
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
   def testParetoParetoKLInfinite(self):
-    a = tfd.Pareto(concentration=1.0, scale=1.0)
-    b = tfd.Pareto(concentration=1.0, scale=2.0)
+    a = tfd.Pareto(concentration=1.0, scale=1.0, validate_args=True)
+    b = tfd.Pareto(concentration=1.0, scale=2.0, validate_args=True)
 
     kl = tfd.kl_divergence(a, b)
     kl_ = self.evaluate(kl)

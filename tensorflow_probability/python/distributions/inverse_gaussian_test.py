@@ -43,7 +43,8 @@ class _InverseGaussianTest(object):
   def testInverseGaussianShape(self):
     loc = self.make_tensor([2.] * 5)
     concentration = self.make_tensor([2.] * 5)
-    inverse_gaussian = tfd.InverseGaussian(loc, concentration)
+    inverse_gaussian = tfd.InverseGaussian(
+        loc, concentration, validate_args=True)
 
     self.assertEqual(self.evaluate(inverse_gaussian.batch_shape_tensor()), (5,))
     if self.use_static_shape:
@@ -55,7 +56,8 @@ class _InverseGaussianTest(object):
   def testInverseGaussianShapeBroadcast(self):
     loc = self.make_tensor([[4.], [5.], [6.]])
     concentration = self.make_tensor([[3., 2.]])
-    inverse_gaussian = tfd.InverseGaussian(loc, concentration)
+    inverse_gaussian = tfd.InverseGaussian(
+        loc, concentration, validate_args=True)
 
     self.assertAllEqual(self.evaluate(inverse_gaussian.batch_shape_tensor()),
                         (3, 2))
@@ -96,7 +98,8 @@ class _InverseGaussianTest(object):
     x_v = [3., 3.1, 4., 5., 6., 7.]
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor([loc_v] * batch_size),
-        self.make_tensor([concentration_v] * batch_size))
+        self.make_tensor([concentration_v] * batch_size),
+        validate_args=True)
 
     log_prob = inverse_gaussian.log_prob(self.make_tensor(x_v))
     if self.use_static_shape:
@@ -141,7 +144,8 @@ class _InverseGaussianTest(object):
     x_v = np.array([[6., 7., 9.2, 5., 6., 7.]]).T
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor([[loc_v]] * batch_size),
-        self.make_tensor([concentration_v] * batch_size))
+        self.make_tensor([concentration_v] * batch_size),
+        validate_args=True)
 
     log_prob = inverse_gaussian.log_prob(self.make_tensor(x_v))
     if self.use_static_shape:
@@ -164,7 +168,8 @@ class _InverseGaussianTest(object):
     x_v = [3., 3.1, 4., 5., 6., 7.]
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor([loc_v] * batch_size),
-        self.make_tensor([concentration_v] * batch_size))
+        self.make_tensor([concentration_v] * batch_size),
+        validate_args=True)
 
     log_cdf = inverse_gaussian.log_cdf(self.make_tensor(x_v))
     if self.use_static_shape:
@@ -209,7 +214,8 @@ class _InverseGaussianTest(object):
     x_v = np.array([[6., 7., 9.2, 5., 6., 7.]]).T
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor([[loc_v]] * batch_size),
-        self.make_tensor([concentration_v] * batch_size))
+        self.make_tensor([concentration_v] * batch_size),
+        validate_args=True)
 
     log_cdf = inverse_gaussian.log_cdf(self.make_tensor(x_v))
     if self.use_static_shape:
@@ -230,7 +236,8 @@ class _InverseGaussianTest(object):
     concentration_v = [1.4, 2., 2.5]
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
+        self.make_tensor(concentration_v),
+        validate_args=True)
     if self.use_static_shape:
       self.assertEqual(inverse_gaussian.mean().shape, (3,))
     self.assertAllClose(
@@ -242,7 +249,8 @@ class _InverseGaussianTest(object):
     concentration_v = [1.4, 2., 2.5]
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
+        self.make_tensor(concentration_v),
+        validate_args=True)
     if self.use_static_shape:
       self.assertEqual(inverse_gaussian.mean().shape, (3,))
     self.assertAllClose(
@@ -254,7 +262,8 @@ class _InverseGaussianTest(object):
     concentration_v = [1.4, 2., 2.5]
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
+        self.make_tensor(concentration_v),
+        validate_args=True)
 
     if self.use_static_shape:
       self.assertEqual(inverse_gaussian.variance().shape, (3,))
@@ -267,7 +276,8 @@ class _InverseGaussianTest(object):
     concentration_v = [1.4, 2., 2.5]
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
+        self.make_tensor(concentration_v),
+        validate_args=True)
 
     if self.use_static_shape:
       self.assertEqual(inverse_gaussian.variance().shape, (3,))
@@ -281,7 +291,8 @@ class _InverseGaussianTest(object):
     n = int(1e6)
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
+        self.make_tensor(concentration_v),
+        validate_args=True)
     samples = inverse_gaussian.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
@@ -300,7 +311,8 @@ class _InverseGaussianTest(object):
     n = int(1e6)
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
+        self.make_tensor(concentration_v),
+        validate_args=True)
     samples = inverse_gaussian.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
@@ -319,7 +331,8 @@ class _InverseGaussianTest(object):
     n = int(1e6)
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
+        self.make_tensor(concentration_v),
+        validate_args=True)
     samples = inverse_gaussian.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
@@ -338,7 +351,8 @@ class _InverseGaussianTest(object):
     n = int(1e6)
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
+        self.make_tensor(concentration_v),
+        validate_args=True)
     samples = inverse_gaussian.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 

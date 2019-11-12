@@ -130,7 +130,7 @@ class PlackettLuceTest(test_util.TestCase):
 
   def testSample(self):
     scores = np.array([[[0.1, 2.3, 5.], [4.2, 0.5, 3.1]]])
-    dist = tfd.PlackettLuce(scores)
+    dist = tfd.PlackettLuce(scores, validate_args=True)
     n = 100
     k = scores.shape[-1]
     samples = dist.sample(n, seed=test_util.test_seed())

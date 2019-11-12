@@ -36,19 +36,19 @@ class RelaxedBernoulliTest(test_util.TestCase):
     """Tests that parameter P is set correctly. Note that dist.p != dist.pdf."""
     temperature = 1.0
     p = [0.1, 0.4]
-    dist = tfd.RelaxedBernoulli(temperature, probs=p)
+    dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
     self.assertAllClose(p, self.evaluate(dist.probs))
 
   def testLogits(self):
     temperature = 2.0
     logits = [-42., 42.]
-    dist = tfd.RelaxedBernoulli(temperature, logits=logits)
+    dist = tfd.RelaxedBernoulli(temperature, logits=logits, validate_args=True)
     self.assertAllClose(logits, self.evaluate(dist.logits))
 
     self.assertAllClose(scipy.special.expit(logits), self.evaluate(dist.probs))
 
     p = [0.01, 0.99, 0.42]
-    dist = tfd.RelaxedBernoulli(temperature, probs=p)
+    dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
     self.assertAllClose(scipy.special.logit(p), self.evaluate(dist.logits))
 
   def testInvalidP(self):
@@ -69,14 +69,14 @@ class RelaxedBernoulliTest(test_util.TestCase):
 
     valid_ps = [0.0, 0.5, 1.0]
     for p in valid_ps:
-      dist = tfd.RelaxedBernoulli(temperature, probs=p)
+      dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
       self.assertEqual(p, self.evaluate(dist.probs))
 
   def testShapes(self):
     for batch_shape in ([], [1], [2, 3, 4]):
       temperature = 1.0
       p = np.random.random(batch_shape).astype(np.float32)
-      dist = tfd.RelaxedBernoulli(temperature, probs=p)
+      dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
       self.assertAllEqual(batch_shape,
                           tensorshape_util.as_list(dist.batch_shape))
       self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
@@ -95,7 +95,7 @@ class RelaxedBernoulliTest(test_util.TestCase):
   def testDtype(self):
     temperature = tf.constant(1.0, dtype=tf.float32)
     p = tf.constant([0.1, 0.4], dtype=tf.float32)
-    dist = tfd.RelaxedBernoulli(temperature, probs=p)
+    dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
     self.assertEqual(dist.dtype, tf.float32)
     self.assertEqual(dist.dtype, dist.sample(5).dtype)
     self.assertEqual(dist.probs.dtype, dist.prob([0.0]).dtype)
@@ -103,14 +103,14 @@ class RelaxedBernoulliTest(test_util.TestCase):
 
     temperature = tf.constant(1.0, dtype=tf.float64)
     p = tf.constant([0.1, 0.4], dtype=tf.float64)
-    dist64 = tfd.RelaxedBernoulli(temperature, probs=p)
+    dist64 = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
     self.assertEqual(dist64.dtype, tf.float64)
     self.assertEqual(dist64.dtype, dist64.sample(5).dtype)
 
   def testLogProb(self):
     t = np.array(1.0, dtype=np.float64)
     p = np.array(0.1, dtype=np.float64)  # P(x=1)
-    dist = tfd.RelaxedBernoulli(t, probs=p)
+    dist = tfd.RelaxedBernoulli(t, probs=p, validate_args=True)
     xs = np.array([0.1, 0.3, 0.5, 0.9], dtype=np.float64)
     # analytical density from Maddison et al. 2016
     alpha = np.array(p / (1 - p), dtype=np.float64)
@@ -122,7 +122,7 @@ class RelaxedBernoulliTest(test_util.TestCase):
 
   def testBoundaryConditions(self):
     temperature = 1e-2
-    dist = tfd.RelaxedBernoulli(temperature, probs=1.0)
+    dist = tfd.RelaxedBernoulli(temperature, probs=1.0, validate_args=True)
     self.assertAllClose(np.nan, self.evaluate(dist.log_prob(0.0)))
     self.assertAllClose([np.nan], [self.evaluate(dist.log_prob(1.0))])
 
@@ -130,7 +130,7 @@ class RelaxedBernoulliTest(test_util.TestCase):
     """mean of quantized samples still approximates the Bernoulli mean."""
     temperature = 1e-2
     p = [0.2, 0.6, 0.5]
-    dist = tfd.RelaxedBernoulli(temperature, probs=p)
+    dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
     n = 10000
     samples = dist.sample(n, seed=test_util.test_seed())
     self.assertEqual(samples.dtype, tf.float32)
@@ -165,13 +165,13 @@ class RelaxedBernoulliTest(test_util.TestCase):
 
   def testUnknownShape(self):
     logits = tf.Variable(np.zeros((1, 5)), shape=tf.TensorShape((1, None)))
-    d = tfd.RelaxedBernoulli(0.5, logits)
+    d = tfd.RelaxedBernoulli(0.5, logits, validate_args=True)
     self.evaluate(logits.initializer)
     d.sample()
 
     if not tf.executing_eagerly():
       logits = tf1.placeholder(tf.float32, shape=(1, None))
-      d = tfd.RelaxedBernoulli(0.5, logits=logits)
+      d = tfd.RelaxedBernoulli(0.5, logits=logits, validate_args=True)
       d.sample()
 
 

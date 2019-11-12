@@ -526,7 +526,8 @@ class JointDistributionCoroutineTest(test_util.TestCase):
           tfd.Sample(tfd.InverseGamma(2, 2), 100))
       yield tfd.Independent(tfd.Normal(0, s), 1)
     sd = collections.namedtuple('Model', ['s', 'w'])(None, None)
-    m = tfd.JointDistributionCoroutine(model, sample_dtype=sd)
+    m = tfd.JointDistributionCoroutine(
+        model, sample_dtype=sd, validate_args=True)
     self.assertEqual(
         ('tfp.distributions.JointDistributionCoroutine('
          '"JointDistributionCoroutine",'
@@ -581,7 +582,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
       yield tfd.Independent(tfd.Multinomial(total_count=z, logits=beta),
                             reinterpreted_batch_ndims=1)
 
-    lda = tfd.JointDistributionCoroutine(lda_model)
+    lda = tfd.JointDistributionCoroutine(lda_model, validate_args=True)
 
     # Now, let's sample some "documents" and compute the log-prob of each.
     docs_shape = [2, 4]  # That is, 8 docs in the shape of [2, 4].
@@ -612,7 +613,8 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     def dist():
       random_rank = tf.cast(3.5 + tf.random.uniform([]), tf.int32)
       yield Root(tfd.Normal(loc=0., scale=tf.ones([random_rank])))
-    joint = tfd.JointDistributionCoroutine(dist)
+
+    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
     @tf.function(autograph=False)
     def get_batch_shapes():

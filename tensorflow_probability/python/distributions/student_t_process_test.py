@@ -53,10 +53,7 @@ class _StudentTProcessTest(object):
           batched_index_points, shape=None)
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
     tp = tfd.StudentTProcess(
-        df,
-        kernel,
-        batched_index_points,
-        jitter=1e-5)
+        df, kernel, batched_index_points, jitter=1e-5, validate_args=True)
 
     batch_shape = [2, 4, 6]
     event_shape = [25]
@@ -105,7 +102,8 @@ class _StudentTProcessTest(object):
         df=df,
         kernel=kernel,
         index_points=index_points,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     def _kernel_fn(x, y):
       return amp ** 2 * np.exp(-.5 * (np.squeeze((x - y)**2)) / (len_scale**2))
@@ -124,7 +122,11 @@ class _StudentTProcessTest(object):
     kernel = psd_kernels.ExponentiatedQuadratic()
     index_points = np.expand_dims(np.random.uniform(-1., 1., 10), -1)
     tp = tfd.StudentTProcess(
-        df=3., kernel=kernel, index_points=index_points, mean_fn=mean_fn)
+        df=3.,
+        kernel=kernel,
+        index_points=index_points,
+        mean_fn=mean_fn,
+        validate_args=True)
     expected_mean = mean_fn(index_points)
     self.assertAllClose(expected_mean,
                         self.evaluate(tp.mean()))
@@ -149,7 +151,8 @@ class _StudentTProcessTest(object):
         kernel=kernel_1,
         index_points=index_points_1,
         mean_fn=mean_fn,
-        jitter=1e-5)
+        jitter=1e-5,
+        validate_args=True)
     tp2 = tp1.copy(df=4., index_points=index_points_2, kernel=kernel_2)
 
     event_shape_1 = [5]
@@ -195,7 +198,8 @@ class _StudentTProcessTest(object):
         df=np.float64(3.),
         kernel=kernel,
         mean_fn=mean_fn,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     index_points = np.random.uniform(-1., 1., [10, 1]).astype(np.float64)
 
@@ -221,7 +225,8 @@ class _StudentTProcessTest(object):
       tp.mean()
 
   def testMarginalHasCorrectTypes(self):
-    tp = tfd.StudentTProcess(df=3., kernel=psd_kernels.ExponentiatedQuadratic())
+    tp = tfd.StudentTProcess(
+        df=3., kernel=psd_kernels.ExponentiatedQuadratic(), validate_args=True)
 
     self.assertIsInstance(
         tp.get_marginal_distribution(

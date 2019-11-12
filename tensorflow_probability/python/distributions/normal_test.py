@@ -47,8 +47,10 @@ class NormalTest(test_util.TestCase):
     self.assertAllEqual(expected, self.evaluate(sigma_shape))
     mu = tf.zeros(mu_shape)
     sigma = tf.ones(sigma_shape)
-    self.assertAllEqual(expected,
-                        self.evaluate(tf.shape(tfd.Normal(mu, sigma).sample())))
+    self.assertAllEqual(
+        expected,
+        self.evaluate(
+            tf.shape(tfd.Normal(mu, sigma, validate_args=True).sample())))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.Normal.param_static_shapes(sample_shape)
@@ -79,7 +81,7 @@ class NormalTest(test_util.TestCase):
     mu = tf.constant([3.0] * batch_size)
     sigma = tf.constant([math.sqrt(10.0)] * batch_size)
     x = np.array([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0], dtype=np.float32)
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
 
     log_pdf = normal.log_prob(x)
     self.assertAllEqual(
@@ -110,7 +112,7 @@ class NormalTest(test_util.TestCase):
     sigma = tf.constant(
         [[math.sqrt(10.0), math.sqrt(15.0)]] * batch_size)
     x = np.array([[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0]], dtype=np.float32).T
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
 
     log_pdf = normal.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
@@ -144,7 +146,7 @@ class NormalTest(test_util.TestCase):
     sigma = self._rng.rand(batch_size) + 1.0
     x = np.linspace(-8.0, 8.0, batch_size).astype(np.float64)
 
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
     cdf = normal.cdf(x)
     self.assertAllEqual(
         self.evaluate(normal.batch_shape_tensor()), cdf.shape)
@@ -162,7 +164,7 @@ class NormalTest(test_util.TestCase):
     sigma = self._rng.rand(batch_size) + 1.0
     x = np.linspace(-8.0, 8.0, batch_size).astype(np.float64)
 
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
 
     sf = normal.survival_function(x)
     self.assertAllEqual(
@@ -181,7 +183,7 @@ class NormalTest(test_util.TestCase):
     sigma = self._rng.rand(batch_size) + 1.0
     x = np.linspace(-100.0, 10.0, batch_size).astype(np.float64)
 
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
 
     cdf = normal.log_cdf(x)
     self.assertAllEqual(
@@ -198,7 +200,10 @@ class NormalTest(test_util.TestCase):
   def testFiniteGradientAtDifficultPoints(self):
     def make_fn(dtype, attr):
       x = np.array([-100., -20., -5., 0., 5., 20., 100.]).astype(dtype)
-      return lambda m, s: getattr(tfd.Normal(loc=m, scale=s), attr)(x)
+      return lambda m, s: getattr(  # pylint: disable=g-long-lambda
+          tfd.Normal(loc=m, scale=s, validate_args=True), attr)(
+              x)
+
     for dtype in np.float32, np.float64:
       for attr in ['cdf', 'log_cdf', 'survival_function',
                    'log_survival_function', 'log_prob', 'prob']:
@@ -215,7 +220,7 @@ class NormalTest(test_util.TestCase):
     sigma = self._rng.rand(batch_size) + 1.0
     x = np.linspace(-10.0, 100.0, batch_size).astype(np.float64)
 
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
 
     sf = normal.log_survival_function(x)
     self.assertAllEqual(
@@ -233,7 +238,7 @@ class NormalTest(test_util.TestCase):
     # Scipy.sp_stats.norm cannot deal with the shapes in the other test.
     mu_v = 2.34
     sigma_v = 4.56
-    normal = tfd.Normal(loc=mu_v, scale=sigma_v)
+    normal = tfd.Normal(loc=mu_v, scale=sigma_v, validate_args=True)
 
     entropy = normal.entropy()
     self.assertAllEqual(
@@ -250,7 +255,7 @@ class NormalTest(test_util.TestCase):
   def testNormalEntropy(self):
     mu_v = np.array([1.0, 1.0, 1.0])
     sigma_v = np.array([[1.0, 2.0, 3.0]]).T
-    normal = tfd.Normal(loc=mu_v, scale=sigma_v)
+    normal = tfd.Normal(loc=mu_v, scale=sigma_v, validate_args=True)
 
     # scipy.sp_stats.norm cannot deal with these shapes.
     sigma_broadcast = mu_v * sigma_v
@@ -270,7 +275,7 @@ class NormalTest(test_util.TestCase):
     mu = [7.]
     sigma = [11., 12., 13.]
 
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
 
     self.assertAllEqual((3,), normal.mean().shape)
     self.assertAllEqual([7., 7, 7], self.evaluate(normal.mean()))
@@ -287,7 +292,7 @@ class NormalTest(test_util.TestCase):
     # special input values to make sure we hit all the pieces.
     p = np.hstack((p, np.exp(-33), 1. - np.exp(-33)))
 
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
     x = normal.quantile(p)
 
     self.assertAllEqual(
@@ -307,8 +312,8 @@ class NormalTest(test_util.TestCase):
     p = tf.constant(dtype([0., np.exp(-32.), np.exp(-2.),
                            1. - np.exp(-2.), 1. - np.exp(-32.), 1.]))
     value, grads = tfp.math.value_and_gradient(
-        lambda m, p_: tfd.Normal(loc=m, scale=sigma).quantile(p_),
-        [mu, p])
+        lambda m, p_: tfd.Normal(loc=m, scale=sigma, validate_args=True).  # pylint: disable=g-long-lambda
+        quantile(p_), [mu, p])
     value, grads = self.evaluate([value, grads])
     self.assertAllFinite(grads[0])
     self.assertAllFinite(grads[1])
@@ -324,7 +329,7 @@ class NormalTest(test_util.TestCase):
     mu = [1., 2., 3.]
     sigma = [7.]
 
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
 
     self.assertAllEqual((3,), normal.variance().shape)
     self.assertAllEqual([49., 49, 49], self.evaluate(normal.variance()))
@@ -334,7 +339,7 @@ class NormalTest(test_util.TestCase):
     mu = [1., 2., 3.]
     sigma = [7.]
 
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
 
     self.assertAllEqual((3,), normal.stddev().shape)
     self.assertAllEqual([7., 7, 7], self.evaluate(normal.stddev()))
@@ -345,7 +350,7 @@ class NormalTest(test_util.TestCase):
     mu_v = 3.0
     sigma_v = np.sqrt(3.0)
     n = tf.constant(100000)
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
     samples = normal.sample(n)
     sample_values = self.evaluate(samples)
     # Note that the standard error for the sample mean is ~ sigma / sqrt(n).
@@ -375,7 +380,7 @@ class NormalTest(test_util.TestCase):
     mu = tf.constant(4.0)
     sigma = tf.constant(3.0)
     _, [grad_mu, grad_sigma] = tfp.math.value_and_gradient(
-        lambda m, s: tfd.Normal(loc=m, scale=s).sample(100),
+        lambda m, s: tfd.Normal(loc=m, scale=s, validate_args=True).sample(100),
         [mu, sigma])
     grad_mu, grad_sigma = self.evaluate([grad_mu, grad_sigma])
     self.assertIsNotNone(grad_mu)
@@ -389,7 +394,7 @@ class NormalTest(test_util.TestCase):
     mu_v = [3.0, -3.0]
     sigma_v = [np.sqrt(2.0), np.sqrt(3.0)]
     n = tf.constant(100000)
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
     samples = normal.sample(n)
     sample_values = self.evaluate(samples)
     # Note that the standard error for the sample mean is ~ sigma / sqrt(n).
@@ -423,7 +428,7 @@ class NormalTest(test_util.TestCase):
   def testNormalShape(self):
     mu = tf.constant([-3.0] * 5)
     sigma = tf.constant(11.0)
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
 
     self.assertEqual(self.evaluate(normal.batch_shape_tensor()), [5])
     self.assertEqual(normal.batch_shape, tf.TensorShape([5]))
@@ -434,7 +439,7 @@ class NormalTest(test_util.TestCase):
     mu = tf1.placeholder_with_default(np.float32(5), shape=None)
     sigma = tf1.placeholder_with_default(
         np.float32([1.0, 2.0]), shape=None)
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
 
     # get_batch_shape should return an '<unknown>' tensor (graph mode only).
     self.assertEqual(normal.event_shape, ())
@@ -450,8 +455,8 @@ class NormalTest(test_util.TestCase):
     mu_b = np.array([-3.0] * batch_size)
     sigma_b = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
 
-    n_a = tfd.Normal(loc=mu_a, scale=sigma_a)
-    n_b = tfd.Normal(loc=mu_b, scale=sigma_b)
+    n_a = tfd.Normal(loc=mu_a, scale=sigma_a, validate_args=True)
+    n_b = tfd.Normal(loc=mu_b, scale=sigma_b, validate_args=True)
 
     kl = tfd.kl_divergence(n_a, n_b)
     kl_val = self.evaluate(kl)
@@ -501,7 +506,7 @@ class NormalEagerGCTest(test_util.TestCase):
     mu = [7.]
     sigma = [11., 12., 13.]
 
-    normal = tfd.Normal(loc=mu, scale=sigma)
+    normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
 
     self.assertAllEqual((3,), normal.mean().shape)
     self.assertAllEqual([7., 7, 7], self.evaluate(normal.mean()))

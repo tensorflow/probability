@@ -246,7 +246,8 @@ class _VariationalGaussianProcessTest(object):
         variational_inducing_observations_scale=(
             variational_inducing_observations_scale),
         observation_noise_variance=observation_noise_variance,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     loss = vgp.variational_loss(
         observations=observations,

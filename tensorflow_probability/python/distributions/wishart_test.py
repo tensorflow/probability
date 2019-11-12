@@ -56,11 +56,11 @@ class WishartTest(test_util.TestCase):
   def testEntropy(self):
     scale = make_pd(1., 2)
     df = 4
-    w = tfd.WishartTriL(df, scale_tril=chol(scale))
+    w = tfd.WishartTriL(df, scale_tril=chol(scale), validate_args=True)
     # sp.stats.wishart(df=4, scale=make_pd(1., 2)).entropy()
     self.assertAllClose(6.301387092430769, self.evaluate(w.entropy()))
 
-    w = tfd.WishartTriL(df=1, scale_tril=[[1.]])
+    w = tfd.WishartTriL(df=1, scale_tril=[[1.]], validate_args=True)
     # sp.stats.wishart(df=1,scale=1).entropy()
     self.assertAllClose(0.78375711047393404, self.evaluate(w.entropy()))
 
@@ -72,10 +72,11 @@ class WishartTest(test_util.TestCase):
                            0.5 * (w.df - dimension - 1.) * w.mean_log_det() +
                            0.5 * w.df * dimension)
 
-    w = tfd.WishartTriL(df=4, scale_tril=chol(make_pd(1., 2)))
+    w = tfd.WishartTriL(
+        df=4, scale_tril=chol(make_pd(1., 2)), validate_args=True)
     self.assertAllClose(self.evaluate(w.entropy()), entropy_alt(w))
 
-    w = tfd.WishartTriL(df=5, scale_tril=[[1.]])
+    w = tfd.WishartTriL(df=5, scale_tril=[[1.]], validate_args=True)
     self.assertAllClose(self.evaluate(w.entropy()), entropy_alt(w))
 
   def testParamBroadcasting(self):
@@ -95,7 +96,7 @@ class WishartTest(test_util.TestCase):
   def testMean(self):
     scale = make_pd(1., 2)
     df = 4
-    w = tfd.WishartTriL(df, scale_tril=chol(scale))
+    w = tfd.WishartTriL(df, scale_tril=chol(scale), validate_args=True)
     self.assertAllEqual(df * scale, self.evaluate(w.mean()))
 
   def testMeanBroadcast(self):
@@ -103,27 +104,27 @@ class WishartTest(test_util.TestCase):
     chol_scale = np.float32([chol(s) for s in scale])
     scale = np.float32(scale)
     df = np.array([4., 3.], dtype=np.float32)
-    w = tfd.WishartTriL(df, scale_tril=chol_scale)
+    w = tfd.WishartTriL(df, scale_tril=chol_scale, validate_args=True)
     self.assertAllEqual(
         df[..., np.newaxis, np.newaxis] * scale, self.evaluate(w.mean()))
 
   def testMode(self):
     scale = make_pd(1., 2)
     df = 4
-    w = tfd.WishartTriL(df, scale_tril=chol(scale))
+    w = tfd.WishartTriL(df, scale_tril=chol(scale), validate_args=True)
     self.assertAllEqual((df - 2. - 1.) * scale, self.evaluate(w.mode()))
 
   def testStd(self):
     scale = make_pd(1., 2)
     df = 4
-    w = tfd.WishartTriL(df, scale_tril=chol(scale))
+    w = tfd.WishartTriL(df, scale_tril=chol(scale), validate_args=True)
     self.assertAllEqual(
         np.sqrt(wishart_var(df, scale)), self.evaluate(w.stddev()))
 
   def testVariance(self):
     scale = make_pd(1., 2)
     df = 4
-    w = tfd.WishartTriL(df, scale_tril=chol(scale))
+    w = tfd.WishartTriL(df, scale_tril=chol(scale), validate_args=True)
     self.assertAllEqual(wishart_var(df, scale), self.evaluate(w.variance()))
 
   def testVarianceBroadcast(self):
@@ -131,7 +132,7 @@ class WishartTest(test_util.TestCase):
     chol_scale = np.float32([chol(s) for s in scale])
     scale = np.float32(scale)
     df = np.array([4., 3.], dtype=np.float32)
-    w = tfd.WishartTriL(df, scale_tril=chol_scale)
+    w = tfd.WishartTriL(df, scale_tril=chol_scale, validate_args=True)
     self.assertAllEqual(wishart_var(df, scale), self.evaluate(w.variance()))
 
   def testSamplingEmptyDist(self):
@@ -150,21 +151,29 @@ class WishartTest(test_util.TestCase):
     seed = test_util.test_seed()
 
     chol_w = tfd.WishartTriL(
-        df, scale_tril=chol(scale), input_output_cholesky=False)
+        df,
+        scale_tril=chol(scale),
+        input_output_cholesky=False,
+        validate_args=True)
 
     x = self.evaluate(chol_w.sample(1, seed=seed))
     chol_x = [chol(x[0])]
 
-    full_w = tfd.Wishart(df, scale, input_output_cholesky=False)
+    full_w = tfd.Wishart(
+        df, scale, input_output_cholesky=False, validate_args=True)
     self.assertAllClose(x, self.evaluate(full_w.sample(1, seed=seed)))
 
     chol_w_chol = tfd.WishartTriL(
-        df, scale_tril=chol(scale), input_output_cholesky=True)
+        df,
+        scale_tril=chol(scale),
+        input_output_cholesky=True,
+        validate_args=True)
     self.assertAllClose(chol_x, self.evaluate(chol_w_chol.sample(1, seed=seed)))
     eigen_values = tf.linalg.diag_part(chol_w_chol.sample(1000, seed=seed))
     np.testing.assert_array_less(0., self.evaluate(eigen_values))
 
-    full_w_chol = tfd.Wishart(df, scale=scale, input_output_cholesky=True)
+    full_w_chol = tfd.Wishart(
+        df, scale=scale, input_output_cholesky=True, validate_args=True)
     self.assertAllClose(chol_x, self.evaluate(full_w_chol.sample(1, seed=seed)))
     eigen_values = tf.linalg.diag_part(full_w_chol.sample(1000, seed=seed))
     np.testing.assert_array_less(0., self.evaluate(eigen_values))
@@ -173,7 +182,10 @@ class WishartTest(test_util.TestCase):
     # Check first and second moments.
     df = 4.
     chol_w = tfd.WishartTriL(
-        df=df, scale_tril=chol(make_pd(1., 3)), input_output_cholesky=False)
+        df=df,
+        scale_tril=chol(make_pd(1., 3)),
+        input_output_cholesky=False,
+        validate_args=True)
     x = chol_w.sample(10000, seed=test_util.test_seed(hardcoded_seed=42))
     self.assertAllEqual((10000, 3, 3), x.shape)
 
@@ -200,7 +212,9 @@ class WishartTest(test_util.TestCase):
         df=df,
         scale_tril=chol(make_pd(1., 3)),
         input_output_cholesky=False,
+        validate_args=True,
         name='wishart1')
+
     samples1 = self.evaluate(chol_w1.sample(n_val, seed=seed))
 
     tf1.set_random_seed(seed)
@@ -208,6 +222,7 @@ class WishartTest(test_util.TestCase):
         df=df,
         scale_tril=chol(make_pd(1., 3)),
         input_output_cholesky=False,
+        validate_args=True,
         name='wishart2')
     samples2 = self.evaluate(chol_w2.sample(n_val, seed=seed))
 
@@ -239,7 +254,10 @@ class WishartTest(test_util.TestCase):
 
     # This test checks that batches don't interfere with correctness.
     w = tfd.WishartTriL(
-        df=[2, 3, 4, 5], scale_tril=chol_x, input_output_cholesky=True)
+        df=[2, 3, 4, 5],
+        scale_tril=chol_x,
+        input_output_cholesky=True,
+        validate_args=True)
     self.assertAllClose(log_prob_df_seq, self.evaluate(w.log_prob(chol_x)))
 
     # Now we test various constructions of Wishart with different sample
@@ -256,10 +274,15 @@ class WishartTest(test_util.TestCase):
         -20.951582705289454,
     ])
 
-    for w in (tfd.WishartTriL(
-        df=4, scale_tril=chol_x[0], input_output_cholesky=False),
-              tfd.Wishart(df=4, scale=x[0], input_output_cholesky=False),
-             ):
+    for w in (
+        tfd.WishartTriL(
+            df=4,
+            scale_tril=chol_x[0],
+            input_output_cholesky=False,
+            validate_args=True),
+        tfd.Wishart(
+            df=4, scale=x[0], input_output_cholesky=False, validate_args=True),
+    ):
       dimension = (w.scale.domain_dimension_tensor() if 'WishartTriL' in w.name
                    else w.dimension)
       self.assertAllEqual((2, 2), self.evaluate(w.event_shape_tensor()))
@@ -275,10 +298,15 @@ class WishartTest(test_util.TestCase):
       self.assertAllEqual((2, 2),
                           w.log_prob(np.reshape(x, (2, 2, 2, 2))).shape)
 
-    for w in (tfd.WishartTriL(
-        df=4, scale_tril=chol_x[0], input_output_cholesky=True),
-              tfd.Wishart(df=4, scale=x[0], input_output_cholesky=True),
-             ):
+    for w in (
+        tfd.WishartTriL(
+            df=4,
+            scale_tril=chol_x[0],
+            input_output_cholesky=True,
+            validate_args=True),
+        tfd.Wishart(
+            df=4, scale=x[0], input_output_cholesky=True, validate_args=True),
+    ):
       dimension = (w.scale.domain_dimension_tensor() if 'WishartTriL' in w.name
                    else w.dimension)
       self.assertAllEqual((2, 2), self.evaluate(w.event_shape_tensor()))
@@ -298,46 +326,50 @@ class WishartTest(test_util.TestCase):
     scale = make_pd(1., 2)
     chol_scale = chol(scale)
 
-    w = tfd.WishartTriL(df=4, scale_tril=chol_scale)
+    w = tfd.WishartTriL(df=4, scale_tril=chol_scale, validate_args=True)
     self.assertAllEqual([], w.batch_shape)
     self.assertAllEqual([], self.evaluate(w.batch_shape_tensor()))
 
     w = tfd.WishartTriL(
-        df=[4., 4], scale_tril=np.array([chol_scale, chol_scale]))
+        df=[4., 4],
+        scale_tril=np.array([chol_scale, chol_scale]),
+        validate_args=True)
     self.assertAllEqual([2], w.batch_shape)
     self.assertAllEqual([2], self.evaluate(w.batch_shape_tensor()))
 
     scale_deferred = tf1.placeholder_with_default(
         chol_scale, shape=chol_scale.shape)
-    w = tfd.WishartTriL(df=4, scale_tril=scale_deferred)
+    w = tfd.WishartTriL(df=4, scale_tril=scale_deferred, validate_args=True)
     self.assertAllEqual([], self.evaluate(w.batch_shape_tensor()))
 
     scale_deferred = tf1.placeholder_with_default(
         np.array([chol_scale, chol_scale]), shape=None)
-    w = tfd.WishartTriL(df=4, scale_tril=scale_deferred)
+    w = tfd.WishartTriL(df=4, scale_tril=scale_deferred, validate_args=True)
     self.assertAllEqual([2], self.evaluate(w.batch_shape_tensor()))
 
   def testEventShape(self):
     scale = make_pd(1., 2)
     chol_scale = chol(scale)
 
-    w = tfd.WishartTriL(df=4, scale_tril=chol_scale)
+    w = tfd.WishartTriL(df=4, scale_tril=chol_scale, validate_args=True)
     self.assertAllEqual([2, 2], w.event_shape)
     self.assertAllEqual([2, 2], self.evaluate(w.event_shape_tensor()))
 
     w = tfd.WishartTriL(
-        df=[4., 4], scale_tril=np.array([chol_scale, chol_scale]))
+        df=[4., 4],
+        scale_tril=np.array([chol_scale, chol_scale]),
+        validate_args=True)
     self.assertAllEqual([2, 2], w.event_shape)
     self.assertAllEqual([2, 2], self.evaluate(w.event_shape_tensor()))
 
     scale_deferred = tf1.placeholder_with_default(
         chol_scale, shape=chol_scale.shape)
-    w = tfd.WishartTriL(df=4, scale_tril=scale_deferred)
+    w = tfd.WishartTriL(df=4, scale_tril=scale_deferred, validate_args=True)
     self.assertAllEqual([2, 2], self.evaluate(w.event_shape_tensor()))
 
     scale_deferred = tf1.placeholder_with_default(
         np.array([chol_scale, chol_scale]), shape=None)
-    w = tfd.WishartTriL(df=4, scale_tril=scale_deferred)
+    w = tfd.WishartTriL(df=4, scale_tril=scale_deferred, validate_args=True)
     self.assertAllEqual([2, 2], self.evaluate(w.event_shape_tensor()))
 
   def testValidateArgs(self):
@@ -418,7 +450,7 @@ class WishartTest(test_util.TestCase):
     scale_tril = np.stack([chol(s) for s in scale])
     scale_tril = np.reshape(np.concatenate([scale_tril]*3, axis=0),
                             batch_shape + [dims, dims])
-    wishart = tfd.WishartTriL(df=5, scale_tril=scale_tril)
+    wishart = tfd.WishartTriL(df=5, scale_tril=scale_tril, validate_args=True)
     x = wishart.sample(sample_shape, seed=test_util.test_seed())
     x_ = self.evaluate(x)
     expected_shape = sample_shape + batch_shape + [dims, dims]
@@ -437,7 +469,7 @@ class WishartTest(test_util.TestCase):
     scale_tril = np.stack([chol(s) for s in scale])
     scale_tril = np.reshape(np.concatenate([scale_tril]*3, axis=0),
                             batch_shape + [dims, dims])
-    wishart = tfd.WishartTriL(df=5, scale_tril=scale_tril)
+    wishart = tfd.WishartTriL(df=5, scale_tril=scale_tril, validate_args=True)
     x = np.random.randn(dims, dims)
     x = np.matmul(x, x.T)
     lp = wishart.log_prob(x)
@@ -455,7 +487,8 @@ class WishartTest(test_util.TestCase):
                         [0.25, 0.75]])
     df = np.arange(3., 8., dtype=np.float32)
     dist = tfd.MixtureSameFamily(
-        components_distribution=tfd.WishartTriL(df=df, scale_tril=chol(scale)),
+        components_distribution=tfd.WishartTriL(
+            df=df, scale_tril=chol(scale), validate_args=True),
         mixture_distribution=tfd.Categorical(logits=tf.zeros(df.shape)))
     x = np.random.randn(dims, dims)
     x = np.matmul(x, x.T)

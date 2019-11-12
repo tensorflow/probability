@@ -53,7 +53,8 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
   def testNamePropertyIsSetByInitArg(self):
     loc = [1., 2.]
     scale = tf.linalg.LinearOperatorIdentity(2)
-    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, name='Billy')
+    mvn = tfd.MultivariateNormalLinearOperator(
+        loc, scale, name='Billy', validate_args=True)
     self.assertStartsWith(mvn.name, 'Billy')
 
   def testLogPDFScalarBatch(self):
@@ -100,7 +101,7 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
   def testMeanAndCovariance(self):
     loc, scale = self._random_loc_and_scale(
         batch_shape=[3, 4], event_shape=[5])
-    mvn = tfd.MultivariateNormalLinearOperator(loc, scale)
+    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
 
     self.assertAllEqual(self.evaluate(mvn.mean()), loc)
     self.assertAllClose(

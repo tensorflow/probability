@@ -55,7 +55,10 @@ class QuantizedDistributionTest(test_util.TestCase):
     for lcut, ucut in [(None, None), (0.0, None), (None, 3.0), (0.0, 3.0),
                        (-10., 10.)]:
       qdist = tfd.QuantizedDistribution(
-          distribution=tfd.Uniform(low=0.0, high=3.0), low=lcut, high=ucut)
+          distribution=tfd.Uniform(low=0.0, high=3.0),
+          low=lcut,
+          high=ucut,
+          validate_args=True)
 
       # pmf
       pmf_n1, pmf_0, pmf_1, pmf_2, pmf_3, pmf_4, pmf_5 = self.evaluate(
@@ -97,7 +100,10 @@ class QuantizedDistributionTest(test_util.TestCase):
     # ...(-infty, -1](-1, 0](0, infty) ...
     #             -1      0     1
     qdist = tfd.QuantizedDistribution(
-        distribution=tfd.Uniform(low=-3., high=3.), low=-1.0, high=1.0)
+        distribution=tfd.Uniform(low=-3., high=3.),
+        low=-1.0,
+        high=1.0,
+        validate_args=True)
 
     # pmf
     cdf_n3, cdf_n2, cdf_n1, cdf_0, cdf_0p5, cdf_1, cdf_10 = self.evaluate(
@@ -132,7 +138,8 @@ class QuantizedDistributionTest(test_util.TestCase):
     uniform = tfd.Uniform(
         low=tf.zeros(batch_shape, dtype=tf.float32),
         high=10 * tf.ones(batch_shape, dtype=tf.float32))
-    qdist = tfd.QuantizedDistribution(distribution=uniform, low=None, high=None)
+    qdist = tfd.QuantizedDistribution(
+        distribution=uniform, low=None, high=None, validate_args=True)
 
     # x is random integers in {-3,...,12}.
     x = rng.randint(-3, 13, size=batch_shape).astype(np.float32)
@@ -160,7 +167,8 @@ class QuantizedDistributionTest(test_util.TestCase):
         loc=tf.zeros(batch_shape, dtype=tf.float32),
         scale=tf.ones(batch_shape, dtype=tf.float32))
 
-    qdist = tfd.QuantizedDistribution(distribution=normal, low=0., high=None)
+    qdist = tfd.QuantizedDistribution(
+        distribution=normal, low=0., high=None, validate_args=True)
 
     samps = qdist.sample(5000, seed=test_util.test_seed())
     samps_v = self.evaluate(samps)
@@ -186,7 +194,8 @@ class QuantizedDistributionTest(test_util.TestCase):
     # pretend that the cdf F is a bijection, and hence F(X) is uniform.
     # Note that F cannot be bijection since it is constant between the
     # integers.  Hence, F(X) (see below) will not be uniform exactly.
-    qdist = tfd.QuantizedDistribution(distribution=tfd.Exponential(rate=0.01))
+    qdist = tfd.QuantizedDistribution(
+        distribution=tfd.Exponential(rate=0.01), validate_args=True)
     # X ~ QuantizedExponential
     x = qdist.sample(10000, seed=test_util.test_seed())
     # Z = F(X), should be Uniform.
@@ -207,7 +216,8 @@ class QuantizedDistributionTest(test_util.TestCase):
     # it makes sure the bin edges are consistent.
 
     # Make an exponential with mean 5.
-    qdist = tfd.QuantizedDistribution(distribution=tfd.Exponential(rate=0.2))
+    qdist = tfd.QuantizedDistribution(
+        distribution=tfd.Exponential(rate=0.2), validate_args=True)
     # Standard error should be less than 1 / (2 * sqrt(n_samples))
     n_samples = 10000
     stddev_err_bound = 1 / (2 * np.sqrt(n_samples))
@@ -228,7 +238,7 @@ class QuantizedDistributionTest(test_util.TestCase):
     mu = rng.randn(*batch_shape)
     sigma = rng.rand(*batch_shape) + 1.0
     qdist = tfd.QuantizedDistribution(
-        distribution=tfd.Normal(loc=mu, scale=sigma))
+        distribution=tfd.Normal(loc=mu, scale=sigma), validate_args=True)
     sp_normal = stats.norm(mu, sigma)
 
     x = rng.randint(-5, 5, size=batch_shape).astype(np.float64)
@@ -244,7 +254,7 @@ class QuantizedDistributionTest(test_util.TestCase):
     mu = rng.randn(*batch_shape)
     sigma = rng.rand(*batch_shape) + 1.0
     qdist = tfd.QuantizedDistribution(
-        distribution=tfd.Normal(loc=mu, scale=sigma))
+        distribution=tfd.Normal(loc=mu, scale=sigma), validate_args=True)
     sp_normal = stats.norm(mu, sigma)
 
     x = rng.randint(-10, 10, size=batch_shape).astype(np.float64)
@@ -257,7 +267,10 @@ class QuantizedDistributionTest(test_util.TestCase):
   def testNormalProbWithCutoffs(self):
     # At integer values, the result should be the same as the standard normal.
     qdist = tfd.QuantizedDistribution(
-        distribution=tfd.Normal(loc=0., scale=1.), low=-2., high=2.)
+        distribution=tfd.Normal(loc=0., scale=1.),
+        low=-2.,
+        high=2.,
+        validate_args=True)
     sm_normal = stats.norm(0., 1.)
     # These cutoffs create partitions of the real line, and indices:
     # (-inf, -2](-2, -1](-1, 0](0, 1](1, inf)
@@ -282,7 +295,10 @@ class QuantizedDistributionTest(test_util.TestCase):
   def testNormalLogProbWithCutoffs(self):
     # At integer values, the result should be the same as the standard normal.
     qdist = tfd.QuantizedDistribution(
-        distribution=tfd.Normal(loc=0., scale=1.), low=-2., high=2.)
+        distribution=tfd.Normal(loc=0., scale=1.),
+        low=-2.,
+        high=2.,
+        validate_args=True)
     sm_normal = stats.norm(0., 1.)
     # These cutoffs create partitions of the real line, and indices:
     # (-inf, -2](-2, -1](-1, 0](0, 1](1, inf)
@@ -312,7 +328,7 @@ class QuantizedDistributionTest(test_util.TestCase):
 
       def inner_func(mu, sigma):
         qdist = tfd.QuantizedDistribution(
-            distribution=tfd.Normal(loc=mu, scale=sigma))
+            distribution=tfd.Normal(loc=mu, scale=sigma), validate_args=True)
         return qdist.log_prob(x)
 
       return inner_func
@@ -331,7 +347,7 @@ class QuantizedDistributionTest(test_util.TestCase):
       x = tf.math.ceil(4 * rng.rand(100).astype(np.float32) - 2)
 
       qdist = tfd.QuantizedDistribution(
-          distribution=tfd.Normal(loc=mu, scale=sigma))
+          distribution=tfd.Normal(loc=mu, scale=sigma), validate_args=True)
       return qdist.log_prob(x)
 
     mu = tf.Variable(0.0, name='mu')
@@ -380,7 +396,8 @@ class QuantizedDistributionTest(test_util.TestCase):
         distribution=tfd.Normal(
             loc=tf.zeros(batch_shape), scale=tf.ones(batch_shape)),
         low=1.0,
-        high=10.0)
+        high=10.0,
+        validate_args=True)
 
     self.assertEqual(batch_shape, qdist.batch_shape)
     self.assertAllEqual(batch_shape, self.evaluate(qdist.batch_shape_tensor()))

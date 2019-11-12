@@ -132,12 +132,14 @@ class BlockwiseTest(test_util.TestCase):
     d0 = tfd.Blockwise([
         tfd.Independent(gamma0, reinterpreted_batch_ndims=1),
         tfd.Independent(normal0, reinterpreted_batch_ndims=1)
-    ])
+    ],
+                       validate_args=True)
 
     d1 = tfd.Blockwise([
         tfd.Independent(gamma1, reinterpreted_batch_ndims=1),
         tfd.Independent(normal1, reinterpreted_batch_ndims=1)
-    ])
+    ],
+                       validate_args=True)
 
     kl_sum = tf.reduce_sum(
         input_tensor=(tfd.kl_divergence(gamma0, gamma1) +
@@ -162,7 +164,8 @@ class BlockwiseTest(test_util.TestCase):
         tfd.MultivariateNormalTriL(
             scale_tril=tf1.placeholder_with_default(
                 tf.eye(2, dtype=tf.float64), shape=None)),
-    ])
+    ],
+                       validate_args=True)
 
     d0_mvn = tfd.MultivariateNormalLinearOperator(
         loc=np.float64([0.] * 6),
@@ -180,7 +183,8 @@ class BlockwiseTest(test_util.TestCase):
             loc=tf.ones(2, dtype=tf.float64),
             scale_tril=tf1.placeholder_with_default(
                 np.float64([[1., 0.], [2., 3.]]), shape=None)),
-    ])
+    ],
+                       validate_args=True)
     d1_mvn = tfd.MultivariateNormalLinearOperator(
         loc=np.float64([1.] * 6),
         scale=tf.linalg.LinearOperatorBlockDiag([
@@ -242,7 +246,7 @@ class BlockwiseTestStaticParams(test_util.TestCase):
     """Checks that basic properties work with single Tensor distributions."""
     base = dist_fn(self)
 
-    flat = tfd.Blockwise(base)
+    flat = tfd.Blockwise(base, validate_args=True)
     if self.use_static_shape:
       self.assertAllEqual([num_elements], flat.event_shape)
     self.assertAllEqual([num_elements],
@@ -333,7 +337,7 @@ class BlockwiseTestStaticParams(test_util.TestCase):
     base = dist_fn(self)
     num_elements = sum(nums_elements)
 
-    flat = tfd.Blockwise(base)
+    flat = tfd.Blockwise(base, validate_args=True)
     if self.use_static_shape:
       self.assertAllEqual([num_elements], flat.event_shape)
     self.assertAllEqual([num_elements],
@@ -402,7 +406,7 @@ class BlockwiseTestStaticParams(test_util.TestCase):
     bases = dists_fn(self)
     num_elements = sum(nums_elements)
 
-    flat = tfd.Blockwise(bases)
+    flat = tfd.Blockwise(bases, validate_args=True)
     if self.use_static_shape:
       self.assertAllEqual([num_elements], flat.event_shape)
     self.assertAllEqual([num_elements],

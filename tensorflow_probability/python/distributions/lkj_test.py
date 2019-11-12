@@ -77,7 +77,8 @@ class LKJTest(test_util.TestCase):
     expected = 2.
     # 2x2 correlation matrices are determined by one number between -1
     # and 1, so the volume of density 1 over all of them is 2.
-    answer = self.evaluate(tfd.LKJ(2, dtype([1.]))._log_normalization())
+    answer = self.evaluate(
+        tfd.LKJ(2, dtype([1.]), validate_args=True)._log_normalization())
     self.assertAllClose(answer, np.log([expected]))
 
   def testNormConst3D(self, dtype):
@@ -92,7 +93,8 @@ class LKJTest(test_util.TestCase):
     # is also obtained by Rousseeuw, P. J., & Molenberghs,
     # G. (1994). "The shape of correlation matrices." The American
     # Statistician, 48(4), 276-279.
-    answer = self.evaluate(tfd.LKJ(3, dtype([1.]))._log_normalization())
+    answer = self.evaluate(
+        tfd.LKJ(3, dtype([1.]), validate_args=True)._log_normalization())
     self.assertAllClose(answer, np.log([expected]))
 
   def _testSampleLogProbExact(self,
@@ -331,7 +333,8 @@ class LKJTest(test_util.TestCase):
     self.assertEqual(results.shape, [4, 3, 2, 1, 1])
 
   def testMean(self, dtype):
-    testee_lkj = tfd.LKJ(dimension=3, concentration=dtype([1., 3., 5.]))
+    testee_lkj = tfd.LKJ(
+        dimension=3, concentration=dtype([1., 3., 5.]), validate_args=True)
     num_samples = 20000
     results = testee_lkj.sample(sample_shape=[num_samples])
     mean = testee_lkj.mean()

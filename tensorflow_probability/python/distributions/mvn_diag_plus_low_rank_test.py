@@ -378,7 +378,10 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
                     np.matmul(scale[1], scale[1].T)])
     tf1.logging.vlog(2, "expected_cov:\n{}".format(cov))
     mvn = tfd.MultivariateNormalDiagPlusLowRank(
-        loc=mu, scale_perturb_factor=u, scale_perturb_diag=m)
+        loc=mu,
+        scale_perturb_factor=u,
+        scale_perturb_diag=m,
+        validate_args=True)
     self.assertAllClose(
         cov, self.evaluate(mvn.covariance()), atol=0., rtol=1e-6)
 

@@ -286,11 +286,13 @@ class Triangular(distribution.Distribution):
           low, high, message='triangular not defined when low >= high.'))
     if (is_init != tensor_util.is_ref(self.low) and
         is_init != tensor_util.is_ref(self.peak)):
-      assertions.append(assert_util.assert_less(
-          low, peak, message='triangular not defined when low > peak.'))
+      assertions.append(
+          assert_util.assert_less_equal(
+              low, peak, message='triangular not defined when low > peak.'))
     if (is_init != tensor_util.is_ref(self.high) and
         is_init != tensor_util.is_ref(self.peak)):
-      assertions.append(assert_util.assert_less(
-          peak, high, message='triangular not defined when peak > high.'))
+      assertions.append(
+          assert_util.assert_less_equal(
+              peak, high, message='triangular not defined when peak > high.'))
 
     return assertions

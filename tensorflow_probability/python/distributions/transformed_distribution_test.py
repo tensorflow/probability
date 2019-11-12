@@ -104,7 +104,9 @@ class TransformedDistributionTest(test_util.TestCase):
     # Note: the Jacobian callable only works for this example; more generally
     # you may or may not need a reduce_sum.
     log_normal = self._cls()(
-        distribution=tfd.Normal(loc=mu, scale=sigma), bijector=tfb.Exp())
+        distribution=tfd.Normal(loc=mu, scale=sigma),
+        bijector=tfb.Exp(),
+        validate_args=True)
     sp_dist = stats.lognorm(s=sigma, scale=np.exp(mu))
 
     # sample
@@ -133,7 +135,8 @@ class TransformedDistributionTest(test_util.TestCase):
     sigma = 2.0
     abs_normal = self._cls()(
         distribution=tfd.Normal(loc=mu, scale=sigma),
-        bijector=tfb.AbsoluteValue())
+        bijector=tfb.AbsoluteValue(),
+        validate_args=True)
     sp_normal = stats.norm(mu, sigma)
 
     # sample
@@ -230,7 +233,9 @@ class TransformedDistributionTest(test_util.TestCase):
     mu = 3.0
     sigma = 0.02
     log_normal = self._cls()(
-        distribution=tfd.Normal(loc=mu, scale=sigma), bijector=exp_forward_only)
+        distribution=tfd.Normal(loc=mu, scale=sigma),
+        bijector=exp_forward_only,
+        validate_args=True)
 
     sample = log_normal.sample([2, 3], seed=test_util.test_seed())
     sample_val, log_pdf_val = self.evaluate(
@@ -260,7 +265,9 @@ class TransformedDistributionTest(test_util.TestCase):
     mu = 2.
     sigma = 1e-2
     exp_normal = self._cls()(
-        distribution=tfd.Normal(loc=mu, scale=sigma), bijector=log_forward_only)
+        distribution=tfd.Normal(loc=mu, scale=sigma),
+        bijector=log_forward_only,
+        validate_args=True)
 
     sample = exp_normal.sample(
         [2, 3], seed=test_util.test_seed(hardcoded_seed=42))
@@ -274,7 +281,10 @@ class TransformedDistributionTest(test_util.TestCase):
     softmax = tfb.SoftmaxCentered()
     standard_normal = tfd.Normal(loc=0., scale=1.)
     multi_logit_normal = self._cls()(
-        distribution=standard_normal, bijector=softmax, event_shape=[1])
+        distribution=standard_normal,
+        bijector=softmax,
+        event_shape=[1],
+        validate_args=True)
     x = [[[-np.log(3.)], [0.]], [[np.log(3)], [np.log(5)]]]
     x = np.float32(x)
     y = self.evaluate(softmax.forward(x))
@@ -373,7 +383,9 @@ class TransformedDistributionTest(test_util.TestCase):
 
   def testScalarBatchScalarEventIdentityScale(self):
     exp2 = self._cls()(
-        tfd.Exponential(rate=0.25), bijector=tfb.AffineScalar(scale=2.))
+        tfd.Exponential(rate=0.25),
+        bijector=tfb.AffineScalar(scale=2.),
+        validate_args=True)
     log_prob = exp2.log_prob(1.)
     log_prob_ = self.evaluate(log_prob)
     base_log_prob = -0.5 * 0.25 + np.log(0.25)

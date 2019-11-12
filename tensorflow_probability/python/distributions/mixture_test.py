@@ -116,7 +116,8 @@ def make_univariate_mixture(batch_shape, num_components, use_static_graph):
       for _ in range(num_components)
   ]
   cat = tfd.Categorical(logits, dtype=tf.int32)
-  return tfd.Mixture(cat, components, use_static_graph=use_static_graph)
+  return tfd.Mixture(
+      cat, components, use_static_graph=use_static_graph, validate_args=True)
 
 
 def make_multivariate_mixture(batch_shape, num_components, event_shape,
@@ -142,10 +143,13 @@ def make_multivariate_mixture(batch_shape, num_components, event_shape,
     scale_diag = 10 * tf.random.uniform(batch_and_event_shape)
     tensorshape_util.set_shape(loc, static_batch_and_event_shape)
     tensorshape_util.set_shape(scale_diag, static_batch_and_event_shape)
-    return tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
+    return tfd.MultivariateNormalDiag(
+        loc=loc, scale_diag=scale_diag, validate_args=True)
+
   components = [create_component() for _ in range(num_components)]
   cat = tfd.Categorical(logits, dtype=tf.int32)
-  return tfd.Mixture(cat, components, use_static_graph=use_static_graph)
+  return tfd.Mixture(
+      cat, components, use_static_graph=use_static_graph, validate_args=True)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -182,7 +186,8 @@ class MixtureTest(test_util.TestCase):
       tfd.Mixture(
           tfd.Categorical([0.1, 0.5]),  # 2 classes
           [tfd.Normal(loc=1.0, scale=2.0)],
-          use_static_graph=self.use_static_graph)
+          use_static_graph=self.use_static_graph,
+          validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         ValueError, r'components\[1\] batch shape must be compatible'):
       # The value error is raised because the batch shapes of the
@@ -194,12 +199,14 @@ class MixtureTest(test_util.TestCase):
               tfd.Normal(loc=1.0, scale=2.0),  # scalar dist
               tfd.Normal(loc=[1.0, 1.0], scale=[2.0, 2.0])
           ],
-          use_static_graph=self.use_static_graph)
+          use_static_graph=self.use_static_graph,
+          validate_args=True)
     with self.assertRaisesWithPredicateMatch(ValueError, r'Could not infer'):
       cat_logits = tf.Variable([[13., 19.]], shape=[1, None], dtype=tf.float32)
       tfd.Mixture(
           tfd.Categorical(cat_logits), [tfd.Normal(loc=[1.0], scale=[2.0])],
-          use_static_graph=self.use_static_graph)
+          use_static_graph=self.use_static_graph,
+          validate_args=True)
 
   def testBrokenShapesDynamic(self):
     d0_param = tf.Variable([2., 3], shape=tf.TensorShape(None))
@@ -220,24 +227,30 @@ class MixtureTest(test_util.TestCase):
 
   def testBrokenTypes(self):
     with self.assertRaisesWithPredicateMatch(TypeError, 'Categorical'):
-      tfd.Mixture(None, [], use_static_graph=self.use_static_graph)
+      tfd.Mixture(
+          None, [], use_static_graph=self.use_static_graph, validate_args=True)
     cat = tfd.Categorical([0.3, 0.2])
     # components must be a list of distributions
     with self.assertRaisesWithPredicateMatch(
         TypeError, 'all .* must be Distribution instances'):
-      tfd.Mixture(cat, [None], use_static_graph=self.use_static_graph)
+      tfd.Mixture(
+          cat, [None],
+          use_static_graph=self.use_static_graph,
+          validate_args=True)
     with self.assertRaisesWithPredicateMatch(TypeError, 'same dtype'):
       tfd.Mixture(
           cat, [
               tfd.Normal(loc=[1.0], scale=[2.0]),
               tfd.Normal(loc=[np.float16(1.0)], scale=[np.float16(2.0)]),
           ],
-          use_static_graph=self.use_static_graph)
+          use_static_graph=self.use_static_graph,
+          validate_args=True)
     with self.assertRaisesWithPredicateMatch(ValueError, 'non-empty list'):
       tfd.Mixture(
           tfd.Categorical([0.3, 0.2]),
           None,
-          use_static_graph=self.use_static_graph)
+          use_static_graph=self.use_static_graph,
+          validate_args=True)
 
     # TODO(ebrevdo): once distribution Domains have been added, add a
     # test to ensure that the domains of the distributions in a
@@ -387,7 +400,8 @@ class MixtureTest(test_util.TestCase):
             tfd.Normal(loc=component_means[0], scale=component_devs[0]),
             tfd.Normal(loc=component_means[1], scale=component_devs[1]),
         ],
-        use_static_graph=self.use_static_graph)
+        use_static_graph=self.use_static_graph,
+        validate_args=True)
     mix_dev = mixture_dist.stddev()
     actual_stddev = self.evaluate(mix_dev)
     self.assertAllClose(actual_stddev, ground_truth_stddev)
@@ -549,7 +563,8 @@ class MixtureTest(test_util.TestCase):
         cat,
         components,
         name='mixture1',
-        use_static_graph=self.use_static_graph)
+        use_static_graph=self.use_static_graph,
+        validate_args=True)
     samples1 = self.evaluate(dist1.sample(n, seed=seed))
 
     tf1.set_random_seed(seed)
@@ -561,7 +576,8 @@ class MixtureTest(test_util.TestCase):
         cat2,
         components2,
         name='mixture2',
-        use_static_graph=self.use_static_graph)
+        use_static_graph=self.use_static_graph,
+        validate_args=True)
     samples2 = self.evaluate(dist2.sample(n, seed=seed))
 
     self.assertAllClose(samples1, samples2)
@@ -722,7 +738,8 @@ class MixtureTest(test_util.TestCase):
     mixture_tf = tfd.Mixture(
         cat=cat_tf,
         components=components_tf,
-        use_static_graph=self.use_static_graph)
+        use_static_graph=self.use_static_graph,
+        validate_args=True)
 
     # These are two test cases to verify.
     xs_to_check = [
@@ -768,7 +785,8 @@ class MixtureTest(test_util.TestCase):
     mixture_tf = tfd.Mixture(
         cat=cat_tf,
         components=components_tf,
-        use_static_graph=self.use_static_graph)
+        use_static_graph=self.use_static_graph,
+        validate_args=True)
 
     xs_to_check = [
         np.array([1.0, 5.9, -3, 0.0, 0.0], dtype=np.float32),
@@ -801,7 +819,8 @@ class MixtureTest(test_util.TestCase):
     gm = tfd.Mixture(
         cat=tfd.Categorical(probs=[.3, .7]),
         components=[tfd.Gamma(1., 2.), tfd.Gamma(2., 1.)],
-        use_static_graph=self.use_static_graph)
+        use_static_graph=self.use_static_graph,
+        validate_args=True)
     x_ = self.evaluate(gm.sample())
     self.assertAllEqual([], x_.shape)
 
@@ -923,7 +942,10 @@ class MixtureBenchmark(tf.test.Benchmark):
           tfd.MultivariateNormalDiag(loc=mu, scale_diag=sigma)
           for (mu, sigma) in zip(mus, sigmas))
       return tfd.Mixture(
-          cat, components, use_static_graph=self.use_static_graph)
+          cat,
+          components,
+          use_static_graph=self.use_static_graph,
+          validate_args=True)
 
     for use_gpu in False, True:
       if use_gpu and not tf.test.is_gpu_available():
@@ -965,7 +987,10 @@ class MixtureBenchmark(tf.test.Benchmark):
               loc=mu, scale_tril=tf.linalg.cholesky(sigma))
           for (mu, sigma) in zip(mus, sigmas))
       return tfd.Mixture(
-          cat, components, use_static_graph=self.use_static_graph)
+          cat,
+          components,
+          use_static_graph=self.use_static_graph,
+          validate_args=True)
 
     for use_gpu in False, True:
       if use_gpu and not tf.test.is_gpu_available():

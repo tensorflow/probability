@@ -197,13 +197,14 @@ class SanityChecks(test_util.TestCase):
     model = tfd.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=[[step_coef]],
-        transition_noise=tfd.MultivariateNormalDiag(loc=[step_shift],
-                                                    scale_diag=[0.]),
+        transition_noise=tfd.MultivariateNormalDiag(
+            loc=[step_shift], scale_diag=[0.]),
         observation_matrix=[[observation_coef]],
-        observation_noise=tfd.MultivariateNormalDiag(loc=[observation_shift],
-                                                     scale_diag=[0.]),
-        initial_state_prior=tfd.MultivariateNormalDiag(loc=[prior_mean],
-                                                       scale_diag=[0.]))
+        observation_noise=tfd.MultivariateNormalDiag(
+            loc=[observation_shift], scale_diag=[0.]),
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            loc=[prior_mean], scale_diag=[0.]),
+        validate_args=True)
 
     # Manually compute expected output.
     expected_latents = [prior_mean]
@@ -235,7 +236,8 @@ class SanityChecks(test_util.TestCase):
         observation_noise=tfd.MultivariateNormalDiag(
             loc=[0.], scale_diag=[observation_scale]),
         initial_state_prior=tfd.MultivariateNormalDiag(
-            loc=[0.], scale_diag=[prior_scale]))
+            loc=[0.], scale_diag=[prior_scale]),
+        validate_args=True)
 
     # Manually compute the marginal variance at each step
     latent_variance = [prior_scale**2]
@@ -274,7 +276,8 @@ class SanityChecks(test_util.TestCase):
         observation_noise=tfd.MultivariateNormalDiag(
             scale_diag=[observation_noise_scale]),
         initial_state_prior=tfd.MultivariateNormalDiag(
-            loc=[prior_mean], scale_diag=[prior_scale]))
+            loc=[prior_mean], scale_diag=[prior_scale]),
+        validate_args=True)
 
     mean_, sample_ = self.evaluate([model.mean(), model.sample()])
 
@@ -319,7 +322,8 @@ class SanityChecks(test_util.TestCase):
         observation_matrix=[[1.]],
         observation_noise=observation_noise,
         initial_state_prior=tfd.MultivariateNormalDiag(
-            loc=[prior_mean], scale_diag=[prior_scale]))
+            loc=[prior_mean], scale_diag=[prior_scale]),
+        validate_args=True)
 
     variance_ = self.evaluate(model.variance())
 
@@ -348,7 +352,8 @@ class SanityChecks(test_util.TestCase):
         observation_noise=tfd.MultivariateNormalDiag(
             scale_diag=tf.fill([latent_size], tf.square(observation_std))),
         initial_state_prior=tfd.MultivariateNormalDiag(
-            scale_diag=tf.ones([latent_size])))
+            scale_diag=tf.ones([latent_size])),
+        validate_args=True)
 
     sample_, mean_, variance_ = self.evaluate(
         [model.sample(), model.mean(), model.variance()])
@@ -636,7 +641,8 @@ class MissingObservationsTests(test_util.TestCase):
         observation_matrix=observation_matrix,
         observation_noise=observation_noise,
         initial_state_prior=initial_state_prior,
-        initial_step=0)
+        initial_step=0,
+        validate_args=True)
 
     return (num_timesteps, transition_matrix, transition_noise,
             observation_matrix, observation_noise,
@@ -682,7 +688,8 @@ class MissingObservationsTests(test_util.TestCase):
         observation_matrix=observation_matrix,
         observation_noise=observation_noise,
         initial_state_prior=initial_state_prior,
-        initial_step=0)
+        initial_step=0,
+        validate_args=True)
 
     (log_likelihoods_, filtered_means_, filtered_covs_, predicted_means_,
      predicted_covs_, observation_means_, observation_covs_) = self.evaluate(
@@ -778,9 +785,10 @@ class MissingObservationsTests(test_util.TestCase):
         observation_matrix=observation_matrix,
         observation_noise=observation_noise,
         initial_state_prior=tfd.MultivariateNormalDiag(
-            scale_diag=np.random.randn(*(
-                batch_shape + [1])).astype(np.float32)),
-        initial_step=0)
+            scale_diag=np.random.randn(*(batch_shape +
+                                         [1])).astype(np.float32)),
+        initial_step=0,
+        validate_args=True)
 
     mask = np.random.randn(num_timesteps) > 0
     observed_time_series = np.random.randn(num_timesteps, 1).astype(np.float32)
@@ -877,7 +885,8 @@ class KalmanSmootherTest(test_util.TestCase):
         observation_matrix=self.observation_matrix,
         observation_noise=self.observation_noise,
         initial_state_prior=self.initial_state_prior,
-        initial_step=0)
+        initial_step=0,
+        validate_args=True)
 
   def testKalmanSmoother(self):
     obs = np.array(

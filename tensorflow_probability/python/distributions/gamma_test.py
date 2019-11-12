@@ -36,7 +36,7 @@ class GammaTest(test_util.TestCase):
   def testGammaShape(self):
     alpha = tf.constant([3.0] * 5)
     beta = tf.constant(11.0)
-    gamma = tfd.Gamma(concentration=alpha, rate=beta)
+    gamma = tfd.Gamma(concentration=alpha, rate=beta, validate_args=True)
 
     self.assertEqual(self.evaluate(gamma.batch_shape_tensor()), (5,))
     self.assertEqual(gamma.batch_shape, tf.TensorShape([5]))
@@ -50,7 +50,7 @@ class GammaTest(test_util.TestCase):
     alpha_v = 2.0
     beta_v = 3.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
-    gamma = tfd.Gamma(concentration=alpha, rate=beta)
+    gamma = tfd.Gamma(concentration=alpha, rate=beta, validate_args=True)
     log_pdf = gamma.log_prob(x)
     self.assertEqual(log_pdf.shape, (6,))
     pdf = gamma.prob(x)
@@ -63,7 +63,7 @@ class GammaTest(test_util.TestCase):
     # When concentration = 1, we have an exponential distribution. Check that at
     # 0 we have finite log prob.
     rate = np.array([0.1, 0.5, 1., 2., 5., 10.], dtype=np.float32)
-    gamma = tfd.Gamma(concentration=1., rate=rate)
+    gamma = tfd.Gamma(concentration=1., rate=rate, validate_args=False)
     log_pdf = gamma.log_prob(0.)
     self.assertAllClose(np.log(rate), self.evaluate(log_pdf))
 
@@ -74,7 +74,7 @@ class GammaTest(test_util.TestCase):
     alpha_v = np.array([2.0, 4.0])
     beta_v = np.array([3.0, 4.0])
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
-    gamma = tfd.Gamma(concentration=alpha, rate=beta)
+    gamma = tfd.Gamma(concentration=alpha, rate=beta, validate_args=True)
     log_pdf = gamma.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
     self.assertEqual(log_pdf.shape, (6, 2))
@@ -92,7 +92,7 @@ class GammaTest(test_util.TestCase):
     alpha_v = np.array([2.0, 4.0])
     beta_v = 3.0
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
-    gamma = tfd.Gamma(concentration=alpha, rate=beta)
+    gamma = tfd.Gamma(concentration=alpha, rate=beta, validate_args=True)
     log_pdf = gamma.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
     self.assertEqual(log_pdf.shape, (6, 2))
@@ -112,7 +112,7 @@ class GammaTest(test_util.TestCase):
     beta_v = 3.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
 
-    gamma = tfd.Gamma(concentration=alpha, rate=beta)
+    gamma = tfd.Gamma(concentration=alpha, rate=beta, validate_args=True)
     cdf = gamma.cdf(x)
     self.assertEqual(cdf.shape, (6,))
     expected_cdf = sp_stats.gamma.cdf(x, alpha_v, scale=1 / beta_v)
@@ -121,7 +121,7 @@ class GammaTest(test_util.TestCase):
   def testGammaMean(self):
     alpha_v = np.array([1.0, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
-    gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v)
+    gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v, validate_args=True)
     self.assertEqual(gamma.mean().shape, (3,))
     expected_means = sp_stats.gamma.mean(alpha_v, scale=1 / beta_v)
     self.assertAllClose(self.evaluate(gamma.mean()), expected_means)
@@ -129,7 +129,7 @@ class GammaTest(test_util.TestCase):
   def testGammaModeAllowNanStatsIsFalseWorksWhenAllBatchMembersAreDefined(self):
     alpha_v = np.array([5.5, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
-    gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v)
+    gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v, validate_args=True)
     expected_modes = (alpha_v - 1) / beta_v
     self.assertEqual(gamma.mode().shape, (3,))
     self.assertAllClose(self.evaluate(gamma.mode()), expected_modes)
@@ -139,7 +139,10 @@ class GammaTest(test_util.TestCase):
     alpha_v = np.array([0.5, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
     gamma = tfd.Gamma(
-        concentration=alpha_v, rate=beta_v, allow_nan_stats=False)
+        concentration=alpha_v,
+        rate=beta_v,
+        allow_nan_stats=False,
+        validate_args=True)
     with self.assertRaisesOpError(
         "Mode not defined when any concentration <= 1."):
       self.evaluate(gamma.mode())
@@ -149,7 +152,10 @@ class GammaTest(test_util.TestCase):
     alpha_v = np.array([0.5, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
     gamma = tfd.Gamma(
-        concentration=alpha_v, rate=beta_v, allow_nan_stats=True)
+        concentration=alpha_v,
+        rate=beta_v,
+        allow_nan_stats=True,
+        validate_args=True)
     expected_modes = (alpha_v - 1) / beta_v
     expected_modes[0] = np.nan
     self.assertEqual(gamma.mode().shape, (3,))
@@ -158,7 +164,7 @@ class GammaTest(test_util.TestCase):
   def testGammaVariance(self):
     alpha_v = np.array([1.0, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
-    gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v)
+    gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v, validate_args=True)
     self.assertEqual(gamma.variance().shape, (3,))
     expected_variances = sp_stats.gamma.var(alpha_v, scale=1 / beta_v)
     self.assertAllClose(self.evaluate(gamma.variance()), expected_variances)
@@ -166,7 +172,7 @@ class GammaTest(test_util.TestCase):
   def testGammaStd(self):
     alpha_v = np.array([1.0, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
-    gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v)
+    gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v, validate_args=True)
     self.assertEqual(gamma.stddev().shape, (3,))
     expected_stddev = sp_stats.gamma.std(alpha_v, scale=1. / beta_v)
     self.assertAllClose(self.evaluate(gamma.stddev()), expected_stddev)
@@ -174,7 +180,7 @@ class GammaTest(test_util.TestCase):
   def testGammaEntropy(self):
     alpha_v = np.array([1.0, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
-    gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v)
+    gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v, validate_args=True)
     self.assertEqual(gamma.entropy().shape, (3,))
     expected_entropy = sp_stats.gamma.entropy(alpha_v, scale=1 / beta_v)
     self.assertAllClose(self.evaluate(gamma.entropy()), expected_entropy)
@@ -185,7 +191,7 @@ class GammaTest(test_util.TestCase):
     alpha = tf.constant(alpha_v)
     beta = tf.constant(beta_v)
     n = 100000
-    gamma = tfd.Gamma(concentration=alpha, rate=beta)
+    gamma = tfd.Gamma(concentration=alpha, rate=beta, validate_args=True)
     samples = gamma.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
@@ -206,7 +212,7 @@ class GammaTest(test_util.TestCase):
     alpha = tf.constant(alpha_v)
     beta = tf.constant(beta_v)
     n = 100000
-    gamma = tfd.Gamma(concentration=alpha, rate=beta)
+    gamma = tfd.Gamma(concentration=alpha, rate=beta, validate_args=True)
     samples = gamma.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
@@ -226,15 +232,15 @@ class GammaTest(test_util.TestCase):
     alpha = tf.constant(4.0)
     beta = tf.constant(3.0)
     _, [grad_alpha, grad_beta] = tfp.math.value_and_gradient(
-        lambda a, b: tfd.Gamma(concentration=a, rate=b).sample(100),
-        [alpha, beta])
+        lambda a, b: tfd.Gamma(concentration=a, rate=b, validate_args=True).  # pylint: disable=g-long-lambda
+        sample(100), [alpha, beta])
     self.assertIsNotNone(grad_alpha)
     self.assertIsNotNone(grad_beta)
 
   def testGammaSampleMultiDimensional(self):
     alpha_v = np.array([np.arange(1, 101, dtype=np.float32)])  # 1 x 100
     beta_v = np.array([np.arange(1, 11, dtype=np.float32)]).T  # 10 x 1
-    gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v)
+    gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v, validate_args=True)
     n = 10000
     samples = gamma.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -269,7 +275,8 @@ class GammaTest(test_util.TestCase):
     return ks < 0.02
 
   def testGammaPdfOfSampleMultiDims(self):
-    gamma = tfd.Gamma(concentration=[7., 11.], rate=[[5.], [6.]])
+    gamma = tfd.Gamma(
+        concentration=[7., 11.], rate=[[5.], [6.]], validate_args=True)
     num = 50000
     samples = gamma.sample(num, seed=test_util.test_seed())
     pdfs = gamma.prob(samples)
@@ -323,8 +330,8 @@ class GammaTest(test_util.TestCase):
     beta1 = np.array([0.5, 1., 1.5, 2., 2.5, 3.])
 
     # Build graph.
-    g0 = tfd.Gamma(concentration=alpha0, rate=beta0)
-    g1 = tfd.Gamma(concentration=alpha1, rate=beta1)
+    g0 = tfd.Gamma(concentration=alpha0, rate=beta0, validate_args=True)
+    g1 = tfd.Gamma(concentration=alpha1, rate=beta1, validate_args=True)
     x = g0.sample(int(1e4), seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(g0.log_prob(x) - g1.log_prob(x), axis=0)
     kl_actual = tfd.kl_divergence(g0, g1)
@@ -348,7 +355,7 @@ class GammaTest(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def testGradientThroughConcentration(self):
     concentration = tf.Variable(3.)
-    d = tfd.Gamma(concentration=concentration, rate=5.)
+    d = tfd.Gamma(concentration=concentration, rate=5., validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([1., 2., 4.])
     grad = tape.gradient(loss, d.trainable_variables)
@@ -373,7 +380,7 @@ class GammaTest(test_util.TestCase):
 
   def testGradientThroughRate(self):
     rate = tf.Variable(3.)
-    d = tfd.Gamma(concentration=1., rate=rate)
+    d = tfd.Gamma(concentration=1., rate=rate, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([1., 2., 4.])
     grad = tape.gradient(loss, d.trainable_variables)

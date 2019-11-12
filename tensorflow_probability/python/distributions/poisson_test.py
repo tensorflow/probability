@@ -32,7 +32,7 @@ class PoissonTest(test_util.TestCase):
 
   def _make_poisson(self,
                     rate,
-                    validate_args=False,
+                    validate_args=True,
                     interpolate_nondiscrete=True):
     return tfd.Poisson(rate=rate,
                        validate_args=validate_args,
@@ -328,7 +328,7 @@ class PoissonLogRateTest(PoissonTest):
 
   def _make_poisson(self,
                     rate,
-                    validate_args=False,
+                    validate_args=True,
                     interpolate_nondiscrete=True):
     return tfd.Poisson(
         log_rate=tf.math.log(rate),
@@ -350,7 +350,7 @@ class PoissonLogRateTest(PoissonTest):
   # so log_rate needs to be defined as a Variable and passed directly.
   def testGradientThroughRate(self):
     log_rate = tf.Variable(3.)
-    dist = tfd.Poisson(log_rate=log_rate)
+    dist = tfd.Poisson(log_rate=log_rate, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -dist.log_prob([1., 2., 4.])
     grad = tape.gradient(loss, dist.trainable_variables)

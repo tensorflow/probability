@@ -50,7 +50,8 @@ class MultivariateNormalFullCovarianceTest(test_util.TestCase):
   def testNamePropertyIsSetByInitArg(self):
     mu = [1., 2.]
     sigma = [[1., 0.], [0., 1.]]
-    mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, name="Billy")
+    mvn = tfd.MultivariateNormalFullCovariance(
+        mu, sigma, name="Billy", validate_args=True)
     self.assertStartsWith(mvn.name, "Billy")
 
   def testDoesNotRaiseIfInitializedWithSymmetricMatrix(self):

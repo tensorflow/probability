@@ -51,8 +51,10 @@ class CauchyTest(test_util.TestCase):
     loc = tf.zeros(loc_shape)
     scale = tf.ones(scale_shape)
     self.assertAllEqual(
-        expected, self.evaluate(
-            tf.shape(input=tfd.Cauchy(loc, scale).sample())))
+        expected,
+        self.evaluate(
+            tf.shape(
+                input=tfd.Cauchy(loc, scale, validate_args=True).sample())))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.Cauchy.param_static_shapes(sample_shape)
@@ -75,7 +77,7 @@ class CauchyTest(test_util.TestCase):
     loc = tf.constant([3.0] * batch_size)
     scale = tf.constant([np.sqrt(10.0, dtype=np.float32)] * batch_size)
     x = np.array([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0], dtype=np.float32)
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
 
     log_pdf = cauchy.log_prob(x)
     self.assertAllEqual(
@@ -106,7 +108,7 @@ class CauchyTest(test_util.TestCase):
         [np.sqrt(10.0, dtype=np.float32),
          np.sqrt(15.0, dtype=np.float32)]] * batch_size)
     x = np.array([[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0]], dtype=np.float32).T
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
 
     log_pdf = cauchy.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
@@ -139,7 +141,7 @@ class CauchyTest(test_util.TestCase):
     scale = self._rng.rand(batch_size) + 1.0
     x = np.linspace(-8.0, 8.0, batch_size).astype(np.float64)
 
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
     cdf = cauchy.cdf(x)
     self.assertAllEqual(self.evaluate(cauchy.batch_shape_tensor()), cdf.shape)
     self.assertAllEqual(
@@ -156,7 +158,7 @@ class CauchyTest(test_util.TestCase):
     scale = self._rng.rand(batch_size) + 1.0
     x = np.linspace(-8.0, 8.0, batch_size).astype(np.float64)
 
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
 
     sf = cauchy.survival_function(x)
     self.assertAllEqual(self.evaluate(cauchy.batch_shape_tensor()), sf.shape)
@@ -174,7 +176,7 @@ class CauchyTest(test_util.TestCase):
     scale = self._rng.rand(batch_size) + 1.0
     x = np.linspace(-100.0, 10.0, batch_size).astype(np.float64)
 
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
 
     cdf = cauchy.log_cdf(x)
     self.assertAllEqual(self.evaluate(cauchy.batch_shape_tensor()), cdf.shape)
@@ -195,7 +197,10 @@ class CauchyTest(test_util.TestCase):
       x = np.array([-100., -20., -5., 0., 5., 20., 100.]).astype(dtype)
       def cauchy_function(name, x):
         def cauchy(loc, scale):
-          return getattr(tfd.Cauchy(loc=loc, scale=scale), name)(x)
+          return getattr(
+              tfd.Cauchy(loc=loc, scale=scale, validate_args=True), name)(
+                  x)
+
         return cauchy
 
       self.evaluate([loc.initializer, scale.initializer])
@@ -216,7 +221,7 @@ class CauchyTest(test_util.TestCase):
     scale = self._rng.rand(batch_size) + 1.0
     x = np.linspace(-10.0, 100.0, batch_size).astype(np.float64)
 
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
 
     sf = cauchy.log_survival_function(x)
     self.assertAllEqual(self.evaluate(cauchy.batch_shape_tensor()), sf.shape)
@@ -232,7 +237,7 @@ class CauchyTest(test_util.TestCase):
   def testCauchyEntropy(self):
     loc = np.array([1.0, 1.0, 1.0])
     scale = np.array([[1.0, 2.0, 3.0]])
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
 
     entropy = cauchy.entropy()
     self.assertAllEqual(
@@ -251,7 +256,7 @@ class CauchyTest(test_util.TestCase):
     loc = [7.]
     scale = [11., 12., 13.]
 
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
 
     self.assertAllEqual((3,), cauchy.mode().shape)
     self.assertAllEqual([7., 7, 7], self.evaluate(cauchy.mode()))
@@ -259,7 +264,7 @@ class CauchyTest(test_util.TestCase):
   def testCauchyMean(self):
     loc = [1., 2., 3.]
     scale = [7.]
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
 
     self.assertAllEqual((3,), cauchy.mean().shape)
     self.assertAllEqual([np.nan] * 3, self.evaluate(cauchy.mean()))
@@ -267,7 +272,8 @@ class CauchyTest(test_util.TestCase):
   def testCauchyNanMean(self):
     loc = [1., 2., 3.]
     scale = [7.]
-    cauchy = tfd.Cauchy(loc=loc, scale=scale, allow_nan_stats=False)
+    cauchy = tfd.Cauchy(
+        loc=loc, scale=scale, allow_nan_stats=False, validate_args=True)
 
     with self.assertRaises(ValueError):
       self.evaluate(cauchy.mean())
@@ -278,7 +284,7 @@ class CauchyTest(test_util.TestCase):
     scale = self._rng.rand(batch_size) + 1.0
     p = np.linspace(0.000001, 0.999999, batch_size).astype(np.float64)
 
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
     x = cauchy.quantile(p)
 
     self.assertAllEqual(self.evaluate(cauchy.batch_shape_tensor()), x.shape)
@@ -295,7 +301,7 @@ class CauchyTest(test_util.TestCase):
     # scale will be broadcast to [7, 7, 7]
     loc = [1., 2., 3.]
     scale = [7.]
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
 
     self.assertAllEqual((3,), cauchy.variance().shape)
     self.assertAllEqual([np.nan] * 3, self.evaluate(cauchy.variance()))
@@ -304,7 +310,8 @@ class CauchyTest(test_util.TestCase):
     # scale will be broadcast to [7, 7, 7]
     loc = [1., 2., 3.]
     scale = [7.]
-    cauchy = tfd.Cauchy(loc=loc, scale=scale, allow_nan_stats=False)
+    cauchy = tfd.Cauchy(
+        loc=loc, scale=scale, allow_nan_stats=False, validate_args=True)
 
     with self.assertRaises(ValueError):
       self.evaluate(cauchy.variance())
@@ -313,7 +320,7 @@ class CauchyTest(test_util.TestCase):
     # scale will be broadcast to [7, 7, 7]
     loc = [1., 2., 3.]
     scale = [7.]
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
 
     self.assertAllEqual((3,), cauchy.stddev().shape)
     self.assertAllEqual([np.nan] * 3, self.evaluate(cauchy.stddev()))
@@ -322,7 +329,8 @@ class CauchyTest(test_util.TestCase):
     # scale will be broadcast to [7, 7, 7]
     loc = [1., 2., 3.]
     scale = [7.]
-    cauchy = tfd.Cauchy(loc=loc, scale=scale, allow_nan_stats=False)
+    cauchy = tfd.Cauchy(
+        loc=loc, scale=scale, allow_nan_stats=False, validate_args=True)
 
     with self.assertRaises(ValueError):
       self.evaluate(cauchy.stddev())
@@ -332,7 +340,7 @@ class CauchyTest(test_util.TestCase):
     scale = tf.constant(1.0)
     loc_v = 3.0
     n = tf.constant(100000)
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
     samples = cauchy.sample(n)
     sample_values = self.evaluate(samples)
 
@@ -357,7 +365,7 @@ class CauchyTest(test_util.TestCase):
     scale = tf.constant([[0.5, 1.0]] * batch_size)
     loc_v = [3.0, -3.0]
     n = tf.constant(100000)
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
     samples = cauchy.sample(n)
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (100000, batch_size, 2))
@@ -382,7 +390,7 @@ class CauchyTest(test_util.TestCase):
   def testCauchyShape(self):
     loc = tf.constant([-3.0] * 5)
     scale = tf.constant(11.0)
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
 
     self.assertEqual(self.evaluate(cauchy.batch_shape_tensor()), [5])
     self.assertEqual(cauchy.batch_shape, tf.TensorShape([5]))
@@ -394,7 +402,7 @@ class CauchyTest(test_util.TestCase):
       return
     loc = tf1.placeholder_with_default(input=5., shape=[])
     scale = tf1.placeholder_with_default(input=[1., 2], shape=None)
-    cauchy = tfd.Cauchy(loc=loc, scale=scale)
+    cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
 
     # get_batch_shape should return an '<unknown>' tensor.
     self.assertEqual(cauchy.batch_shape, tf.TensorShape(None))
