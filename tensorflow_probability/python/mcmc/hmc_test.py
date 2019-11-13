@@ -943,6 +943,15 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
 
     optimizer = tf.optimizers.SGD(learning_rate=0.01)
 
+    # TODO(b/144045420): eliminate the need for this tf.function decorator. The
+    # reason it was added was that the test code is written to work in both
+    # eager and graph modes, and in order to do so, calls this funtion
+    # repeatedly in an optimization loop. In graph mode, that results in the
+    # graph growing during optimization which results in runtime quadratic in
+    # number of optimization steps. Decorating with tf.function means the graph
+    # doesn't grow, but is hacky. Instead, we should ensure the code is written
+    # performantly in eager and graph modes, potentially by forking the
+    # implementation based on tf.executing_eagerly().
     @tf.function(input_signature=[
         tf.TensorSpec(shape=[dims], dtype=tf.float32),
         tf.TensorSpec(shape=[], dtype=tf.float32),
