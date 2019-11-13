@@ -26,6 +26,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 
@@ -60,7 +61,8 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
 
   # TODO(b/74154679): Create Fake TransitionKernel and not rely on HMC.
 
-  def _ais_gets_correct_log_normalizer(self, init, independent_chain_ndims):
+  def _ais_gets_correct_log_normalizer(self, init, independent_chain_ndims,
+                                       use_transformed_kernel=False):
     counter = collections.Counter()
 
     def proposal_log_prob(x):
@@ -76,12 +78,22 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
 
     num_steps = 200
 
-    def make_kernel(tlp_fn):
-      return tfp.mcmc.HamiltonianMonteCarlo(
-          target_log_prob_fn=tlp_fn,
-          step_size=0.5,
-          num_leapfrog_steps=2,
-          seed=_maybe_seed(make_kernel.seed()))
+    if use_transformed_kernel:
+      def make_kernel(tlp_fn):
+        return tfp.mcmc.TransformedTransitionKernel(
+            inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
+                target_log_prob_fn=tlp_fn,
+                step_size=0.5,
+                num_leapfrog_steps=2,
+                seed=_maybe_seed(make_kernel.seed())),
+            bijector=tfb.Identity())
+    else:
+      def make_kernel(tlp_fn):
+        return tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=tlp_fn,
+            step_size=0.5,
+            num_leapfrog_steps=2,
+            seed=_maybe_seed(make_kernel.seed()))
 
     make_kernel.seed = tfp.util.SeedStream('make_kernel', 45)
 
@@ -140,12 +152,15 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
             event_size_))
     self.assertNear(ratio_estimate_true_.mean(), 1., 4. * standard_error_)
 
-  def _ais_gets_correct_log_normalizer_wrapper(self, independent_chain_ndims):
+  def _ais_gets_correct_log_normalizer_wrapper(self, independent_chain_ndims,
+                                               use_transformed_kernel=False):
     """Tests that AIS yields reasonable estimates of normalizers."""
     initial_draws = np.random.normal(size=[30, 2, 1])
     x_ph = tf1.placeholder_with_default(
         np.float32(initial_draws), shape=initial_draws.shape, name='x_ph')
-    self._ais_gets_correct_log_normalizer(x_ph, independent_chain_ndims)
+    self._ais_gets_correct_log_normalizer(
+        x_ph, independent_chain_ndims,
+        use_transformed_kernel=use_transformed_kernel)
 
   def testAIS1(self):
     self._ais_gets_correct_log_normalizer_wrapper(1)
@@ -155,6 +170,10 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
 
   def testAIS3(self):
     self._ais_gets_correct_log_normalizer_wrapper(3)
+
+  def testAISWithTransformedKernel(self):
+    self._ais_gets_correct_log_normalizer_wrapper(
+        1, use_transformed_kernel=True)
 
   def testSampleAIChainSeedReproducibleWorksCorrectly(self):
     independent_chain_ndims = 1
