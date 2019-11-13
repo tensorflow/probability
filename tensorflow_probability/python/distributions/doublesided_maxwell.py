@@ -151,7 +151,6 @@ class DoublesidedMaxwell(distribution.Distribution):
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
-        graph_parents=[self._loc, self._scale],
         name=name)
 
   @staticmethod
