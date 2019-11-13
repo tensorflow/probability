@@ -45,11 +45,14 @@ https://github.com/tensorflow/probability/blob/master/STYLE_GUIDE.md#tensorflow-
 3. All member functions must be _efficiently computable_. To us, efficiently
    computable means: computable in (at most) expected polynomial time.
 
-4. All member functions (except sample) must be exact. This means, for example,
-   Monte Carlo approximations are disallowed and even if they hard-code RNG
-   state (for reproducibility). For example, it is acceptable to implement an
-   efficiently computable analytical upper bound on entropy but it is not
-   acceptable to implement a Monte Carlo estimate of entropy.
+4. All member functions (except sample) must be deterministic, reproducible, and
+   platform invariant. The means no stochastic approximations (even seeded). For
+   example, it is acceptable to implement an efficiently
+   computable analytical upper bound on entropy but it is not acceptable to
+   implement a Monte Carlo estimate of entropy, even if that Monte Carlo
+   estimate uses a seeded RNG for reproducibility. It also acceptable to
+   implement an approximation of statistic (e.g., approximation of LogitNormal
+   mean), as long as this can be computed non-stochastically.
 
 5. Implementing other distribution properties is highly encouraged iff they are
    mathematically well-defined and efficiently computable. For example
@@ -66,13 +69,15 @@ https://github.com/tensorflow/probability/blob/master/STYLE_GUIDE.md#tensorflow-
    - *Exception*: `tfd.JointDistribution` takes/returns a `list`-like of
      `Tensor`s.
 
-7. A `Distribution`'s `event_ndims` must be known statically. For example,
+7. ~~A `Distribution`'s `event_ndims` must be known statically. For example,
    `Wishart` has `event_ndims=2`, `MultivariateNormalDiag` has `event_ndims=1`,
    `Normal` has `event_ndims=0`, `Categorical` has `event_ndims=0` and
    `OneHotCategorical` has `event_ndims=1`. The `event_shape` need not be known
    statically, i.e., this might only be known at runtime (in Eager mode) or at
    graph execution time (in graph mode). Often a `Distribution`'s `event_ndims`
-   will be self-evident from the class name itself.
+   will be self-evident from the class name itself.~~
+
+   - Redacted 07-nov-2019.
 
 8. All `Distribution`s are implicitly or explicitly conditioned on global or
    local (per-sample) parameters. A `Distribution` infers dtype and batch/event
@@ -95,6 +100,60 @@ https://github.com/tensorflow/probability/blob/master/STYLE_GUIDE.md#tensorflow-
     choose between mathematical purity and conveying intuitive meaning, prefer
     the latter but provide extensive documentation.
 
+12. TFP `Distribution`s guarantee that input arguments are not manipulated
+    by `__init__` except to convert non-TF-derived inputs to `tf.Tensor`s.
+
+    Among other things, this contract implies:
+
+      1. `tf.Variable`-derived `__init__` arguments are not read ("concretized")
+         until some computation is requested, e.g. a member function is called.
+         We call this "maximally deferred read" idea: "`tf.Variable` safety."
+
+      2. No additional computation result is stored in lieu of `__init__`
+         arguments except to convert them to `tf.Tensor`s (if they aren't
+         already). For reasons made clear below, we call this "non manipulation"
+         idea: "`tf.GradientTape` safety".
+
+    The above contract ensures several desirable features of `Distribution`s:
+
+      1. Evaluations of mutable arguments (including assertions) are re-run any
+         time the underlying values could possibly change. Example:
+
+         ```python
+         loc = tf.constant(0.)
+         scale = tf.Variable(1.)
+         d = tfp.distributions.Normal(loc, scale, validate_args=True)
+         d.log_prob(0.)
+         # ==> -0.918938
+         d.scale.assign(-1.)
+         d.log_prob(0.)
+         # ==> InvalidArgumentError: Argument `scale` must be positive.
+         ```
+
+      2. Gradients of public `Distribution` methods with respect to `__init__`
+         arguments are valid regardless of the `Distribution` being created
+         inside or outside the `tf.GradientTape`. Example:
+
+         ```python
+         loc = tf.constant(0.)
+         scale = tf.Variable(1.)
+         d = tfp.distributions.Normal(loc, scale, validate_args=True)
+         with tf.GradientTape() as tape:
+           tape.watch(loc)
+           # `tape.watch(scale)` is not required since `tf.GradientTape`
+           # automatically watches `tf.Variable` dependencies (by default).
+           x = -d.log_prob(1.)
+         grad = tape.gradient(x, [loc, scale, d.loc, d.scale])
+         assert all([g is not None for g in grad])
+         ```
+
+    Note that both of these properties would be lost if `__init__` memoized any
+    derived computation in lieu of the original `Tensor`-convertible arguments.
+
+13. `Distribution` and subclasses' `@property` methods shall never execute TF
+    ops. For example, in graph execution regime this implies calling `@property`
+    will never mutate the graph.
+
 ## Non-Requirements (Noncomprehensive)
 
 In this section we list items which have historically been presumed true of
@@ -102,10 +161,10 @@ In this section we list items which have historically been presumed true of
 
 1. Mutable state is not explicitly disallowed. However, it is _highly
    discouraged_ as it makes reasoning about the object more challenging (for
-   both API owner and user). As of 18-nov-2018, no `tfp.distributions` member
+   both API owner and user). As of 11-nov-2019, no `tfp.distributions` member
    has its own mutable state although all distributions do mutate the global
    random number generate state on access to `sample`.
 
 2. Subclasses are free to override public base class members. I.e., you don't
    have to follow the "public calls private" pattern. (However, as of
-   18-nov-2018, there has not yet been a reason to deviate from this pattern.)
+   11-nov-2019, there has not yet been a reason to deviate from this pattern.)
