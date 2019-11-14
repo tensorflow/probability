@@ -79,5 +79,26 @@ class ExpBijectorTest(test_util.TestCase):
     self.assertAllClose(fldj_, fldj_theoretical_)
 
 
+@test_util.test_all_tf_execution_regimes
+class LogBijectorTest(test_util.TestCase):
+
+  def testBijectorIsInvertExp(self):
+    x = np.linspace(1., 10., num=200)
+    log = tfb.Log()
+    invert_exp = tfb.Invert(tfb.Exp())
+    self.assertAllClose(
+        self.evaluate(log.forward(x)),
+        self.evaluate(invert_exp.forward(x)))
+    self.assertAllClose(
+        self.evaluate(log.inverse(x)),
+        self.evaluate(invert_exp.inverse(x)))
+    self.assertAllClose(
+        self.evaluate(log.forward_log_det_jacobian(x, event_ndims=1)),
+        self.evaluate(invert_exp.forward_log_det_jacobian(x, event_ndims=1)))
+    self.assertAllClose(
+        self.evaluate(log.inverse_log_det_jacobian(x, event_ndims=1)),
+        self.evaluate(invert_exp.inverse_log_det_jacobian(x, event_ndims=1)))
+
+
 if __name__ == '__main__':
   tf.test.main()

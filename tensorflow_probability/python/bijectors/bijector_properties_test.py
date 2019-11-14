@@ -55,6 +55,8 @@ TF2_FRIENDLY_BIJECTORS = (
     'Invert',
     'IteratedSigmoidCentered',
     'Kumaraswamy',
+    'Log',
+    'Log1p',
     'MatvecLU',
     'MatrixInverseTriL',
     'NormalCDF',

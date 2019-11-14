@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Exp Tests."""
+"""Expm1 Tests."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -33,7 +33,7 @@ class Expm1BijectorTest(test_util.TestCase):
 
   def testBijector(self):
     bijector = tfb.Expm1()
-    self.assertStartsWith(bijector.name, "expm1")
+    self.assertStartsWith(bijector.name, 'expm1')
     x = [[[-1.], [1.4]]]
     y = np.expm1(x)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
@@ -71,5 +71,26 @@ class Expm1BijectorTest(test_util.TestCase):
         bijector, x, y, eval_func=self.evaluate, event_ndims=0)
 
 
-if __name__ == "__main__":
+@test_util.test_all_tf_execution_regimes
+class Log1pBijectorTest(test_util.TestCase):
+
+  def testBijectorIsInvertExpm1(self):
+    x = np.linspace(0., 10., num=200)
+    log1p = tfb.Log1p()
+    invert_expm1 = tfb.Invert(tfb.Expm1())
+    self.assertAllClose(
+        self.evaluate(log1p.forward(x)),
+        self.evaluate(invert_expm1.forward(x)))
+    self.assertAllClose(
+        self.evaluate(log1p.inverse(x)),
+        self.evaluate(invert_expm1.inverse(x)))
+    self.assertAllClose(
+        self.evaluate(log1p.forward_log_det_jacobian(x, event_ndims=1)),
+        self.evaluate(invert_expm1.forward_log_det_jacobian(x, event_ndims=1)))
+    self.assertAllClose(
+        self.evaluate(log1p.inverse_log_det_jacobian(x, event_ndims=1)),
+        self.evaluate(invert_expm1.inverse_log_det_jacobian(x, event_ndims=1)))
+
+
+if __name__ == '__main__':
   tf.test.main()

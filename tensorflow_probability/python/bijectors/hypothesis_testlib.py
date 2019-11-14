@@ -169,6 +169,13 @@ def bijector_supports():
                           Support.VECTOR_WITH_L1_NORM_1_SIZE_GT1),
       'Kumaraswamy':
           BijectorSupport(Support.SCALAR_IN_0_1, Support.SCALAR_IN_0_1),
+      'Log':
+          BijectorSupport(
+              Support.SCALAR_POSITIVE, Support.SCALAR_UNCONSTRAINED),
+      'Log1p':
+          BijectorSupport(
+              Support.SCALAR_GT_NEG1, Support.SCALAR_UNCONSTRAINED),
+
       'MatrixInverseTriL':
           BijectorSupport(Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE,
                           Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),

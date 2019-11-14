@@ -34,7 +34,9 @@ from tensorflow_probability.python.bijectors.correlation_cholesky import Correla
 from tensorflow_probability.python.bijectors.cumsum import Cumsum
 from tensorflow_probability.python.bijectors.discrete_cosine_transform import DiscreteCosineTransform
 from tensorflow_probability.python.bijectors.exp import Exp
+from tensorflow_probability.python.bijectors.exp import Log
 from tensorflow_probability.python.bijectors.expm1 import Expm1
+from tensorflow_probability.python.bijectors.expm1 import Log1p
 from tensorflow_probability.python.bijectors.fill_scale_tril import FillScaleTriL
 from tensorflow_probability.python.bijectors.fill_scale_tril import ScaleTriL
 from tensorflow_probability.python.bijectors.fill_triangular import FillTriangular
@@ -108,6 +110,8 @@ __all__ = [
     "Invert",
     "IteratedSigmoidCentered",
     "Kumaraswamy",
+    "Log",
+    "Log1p",
     "MaskedAutoregressiveFlow",
     "MatrixInverseTriL",
     "MatvecLU",

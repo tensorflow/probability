@@ -375,6 +375,7 @@ py_library(
     name = "exp",
     srcs = ["exp.py"],
     deps = [
+        ":invert",
         ":power_transform",
     ],
 )
@@ -384,6 +385,7 @@ py_library(
     srcs = ["expm1.py"],
     deps = [
         ":bijector",
+        ":invert",
         # tensorflow dep,
     ],
 )
