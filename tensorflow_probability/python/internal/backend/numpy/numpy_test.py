@@ -628,6 +628,27 @@ class NumpyTest(test_util.TestCase):
         np.int32,
         convert_to_tensor(np.int32(False), dtype_hint=tf.bool).dtype)
 
+  def test_convert_to_tensor_dimension(self):
+    convert_to_tensor = numpy_backend.convert_to_tensor
+    shape = tf1.Dimension(1)
+
+    tensor_shape = convert_to_tensor(shape)
+    self.assertNotIsInstance(tensor_shape, tf1.Dimension)
+
+  def test_convert_to_tensor_dimension_list(self):
+    convert_to_tensor = numpy_backend.convert_to_tensor
+    shape = tf.TensorShape((1, 2))
+
+    tensor_shape = convert_to_tensor(shape)
+    for dim in tensor_shape:
+      self.assertNotIsInstance(dim, tf1.Dimension)
+
+    shape = [tf1.Dimension(1), tf1.Dimension(2)]
+    tensor_shape = convert_to_tensor(shape)
+
+    for dim in tensor_shape:
+      self.assertNotIsInstance(dim, tf1.Dimension)
+
   def evaluate(self, tensors):
     if tf.executing_eagerly():
       return self._eval_helper(tensors)
