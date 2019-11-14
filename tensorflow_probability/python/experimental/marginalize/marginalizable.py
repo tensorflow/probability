@@ -14,9 +14,12 @@
 # ============================================================================
 """Marginalizable probability distributions."""
 
+# pylint: disable=abstract-method, no-member
+
 from __future__ import print_function
 
-import tensorflow as tf
+import numpy as np
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 __all__ = [
@@ -54,36 +57,94 @@ def _squeezed_einsum(formula, *args):
   return result
 
 
+def _cartesian_product(*supports):
+  """Construct "cartesian product" of tensors.
+
+  Args:
+    *supports: a sequence of tensors `s1, ..., sn`.
+
+  Returns:
+    This function computes a tensor analogous to the cartesian
+    product of sets.
+    If `t = _cartesian_product(s1, ..., sn)` then
+    `t[i1, ..., in] = s1[i1] s2[i2] ... sn[in]`
+    where the elements on the right hand side are concatenated
+    together.
+
+    In particular, if `s1, ..., sn` are the supports of `n`
+    distributions, the cartesian product represents the support of the
+    product distribution.
+
+    For example if `a = [0, 1]`, b = [10, 20]` and
+    `c = _cartesian_product(a, b)` then
+    `c = [[[0, 10], [0, 20]], [[1, 10], [1, 20]]]`.
+    In this case note (for example) that
+    `a[0] = 0`, `b[1] = 20` and so `c[0, 1] = [0, 20]`.
+  """
+
+  return tf.stack(tf.meshgrid(*supports, indexing='ij'), axis=-1)
+
+
+def _power(support, n):
+  """Construct n-fold cartesian product of a tensor with itself."""
+  return _cartesian_product(*(n * [tf.expand_dims(support, -1)]))
+
+
 def _support(dist):
   """Compute support of a discrete distribution.
 
-  Currently supports Bernoulli and Categorical.
+  Currently supports `Bernoulli`, `Categorical` and `Sample`.
 
   Args:
     dist: a `tfd.Distribution` instance.
+
+  Returns:
+    pair consisting of support of distribution and the rank of
+    the underlying event type.
   """
 
   if isinstance(dist, tfd.Bernoulli):
-    return tf.range(2)
+    return tf.range(2), 0
   elif isinstance(dist, tfd.Categorical):
-    return tf.range(tf.shape(dist.probs_parameter())[-1])
+    return tf.range(tf.shape(dist.probs_parameter())[-1]), 0
+  elif isinstance(dist, tfd.Sample):
+    # The support of `tfd.Sample` is the n-fold cartesian product
+    # of the supports of the underlying distributions where
+    # `n` is the total size of the sample shape.
+
+    sample_shape, n = dist._expand_sample_shape_to_vector(  # pylint: disable=protected-access
+        dist.sample_shape, 'expand_sample_shape')
+    p, rank = _support(dist.distribution)
+    product = _power(p, n)
+    new_shape = tf.concat([tf.shape(product)[:-1], sample_shape], axis=-1)
+
+    new_rank = rank + tf.compat.v2.compat.dimension_value(
+        sample_shape.shape[0])
+    return tf.reshape(product, new_shape), new_rank
   else:
     raise ValueError('Unable to find support for distribution ' +
                      str(dist))
 
 
-def _expand_right(a, n):
-  """Insert multiple axes of size 1 at right end of tensor's shape.
+def _expand_right(a, n, pos):
+  """Insert multiple dimensions of size 1 at position `pos` in tensor's shape.
 
-  Equivalent to performing `expand_dims(..., -1)` `n` times.
+  Equivalent to performing `expand_dims(..., pos)` `n` times.
 
   Args:
-    a: tensor into which extra axes will be inserted.
-    n: number of inserted axes.
+    a: tensor into which extra dimensions will be inserted.
+    n: number of inserted dimensions.
+    pos: choice of dimension for insertion. Must be negative.
+
+  Returns:
+    Tensor with inserted dimensions.
   """
 
+  axis = tf.rank(a) + pos + 1
   return tf.reshape(a, tf.concat([
-      tf.shape(a), tf.ones([n], dtype=tf.int32)], axis=0))
+      tf.shape(a)[:axis],
+      tf.ones([n], dtype=tf.int32),
+      tf.shape(a)[axis:]], axis=0))
 
 
 def _letter(i):
@@ -132,7 +193,6 @@ class Marginalizable(object):
       Currently only a single log probability can be computed, so lists or
       tensors containing multiple samples from the joint distribution are
       not supported.
-      Currently only scalar distributions can be marginalized or tabulated.
       The performance of this operation is very sensitive to the reduction
       order chosen by `tf.einsum`. Incorrect ordering can result in
       orders of magnitude difference in the time taken to compute the result.
@@ -140,20 +200,21 @@ class Marginalizable(object):
       faster.
       The number of latent (i.e. marginalized or tabulated) variables is
       limited to 52 in this version.
+      The individual samples in `tfd.Sample` are mathematically independent
+      but the marginalization algorithm used is unable to exploit this fact,
+      meaning that computation time can easily grow exponentially with
+      `sample_shape`.
     """
     new_values = []
     indices = []
     formula = []
     table_rhs = []
-    shift = 0
+
+    # Number of independent variables created so far
+    num_variables = 0
 
     with tf.name_scope(name):
-      flat_values = self._model_flatten(values)
-
-      ds = self._get_single_sample_distributions()
-
-      for d in ds:
-        d.event_shape.assert_has_rank(0)
+      ds, _ = self._flat_sample_distributions()
 
       # Both 'marginalize' and 'tabulate' indicate that
       # instead of using samples provided by the user, this method
@@ -163,44 +224,65 @@ class Marginalizable(object):
       # At the end, the probabilities are computed using `tf.einsum`
       # and the unique axes means that each tabulated or marginalized
       # variable corresponds to one symbol used in the `einsum`.
-      for a, dist in zip(flat_values, ds):
-        if a == 'marginalize':
-          supp = _support(dist)
-          new_values.append(_expand_right(supp, shift))
-          indices = range(shift, -1, -1)
-          shift += 1
-          # By *not* placing an index on the right of the '->' in
+      for value, dist in zip(values, ds):
+        if value == 'marginalize':
+          supp, rank = _support(dist)
+          r = supp.shape.rank
+          num_new_variables = r - rank
+          # We can think of supp as being a tensor containing tensors,
+          # each of which is a draw from the distribution.
+          # `rank` is the rank of samples from the distribution.
+          # `num_new_variables` is the rank of the containing tensor.
+          # When we marginalize over a variable we want the sum
+          # over the containing tensor.
+          # So `num_new_variables` is the number of new indices needed.
+          # We use `expand_right` to ensure that each of these
+          # new indices is unique and independent of previous
+          # supports.
+          new_values.append(_expand_right(supp, n=num_variables, pos=-1 - rank))
+          num_variables += num_new_variables
+          indices = np.arange(num_variables - 1, -1, -1)
+          # By *not* placing indices on the right of the '->' in
           # the einsum below we ensure that this variable is
           # used for reduction, in effect marginalizing over
           # that variable.
           formula.append(indices)
-        elif a == 'tabulate':
-          supp = _support(dist)
-          new_values.append(_expand_right(supp, shift))
-          indices = range(shift, -1, -1)
-          shift += 1
-          # By placing an index on the right of the '->' in
+        elif value == 'tabulate':
+          supp, rank = _support(dist)
+          r = supp.shape.rank
+          if r is None:
+            raise ValueError('Need to be able to statically find rank of'
+                             'support of random variable: {}'.format(str(dist)))
+          num_new_variables = r - rank
+          new_values.append(_expand_right(supp, n=num_variables, pos=-1 - rank))
+          num_variables += num_new_variables
+          indices = np.arange(num_variables - 1, -1, -1)
+          # The first elements of `indices` are the newly
+          # introduced variables.
+          new_indices = indices[: num_new_variables]
+          # By placing indices on the right of the '->' in
           # the einsum below we ensure that this variable isn't
           # reduced over and that instead it is tabulated
           # in the resulting tensor.
-          table_rhs.append(indices[0])
+          table_rhs.extend(new_indices)
           formula.append(indices)
         else:
-          new_values.append(_expand_right(a, shift))
+          new_values.append(_expand_right(value, num_variables, -1))
+          indices = range(num_variables - 1, -1, -1)
           formula.append(indices)
       formula = [''.join(map(_letter, f)) for f in formula]
       formula_rhs = ''.join(map(_letter, table_rhs))
       formula = '{}->{}'.format(','.join(formula), formula_rhs)
 
-      # There is no `logsumexp_einsum` yet.
-      # TODO(b/144098450)
-      # So use higher precision of user requests it.
+      # There is no `logsumexp_einsum`.
+      # So use higher precision if user requests it.
       lpp = self.log_prob_parts(new_values)
       if internal_type:
-        lpp = tf.cast(lpp, dtype=internal_type)
+        lpp = [tf.cast(x, dtype=internal_type) for x in lpp]
       return tf.math.log(_squeezed_einsum(formula, *map(tf.exp, lpp)))
 
 
 class MarginalizableJointDistributionCoroutine(
     tfd.JointDistributionCoroutine, Marginalizable):
+
   pass

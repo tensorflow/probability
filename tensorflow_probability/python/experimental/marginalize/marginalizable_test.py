@@ -14,6 +14,8 @@
 # ============================================================================
 """Test the MarginalizableJointDistributionCoroutine distribution class."""
 
+# pylint: disable=abstract-method, no-member
+
 # To aid readability by humans it is common practice to name the
 # values yielded inside joint distribution models even though
 # they aren't used by the Python interpreter.
@@ -23,6 +25,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import itertools
 
 # Dependency imports
@@ -37,8 +40,20 @@ from tensorflow_probability.python.internal import test_util
 Root = tfd.JointDistributionCoroutine.Root
 
 
-def _cat(*a):
-  return tf.concat(a, axis=0)
+def _conform(ts):
+  """Broadcast all arguments to a common shape."""
+
+  shape = functools.reduce(
+      tf.broadcast_static_shape, [a.shape for a in ts])
+  return [tf.broadcast_to(a, shape) for a in ts]
+
+
+def _cat(*ts):
+  return tf.concat(ts, axis=0)
+
+
+def _stack(*ts):
+  return tf.stack(_conform(ts), axis=-1)
 
 
 def _tree_example(n, n_steps):
@@ -94,16 +109,19 @@ class _MarginalizeTest(
     test_util.TestCase):
 
   def test_basics(self):
-    probs = np.random.rand(20)
+    probs = np.random.rand(20) + 0.001
+    probs = probs / np.sum(probs)
 
     def model():
       i = yield Root(tfd.Categorical(probs=probs, dtype=tf.int32))
-      j = yield Root(tfd.Categorical(probs=probs, dtype=tf.int32))
-      k = yield Root(tfd.Categorical(probs=probs, dtype=tf.int32))
+      j = yield tfd.Categorical(probs=probs, dtype=tf.int32)
+      k = yield tfd.Categorical(probs=probs, dtype=tf.int32)
 
     dist = marginalize.MarginalizableJointDistributionCoroutine(model)
 
-    p = tf.exp(dist.marginalized_log_prob(['tabulate', 'tabulate', 'tabulate']))
+    p = tf.exp(dist.marginalized_log_prob(['tabulate',
+                                           'tabulate',
+                                           'tabulate']))
     self.assertEqual(p.shape, [20, 20, 20])
     self.assertAllClose(tf.reduce_sum(p), 1.0)
 
@@ -111,6 +129,52 @@ class _MarginalizeTest(
                                            'marginalize',
                                            'marginalize']))
     self.assertAllClose(s, 1.0)
+
+  def test_simple_network(self):
+    # From https://en.wikipedia.org/wiki/Bayesian_network#Example
+    def model():
+      raining = yield Root(tfd.Bernoulli(probs=0.2, dtype=tf.int32))
+      sprinkler_prob = [0.4, 0.01]
+      sprinkler_prob = tf.gather(sprinkler_prob, raining)
+      sprinkler = yield tfd.Bernoulli(probs=sprinkler_prob, dtype=tf.int32)
+      grass_wet_prob = [[0.0, 0.8],
+                        [0.9, 0.99]]
+      grass_wet_prob = tf.gather_nd(grass_wet_prob, _stack(sprinkler, raining))
+      grass_wet = yield tfd.Bernoulli(probs=grass_wet_prob, dtype=tf.int32)
+
+    d = marginalize.MarginalizableJointDistributionCoroutine(model)
+    # We want to know the probability that it was raining
+    # and we want to marginalize over the state of the sprinkler.
+    observations = ['tabulate',     # We want to know the probability it rained.
+                    'marginalize',  # We don't know the sprinkler state.
+                    1]              # We observed a wet lawn.
+    p = tf.exp(d.marginalized_log_prob(observations))
+    p = p / tf.reduce_sum(p)
+    self.assertAllClose(p[1], 0.357688)
+
+  def test_sample_distribution(self):
+    probs = np.random.rand(4) + 0.001
+    probs = probs / np.sum(probs)
+
+    def model():
+      i = yield Root(
+          tfd.Sample(
+              tfd.Categorical(probs=probs, dtype=tf.int32), sample_shape=[2]))
+      # Note use of scalar `sample_shape` to test expansion of shape
+      # to vector.
+      j = yield tfd.Sample(
+          tfd.Categorical(probs=probs, dtype=tf.int32), sample_shape=2)
+
+    dist = marginalize.MarginalizableJointDistributionCoroutine(model)
+
+    ptt = tf.exp(dist.marginalized_log_prob(['tabulate', 'tabulate']))
+    ptm = tf.exp(dist.marginalized_log_prob(['tabulate', 'marginalize']))
+    pmt = tf.exp(dist.marginalized_log_prob(['marginalize', 'tabulate']))
+    pmm = tf.exp(dist.marginalized_log_prob(['marginalize', 'marginalize']))
+    self.assertEqual(ptt.shape, [4, 4, 4, 4])
+    self.assertEqual(ptm.shape, [4, 4])
+    self.assertEqual(pmt.shape, [4, 4])
+    self.assertEqual(pmm.shape, [])
 
   def test_hmm(self):
     n_steps = 4
@@ -154,6 +218,31 @@ class _MarginalizeTest(
     q = q / tf.reduce_sum(q)
 
     self.assertAllClose(p, q)
+
+  def test_markov_chain_stationary(self):
+    n_steps = 52
+    initial_prob = tf.constant([0.6, 0.4], dtype=tf.float64)
+    transition_matrix = tf.constant([[0.6, 0.4],
+                                     [0.3, 0.7]], dtype=tf.float64)
+
+    def model():
+      i = yield Root(tfd.Categorical(probs=initial_prob,
+                                     dtype=tf.int32))
+
+      for t in range(n_steps - 1):
+        i = yield tfd.Categorical(probs=tf.gather(transition_matrix, i),
+                                  dtype=tf.int32)
+
+      yield tfd.Deterministic(i)
+
+    dist = marginalize.MarginalizableJointDistributionCoroutine(model)
+    # Compute probability of ending in state 1 by marginalizing out
+    # all intermediate states.
+    # Limiting distribution as `n_steps` -> infinity is exactly 4/7.
+    observations = n_steps * ['marginalize'] + [1]
+    p = tf.exp(dist.marginalized_log_prob(observations,
+                                          internal_type=tf.float64))
+    self.assertAllClose(p, 4./7.)
 
   def test_particle_tree(self):
     # m particles are born at the same random location on an n x n grid.
@@ -219,6 +308,28 @@ class _MarginalizeTest(
     # `marginalized_log_prob` will run faster when the elimination
     # order chosen by `tf.einsum` closer matches `_tree_example` above.
     self.assertAllClose(p, q)
+
+  def test_marginalized_gradient(self):
+    n = 10
+
+    mu1 = tf.Variable(3.)
+    mu2 = tf.Variable(3.)
+
+    def model():
+      change_year = yield Root(tfd.Categorical(probs=tf.ones(n) / n))
+      for year in range(n):
+        post_change_year = tf.cast(year >= change_year, dtype=tf.int32)
+        mu = tf.gather([mu1, mu2], post_change_year)
+        accidents = yield tfd.Poisson(mu)
+
+    counts = np.ones([n], dtype=np.float32)
+    dist = marginalize.MarginalizableJointDistributionCoroutine(model)
+    obs = ['marginalize'] + list(counts)
+    with tf.GradientTape() as tape:
+      loss = -dist.marginalized_log_prob(obs)
+    grad = tape.gradient(loss, [mu1, mu2])
+    self.assertLen(grad, 2)
+    self.assertAllNotNone(grad)
 
 
 if __name__ == '__main__':
