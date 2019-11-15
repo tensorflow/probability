@@ -1017,9 +1017,13 @@ def pick_vector(cond, true_vector, false_vector, name='pick_vector'):
     true_vector: `Tensor` of one dimension. Returned when cond is `True`.
     false_vector: `Tensor` of one dimension. Returned when cond is `False`.
     name: Python `str`. The name to give this op.
-  Example:  ```python pick_vector(tf.less(0, 5), tf.range(10, 12), tf.range(15,
-    18))  # [10, 11] pick_vector(tf.less(5, 0), tf.range(10, 12), tf.range(15,
-    18))  # [15, 16, 17] ```
+
+  Example:
+
+  ```python
+  pick_vector(tf.less(0, 5), tf.range(10, 12), tf.range(15, 18))  # [10, 11]
+  pick_vector(tf.less(5, 0), tf.range(10, 12), tf.range(15, 18))  # [15, 16, 17]
+  ```
 
   Returns:
     true_or_false_vector: `Tensor`.
