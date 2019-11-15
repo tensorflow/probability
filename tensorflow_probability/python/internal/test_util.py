@@ -63,7 +63,7 @@ flags.DEFINE_string('fixed_seed', None,
 class TestCase(tf.test.TestCase, parameterized.TestCase):
   """Class to provide TensorFlow Probability specific test features."""
 
-  def maybe_static(self, x, is_static=True):
+  def maybe_static(self, x, is_static):
     """If `not is_static`, return placeholder_with_default with unknown shape.
 
     Args:

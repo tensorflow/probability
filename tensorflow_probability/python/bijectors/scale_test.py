@@ -46,7 +46,7 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
   )
   def testNoBatchScale(self, is_static, dtype):
     bijector = tfb.Scale(scale=dtype(2.))
-    x = self.maybe_static(np.array([1., 2, 3], dtype))
+    x = self.maybe_static(np.array([1., 2, 3], dtype), is_static)
     self.assertAllClose([2., 4, 6], bijector.forward(x))
     self.assertAllClose([.5, 1, 1.5], bijector.inverse(x))
     self.assertAllClose(
@@ -62,7 +62,7 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
   def testBatchScale(self, is_static, dtype):
     # Batched scale
     bijector = tfb.Scale(scale=dtype([2., 3.]))
-    x = self.maybe_static(np.array([1.], dtype=dtype))
+    x = self.maybe_static(np.array([1.], dtype=dtype), is_static)
     self.assertAllClose([2., 3.], bijector.forward(x))
     self.assertAllClose([0.5, 1./3.], bijector.inverse(x))
     self.assertAllClose(
