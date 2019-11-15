@@ -331,3 +331,13 @@ py_test(
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
+
+exports_files(
+    [
+        "gradient.py",
+        "generic.py",
+        "numeric.py",
+        "linalg.py",
+    ],
+    visibility = ["//tensorflow_probability:__subpackages__"],
+)

@@ -332,3 +332,18 @@ py_test(
         # tensorflow dep,
     ],
 )
+
+exports_files(
+    [
+        "special_math.py",
+        "assert_util.py",
+        "tensor_util.py",
+        "distribution_util.py",
+        "prefer_static.py",
+        "dtype_util.py",
+    ],
+    visibility = [
+        "//tensorflow_probability:__subpackages__",
+        "//tensorflow_probability/google:friends",
+    ],
+)

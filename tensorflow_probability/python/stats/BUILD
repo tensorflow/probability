@@ -171,3 +171,8 @@ py_test(
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
+
+exports_files(
+    ["leave_one_out.py"],
+    visibility = ["//tensorflow_probability:__subpackages__"],
+)

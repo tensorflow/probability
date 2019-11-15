@@ -78,3 +78,8 @@ py_test(
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
+
+exports_files(
+    ["seed_stream.py"],
+    visibility = ["//tensorflow_probability:__subpackages__"],
+)
