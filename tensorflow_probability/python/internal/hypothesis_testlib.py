@@ -20,7 +20,9 @@ from __future__ import print_function
 
 import contextlib
 import os
+import re
 import traceback
+import unittest
 
 # Dependency imports
 import hypothesis as hp
@@ -43,6 +45,16 @@ def randomize_hypothesis():
 def hypothesis_max_examples(default=None):
   # Use --test_env=TFP_HYPOTHESIS_MAX_EXAMPLES=1000 to get fuller coverage.
   return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', default or 20))
+
+
+def hypothesis_reproduction_seed():
+  # Use --test_env=TFP_HYPOTHESIS_REPRODUCE=hexjunk to reproduce a failure.
+  return os.environ.get('TFP_HYPOTHESIS_REPRODUCE', None)
+
+
+def running_under_guitar():
+  # The Guitar build sets --test_env=TFP_GUITAR=1
+  return bool(int(os.environ.get('TFP_GUITAR', 0)))
 
 
 def tfp_hp_settings(default_max_examples=None, **kwargs):
@@ -68,7 +80,60 @@ def tfp_hp_settings(default_max_examples=None, **kwargs):
       max_examples=hypothesis_max_examples(default=default_max_examples),
       print_blob=hp.PrintSettings.ALWAYS)
   kwds.update(kwargs)
-  return hp.settings(**kwds)
+  def decorator(test_method):
+    seed = hypothesis_reproduction_seed()
+    if seed is not None:
+      # This implements the semantics of TFP_HYPOTHESIS_REPRODUCE via
+      # the `hp.reproduce_failure` decorator.
+      test_method = hp.reproduce_failure('3.56.5', seed)(test_method)
+    return hp.settings(**kwds)(test_method)
+  return decorator
+
+
+def guitar_skip(reason):
+  """Skips tests in the Guitar build.
+
+  Why skip specifically in Guitar?  The Guitar build uses more compute to look
+  for bad inputs than our regular test suite.  It is therefore common for a test
+  to be failing in Guitar but passing on TAP.  This calls for disabling it in
+  Guitar, to keep Guitar green, while leaving it enabled on TAP, to get its
+  value as a presubmit.
+
+  Args:
+    reason: Python string.  The reason to skip, or a reference to the relevant
+      bug.
+
+  Returns nothing.
+
+  Raises:
+    SkipTest: If the test should be skipped.
+  """
+  if running_under_guitar():
+    raise unittest.case.SkipTest(reason)
+
+
+def guitar_skip_if_matches(pattern, name, reason):
+  """Skips tests in the Guitar build if `name` matches `pattern`.
+
+  This is an alternative to `guitar_skip` for parameterized tests, when the
+  goal is to disable only some tests in a parameterized group.
+
+  Args:
+    pattern: Regex to apply to `name` to detect whether to skip.
+    name: Python string giving a "name" for this test, e.g., the Bijector or
+      Distribution being tested.  The test will be skipped if this matches the
+      `pattern`.
+    reason: Python string.  The reason to skip, or a reference to the relevant
+      bug.
+
+  Returns nothing.
+
+  Raises:
+    SkipTest: If the test should be skipped.
+  """
+  if running_under_guitar():
+    if re.search(pattern, name):
+      raise unittest.case.SkipTest(reason)
 
 
 VAR_USAGES = {}
