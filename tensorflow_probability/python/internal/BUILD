@@ -344,6 +344,6 @@ exports_files(
     ],
     visibility = [
         "//tensorflow_probability:__subpackages__",
-        "//tensorflow_probability/google:friends",
+#         "//tensorflow_probability/google:friends",  # DisableOnExport
     ],
 )
