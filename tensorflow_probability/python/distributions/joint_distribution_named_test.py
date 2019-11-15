@@ -153,6 +153,70 @@ class JointDistributionNamedTest(test_util.TestCase):
     self.assertAllClose(*self.evaluate([expected_jlp, actual_jlp]),
                         atol=0., rtol=1e-4)
 
+  def test_ordereddict_sample_log_prob(self):
+    build_ordereddict = lambda e, scale, loc, m, x: collections.OrderedDict([  # pylint: disable=g-long-lambda
+        ('e', e), ('scale', scale), ('loc', loc), ('m', m), ('x', x)])
+
+    # pylint: disable=bad-whitespace
+    model = build_ordereddict(
+        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
+        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+        loc  =          tfd.Normal(loc=0, scale=2.),
+        m    =          tfd.Normal,
+        x    =lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12))
+    # pylint: enable=bad-whitespace
+    d = tfd.JointDistributionNamed(model, validate_args=True)
+
+    self.assertEqual(
+        (
+            ('e', ()),
+            ('scale', ('e',)),
+            ('loc', ()),
+            ('m', ('loc', 'scale')),
+            ('x', ('m',)),
+        ),
+        d._resolve_graph())
+
+    xs = d.sample(seed=test_util.test_seed())
+    self.assertLen(xs, 5)
+    # We'll verify the shapes work as intended when we plumb these back into the
+    # respective log_probs.
+
+    ds, _ = d.sample_distributions(value=xs)
+    self.assertLen(ds, 5)
+    values = tuple(ds.values())
+    self.assertIsInstance(values[0], tfd.Independent)
+    self.assertIsInstance(values[1], tfd.Gamma)
+    self.assertIsInstance(values[2], tfd.Normal)
+    self.assertIsInstance(values[3], tfd.Normal)
+    self.assertIsInstance(values[4], tfd.Sample)
+
+    # Static properties.
+    self.assertAllEqual(build_ordereddict(
+        e=tf.float32, scale=tf.float32, loc=tf.float32,
+        m=tf.float32, x=tf.int32), d.dtype)
+
+    batch_shape_tensor_, event_shape_tensor_ = self.evaluate([
+        d.batch_shape_tensor(), d.event_shape_tensor()])
+
+    expected_batch_shape = build_ordereddict(e=[], scale=[], loc=[], m=[], x=[])
+    for (expected, actual_tensorshape, actual_shape_tensor_) in zip(
+        expected_batch_shape, d.batch_shape, batch_shape_tensor_):
+      self.assertAllEqual(expected, actual_tensorshape)
+      self.assertAllEqual(expected, actual_shape_tensor_)
+
+    expected_event_shape = build_ordereddict(
+        e=[2], scale=[], loc=[], m=[], x=[12])
+    for (expected, actual_tensorshape, actual_shape_tensor_) in zip(
+        expected_event_shape, d.event_shape, event_shape_tensor_):
+      self.assertAllEqual(expected, actual_tensorshape)
+      self.assertAllEqual(expected, actual_shape_tensor_)
+
+    expected_jlp = sum(d.log_prob(x) for d, x in zip(ds.values(), xs.values()))
+    actual_jlp = d.log_prob(xs)
+    self.assertAllClose(*self.evaluate([expected_jlp, actual_jlp]),
+                        atol=0., rtol=1e-4)
+
   def test_kl_divergence(self):
     d0 = tfd.JointDistributionNamed(
         dict(e=tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
