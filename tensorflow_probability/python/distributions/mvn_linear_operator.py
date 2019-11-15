@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -249,29 +250,51 @@ class MultivariateNormalLinearOperator(
 
   def _variance(self):
     if distribution_util.is_diagonal_scale(self.scale):
-      return tf.square(self.scale.diag_part())
+      variance = tf.square(self.scale.diag_part())
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
-      return self.scale.matmul(self.scale.adjoint()).diag_part()
+      variance = self.scale.matmul(self.scale.adjoint()).diag_part()
     elif isinstance(self.scale, tf.linalg.LinearOperatorKronecker):
       factors_sq_operators = [
           factor.matmul(factor.adjoint()) for factor in self.scale.operators
       ]
-      return tf.linalg.LinearOperatorKronecker(factors_sq_operators).diag_part()
+      variance = (tf.linalg.LinearOperatorKronecker(factors_sq_operators)
+                  .diag_part())
     else:
-      return self.scale.matmul(self.scale.adjoint()).diag_part()
+      variance = self.scale.matmul(self.scale.adjoint()).diag_part()
+
+    return tf.broadcast_to(
+        variance,
+        prefer_static.broadcast_shape(
+            prefer_static.shape(variance),
+            prefer_static.shape(self.loc)))
 
   def _stddev(self):
     if distribution_util.is_diagonal_scale(self.scale):
-      return tf.abs(self.scale.diag_part())
+      stddev = tf.abs(self.scale.diag_part())
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
-      return tf.sqrt(
+      stddev = tf.sqrt(
           tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense())))
     else:
-      return tf.sqrt(
+      stddev = tf.sqrt(
           tf.linalg.diag_part(
               self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)))
+
+    shape = tensorshape_util.concatenate(self.batch_shape, self.event_shape)
+    has_static_shape = tensorshape_util.is_fully_defined(shape)
+    if not has_static_shape:
+      shape = tf.concat([
+          self.batch_shape_tensor(),
+          self.event_shape_tensor(),
+      ], 0)
+
+    if has_static_shape and shape == stddev.shape:
+      return stddev
+
+    # Add dummy tensor of zeros to broadcast.  This is only necessary if shape
+    # != stddev.shape, but we could not determine if this is the case.
+    return stddev + tf.zeros(shape, self.dtype)
 
   def _mode(self):
     return self._mean()

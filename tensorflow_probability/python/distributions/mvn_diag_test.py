@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 from scipy import stats
 
@@ -42,7 +43,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
   def testScalarParams(self):
     mu = -1.
     diag = -5.
-    with self.assertRaisesRegexp(ValueError, "at least 1 dimension"):
+    with self.assertRaisesRegexp(ValueError, 'at least 1 dimension'):
       tfd.MultivariateNormalDiag(mu, diag)
 
   def testVectorParams(self):
@@ -99,7 +100,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
   def testSingularScaleRaises(self):
     mu = [-1., 1]
     diag = [1., 0]
-    with self.assertRaisesOpError("Singular"):
+    with self.assertRaisesOpError('Singular'):
       dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
       self.evaluate(dist.sample())
 
@@ -154,11 +155,29 @@ class MultivariateNormalDiagTest(test_util.TestCase):
                                                        [0, 0, 6]]])**2.,
         self.evaluate(mvn.covariance()))
 
-  def testVariance(self):
+  @parameterized.named_parameters(
+      dict(testcase_name='static', is_static=True),
+      dict(testcase_name='dynamic', is_static=False))
+  def testVariance(self, is_static):
     mvn = tfd.MultivariateNormalDiag(
-        loc=tf.zeros([2, 3], dtype=tf.float32), validate_args=True)
+        loc=self.maybe_static(tf.zeros([2, 3], dtype=tf.float32), is_static),
+        validate_args=True)
     self.assertAllClose(
-        np.ones([3], dtype=np.float32), self.evaluate(mvn.variance()))
+        np.ones([2, 3], dtype=np.float32), self.evaluate(mvn.variance()))
+
+    mvn = tfd.MultivariateNormalDiag(
+        loc=self.maybe_static(tf.zeros([100, 3], dtype=tf.float32), is_static),
+        scale_identity_multiplier=self.maybe_static(3., is_static),
+        validate_args=True)
+    self.assertAllClose(
+        np.array(9. * np.ones([100, 3])), self.evaluate(mvn.variance()))
+
+    mvn = tfd.MultivariateNormalDiag(
+        loc=self.maybe_static(tf.zeros([100, 3], dtype=tf.float32), is_static),
+        scale_diag=self.maybe_static([3., 3., 3.], is_static),
+        validate_args=True)
+    self.assertAllClose(
+        np.array(9. * np.ones([100, 3])), self.evaluate(mvn.variance()))
 
     mvn = tfd.MultivariateNormalDiag(
         loc=tf.zeros([3], dtype=tf.float32),
@@ -174,11 +193,29 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     self.assertAllClose(
         np.array([[3., 2, 1], [4, 5, 6]])**2., self.evaluate(mvn.variance()))
 
-  def testStddev(self):
+  @parameterized.named_parameters(
+      dict(testcase_name='static', is_static=True),
+      dict(testcase_name='dynamic', is_static=False))
+  def testStddev(self, is_static):
     mvn = tfd.MultivariateNormalDiag(
-        loc=tf.zeros([2, 3], dtype=tf.float32), validate_args=True)
+        loc=self.maybe_static(tf.zeros([2, 3], dtype=tf.float32), is_static),
+        validate_args=True)
     self.assertAllClose(
-        np.ones([3], dtype=np.float32), self.evaluate(mvn.stddev()))
+        np.ones([2, 3], dtype=np.float32), self.evaluate(mvn.stddev()))
+
+    mvn = tfd.MultivariateNormalDiag(
+        loc=self.maybe_static(tf.zeros([100, 3], dtype=tf.float32), is_static),
+        scale_identity_multiplier=self.maybe_static(3., is_static),
+        validate_args=True)
+    self.assertAllClose(
+        np.array(3. * np.ones([100, 3])), self.evaluate(mvn.stddev()))
+
+    mvn = tfd.MultivariateNormalDiag(
+        loc=self.maybe_static(tf.zeros([100, 3], dtype=tf.float32), is_static),
+        scale_diag=self.maybe_static([3., 3., 3.], is_static),
+        validate_args=True)
+    self.assertAllClose(
+        np.array(3. * np.ones([100, 3])), self.evaluate(mvn.stddev()))
 
     mvn = tfd.MultivariateNormalDiag(
         loc=tf.zeros([3], dtype=tf.float32),
@@ -198,9 +235,9 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     num_draws = 50
     dims = 3
     x = np.zeros([num_draws, dims], dtype=np.float32)
-    x_pl = tf1.placeholder_with_default(input=x, shape=[None, dims], name="x")
+    x_pl = tf1.placeholder_with_default(input=x, shape=[None, dims], name='x')
     mu_var = tf1.get_variable(
-        name="mu",
+        name='mu',
         shape=[dims],
         dtype=tf.float32,
         initializer=tf1.initializers.constant(1.))
@@ -345,5 +382,5 @@ class MultivariateNormalDiagTest(test_util.TestCase):
         self.evaluate(d.sample())
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()
