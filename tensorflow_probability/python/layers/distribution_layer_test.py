@@ -467,11 +467,12 @@ class DistributionLambdaVariableCreation(test_util.TestCase):
 
 
 @test_util.test_graph_and_eager_modes
-class KLDivergenceAddLoss(test_util.TestCase):
+class KLDivergenceAddLossTest(test_util.TestCase):
 
   def test_approx_kl(self):
     # TODO(b/120320323): Enable this test in eager.
-    if tf.executing_eagerly(): return
+    if tf.executing_eagerly():
+      self.skipTest('KLDivergenceAddLossTest disabled for Eager (b/120320323).')
 
     event_size = 2
     prior = tfd.MultivariateNormalDiag(loc=tf.zeros(event_size))
@@ -501,6 +502,52 @@ class KLDivergenceAddLoss(test_util.TestCase):
     self.assertAllClose([loc], loc_, atol=0., rtol=1e-5)
     self.assertAllClose([scale_tril], scale_tril_, atol=0., rtol=1e-5)
     self.assertNear(actual_kl_, approx_kl_, err=0.15)
+
+    model.compile(
+        optimizer=tf.optimizers.Adam(),
+        loss=lambda x, dist: -dist.log_prob(x[0, :event_size]),
+        metrics=[])
+    model.fit(x, x,
+              batch_size=25,
+              epochs=1,
+              steps_per_epoch=1)  # Usually `n // batch_size`.
+
+  def test_use_exact_kl(self):
+    # TODO(b/120320323): Enable this test in eager.
+    if tf.executing_eagerly():
+      self.skipTest('KLDivergenceAddLossTest disabled for Eager (b/120320323).')
+
+    event_size = 2
+    prior = tfd.MultivariateNormalDiag(loc=tf.zeros(event_size))
+
+    # Use a small number of samples because we want to verify that
+    # we calculated the exact KL divergence and not the one from sampling.
+    model = tfk.Sequential([
+        tfpl.MultivariateNormalTriL(event_size,
+                                    lambda s: s.sample(3, seed=42)),
+        tfpl.KLDivergenceAddLoss(prior, use_exact_kl=True),
+    ])
+
+    loc = [-1., 1.]
+    scale_tril = [[1.1, 0.],
+                  [0.2, 1.3]]
+    actual_kl = tfd.kl_divergence(
+        tfd.MultivariateNormalTriL(loc, scale_tril), prior)
+
+    x = tf.concat(
+        [loc, tfb.FillScaleTriL().inverse(scale_tril)], axis=0)[tf.newaxis]
+
+    y = model(x)
+    self.assertEqual(1, len(model.losses))
+    y = model(x)
+    self.assertEqual(2, len(model.losses))
+
+    [loc_, scale_tril_, actual_kl_, evaluated_kl_] = self.evaluate([
+        y.loc, y.scale.to_dense(), actual_kl, model.losses[0]])
+
+    self.assertAllClose([loc], loc_, atol=0., rtol=1e-5)
+    self.assertAllClose([scale_tril], scale_tril_, atol=0., rtol=1e-5)
+    self.assertNear(actual_kl_, evaluated_kl_, err=1e-5)
 
     model.compile(
         optimizer=tf.optimizers.Adam(),

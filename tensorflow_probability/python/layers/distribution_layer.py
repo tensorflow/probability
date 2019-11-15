@@ -1368,7 +1368,7 @@ def _make_kl_divergence_fn(
     weight=None):
   """Creates a callable computing `KL[a,b]` from `a`, a `tfd.Distribution`."""
 
-  if use_exact_kl is None:
+  if use_exact_kl:
     kl_divergence_fn = kl_lib.kl_divergence
   else:
     # Closure over: test_points_fn, test_points_reduce_axis.
