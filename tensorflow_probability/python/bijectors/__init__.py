@@ -37,6 +37,7 @@ from tensorflow_probability.python.bijectors.exp import Exp
 from tensorflow_probability.python.bijectors.exp import Log
 from tensorflow_probability.python.bijectors.expm1 import Expm1
 from tensorflow_probability.python.bijectors.expm1 import Log1p
+from tensorflow_probability.python.bijectors.ffjord import FFJORD
 from tensorflow_probability.python.bijectors.fill_scale_tril import FillScaleTriL
 from tensorflow_probability.python.bijectors.fill_scale_tril import ScaleTriL
 from tensorflow_probability.python.bijectors.fill_triangular import FillTriangular
@@ -102,6 +103,7 @@ __all__ = [
     "DiscreteCosineTransform",
     "Exp",
     "Expm1",
+    "FFJORD",
     "FillScaleTriL",
     "FillTriangular",
     "Gumbel",

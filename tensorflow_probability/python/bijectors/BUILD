@@ -48,6 +48,7 @@ py_library(
         ":discrete_cosine_transform",
         ":exp",
         ":expm1",
+        ":ffjord",
         ":fill_scale_tril",
         ":fill_triangular",
         ":gumbel",
@@ -387,6 +388,18 @@ py_library(
         ":bijector",
         ":invert",
         # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "ffjord",
+    srcs = ["ffjord.py"],
+    deps = [
+        ":bijector",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -1076,6 +1089,21 @@ py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "ffjord_test",
+    size = "large",
+    srcs = ["ffjord_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
