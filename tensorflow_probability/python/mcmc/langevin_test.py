@@ -217,6 +217,20 @@ class LangevinTest(test_util.TestCase):
                                          dtype=dtype),
                         atol=0.01, rtol=0.01)
 
+  def testMALAIsCalibrated(self):
+    mala = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+        target_log_prob_fn=lambda x: -tf.square(x) / 2.,
+        step_size=0.1,
+    )
+    self.assertTrue(mala.is_calibrated)
+
+  def testUncalibratedLangevinIsNotCalibrated(self):
+    uncal_langevin = tfp.mcmc.UncalibratedLangevin(
+        target_log_prob_fn=lambda x: -tf.square(x) / 2.,
+        step_size=0.1,
+    )
+    self.assertFalse(uncal_langevin.is_calibrated)
+
 
 if __name__ == '__main__':
   tf.test.main()

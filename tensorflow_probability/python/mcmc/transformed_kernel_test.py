@@ -45,8 +45,9 @@ def _maybe_seed(seed):
 class FakeInnerKernel(tfp.mcmc.TransitionKernel):
   """Fake Transition Kernel."""
 
-  def __init__(self, target_log_prob_fn):
-    self._parameters = dict(target_log_prob_fn=target_log_prob_fn)
+  def __init__(self, target_log_prob_fn, is_calibrated=True):
+    self._parameters = dict(
+        target_log_prob_fn=target_log_prob_fn, is_calibrated=is_calibrated)
 
   @property
   def parameters(self):
@@ -54,7 +55,7 @@ class FakeInnerKernel(tfp.mcmc.TransitionKernel):
 
   @property
   def is_calibrated(self):
-    return True
+    return self._parameters['is_calibrated']
 
   def one_step(self, current_state, previous_kernel_results):
     pass
@@ -301,6 +302,16 @@ class TransformedTransitionKernelTest(test_util.TestCase):
 
     self.assertAllClose(pkr.inner_results.target_log_prob,
                         pkr_copy.inner_results.target_log_prob)
+
+  def test_is_calibrated(self):
+    self.assertTrue(
+        tfp.mcmc.TransformedTransitionKernel(
+            FakeInnerKernel(lambda x: -x**2 / 2, True),
+            tfb.Identity()).is_calibrated)
+    self.assertFalse(
+        tfp.mcmc.TransformedTransitionKernel(
+            FakeInnerKernel(lambda x: -x**2 / 2, False),
+            tfb.Identity()).is_calibrated)
 
 
 if __name__ == '__main__':

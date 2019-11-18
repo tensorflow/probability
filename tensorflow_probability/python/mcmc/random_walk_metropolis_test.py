@@ -166,6 +166,18 @@ class RWMTest(test_util.TestCase):
     self.assertAllClose(np.squeeze(sample_mean_), true_mean, atol=0.1, rtol=0.1)
     self.assertAllClose(np.squeeze(sample_cov_), true_cov, atol=0.1, rtol=0.1)
 
+  def testRWMIsCalibrated(self):
+    rwm = tfp.mcmc.RandomWalkMetropolis(
+        target_log_prob_fn=lambda x: -tf.square(x) / 2.,
+    )
+    self.assertTrue(rwm.is_calibrated)
+
+  def testUncalibratedRWIsNotCalibrated(self):
+    uncal_rw = tfp.mcmc.UncalibratedRandomWalk(
+        target_log_prob_fn=lambda x: -tf.square(x) / 2.,
+    )
+    self.assertFalse(uncal_rw.is_calibrated)
+
 
 if __name__ == '__main__':
   tf.test.main()

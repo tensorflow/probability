@@ -53,6 +53,7 @@ class HMCTest(test_util.TestCase):
     self._shape_param = 5.
     self._rate_param = 10.
 
+    super(HMCTest, self).setUp()
     tf1.random.set_random_seed(10003)
     np.random.seed(10003)
 
@@ -414,8 +415,7 @@ class HMCTest(test_util.TestCase):
 
     tf1.logging.vlog(1, 'initial_x = {}'.format(initial_x_))
     tf1.logging.vlog(1, 'updated_x = {}'.format(updated_x_))
-    tf1.logging.vlog(1,
-                              'log_accept_ratio = {}'.format(log_accept_ratio_))
+    tf1.logging.vlog(1, 'log_accept_ratio = {}'.format(log_accept_ratio_))
 
     self.assertAllEqual(initial_x_, updated_x_)
     self.assertEqual(acceptance_probs, 0.)
@@ -443,8 +443,7 @@ class HMCTest(test_util.TestCase):
 
     tf1.logging.vlog(1, 'initial_x = {}'.format(initial_x_))
     tf1.logging.vlog(1, 'updated_x = {}'.format(updated_x_))
-    tf1.logging.vlog(1,
-                              'log_accept_ratio = {}'.format(log_accept_ratio_))
+    tf1.logging.vlog(1, 'log_accept_ratio = {}'.format(log_accept_ratio_))
 
     self.assertAllEqual(initial_x_, updated_x_)
     self.assertEqual(acceptance_probs, 0.)
@@ -566,6 +565,22 @@ class HMCTest(test_util.TestCase):
     self.assertAllEqual([3], r0.accepted_results.target_log_prob.shape)
     self.assertAllEqual([3, 2], x1.shape)
     self.assertAllEqual([3], r1.accepted_results.target_log_prob.shape)
+
+  def testHMCIsCalibrated(self):
+    hmc = tfp.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=lambda x: -tf.square(x) / 2.,
+        step_size=0.5,
+        num_leapfrog_steps=2,
+    )
+    self.assertTrue(hmc.is_calibrated)
+
+  def testUncalibratedHMCIsNotCalibrated(self):
+    uncal_hmc = tfp.mcmc.UncalibratedHamiltonianMonteCarlo(
+        target_log_prob_fn=lambda x: -tf.square(x) / 2.,
+        step_size=0.5,
+        num_leapfrog_steps=2,
+    )
+    self.assertFalse(uncal_hmc.is_calibrated)
 
   def testAdaptiveParameters(self):
     hmc = tfp.mcmc.HamiltonianMonteCarlo(
@@ -785,6 +800,7 @@ class HMCHandlesLists64(_HMCHandlesLists, test_util.TestCase):
 class HMCAdaptiveStepSize(test_util.TestCase):
 
   def setUp(self):
+    super(HMCAdaptiveStepSize, self).setUp()
     tf1.random.set_random_seed(10014)
     np.random.seed(10014)
 
@@ -904,6 +920,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
   """This test verifies that the docstring example works as advertised."""
 
   def setUp(self):
+    super(HMCEMAdaptiveStepSize, self).setUp()
     tf1.random.set_random_seed(10014)
     np.random.seed(10014)
 

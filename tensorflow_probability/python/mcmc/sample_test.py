@@ -38,6 +38,9 @@ TestTransitionKernelResults = collections.namedtuple(
 @test_util.test_all_tf_execution_regimes
 class TestTransitionKernel(tfp.mcmc.TransitionKernel):
 
+  def __init__(self, is_calibrated=True):
+    self._is_calibrated = is_calibrated
+
   def one_step(self, current_state, previous_kernel_results):
     return current_state + 1, TestTransitionKernelResults(
         counter_1=previous_kernel_results.counter_1 + 1,
@@ -46,8 +49,9 @@ class TestTransitionKernel(tfp.mcmc.TransitionKernel):
   def bootstrap_results(self, current_state):
     return TestTransitionKernelResults(counter_1=0, counter_2=0)
 
+  @property
   def is_calibrated(self):
-    return True
+    return self._is_calibrated
 
 
 class SampleChainTest(test_util.TestCase):
@@ -56,6 +60,7 @@ class SampleChainTest(test_util.TestCase):
     self._shape_param = 5.
     self._rate_param = 10.
 
+    super(SampleChainTest, self).setUp()
     tf1.random.set_random_seed(10003)
     np.random.seed(10003)
 
@@ -241,6 +246,18 @@ class SampleChainTest(test_util.TestCase):
           trace_fn=lambda current_state, kernel_results: kernel_results)
     self.assertFalse(
         any('Tracing all kernel results by default is deprecated' in str(
+            warning.message) for warning in triggered))
+
+  def testIsCalibrated(self):
+    with warnings.catch_warnings(record=True) as triggered:
+      kernel = TestTransitionKernel(False)
+      tfp.mcmc.sample_chain(
+          num_results=2,
+          current_state=0,
+          kernel=kernel,
+          trace_fn=lambda current_state, kernel_results: kernel_results)
+    self.assertTrue(
+        any('supplied `TransitionKernel` is not calibrated.' in str(
             warning.message) for warning in triggered))
 
 

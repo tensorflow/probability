@@ -81,6 +81,7 @@ class FakeMHKernel(tfp.mcmc.TransitionKernel):
             value=self.parameters['log_accept_ratio']),
     )
 
+  @property
   def is_calibrated(self):
     return True
 
@@ -104,6 +105,7 @@ class FakeSteppedKernel(tfp.mcmc.TransitionKernel):
         step_size=tf.nest.map_structure(tf.convert_to_tensor,
                                         self.parameters['step_size']))
 
+  @property
   def is_calibrated(self):
     return False
 
@@ -131,8 +133,9 @@ class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
     return FakeWrapperKernelResults(
         inner_results=self.inner_kernel.bootstrap_results(current_state))
 
+  @property
   def is_calibrated(self):
-    return self.inner_kernel.is_calibrated()
+    return self.inner_kernel.is_calibrated
 
 
 @test_util.test_all_tf_execution_regimes
@@ -304,6 +307,15 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
         tf.minimum(log_accept_ratio, 0.)))
 
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
+
+  def testIsCalibrated(self):
+    test_kernel = collections.namedtuple('TestKernel', 'is_calibrated')
+    self.assertTrue(
+        tfp.mcmc.DualAveragingStepSizeAdaptation(test_kernel(True),
+                                                 1).is_calibrated)
+    self.assertFalse(
+        tfp.mcmc.DualAveragingStepSizeAdaptation(test_kernel(False),
+                                                 1).is_calibrated)
 
 
 @test_util.test_all_tf_execution_regimes

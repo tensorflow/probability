@@ -523,8 +523,9 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
           log_averaging_step=log_averaging_step,
           new_step_size=step_size)
 
+  @property
   def is_calibrated(self):
-    return self.inner_kernel.is_calibrated()
+    return self.inner_kernel.is_calibrated
 
 
 def _maybe_validate_target_accept_prob(target_accept_prob, validate_args):
