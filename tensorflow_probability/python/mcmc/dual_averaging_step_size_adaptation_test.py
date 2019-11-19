@@ -201,6 +201,25 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
         -0.01 / ((_INITIAL_T + 1.) * _EXPLORATION_SHRINKAGE))
     self.assertAllClose(expected, step_size)
 
+  def testRecoversFromNaNAcceptProb(self):
+    kernel = FakeMHKernel(
+        FakeSteppedKernel(step_size=0.1),
+        log_accept_ratio=tf.convert_to_tensor(np.nan))
+    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+        kernel,
+        num_adaptation_steps=1,
+        validate_args=True)
+
+    init_state = tf.constant(0.)
+    kernel_results = kernel.bootstrap_results(init_state)
+    for _ in range(2):
+      _, kernel_results = kernel.one_step(init_state, kernel_results)
+
+    step_size = self.evaluate(
+        kernel_results.inner_results.accepted_results.step_size)
+
+    self.assertTrue(np.isfinite(step_size))
+
   def testChainLogProbScalarTarget(self):
     init_step = tf.constant([0.1, 0.2])
     kernel = FakeMHKernel(

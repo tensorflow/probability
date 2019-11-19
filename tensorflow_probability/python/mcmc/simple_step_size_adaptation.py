@@ -46,7 +46,11 @@ def hmc_like_step_size_getter_fn(kernel_results):
 
 @mcmc_util.make_innermost_getter
 def hmc_like_log_accept_prob_getter_fn(kernel_results):
-  return tf.minimum(kernel_results.log_accept_ratio, 0.)
+  safe_accept_ratio = tf.where(
+      tf.math.is_finite(kernel_results.log_accept_ratio),
+      kernel_results.log_accept_ratio,
+      tf.constant(-np.inf, dtype=kernel_results.log_accept_ratio.dtype))
+  return tf.minimum(safe_accept_ratio, 0.)
 
 
 def get_differing_dims(a, b):
