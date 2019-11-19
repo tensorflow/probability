@@ -441,6 +441,7 @@ class BijectorPropertiesTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testBijector(self, bijector_name, data):
+    tfp_hps.guitar_skip_if_matches('Tanh', bijector_name, 'b/144163991')
     if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
       return
     event_dim = data.draw(hps.integers(min_value=2, max_value=6))

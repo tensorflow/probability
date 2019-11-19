@@ -100,6 +100,7 @@ class GeneralizedParetoTest(test_util.TestCase):
   @hp.given(generalized_paretos(batch_shape=[]))
   @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testCDF(self, dist):
+    tfp_hps.guitar_skip('b/144185740')
     xs = self.evaluate(dist.sample())
     cdf = dist.cdf(xs)
     self.assertEqual(dist.batch_shape, cdf.shape)
@@ -111,6 +112,7 @@ class GeneralizedParetoTest(test_util.TestCase):
   @hp.given(generalized_paretos(batch_shape=[]))
   @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testMean(self, dist):
+    tfp_hps.guitar_skip('b/144185740')
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
     self.assertEqual(dist.batch_shape, dist.mean().shape)
     if np.abs(conc) < 1e-5 and conc != 0:
@@ -122,6 +124,7 @@ class GeneralizedParetoTest(test_util.TestCase):
   @hp.given(generalized_paretos(batch_shape=[]))
   @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testVariance(self, dist):
+    tfp_hps.guitar_skip('b/144185740')
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
     self.assertEqual(dist.batch_shape, dist.variance().shape)
     expected = sp_stats.genpareto(conc, loc=loc, scale=scale).var()
