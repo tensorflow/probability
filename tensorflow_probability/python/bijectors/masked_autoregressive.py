@@ -29,11 +29,9 @@ from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
-    'AutoregressiveLayer',
     'AutoregressiveNetwork',
     'MaskedAutoregressiveFlow',
     'masked_autoregressive_default_template',
@@ -939,17 +937,6 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   @property
   def params(self):
     return self._params
-
-
-class AutoregressiveLayer(AutoregressiveNetwork):
-  """Masked Autoencoder for Distribution Estimation [Germain et al. (2015)]."""
-
-  @deprecation.deprecated(
-      '2019-08-01',
-      '`AutoregressiveLayer` has been renamed `AutoregressiveNetwork`.',
-      warn_once=True)
-  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
-    return super(AutoregressiveLayer, cls).__new__(cls)
 
 
 def _list(xs):

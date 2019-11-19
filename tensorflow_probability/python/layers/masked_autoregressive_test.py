@@ -58,7 +58,7 @@ class AutoregressiveTransformTest(test_util.TestCase):
 
         # Transform the standard normal distribution with event_shape of [2] to
         # the target distribution with event_shape of [2].
-        tfpl.AutoregressiveTransform(tfb.AutoregressiveLayer(
+        tfpl.AutoregressiveTransform(tfb.AutoregressiveNetwork(
             params=2, hidden_units=[10], activation='relu')),
     ])
 

@@ -55,7 +55,7 @@ def make_iaf_stack(total_event_size,
     initializer = tf.compat.v2.keras.initializers.VarianceScaling(
         2 * 0.01, seed=seed() % (2**31 - 1))
 
-    made = tfb.AutoregressiveLayer(
+    made = tfb.AutoregressiveNetwork(
         params=2,
         event_shape=[total_event_size],
         hidden_units=[total_event_size] * num_hidden_layers,
