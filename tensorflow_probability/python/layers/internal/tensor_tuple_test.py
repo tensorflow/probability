@@ -82,9 +82,7 @@ class CustomConvertToCompositeTensorTest(test_util.TestCase):
     self.assertIsInstance(z, tensor_tuple.TensorTuple)
     self.assertEqual(y._sequence, z._sequence)
 
-  def disabled_test_str_repr(self):
-    # TODO(b/141554140): Temporarily disabled as tf.Tensor.__repr__() is
-    # changing. Re-enable once cl/270975275 lands.
+  def test_str_repr(self):
     x = MyTuple((1, [2., 3.], [[4, 5], [6, 7]]))
     y = ops.convert_to_tensor_or_composite(value=x)
 
