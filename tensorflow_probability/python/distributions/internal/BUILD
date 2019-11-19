@@ -34,30 +34,6 @@ py_library(
 )
 
 py_library(
-    name = "moving_stats",
-    srcs = ["moving_stats.py"],
-    deps = [
-        ":init",
-        # tensorflow dep,
-    ],
-)
-
-py_test(
-    name = "moving_stats_test",
-    size = "medium",
-    srcs = ["moving_stats_test.py"],
-    tags = [
-        "nomsan",  # disable to avoid false positives from scipy.
-    ],
-    deps = [
-        ":moving_stats",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_library(
     name = "statistical_testing",
     srcs = ["statistical_testing.py"],
     srcs_version = "PY2AND3",

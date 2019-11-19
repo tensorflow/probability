@@ -34,6 +34,7 @@ py_library(
     deps = [
         ":calibration",
         ":leave_one_out",
+        ":moving_stats",
         ":quantiles",
         ":ranking",
         ":sample_stats",
@@ -59,6 +60,30 @@ py_test(
     size = "small",
     srcs = ["leave_one_out_test.py"],
     deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "moving_stats",
+    srcs = ["moving_stats.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+py_test(
+    name = "moving_stats_test",
+    size = "medium",
+    srcs = ["moving_stats_test.py"],
+    deps = [
+        ":moving_stats",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

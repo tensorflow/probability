@@ -28,6 +28,7 @@ exports_files(["LICENSE"])
 
 FILENAMES = [
     "leave_one_out",
+    "moving_stats",
 ]
 
 # TODO(bjp): Enable the tests

@@ -117,7 +117,6 @@ py_library(
         ":von_mises_fisher",
         ":wishart",
         ":zipf",
-        "//tensorflow_probability/python/distributions/internal:moving_stats",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/math:linalg",
