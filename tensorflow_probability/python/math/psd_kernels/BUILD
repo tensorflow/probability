@@ -238,7 +238,7 @@ py_library(
     deps = [
         ":positive_semidefinite_kernel",
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:kumaraswamy",
+        "//tensorflow_probability/python/bijectors:kumaraswamy_cdf",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],

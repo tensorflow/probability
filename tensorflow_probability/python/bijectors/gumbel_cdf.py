@@ -24,14 +24,17 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
+    'GumbelCDF',
     'Gumbel',
 ]
 
 
-class Gumbel(bijector.Bijector):
-  """Compute `Y = g(X) = exp(-exp(-(X - loc) / scale))`.
+class GumbelCDF(bijector.Bijector):
+  """Compute `Y = g(X) = exp(-exp(-(X - loc) / scale))`, the Gumbel CDF.
 
   This bijector maps inputs from `[-inf, inf]` to `[0, 1]`. The inverse of the
   bijector applied to a uniform random variable `X ~ U(0, 1)` gives back a
@@ -39,7 +42,7 @@ class Gumbel(bijector.Bijector):
   [Gumbel distribution](https://en.wikipedia.org/wiki/Gumbel_distribution):
 
   ```none
-  Y ~ Gumbel(loc, scale)
+  Y ~ GumbelCDF(loc, scale)
   pdf(y; loc, scale) = exp(
     -( (y - loc) / scale + exp(- (y - loc) / scale) ) ) / scale
   ```
@@ -49,8 +52,8 @@ class Gumbel(bijector.Bijector):
                loc=0.,
                scale=1.,
                validate_args=False,
-               name='gumbel'):
-    """Instantiates the `Gumbel` bijector.
+               name='gumbel_cdf'):
+    """Instantiates the `GumbelCDF` bijector.
 
     Args:
       loc: Float-like `Tensor` that is the same dtype and is
@@ -69,7 +72,7 @@ class Gumbel(bijector.Bijector):
           loc, dtype=dtype, name='loc')
       self._scale = tensor_util.convert_nonref_to_tensor(
           scale, dtype=dtype, name='scale')
-      super(Gumbel, self).__init__(
+      super(GumbelCDF, self).__init__(
           validate_args=validate_args,
           forward_min_event_ndims=0,
           name=name)
@@ -125,3 +128,21 @@ class Gumbel(bijector.Bijector):
           self.scale,
           message='Argument `scale` must be positive.'))
     return assertions
+
+
+class Gumbel(GumbelCDF):
+  """Computes the Gumbel CDF."""
+
+  @deprecation.deprecated(
+      '2020-01-20',
+      'Gumbel is deprecated, use GumbelCDF(...) instead.',
+      warn_once=True)
+
+  def __init__(self,
+               loc=0.,
+               scale=1.,
+               validate_args=False,
+               name='gumbel'):
+    with tf.name_scope(name) as name:
+      super(Gumbel, self).__init__(
+          loc=loc, scale=scale, validate_args=validate_args, name=name)

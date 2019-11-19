@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Weibull bijector."""
+"""WeibullCDF bijector."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -24,14 +24,16 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
+    'WeibullCDF',
     'Weibull',
 ]
 
 
-class Weibull(bijector.Bijector):
+class WeibullCDF(bijector.Bijector):
   """Compute `Y = g(X) = 1 - exp((-X / scale) ** concentration), X >= 0`.
 
   This bijector maps inputs from `[0, inf]` to `[0, 1]`. The inverse of the
@@ -45,14 +47,16 @@ class Weibull(bijector.Bijector):
       (concentration / scale) * (y / scale)**(concentration - 1) *
       exp(-(y / scale)**concentration)
   ```
+
+  Likwewise, the forward of this bijector is the Weibull distribution CDF.
   """
 
   def __init__(self,
                scale=1.,
                concentration=1.,
                validate_args=False,
-               name='weibull'):
-    """Instantiates the `Weibull` bijector.
+               name='weibull_cdf'):
+    """Instantiates the `WeibullCDF` bijector.
 
     Args:
       scale: Positive Float-type `Tensor` that is the same dtype and is
@@ -72,7 +76,7 @@ class Weibull(bijector.Bijector):
           scale, dtype=dtype, name='scale')
       self._concentration = tensor_util.convert_nonref_to_tensor(
           concentration, dtype=dtype, name='concentration')
-      super(Weibull, self).__init__(
+      super(WeibullCDF, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
           name=name)
@@ -146,3 +150,24 @@ class Weibull(bijector.Bijector):
           self.concentration,
           message='Argument `concentration` must be positive.'))
     return assertions
+
+
+class Weibull(WeibullCDF):
+  """Computes the Weibull CDF."""
+
+  @deprecation.deprecated(
+      '2020-01-20',
+      'Weibull is deprecated, use WeibullCDF(...) instead.',
+      warn_once=True)
+
+  def __init__(self,
+               scale=1.,
+               concentration=1.,
+               validate_args=False,
+               name='weibull'):
+    with tf.name_scope(name) as name:
+      super(Weibull, self).__init__(
+          scale=scale,
+          concentration=concentration,
+          validate_args=validate_args,
+          name=name)

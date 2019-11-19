@@ -51,12 +51,12 @@ py_library(
         ":ffjord",
         ":fill_scale_tril",
         ":fill_triangular",
-        ":gumbel",
+        ":gumbel_cdf",
         ":identity",
         ":inline",
         ":invert",
         ":iterated_sigmoid_centered",
-        ":kumaraswamy",
+        ":kumaraswamy_cdf",
         ":masked_autoregressive",
         ":matrix_inverse_tril",
         ":normal_cdf",
@@ -84,7 +84,7 @@ py_library(
         ":tanh",
         ":transform_diagonal",
         ":transpose",
-        ":weibull",
+        ":weibull_cdf",
     ],
 )
 
@@ -418,8 +418,8 @@ py_library(
 )
 
 py_library(
-    name = "gumbel",
-    srcs = ["gumbel.py"],
+    name = "gumbel_cdf",
+    srcs = ["gumbel_cdf.py"],
     deps = [
         ":bijector",
         # tensorflow dep,
@@ -456,10 +456,11 @@ py_library(
 )
 
 py_library(
-    name = "kumaraswamy",
-    srcs = ["kumaraswamy.py"],
+    name = "kumaraswamy_cdf",
+    srcs = ["kumaraswamy_cdf.py"],
     deps = [
         ":bijector",
+        ":invert",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
@@ -763,8 +764,8 @@ py_library(
 )
 
 py_library(
-    name = "weibull",
-    srcs = ["weibull.py"],
+    name = "weibull_cdf",
+    srcs = ["weibull_cdf.py"],
     deps = [
         ":bijector",
         # tensorflow dep,
@@ -1122,9 +1123,9 @@ py_test(
 )
 
 py_test(
-    name = "gumbel_test",
+    name = "gumbel_cdf_test",
     size = "small",
-    srcs = ["gumbel_test.py"],
+    srcs = ["gumbel_cdf_test.py"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1175,9 +1176,9 @@ py_test(
 )
 
 py_test(
-    name = "kumaraswamy_test",
+    name = "kumaraswamy_cdf_test",
     size = "small",
-    srcs = ["kumaraswamy_test.py"],
+    srcs = ["kumaraswamy_cdf_test.py"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1518,9 +1519,9 @@ py_test(
 )
 
 py_test(
-    name = "weibull_test",
+    name = "weibull_cdf_test",
     size = "small",
-    srcs = ["weibull_test.py"],
+    srcs = ["weibull_cdf_test.py"],
     deps = [
         ":bijector_test_util",
         ":bijectors",

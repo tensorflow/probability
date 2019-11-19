@@ -23,7 +23,8 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
-from tensorflow_probability.python.bijectors import kumaraswamy as kumaraswamy_bijector
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import kumaraswamy_cdf as kumaraswamy_cdf
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import assert_util
@@ -32,7 +33,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
-    "Kumaraswamy",
+    'Kumaraswamy',
 ]
 
 _kumaraswamy_sample_note = """Note: `x` must have dtype `self.dtype` and be in
@@ -127,7 +128,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
                concentration0=1.,
                validate_args=False,
                allow_nan_stats=True,
-               name="Kumaraswamy"):
+               name='Kumaraswamy'):
     """Initialize a batch of Kumaraswamy distributions.
 
     Args:
@@ -153,18 +154,20 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       dtype_hint=tf.float32)
       concentration1 = tensor_util.convert_nonref_to_tensor(
-          concentration1, name="concentration1", dtype=dtype)
+          concentration1, name='concentration1', dtype=dtype)
       concentration0 = tensor_util.convert_nonref_to_tensor(
-          concentration0, name="concentration0", dtype=dtype)
+          concentration0, name='concentration0', dtype=dtype)
+      self._kumaraswamy_cdf = kumaraswamy_cdf.KumaraswamyCDF(
+          concentration1=concentration1,
+          concentration0=concentration0,
+          validate_args=validate_args)
       super(Kumaraswamy, self).__init__(
           distribution=uniform.Uniform(
               low=tf.zeros([], dtype=dtype),
               high=tf.ones([], dtype=dtype),
               allow_nan_stats=allow_nan_stats),
-          bijector=kumaraswamy_bijector.Kumaraswamy(
-              concentration1=concentration1,
-              concentration0=concentration0,
-              validate_args=validate_args),
+          bijector=invert.Invert(
+              self._kumaraswamy_cdf, validate_args=validate_args),
           batch_shape=distribution_util.get_broadcast_shape(
               concentration1, concentration0),
           parameters=parameters,
@@ -177,12 +180,12 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
   @property
   def concentration1(self):
     """Concentration parameter associated with a `1` outcome."""
-    return self.bijector.concentration1
+    return self._kumaraswamy_cdf.concentration1
 
   @property
   def concentration0(self):
     """Concentration parameter associated with a `0` outcome."""
-    return self.bijector.concentration0
+    return self._kumaraswamy_cdf.concentration0
 
   def _entropy(self):
     a = tf.convert_to_tensor(self.concentration1)
@@ -243,13 +246,12 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
         assert_util.assert_less(
             tf.ones([], dtype=a.dtype),
             a,
-            message="Mode undefined for concentration1 <= 1."),
+            message='Mode undefined for concentration1 <= 1.'),
         assert_util.assert_less(
             tf.ones([], dtype=b.dtype),
             b,
-            message="Mode undefined for concentration0 <= 1.")
+            message='Mode undefined for concentration0 <= 1.')
     ], mode)
 
   def _parameter_control_dependencies(self, is_init):
-    return self.bijector._parameter_control_dependencies(is_init)  # pylint: disable=protected-access
-
+    return self.bijector.bijector._parameter_control_dependencies(is_init)  # pylint: disable=protected-access

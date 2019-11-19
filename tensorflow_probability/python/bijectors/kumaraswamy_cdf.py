@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Kumaraswamy bijector."""
+"""KumaraswamyCDF bijector."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -21,18 +21,22 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
-    "Kumaraswamy",
+    'KumaraswamyCDF',
+    'Kumaraswamy',
 ]
 
 
-class Kumaraswamy(bijector.Bijector):
-  """Compute `Y = g(X) = (1 - (1 - X)**(1 / b))**(1 / a), X in [0, 1]`.
+class KumaraswamyCDF(bijector.Bijector):
+  """Compute `Y = g(X) = (1 - X**a)**b, X in [0, 1]`.
 
   This bijector maps inputs from `[0, 1]` to `[0, 1]`. The inverse of the
   bijector applied to a uniform random variable `X ~ U(0, 1)` gives back a
@@ -49,8 +53,8 @@ class Kumaraswamy(bijector.Bijector):
                concentration1=1.,
                concentration0=1.,
                validate_args=False,
-               name="kumaraswamy"):
-    """Instantiates the `Kumaraswamy` bijector.
+               name='kumaraswamy_cdf'):
+    """Instantiates the `KumaraswamyCDF` bijector.
 
     Args:
       concentration1: Python `float` scalar indicating the transform power,
@@ -67,10 +71,10 @@ class Kumaraswamy(bijector.Bijector):
       dtype = dtype_util.common_dtype([concentration0, concentration1],
                                       dtype_hint=tf.float32)
       self._concentration0 = tensor_util.convert_nonref_to_tensor(
-          concentration0, dtype=dtype, name="concentration0")
+          concentration0, dtype=dtype, name='concentration0')
       self._concentration1 = tensor_util.convert_nonref_to_tensor(
-          concentration1, dtype=dtype, name="concentration1")
-      super(Kumaraswamy, self).__init__(
+          concentration1, dtype=dtype, name='concentration1')
+      super(KumaraswamyCDF, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
           name=name)
@@ -89,36 +93,36 @@ class Kumaraswamy(bijector.Bijector):
   def _is_increasing(cls):
     return True
 
-  def _forward(self, x):
-    x = self._maybe_assert_valid(x)
-    return tf.exp(
-        tf.math.log1p(-tf.exp(tf.math.log1p(-x) / self.concentration0)) /
-        self.concentration1)
-
   def _inverse(self, y):
     y = self._maybe_assert_valid(y)
-    return -tf.math.expm1(self.concentration0 * tf.math.log1p(
-        -(y ** self.concentration1)))
+    return tf.exp(
+        tf.math.log1p(-tf.exp(tf.math.log1p(-y) / self.concentration0)) /
+        self.concentration1)
 
-  def _inverse_log_det_jacobian(self, y):
-    y = self._maybe_assert_valid(y)
+  def _forward(self, x):
+    x = self._maybe_assert_valid(x)
+    return -tf.math.expm1(self.concentration0 * tf.math.log1p(
+        -(x ** self.concentration1)))
+
+  def _forward_log_det_jacobian(self, x):
+    x = self._maybe_assert_valid(x)
     concentration1 = tf.convert_to_tensor(self.concentration1)
     concentration0 = tf.convert_to_tensor(self.concentration0)
     return (tf.math.log(concentration1) +
             tf.math.log(concentration0) +
-            tf.math.xlogy(concentration1 - 1, y) +
-            (concentration0 - 1) * tf.math.log1p(-y**concentration1))
+            tf.math.xlogy(concentration1 - 1, x) +
+            (concentration0 - 1) * tf.math.log1p(-x**concentration1))
 
   def _maybe_assert_valid(self, x):
     if not self.validate_args:
       return x
     return distribution_util.with_dependencies([
         assert_util.assert_non_negative(
-            x, message="sample must be non-negative"),
+            x, message='sample must be non-negative'),
         assert_util.assert_less_equal(
             x,
             tf.ones([], self.concentration0.dtype),
-            message="sample must be no larger than `1`."),
+            message='sample must be no larger than `1`.'),
     ], x)
 
   def _parameter_control_dependencies(self, is_init):
@@ -128,9 +132,40 @@ class Kumaraswamy(bijector.Bijector):
     if is_init != tensor_util.is_ref(self.concentration0):
       assertions.append(assert_util.assert_positive(
           self.concentration0,
-          message="Argument `concentration0` must be positive."))
+          message='Argument `concentration0` must be positive.'))
     if is_init != tensor_util.is_ref(self.concentration1):
       assertions.append(assert_util.assert_positive(
           self.concentration1,
-          message="Argument `concentration1` must be positive."))
+          message='Argument `concentration1` must be positive.'))
     return assertions
+
+
+class Kumaraswamy(invert.Invert):
+  """Computes the inverse of the Kumaraswamy CDF."""
+
+  @deprecation.deprecated(
+      '2020-01-20',
+      'Kumaraswamy is deprecated, use Invert(KumaraswamyCDF(...)) instead.',
+      warn_once=True)
+
+  def __init__(self,
+               concentration1=1.,
+               concentration0=1.,
+               validate_args=False,
+               name='kumaraswamy'):
+    with tf.name_scope(name) as name:
+      kumaraswamy_cdf = KumaraswamyCDF(
+          concentration1=concentration1,
+          concentration0=concentration0,
+          validate_args=validate_args,
+          name=name)
+      super(Kumaraswamy, self).__init__(
+          bijector=kumaraswamy_cdf, validate_args=validate_args, name=name)
+
+  @property
+  def concentration1(self):
+    return self.bijector.concentration1
+
+  @property
+  def concentration0(self):
+    return self.bijector.concentration0

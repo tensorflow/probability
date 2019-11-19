@@ -29,13 +29,13 @@ from tensorflow_probability.python.internal import test_util
 
 
 @test_util.test_all_tf_execution_regimes
-class GumbelTest(test_util.TestCase):
+class GumbelCDFTest(test_util.TestCase):
   """Tests correctness of the Gumbel bijector."""
 
   def testBijector(self):
     loc = 0.3
     scale = 5.
-    bijector = tfb.Gumbel(loc=loc, scale=scale, validate_args=True)
+    bijector = tfb.GumbelCDF(loc=loc, scale=scale, validate_args=True)
     self.assertStartsWith(bijector.name, "gumbel")
     x = np.array([[[-3.], [0.], [0.5], [4.2], [12.]]], dtype=np.float32)
     # Gumbel distribution
@@ -54,11 +54,11 @@ class GumbelTest(test_util.TestCase):
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.Gumbel(loc=0.3, scale=20.), lower_x=1., upper_x=100.,
+        tfb.GumbelCDF(loc=0.3, scale=20.), lower_x=1., upper_x=100.,
         eval_func=self.evaluate, rtol=0.05)
 
   def testBijectiveAndFinite(self):
-    bijector = tfb.Gumbel(loc=0., scale=3.0, validate_args=True)
+    bijector = tfb.GumbelCDF(loc=0., scale=3.0, validate_args=True)
     x = np.linspace(-10., 10., num=10).astype(np.float32)
     y = np.linspace(0.01, 0.99, num=10).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
@@ -67,7 +67,7 @@ class GumbelTest(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def testVariableScale(self):
     x = tf.Variable(1.)
-    b = tfb.Gumbel(loc=0., scale=x, validate_args=True)
+    b = tfb.GumbelCDF(loc=0., scale=x, validate_args=True)
     self.evaluate(x.initializer)
     self.assertIs(x, b.scale)
     self.assertEqual((), self.evaluate(b.forward(-3.)).shape)

@@ -46,12 +46,12 @@ FILENAMES = [
     "ffjord",
     "fill_scale_tril",
     "fill_triangular",
-    "gumbel",
+    "gumbel_cdf",
     "identity",
     "inline",
     "invert",
     "iterated_sigmoid_centered",
-    "kumaraswamy",
+    "kumaraswamy_cdf",
     # "masked_autoregressive",
     "matrix_inverse_tril",
     # "scale_matvec_lu",
@@ -79,7 +79,7 @@ FILENAMES = [
     "tanh",
     "transform_diagonal",
     "transpose",
-    "weibull",
+    "weibull_cdf",
 ]
 
 TEST_FILENAMES = [filename + "_test" for filename in FILENAMES]

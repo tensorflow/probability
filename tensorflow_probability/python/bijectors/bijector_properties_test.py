@@ -49,12 +49,12 @@ TF2_FRIENDLY_BIJECTORS = (
     'Expm1',
     'FillScaleTriL',
     'FillTriangular',
-    'Gumbel',
+    'GumbelCDF',
     'Identity',
     'Inline',
     'Invert',
     'IteratedSigmoidCentered',
-    'Kumaraswamy',
+    'KumaraswamyCDF',
     'Log',
     'Log1p',
     'MatvecLU',
@@ -81,13 +81,13 @@ TF2_FRIENDLY_BIJECTORS = (
     'Tanh',
     'TransformDiagonal',
     'Transpose',
-    'Weibull',
+    'WeibullCDF',
 )
 
 BIJECTOR_PARAMS_NDIMS = {
     'AffineScalar': dict(shift=0, scale=0, log_scale=0),
-    'Gumbel': dict(loc=0, scale=0),
-    'Kumaraswamy': dict(concentration1=0, concentration0=0),
+    'GumbelCDF': dict(loc=0, scale=0),
+    'KumaraswamyCDF': dict(concentration1=0, concentration0=0),
     'MatvecLU': dict(lower_upper=2, permutation=1),
     'Scale': dict(scale=0),
     'ScaleMatvecDiag': dict(scale_diag=1),
@@ -98,7 +98,7 @@ BIJECTOR_PARAMS_NDIMS = {
     'Softfloor': dict(temperature=0),
     'Softplus': dict(hinge_softness=0),
     'RationalQuadraticSpline': dict(bin_widths=1, bin_heights=1, knot_slopes=1),
-    'Weibull': dict(concentration=0, scale=0),
+    'WeibullCDF': dict(concentration=0, scale=0),
 }
 
 MUTEX_PARAMS = (
@@ -113,7 +113,7 @@ INVERT_LDJ = {FLDJ: ILDJ, ILDJ: FLDJ}
 NO_LDJ_GRADS_EXPECTED = {
     'AffineScalar': dict(shift={FLDJ, ILDJ}),
     'BatchNormalization': dict(beta={FLDJ, ILDJ}),
-    'Gumbel': dict(loc={ILDJ}),
+    'GumbelCDF': dict(loc={ILDJ}),
     'Shift': dict(shift={FLDJ, ILDJ}),
 }
 
@@ -123,10 +123,10 @@ TRANSFORM_DIAGONAL_WHITELIST = {
     'DiscreteCosineTransform',
     'Exp',
     'Expm1',
-    'Gumbel',
+    'GumbelCDF',
     'Identity',
     'Inline',
-    'Kumaraswamy',
+    'KumaraswamyCDF',
     'NormalCDF',
     'PowerTransform',
     'Reciprocal',
@@ -141,7 +141,7 @@ TRANSFORM_DIAGONAL_WHITELIST = {
     'Softsign',
     'Square',
     'Tanh',
-    'Weibull',
+    'WeibullCDF',
 }
 
 

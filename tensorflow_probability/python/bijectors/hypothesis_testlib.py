@@ -154,7 +154,7 @@ def bijector_supports():
       'FillTriangular':
           BijectorSupport(
               Support.VECTOR_SIZE_TRIANGULAR, Support.MATRIX_LOWER_TRIL),
-      'Gumbel':
+      'GumbelCDF':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'Identity':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
@@ -167,7 +167,7 @@ def bijector_supports():
       'IteratedSigmoidCentered':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
                           Support.VECTOR_WITH_L1_NORM_1_SIZE_GT1),
-      'Kumaraswamy':
+      'KumaraswamyCDF':
           BijectorSupport(Support.SCALAR_IN_0_1, Support.SCALAR_IN_0_1),
       'Log':
           BijectorSupport(
@@ -249,7 +249,7 @@ def bijector_supports():
       'Transpose':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
-      'Weibull':
+      'WeibullCDF':
           BijectorSupport(Support.SCALAR_NON_NEGATIVE, Support.SCALAR_IN_0_1),
   }
   missing_keys = set(instantiable_bijectors().keys()) - set(supports.keys())
