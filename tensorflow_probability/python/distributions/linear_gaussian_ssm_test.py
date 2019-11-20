@@ -85,6 +85,7 @@ class _IIDNormalTest(object):
     latent_size = 3
     observation_size = 2
     num_samples = 10000
+    strm = test_util.test_seed_stream()
 
     for transition_variance_val in [.3, 100.]:
       for observation_variance_val in [.6, 40.]:
@@ -96,7 +97,7 @@ class _IIDNormalTest(object):
             transition_variance=transition_variance_val,
             observation_variance=observation_variance_val)
 
-        x = iid_latents.sample(num_samples)
+        x = iid_latents.sample(num_samples, seed=strm())
 
         x_val = self.evaluate(x)
         result_shape = [num_timesteps, observation_size]
