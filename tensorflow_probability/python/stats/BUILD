@@ -201,3 +201,8 @@ exports_files(
     ["leave_one_out.py"],
     visibility = ["//tensorflow_probability:__subpackages__"],
 )
+
+exports_files(
+    ["moving_stats.py"],
+    visibility = ["//tensorflow_probability:__subpackages__"],
+)

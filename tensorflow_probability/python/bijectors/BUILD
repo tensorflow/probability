@@ -1590,3 +1590,8 @@ exports_files(
     ],
     visibility = ["//tensorflow_probability:__subpackages__"],
 )
+
+exports_files(
+    ["ffjord.py"],
+    visibility = ["//tensorflow_probability:__subpackages__"],
+)
