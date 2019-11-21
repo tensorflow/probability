@@ -22,6 +22,7 @@ from __future__ import print_function
 import functools
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -230,15 +231,23 @@ class GeneralizedPareto(distribution.Distribution):
     where_nonzero = (1 / nonzero_conc + 1) * tf.math.log1p(nonzero_conc * z)
     return -tf.math.log(scale) - tf.where(eq_zero, z, where_nonzero)
 
-  def _log_cdf(self, x):
+  def _log_survival_function(self, x):
     scale = tf.convert_to_tensor(self.scale)
     concentration = tf.convert_to_tensor(self.concentration)
     z = self._z(x, scale, concentration)
     eq_zero = tf.equal(concentration, 0)  # Concentration = 0 ==> Exponential.
     nonzero_conc = tf.where(eq_zero, tf.constant(1, self.dtype), concentration)
-    where_nonzero = tf.math.log1p(-(1 + nonzero_conc * z)**(-1 / nonzero_conc))
-    where_zero = tf.math.log1p(-tf.exp(-z))
-    return tf.where(eq_zero, where_zero, where_nonzero)
+    where_nonzero = -tf.math.log1p(nonzero_conc * z) / nonzero_conc
+    return tf.where(eq_zero, -z, where_nonzero)
+
+  def _log_cdf(self, x):
+    # Going through the survival function is more accurate when conc is near
+    # zero, because it amounts to computing the (1 + conc * z)**(-1 / conc)
+    # term in log-space with log1p.
+    # tfp_math.log1mexp(a) accurately computes log(1 - exp(-|a|)).  The negation
+    # and the absolute value are fine here because the log survival function is
+    # always non-positive.
+    return tfp_math.log1mexp(self._log_survival_function(x))
 
   def _z(self, x, scale, concentration):
     loc = tf.convert_to_tensor(self.loc)

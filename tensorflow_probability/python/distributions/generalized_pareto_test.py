@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import sys
-
 # Dependency imports
 import hypothesis as hp
 import hypothesis.strategies as hps
@@ -65,7 +63,7 @@ def generalized_paretos(draw, batch_shape=None):
 class GeneralizedParetoTest(test_util.TestCase):
 
   @hp.given(generalized_paretos())
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings()
   def testShape(self, dist):
     # batch_shape == dist.batch_shape asserted in generalized_paretos()
     self.assertEqual(dist.batch_shape, self.evaluate(dist.batch_shape_tensor()))
@@ -73,7 +71,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings()
   def testLogPDF(self, dist):
     xs = self.evaluate(dist.sample())
 
@@ -98,46 +96,53 @@ class GeneralizedParetoTest(test_util.TestCase):
     self.assertAllClose(-np.log(scale), self.evaluate(log_pdf), rtol=1e-5)
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings()
   def testCDF(self, dist):
-    tfp_hps.guitar_skip('b/144185740')
     xs = self.evaluate(dist.sample())
     cdf = dist.cdf(xs)
     self.assertEqual(dist.batch_shape, cdf.shape)
 
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
     expected_cdf = sp_stats.genpareto(conc, loc=loc, scale=scale).cdf(xs)
-    self.assertAllClose(expected_cdf, self.evaluate(cdf), rtol=5e-5)
+    actual_cdf = self.evaluate(cdf)
+    msg = ('Location: {}, scale: {}, concentration: {}, xs: {} '
+           'scipy cdf: {}, tfp cdf: {}')
+    hp.note(msg.format(loc, scale, conc, xs, expected_cdf, actual_cdf))
+    self.assertAllClose(expected_cdf, actual_cdf, rtol=5e-5)
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings()
   def testMean(self, dist):
-    tfp_hps.guitar_skip('b/144185740')
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
+    hp.note('Location: {}, scale: {}, concentration: {}'.format(
+        loc, scale, conc))
     self.assertEqual(dist.batch_shape, dist.mean().shape)
-    if np.abs(conc) < 1e-5 and conc != 0:
-      return  # scipy does badly at small nonzero concentrations.
-    expected = sp_stats.genpareto(conc, loc=loc, scale=scale).mean()
+    # scipy doesn't seem to be very accurate for small concentrations, so use
+    # higher precision.
+    expected = sp_stats.genpareto(np.float64(conc), loc=np.float64(loc),
+                                  scale=np.float64(scale)).mean()
     actual = self.evaluate(dist.mean())
     self.assertAllClose(expected, actual, rtol=5e-4)
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings()
   def testVariance(self, dist):
-    tfp_hps.guitar_skip('b/144185740')
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
     self.assertEqual(dist.batch_shape, dist.variance().shape)
-    expected = sp_stats.genpareto(conc, loc=loc, scale=scale).var()
-    if np.abs(conc) < 1e-4 and conc != 0:
-      return  # scipy does badly at small nonzero concentrations.
+    # scipy doesn't seem to be very accurate for small concentrations, so use
+    # higher precision.
+    expected = sp_stats.genpareto(np.float64(conc), loc=np.float64(loc),
+                                  scale=np.float64(scale)).var()
     if expected <= 0:
       return  # scipy sometimes returns nonsense zero or negative variances.
     actual = self.evaluate(dist.variance())
-    print('var', loc, scale, conc, expected, actual, file=sys.stderr)
-    self.assertAllClose(expected, actual, rtol=.01)
+    msg = ('Location: {}, scale: {}, concentration: {}, '
+           'scipy variance: {}, tfp variance: {}')
+    hp.note(msg.format(loc, scale, conc, expected, actual))
+    self.assertAllClose(expected, actual)
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings()
   def testEntropy(self, dist):
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
     self.assertEqual(dist.batch_shape, dist.entropy().shape)
