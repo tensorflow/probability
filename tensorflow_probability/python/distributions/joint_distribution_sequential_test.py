@@ -307,6 +307,22 @@ class JointDistributionSequentialTest(test_util.TestCase):
     lp = dist.log_prob(dist.sample(5))
     self.assertAllEqual(self.evaluate(lp).shape, [5])
 
+  def test_uses_structure_to_convert_nested_lists(self):
+    joint = tfd.JointDistributionSequential([
+        tfd.MultivariateNormalDiag([0., 0.], [1., 1.]),
+        lambda a: tfd.JointDistributionSequential([  # pylint: disable=g-long-lambda
+            tfd.JointDistributionSequential([
+                tfd.Normal(a[..., 0], 1.)]),
+            tfd.Normal(a[..., 1], 1.)])
+    ])
+
+    x = [tf.convert_to_tensor([4., 2.]), [[1.], 3.]]
+    x_with_tensor_as_list = [[4., 2.], [[1.], 3.]]
+    lp = self.evaluate(joint.log_prob(x))
+    lp_with_tensor_as_list = self.evaluate(
+        joint.log_prob(x_with_tensor_as_list))
+    self.assertAllEqual(lp, lp_with_tensor_as_list)
+
   def test_latent_dirichlet_allocation(self):
     """Tests Latent Dirichlet Allocation joint model.
 

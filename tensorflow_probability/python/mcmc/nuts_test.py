@@ -461,9 +461,10 @@ class NutsTest(test_util.TestCase):
             tfd.HalfNormal(5.),  # df
             lambda df, b1, b0: tfd.Independent(  # pylint: disable=g-long-lambda
                 tfd.StudentT(  # Likelihood
-                    df=df[:, None],
-                    loc=b0[:, None] + b1[:, None] * predictors[None, :],
-                    scale=y_sigma[None, :])),
+                    df=df[..., tf.newaxis],
+                    loc=(b0[..., tf.newaxis] +
+                         b1[..., tf.newaxis] * predictors[tf.newaxis]),
+                    scale=y_sigma)),
         ],
         validate_args=True)
 

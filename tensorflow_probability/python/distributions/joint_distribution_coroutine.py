@@ -247,7 +247,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
           with tf.control_dependencies(
               self._assert_compatible_shape(
                   index, sample_shape, next_value)):
-            values_out.append(tf.identity(next_value))
+            values_out.append(tf.nest.map_structure(tf.identity, next_value))
         else:
           values_out.append(next_value)
 

@@ -35,6 +35,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -162,15 +163,18 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):
       tf.nest.is_nested(dtype_hint)):
     if dtype is None:
       fn = lambda v, dh: tf.convert_to_tensor(v, dtype_hint=dh, name=name)
-      return tf.nest.map_structure(fn, value, dtype_hint)
+      return nest.map_structure_up_to(dtype_hint, fn, value, dtype_hint,
+                                      # Allow list<->tuple conflation.
+                                      check_types=False)
     elif dtype_hint is None:
       fn = lambda v, d: tf.convert_to_tensor(v, dtype=d, name=name)
-      return tf.nest.map_structure(fn, value, dtype)
+      return nest.map_structure_up_to(dtype, fn, value, dtype,
+                                      check_types=False)
     else:
       fn = lambda v, d, dh: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
           v, dtype=d, dtype_hint=dh, name=name)
-      return tf.nest.map_structure(fn, value, dtype, dtype_hint,
-                                   expand_composites=True)
+      return nest.map_structure_up_to(dtype, fn, value, dtype, dtype_hint,
+                                      check_types=False, expand_composites=True)
   return tf.convert_to_tensor(
       value, dtype=dtype, dtype_hint=dtype_hint, name=name)
 

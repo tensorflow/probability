@@ -338,14 +338,10 @@ class JointDistribution(distribution_lib.Distribution):
 
     return ds, xs
 
-  # We need to bypass base Distribution reshaping/validation logic so we
-  # tactically implement a few of the `_call_*` redirectors.  We don't want to
+  # We need to bypass base Distribution reshaping logic, so we
+  # tactically implement the `_call_sample_n` redirector.  We don't want to
   # override the public level because then tfp.layers can't take generic
-  # `Distribution.foo` as argument for the `convert_to_tensor_fn` parameter.
-  def _call_log_prob(self, value, name):
-    with self._name_and_control_scope(name):
-      return self._log_prob(value)
-
+  # `Distribution.sample` as argument for the `convert_to_tensor_fn` parameter.
   def _call_sample_n(self, sample_shape, seed, name, value=None):
     with self._name_and_control_scope(name):
       return self._sample_n(

@@ -543,6 +543,22 @@ class JointDistributionCoroutineTest(test_util.TestCase):
          ' dtype=Model(s=float32, w=float32)>'),
         repr(m))
 
+  def test_converts_nested_lists_to_tensor(self):
+    def dist():
+      a = yield Root(tfd.MultivariateNormalDiag([0., 0.], [1., 1.]))
+      yield tfd.JointDistributionSequential([
+          tfd.JointDistributionSequential([
+              tfd.Normal(a[..., 0], 1.)]),
+          tfd.Normal(a[..., 1], 1.)])
+    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+
+    x = [tf.convert_to_tensor([4., 2.]), [[1.], 3.]]
+    x_with_tensor_as_list = [[4., 2.], [[1.], 3.]]
+    lp = self.evaluate(joint.log_prob(x))
+    lp_with_tensor_as_list = self.evaluate(
+        joint.log_prob(x_with_tensor_as_list))
+    self.assertAllEqual(lp, lp_with_tensor_as_list)
+
   def test_latent_dirichlet_allocation(self):
     """Tests Latent Dirichlet Allocation joint model.
 

@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import joint_distribution as jo
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -246,7 +247,11 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
             () if args and not self._always_use_specified_sample_shape
             else sample_shape, seed=seed())
       else:
-        xs[i] = tf.convert_to_tensor(xs[i], dtype_hint=ds[-1].dtype)
+        xs[i] = nest.map_structure_up_to(
+            ds[-1].dtype,
+            lambda x, dtype: tf.convert_to_tensor(x, dtype_hint=dtype),
+            xs[i],
+            ds[-1].dtype)
         seed()  # Ensure reproducibility even when xs are (partially) set.
     # Note: we could also resolve distributions up to the first non-`None` in
     # `self._model_flatten(value)`, however we omit this feature for simplicity,
