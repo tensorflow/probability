@@ -54,15 +54,15 @@ class OneHotCategoricalTest(test_util.TestCase):
     p = [0.2, 0.8]
     dist = tfd.OneHotCategorical(probs=p, validate_args=True)
     self.assertAllClose(p, self.evaluate(dist.probs))
-    self.assertAllEqual([2], dist.logits.shape)
+    self.assertAllEqual([2], dist.logits_parameter().shape)
 
   def testLogits(self):
     p = np.array([0.2, 0.8], dtype=np.float32)
     logits = np.log(p) - 50.
     dist = tfd.OneHotCategorical(logits=logits, validate_args=True)
-    self.assertAllEqual([2], dist.probs.shape)
+    self.assertAllEqual([2], dist.probs_parameter().shape)
     self.assertAllEqual([2], dist.logits.shape)
-    self.assertAllClose(self.evaluate(dist.probs), p)
+    self.assertAllClose(self.evaluate(dist.probs_parameter()), p)
     self.assertAllClose(self.evaluate(dist.logits), logits)
 
   def testShapes(self):
@@ -95,7 +95,7 @@ class OneHotCategoricalTest(test_util.TestCase):
     self.assertEqual(dist.dtype, tf.int64)
     self.assertEqual(dist.dtype, dist.sample(5).dtype)
     self.assertEqual(dist.dtype, dist.mode().dtype)
-    self.assertEqual(dist.probs.dtype, tf.float32)
+    self.assertEqual(dist.probs_parameter().dtype, tf.float32)
     self.assertEqual(dist.logits.dtype, tf.float32)
     self.assertEqual(dist.logits.dtype, dist.entropy().dtype)
     self.assertEqual(dist.logits.dtype, dist.prob(
@@ -261,7 +261,7 @@ class OneHotCategoricalTest(test_util.TestCase):
     ] = self.evaluate([
         sample_mean,
         sample_covariance,
-        dist.probs,
+        dist.probs_parameter(),
         dist.covariance(),
     ])
     self.assertAllEqual([3], sample_mean.shape)

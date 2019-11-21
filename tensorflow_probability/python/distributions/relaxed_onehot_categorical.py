@@ -211,15 +211,11 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
   @property
   def logits(self):
     """Input argument `logits`."""
-    if self._logits is None:
-      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
-    if self._probs is None:
-      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self, temperature=None, logits=None):
@@ -319,22 +315,6 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         assert_util.assert_near(
             tf.zeros([], dtype=self.dtype), tf.reduce_logsumexp(x, axis=[-1])),
     ], x)
-
-  @deprecation.deprecated(
-      '2019-11-01',
-      ('The `logits` property will return `None` when the distribution is '
-       'parameterized with `logits=None`. Use `logits_parameter()` instead.'),
-      warn_once=True)
-  def _logits_deprecated_behavior(self):
-    return self.logits_parameter()
-
-  @deprecation.deprecated(
-      '2019-11-01',
-      ('The `probs` property will return `None` when the distribution is '
-       'parameterized with `probs=None`. Use `probs_parameter()` instead.'),
-      warn_once=True)
-  def _probs_deprecated_behavior(self):
-    return self.probs_parameter()
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

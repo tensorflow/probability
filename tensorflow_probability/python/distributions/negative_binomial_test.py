@@ -58,7 +58,7 @@ class NegativeBinomialTest(test_util.TestCase):
     logits = [[0., 9., -0.5]]
     negbinom = tfd.NegativeBinomial(
         total_count=3., logits=logits, validate_args=True)
-    self.assertEqual([1, 3], negbinom.probs.shape)
+    self.assertEqual([1, 3], negbinom.probs_parameter().shape)
     self.assertEqual([1, 3], negbinom.logits.shape)
     self.assertAllClose(logits, self.evaluate(negbinom.logits))
 

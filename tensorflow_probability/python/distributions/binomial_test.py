@@ -60,13 +60,13 @@ class BinomialTest(test_util.TestCase):
     p = [[0.1, 0.2, 0.7]]
     binom = tfd.Binomial(total_count=3., probs=p, validate_args=True)
     self.assertEqual((1, 3), binom.probs.shape)
-    self.assertEqual((1, 3), binom.logits.shape)
+    self.assertEqual((1, 3), binom.logits_parameter().shape)
     self.assertAllClose(p, self.evaluate(binom.probs))
 
   def testLogitsProperty(self):
     logits = [[0., 9., -0.5]]
     binom = tfd.Binomial(total_count=3., logits=logits, validate_args=True)
-    self.assertEqual((1, 3), binom.probs.shape)
+    self.assertEqual((1, 3), binom.probs_parameter().shape)
     self.assertEqual((1, 3), binom.logits.shape)
     self.assertAllClose(logits, self.evaluate(binom.logits))
 

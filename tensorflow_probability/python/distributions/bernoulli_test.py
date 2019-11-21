@@ -53,11 +53,13 @@ class BernoulliTest(test_util.TestCase):
     logits = [-42., 42.]
     dist = tfd.Bernoulli(logits=logits, validate_args=True)
     self.assertAllClose(logits, self.evaluate(dist.logits))
-    self.assertAllClose(sp_special.expit(logits), self.evaluate(dist.probs))
+    self.assertAllClose(sp_special.expit(logits),
+                        self.evaluate(dist.probs_parameter()))
 
     p = [0.01, 0.99, 0.42]
     dist = tfd.Bernoulli(probs=p, validate_args=True)
-    self.assertAllClose(sp_special.logit(p), self.evaluate(dist.logits))
+    self.assertAllClose(sp_special.logit(p),
+                        self.evaluate(dist.logits_parameter()))
 
   def testInvalidP(self):
     invalid_ps = [1.01, 2.]

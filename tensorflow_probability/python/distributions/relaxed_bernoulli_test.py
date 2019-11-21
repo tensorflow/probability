@@ -45,11 +45,13 @@ class RelaxedBernoulliTest(test_util.TestCase):
     dist = tfd.RelaxedBernoulli(temperature, logits=logits, validate_args=True)
     self.assertAllClose(logits, self.evaluate(dist.logits))
 
-    self.assertAllClose(scipy.special.expit(logits), self.evaluate(dist.probs))
+    self.assertAllClose(scipy.special.expit(logits),
+                        self.evaluate(dist.probs_parameter()))
 
     p = [0.01, 0.99, 0.42]
     dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
-    self.assertAllClose(scipy.special.logit(p), self.evaluate(dist.logits))
+    self.assertAllClose(scipy.special.logit(p),
+                        self.evaluate(dist.logits_parameter()))
 
   def testInvalidP(self):
     temperature = 1.0
