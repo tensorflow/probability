@@ -121,7 +121,7 @@ echo "${shard_tests}" \
     --copt=-O3 \
     --copt=-march=native \
     --notest_keep_going \
-    --test_tag_filters=-gpu,-requires-gpu-sm35,-notap,-no-oss-ci,-tfp_jax,-tf2-broken \
+    --test_tag_filters=-gpu,-requires-gpu-sm35,-notap,-no-oss-ci,-tfp_jax,-tf2-broken,-tf2-kokoro-broken \
     --test_timeout 300,450,1200,3600 \
     --action_env=PATH \
     --action_env=LD_LIBRARY_PATH \
