@@ -152,7 +152,7 @@ class WeakKeyDefaultDict(dict):
 
   # This is the 'WeakKey' part.
   def __getitem__(self, key):
-    weak_key = HashableWeakRef(key, lambda w: self.pop(w, None))
+    weak_key = HashableWeakRef(key, self.pop)
     return super(WeakKeyDefaultDict, self).__getitem__(weak_key)
 
   # This is the 'DefaultDict' part.
@@ -178,19 +178,52 @@ class WeakKeyDefaultDict(dict):
 
 
 class HashableWeakRef(weakref.ref):
-  """weakref.ref which makes np.array objects hashable."""
+  """weakref.ref which makes np.array objects hashable.
+
+  We take care to ensure that a hash can still be provided in the case that the
+  ref has been cleaned up. This ensures that the WeakKeyDefaultDict doesn't
+  suffer memory leaks by failing to clean up HashableWeakRef key objects whose
+  referrents have gone out of scope and been destroyed (as in
+  https://github.com/tensorflow/probability/issues/647).
+  """
+
+  def __init__(self, referrent, callback=None):
+    # Note that -1 is a safe sentinal value for detecting whether hash has been
+    # initialized, since python doesn't allow hashes of -1. In particular,
+    #
+    # ```python
+    # a = -1
+    # print(hash(a))
+    # ==> -2
+    # ```
+    self._last_known_hash = -1
+    super(HashableWeakRef, self).__init__(referrent, callback)
 
   def __hash__(self):
     x = self()
+    # If the ref has been cleaned up, fall back to the last known hash value.
+    if x is None:
+      if self._last_known_hash == -1:
+        raise ValueError(
+            'HashableWeakRef\'s ref has been cleaned up but the hash was never '
+            'known. It may not be able to be cleaned up as a result. This '
+            'should not happen in typical TFP usage, and constitutes a real '
+            'bug; please file an issue on '
+            'https://github.com/tensorflow/probability/issues or notify '
+            'tfprobability@tensorflow.org.')
+      return self._last_known_hash
     if not isinstance(x, onp.ndarray):
-      return id(x)
-    if isinstance(x, np.generic):
+      result = id(x)
+    elif isinstance(x, np.generic):
       raise ValueError('Unable to weakref np.generic')
     # Note: The following logic can never be reached by the public API because
     # the bijector base class always calls `convert_to_tensor` before accessing
     # the cache.
-    x.flags.writeable = False
-    return hash(str(x.__array_interface__) + str(id(x)))
+    else:
+      x.flags.writeable = False
+      result = hash(str(x.__array_interface__) + str(id(x)))
+    self._last_known_hash = result
+    return result
 
   def __repr__(self):
     return repr(self())
@@ -199,16 +232,21 @@ class HashableWeakRef(weakref.ref):
     return str(self())
 
   def __eq__(self, other):
+    # If either ref has been cleaned up, fall back to comparing the
+    # HashableWeakRef instance ids, following what weakref equality checks do
+    # (https://github.com/python/cpython/blob/master/Objects/weakrefobject.c#L196)
+    if self() is None or other() is None:
+      return id(self) == id(other)
     x = self()
     if isinstance(x, np.generic):
       raise ValueError('Unable to weakref np.generic')
     y = other()
     ids_are_equal = id(x) == id(y)
-    if isinstance(x, onp.ndarray):
-      return (isinstance(y, onp.ndarray) and
-              x.__array_interface__ == y.__array_interface__ and
-              ids_are_equal)
-    return ids_are_equal
+    if not isinstance(x, onp.ndarray):
+      return ids_are_equal
+    return (isinstance(y, onp.ndarray) and
+            x.__array_interface__ == y.__array_interface__ and
+            ids_are_equal)
 
 
 @six.add_metaclass(abc.ABCMeta)

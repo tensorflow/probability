@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import weakref
-
 # Dependency imports
 import mock
 import numpy as np
@@ -246,15 +244,14 @@ class BijectorCachingTest(test_util.TestCase):
 
   def testCachingGarbageCollection(self):
     bijector = ForwardOnlyBijector()
-    refs = []
-    niters = 3
-    for _ in range(niters):
-      y = bijector.forward(tf.zeros([10]))
-      refs.append(weakref.ref(y))
+    niters = 6
+    for i in range(niters):
+      x = tf.constant(i, dtype=tf.float32)
+      y = bijector.forward(x)  # pylint: disable=unused-variable
 
     # We tolerate leaking tensor references in graph mode only.
     expected_live = 1 if tf.executing_eagerly() else niters
-    self.assertEqual(expected_live, sum(ref() is not None for ref in refs))
+    self.assertEqual(expected_live, len(bijector._from_x))
 
 
 @test_util.test_all_tf_execution_regimes
