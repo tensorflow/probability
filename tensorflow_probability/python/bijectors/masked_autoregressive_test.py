@@ -39,7 +39,11 @@ def _masked_autoregressive_2d_template(base_template, event_shape):
   def wrapper(x):
     x_flat = tf.reshape(
         x, tf.concat([tf.shape(x)[:-len(event_shape)], [-1]], -1))
-    x_shift, x_log_scale = base_template(x_flat)
+    t = base_template(x_flat)
+    if tf.is_tensor(t):
+      x_shift, x_log_scale = tf.unstack(t, axis=-1)
+    else:
+      x_shift, x_log_scale = t
     return tf.reshape(x_shift, tf.shape(x)), tf.reshape(
         x_log_scale, tf.shape(x))
 
@@ -58,7 +62,7 @@ def _masked_autoregressive_shift_and_log_scale_fn(hidden_units,
   if shift_only:
     return lambda x: (layer(x)[..., 0], None)
 
-  return lambda x: tf.unstack(layer(x), axis=-1)
+  return layer
 
 
 def _masked_autoregressive_gated_bijector_fn(hidden_units,
@@ -478,8 +482,7 @@ class AutoregressiveNetworkTest(test_util.TestCase):
 
     distribution = tfd.TransformedDistribution(
         distribution=tfd.Normal(loc=0., scale=1.),
-        bijector=tfb.MaskedAutoregressiveFlow(
-            lambda x: tf.unstack(made(x), num=2, axis=-1)),
+        bijector=tfb.MaskedAutoregressiveFlow(made),
         event_shape=[2])
 
     # Construct and fit model.
