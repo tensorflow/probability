@@ -138,6 +138,7 @@ INSTANTIABLE_BUT_NOT_SLICABLE = (
 EXTRA_TENSOR_CONVERSION_DISTS = {
     'RelaxedBernoulli': 1,
     'WishartTriL': 3,  # not concretizing linear operator scale
+    'Chi': 2,  # subclasses `Chi2`, runs redundant checks on `df` parameter
 }
 
 # Whitelist of underlying distributions for QuantizedDistribution (must have

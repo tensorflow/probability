@@ -116,7 +116,12 @@ FILENAMES = [
     "zipf",
 ]
 
-NO_TESTS = ("joint_distribution", "vector_exponential_linear_operator", "vector_laplace_linear_operator")
+NO_TESTS = (
+    "joint_distribution",
+    "vector_exponential_linear_operator",
+    "vector_laplace_linear_operator",
+    "transformed_distribution",
+)
 
 TEST_FILENAMES = [filename + "_test" for filename in FILENAMES if filename not in NO_TESTS]
 
@@ -130,7 +135,6 @@ TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     "kumaraswamy",
     "sample",
     "sinh_arcsinh",
-    "transformed_distribution",
 )]
 
 [genrule(
