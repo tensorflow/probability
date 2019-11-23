@@ -24,6 +24,9 @@ from tensorflow_probability.python.experimental.substrates.jax.math.generic impo
 from tensorflow_probability.python.experimental.substrates.jax.math.generic import log_combinations
 from tensorflow_probability.python.experimental.substrates.jax.math.generic import log_sub_exp
 from tensorflow_probability.python.experimental.substrates.jax.math.generic import reduce_weighted_logsumexp
+from tensorflow_probability.python.experimental.substrates.jax.math.generic import smootherstep
+from tensorflow_probability.python.experimental.substrates.jax.math.generic import soft_sorting_matrix
+from tensorflow_probability.python.experimental.substrates.jax.math.generic import soft_threshold
 from tensorflow_probability.python.experimental.substrates.jax.math.generic import softplus_inverse
 from tensorflow_probability.python.experimental.substrates.jax.math.gradient import value_and_gradient
 from tensorflow_probability.python.experimental.substrates.jax.math.linalg import fill_triangular

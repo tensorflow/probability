@@ -126,10 +126,13 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
         if not np.issubdtype(dtype_hint, np.complexfloating):
           return value
       if np.issubdtype(value.dtype, np.floating):
-        if not np.issubdtype(dtype_hint, np.floating):
+        if not (np.issubdtype(dtype_hint, np.floating)
+                or np.issubdtype(dtype_hint, np.complexfloating)):
           return value
       if np.issubdtype(value.dtype, np.integer):
-        if not np.issubdtype(dtype_hint, np.integer):
+        if not (np.issubdtype(dtype_hint, np.integer)
+                or np.issubdtype(dtype_hint, np.floating)
+                or np.issubdtype(dtype_hint, np.complexfloating)):
           return value
     return value.astype(dtype_hint)
   return np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))

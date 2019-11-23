@@ -77,4 +77,7 @@ class TestCase(tf.test.TestCase):
 
     return super(TestCase, self).assertEqual(first, second, msg)
 
+  def assertShapeEqual(self, first, second, msg=None):
+    self.assertTupleEqual(first.shape, second.shape, msg=msg)
+
 main = tf.test.main

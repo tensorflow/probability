@@ -283,6 +283,8 @@ class SoftplusInverseTest(test_util.TestCase):
           use_gpu=True)
 
   @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_test_missing_functionality(
+      'Relies on Tensorflow gradient_checker')
   def testGradient(self):
     x = tf.constant(
         [-0.9, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 0.9],

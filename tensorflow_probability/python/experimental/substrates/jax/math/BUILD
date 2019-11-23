@@ -33,9 +33,15 @@ FILENAMES = [
     "numeric",
 ]
 
-# TODO(bjp): Enable the tests
-# TEST_FILENAMES = [filename + "_test" for filename in FILENAMES]
-TEST_FILENAMES = []
+TEST_WHITELIST = [
+    "generic",
+    "gradient",
+]
+
+TEST_FILENAMES = [filename + "_test" for filename in TEST_WHITELIST]
+
+DEPS = {
+}
 
 [genrule(
     name = "rewrite_{}".format(filename),
@@ -60,8 +66,10 @@ TEST_FILENAMES = []
     tags = ["tfp_jax"],
     deps = [
         ":math",
+        # jax dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/experimental/substrates/jax/internal:test_util",
-    ],
+    ] + DEPS.get(filename, []),
 ) for filename in TEST_FILENAMES]
 
 py_library(

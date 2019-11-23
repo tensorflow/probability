@@ -31,6 +31,12 @@ from tensorflow_probability.python.internal.backend.numpy.numpy_array import _re
 scipy_special = utils.try_import('scipy.special')
 
 
+JAX_MODE = False
+
+if JAX_MODE:
+  import jax  # pylint: disable=g-import-not-at-top
+
+
 __all__ = [
     'abs',
     'accumulate_n',
@@ -503,13 +509,60 @@ logical_xor = utils.copy_docstring(
     tf.math.logical_xor,
     lambda x, y, name=None: np.logical_xor(x, y))
 
+
+if JAX_MODE:
+
+  @jax.custom_transforms
+  def _maximum_(x, y, name=None):
+    del name
+    return np.maximum(x, y)
+
+  @jax.custom_transforms
+  def _minimum_(x, y, name=None):
+    del name
+    return np.minimum(x, y)
+
+  # TF and Jax have differing behavior
+  # when the inputs to maximum/minimum are equal.
+  # This custom transforms rule
+  # modifies Jax to match TF's behavior.
+
+  def _maximum_vjp(x, y):
+    out_primals = _maximum_(x, y)
+    def vjp(g):
+      gx = g * np.where(x >= y, np.ones_like(x), np.zeros_like(x))
+      return (gx.astype(x.dtype), (g - gx).astype(y.dtype))
+    return out_primals, vjp
+  jax.defvjp_all(_maximum_, _maximum_vjp)
+
+  def _minimum_vjp(x, y):
+    out_primals = _minimum_(x, y)
+    def vjp(g):
+      gx = g * np.where(x <= y, np.ones_like(x), np.zeros_like(x))
+      return (gx.astype(x.dtype), (g - gx).astype(y.dtype))
+    return out_primals, vjp
+  jax.defvjp_all(_minimum_, _minimum_vjp)
+  # Need to wrap in lambda because custom_transforms
+  # returns an object, not a function
+  # which breaks docstring wrapping
+  _maximum = lambda *args, **kwargs: _maximum_(*args, **kwargs)  # pylint: disable=unnecessary-lambda
+  _minimum = lambda *args, **kwargs: _minimum_(*args, **kwargs)  # pylint: disable=unnecessary-lambda
+else:
+
+  def _maximum(x, y, name=None):
+    del name
+    return np.maximum(x, y)
+
+  def _minimum(x, y, name=None):
+    del name
+    return np.minimum(x, y)
+
+
 maximum = utils.copy_docstring(
-    tf.math.maximum,
-    lambda x, y, name=None: np.maximum(x, y))
+    tf.math.maximum, _maximum)
 
 minimum = utils.copy_docstring(
-    tf.math.minimum,
-    lambda x, y, name=None: np.minimum(x, y))
+    tf.math.minimum, _minimum)
 
 multiply = utils.copy_docstring(
     tf.math.multiply,

@@ -623,6 +623,10 @@ class NumpyTest(test_util.TestCase):
     self.assertEqual(np.float64,
                      convert_to_tensor(1., dtype_hint=tf.int32).dtype)
     self.assertEqual(np.int32, convert_to_tensor(1, dtype_hint=tf.int32).dtype)
+    self.assertEqual(np.float32,
+                     convert_to_tensor(1, dtype_hint=tf.float32).dtype)
+    self.assertEqual(np.complex64,
+                     convert_to_tensor(1., dtype_hint=tf.complex64).dtype)
     self.assertEqual(np.int64, convert_to_tensor(1, dtype_hint=tf.int64).dtype)
     self.assertEqual(
         np.int32,
