@@ -22,11 +22,11 @@ from __future__ import print_function
 
 import numpy as np
 from scipy import stats
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -178,16 +178,16 @@ class TransformedDistributionTest(test_util.TestCase):
   def testCdfDescending(self):
     td = self._cls()(
         distribution=tfd.Normal(loc=0., scale=[1., 1.]),
-        bijector=tfb.Shift(shift=1.)(tfb.Scale(scale=[2., -2.])),
+        bijector=tfb.AffineScalar(shift=1., scale=[2., -2.]),
         validate_args=True)
     nd = tfd.Normal(loc=1., scale=2., validate_args=True)
     self.assertAllEqual(tf.ones(td.batch_shape, dtype=tf.bool),
                         td.cdf(nd.quantile(.8)) < td.cdf(nd.quantile(.9)))
 
   def testCdfDescendingChained(self):
-    bij1 = tfb.Shift(shift=1.)(tfb.Scale(scale=[1., -2.]))
-    bij2 = tfb.Shift(shift=1.)(tfb.Scale(scale=[[3.], [-5.]]))
-    bij3 = tfb.Shift(shift=1.)(tfb.Scale(scale=[[[7.]], [[-11.]]]))
+    bij1 = tfb.AffineScalar(shift=1., scale=[1., -2.])
+    bij2 = tfb.AffineScalar(shift=1., scale=[[3.], [-5.]])
+    bij3 = tfb.AffineScalar(shift=1., scale=[[[7.]], [[-11.]]])
     for chain in bij2(bij1), bij3(bij2(bij1)):
       td = self._cls()(
           distribution=tfd.Normal(loc=0., scale=tf.ones([2, 2, 2])),
@@ -201,7 +201,7 @@ class TransformedDistributionTest(test_util.TestCase):
   def testSfDescending(self):
     td = self._cls()(
         distribution=tfd.Normal(loc=0., scale=[1., 1.]),
-        bijector=tfb.Shift(shift=1.)(tfb.Scale(scale=[2., -2.])),
+        bijector=tfb.AffineScalar(shift=1., scale=[2., -2.]),
         validate_args=True)
     nd = tfd.Normal(loc=1., scale=2., validate_args=True)
     self.assertAllEqual(tf.ones(td.batch_shape, dtype=tf.bool),
@@ -211,7 +211,7 @@ class TransformedDistributionTest(test_util.TestCase):
   def testQuantileDescending(self):
     td = self._cls()(
         distribution=tfd.Normal(loc=0., scale=[1., 1.]),
-        bijector=tfb.Shift(shift=1.)(tfb.Scale(scale=[2., -2.])),
+        bijector=tfb.AffineScalar(shift=1., scale=[2., -2.]),
         validate_args=True)
     self.assertAllEqual(tf.ones(td.batch_shape, dtype=tf.bool),
                         td.quantile(.8) < td.quantile(.9))
@@ -226,7 +226,7 @@ class TransformedDistributionTest(test_util.TestCase):
         return tf.exp(x)
 
       def _forward_log_det_jacobian(self, x):
-        return tf.convert_to_tensor(x)
+        return tf.convert_to_tensor(value=x)
 
     exp_forward_only = ExpForwardOnly()
 
@@ -295,7 +295,7 @@ class TransformedDistributionTest(test_util.TestCase):
                         self.evaluate(multi_logit_normal.log_prob(y)))
     self.assertAllClose(
         [1, 2, 3, 2],
-        self.evaluate(tf.shape(multi_logit_normal.sample([1, 2, 3]))))
+        self.evaluate(tf.shape(input=multi_logit_normal.sample([1, 2, 3]))))
     self.assertAllEqual([2], multi_logit_normal.event_shape)
     self.assertAllEqual([2],
                         self.evaluate(multi_logit_normal.event_shape_tensor()))
@@ -384,7 +384,7 @@ class TransformedDistributionTest(test_util.TestCase):
   def testScalarBatchScalarEventIdentityScale(self):
     exp2 = self._cls()(
         tfd.Exponential(rate=0.25),
-        bijector=tfb.Scale(scale=2.),
+        bijector=tfb.AffineScalar(scale=2.),
         validate_args=True)
     log_prob = exp2.log_prob(1.)
     log_prob_ = self.evaluate(log_prob)
@@ -393,7 +393,6 @@ class TransformedDistributionTest(test_util.TestCase):
     self.assertAllClose(base_log_prob - ildj, log_prob_, rtol=1e-6, atol=0.)
 
 
-@test_util.test_all_tf_execution_regimes
 class ScalarToMultiTest(test_util.TestCase):
 
   def _cls(self):
@@ -420,21 +419,16 @@ class ScalarToMultiTest(test_util.TestCase):
     # batch_shape agnostic and only care about event_ndims.
     # In the case of `Affine`, if we got it wrong then it would fire an
     # exception due to incompatible dimensions.
-    batch_shape_var = tf.Variable(
-        np.int32(batch_shape),
-        shape=tf.TensorShape(None),
-        name='dynamic_batch_shape')
-    event_shape_var = tf.Variable(
-        np.int32(event_shape),
-        shape=tf.TensorShape(None),
-        name='dynamic_event_shape')
-
+    batch_shape_pl = tf1.placeholder_with_default(
+        input=np.int32(batch_shape), shape=None, name='dynamic_batch_shape')
+    event_shape_pl = tf1.placeholder_with_default(
+        input=np.int32(event_shape), shape=None, name='dynamic_event_shape')
     fake_mvn_dynamic = self._cls()(
         distribution=base_distribution_class(
             validate_args=True, **base_distribution_kwargs),
         bijector=tfb.Affine(shift=self._shift, scale_tril=self._tril),
-        batch_shape=batch_shape_var,
-        event_shape=event_shape_var,
+        batch_shape=batch_shape_pl,
+        event_shape=event_shape_pl,
         validate_args=True)
 
     fake_mvn_static = self._cls()(
@@ -478,11 +472,10 @@ class ScalarToMultiTest(test_util.TestCase):
       # Ensure sample works by checking first, second moments.
       y = fake_mvn.sample(int(num_samples), seed=test_util.test_seed())
       x = y[0:5, ...]
-      sample_mean = tf.reduce_mean(y, axis=0)
+      sample_mean = tf.reduce_mean(input_tensor=y, axis=0)
       centered_y = tf.transpose(a=y - sample_mean, perm=[1, 2, 0])
       sample_cov = tf.matmul(
           centered_y, centered_y, transpose_b=True) / num_samples
-      self.evaluate([batch_shape_var.initializer, event_shape_var.initializer])
       [
           sample_mean_,
           sample_cov_,
@@ -528,7 +521,7 @@ class ScalarToMultiTest(test_util.TestCase):
         },
         batch_shape=[2],
         event_shape=[3],
-        not_implemented_message='not implemented when overriding `event_shape`')
+        not_implemented_message='not implemented when overriding event_shape')
 
   def testScalarBatchNonScalarEvent(self):
     self._testMVN(
@@ -541,9 +534,7 @@ class ScalarToMultiTest(test_util.TestCase):
         not_implemented_message='not implemented')
 
     # Can't override event_shape for scalar batch, non-scalar event.
-    with self.assertRaisesWithPredicateMatch(
-        Exception, 'Base distribution is not scalar.'):
-
+    with self.assertRaisesRegexp(ValueError, 'base distribution not scalar'):
       self._cls()(
           distribution=tfd.MultivariateNormalDiag(loc=[0.], scale_diag=[1.]),
           bijector=tfb.Affine(shift=self._shift, scale_tril=self._tril),
@@ -552,7 +543,6 @@ class ScalarToMultiTest(test_util.TestCase):
           validate_args=True)
 
   def testNonScalarBatchScalarEvent(self):
-
     self._testMVN(
         base_distribution_class=tfd.Normal,
         base_distribution_kwargs={
@@ -560,12 +550,10 @@ class ScalarToMultiTest(test_util.TestCase):
             'scale': [1., 1]
         },
         event_shape=[3],
-        not_implemented_message='not implemented when overriding'
-        ' `event_shape`')
+        not_implemented_message='not implemented when overriding event_shape')
 
     # Can't override batch_shape for non-scalar batch, scalar event.
-    with self.assertRaisesWithPredicateMatch(
-        Exception, 'Base distribution is not scalar.'):
+    with self.assertRaisesRegexp(ValueError, 'base distribution not scalar'):
       self._cls()(
           distribution=tfd.Normal(loc=[0.], scale=[1.]),
           bijector=tfb.Affine(shift=self._shift, scale_tril=self._tril),
@@ -576,7 +564,7 @@ class ScalarToMultiTest(test_util.TestCase):
   def testNonScalarBatchNonScalarEvent(self):
     # Can't override event_shape and/or batch_shape for non_scalar batch,
     # non-scalar event.
-    with self.assertRaisesRegexp(ValueError, 'Base distribution is not scalar'):
+    with self.assertRaisesRegexp(ValueError, 'base distribution not scalar'):
       self._cls()(
           distribution=tfd.MultivariateNormalDiag(
               loc=[[0.]], scale_diag=[[1.]]),
@@ -588,22 +576,18 @@ class ScalarToMultiTest(test_util.TestCase):
   def testMatrixEvent(self):
     batch_shape = [2]
     event_shape = [2, 3, 3]
-    batch_shape_var = tf.Variable(
-        np.int32(batch_shape),
-        shape=tf.TensorShape(None),
-        name='dynamic_batch_shape')
-    event_shape_var = tf.Variable(
-        np.int32(event_shape),
-        shape=tf.TensorShape(None),
-        name='dynamic_event_shape')
+    batch_shape_pl = tf1.placeholder_with_default(
+        input=np.int32(batch_shape), shape=None, name='dynamic_batch_shape')
+    event_shape_pl = tf1.placeholder_with_default(
+        input=np.int32(event_shape), shape=None, name='dynamic_event_shape')
 
     scale = 2.
     loc = 0.
     fake_mvn_dynamic = self._cls()(
         distribution=tfd.Normal(loc=loc, scale=scale),
         bijector=DummyMatrixTransform(),
-        batch_shape=batch_shape_var,
-        event_shape=event_shape_var,
+        batch_shape=batch_shape_pl,
+        event_shape=event_shape_pl,
         validate_args=True)
 
     fake_mvn_static = self._cls()(
@@ -628,7 +612,6 @@ class ScalarToMultiTest(test_util.TestCase):
       self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
 
     num_samples = 5e3
-    self.evaluate([event_shape_var.initializer, batch_shape_var.initializer])
     for fake_mvn in [fake_mvn_static, fake_mvn_dynamic]:
       # Ensure sample works by checking first, second moments.
       y = fake_mvn.sample(int(num_samples), seed=test_util.test_seed())
@@ -661,19 +644,16 @@ class ScalarToMultiTest(test_util.TestCase):
   def testEmptyEvent(self):
     # Verify that zero-dimensional multivariate Normal distributions still
     # return reasonable shapes and a log-prob of 0.0.
-
     event_shape = [0]
     for batch_shape in ([2], []):
       for shapes_are_dynamic in (True, False):
         loc = tf.zeros(batch_shape + event_shape)
         scale_diag = tf.ones(batch_shape + event_shape)
-
         if shapes_are_dynamic:
-          loc = tf.Variable(
-              loc, shape=tf.TensorShape(None), name='dynamic_loc')
-          scale_diag = tf.Variable(
-              scale_diag, shape=tf.TensorShape(None), name='dynamic_scale_diag')
-          self.evaluate([loc.initializer, scale_diag.initializer])
+          loc = tf1.placeholder_with_default(
+              loc, shape=None, name='dynamic_loc')
+          scale_diag = tf1.placeholder_with_default(
+              scale_diag, shape=None, name='dynamic_scale_diag')
 
         mvn = tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
 
@@ -704,162 +684,6 @@ class ScalarToMultiTest(test_util.TestCase):
         np.sign(
             self.evaluate(
                 conditional_normal.sample(5, bijector_kwargs={'z': z}))), z)
-
-  def testVectorDynamicShapeOverrideWithMutation(self):
-    batch_shape = tf.Variable([4], shape=tf.TensorShape(None), dtype=tf.int32)
-    d = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=2., scale=1.),
-        bijector=tfb.Exp(),
-        batch_shape=batch_shape,
-        validate_args=True)
-    self.evaluate(batch_shape.initializer)
-    self.evaluate(d.sample())
-    with tf.control_dependencies(
-        [batch_shape.assign([[4, 2]])]):
-      with self.assertRaisesOpError('must be a vector'):
-        self.evaluate(d.sample())
-
-  def testNonNegativeDynamicShapeOverrideWithMutation(self):
-    batch_shape = tf.Variable([4], shape=tf.TensorShape(None), dtype=tf.int32)
-    d = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=-1., scale=1.),
-        bijector=tfb.Exp(),
-        batch_shape=batch_shape,
-        validate_args=True)
-    self.evaluate(batch_shape.initializer)
-    self.evaluate(d.sample())
-    with tf.control_dependencies([batch_shape.assign([-4])]):
-      with self.assertRaisesOpError('must have non-negative elements'):
-        self.evaluate(d.sample())
-
-  def testNonScalarDynamicShapeOverrideWithMutation(self):
-    loc = tf.Variable(3., shape=tf.TensorShape(None))
-    base_dist = tfd.Normal(loc=loc, scale=1.)
-    d = tfd.TransformedDistribution(
-        distribution=base_dist,
-        bijector=tfb.Exp(),
-        batch_shape=tf.convert_to_tensor([3], dtype=tf.int32),
-        validate_args=True)
-    self.evaluate(loc.initializer)
-    self.evaluate(d.sample())
-    with tf.control_dependencies([loc.assign([4., 2.])]):
-      with self.assertRaisesWithPredicateMatch(
-          Exception, 'Base distribution is not scalar'):
-        self.evaluate(d.sample())
-
-
-@test_util.test_all_tf_execution_regimes
-class ExcessiveConcretizationTest(test_util.TestCase):
-
-  def setUp(self):
-    super(ExcessiveConcretizationTest, self).setUp()
-
-    self.max_permissible = {
-
-        # extra concretizations primarily of base distribution parameters
-        'mean': 4,
-        'sample': 3,
-        'log_cdf': 4,
-        'cdf': 4,
-        'survival_function': 4,
-        'log_survival_function': 4,
-
-        # extra concretizations primarily of bijector parameters
-        'entropy': 6,
-        'log_prob': 7,
-        'prob': 7,
-        'quantile': 4,
-
-        'event_shape_tensor': 2,
-        'batch_shape_tensor': 2,
-    }
-
-    self.shape = None
-
-  def testExcessiveConcretizationOfParams(self):
-    loc = tfp_hps.defer_and_count_usage(
-        tf.Variable(0., name='loc', dtype=tf.float32, shape=self.shape))
-    scale = tfp_hps.defer_and_count_usage(
-        tf.Variable(2., name='scale', dtype=tf.float32, shape=self.shape))
-    bij_scale = tfp_hps.defer_and_count_usage(
-        tf.Variable(2., name='bij_scale', dtype=tf.float32, shape=self.shape))
-    event_shape = tfp_hps.defer_and_count_usage(
-        tf.Variable([2, 2], name='input_event_shape', dtype=tf.int32,
-                    shape=self.shape))
-    batch_shape = tfp_hps.defer_and_count_usage(
-        tf.Variable([4, 3, 5], name='input_batch_shape', dtype=tf.int32,
-                    shape=self.shape))
-
-    dist = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=loc, scale=scale, validate_args=True),
-        bijector=tfb.Scale(scale=bij_scale, validate_args=True),
-        event_shape=event_shape,
-        batch_shape=batch_shape,
-        validate_args=True)
-
-    for method in ('mean', 'sample', 'entropy', 'event_shape_tensor',
-                   'batch_shape_tensor'):
-      with tfp_hps.assert_no_excessive_var_usage(
-          method, max_permissible=self.max_permissible[method]):
-        getattr(dist, method)()
-
-    for method in ('log_prob', 'prob'):
-      with tfp_hps.assert_no_excessive_var_usage(
-          method, max_permissible=self.max_permissible[method]):
-        getattr(dist, method)(np.ones((4, 3, 5, 2, 2)) / 3.)
-
-  def testExcessiveConcretizationOfParamsBatchShapeOverride(self):
-    # Test methods that are not implemented if event_shape is overriden.
-    loc = tfp_hps.defer_and_count_usage(
-        tf.Variable(0., name='loc', dtype=tf.float32, shape=self.shape))
-    scale = tfp_hps.defer_and_count_usage(
-        tf.Variable(2., name='scale', dtype=tf.float32, shape=self.shape))
-    bij_scale = tfp_hps.defer_and_count_usage(
-        tf.Variable(2., name='bij_scale', dtype=tf.float32, shape=self.shape))
-    batch_shape = tfp_hps.defer_and_count_usage(
-        tf.Variable([4, 3, 5], name='input_batch_shape', dtype=tf.int32,
-                    shape=self.shape))
-    dist = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=loc, scale=scale, validate_args=True),
-        bijector=tfb.Scale(scale=bij_scale, validate_args=True),
-        batch_shape=batch_shape,
-        validate_args=True)
-
-    for method in (
-        'log_cdf', 'cdf', 'survival_function', 'log_survival_function'):
-      with tfp_hps.assert_no_excessive_var_usage(
-          method, max_permissible=self.max_permissible[method]):
-        getattr(dist, method)(np.ones((4, 3, 2)) / 3.)
-
-    with tfp_hps.assert_no_excessive_var_usage(
-        'quantile', max_permissible=self.max_permissible['quantile']):
-      dist.quantile(.1)
-
-
-@test_util.test_all_tf_execution_regimes
-class ExcessiveConcretizationTestUnknownShape(ExcessiveConcretizationTest):
-
-  def setUp(self):
-    super(ExcessiveConcretizationTestUnknownShape, self).setUp()
-
-    self.max_permissible = {
-
-        # extra concretizations primarily of base distribution parameters
-        'mean': 9,
-        'sample': 9,
-        'log_cdf': 7,
-        'cdf': 7,
-        'survival_function': 7,
-        'log_survival_function': 7,
-        'entropy': 9,
-        'quantile': 5,
-        'event_shape_tensor': 5,
-        'batch_shape_tensor': 6,
-        'log_prob': 10,
-        'prob': 13,
-    }
-
-    self.shape = tf.TensorShape(None)
 
 
 if __name__ == '__main__':
