@@ -514,7 +514,7 @@ def soft_sorting_matrix(x, temperature, name=None):
     n = tf.shape(x)[-1]
     y = x[..., tf.newaxis]
     pairwise_distances = tf.abs(y - tf.linalg.matrix_transpose(y))
-    scaling = tf.dtypes.cast(
+    scaling = tf.cast(
         tf.range(n - 1, -(n - 1) - 1, delta=-2), dtype=dtype)
     p_logits = tf.linalg.matrix_transpose(
         tf.matmul(y, scaling[tf.newaxis, ...]) - tf.reduce_sum(

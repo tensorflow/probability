@@ -24,6 +24,8 @@ from tensorflow_probability.python.experimental.substrates.numpy.math.generic im
 from tensorflow_probability.python.experimental.substrates.numpy.math.generic import log_combinations
 from tensorflow_probability.python.experimental.substrates.numpy.math.generic import log_sub_exp
 from tensorflow_probability.python.experimental.substrates.numpy.math.generic import reduce_weighted_logsumexp
+from tensorflow_probability.python.experimental.substrates.numpy.math.generic import soft_sorting_matrix
+from tensorflow_probability.python.experimental.substrates.numpy.math.generic import soft_threshold
 from tensorflow_probability.python.experimental.substrates.numpy.math.generic import softplus_inverse
 from tensorflow_probability.python.experimental.substrates.numpy.math.linalg import fill_triangular
 from tensorflow_probability.python.experimental.substrates.numpy.math.linalg import fill_triangular_inverse

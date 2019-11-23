@@ -68,6 +68,13 @@ __all__ = [
 ]
 
 
+def _astuple(x):
+  try:
+    return tuple(x)
+  except TypeError:
+    return x
+
+
 # TODO(b/136555907): Add unit-test.
 def _gather(  # pylint: disable=unused-argument
     params,
@@ -297,7 +304,7 @@ split = utils.copy_docstring(tf.split, _split)
 
 squeeze = utils.copy_docstring(
     tf.squeeze,
-    lambda input, axis=None, name=None: np.squeeze(input, axis))
+    lambda input, axis=None, name=None: np.squeeze(input, _astuple(axis)))
 
 stack = utils.copy_docstring(
     tf.stack, lambda values, axis=0, name='stack': np.stack(values, axis))

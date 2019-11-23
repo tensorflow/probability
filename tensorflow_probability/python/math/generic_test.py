@@ -189,6 +189,7 @@ class SoftThresholdTest(test_util.TestCase):
       (-6., 5., -1., 1.),
       (0., 0., 0., 0.),
   )
+  @test_util.numpy_disable_gradient_test
   # pylint: enable=bad-whitespace
   # pyformat: enable
   def test_soft_threshold(self, x, threshold, expected_y, expected_dydx):
@@ -237,6 +238,7 @@ class SoftplusInverseTest(test_util.TestCase):
     self.assertAllEqual(np.ones_like(tf_softplus_inverse).astype(np.bool),
                         np.isfinite(tf_softplus_inverse))
 
+  @test_util.numpy_disable_gradient_test  # TODO(sharadmv): fix Numpy test
   def testNumbers(self):
     for t in [np.float16, np.float32, np.float64]:
       lower = {np.float16: -15, np.float32: -50, np.float64: -50}.get(t, -100)
@@ -280,6 +282,7 @@ class SoftplusInverseTest(test_util.TestCase):
           ],
           use_gpu=True)
 
+  @test_util.numpy_disable_gradient_test
   def testGradient(self):
     x = tf.constant(
         [-0.9, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 0.9],
@@ -289,6 +292,7 @@ class SoftplusInverseTest(test_util.TestCase):
     tf1.logging.vlog(2, 'softplus (float) gradient err = ', err)
     self.assertLess(err, 1e-4)
 
+  @test_util.numpy_disable_gradient_test
   def testInverseSoftplusGradientNeverNan(self):
     # Note that this range contains both zero and inf.
     x = tf.constant(np.logspace(-8, 6).astype(np.float16))
@@ -297,6 +301,7 @@ class SoftplusInverseTest(test_util.TestCase):
     # Equivalent to `assertAllFalse` (if it existed).
     self.assertAllEqual(np.zeros_like(grads).astype(np.bool), np.isnan(grads))
 
+  @test_util.numpy_disable_gradient_test
   def testInverseSoftplusGradientFinite(self):
     # This range of x is all finite, and so is 1 / x.  So the
     # gradient and its approximations should be finite as well.
@@ -311,6 +316,7 @@ class SoftplusInverseTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class LogAddExp(test_util.TestCase):
 
+  @test_util.numpy_disable_gradient_test
   def test_small(self):
     x = [-2, -1000]
     y = [-1000, -3]
@@ -319,6 +325,7 @@ class LogAddExp(test_util.TestCase):
     self.assertAllClose([-2., -3.], z, atol=0., rtol=1e-5)
     self.assertAllEqual(np.eye(2), g)
 
+  @test_util.numpy_disable_gradient_test
   def test_medium(self):
     x = [-2, -3]
     y = [-3, 2]
@@ -327,6 +334,7 @@ class LogAddExp(test_util.TestCase):
     self.assertAllClose(np.log(np.exp(x) + np.exp(y)), z, atol=0., rtol=1e-5)
     self.assertAllNotNone(g)
 
+  @test_util.numpy_disable_gradient_test
   def test_big(self):
     x = [2, 1000]
     y = [1000, 3]
@@ -350,6 +358,7 @@ class LogSubExpTest(test_util.TestCase):
         -1000. - np.log(2.),
         self.evaluate(tfp.math.log_sub_exp(-1000., -1000. + np.log(.5))))
 
+  @test_util.numpy_disable_gradient_test
   def test_small(self):
     x = [-2]
     y = [-1000]
@@ -358,6 +367,7 @@ class LogSubExpTest(test_util.TestCase):
     self.assertAllClose([-2.], z, atol=0., rtol=1e-5)
     self.assertAllClose([[1.], [0.]], g)
 
+  @test_util.numpy_disable_gradient_test
   def test_medium(self):
     x = [-2, -3, -5, -3]
     y = [-3, -5, -3, -2]
@@ -369,6 +379,7 @@ class LogSubExpTest(test_util.TestCase):
                         tfp.math.log_sub_exp(x, y, return_sign=True)[1])
     self.assertAllNotNone(g)
 
+  @test_util.numpy_disable_gradient_test
   def test_big(self):
     x = [1000, -3]
     y = [2, 1000]
@@ -399,6 +410,7 @@ class Log1mexpTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class Smootherstep(test_util.TestCase):
 
+  @test_util.numpy_disable_gradient_test
   def test_value_vector(self):
     x = tf.constant([-np.inf, -20., 0., 0.5, 1., 20., np.inf])
     y, _ = tfp.math.value_and_gradient(tfp.math.smootherstep, x)
@@ -406,6 +418,7 @@ class Smootherstep(test_util.TestCase):
     y_ = self.evaluate(y)
     self.assertAllClose([0., 0., 0., 0.5, 1., 1., 1.], y_, atol=1e-5, rtol=1e-5)
 
+  @test_util.numpy_disable_gradient_test
   def test_gradient_matrix(self):
     x = tf.constant([[-np.inf, -20., 0., 0.5],
                      [np.inf, 20., 1., 0.5]])
