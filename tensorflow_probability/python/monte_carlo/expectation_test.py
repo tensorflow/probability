@@ -78,7 +78,7 @@ class ExpectationTest(tfp_test_util.TestCase):
       samples = p.sample(int(1e5), seed=1)
       efx_reparam = tfp.monte_carlo.expectation(f, samples, p.log_prob)
       efx_score = tfp.monte_carlo.expectation(f, samples, p.log_prob,
-                                              use_reparametrization=False)
+                                              use_reparameterization=False)
 
     [
         efx_true_,
@@ -128,8 +128,8 @@ class ExpectationTest(tfp_test_util.TestCase):
           f=lambda x: p.log_prob(x) - q.log_prob(x),
           samples=p.sample(num_draws, seed=42),
           log_prob=p.log_prob,
-          use_reparametrization=(p.reparameterization_type ==
-                                 tfd.FULLY_REPARAMETERIZED))
+          use_reparameterization=(p.reparameterization_type ==
+                                  tfd.FULLY_REPARAMETERIZED))
     [exact_kl_normal_normal_, approx_kl_normal_normal_] = self.evaluate([
         exact_kl_normal_normal, approx_kl_normal_normal])
     self.assertEqual(
@@ -172,7 +172,7 @@ class ExpectationTest(tfp_test_util.TestCase):
           f=lambda x: p.log_prob(x) - q.log_prob(x),
           samples=p.sample(num_draws, seed=42),
           log_prob=p.log_prob,
-          use_reparametrization=(
+          use_reparameterization=(
               p.reparameterization_type == tfd.FULLY_REPARAMETERIZED))
       approx_kl_bernoulli_bernoulli = tfd.kl_divergence(p, q)
     [
@@ -229,12 +229,12 @@ class ExpectationTest(tfp_test_util.TestCase):
         f=lambda d: d['x']**2 + d['y']**2,
         samples=p.sample(1000, seed=42),
         log_prob=p.log_prob,
-        use_reparametrization=True)
+        use_reparameterization=True)
     total_variance_without_reparam = tfp.monte_carlo.expectation(
         f=lambda d: d['x']**2 + d['y']**2,
         samples=p.sample(1000, seed=42),
         log_prob=p.log_prob,
-        use_reparametrization=False)
+        use_reparameterization=False)
     [
         total_variance_with_reparam_,
         total_variance_without_reparam_

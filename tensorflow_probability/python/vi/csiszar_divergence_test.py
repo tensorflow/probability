@@ -42,6 +42,7 @@ def tridiag(d, diag_value, offdiag_value):
 class AmariAlphaTest(test_util.TestCase):
 
   def setUp(self):
+    super(AmariAlphaTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -96,6 +97,7 @@ class AmariAlphaTest(test_util.TestCase):
 class KLReverseTest(test_util.TestCase):
 
   def setUp(self):
+    super(KLReverseTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -119,6 +121,7 @@ class KLReverseTest(test_util.TestCase):
 class KLForwardTest(test_util.TestCase):
 
   def setUp(self):
+    super(KLForwardTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -142,6 +145,7 @@ class KLForwardTest(test_util.TestCase):
 class JensenShannonTest(test_util.TestCase):
 
   def setUp(self):
+    super(JensenShannonTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -179,6 +183,7 @@ class JensenShannonTest(test_util.TestCase):
 class ArithmeticGeometricMeanTest(test_util.TestCase):
 
   def setUp(self):
+    super(ArithmeticGeometricMeanTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -210,6 +215,7 @@ class ArithmeticGeometricMeanTest(test_util.TestCase):
 class TotalVariationTest(test_util.TestCase):
 
   def setUp(self):
+    super(TotalVariationTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -226,6 +232,7 @@ class TotalVariationTest(test_util.TestCase):
 class PearsonTest(test_util.TestCase):
 
   def setUp(self):
+    super(PearsonTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -242,6 +249,7 @@ class PearsonTest(test_util.TestCase):
 class SquaredHellingerTest(test_util.TestCase):
 
   def setUp(self):
+    super(SquaredHellingerTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -264,6 +272,7 @@ class SquaredHellingerTest(test_util.TestCase):
 class TriangularTest(test_util.TestCase):
 
   def setUp(self):
+    super(TriangularTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -286,6 +295,7 @@ class TriangularTest(test_util.TestCase):
 class TPowerTest(test_util.TestCase):
 
   def setUp(self):
+    super(TPowerTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -330,6 +340,7 @@ class TPowerTest(test_util.TestCase):
 class Log1pAbsTest(test_util.TestCase):
 
   def setUp(self):
+    super(Log1pAbsTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -346,6 +357,7 @@ class Log1pAbsTest(test_util.TestCase):
 class JeffreysTest(test_util.TestCase):
 
   def setUp(self):
+    super(JeffreysTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -368,6 +380,7 @@ class JeffreysTest(test_util.TestCase):
 class ChiSquareTest(test_util.TestCase):
 
   def setUp(self):
+    super(ChiSquareTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -384,6 +397,7 @@ class ChiSquareTest(test_util.TestCase):
 class ModifiedGanTest(test_util.TestCase):
 
   def setUp(self):
+    super(ModifiedGanTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -408,6 +422,7 @@ class ModifiedGanTest(test_util.TestCase):
 class SymmetrizedCsiszarFunctionTest(test_util.TestCase):
 
   def setUp(self):
+    super(SymmetrizedCsiszarFunctionTest, self).setUp()
     self._logu = np.linspace(-10., 10., 100)
     self._u = np.exp(self._logu)
 
@@ -447,6 +462,7 @@ class SymmetrizedCsiszarFunctionTest(test_util.TestCase):
 class DualCsiszarFunctionTest(test_util.TestCase):
 
   def setUp(self):
+    super(DualCsiszarFunctionTest, self).setUp()
     self._logu = np.linspace(-10., 10., 100)
     self._u = np.exp(self._logu)
 
@@ -665,7 +681,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
     s = tf.constant(1.)
 
     def construct_monte_carlo_csiszar_f_divergence(
-        func, use_reparametrization=True):
+        func, use_reparameterization=True):
       def _fn(s):
         p = tfd.MultivariateNormalFullCovariance(
             covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
@@ -675,7 +691,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
             surrogate_posterior=q,
             discrepancy_fn=func,
             sample_size=sample_size,
-            use_reparametrization=use_reparametrization,
+            use_reparameterization=use_reparameterization,
             seed=seed)
       return _fn
 
@@ -686,12 +702,12 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
         lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True))
 
     approx_kl_score_trick = construct_monte_carlo_csiszar_f_divergence(
-        tfp.vi.kl_reverse, use_reparametrization=False)
+        tfp.vi.kl_reverse, use_reparameterization=False)
 
     approx_kl_self_normalized_score_trick = (
         construct_monte_carlo_csiszar_f_divergence(
             lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
-            use_reparametrization=False))
+            use_reparameterization=False))
 
     def exact_kl(s):
       p = tfd.MultivariateNormalFullCovariance(

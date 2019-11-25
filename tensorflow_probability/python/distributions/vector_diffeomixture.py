@@ -266,7 +266,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
   sources of stochasticity. That is, as long as the parameters are used *after*
   the underlying source of stochasticity, the computed gradient is accurate.
 
-  Reparametrization means that we can use gradient-descent (via backprop) to
+  Reparameterization means that we can use gradient-descent (via backprop) to
   optimize Monte-Carlo objectives. Such objectives are a finite-sample
   approximation of an expectation and arise throughout scientific computing.
 

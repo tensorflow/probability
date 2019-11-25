@@ -29,9 +29,19 @@ __all__ = [
 
 
 @deprecation.deprecated_args(
-    '2020-01-04', 'Use `keepdims` instead of `keep_dims`', 'keep_dims')
-def expectation(f, samples, log_prob=None, use_reparametrization=True,
-                axis=0, keepdims=False, name=None, keep_dims=False):
+    '2020-01-04',
+    'Use `keepdims` instead of `keep_dims`. '
+    'Use `use_reparameterization` instead of `use_reparametrization`.',
+    'keep_dims', 'use_reparametrization')
+def expectation(f,
+                samples,
+                log_prob=None,
+                use_reparameterization=True,
+                use_reparametrization=True,
+                axis=0,
+                keepdims=False,
+                keep_dims=False,
+                name=None):
   """Computes the Monte-Carlo approximation of `E_p[f(X)]`.
 
   This function computes the Monte-Carlo approximation of an expectation, i.e.,
@@ -58,7 +68,7 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
   However, if p is not reparameterized, TensorFlow's gradient will be incorrect
   since the chain-rule stops at samples of non-reparameterized distributions.
   (The non-differentiated result, `approx_expectation`, is the same regardless
-  of `use_reparametrization`.) In this circumstance using the Score-Gradient
+  of `use_reparameterization`.) In this circumstance using the Score-Gradient
   trick results in an unbiased gradient, i.e.,
 
   ```none
@@ -72,7 +82,7 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
   ```
 
   Unless p is not reparametrized, it is usually preferable to
-  `use_reparametrization = True`.
+  `use_reparameterization = True`.
 
   Warning: users are responsible for verifying `p` is a "reparameterized"
   distribution.
@@ -91,7 +101,7 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       f=lambda x: p.log_prob(x) - q.log_prob(x),
       samples=p.sample(num_draws, seed=42),
       log_prob=p.log_prob,
-      use_reparametrization=(p.reparameterization_type
+      use_reparameterization=(p.reparameterization_type
                              == tfp.distributions.FULLY_REPARAMETERIZED))
   # ==> 0.44632751
   # Relative Error: <1%
@@ -108,7 +118,7 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       f=lambda x: p.log_prob(x) - q.log_prob(x),
       samples=p.sample(num_draws, seed=42),
       log_prob=p.log_prob,
-      use_reparametrization=(p.reparameterization_type
+      use_reparameterization=(p.reparameterization_type
                              == tfp.distributions.FULLY_REPARAMETERIZED))
   # ==> 0.38336259
   # Relative Error: <1%
@@ -134,22 +144,27 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
       `E_p[f(X)]`.  A batch of samples should be indexed by `axis` dimensions.
     log_prob: Python callable which can return `log_prob(samples)`. Must
       correspond to the natural-logarithm of the pdf/pmf of each sample. Only
-      required/used if `use_reparametrization=False`.
+      required/used if `use_reparameterization=False`.
       Default value: `None`.
-    use_reparametrization: Python `bool` indicating that the approximation
+    use_reparameterization: Python `bool` indicating that the approximation
       should use the fact that the gradient of samples is unbiased. Whether
       `True` or `False`, this arg only affects the gradient of the resulting
       `approx_expectation`.
+      Default value: `True`.
+    use_reparametrization: (Deprecated) Python `bool` indicating that the
+      approximation should use the fact that the gradient of samples is
+      unbiased.  Whether `True` or `False`, this arg only affects the gradient
+      of the resulting `approx_expectation`.
       Default value: `True`.
     axis: The dimensions to average. If `None`, averages all
       dimensions.
       Default value: `0` (the left-most dimension).
     keepdims: If True, retains averaged dimensions using size `1`.
       Default value: `False`.
-    name: A `name_scope` for operations created by this function.
-      Default value: `None` (which implies "expectation").
     keep_dims: (Deprecated) If True, retains averaged dimensions using size `1`.
       Default value: `False`.
+    name: A `name_scope` for operations created by this function.
+      Default value: `None` (which implies "expectation").
 
   Returns:
     approx_expectation: `Tensor` corresponding to the Monte-Carlo approximation
@@ -157,15 +172,17 @@ def expectation(f, samples, log_prob=None, use_reparametrization=True,
 
   Raises:
     ValueError: if `f` is not a Python `callable`.
-    ValueError: if `use_reparametrization=False` and `log_prob` is not a Python
+    ValueError: if `use_reparameterization=False` and `log_prob` is not a Python
       `callable`.
   """
   keepdims = keepdims or keep_dims
   del keep_dims
+  use_reparameterization = use_reparameterization and use_reparametrization
+  del use_reparametrization
   with tf.name_scope(name or 'expectation'):
     if not callable(f):
       raise ValueError('`f` must be a callable function.')
-    if use_reparametrization:
+    if use_reparameterization:
       return tf.reduce_mean(f(samples), axis=axis, keepdims=keepdims)
     else:
       if not callable(log_prob):

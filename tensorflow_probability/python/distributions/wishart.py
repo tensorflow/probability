@@ -185,7 +185,7 @@ class WishartLinearOperator(distribution.Distribution):
         shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=stream())
 
     # Complexity: O(nbk)
-    # This parametrization is equivalent to Chi2, i.e.,
+    # This parameterization is equivalent to Chi2, i.e.,
     # ChiSquared(k) == Gamma(alpha=k/2, beta=1/2)
     expanded_df = df * tf.ones(
         self._scale.batch_shape_tensor(),

@@ -31,7 +31,7 @@ _trace_loss = lambda loss, grads, variables: loss
 _reparameterized_elbo = functools.partial(
     csiszar_divergence.monte_carlo_variational_loss,
     discrepancy_fn=csiszar_divergence.kl_reverse,
-    use_reparametrization=True)
+    use_reparameterization=True)
 
 
 def fit_surrogate_posterior(target_log_prob_fn,
