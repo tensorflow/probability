@@ -335,12 +335,15 @@ py_test(
 
 exports_files(
     [
-        "special_math.py",
         "assert_util.py",
-        "tensor_util.py",
         "distribution_util.py",
-        "prefer_static.py",
         "dtype_util.py",
+        "hypothesis_testlib.py",
+        "prefer_static.py",
+        "special_math.py",
+        "tensor_util.py",
+        "test_combinations.py",
+        "test_util.py",
     ],
     visibility = [
         "//tensorflow_probability:__subpackages__",
