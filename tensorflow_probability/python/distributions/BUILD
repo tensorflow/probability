@@ -2721,6 +2721,7 @@ exports_files(
         "relaxed_bernoulli.py",
         "relaxed_onehot_categorical.py",
         "sample.py",
+        "sample_test.py",
         "sinh_arcsinh.py",
         "student_t.py",
         "transformed_distribution.py",
