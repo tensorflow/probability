@@ -66,6 +66,9 @@ class JointDistributionNamed(
   identical a zero argument `callable`. When the maker takes no arguments it is
   preferable to directly provide the distribution instance.
 
+  **Name resolution**: `The names of `JointDistributionNamed` components are
+  simply the keys specified explicitly in the model definition.
+
   #### Examples
 
   ```python
@@ -202,6 +205,9 @@ class JointDistributionNamed(
     return tuple(zip(self._dist_fn_name,
                      [() if x is None else x
                       for x in self._dist_fn_args]))
+
+  def _flat_resolve_names(self, distribution_names=None, leaf_name='x'):
+    return self._dist_fn_name
 
 
 class _Node(object):

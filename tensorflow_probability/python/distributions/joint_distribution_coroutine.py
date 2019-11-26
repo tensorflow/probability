@@ -73,6 +73,11 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
   each of the distributions generates samples with the specified sample
   size.
 
+  **Name resolution**: The names of `JointDistributionCoroutine` components
+  may be specified by passing `name` arguments to distribution constructors (
+  `tfd.Normal(0., 1., name='x')). Components without an explicit name will be
+  assigned a dummy name.
+
   #### Examples
 
   ```python

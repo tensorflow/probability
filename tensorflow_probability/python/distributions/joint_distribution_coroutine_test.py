@@ -21,6 +21,7 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
@@ -34,6 +35,40 @@ tfd = tfp.distributions
 
 
 Root = tfd.JointDistributionCoroutine.Root
+
+
+def basic_model_with_names_fn():
+  yield Root(tfd.Normal(0., 1., name='a'))
+  e = yield Root(tfd.Independent(
+      tfd.Exponential(rate=[100, 120]),
+      reinterpreted_batch_ndims=1, name='e'))
+  yield tfd.Gamma(concentration=e[..., 0], rate=e[..., 1], name='x')
+
+
+def nested_lists_with_names_model_fn():
+  abc = yield Root(tfd.JointDistributionSequential([
+      tfd.MultivariateNormalDiag([0., 0.], [1., 1.]),
+      tfd.JointDistributionSequential([
+          tfd.StudentT(3., -2., 5.),
+          tfd.Exponential(4.)])], name='abc'))
+  a, (b, c) = abc
+  yield tfd.JointDistributionSequential([tfd.Normal(a * b, c),
+                                         tfd.Normal(a + b, c)], name='de')
+
+
+def singleton_normal_model_fn():
+  yield Root(tfd.Normal(0., 1., name='x'))
+
+
+def singleton_jds_model_fn():
+  yield Root(tfd.JointDistributionSequential(
+      [tfd.Normal(0., 1.), lambda x: tfd.Poisson(tf.exp(x))], name='x'))
+
+
+def singleton_jdn_model_fn():
+  yield Root(tfd.JointDistributionNamed(
+      {'z': tfd.Normal(0., 1.), 'y': lambda z: tfd.Poisson(tf.exp(z))},
+      name='x'))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -310,6 +345,59 @@ class JointDistributionCoroutineTest(test_util.TestCase):
         Exception,
         'must be wrapped in `Root`'):
       self.evaluate(joint.sample())
+
+  @parameterized.named_parameters(
+      ('basic', basic_model_with_names_fn),
+      ('nested_lists', nested_lists_with_names_model_fn))
+  def test_can_call_log_prob_with_args_and_kwargs(self, model_fn):
+    d = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+
+    # Destructure vector-valued Tensors into Python lists, to mimic the values
+    # a user might type.
+    value = tf.nest.map_structure(
+        lambda x: list(x) if isinstance(x, np.ndarray) else x,
+        self.evaluate(d.sample(seed=test_util.test_seed())))
+    value_with_names = list(zip(d._flat_resolve_names(), value))
+
+    lp_value_positional = self.evaluate(d.log_prob(value))
+    lp_value_named = self.evaluate(d.log_prob(value=value))
+    self.assertAllEqual(lp_value_positional, lp_value_named)
+
+    lp_args = self.evaluate(d.log_prob(*value))
+    self.assertAllEqual(lp_value_positional, lp_args)
+
+    lp_kwargs = self.evaluate(d.log_prob(**dict(value_with_names)))
+    self.assertAllEqual(lp_value_positional, lp_kwargs)
+
+    lp_args_then_kwargs = self.evaluate(d.log_prob(
+        *value[:1], **dict(value_with_names[1:])))
+    self.assertAllEqual(lp_value_positional, lp_args_then_kwargs)
+
+    with self.assertRaisesRegexp(
+        ValueError, r'Joint distribution expected values for [0-9] components'):
+      d.log_prob(badvar=27.)
+
+    with self.assertRaisesRegexp(TypeError, 'unexpected keyword argument'):
+      d.log_prob(*value, extra_arg=27.)
+
+  @parameterized.named_parameters(
+      ('singleton_float', singleton_normal_model_fn),
+      ('singleton_tuple', singleton_jds_model_fn),
+      ('singleton_dict', singleton_jdn_model_fn))
+  def test_singleton_model_works_with_args_and_kwargs(self, model_fn):
+    d = tfd.JointDistributionCoroutine(model_fn)
+
+    xs = self.evaluate(d.sample())  # `xs` is a one-element list.
+
+    lp_from_structure = self.evaluate(d.log_prob(xs))
+    lp_from_structure_kwarg = self.evaluate(d.log_prob(value=xs))
+    self.assertAllEqual(lp_from_structure, lp_from_structure_kwarg)
+
+    lp_from_arg = self.evaluate(d.log_prob(xs[0]))
+    self.assertAllEqual(lp_from_structure, lp_from_arg)
+
+    lp_from_kwarg = self.evaluate(d.log_prob(x=xs[0]))
+    self.assertAllEqual(lp_from_structure, lp_from_kwarg)
 
   def test_check_sample_rank(self):
     def dist():

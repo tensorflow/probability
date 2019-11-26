@@ -28,12 +28,38 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import joint_distribution_sequential
 from tensorflow_probability.python.internal import test_util
+
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
+
+
+# Defer creating test dists (by hiding them in functions) until we know what
+# execution regime (eager/graph/tf-function) the test will run under.
+def basic_model_fn():
+  return [
+      tfd.Normal(0., 1., name='a'),
+      tfd.Independent(tfd.Exponential(rate=[100, 120]),
+                      reinterpreted_batch_ndims=1),
+      lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])
+  ]
+
+
+def nested_lists_model_fn():
+  return [
+      tfd.JointDistributionSequential([
+          tfd.MultivariateNormalDiag([0., 0.], [1., 1.]),
+          tfd.JointDistributionSequential([
+              tfd.StudentT(3., -2., 5.),
+              tfd.Exponential(4.)])], name='abc'),
+      lambda abc: tfd.JointDistributionSequential([  # pylint: disable=g-long-lambda
+          tfd.Normal(abc[0] * abc[1][0], abc[1][1]),
+          tfd.Normal(abc[0] + abc[1][0], abc[1][1])], name='de')
+  ]
 
 
 class Dummy(object):
@@ -66,7 +92,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
             ('m', ('loc', 'scale')),
             ('x', ('m',)),
         ),
-        d._resolve_graph())
+        d.resolve_graph())
 
     xs = d.sample(seed=test_util.test_seed())
     self.assertLen(xs, 5)
@@ -169,7 +195,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
          ('loc', ('s',)),
          ('df', ()),
          ('x', ('df', 'loc', '_', 'scale'))),
-        d._resolve_graph())
+        d.resolve_graph())
 
   @parameterized.parameters('mean', 'mode', 'stddev', 'variance')
   def test_summary_statistic(self, attr):
@@ -307,6 +333,57 @@ class JointDistributionSequentialTest(test_util.TestCase):
     lp = dist.log_prob(dist.sample(5))
     self.assertAllEqual(self.evaluate(lp).shape, [5])
 
+  @parameterized.named_parameters(
+      ('basic', basic_model_fn),
+      ('nested_lists', nested_lists_model_fn))
+  def test_can_call_log_prob_with_args_and_kwargs(self, model_fn):
+    d = tfd.JointDistributionSequential(
+        model_fn(), validate_args=True)
+
+    # Destructure vector-valued Tensors into Python lists, to mimic the values
+    # a user might type.
+    value = tf.nest.map_structure(
+        lambda x: list(x) if isinstance(x, np.ndarray) else x,
+        self.evaluate(d.sample(seed=test_util.test_seed())))
+    value_with_names = list(zip(d._flat_resolve_names(), value))
+
+    lp_value_positional = self.evaluate(d.log_prob(value))
+    lp_value_named = self.evaluate(d.log_prob(value=value))
+    self.assertAllEqual(lp_value_positional, lp_value_named)
+
+    lp_args = self.evaluate(d.log_prob(*value))
+    self.assertAllEqual(lp_value_positional, lp_args)
+
+    lp_kwargs = self.evaluate(d.log_prob(**dict(value_with_names)))
+    self.assertAllEqual(lp_value_positional, lp_kwargs)
+
+    lp_args_then_kwargs = self.evaluate(d.log_prob(
+        *value[:1], **dict(value_with_names[1:])))
+    self.assertAllEqual(lp_value_positional, lp_args_then_kwargs)
+
+    with self.assertRaisesRegexp(
+        ValueError, r'Joint distribution expected values for [0-9] components'):
+      d.log_prob(badvar=27.)
+
+    with self.assertRaisesRegexp(TypeError, 'unexpected keyword argument'):
+      d.log_prob(*value, extra_arg=27.)
+
+  def test_can_call_prob_with_args_and_kwargs(self):
+    d = tfd.JointDistributionSequential(basic_model_fn(), validate_args=True)
+    a, e, x = self.evaluate(d.sample([2, 3], seed=test_util.test_seed()))
+    prob_value_positional = self.evaluate(d.prob([a, e, x]))
+    prob_value_named = self.evaluate(d.prob(value=[a, e, x]))
+    self.assertAllEqual(prob_value_positional, prob_value_named)
+
+    prob_args = self.evaluate(d.prob(a, e, x))
+    self.assertAllEqual(prob_value_positional, prob_args)
+
+    prob_kwargs = self.evaluate(d.prob(a=a, e=e, x=x))
+    self.assertAllEqual(prob_value_positional, prob_kwargs)
+
+    prob_args_then_kwargs = self.evaluate(d.prob(a, e=e, x=x))
+    self.assertAllEqual(prob_value_positional, prob_args_then_kwargs)
+
   def test_uses_structure_to_convert_nested_lists(self):
     joint = tfd.JointDistributionSequential([
         tfd.MultivariateNormalDiag([0., 0.], [1., 1.]),
@@ -425,6 +502,67 @@ class JointDistributionSequentialTest(test_util.TestCase):
     self.assertEqual(batch_shape,
                      joint.log_prob(joint.sample(batch_shape)).shape)
 
+
+class ResolveDistributionNamesTest(test_util.TestCase):
+
+  def test_dummy_names_are_unique(self):
+
+    dist_names = joint_distribution_sequential._resolve_distribution_names(
+        dist_fn_args=[None, None, None],
+        dist_names=None,
+        leaf_name='x',
+        instance_names=[None, None, None])
+    self.assertAllEqual(dist_names, ['x2', 'x1', 'x'])
+
+    dist_names = joint_distribution_sequential._resolve_distribution_names(
+        dist_fn_args=[None, None, None],
+        dist_names=None,
+        leaf_name='x',
+        instance_names=['x', 'x1', None])
+    self.assertAllEqual(dist_names, ['x', 'x1', 'x2'])
+
+  def test_ignores_trivial_names(self):
+
+    # Should ignore a trivial reference downstream of the real name `z`.
+    dist_names = joint_distribution_sequential._resolve_distribution_names(
+        dist_fn_args=[None, ['z'], ['w', '_']],
+        dist_names=None,
+        leaf_name='y',
+        instance_names=[None, None, None])
+    self.assertAllEqual(dist_names, ['z', 'w', 'y'])
+
+    # Trivial reference upstream of the real name `z`.
+    dist_names = joint_distribution_sequential._resolve_distribution_names(
+        dist_fn_args=[None, ['_'], ['w', 'z']],
+        dist_names=None,
+        leaf_name='y',
+        instance_names=[None, None, None])
+    self.assertAllEqual(dist_names, ['z', 'w', 'y'])
+
+    # The only direct reference is trivial, but we have an instance name.
+    dist_names = joint_distribution_sequential._resolve_distribution_names(
+        dist_fn_args=[None, ['_']],
+        dist_names=None,
+        leaf_name='y',
+        instance_names=['z', None])
+    self.assertAllEqual(dist_names, ['z', 'y'])
+
+  def test_inconsistent_names_raise_error(self):
+    with self.assertRaisesRegexp(ValueError, 'Inconsistent names'):
+      # Refers to first variable as both `z` and `x`.
+      joint_distribution_sequential._resolve_distribution_names(
+          dist_fn_args=[None, ['z'], ['x', 'w']],
+          dist_names=None,
+          leaf_name='y',
+          instance_names=[None, None, None])
+
+    with self.assertRaisesRegexp(ValueError, 'Inconsistent names'):
+      # Refers to first variable as `x`, but it was explicitly named `z`.
+      joint_distribution_sequential._resolve_distribution_names(
+          dist_fn_args=[None, ['x']],
+          dist_names=None,
+          leaf_name='y',
+          instance_names=['z', None])
 
 if __name__ == '__main__':
   tf.test.main()

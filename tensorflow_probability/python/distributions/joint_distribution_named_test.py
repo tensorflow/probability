@@ -23,9 +23,34 @@ import collections
 # Dependency imports
 
 from absl.testing import parameterized
+import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
+
+
+# Defer creating test dists (by hiding them in functions) until we know what
+# execution regime (eager/graph/tf-function) the test will run under.
+def basic_ordered_model_fn():
+  return collections.OrderedDict(
+      (('a', tfd.Normal(0., 1.)),
+       ('e',
+        tfd.Independent(tfd.Exponential(rate=[100, 120]),
+                        reinterpreted_batch_ndims=1)),
+       ('x', lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])),
+      ))
+
+
+def nested_lists_model_fn():
+  return collections.OrderedDict((
+      ('abc', tfd.JointDistributionSequential([
+          tfd.MultivariateNormalDiag([0., 0.], [1., 1.]),
+          tfd.JointDistributionSequential(
+              [tfd.StudentT(3., -2., 5.),
+               tfd.Exponential(4.)])])),
+      ('de', lambda abc: tfd.JointDistributionSequential([  # pylint: disable=g-long-lambda
+          tfd.Normal(abc[0] * abc[1][0], abc[1][1]),
+          tfd.Normal(abc[0] + abc[1][0], abc[1][1])]))))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -50,7 +75,7 @@ class JointDistributionNamedTest(test_util.TestCase):
             ('m', ('loc', 'scale')),
             ('x', ('m',)),
         ),
-        d._resolve_graph())
+        d.resolve_graph())
 
     xs = d.sample(seed=test_util.test_seed())
     self.assertLen(xs, 5)
@@ -113,7 +138,7 @@ class JointDistributionNamedTest(test_util.TestCase):
             ('m', ('loc', 'scale')),
             ('x', ('m',)),
         ),
-        d._resolve_graph())
+        d.resolve_graph())
 
     xs = d.sample(seed=test_util.test_seed())
     self.assertLen(xs, 5)
@@ -175,7 +200,7 @@ class JointDistributionNamedTest(test_util.TestCase):
             ('m', ('loc', 'scale')),
             ('x', ('m',)),
         ),
-        d._resolve_graph())
+        d.resolve_graph())
 
     xs = d.sample(seed=test_util.test_seed())
     self.assertLen(xs, 5)
@@ -216,6 +241,88 @@ class JointDistributionNamedTest(test_util.TestCase):
     actual_jlp = d.log_prob(xs)
     self.assertAllClose(*self.evaluate([expected_jlp, actual_jlp]),
                         atol=0., rtol=1e-4)
+
+  def test_can_call_log_prob_with_kwargs(self):
+
+    d = tfd.JointDistributionNamed({
+        'e': tfd.Normal(0., 1.),
+        'a': tfd.Independent(
+            tfd.Exponential(rate=[100, 120]),
+            reinterpreted_batch_ndims=1),
+        'x': lambda a: tfd.Gamma(concentration=a[..., 0], rate=a[..., 1])
+    }, validate_args=True)
+
+    sample = self.evaluate(d.sample([2, 3], seed=test_util.test_seed()))
+    e, a, x = sample['e'], sample['a'], sample['x']
+
+    lp_value_positional = self.evaluate(d.log_prob({'e': e, 'a': a, 'x': x}))
+    lp_value_named = self.evaluate(d.log_prob(value={'e': e, 'a': a, 'x': x}))
+    # Assert all close (rather than equal) because order is not defined for
+    # dicts, and reordering the computation can give subtly different results.
+    self.assertAllClose(lp_value_positional, lp_value_named)
+
+    lp_kwargs = self.evaluate(d.log_prob(a=a, e=e, x=x))
+    self.assertAllClose(lp_value_positional, lp_kwargs)
+
+    with self.assertRaisesRegexp(ValueError,
+                                 'Joint distribution with unordered variables '
+                                 "can't take positional args"):
+      lp_kwargs = d.log_prob(e, a, x)
+
+  @parameterized.named_parameters(
+      ('basic', basic_ordered_model_fn),
+      ('nested_lists', nested_lists_model_fn))
+  def test_can_call_ordereddict_log_prob_with_args_and_kwargs(self, model_fn):
+    # With an OrderedDict, we can pass keyword and/or positional args.
+    d = tfd.JointDistributionNamed(model_fn(), validate_args=True)
+
+    # Destructure vector-valued Tensors into Python lists, to mimic the values
+    # a user might type.
+    sample = tf.nest.map_structure(
+        lambda x: list(x) if isinstance(x, np.ndarray) else x,
+        self.evaluate(d.sample(seed=test_util.test_seed())))
+    sample_dict = dict(sample)
+
+    lp_value_positional = self.evaluate(d.log_prob(sample_dict))
+    lp_value_named = self.evaluate(d.log_prob(value=sample_dict))
+    self.assertAllClose(lp_value_positional, lp_value_named)
+
+    lp_args = self.evaluate(d.log_prob(*sample.values()))
+    self.assertAllClose(lp_value_positional, lp_args)
+
+    lp_kwargs = self.evaluate(d.log_prob(**sample_dict))
+    self.assertAllClose(lp_value_positional, lp_kwargs)
+
+    lp_args_then_kwargs = self.evaluate(d.log_prob(
+        *list(sample.values())[:1], **dict(list(sample.items())[1:])))
+    self.assertAllClose(lp_value_positional, lp_args_then_kwargs)
+
+  def test_can_call_namedtuple_log_prob_with_args_and_kwargs(self):
+    # With an namedtuple, we can pass keyword and/or positional args.
+    Model = collections.namedtuple('Model', ['e', 'a', 'x'])  # pylint: disable=invalid-name
+    d = tfd.JointDistributionNamed(
+        Model(e=tfd.Normal(0., 1.),
+              a=tfd.Independent(
+                  tfd.Exponential(rate=[100, 120]),
+                  reinterpreted_batch_ndims=1),
+              x=lambda a: tfd.Gamma(concentration=a[..., 0], rate=a[..., 1])),
+        validate_args=True)
+
+    sample = self.evaluate(d.sample([2, 3], seed=test_util.test_seed()))
+    e, a, x = sample.e, sample.a, sample.x
+
+    lp_value_positional = self.evaluate(d.log_prob(Model(e=e, a=a, x=x)))
+    lp_value_named = self.evaluate(d.log_prob(value=Model(e=e, a=a, x=x)))
+    self.assertAllClose(lp_value_positional, lp_value_named)
+
+    lp_kwargs = self.evaluate(d.log_prob(e=e, a=a, x=x))
+    self.assertAllClose(lp_value_positional, lp_kwargs)
+
+    lp_args = self.evaluate(d.log_prob(e, a, x))
+    self.assertAllClose(lp_value_positional, lp_args)
+
+    lp_args_then_kwargs = self.evaluate(d.log_prob(e, a=a, x=x))
+    self.assertAllClose(lp_value_positional, lp_args_then_kwargs)
 
   def test_kl_divergence(self):
     d0 = tfd.JointDistributionNamed(
@@ -279,7 +386,7 @@ class JointDistributionNamedTest(test_util.TestCase):
             ('df', ()),
             ('x', ('df', 'loc', 'scale'))
         ),
-        d._resolve_graph())
+        d.resolve_graph())
 
   @parameterized.parameters('mean', 'mode', 'stddev', 'variance')
   def test_summary_statistic(self, attr):
@@ -420,7 +527,7 @@ class JointDistributionNamedTest(test_util.TestCase):
             ('y', ('df', 'loc', 'scale')),
             ('x', ('df', 'loc', 'scale')),
         ),
-        d._resolve_graph())
+        d.resolve_graph())
 
     x = d.sample()
     self.assertLen(x, 7)
