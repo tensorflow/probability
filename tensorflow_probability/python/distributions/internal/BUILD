@@ -129,6 +129,9 @@ py_test(
 )
 
 exports_files(
-    ["slicing.py"],
+    [
+        "slicing.py",
+        "slicing_test.py",
+    ],
     visibility = ["//tensorflow_probability:__subpackages__"],
 )
