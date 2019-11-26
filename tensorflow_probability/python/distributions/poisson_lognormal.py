@@ -35,7 +35,6 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -301,28 +300,6 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
         validate_args=self.validate_args,
         allow_nan_stats=self.allow_nan_stats)
     return dist, mixture_dist
-
-  @property
-  @deprecation.deprecated(
-      '2019-11-01',
-      ('The `mixture_distribution` property will be removed. '
-       'Use `poisson_and_mixture_distributions` instead.'),
-      warn_once=True)
-  def mixture_distribution(self):
-    """Distribution which randomly selects a Poisson with quadrature param."""
-    _, mixture_dist = self.poisson_and_mixture_distributions()
-    return mixture_dist
-
-  @property
-  @deprecation.deprecated(
-      '2019-11-01',
-      ('The `distribution` property will be removed. '
-       'Use `poisson_and_mixture_distributions` instead.'),
-      warn_once=True)
-  def distribution(self):
-    """Base Poisson parameterized by a quadrature grid."""
-    dist, _ = self.poisson_and_mixture_distributions()
-    return dist
 
   @property
   def loc(self):
