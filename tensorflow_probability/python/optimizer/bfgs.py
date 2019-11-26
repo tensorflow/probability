@@ -79,7 +79,8 @@ def minimize(value_and_gradients_function,
              max_iterations=50,
              parallel_iterations=1,
              stopping_condition=None,
-             name=None):
+             name=None,
+             print_n_iterations=50):
   """Applies the BFGS algorithm to minimize a differentiable function.
 
   Performs unconstrained minimization of a differentiable function using the
@@ -205,6 +206,8 @@ def minimize(value_and_gradients_function,
         value=x_tolerance, dtype=dtype, name='x_tolerance')
     max_iterations = tf.convert_to_tensor(
         value=max_iterations, name='max_iterations')
+    print_n_iterations = tf.convert_to_tensor(
+        value=print_n_iterations, name='print_n_iterations')
 
     input_shape = distribution_util.prefer_static_shape(initial_position)
     batch_shape, domain_size = input_shape[:-1], input_shape[-1]
@@ -271,8 +274,14 @@ def minimize(value_and_gradients_function,
           value_and_gradients_function, actual_serch_direction,
           tolerance, f_relative_tolerance, x_tolerance, stopping_condition)
 
+      # Print number of iterations.
+      print_op = tf.case(
+          [(tf.equal(state.num_iterations % print_n_iterations, 0),
+            lambda: tf.print('Iteration', state.num_iterations + 1))],
+          default=tf.no_op)
+      with tf.control_dependencies([print_op]):
       # Update the inverse Hessian if needed and continue.
-      return [_update_inv_hessian(current_state, next_state)]
+        return [_update_inv_hessian(current_state, next_state)]
 
     kwargs = bfgs_utils.get_initial_state_args(
         value_and_gradients_function,
