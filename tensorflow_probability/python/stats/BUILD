@@ -83,7 +83,6 @@ py_test(
     size = "medium",
     srcs = ["moving_stats_test.py"],
     deps = [
-        ":moving_stats",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -177,9 +176,9 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math",
     ],
 )
 
