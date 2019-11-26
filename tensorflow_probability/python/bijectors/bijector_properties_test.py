@@ -236,6 +236,8 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
             event_dim=event_dim,
             enable_vars=enable_vars))
     bijector_params = {'bijector': underlying}
+    msg = 'Forming Invert bijector with underlying bijector {}.'
+    hp.note(msg.format(underlying))
   elif bijector_name == 'TransformDiagonal':
     underlying_name = draw(
         hps.sampled_from(sorted(TRANSFORM_DIAGONAL_WHITELIST)))
@@ -246,6 +248,8 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
             event_dim=event_dim,
             enable_vars=enable_vars))
     bijector_params = {'diag_bijector': underlying}
+    msg = 'Forming TransformDiagonal bijector with underlying bijector {}.'
+    hp.note(msg.format(underlying))
   elif bijector_name == 'Inline':
     scale = draw(tfp_hps.maybe_variable(
         hps.sampled_from(np.float32([1., -1., 2, -2.])), enable_vars))
@@ -432,6 +436,17 @@ def assert_no_none_grad(bijector, method, wrt_vars, grads):
           'Missing' if expect_grad else 'Unexpected', method, var, bijector))
 
 
+def _ldj_tensor_conversions_allowed(bijector, is_forward):
+  if is_invert(bijector):
+    return _ldj_tensor_conversions_allowed(bijector.bijector, not is_forward)
+  elif is_transform_diagonal(bijector):
+    return _ldj_tensor_conversions_allowed(bijector.diag_bijector, is_forward)
+  elif is_forward:
+    return 2 if hasattr(bijector, '_forward_log_det_jacobian') else 4
+  else:
+    return 2 if hasattr(bijector, '_inverse_log_det_jacobian') else 4
+
+
 @test_util.test_all_tf_execution_regimes
 class BijectorPropertiesTest(test_util.TestCase):
 
@@ -498,13 +513,7 @@ class BijectorPropertiesTest(test_util.TestCase):
             min_value=bijector.forward_min_event_ndims,
             max_value=xs.shape.ndims))
     with tf.GradientTape() as tape:
-      max_permitted = 2 if hasattr(bijector, '_forward_log_det_jacobian') else 4
-      if is_invert(bijector):
-        max_permitted = (2 if hasattr(bijector.bijector,
-                                      '_inverse_log_det_jacobian') else 4)
-      elif is_transform_diagonal(bijector):
-        max_permitted = (2 if hasattr(bijector.diag_bijector,
-                                      '_forward_log_det_jacobian') else 4)
+      max_permitted = _ldj_tensor_conversions_allowed(bijector, is_forward=True)
       with tfp_hps.assert_no_excessive_var_usage(
           'method `forward_log_det_jacobian` of {}'.format(bijector),
           max_permissible=max_permitted):
@@ -546,13 +555,8 @@ class BijectorPropertiesTest(test_util.TestCase):
             min_value=bijector.inverse_min_event_ndims,
             max_value=ys.shape.ndims))
     with tf.GradientTape() as tape:
-      max_permitted = 2 if hasattr(bijector, '_inverse_log_det_jacobian') else 4
-      if is_invert(bijector):
-        max_permitted = (2 if hasattr(bijector.bijector,
-                                      '_forward_log_det_jacobian') else 4)
-      elif is_transform_diagonal(bijector):
-        max_permitted = (2 if hasattr(bijector.diag_bijector,
-                                      '_inverse_log_det_jacobian') else 4)
+      max_permitted = _ldj_tensor_conversions_allowed(
+          bijector, is_forward=False)
       with tfp_hps.assert_no_excessive_var_usage(
           'method `inverse_log_det_jacobian` of {}'.format(bijector),
           max_permissible=max_permitted):
