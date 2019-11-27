@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -109,13 +110,9 @@ class BatchReshape(distribution_lib.Distribution):
       self._batch_shape_unexpanded = tensor_util.convert_nonref_to_tensor(
           batch_shape, dtype=dtype, name='batch_shape')
       validate_init_args_statically(distribution, self._batch_shape_unexpanded)
-      batch_shape, batch_shape_static, runtime_assertions = calculate_reshape(
-          distribution.batch_shape_tensor(), self._batch_shape_unexpanded,
-          validate_args)
       self._distribution = distribution
-      self._batch_shape_ = batch_shape
-      self._batch_shape_static = batch_shape_static
-      self._runtime_assertions = runtime_assertions
+      self._batch_shape_static = tensorshape_util.constant_value_as_shape(
+          self._batch_shape_unexpanded)
       super(BatchReshape, self).__init__(
           dtype=distribution.dtype,
           reparameterization_type=distribution.reparameterization_type,
@@ -124,35 +121,82 @@ class BatchReshape(distribution_lib.Distribution):
           parameters=parameters,
           name=name)
 
+  def _calculate_new_shape(self):
+    # Try to get the old shape statically if available.
+    original_shape = self._distribution.batch_shape
+    if not tensorshape_util.is_fully_defined(original_shape):
+      original_shape = self._distribution.batch_shape_tensor()
+    # This is not a check for falseness, it's a check for exactly that shape.
+    if original_shape == ():  # pylint: disable=g-explicit-bool-comparison
+      # Force the size to be an integer, not a float, when the shape contains no
+      # dtype information.
+      original_size = 1
+    else:
+      original_size = prefer_static.reduce_prod(original_shape)
+    original_size = tf.cast(original_size, tf.int32)
+    # Compute the new shape, filling in the `-1` dimension if present.
+    new_shape = self._batch_shape_unexpanded
+    implicit_dim_mask = prefer_static.equal(new_shape, -1)
+    size_implicit_dim = (
+        original_size // prefer_static.maximum(
+            1, -prefer_static.reduce_prod(new_shape)))
+    expanded_new_shape = tf.where(  # Assumes exactly one `-1`.
+        implicit_dim_mask, size_implicit_dim, new_shape)
+    # Return the original size on the side because one caller would otherwise
+    # have to recompute it.
+    return expanded_new_shape, original_size
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      # Avoid computing intermediates needed to construct the assertions.
+      return []
+    assertions = []
+    if is_init != tensor_util.is_ref(self._batch_shape_unexpanded):
+      implicit_dim_mask = prefer_static.equal(self._batch_shape_unexpanded, -1)
+      assertions.append(assert_util.assert_rank(
+          self._batch_shape_unexpanded, 1,
+          message='New shape must be a vector.'))
+      assertions.append(assert_util.assert_less_equal(
+          tf.math.count_nonzero(implicit_dim_mask, dtype=tf.int32), 1,
+          message='At most one dimension can be unknown.'))
+      assertions.append(assert_util.assert_non_negative(
+          self._batch_shape_unexpanded + 1,
+          message='Shape elements must be >=-1.'))
+      # Check that the old and new shapes are the same size.
+      expanded_new_shape, original_size = self._calculate_new_shape()
+      new_size = prefer_static.reduce_prod(expanded_new_shape)
+      assertions.append(assert_util.assert_equal(
+          new_size, tf.cast(original_size, new_size.dtype),
+          message='Shape sizes do not match.'))
+    return assertions
+
   @property
   def distribution(self):
     return self._distribution
 
   def _batch_shape_tensor(self):
-    with tf.control_dependencies(self._runtime_assertions):
-      return tf.identity(self._batch_shape_)
+    expanded_new_shape, _ = self._calculate_new_shape()
+    return expanded_new_shape
 
   def _batch_shape(self):
     return self._batch_shape_static
 
   def _event_shape_tensor(self):
-    with tf.control_dependencies(self._runtime_assertions):
-      return tf.identity(self.distribution.event_shape_tensor())
+    return self.distribution.event_shape_tensor()
 
   def _event_shape(self):
     return self.distribution.event_shape
 
   def _sample_n(self, n, seed=None, **kwargs):
-    with tf.control_dependencies(self._runtime_assertions):
-      x = self.distribution.sample(sample_shape=n, seed=seed, **kwargs)
-      new_shape = tf.concat(
-          [
-              [n],
-              self._batch_shape_unexpanded,
-              self.event_shape_tensor(),
-          ],
-          axis=0)
-      return tf.reshape(x, new_shape)
+    x = self.distribution.sample(sample_shape=n, seed=seed, **kwargs)
+    new_shape = tf.concat(
+        [
+            [n],
+            self._batch_shape_unexpanded,
+            self.event_shape_tensor(),
+        ],
+        axis=0)
+    return tf.reshape(x, new_shape)
 
   def _log_prob(self, x, **kwargs):
     return self._call_reshape_input_output(
@@ -237,8 +281,7 @@ class BatchReshape(distribution_lib.Distribution):
     # Note: we take `extra_kwargs` as a dict rather than `**extra_kwargs`
     # because it is possible the user provided extra kwargs would itself
     # have `fn` and/or `x` as a key.
-    with tf.control_dependencies(self._runtime_assertions +
-                                 self._validate_sample_arg(x)):
+    with tf.control_dependencies(self._validate_sample_arg(x)):
       sample_shape, static_sample_shape = self._sample_shape(x)
       old_shape = tf.concat(
           [
@@ -273,24 +316,23 @@ class BatchReshape(distribution_lib.Distribution):
     # because it is possible the user provided extra kwargs would itself
     # have `fn`, `event_shape_list`, `static_event_shape_list` and/or
     # `extra_kwargs` as keys.
-    with tf.control_dependencies(self._runtime_assertions):
-      if event_shape_list is None:
-        event_shape_list = [self._event_shape_tensor()]
-      if static_event_shape_list is None:
-        static_event_shape_list = [self.event_shape]
-      new_shape = tf.concat(
-          [self._batch_shape_unexpanded] + event_shape_list, axis=0)
-      result = tf.reshape(fn(**extra_kwargs) if extra_kwargs else fn(),
-                          new_shape)
-      if (tensorshape_util.rank(self.batch_shape) is not None and
-          tensorshape_util.rank(self.event_shape) is not None):
-        event_shape = tf.TensorShape([])
-        for rss in static_event_shape_list:
-          event_shape = tensorshape_util.concatenate(event_shape, rss)
-        static_shape = tensorshape_util.concatenate(
-            self.batch_shape, event_shape)
-        tensorshape_util.set_shape(result, static_shape)
-      return result
+    if event_shape_list is None:
+      event_shape_list = [self._event_shape_tensor()]
+    if static_event_shape_list is None:
+      static_event_shape_list = [self.event_shape]
+    new_shape = tf.concat(
+        [self._batch_shape_unexpanded] + event_shape_list, axis=0)
+    result = tf.reshape(fn(**extra_kwargs) if extra_kwargs else fn(),
+                        new_shape)
+    if (tensorshape_util.rank(self.batch_shape) is not None and
+        tensorshape_util.rank(self.event_shape) is not None):
+      event_shape = tf.TensorShape([])
+      for rss in static_event_shape_list:
+        event_shape = tensorshape_util.concatenate(event_shape, rss)
+      static_shape = tensorshape_util.concatenate(
+          self.batch_shape, event_shape)
+      tensorshape_util.set_shape(result, static_shape)
+    return result
 
   def _validate_sample_arg(self, x):
     """Helper which validates sample arg, e.g., input to `log_prob`."""
@@ -376,37 +418,6 @@ class BatchReshape(distribution_lib.Distribution):
         runtime_assertions = []
 
       return runtime_assertions
-
-
-def calculate_reshape(original_shape, new_shape, validate=False, name=None):
-  """Calculates the reshaped dimensions (replacing up to one -1 in reshape)."""
-  batch_shape_static = tensorshape_util.constant_value_as_shape(new_shape)
-  if tensorshape_util.is_fully_defined(batch_shape_static):
-    return np.int32(batch_shape_static), batch_shape_static, []
-  with tf.name_scope(name or 'calculate_reshape'):
-    original_size = tf.reduce_prod(original_shape)
-    implicit_dim = tf.equal(new_shape, -1)
-    size_implicit_dim = (
-        original_size // tf.maximum(1, -tf.reduce_prod(new_shape)))
-    expanded_new_shape = tf.where(  # Assumes exactly one `-1`.
-        implicit_dim, size_implicit_dim, new_shape)
-    validations = [] if not validate else [  # pylint: disable=g-long-ternary
-        assert_util.assert_rank(
-            original_shape, 1, message='Original shape must be a vector.'),
-        assert_util.assert_rank(
-            new_shape, 1, message='New shape must be a vector.'),
-        assert_util.assert_less_equal(
-            tf.math.count_nonzero(implicit_dim, dtype=tf.int32),
-            1,
-            message='At most one dimension can be unknown.'),
-        assert_util.assert_positive(
-            expanded_new_shape, message='Shape elements must be >=-1.'),
-        assert_util.assert_equal(
-            tf.reduce_prod(expanded_new_shape),
-            original_size,
-            message='Shape sizes do not match.'),
-    ]
-    return expanded_new_shape, batch_shape_static, validations
 
 
 def validate_init_args_statically(distribution, batch_shape):

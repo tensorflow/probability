@@ -585,6 +585,23 @@ class _BatchReshapeTest(object):
     with self.assertRaisesOpError('unexpected batch and event shape'):
       self.evaluate(poisson_141_reshaped.log_prob(x_114))
 
+  def test_at_most_one_implicit_dimension(self):
+    batch_shape = tf.Variable([-1, -1])
+    self.evaluate(batch_shape.initializer)
+    with self.assertRaisesOpError('At most one dimension can be unknown'):
+      d = tfd.BatchReshape(tfd.Normal(0, 1), batch_shape, validate_args=True)
+      self.evaluate(d.sample())
+
+  def test_mutated_at_most_one_implicit_dimension(self):
+    batch_shape = tf.Variable([1, 1])
+    self.evaluate(batch_shape.initializer)
+    dist = tfd.Normal([[0]], [[1]])
+    d = tfd.BatchReshape(dist, batch_shape, validate_args=True)
+    self.evaluate(d.sample())
+    with self.assertRaisesOpError('At most one dimension can be unknown'):
+      with tf.control_dependencies([batch_shape.assign([-1, -1])]):
+        self.evaluate(d.sample())
+
 
 @test_util.test_all_tf_execution_regimes
 class BatchReshapeStaticTest(_BatchReshapeTest, test_util.TestCase):
