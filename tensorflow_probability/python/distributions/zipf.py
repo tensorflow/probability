@@ -323,6 +323,6 @@ class Zipf(distribution.Distribution):
     assertions = []
     if is_init != tensor_util.is_ref(self.power):
       assertions.append(assert_util.assert_greater(
-          self.power, np.ones([], self.power.dtype.as_numpy_dtype),
+          self.power, np.ones([], dtype_util.as_numpy_dtype(self.power.dtype)),
           message='`power` must be greater than 1.'))
     return assertions

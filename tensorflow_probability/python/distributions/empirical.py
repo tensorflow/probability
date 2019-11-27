@@ -26,6 +26,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.ops import gen_array_ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -215,7 +216,7 @@ class Empirical(distribution.Distribution):
     return tf.shape(samples)[:self._samples_axis]
 
   def _batch_shape(self):
-    if self.samples.shape.rank is None:
+    if tensorshape_util.rank(self.samples.shape) is None:
       return tf.TensorShape(None)
     return self.samples.shape[:self._samples_axis]
 
@@ -225,7 +226,7 @@ class Empirical(distribution.Distribution):
     return tf.shape(samples)[self._samples_axis + 1:]
 
   def _event_shape(self):
-    if self.samples.shape.rank is None:
+    if tensorshape_util.rank(self.samples.shape) is None:
       return tf.TensorShape(None)
     return self.samples.shape[self._samples_axis + 1:]
 
@@ -346,9 +347,9 @@ class Empirical(distribution.Distribution):
 
     message = 'Rank of `samples` must be at least `event_ndims + 1`.'
     if is_init:
-      samples_rank = self.samples.shape.rank
+      samples_rank = tensorshape_util.rank(self.samples.shape)
       if samples_rank is not None:
-        if self.samples.shape.rank < self._event_ndims + 1:
+        if samples_rank < self._event_ndims + 1:
           raise ValueError(message)
       elif self._validate_args:
         assertions.append(

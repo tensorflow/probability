@@ -632,7 +632,7 @@ def _is_known_unsigned_by_dtype(dt):
       tf.bool: True,
       tf.uint8: True,
       tf.uint16: True,
-  }.get(dt.base_dtype, False)
+  }.get(dtype_util.base_dtype(dt), False)
 
 
 def _is_known_signed_by_dtype(dt):
@@ -645,7 +645,7 @@ def _is_known_signed_by_dtype(dt):
       tf.int16: True,
       tf.int32: True,
       tf.int64: True,
-  }.get(dt.base_dtype, False)
+  }.get(dtype_util.base_dtype(dt), False)
 
 
 def _is_known_dtype(dt):
@@ -656,21 +656,21 @@ def _is_known_dtype(dt):
 def _largest_integer_by_dtype(dt):
   """Helper returning the largest integer exactly representable by dtype."""
   if not _is_known_dtype(dt):
-    raise TypeError('Unrecognized dtype: {}'.format(dt.name))
-  if dt.is_floating:
-    return int(2**(np.finfo(dt.as_numpy_dtype).nmant + 1))
-  if dt.is_integer:
-    return np.iinfo(dt.as_numpy_dtype).max
-  if dt.base_dtype == tf.bool:
+    raise TypeError('Unrecognized dtype: {}'.format(dtype_util.name(dt)))
+  if dtype_util.is_floating(dt):
+    return int(2**(np.finfo(dtype_util.as_numpy_dtype(dt)).nmant + 1))
+  if dtype_util.is_integer(dt):
+    return np.iinfo(dtype_util.as_numpy_dtype(dt)).max
+  if dtype_util.base_dtype(dt) == tf.bool:
     return int(1)
   # We actually can't land here but keep the case for completeness.
-  raise TypeError('Unrecognized dtype: {}'.format(dt.name))
+  raise TypeError('Unrecognized dtype: {}'.format(dtype_util.name(dt)))
 
 
 def _smallest_integer_by_dtype(dt):
   """Helper returning the smallest integer exactly representable by dtype."""
   if not _is_known_dtype(dt):
-    raise TypeError('Unrecognized dtype: {}'.format(dt.name))
+    raise TypeError('Unrecognized dtype: {}'.format(dtype_util.name(dt)))
   if _is_known_unsigned_by_dtype(dt):
     return 0
   return -1 * _largest_integer_by_dtype(dt)
@@ -679,8 +679,8 @@ def _smallest_integer_by_dtype(dt):
 def _is_integer_like_by_dtype(dt):
   """Helper returning True if dtype.is_integer or is `bool`."""
   if not _is_known_dtype(dt):
-    raise TypeError('Unrecognized dtype: {}'.format(dt.name))
-  return dt.is_integer or dt.base_dtype == tf.bool
+    raise TypeError('Unrecognized dtype: {}'.format(dtype_util.name(dt)))
+  return dtype_util.is_integer(dt) or dtype_util.base_dtype(dt) == tf.bool
 
 
 def assert_categorical_event_shape(

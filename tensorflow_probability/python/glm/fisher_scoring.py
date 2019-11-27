@@ -370,7 +370,8 @@ def fit_one_step(
 
     def mask_if_invalid(x, mask):
       mask = tf.fill(
-          tf.shape(input=x), value=np.array(mask, x.dtype.as_numpy_dtype))
+          tf.shape(input=x), value=np.array(
+              mask, dtype_util.as_numpy_dtype(x.dtype)))
       return tf1.where(is_valid, x, mask)
 
     # Run one step of iteratively reweighted least-squares.
@@ -400,10 +401,10 @@ def fit_one_step(
     # where `@` denotes `matmul`.
 
     if l2_regularizer is None:
-      l2_regularizer = np.array(0, a.dtype.as_numpy_dtype)
+      l2_regularizer = np.array(0, dtype_util.as_numpy_dtype(a.dtype))
     else:
       l2_regularizer_ = distribution_util.maybe_get_static_value(
-          l2_regularizer, a.dtype.as_numpy_dtype)
+          l2_regularizer, dtype_util.as_numpy_dtype(a.dtype))
       if l2_regularizer_ is not None:
         l2_regularizer = l2_regularizer_
 
@@ -431,7 +432,7 @@ def fit_one_step(
       b_ = distribution_util.pad(
           b, count=num_model_coefficients, axis=-1, back=True)
       # Return l2_regularizer=0 since its now embedded.
-      l2_regularizer_ = np.array(0, a.dtype.as_numpy_dtype)
+      l2_regularizer_ = np.array(0, dtype_util.as_numpy_dtype(a.dtype))
       return a_, b_, l2_regularizer_
 
     a, b, l2_regularizer = prefer_static.cond(

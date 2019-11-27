@@ -279,7 +279,6 @@ class InverseGamma(distribution.Distribution):
     return self.scale / (1. + self.concentration)
 
   def _maybe_assert_valid_sample(self, x):
-    dtype_util.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
     if not self.validate_args:
       return []
     return [assert_util.assert_positive(x, message='Sample must be positive.')]

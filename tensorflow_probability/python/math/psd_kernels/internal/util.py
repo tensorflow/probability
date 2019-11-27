@@ -164,7 +164,8 @@ def sqrt_with_finite_grads(x, name=None):
     if not x.dtype.is_floating:
       raise TypeError('Input `x` must be floating type.')
     def grad(grad_ys):
-      large_float_like_x = np.sqrt(np.finfo(x.dtype.as_numpy_dtype()).max)
+      large_float_like_x = np.sqrt(
+          np.finfo(dtype_util.as_numpy_dtype(x.dtype)).max)
       safe_grads = tf.where(
           tf.equal(x, 0), large_float_like_x, 0.5 * tf.math.rsqrt(x))
       return grad_ys * safe_grads

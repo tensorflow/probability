@@ -402,7 +402,7 @@ def _gen_mask(num_blocks,
               dtype=tf.float32):
   """Generate the mask for building an autoregressive dense layer."""
   # TODO(b/67594795): Better support of dynamic shape.
-  mask = np.zeros([n_out, n_in], dtype=dtype.as_numpy_dtype())
+  mask = np.zeros([n_out, n_in], dtype=dtype_util.as_numpy_dtype(dtype))
   slices = _gen_slices(num_blocks, n_in, n_out, mask_type=mask_type)
   for [row_slice, col_slice] in slices:
     mask[row_slice, col_slice] = 1

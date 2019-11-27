@@ -32,6 +32,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -463,7 +464,7 @@ class GaussianProcess(distribution.Distribution):
       # The examples index is one position to the left of the feature dims.
       examples_index = -(self.kernel.feature_ndims + 1)
       shape = index_points.shape[examples_index:examples_index + 1]
-      if shape.rank is None:
+      if tensorshape_util.rank(shape) is None:
         return tf.TensorShape([None])
       return shape
 

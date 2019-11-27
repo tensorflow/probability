@@ -257,7 +257,7 @@ class BernoulliNormalCDF(ExponentialFamily):
   _is_canonical = False
 
   def _call(self, r):
-    dtype = r.dtype.as_numpy_dtype
+    dtype = dtype_util.as_numpy_dtype(r.dtype)
     d = tfd.Normal(loc=np.array(0, dtype), scale=np.array(1, dtype))
     mean = d.cdf(r)
     # var = cdf(r) * cdf(-r) but cdf(-r) = 1 - cdf(r) = survival_function(r).
@@ -266,7 +266,7 @@ class BernoulliNormalCDF(ExponentialFamily):
     return mean, variance, grad_mean
 
   def _log_prob(self, y, r):
-    dtype = r.dtype.as_numpy_dtype
+    dtype = dtype_util.as_numpy_dtype(r.dtype)
     d = tfd.Normal(loc=np.array(0, dtype), scale=np.array(1, dtype))
     # logit(ncdf(r)) = log(ncdf(r)) - log(1-ncdf(r)) = logncdf(r) - lognsf(r).
     logits = d.log_cdf(r) - d.log_survival_function(r)
@@ -285,7 +285,7 @@ class GammaExp(ExponentialFamily):
     return mean, variance, grad_mean
 
   def _log_prob(self, y, r):
-    dtype = r.dtype.as_numpy_dtype
+    dtype = dtype_util.as_numpy_dtype(r.dtype)
     g = tfd.Gamma(concentration=np.array(1, dtype), rate=tf.exp(-r))
     return g.log_prob(y)
 
@@ -303,7 +303,7 @@ class GammaSoftplus(ExponentialFamily):
     return mean, variance, grad_mean
 
   def _log_prob(self, y, r):
-    dtype = r.dtype.as_numpy_dtype
+    dtype = dtype_util.as_numpy_dtype(r.dtype)
     mean = tf.nn.softplus(r)
     g = tfd.Gamma(concentration=np.array(1, dtype), rate=1./mean)
     return g.log_prob(y)
@@ -349,7 +349,7 @@ class LogNormal(ExponentialFamily):
     return mean, variance, grad_mean
 
   def _log_prob(self, y, r):
-    dtype = r.dtype.as_numpy_dtype
+    dtype = dtype_util.as_numpy_dtype(r.dtype)
     log_y = tf.math.log(y)
     s2 = np.log(2.).astype(dtype)
     return -log_y + tfd.Normal(
@@ -371,7 +371,7 @@ class LogNormalSoftplus(ExponentialFamily):
     return mean, variance, grad_mean
 
   def _log_prob(self, y, r):
-    dtype = r.dtype.as_numpy_dtype
+    dtype = dtype_util.as_numpy_dtype(r.dtype)
     log_y = tf.math.log(y)
     s2 = np.log(2.).astype(dtype)
     return tfd.Normal(
@@ -390,7 +390,7 @@ class Normal(ExponentialFamily):
     return mean, variance, grad_mean
 
   def _log_prob(self, y, r):
-    dtype = r.dtype.as_numpy_dtype
+    dtype = dtype_util.as_numpy_dtype(r.dtype)
     return tfd.Normal(loc=r, scale=np.array(1, dtype)).log_prob(y)
 
 
@@ -406,5 +406,5 @@ class NormalReciprocal(ExponentialFamily):
     return mean, variance, grad_mean
 
   def _log_prob(self, y, r):
-    dtype = r.dtype.as_numpy_dtype
+    dtype = dtype_util.as_numpy_dtype(r.dtype)
     return tfd.Normal(loc=1. / r, scale=np.array(1, dtype)).log_prob(y)

@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import fill_triangular
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'CorrelationCholesky',
@@ -104,7 +105,7 @@ class CorrelationCholesky(bijector.Bijector):
           name=name)
 
   def _forward_event_shape(self, input_shape):
-    if not input_shape.rank:
+    if tensorshape_util.rank(input_shape) is None:
       return input_shape
     tril_shape = fill_triangular.FillTriangular().forward_event_shape(
         input_shape)
