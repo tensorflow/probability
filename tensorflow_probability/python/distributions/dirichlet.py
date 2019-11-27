@@ -30,7 +30,6 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -200,17 +199,6 @@ class Dirichlet(distribution.Distribution):
   def concentration(self):
     """Concentration parameter; expected counts for that coordinate."""
     return self._concentration
-
-  @property
-  @deprecation.deprecated(
-      '2019-10-01',
-      ('The `total_concentration` property is deprecated; instead use '
-       '`tf.reduce_sum(dist.concentration, axis=-1)`.'),
-      warn_once=True)
-  def total_concentration(self):
-    """Sum of last dim of concentration parameter."""
-    with self._name_and_control_scope('total_concentration'):
-      return tf.reduce_sum(self.concentration, axis=-1)
 
   def _batch_shape_tensor(self):
     # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
