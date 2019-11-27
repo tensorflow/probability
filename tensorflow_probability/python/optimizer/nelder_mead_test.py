@@ -37,7 +37,8 @@ class NelderMeadTest(test_util.TestCase):
     minimum = np.array([1.0, 1.0])
     scales = np.array([2.0, 3.0])
     def quadratic(x):
-      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2, axis=-1)
+      return tf.reduce_sum(
+          scales * tf.math.squared_difference(x, minimum), axis=-1)
 
     start = tf.constant([0.6, 0.8])
     results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
@@ -52,7 +53,8 @@ class NelderMeadTest(test_util.TestCase):
     minimum = np.array([1.0, 1.0])
     scales = np.array([2.0, 3.0])
     def quadratic(x):
-      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2, axis=-1)
+      return tf.reduce_sum(
+          scales * tf.math.squared_difference(x, minimum), axis=-1)
 
     initial_simplex = tf.constant([[0.6, 0.8], [5.0, 4.1], [-1.4, -3.2]])
     results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
@@ -68,7 +70,8 @@ class NelderMeadTest(test_util.TestCase):
     minimum = np.array([1.0, 1.0])
     scales = np.array([2.0, 3.0])
     def quadratic(x):
-      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2, axis=-1)
+      return tf.reduce_sum(
+          scales * tf.math.squared_difference(x, minimum), axis=-1)
 
     initial_vertex = tf.constant([1.29, -0.88])
     step_sizes = tf.constant([0.2, 1.3])
@@ -90,7 +93,8 @@ class NelderMeadTest(test_util.TestCase):
     scales = np.exp(np.random.randn(dim))
 
     def quadratic(x):
-      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2, axis=-1)
+      return tf.reduce_sum(
+          scales * tf.math.squared_difference(x, minimum), axis=-1)
 
     start = tf.ones_like(minimum)
     results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
@@ -112,7 +116,7 @@ class NelderMeadTest(test_util.TestCase):
     def quadratic(x):
       y = x - minimum
       yp = tf.tensordot(hessian, y, axes=[1, 0])
-      value = tf.reduce_sum(input_tensor=y * yp) / 2
+      value = tf.reduce_sum(y * yp) / 2
       return value
 
     start = tf.ones_like(minimum)
@@ -134,7 +138,7 @@ class NelderMeadTest(test_util.TestCase):
     def quadratic(x):
       y = x - minimum
       yp = tf.tensordot(hessian, y, axes=[1, 0])
-      return tf.reduce_sum(input_tensor=y * yp) / 2
+      return tf.reduce_sum(y * yp) / 2
 
     start = tf.ones_like(minimum)
     results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
@@ -149,7 +153,7 @@ class NelderMeadTest(test_util.TestCase):
     """Can minimize the square root function."""
     minimum = np.array([0.0, 0.0, 0.0, 0.0])
     def sqrt_quad(x):
-      return tf.sqrt(tf.reduce_sum(input_tensor=x**2, axis=-1))
+      return tf.sqrt(tf.reduce_sum(x**2, axis=-1))
 
     start = tf.constant([1.2, 0.4, -1.8, 2.9])
     results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
@@ -164,7 +168,7 @@ class NelderMeadTest(test_util.TestCase):
     """Can minimize the absolute value function."""
     minimum = np.array([0.0, 0.0, 0.0])
     def abs_func(x):
-      return tf.reduce_sum(input_tensor=tf.abs(x), axis=-1)
+      return tf.reduce_sum(tf.abs(x), axis=-1)
 
     start = tf.constant([0.6, 1.8, -4.3], dtype=tf.float64)
     results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
@@ -228,8 +232,8 @@ class NelderMeadTest(test_util.TestCase):
         value: Scalar real `Tensor`. The value of the Easom function at the
           supplied argument.
       """
-      f1 = tf.reduce_prod(input_tensor=tf.cos(z), axis=-1)
-      f2 = tf.exp(-tf.reduce_sum(input_tensor=(z - np.pi)**2, axis=-1))
+      f1 = tf.reduce_prod(tf.cos(z), axis=-1)
+      f2 = tf.exp(-tf.reduce_sum((z - np.pi)**2, axis=-1))
       return -f1 * f2
 
     start = tf.constant([1.3, 2.2], dtype=tf.float64)
@@ -269,8 +273,7 @@ class NelderMeadTest(test_util.TestCase):
         value: A scalar `Tensor` of the function value at the supplied point.
       """
       value = tf.reduce_sum(
-          input_tensor=x**2 - 10.0 * tf.cos(2 * np.pi * x),
-          axis=-1) + 10.0 * dim
+          x**2 - 10.0 * tf.cos(2 * np.pi * x), axis=-1) + 10.0 * dim
       return value
 
     start_position = np.random.rand(dim) * 2.0 * 5.12 - 5.12

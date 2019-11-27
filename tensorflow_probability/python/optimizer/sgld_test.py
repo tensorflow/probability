@@ -366,7 +366,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
       # Loss function
       def loss_fn():
         var = tf.concat([var_1, var_2], axis=-1)
-        loss_part = tf.linalg.cholesky_solve(chol, tf.expand_dims(var, -1))
+        loss_part = tf.linalg.cholesky_solve(chol, var[..., tf.newaxis])
         return tf.linalg.matvec(loss_part, var, transpose_a=True)
 
       # Set up the learning rate with a polynomial decay

@@ -41,8 +41,8 @@ def _interval(val_left, val_right):
   return LineSearchInterval(
       converged=false,
       failed=false,
-      func_evals=tf.constant(value=0),
-      iterations=tf.constant(value=0),
+      func_evals=tf.constant(0),
+      iterations=tf.constant(0),
       left=val_left,
       right=val_right)
 
@@ -61,13 +61,13 @@ def test_function_x_y(x, y):
   batches = y.shape[0] if len(y.shape) == 2 else None
   deg = len(x) - 1
   poly = np.polyfit(x, y.T, deg)
-  poly = [tf.convert_to_tensor(value=c, dtype=tf.float32) for c in poly]
+  poly = [tf.convert_to_tensor(c, dtype=tf.float32) for c in poly]
 
   def f(t):
-    t = tf.convert_to_tensor(value=t, dtype=tf.float32)
+    t = tf.convert_to_tensor(t, dtype=tf.float32)
     if batches is not None and not tuple(t.shape):
       # Broadcast a scalar through all batches.
-      t = tf.tile(tf.expand_dims(t, -1), [batches])
+      t = tf.tile(t[..., tf.newaxis], [batches])
     f, df = value_and_gradient(lambda t_: tf.math.polyval(poly, t_), t)
     return ValueAndGradient(x=t, f=tf.squeeze(f), df=tf.squeeze(df))
 

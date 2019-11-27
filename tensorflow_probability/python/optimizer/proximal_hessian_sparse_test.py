@@ -32,7 +32,7 @@ class _ProximalHessianTest(object):
 
   def _make_placeholder(self, x):
     return tf1.placeholder_with_default(
-        input=x, shape=(x.shape if self.use_static_shape else None))
+        x, shape=(x.shape if self.use_static_shape else None))
 
   def _adjust_dtype_and_shape_hints(self, x):
     x_ = tf.cast(x, self.dtype)

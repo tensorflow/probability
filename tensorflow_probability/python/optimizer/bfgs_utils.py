@@ -20,10 +20,10 @@ from __future__ import print_function
 
 import collections
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer import linesearch
 
@@ -36,13 +36,12 @@ ValueAndGradient = collections.namedtuple('ValueAndGradient',
 
 def converged_any(converged, failed):
   """Condition to stop when any batch member converges, or all have failed."""
-  return (tf.reduce_any(input_tensor=converged) |
-          tf.reduce_all(input_tensor=failed))
+  return tf.reduce_any(converged) | tf.reduce_all(failed)
 
 
 def converged_all(converged, failed):
   """Condition to stop when all batch members have converged or failed."""
-  return tf.reduce_all(input_tensor=converged | failed)
+  return tf.reduce_all(converged | failed)
 
 
 def get_initial_state_args(value_and_gradients_function,
@@ -85,8 +84,8 @@ def get_initial_state_args(value_and_gradients_function,
   return dict(
       converged=converged,
       failed=tf.zeros_like(converged),  # i.e. False.
-      num_iterations=tf.convert_to_tensor(value=0),
-      num_objective_evaluations=tf.convert_to_tensor(value=1),
+      num_iterations=tf.convert_to_tensor(0),
+      num_objective_evaluations=tf.convert_to_tensor(1),
       position=initial_position,
       objective_value=f0,
       objective_gradient=df0)
@@ -141,7 +140,7 @@ def line_search_step(state, value_and_gradients_function, search_direction,
   line_search_value_grad_func = _restrict_along_direction(
       value_and_gradients_function, state.position, search_direction)
   derivative_at_start_pt = tf.reduce_sum(
-      input_tensor=state.objective_gradient * search_direction, axis=-1)
+      state.objective_gradient * search_direction, axis=-1)
   val_0 = ValueAndGradient(x=_broadcast(0, state.position),
                            f=state.objective_value,
                            df=derivative_at_start_pt,
@@ -164,9 +163,10 @@ def line_search_step(state, value_and_gradients_function, search_direction,
     # For inactive batch members `left.x` is zero. However, their
     # `search_direction` might also be undefined, so we can't rely on
     # multiplication by zero to produce a `position_delta` of zero.
-    position_delta = tf1.where(
-        inactive, tf.zeros_like(search_direction),
-        search_direction * tf.expand_dims(ls_result.left.x, axis=-1))
+    position_delta = tf.where(
+        inactive[..., tf.newaxis],
+        dtype_util.as_numpy_dtype(search_direction.dtype)(0),
+        search_direction * ls_result.left.x[..., tf.newaxis])
     return _update_position(
         state_after_ls,
         position_delta,
@@ -243,13 +243,13 @@ def _restrict_along_direction(value_and_gradients_function,
           of the original `value_and_gradients_function`.
   """
   def _restricted_func(t):
+    pt = position + t[..., tf.newaxis] * direction
     t = _broadcast(t, position)
-    pt = position + tf.expand_dims(t, axis=-1) * direction
     objective_value, gradient = value_and_gradients_function(pt)
     return ValueAndGradient(
         x=t,
         f=objective_value,
-        df=tf.reduce_sum(input_tensor=gradient * direction, axis=-1),
+        df=tf.reduce_sum(gradient * direction, axis=-1),
         full_gradient=gradient)
 
   return _restricted_func
@@ -264,7 +264,7 @@ def _update_position(state,
                      x_tolerance):
   """Updates the state advancing its position by a given position_delta."""
   failed = state.failed | ~tf.math.is_finite(next_objective) | ~tf.reduce_all(
-      input_tensor=tf.math.is_finite(next_gradient), axis=-1)
+      tf.math.is_finite(next_gradient), axis=-1)
 
   next_position = state.position + position_delta
   converged = ~failed & _check_convergence(state.position,
@@ -336,5 +336,5 @@ def _broadcast(value, target):
     A `Tensor` of shape [b1, ..., bn] and same dtype as the target.
   """
   return tf.broadcast_to(
-      tf.convert_to_tensor(value=value, dtype=target.dtype),
+      tf.convert_to_tensor(value, dtype=target.dtype),
       distribution_util.prefer_static_shape(target)[:-1])

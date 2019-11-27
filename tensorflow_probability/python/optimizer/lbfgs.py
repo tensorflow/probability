@@ -30,7 +30,6 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
@@ -206,18 +205,17 @@ def minimize(value_and_gradients_function,
   if stopping_condition is None:
     stopping_condition = bfgs_utils.converged_all
 
-  with tf1.name_scope(name, 'minimize', [initial_position, tolerance]):
+  with tf.name_scope(name or 'minimize'):
     initial_position = tf.convert_to_tensor(
-        value=initial_position, name='initial_position')
+        initial_position, name='initial_position')
     dtype = initial_position.dtype.base_dtype
     tolerance = tf.convert_to_tensor(
-        value=tolerance, dtype=dtype, name='grad_tolerance')
+        tolerance, dtype=dtype, name='grad_tolerance')
     f_relative_tolerance = tf.convert_to_tensor(
-        value=f_relative_tolerance, dtype=dtype, name='f_relative_tolerance')
+        f_relative_tolerance, dtype=dtype, name='f_relative_tolerance')
     x_tolerance = tf.convert_to_tensor(
-        value=x_tolerance, dtype=dtype, name='x_tolerance')
-    max_iterations = tf.convert_to_tensor(
-        value=max_iterations, name='max_iterations')
+        x_tolerance, dtype=dtype, name='x_tolerance')
+    max_iterations = tf.convert_to_tensor(max_iterations, name='max_iterations')
 
     # The `state` here is a `LBfgsOptimizerResults` tuple with values for the
     # current state of the algorithm computation.
@@ -326,14 +324,14 @@ def _get_search_direction(state):
 
     # Pre-compute all `inv_rho[i]`s.
     inv_rhos = tf.reduce_sum(
-        input_tensor=gradient_deltas * position_deltas, axis=-1)
+        gradient_deltas * position_deltas, axis=-1)
 
     def first_loop(acc, args):
       _, q_direction = acc
       position_delta, gradient_delta, inv_rho = args
       alpha = tf.reduce_sum(
-          input_tensor=position_delta * q_direction, axis=-1) / inv_rho
-      direction_delta = tf.expand_dims(alpha, axis=-1) * gradient_delta
+          position_delta * q_direction, axis=-1) / inv_rho
+      direction_delta = alpha[..., tf.newaxis] * gradient_delta
       return (alpha, q_direction - direction_delta)
 
     # Run first loop body computing and collecting `alpha[i]`s, while also
@@ -346,14 +344,14 @@ def _get_search_direction(state):
     # We use `H^0_k = gamma_k * I` as an estimate for the initial inverse
     # hessian for the k-th iteration; then `r_direction = H^0_k * q_direction`.
     gamma_k = inv_rhos[-1] / tf.reduce_sum(
-        input_tensor=gradient_deltas[-1] * gradient_deltas[-1], axis=-1)
-    r_direction = tf.expand_dims(gamma_k, axis=-1) * q_directions[0]
+        gradient_deltas[-1] * gradient_deltas[-1], axis=-1)
+    r_direction = gamma_k[..., tf.newaxis] * q_directions[0]
 
     def second_loop(r_direction, args):
       alpha, position_delta, gradient_delta, inv_rho = args
       beta = tf.reduce_sum(
-          input_tensor=gradient_delta * r_direction, axis=-1) / inv_rho
-      direction_delta = tf.expand_dims(alpha - beta, axis=-1) * position_delta
+          gradient_delta * r_direction, axis=-1) / inv_rho
+      direction_delta = (alpha - beta)[..., tf.newaxis] * position_delta
       return r_direction + direction_delta
 
     # Finally, run second loop body computing the updated `r_direction` at each
@@ -462,7 +460,5 @@ def _queue_push(queue, should_update, new_vecs):
     A new `tf.Tensor` of shape `[k, ..., n]`.
   """
   new_queue = tf.concat([queue[1:], [new_vecs]], axis=0)
-  update_pattern = tf.broadcast_to(
-      should_update[tf.newaxis, ..., tf.newaxis],
-      distribution_util.prefer_static_shape(queue))
-  return tf1.where(update_pattern, new_queue, queue)
+  return tf.where(
+      should_update[tf.newaxis, ..., tf.newaxis], new_queue, queue)
