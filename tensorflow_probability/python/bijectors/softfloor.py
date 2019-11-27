@@ -168,7 +168,7 @@ class Softfloor(bijector.Bijector):
   def _inverse(self, y):
     # We undo the transformation from [0, 1] -> [0, 1].
     # The inverse of the transformation will look like a shifted and scaled
-    # logit function. We rewrite this to be more numericaly stable, and will
+    # logit function. We rewrite this to be more numerically stable, and will
     # produce a term log(a / b). log_{numerator, denominator} below is log(a)
     # and log(b) respectively.
     t = tf.convert_to_tensor(self.temperature)
