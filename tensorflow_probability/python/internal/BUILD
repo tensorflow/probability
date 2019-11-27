@@ -340,6 +340,7 @@ exports_files(
         "dtype_util.py",
         "hypothesis_testlib.py",
         "prefer_static.py",
+        "prefer_static_test.py",
         "special_math.py",
         "tensor_util.py",
         "test_combinations.py",
