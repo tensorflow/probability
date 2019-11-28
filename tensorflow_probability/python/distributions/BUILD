@@ -2674,6 +2674,7 @@ exports_files(
         "chi2.py",
         "cholesky_lkj.py",
         "deprecated_linalg.py",
+        "deprecated_linalg_test.py",
         "deterministic.py",
         "dirichlet.py",
         "dirichlet_multinomial.py",

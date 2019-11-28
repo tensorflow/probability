@@ -1589,6 +1589,7 @@ exports_files(
         "sigmoid.py",
         "sinh_arcsinh.py",
         "softfloor.py",
+        "softfloor_test.py",
         "softmax_centered.py",
         "softplus.py",
         "softplus_test.py",
