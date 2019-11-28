@@ -146,7 +146,7 @@ class FFJORD(bijector.Bijector):
   """Implements a continuous normalizing flow X->Y defined via an ODE.
 
 
-  This bijector implementes a continuous dynamics transformation
+  This bijector implements a continuous dynamics transformation
   parameterized by a differential equation, where initial and terminal
   conditions correspond to domain (X) and image (Y) i.e.
 
