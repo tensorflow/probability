@@ -338,6 +338,7 @@ exports_files(
         "assert_util.py",
         "distribution_util.py",
         "dtype_util.py",
+        "dtype_util_test.py",
         "hypothesis_testlib.py",
         "prefer_static.py",
         "prefer_static_test.py",
@@ -345,6 +346,7 @@ exports_files(
         "tensor_util.py",
         "test_combinations.py",
         "test_util.py",
+        "test_util_test.py",
     ],
     visibility = [
         "//tensorflow_probability:__subpackages__",

@@ -1596,6 +1596,7 @@ exports_files(
         "square.py",
         "square_test.py",
         "tanh.py",
+        "tanh_test.py",
         "transform_diagonal.py",
         "transpose.py",
         "transpose_test.py",
