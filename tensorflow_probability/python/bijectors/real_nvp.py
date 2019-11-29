@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
@@ -144,10 +145,14 @@ class RealNVP(bijector_lib.Bijector):
     """Creates the Real NVP or NICE bijector.
 
     Args:
-      num_masked: Python `int` indicating that the first `d` units of the event
-        should be masked. Must be in the closed interval `[0, D-1]`, where `D`
-        is the event size of the base distribution. If the value is negative,
-        then the last `d` units of the event are masked instead.
+      num_masked: Python `int` or `float` indicating the number of units of the
+        event that should should be masked. If `int`, must be in the closed
+        interval `[0, D-1]`, where `D` is the event size of the base
+        distribution. If the value is negative, then the last `d` units of the
+        event are masked instead. If `float`, must be in the closed interval
+        `[-1, 1]`, and the value represents the proportion of the values to be
+        masked. If negative, then the last proportion of units will of the
+        are masked instead.
       shift_and_log_scale_fn: Python `callable` which computes `shift` and
         `log_scale` from both the forward domain (`x`) and the inverse domain
         (`y`). Calculation must respect the 'autoregressive property' (see class
@@ -171,14 +176,12 @@ class RealNVP(bijector_lib.Bijector):
       name: Python `str`, name given to ops managed by this object.
 
     Raises:
-      ValueError: If num_masked < 0.
       ValueError: If both or none of `shift_and_log_scale_fn` and `bijector_fn`
           are specified.
     """
     name = name or 'real_nvp'
 
     self._num_masked = num_masked
-
     self._reverse_mask = self._num_masked < 0
     # At construction time, we don't know input_depth.
     self._input_depth = None
@@ -206,6 +209,18 @@ class RealNVP(bijector_lib.Bijector):
         validate_args=validate_args,
         name=name)
 
+  @property
+  def num_masked(self):
+    if isinstance(self._num_masked, (int, np.integer)):
+      return self._num_masked
+    elif np.issubdtype(type(self._num_masked), np.floating):
+      return int(np.floor(self._input_depth * self._num_masked))
+    else:
+      raise ValueError(
+        "_num_masked should be either `int` or `float`. Got {}"
+        " of type {}."
+        "".format(self._num_masked, type(self._num_masked)))
+
   def _cache_input_depth(self, x):
     if self._input_depth is None:
       self._input_depth = tf.compat.dimension_value(
@@ -213,17 +228,18 @@ class RealNVP(bijector_lib.Bijector):
       if self._input_depth is None:
         raise NotImplementedError(
             'Rightmost dimension must be known prior to graph execution.')
-      if self._num_masked >= self._input_depth:
+
+      if self.num_masked >= self._input_depth:
         raise ValueError(
             'Number of masked units must be smaller than the event size.')
 
   def _bijector_input_units(self):
-    return self._input_depth - abs(self._num_masked)
+    return self._input_depth - abs(self.num_masked)
 
   def _forward(self, x, **condition_kwargs):
     self._cache_input_depth(x)
 
-    x0, x1 = x[..., :self._num_masked], x[..., self._num_masked:]
+    x0, x1 = x[..., :self.num_masked], x[..., self.num_masked:]
 
     if self._reverse_mask:
       x0, x1 = x1, x0
@@ -240,7 +256,7 @@ class RealNVP(bijector_lib.Bijector):
   def _inverse(self, y, **condition_kwargs):
     self._cache_input_depth(y)
 
-    y0, y1 = y[..., :self._num_masked], y[..., self._num_masked:]
+    y0, y1 = y[..., :self.num_masked], y[..., self.num_masked:]
 
     if self._reverse_mask:
       y0, y1 = y1, y0
@@ -257,7 +273,7 @@ class RealNVP(bijector_lib.Bijector):
   def _forward_log_det_jacobian(self, x, **condition_kwargs):
     self._cache_input_depth(x)
 
-    x0, x1 = x[..., :self._num_masked], x[..., self._num_masked:]
+    x0, x1 = x[..., :self.num_masked], x[..., self.num_masked:]
 
     if self._reverse_mask:
       x0, x1 = x1, x0
@@ -269,7 +285,7 @@ class RealNVP(bijector_lib.Bijector):
   def _inverse_log_det_jacobian(self, y, **condition_kwargs):
     self._cache_input_depth(y)
 
-    y0, y1 = y[..., :self._num_masked], y[..., self._num_masked:]
+    y0, y1 = y[..., :self.num_masked], y[..., self.num_masked:]
 
     if self._reverse_mask:
       y0, y1 = y1, y0
