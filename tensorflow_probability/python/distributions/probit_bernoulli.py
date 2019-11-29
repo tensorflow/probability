@@ -61,7 +61,7 @@ class ProbitBernoulli(distribution.Distribution):
 
     Args:
       probits: An N-D `Tensor` representing the probit-odds of a `1` event. Each
-        entry in the `Tensor` parametrizes an independent ProbitBernoulli
+        entry in the `Tensor` parameterizes an independent ProbitBernoulli
         distribution where the probability of an event is normal_cdf(probits).
         Only one of `probits` or `probs` should be passed in.
       probs: An N-D `Tensor` representing the probability of a `1`

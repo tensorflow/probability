@@ -144,7 +144,7 @@ class RelaxedBernoulli(distribution.Distribution):
         RelaxedBernoulli distributions. The temperature values should be
         positive.
       logits: An N-D `Tensor` representing the log-odds
-        of a positive event. Each entry in the `Tensor` parametrizes
+        of a positive event. Each entry in the `Tensor` parameterizes
         an independent RelaxedBernoulli distribution where the probability of an
         event is sigmoid(logits). Only one of `logits` or `probs` should be
         passed in.

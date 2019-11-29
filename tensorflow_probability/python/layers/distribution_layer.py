@@ -126,7 +126,7 @@ class DistributionLambda(tf.keras.layers.Lambda, tf.Module):
       convert_to_tensor_fn=lambda s: s.sample(5))
   ])
   # model.call(x), where x.shape = B + [2] will produce
-  # ==> Normal (batch_shape=[B]) instance parametrized by mean and log scale.
+  # ==> Normal (batch_shape=[B]) instance parameterized by mean and log scale.
   ```
 
   """

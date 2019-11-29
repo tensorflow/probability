@@ -94,11 +94,11 @@ class DirichletMultinomial(distribution.Distribution):
     2. Draw integers:
        `counts = [n_0,...,n_{K-1}] ~ Multinomial(total_count, probs)`
 
-  The last `concentration` dimension parametrizes a single Dirichlet-Multinomial
-  distribution. When calling distribution functions (e.g., `dist.prob(counts)`),
-  `concentration`, `total_count` and `counts` are broadcast to the same shape.
-  The last dimension of `counts` corresponds single Dirichlet-Multinomial
-  distributions.
+  The last `concentration` dimension parameterizes a single
+  Dirichlet-Multinomial distribution. When calling distribution functions
+  (e.g., `dist.prob(counts)`), `concentration`, `total_count` and `counts` are
+  broadcast to the same shape. The last dimension of `counts` corresponds to
+  single Dirichlet-Multinomial distributions.
 
   Distribution parameters are automatically broadcast in all functions; see
   examples for details.

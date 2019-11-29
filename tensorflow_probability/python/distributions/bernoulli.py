@@ -47,9 +47,9 @@ class Bernoulli(distribution.Distribution):
 
     Args:
       logits: An N-D `Tensor` representing the log-odds of a `1` event. Each
-        entry in the `Tensor` parametrizes an independent Bernoulli distribution
-        where the probability of an event is sigmoid(logits). Only one of
-        `logits` or `probs` should be passed in.
+        entry in the `Tensor` parameterizes an independent Bernoulli
+        distribution where the probability of an event is sigmoid(logits). Only
+        one of `logits` or `probs` should be passed in.
       probs: An N-D `Tensor` representing the probability of a `1`
         event. Each entry in the `Tensor` parameterizes an independent
         Bernoulli distribution. Only one of `logits` or `probs` should be passed

@@ -54,7 +54,7 @@ class ExponentialFamily(object):
   some [link function](
   https://en.wikipedia.org/wiki/Generalized_linear_model#Link_function)
   to be interpreted as the distribution's mean. The distribution is
-  parameterized by this mean, i.e., "mean-value parametrized."
+  parameterized by this mean, i.e., "mean-value parameterized."
 
   Subclasses are typically used to specify a Generalized Linear Model (GLM). A
   [GLM]( https://en.wikipedia.org/wiki/Generalized_linear_model) is a

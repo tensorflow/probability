@@ -81,7 +81,7 @@ def expectation(f,
   = E_p[ grad[ f(x) p(x) / stop_grad[p(x)] ] ]
   ```
 
-  Unless p is not reparametrized, it is usually preferable to
+  Unless p is not reparameterized, it is usually preferable to
   `use_reparameterization = True`.
 
   Warning: users are responsible for verifying `p` is a "reparameterized"
