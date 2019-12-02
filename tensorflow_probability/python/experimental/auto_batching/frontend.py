@@ -43,13 +43,23 @@ from tensorflow.python.autograph.converters import return_statements
 from tensorflow.python.autograph.core import converter
 from tensorflow.python.autograph.core import naming
 from tensorflow.python.autograph.pyct import anno
-from tensorflow.python.autograph.pyct import compiler
 from tensorflow.python.autograph.pyct import inspect_utils
 from tensorflow.python.autograph.pyct import parser
 from tensorflow.python.autograph.pyct import qual_names
 from tensorflow.python.autograph.pyct import templates
 from tensorflow.python.autograph.pyct import transformer
 from tensorflow.python.autograph.pyct.common_transformers import anf
+
+
+# For backward compatibility: compiler will be renamed to loader in TF 2.2+.
+try:
+  from tensorflow.python.autograph.pyct import loader  # pylint:disable=g-import-not-at-top
+except ImportError:
+  from tensorflow.python.autograph.pyct import compiler  # pylint:disable=g-import-not-at-top
+
+  loader = compiler
+  loader.load_ast = compiler.ast_to_object
+
 
 TF_BACKEND = tf_backend.TensorFlowBackend()
 
@@ -615,13 +625,11 @@ class Context(object):
     for function, _ in self._tagged_functions:
       name = function.__name__
       node, ctx = _parse_and_analyze(function, self.function_names())
-      # print(compiler.ast_to_source(node, indentation='  '))
       node = _AutoBatchingTransformer(
           self.function_names(),
           [scoped_name for scoped_name, _ in _environment(function, [name])],
           ctx).visit(node)
-      # print(compiler.ast_to_source(node, indentation='  '))
-      builder_module, _, _ = compiler.ast_to_object(node)
+      builder_module, _, _ = loader.load_ast(node)
       for scoped_name, val in _environment(function, [name]):
         builder_module.__dict__[scoped_name] = val
       builder = getattr(builder_module, name)
