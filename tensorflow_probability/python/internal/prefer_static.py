@@ -389,9 +389,11 @@ def is_numpy(x):
 # statically*. Often (e.g., above) we dont need static values, just static
 # properties.
 add = _prefer_static(tf.add, nptf.add)
+argsort = _prefer_static(tf.argsort, nptf.argsort)
 cast = _prefer_static(tf.cast, nptf.cast)
 concat = _prefer_static(tf.concat, nptf.concat)
 equal = _prefer_static(tf.equal, nptf.equal)
+gather = _prefer_static(tf.gather, nptf.gather)
 greater = _prefer_static(tf.greater, nptf.greater)
 identity = _prefer_static(tf.identity, nptf.identity)
 less = _prefer_static(tf.less, nptf.less)
