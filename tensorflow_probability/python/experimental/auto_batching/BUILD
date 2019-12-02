@@ -265,7 +265,7 @@ py_test(
 
 py_test(
     name = "tf_backend_test",
-    size = "medium",
+    size = "large",
     srcs = ["tf_backend_test.py"],
     srcs_version = "PY2AND3",
     deps = [
@@ -378,7 +378,7 @@ py_test(
 
 py_test(
     name = "frontend_test",
-    size = "medium",
+    size = "small",
     srcs = ["frontend_test.py"],
     shard_count = 4,
     srcs_version = "PY2AND3",

@@ -50,6 +50,7 @@ py_library(
 
 py_test(
     name = "util_test",
+    size = "small",
     srcs = ["util_test.py"],
     deps = [
         ":util",

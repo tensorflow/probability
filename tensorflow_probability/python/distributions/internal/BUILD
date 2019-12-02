@@ -49,7 +49,7 @@ py_library(
 
 py_test(
     name = "statistical_testing_test",
-    size = "medium",
+    size = "small",
     srcs = ["statistical_testing_test.py"],
     shard_count = 4,
     deps = [
@@ -91,7 +91,7 @@ py_binary(
 
 py_test(
     name = "correlation_matrix_volumes_test",
-    size = "medium",
+    size = "small",
     srcs = ["correlation_matrix_volumes_test.py"],
     shard_count = 4,
     tags = [
@@ -119,6 +119,7 @@ py_library(
 
 py_test(
     name = "slicing_test",
+    size = "small",
     srcs = ["slicing_test.py"],
     deps = [
         ":slicing",

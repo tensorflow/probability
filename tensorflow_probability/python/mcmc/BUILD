@@ -66,7 +66,7 @@ py_library(
 
 py_test(
     name = "diagnostic_test",
-    size = "medium",
+    size = "small",
     srcs = ["diagnostic_test.py"],
     deps = [
         # numpy dep,
@@ -169,7 +169,7 @@ py_library(
 
 py_test(
     name = "nuts_test",
-    size = "large",
+    size = "medium",
     srcs = ["nuts_test.py"],
     shard_count = 7,
     srcs_version = "PY2AND3",

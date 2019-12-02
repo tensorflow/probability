@@ -156,7 +156,7 @@ py_library(
 
 py_test(
     name = "distribution_layer_test",
-    size = "large",
+    size = "medium",
     srcs = ["distribution_layer_test.py"],
     shard_count = 5,
     deps = [
@@ -180,6 +180,7 @@ py_library(
 
 py_test(
     name = "initializers_test",
+    size = "small",
     srcs = ["initializers_test.py"],
     deps = [
         # tensorflow dep,
@@ -201,7 +202,7 @@ py_library(
 
 py_test(
     name = "masked_autoregressive_test",
-    size = "medium",
+    size = "small",
     srcs = ["masked_autoregressive_test.py"],
     deps = [
         # numpy dep,
@@ -239,6 +240,7 @@ py_library(
 
 py_test(
     name = "variable_input_test",
+    size = "small",
     srcs = ["variable_input_test.py"],
     deps = [
         # tensorflow dep,
@@ -260,6 +262,7 @@ py_library(
 
 py_test(
     name = "weight_norm_test",
+    size = "small",
     srcs = ["weight_norm_test.py"],
     deps = [
         # absl/testing:parameterized dep,

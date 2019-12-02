@@ -52,7 +52,7 @@ py_library(
 
 py_test(
     name = "surrogate_posteriors_test",
-    size = "medium",
+    size = "small",
     srcs = ["surrogate_posteriors_test.py"],
     shard_count = 5,
     deps = [

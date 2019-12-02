@@ -245,6 +245,7 @@ py_library(
 
 py_test(
     name = "tensor_array_ops_test",
+    size = "small",
     srcs = ["tensor_array_ops_test.py"],
     tags = ["tfp_numpy"],
     deps = [
@@ -295,6 +296,7 @@ py_library(
 
 py_test(
     name = "numpy_test",
+    size = "small",
     srcs = ["numpy_test.py"],
     shard_count = 5,
     tags = ["tfp_numpy"],

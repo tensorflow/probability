@@ -950,7 +950,7 @@ py_test(
 
 py_test(
     name = "batch_normalization_test",
-    size = "medium",
+    size = "small",
     srcs = ["batch_normalization_test.py"],
     deps = [
         ":bijector_test_util",
@@ -1097,7 +1097,7 @@ py_test(
 
 py_test(
     name = "ffjord_test",
-    size = "large",
+    size = "medium",
     srcs = ["ffjord_test.py"],
     deps = [
         ":bijector_test_util",
@@ -1139,6 +1139,7 @@ py_test(
 
 py_test(
     name = "identity_test",
+    size = "small",
     srcs = ["identity_test.py"],
     deps = [
         ":bijector_test_util",
@@ -1234,6 +1235,7 @@ py_test(
 
 py_test(
     name = "normal_cdf_test",
+    size = "small",
     srcs = ["normal_cdf_test.py"],
     deps = [
         ":bijector_test_util",
@@ -1247,6 +1249,7 @@ py_test(
 
 py_test(
     name = "ordered_test",
+    size = "small",
     srcs = ["ordered_test.py"],
     deps = [
         ":bijector_test_util",
@@ -1298,7 +1301,7 @@ py_test(
 
 py_test(
     name = "real_nvp_test",
-    size = "medium",
+    size = "small",
     srcs = ["real_nvp_test.py"],
     deps = [
         ":bijectors",
@@ -1342,7 +1345,7 @@ py_test(
 
 py_test(
     name = "reshape_test",
-    size = "medium",
+    size = "small",
     srcs = ["reshape_test.py"],
     deps = [
         ":bijector_test_util",
@@ -1356,7 +1359,7 @@ py_test(
 
 py_test(
     name = "fill_scale_tril_test",
-    size = "medium",
+    size = "small",
     srcs = ["fill_scale_tril_test.py"],
     deps = [
         ":bijectors",
@@ -1490,7 +1493,7 @@ py_test(
 
 py_test(
     name = "transform_diagonal_test",
-    size = "medium",
+    size = "small",
     srcs = ["transform_diagonal_test.py"],
     tags = ["hypothesis"],
     deps = [

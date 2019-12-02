@@ -140,7 +140,7 @@ py_library(
 
 py_test(
     name = "interpolation_test",
-    size = "medium",
+    size = "small",
     srcs = ["interpolation_test.py"],
     deps = [
         # numpy dep,
@@ -169,7 +169,7 @@ py_library(
 
 py_test(
     name = "linalg_test",
-    size = "medium",
+    size = "small",
     srcs = ["linalg_test.py"],
     shard_count = 5,
     tags = ["hypothesis"],
@@ -224,6 +224,7 @@ py_library(
 
 py_test(
     name = "numeric_test",
+    size = "small",
     srcs = [
         "numeric_test.py",
     ],
@@ -298,7 +299,7 @@ py_library(
 
 py_test(
     name = "root_search_test",
-    size = "medium",
+    size = "small",
     srcs = ["root_search_test.py"],
     deps = [
         # scipy dep,

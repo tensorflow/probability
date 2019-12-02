@@ -56,7 +56,7 @@ py_library(
 
 py_test(
     name = "csiszar_divergence_test",
-    size = "medium",
+    size = "small",
     srcs = ["csiszar_divergence_test.py"],
     shard_count = 5,
     deps = [
@@ -82,7 +82,7 @@ py_library(
 
 py_test(
     name = "mutual_information_test",
-    size = "medium",
+    size = "small",
     srcs = ["mutual_information_test.py"],
     shard_count = 5,
     deps = [

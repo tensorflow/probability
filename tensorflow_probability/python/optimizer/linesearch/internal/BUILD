@@ -46,6 +46,7 @@ py_library(
 
 py_test(
     name = "hager_zhang_lib_test",
+    size = "small",
     srcs = ["hager_zhang_lib_test.py"],
     deps = [
         ":hager_zhang_lib",

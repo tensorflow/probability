@@ -177,6 +177,7 @@ py_library(
 
 py_test(
     name = "prefer_static_test",
+    size = "small",
     srcs = ["prefer_static_test.py"],
     deps = [
         ":prefer_static",
@@ -204,6 +205,7 @@ py_library(
 
 py_test(
     name = "special_math_test",
+    size = "small",
     srcs = ["special_math_test.py"],
     deps = [
         ":special_math",
@@ -265,6 +267,7 @@ py_library(
 
 py_test(
     name = "hypothesis_testlib_test",
+    size = "small",
     srcs = ["hypothesis_testlib_test.py"],
     srcs_version = "PY2AND3",
     deps = [

@@ -47,7 +47,7 @@ py_library(
 
 py_test(
     name = "hager_zhang_test",
-    size = "medium",
+    size = "small",
     srcs = ["hager_zhang_test.py"],
     shard_count = 5,
     deps = [

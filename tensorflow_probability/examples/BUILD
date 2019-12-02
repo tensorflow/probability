@@ -230,7 +230,7 @@ py_library(
 
 py_test(
     name = "latent_dirichlet_allocation_distributions_test",
-    size = "medium",
+    size = "small",
     srcs = ["latent_dirichlet_allocation_distributions.py"],
     args = [
         "--fake_data",
@@ -270,7 +270,7 @@ py_library(
 
 py_test(
     name = "latent_dirichlet_allocation_edward2_test",
-    size = "medium",
+    size = "small",
     srcs = ["latent_dirichlet_allocation_edward2.py"],
     args = [
         "--fake_data",

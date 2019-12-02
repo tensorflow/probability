@@ -79,6 +79,7 @@ py_library(
 
 py_test(
     name = "exponentiated_quadratic_test",
+    size = "small",
     srcs = ["exponentiated_quadratic_test.py"],
     deps = [
         # absl/testing:parameterized dep,
@@ -103,6 +104,7 @@ py_library(
 
 py_test(
     name = "exp_sin_squared_test",
+    size = "small",
     srcs = ["exp_sin_squared_test.py"],
     deps = [
         # absl/testing:parameterized dep,
@@ -127,6 +129,7 @@ py_library(
 
 py_test(
     name = "matern_test",
+    size = "small",
     srcs = ["matern_test.py"],
     deps = [
         # absl/testing:parameterized dep,
@@ -150,6 +153,7 @@ py_library(
 
 py_test(
     name = "rational_quadratic_test",
+    size = "small",
     srcs = ["rational_quadratic_test.py"],
     deps = [
         # absl/testing:parameterized dep,
@@ -173,6 +177,7 @@ py_library(
 
 py_test(
     name = "polynomial_test",
+    size = "small",
     srcs = ["polynomial_test.py"],
     deps = [
         # absl/testing:parameterized dep,
@@ -222,6 +227,7 @@ py_library(
 
 py_test(
     name = "feature_scaled_test",
+    size = "small",
     srcs = ["feature_scaled_test.py"],
     deps = [
         # absl/testing:parameterized dep,
@@ -246,6 +252,7 @@ py_library(
 
 py_test(
     name = "feature_transformed_test",
+    size = "small",
     srcs = ["feature_transformed_test.py"],
     deps = [
         # absl/testing:parameterized dep,
@@ -269,6 +276,7 @@ py_library(
 
 py_test(
     name = "kumaraswamy_transformed_test",
+    size = "small",
     srcs = ["kumaraswamy_transformed_test.py"],
     deps = [
         # absl/testing:parameterized dep,

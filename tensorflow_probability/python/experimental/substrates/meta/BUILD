@@ -26,6 +26,7 @@ package(
 
 py_test(
     name = "numpy_integration_test",
+    size = "small",
     srcs = ["numpy_integration_test.py"],
     tags = ["tfp_numpy"],
     deps = [

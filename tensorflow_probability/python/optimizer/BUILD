@@ -55,7 +55,7 @@ py_library(
 
 py_test(
     name = "sgld_test",
-    size = "medium",
+    size = "small",
     srcs = ["sgld_test.py"],
     deps = [
         # numpy dep,
@@ -77,7 +77,7 @@ py_library(
 
 py_test(
     name = "variational_sgd_test",
-    size = "medium",
+    size = "small",
     srcs = ["variational_sgd_test.py"],
     deps = [
         # tensorflow dep,
@@ -123,7 +123,7 @@ py_library(
 
 py_test(
     name = "lbfgs_test",
-    size = "medium",
+    size = "small",
     timeout = "long",
     srcs = ["lbfgs_test.py"],
     shard_count = 5,
@@ -208,7 +208,7 @@ py_library(
 
 py_test(
     name = "proximal_hessian_sparse_test",
-    size = "medium",
+    size = "small",
     srcs = ["proximal_hessian_sparse_test.py"],
     deps = [
         # numpy dep,

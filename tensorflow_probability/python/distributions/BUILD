@@ -1483,6 +1483,7 @@ py_test(
 
 py_test(
     name = "bernoulli_test",
+    size = "small",
     srcs = ["bernoulli_test.py"],
     deps = [
         # numpy dep,
@@ -1496,6 +1497,7 @@ py_test(
 
 py_test(
     name = "beta_test",
+    size = "small",
     srcs = ["beta_test.py"],
     deps = [
         # numpy dep,
@@ -1521,6 +1523,7 @@ py_test(
 
 py_test(
     name = "blockwise_test",
+    size = "small",
     srcs = ["blockwise_test.py"],
     deps = [
         # numpy dep,
@@ -1532,6 +1535,7 @@ py_test(
 
 py_test(
     name = "categorical_test",
+    size = "small",
     srcs = ["categorical_test.py"],
     deps = [
         # absl/testing:parameterized dep,
@@ -1546,7 +1550,7 @@ py_test(
 
 py_test(
     name = "cauchy_test",
-    size = "medium",
+    size = "small",
     srcs = ["cauchy_test.py"],
     deps = [
         # numpy dep,
@@ -1559,6 +1563,7 @@ py_test(
 
 py_test(
     name = "chi_test",
+    size = "small",
     srcs = ["chi_test.py"],
     deps = [
         # numpy dep,
@@ -1571,6 +1576,7 @@ py_test(
 
 py_test(
     name = "chi2_test",
+    size = "small",
     srcs = ["chi2_test.py"],
     deps = [
         # numpy dep,
@@ -1583,7 +1589,7 @@ py_test(
 
 py_test(
     name = "cholesky_lkj_test",
-    size = "medium",
+    size = "small",
     srcs = [
         "cholesky_lkj_test.py",
     ],
@@ -1623,6 +1629,7 @@ py_test(
 
 py_test(
     name = "dirichlet_multinomial_test",
+    size = "medium",
     srcs = ["dirichlet_multinomial_test.py"],
     shard_count = 4,
     deps = [
@@ -1635,6 +1642,7 @@ py_test(
 
 py_test(
     name = "dirichlet_test",
+    size = "small",
     srcs = ["dirichlet_test.py"],
     deps = [
         # numpy dep,
@@ -1674,6 +1682,7 @@ py_test(
 
 py_test(
     name = "empirical_test",
+    size = "small",
     srcs = ["empirical_test.py"],
     deps = [
         # absl/testing:parameterized dep,
@@ -1686,6 +1695,7 @@ py_test(
 
 py_test(
     name = "exponential_test",
+    size = "small",
     srcs = ["exponential_test.py"],
     deps = [
         ":exponential",
@@ -1699,6 +1709,7 @@ py_test(
 
 py_test(
     name = "finite_discrete_test",
+    size = "small",
     srcs = ["finite_discrete_test.py"],
     deps = [
         # numpy dep,
@@ -1748,7 +1759,7 @@ py_test(
 
 py_test(
     name = "gaussian_process_regression_model_test",
-    size = "medium",
+    size = "small",
     srcs = ["gaussian_process_regression_model_test.py"],
     deps = [
         ":distributions",
@@ -1804,7 +1815,7 @@ py_test(
 
 py_test(
     name = "half_cauchy_test",
-    size = "medium",
+    size = "small",
     srcs = ["half_cauchy_test.py"],
     deps = [
         # numpy dep,
@@ -1817,7 +1828,7 @@ py_test(
 
 py_test(
     name = "half_normal_test",
-    size = "medium",
+    size = "small",
     srcs = ["half_normal_test.py"],
     deps = [
         # numpy dep,
@@ -1830,7 +1841,7 @@ py_test(
 
 py_test(
     name = "hidden_markov_model_test",
-    size = "medium",
+    size = "small",
     srcs = ["hidden_markov_model_test.py"],
     shard_count = 4,
     deps = [
@@ -1844,7 +1855,7 @@ py_test(
 
 py_test(
     name = "horseshoe_test",
-    size = "medium",
+    size = "small",
     srcs = ["horseshoe_test.py"],
     deps = [
         # numpy dep,
@@ -1897,6 +1908,7 @@ py_test(
 
 py_test(
     name = "kullback_leibler_test",
+    size = "small",
     srcs = ["kullback_leibler_test.py"],
     deps = [
         ":distribution",
@@ -1947,6 +1959,7 @@ py_test(
 
 py_test(
     name = "kumaraswamy_test",
+    size = "small",
     srcs = ["kumaraswamy_test.py"],
     deps = [
         # numpy dep,
@@ -1959,6 +1972,7 @@ py_test(
 
 py_test(
     name = "laplace_test",
+    size = "small",
     srcs = ["laplace_test.py"],
     deps = [
         # numpy dep,
@@ -1971,7 +1985,7 @@ py_test(
 
 py_test(
     name = "linear_gaussian_ssm_test",
-    size = "medium",
+    size = "small",
     srcs = ["linear_gaussian_ssm_test.py"],
     shard_count = 5,
     deps = [
@@ -2071,6 +2085,7 @@ py_test(
 
 py_test(
     name = "multinomial_test",
+    size = "small",
     srcs = ["multinomial_test.py"],
     deps = [
         # numpy dep,
@@ -2094,7 +2109,7 @@ py_test(
 
 py_test(
     name = "mvn_diag_plus_low_rank_test",
-    size = "medium",
+    size = "small",
     srcs = ["mvn_diag_plus_low_rank_test.py"],
     deps = [
         # numpy dep,
@@ -2148,7 +2163,7 @@ py_test(
 
 py_test(
     name = "mvn_tril_test",
-    size = "medium",
+    size = "small",
     srcs = ["mvn_tril_test.py"],
     shard_count = 5,
     tags = ["nomsan"],
@@ -2178,6 +2193,7 @@ py_test(
 
 py_test(
     name = "normal_test",
+    size = "small",
     srcs = ["normal_test.py"],
     deps = [
         # numpy dep,
@@ -2255,7 +2271,7 @@ py_test(
 
 py_test(
     name = "poisson_test",
-    size = "medium",
+    size = "small",
     srcs = ["poisson_test.py"],
     deps = [
         # numpy dep,
@@ -2269,7 +2285,7 @@ py_test(
 
 py_test(
     name = "poisson_lognormal_test",
-    size = "medium",
+    size = "small",
     srcs = ["poisson_lognormal_test.py"],
     deps = [
         # tensorflow dep,
@@ -2280,6 +2296,7 @@ py_test(
 
 py_test(
     name = "probit_bernoulli_test",
+    size = "small",
     srcs = ["probit_bernoulli_test.py"],
     deps = [
         # numpy dep,
@@ -2294,7 +2311,7 @@ py_test(
 
 py_test(
     name = "quantized_distribution_test",
-    size = "medium",
+    size = "small",
     srcs = ["quantized_distribution_test.py"],
     deps = [
         # numpy dep,
@@ -2360,6 +2377,7 @@ py_test(
 
 py_test(
     name = "student_t_test",
+    size = "small",
     srcs = ["student_t_test.py"],
     deps = [
         # numpy dep,
@@ -2386,7 +2404,7 @@ py_test(
 
 py_test(
     name = "transformed_distribution_test",
-    size = "medium",
+    size = "small",
     srcs = ["transformed_distribution_test.py"],
     deps = [
         # numpy dep,
@@ -2401,6 +2419,7 @@ py_test(
 
 py_test(
     name = "triangular_test",
+    size = "small",
     srcs = ["triangular_test.py"],
     deps = [
         # numpy dep,
@@ -2414,7 +2433,7 @@ py_test(
 
 py_test(
     name = "truncated_normal_test",
-    size = "large",
+    size = "small",
     srcs = ["truncated_normal_test.py"],
     shard_count = 10,
     deps = [
@@ -2429,6 +2448,7 @@ py_test(
 
 py_test(
     name = "uniform_test",
+    size = "small",
     srcs = ["uniform_test.py"],
     deps = [
         # numpy dep,
@@ -2466,7 +2486,7 @@ py_test(
 
 py_test(
     name = "vector_exponential_diag_test",
-    size = "medium",
+    size = "small",
     srcs = ["vector_exponential_diag_test.py"],
     deps = [
         # numpy dep,
@@ -2478,7 +2498,7 @@ py_test(
 
 py_test(
     name = "vector_laplace_diag_test",
-    size = "medium",
+    size = "small",
     srcs = ["vector_laplace_diag_test.py"],
     deps = [
         # numpy dep,
@@ -2490,7 +2510,7 @@ py_test(
 
 py_test(
     name = "vector_sinh_arcsinh_diag_test",
-    size = "medium",
+    size = "small",
     srcs = ["vector_sinh_arcsinh_diag_test.py"],
     deps = [
         # numpy dep,
@@ -2502,7 +2522,7 @@ py_test(
 
 py_test(
     name = "von_mises_fisher_test",
-    size = "medium",
+    size = "small",
     srcs = ["von_mises_fisher_test.py"],
     deps = [
         ":von_mises_fisher",
