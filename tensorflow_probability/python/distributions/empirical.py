@@ -28,7 +28,6 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.ops import gen_array_ops  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -180,16 +179,6 @@ class Empirical(distribution.Distribution):
   def samples(self):
     """Distribution parameter."""
     return self._samples
-
-  @property
-  @deprecation.deprecated(
-      '2019-11-01', 'The `num_samples` property is deprecated. Use '
-      'Empirical.compute_num_samples() instead.')
-  # Note this function has graph side-effects which is why it must be
-  # deprecated.
-  def num_samples(self):
-    """Number of samples."""
-    return self.compute_num_samples()
 
   def compute_num_samples(self):
     """Compute and return the number of values in `self.samples`.
