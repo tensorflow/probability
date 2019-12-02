@@ -250,6 +250,15 @@ py_library(
 )
 
 py_library(
+    name = "vectorization_util",
+    srcs = ["vectorization_util.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_library(
     name = "hypothesis_testlib",
     testonly = 1,
     srcs = ["hypothesis_testlib.py"],
@@ -333,6 +342,19 @@ py_test(
         ":test_util",
         # absl/testing:parameterized dep,
         # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "vectorization_util_test",
+    size = "small",
+    srcs = ["vectorization_util_test.py"],
+    deps = [
+        ":test_util",
+        ":vectorization_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
