@@ -87,10 +87,18 @@ def _gather(  # pylint: disable=unused-argument
   if validate_indices is not None:
     raise NotImplementedError(
         'Argument `validate_indices != None` is currently unimplemented.')
-  if batch_dims != 0:
-    raise NotImplementedError(
-        'Argument `batch_dims != 0` is currently unimplemented.')
-  return np.take(params, indices, axis=axis)
+  # NOTE: For only the numpy backend, this function could create a single result
+  # ndarray and use in-place updates.  For the Jax backend, this function could
+  # vmap `np.take`.
+  if axis is None:
+    axis = batch_dims
+  res = np.array([
+      np.take(params[i], indices[i], axis=axis - batch_dims)
+      for i in np.ndindex(*params.shape[:batch_dims])
+  ])
+  return np.reshape(
+      res,
+      params.shape[:axis] + indices.shape[batch_dims:] + params.shape[axis+1:])
 
 
 def _gather_nd(  # pylint: disable=unused-argument

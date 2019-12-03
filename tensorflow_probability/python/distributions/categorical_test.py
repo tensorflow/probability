@@ -35,8 +35,9 @@ tfd = tfp.distributions
 
 
 def make_categorical(batch_shape, num_classes, dtype=tf.int32):
-  logits = tf.random.uniform(
-      list(batch_shape) + [num_classes], -10, 10, dtype=tf.float32) - 50.
+  logits = -50. + tf.random.uniform(
+      list(batch_shape) + [num_classes], minval=-10, maxval=10,
+      dtype=tf.float32, seed=test_util.test_seed())
   return tfd.Categorical(logits, dtype=dtype, validate_args=True)
 
 
@@ -90,11 +91,13 @@ class CategoricalTest(test_util.TestCase):
   def testDtype(self):
     dist = make_categorical([], 5, dtype=tf.int32)
     self.assertEqual(dist.dtype, tf.int32)
-    self.assertEqual(dist.dtype, dist.sample(5).dtype)
+    self.assertEqual(
+        dist.dtype, dist.sample(5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist.dtype, dist.mode().dtype)
     dist = make_categorical([], 5, dtype=tf.int64)
     self.assertEqual(dist.dtype, tf.int64)
-    self.assertEqual(dist.dtype, dist.sample(5).dtype)
+    self.assertEqual(
+        dist.dtype, dist.sample(5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist.dtype, dist.mode().dtype)
     self.assertEqual(dist.logits.dtype, tf.float32)
     self.assertEqual(dist.logits.dtype, dist.entropy().dtype)
@@ -107,13 +110,14 @@ class CategoricalTest(test_util.TestCase):
     for dtype in [tf.float16, tf.float32, tf.float64]:
       dist = make_categorical([], 5, dtype=dtype)
       self.assertEqual(dist.dtype, dtype)
-      self.assertEqual(dist.dtype, dist.sample(5).dtype)
+      self.assertEqual(
+          dist.dtype, dist.sample(5, seed=test_util.test_seed()).dtype)
 
   def testUnknownShape(self):
     logits = lambda l: tf1.placeholder_with_default(  # pylint: disable=g-long-lambda
         np.float32(l), shape=None)
     sample = lambda l: tfd.Categorical(  # pylint: disable=g-long-lambda
-        logits=logits(l), validate_args=True).sample()
+        logits=logits(l), validate_args=True).sample(seed=test_util.test_seed())
     # Will sample class 1.
     sample_value = self.evaluate(sample([-1000.0, 1000.0]))
     self.assertEqual(1, sample_value)
@@ -124,12 +128,12 @@ class CategoricalTest(test_util.TestCase):
     self.assertAllEqual([1, 0], sample_value_batch)
 
   def testPMFWithBatch(self):
-    histograms = [[0.2, 0.8], [0.6, 0.4]]
+    histograms = np.array([[0.2, 0.8], [0.6, 0.4]])
     dist = tfd.Categorical(tf.math.log(histograms) - 50., validate_args=True)
     self.assertAllClose([0.2, 0.4], self.evaluate(dist.prob([0, 1])))
 
   def testPMFNoBatch(self):
-    histograms = [0.2, 0.8]
+    histograms = np.array([0.2, 0.8])
     dist = tfd.Categorical(tf.math.log(histograms) - 50., validate_args=True)
     self.assertAllClose(0.2, self.evaluate(dist.prob(0)))
 
@@ -306,22 +310,22 @@ class CategoricalTest(test_util.TestCase):
                         run_result['norm_log_cdf'].shape)
 
   def testLogPMF(self):
-    logits = np.log([[0.2, 0.8], [0.6, 0.4]]) - 50.
+    logits = np.log(np.array([[0.2, 0.8], [0.6, 0.4]])) - 50.
     dist = tfd.Categorical(logits, validate_args=True)
-    self.assertAllClose(np.log([0.2, 0.4]),
+    self.assertAllClose(np.log(np.array([0.2, 0.4])),
                         self.evaluate(dist.log_prob([0, 1])))
-    self.assertAllClose(np.log([0.2, 0.4]),
+    self.assertAllClose(np.log(np.array([0.2, 0.4])),
                         self.evaluate(dist.log_prob([0.0, 1.0])))
 
   def testEntropyNoBatch(self):
-    logits = np.log([0.2, 0.8]) - 50.
+    logits = np.log(np.array([0.2, 0.8])) - 50.
     dist = tfd.Categorical(logits, validate_args=True)
     self.assertAllClose(-(0.2 * np.log(0.2) + 0.8 * np.log(0.8)),
                         self.evaluate(dist.entropy()),
                         atol=0, rtol=1e-5)
 
   def testEntropyWithBatch(self):
-    logits = np.log([[0.2, 0.8], [0.6, 0.4]]) - 50.
+    logits = np.log(np.array([[0.2, 0.8], [0.6, 0.4]])) - 50.
     dist = tfd.Categorical(logits, validate_args=True)
     self.assertAllClose([-(0.2 * np.log(0.2) + 0.8 * np.log(0.8)),
                          -(0.6 * np.log(0.6) + 0.4 * np.log(0.4))],
@@ -355,7 +359,7 @@ class CategoricalTest(test_util.TestCase):
                         res['categorical_entropy_g'])
 
   def testEntropyWithZeroProbabilities(self):
-    probs = [[0, 0.5, 0.5], [0, 1, 0]]
+    probs = np.array([[0, 0.5, 0.5], [0, 1, 0]])
     dist = tfd.Categorical(probs=probs, validate_args=True)
     dist_entropy = dist.entropy()
 
@@ -363,7 +367,7 @@ class CategoricalTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(dist_entropy), ans)
 
   def testEntropyWithNegInfLogits(self):
-    probs = [[0, 0.5, 0.5], [0, 1, 0]]
+    probs = np.array([[0, 0.5, 0.5], [0, 1, 0]])
     dist = tfd.Categorical(logits=np.log(probs), validate_args=True)
     dist_entropy = dist.entropy()
 
@@ -371,7 +375,7 @@ class CategoricalTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(dist_entropy), ans)
 
   def testSample(self):
-    histograms = [[[0.2, 0.8], [0.4, 0.6]]]
+    histograms = np.array([[[0.2, 0.8], [0.4, 0.6]]])
     dist = tfd.Categorical(tf.math.log(histograms) - 50., validate_args=True)
     n = 10000
     samples = dist.sample(n, seed=test_util.test_seed())
@@ -386,7 +390,7 @@ class CategoricalTest(test_util.TestCase):
         [[0.8, 0.6]], np.mean(sample_values == 1, axis=0), atol=1e-2)
 
   def testSampleWithSampleShape(self):
-    histograms = [[[0.2, 0.8], [0.4, 0.6]]]
+    histograms = np.array([[[0.2, 0.8], [0.4, 0.6]]])
     dist = tfd.Categorical(tf.math.log(histograms) - 50., validate_args=True)
     samples = dist.sample((100, 100), seed=test_util.test_seed())
     prob = dist.prob(samples)
@@ -399,12 +403,15 @@ class CategoricalTest(test_util.TestCase):
   def testNotReparameterized(self):
     p = tf.constant([0.3, 0.3, 0.4])
     _, grad_p = tfp.math.value_and_gradient(
-        lambda x: tfd.Categorical(x, validate_args=True).sample(100), p)
+        # pylint: disable=g-long-lambda
+        lambda x: tfd.Categorical(x, validate_args=True).sample(
+            100, seed=test_util.test_seed()),
+        p)
     self.assertIsNone(grad_p)
 
   def testLogPMFBroadcasting(self):
     # 1 x 2 x 2
-    histograms = [[[0.2, 0.8], [0.4, 0.6]]]
+    histograms = np.array([[[0.2, 0.8], [0.4, 0.6]]])
     dist = tfd.Categorical(tf.math.log(histograms) - 50., validate_args=True)
 
     prob = dist.prob(1)
@@ -431,7 +438,7 @@ class CategoricalTest(test_util.TestCase):
 
   def testLogPMFShape(self):
     # shape [1, 2, 2]
-    histograms = [[[0.2, 0.8], [0.4, 0.6]]]
+    histograms = np.array([[[0.2, 0.8], [0.4, 0.6]]])
     dist = tfd.Categorical(tf.math.log(histograms), validate_args=True)
 
     log_prob = dist.log_prob([0, 1])
@@ -443,7 +450,7 @@ class CategoricalTest(test_util.TestCase):
     self.assertAllEqual([2, 2, 2], log_prob.shape)
 
   def testLogPMFShapeNoBatch(self):
-    histograms = [0.2, 0.8]
+    histograms = np.array([0.2, 0.8])
     dist = tfd.Categorical(tf.math.log(histograms), validate_args=True)
 
     log_prob = dist.log_prob(0)
@@ -455,7 +462,7 @@ class CategoricalTest(test_util.TestCase):
     self.assertAllEqual([2, 2, 2], log_prob.shape)
 
   def testMode(self):
-    histograms = [[[0.2, 0.8], [0.6, 0.4]]]
+    histograms = np.array([[[0.2, 0.8], [0.6, 0.4]]])
     dist = tfd.Categorical(tf.math.log(histograms) - 50., validate_args=True)
     self.assertAllEqual([[1, 0]], self.evaluate(dist.mode()))
 
