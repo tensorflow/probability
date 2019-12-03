@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import itertools
+import unittest
 
 # Dependency imports
 from absl.testing import parameterized
@@ -365,6 +366,22 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     else:
       err = self.compute_max_gradient_error(lambda x: f(x, scale), [loc])
       self.assertLess(err, 0.005)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testReproduceVmap(self, dtype):
+    if dtype == tf.float32:
+      raise unittest.SkipTest('b/145554459')
+    loc = tf.constant(-200., dtype=dtype)
+    scale = tf.constant(2.188274e+01, dtype=dtype)
+    high = tf.constant(113.33857, dtype=dtype)
+    low = tf.constant(102.94414, dtype=dtype)
+    # Not validating args b/c the assertions confuse pfor.
+    dist = tfd.TruncatedNormal(loc, scale, low, high, validate_args=False)
+    sample = tf.constant([102.950745, 103.87256, 107.78299], dtype=dtype)
+    batch_lp = dist.log_prob(sample)
+    pfor_lp = tf.vectorized_map(dist.log_prob, tf.convert_to_tensor(sample))
+    batch_lp_, pfor_lp_ = self.evaluate((batch_lp, pfor_lp))
+    self.assertAllClose(batch_lp_, pfor_lp_, atol=1e-6)
 
 
 @test_util.test_all_tf_execution_regimes

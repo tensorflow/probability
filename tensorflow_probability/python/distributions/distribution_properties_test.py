@@ -182,6 +182,7 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Multinomial',  # Seemingly runs, but gives `NaN`s sometimes.
     'OneHotCategorical',  # Seemingly runs, but gives `NaN`s sometimes.
     'PlackettLuce',  # Shape error because pfor gather ignores `batch_dims`.
+    'TruncatedNormal',  # Numerical problem: b/145554459
     'VonMisesFisher',  # No converter for CheckNumerics
     'Wishart',  # Actually works, but disabled because log_prob of sample is
                 # ill-conditioned for reasons unrelated to pfor.
@@ -1325,6 +1326,7 @@ class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
     else:
       sample = self.evaluate(tf.vectorized_map(
           lambda i: dist.sample(seed=seed), tf.range(num_samples)))
+    hp.note('Drew samples {}'.format(sample))
 
     if dist_name not in LOGPROB_AUTOVECTORIZATION_IS_BROKEN:
       pfor_lp = tf.vectorized_map(dist.log_prob, tf.convert_to_tensor(sample))
