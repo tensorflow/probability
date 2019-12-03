@@ -351,7 +351,7 @@ class NormalTest(test_util.TestCase):
     sigma_v = np.sqrt(3.0)
     n = tf.constant(100000)
     normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
-    samples = normal.sample(n)
+    samples = normal.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     # Note that the standard error for the sample mean is ~ sigma / sqrt(n).
     # The sample variance similarly is dependent on sigma and n.
@@ -395,7 +395,7 @@ class NormalTest(test_util.TestCase):
     sigma_v = [np.sqrt(2.0), np.sqrt(3.0)]
     n = tf.constant(100000)
     normal = tfd.Normal(loc=mu, scale=sigma, validate_args=True)
-    samples = normal.sample(n)
+    samples = normal.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     # Note that the standard error for the sample mean is ~ sigma / sqrt(n).
     # The sample variance similarly is dependent on sigma and n.

@@ -100,7 +100,7 @@ def is_complex(dtype):
   dtype = tf.as_dtype(dtype)
   if hasattr(dtype, 'is_complex'):
     return dtype.is_complex
-  return np.issubdtype(np.dtype(dtype), np.complex)
+  return np.issubdtype(np.dtype(dtype), np.complexfloating)
 
 
 def is_floating(dtype):

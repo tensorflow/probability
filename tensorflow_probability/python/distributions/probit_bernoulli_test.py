@@ -218,7 +218,7 @@ class ProbitBernoulliTest(test_util.TestCase):
     p = [0.2, 0.6]
     dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
     n = 100000
-    samples = dist.sample(n)
+    samples = dist.sample(n, seed=test_util.test_seed())
     tensorshape_util.set_shape(samples, [n, 2])
     self.assertEqual(samples.dtype, tf.int32)
     sample_values = self.evaluate(samples)

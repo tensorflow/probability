@@ -371,7 +371,7 @@ class _HalfCauchyTest(object):
     scale = self._create_placeholder_with_default(scale_, name="scale")
     n = int(1e5)
     half_cauchy = tfd.HalfCauchy(loc=loc, scale=scale, validate_args=True)
-    samples = half_cauchy.sample(n)
+    samples = half_cauchy.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     self.assertEqual(sample_values.shape, (n, batch_size))
@@ -396,7 +396,7 @@ class _HalfCauchyTest(object):
     n_ = [int(1e5), 2]
     n = tf.convert_to_tensor(n_, dtype=tf.int32, name="n")
     half_cauchy = tfd.HalfCauchy(loc=loc, scale=scale, validate_args=True)
-    samples = half_cauchy.sample(n)
+    samples = half_cauchy.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     self.assertAllEqual(sample_values.shape, n_ + [batch_size, 2])

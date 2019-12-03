@@ -341,7 +341,7 @@ class CauchyTest(test_util.TestCase):
     loc_v = 3.0
     n = tf.constant(100000)
     cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
-    samples = cauchy.sample(n)
+    samples = cauchy.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     self.assertEqual(sample_values.shape, (100000,))
@@ -366,7 +366,7 @@ class CauchyTest(test_util.TestCase):
     loc_v = [3.0, -3.0]
     n = tf.constant(100000)
     cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
-    samples = cauchy.sample(n)
+    samples = cauchy.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (100000, batch_size, 2))
     self.assertAllClose(np.median(sample_values[:, 0, 0]), loc_v[0], atol=1e-1)

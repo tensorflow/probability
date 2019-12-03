@@ -38,14 +38,18 @@ __all__ = [
     'diag',
     'diag_part',
     'eye',
+    'inv',
     'lu',
     'matmul',
+    'matrix_determinant',
     'matrix_rank',
+    'matrix_solve',
     'matrix_transpose',
     'norm',
     'pinv',
     'set_diag',
     'slogdet',
+    'solve',
     'triangular_solve',
     # 'cross',
     # 'eigh',
@@ -53,7 +57,6 @@ __all__ = [
     # 'einsum',
     # 'expm',
     # 'global_norm',
-    # 'inv',
     # 'l2_normalize',
     # 'logdet',
     # 'logm',
@@ -61,7 +64,6 @@ __all__ = [
     # 'matvec',
     # 'norm',
     # 'qr',
-    # 'solve',
     # 'sqrtm',
     # 'svd',
     # 'tensor_diag',
@@ -198,6 +200,34 @@ def _set_diag(input, diagonal, name=None):  # pylint: disable=unused-argument,re
                   input)
 
 
+def _solve(matrix, rhs, adjoint=False, name=None):  # pylint: disable=redefined-outer-name
+  """Numpy solve does not broadcast, so we must do so explicitly."""
+  del name
+  if adjoint:
+    matrix = _matrix_transpose(matrix, conjugate=True)
+  if JAX_MODE:  # But JAX uses XLA, which can do a batched solve.
+    matrix = matrix + np.zeros(rhs.shape[:-2] + (1, 1), dtype=matrix.dtype)
+    rhs = rhs + np.zeros(matrix.shape[:-2] + (1, 1), dtype=rhs.dtype)
+    return np.linalg.solve(matrix, rhs)
+  try:
+    bcast = np.broadcast(matrix[..., :1], rhs)
+  except ValueError as e:
+    raise ValueError('Error with inputs shaped `matrix`={}, rhs={}:\n{}'.format(
+        matrix.shape, rhs.shape, str(e)))
+  dim = matrix.shape[-1]
+  matrix = np.broadcast_to(matrix, bcast.shape[:-1] + (dim,))
+  rhs = np.broadcast_to(rhs, bcast.shape)
+  nbatch = int(np.prod(matrix.shape[:-2]))
+  flat_mat = matrix.reshape(nbatch, dim, dim)
+  flat_rhs = rhs.reshape(nbatch, dim, rhs.shape[-1])
+  result = np.empty(flat_rhs.shape)
+  if np.size(result):
+    # ValueError: On entry to STRTRS parameter number 7 had an illegal value.
+    for i, (mat, rh) in enumerate(zip(flat_mat, flat_rhs)):
+      result[i] = np.linalg.solve(mat, rh)
+  return result.reshape(*rhs.shape)
+
+
 def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):  # pylint: disable=redefined-outer-name
   """Scipy solve does not broadcast, so we must do so explicitly."""
   del name
@@ -248,6 +278,8 @@ det = utils.copy_docstring(
     tf.linalg.det,
     lambda input, name=None: np.linalg.det(input))
 
+matrix_determinant = det
+
 diag = utils.copy_docstring(
     tf.linalg.diag,
     _diag)
@@ -259,6 +291,10 @@ diag_part = utils.copy_docstring(
 eye = utils.copy_docstring(
     tf.eye,
     _eye)
+
+inv = utils.copy_docstring(
+    tf.linalg.inv,
+    lambda input, name=None: np.linalg.inv(input))
 
 lu = utils.copy_docstring(
     tf.linalg.lu,
@@ -310,6 +346,9 @@ slogdet = utils.copy_docstring(
 matrix_transpose = utils.copy_docstring(
     tf.linalg.matrix_transpose,
     _matrix_transpose)
+
+solve = utils.copy_docstring(tf.linalg.solve, _solve)
+matrix_solve = solve
 
 triangular_solve = utils.copy_docstring(
     tf.linalg.triangular_solve,

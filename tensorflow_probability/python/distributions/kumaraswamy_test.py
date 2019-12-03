@@ -258,7 +258,7 @@ class KumaraswamyTest(test_util.TestCase):
     b = 2.
     kumaraswamy = tfd.Kumaraswamy(a, b, validate_args=True)
     n = tf.constant(100000)
-    samples = kumaraswamy.sample(n)
+    samples = kumaraswamy.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000,))
     self.assertFalse(np.any(sample_values < 0.0))
@@ -306,7 +306,7 @@ class KumaraswamyTest(test_util.TestCase):
     b = np.random.rand(3, 2, 2).astype(np.float32)
     kumaraswamy = tfd.Kumaraswamy(a, b, validate_args=True)
     n = tf.constant(100000)
-    samples = kumaraswamy.sample(n)
+    samples = kumaraswamy.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000, 3, 2, 2))
     self.assertFalse(np.any(sample_values < 0.0))

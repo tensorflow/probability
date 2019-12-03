@@ -327,12 +327,12 @@ class OneHotCategorical(distribution.Distribution):
 
       msg1 = 'Argument `{}` must have final dimension >= 1.'.format(name)
       msg2 = 'Argument `{}` must have final dimension <= {}.'.format(
-          name, tf.int32.max)
+          name, dtype_util.max(tf.int32))
       event_size = shape_static[-1] if shape_static is not None else None
       if event_size is not None:
         if event_size < 1:
           raise ValueError(msg1)
-        if event_size > tf.int32.max:
+        if event_size > dtype_util.max(tf.int32):
           raise ValueError(msg2)
       elif self.validate_args:
         param = tf.convert_to_tensor(param)

@@ -388,14 +388,16 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase):
   def testSampling(self, loc, scale):
     n = 1000000
     truncated_dist, normal_dist = self.constructDists(loc, scale)
-    truncated_samples = self.evaluate(truncated_dist.sample(n)).flatten()
+    seed_stream = test_util.test_seed_stream(salt='TruncNormal')
+    truncated_samples = self.evaluate(
+        truncated_dist.sample(n, seed=seed_stream())).flatten()
     lb = self.evaluate(truncated_dist.low)
     ub = self.evaluate(truncated_dist.high)
     self.assertAllGreaterEqual(truncated_samples, lb)
     self.assertAllLessEqual(truncated_samples, ub)
 
     normal_samples = self.evaluate(normal_dist.sample(
-        n, seed=test_util.test_seed())).flatten()
+        n, seed=seed_stream())).flatten()
     # Rejection sample the normal distribution
     rejection_samples = normal_samples[normal_samples >= lb]
     rejection_samples = rejection_samples[rejection_samples <= ub]

@@ -198,13 +198,17 @@ class Zipf(distribution.Distribution):
   @distribution_util.AppendDocstring(
       """Note: Zipf has an infinite mean when `power` <= 2.""")
   def _mean(self):
-    zeta_p = tf.math.zeta(self.power[..., tf.newaxis] - [0., 1.], 1.)
+    zeta_p = tf.math.zeta(
+        self.power[..., tf.newaxis] -
+        np.array([0., 1.], dtype_util.as_numpy_dtype(self.dtype)), 1.)
     return zeta_p[..., 1] / zeta_p[..., 0]
 
   @distribution_util.AppendDocstring(
       """Note: Zipf has infinite variance when `power` <= 3.""")
   def _variance(self):
-    zeta_p = tf.math.zeta(self.power[..., tf.newaxis] - [0., 1., 2.], 1.)
+    zeta_p = tf.math.zeta(
+        self.power[..., tf.newaxis] -
+        np.array([0., 1., 2.], dtype_util.as_numpy_dtype(self.dtype)), 1.)
     return ((zeta_p[..., 0] * zeta_p[..., 2]) - (zeta_p[..., 1]**2)) / (
         zeta_p[..., 0]**2)
 
@@ -229,7 +233,8 @@ class Zipf(distribution.Distribution):
     seed = SeedStream(seed, salt='zipf')
 
     minval_u = self._hat_integral(0.5, power=power) + 1.
-    maxval_u = self._hat_integral(tf.int64.max - 0.5, power=power)
+    maxval_u = self._hat_integral(
+        dtype_util.max(tf.int64) - 0.5, power=power)
 
     def loop_body(should_continue, k):
       """Resample the non-accepted points."""

@@ -111,7 +111,7 @@ FILENAMES = [
     "vector_laplace_linear_operator",
     "vector_sinh_arcsinh_diag",
     "von_mises_fisher",
-    # "von_mises",
+    "von_mises",
     "wishart",
     "zipf",
 ]

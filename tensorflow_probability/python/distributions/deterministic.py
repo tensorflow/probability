@@ -101,7 +101,7 @@ class _BaseDeterministic(distribution.Distribution):
           dtype=self._loc.dtype,
           reparameterization_type=(
               reparameterization.FULLY_REPARAMETERIZED
-              if self._loc.dtype.is_floating
+              if dtype_util.is_floating(self._loc.dtype)
               else reparameterization.NOT_REPARAMETERIZED),
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
@@ -290,7 +290,8 @@ class Deterministic(_BaseDeterministic):
   def _prob(self, x):
     loc = tf.convert_to_tensor(self.loc)
     # Enforces dtype of probability to be float, when self.dtype is not.
-    prob_dtype = self.dtype if self.dtype.is_floating else tf.float32
+    prob_dtype = self.dtype if dtype_util.is_floating(
+        self.dtype) else tf.float32
     return tf.cast(tf.abs(x - loc) <= self._slack(loc), dtype=prob_dtype)
 
   def _cdf(self, x):

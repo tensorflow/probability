@@ -229,7 +229,7 @@ class DirichletTest(test_util.TestCase):
     alpha = [1., 2]
     dirichlet = tfd.Dirichlet(alpha)
     n = tf.constant(100000)
-    samples = dirichlet.sample(n)
+    samples = dirichlet.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000, 2))
     self.assertTrue(np.all(sample_values > 0.0))

@@ -224,7 +224,7 @@ class HalfNormalTest(test_util.TestCase):
     n = tf.constant(100000)
     halfnorm = tfd.HalfNormal(scale=scale, validate_args=True)
 
-    sample = halfnorm.sample(n)
+    sample = halfnorm.sample(n, seed=test_util.test_seed())
 
     self.assertEqual(self.evaluate(sample).shape, (100000,))
     self.assertAllClose(
@@ -248,7 +248,7 @@ class HalfNormalTest(test_util.TestCase):
     n = tf.constant(100000)
     halfnorm = tfd.HalfNormal(scale=scale, validate_args=True)
 
-    sample = halfnorm.sample(n)
+    sample = halfnorm.sample(n, seed=test_util.test_seed())
     self.assertEqual(sample.shape, (100000, batch_size, 2))
     self.assertAllClose(
         self.evaluate(sample)[:, 0, 0].mean(),

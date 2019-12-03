@@ -111,7 +111,7 @@ FILENAMES = [
     "vector_laplace_linear_operator",
     "vector_sinh_arcsinh_diag",
     "von_mises_fisher",
-    # "von_mises",
+    "von_mises",
     "wishart",
     "zipf",
 ]
@@ -162,6 +162,8 @@ COMMON_DEPS = {
 DEPS = {
     "lkj": [":beta"],
     "cholesky_lkj": [":lkj"],
+    "von_mises_fisher": [":beta"],
+    "von_mises": [":normal"],
 }
 
 [py_library(

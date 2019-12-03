@@ -34,6 +34,8 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
+__all__ = ['VonMises']
+
 
 class VonMises(distribution.Distribution):
   """The von Mises distribution over angles.
