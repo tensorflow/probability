@@ -137,7 +137,7 @@ py_library(
 
 py_test(
     name = "fitting_test",
-    size = "medium",
+    size = "large",
     srcs = ["fitting_test.py"],
     shard_count = 6,
     deps = [
