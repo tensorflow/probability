@@ -1985,7 +1985,7 @@ py_test(
 
 py_test(
     name = "linear_gaussian_ssm_test",
-    size = "small",
+    size = "medium",
     srcs = ["linear_gaussian_ssm_test.py"],
     shard_count = 5,
     deps = [
