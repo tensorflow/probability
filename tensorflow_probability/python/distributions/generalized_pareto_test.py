@@ -156,13 +156,16 @@ class GeneralizedParetoTest(test_util.TestCase):
   @tfp_hps.tfp_hp_settings()
   def testVariance(self, dist):
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
-    self.assertEqual(dist.batch_shape, dist.variance().shape)
     # scipy doesn't seem to be very accurate for small concentrations, so use
     # higher precision.
     expected = sp_stats.genpareto(np.float64(conc), loc=np.float64(loc),
                                   scale=np.float64(scale)).var()
-    if expected <= 0:
-      return  # scipy sometimes returns nonsense zero or negative variances.
+    # scipy sometimes returns nonsense zero or negative variances.
+    hp.assume(expected > 0)
+    # scipy gets bad answers for very small concentrations even in 64-bit.
+    # https://github.com/scipy/scipy/issues/11168
+    hp.assume(conc > 1e-5)
+    self.assertEqual(dist.batch_shape, dist.variance().shape)
     actual = self.evaluate(dist.variance())
     msg = ('Location: {}, scale: {}, concentration: {}, '
            'scipy variance: {}, tfp variance: {}')
