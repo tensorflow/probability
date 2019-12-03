@@ -335,7 +335,6 @@ class QuantizedDistribution(distributions.Distribution):
       raise NotImplementedError(
           '`log_prob` not implemented unless the base distribution implements '
           '`log_cdf`')
-    y = self._check_integer(y)
     try:
       return self._log_prob_with_logsf_and_logcdf(y)
     except NotImplementedError:
@@ -380,7 +379,6 @@ class QuantizedDistribution(distributions.Distribution):
       raise NotImplementedError(
           '`prob` not implemented unless the base distribution implements '
           '`cdf`')
-    y = self._check_integer(y)
     try:
       return self._prob_with_sf_and_cdf(y)
     except NotImplementedError:
@@ -523,16 +521,6 @@ class QuantizedDistribution(distributions.Distribution):
 
     return result_so_far
 
-  def _check_integer(self, value):
-    with tf.name_scope('check_integer'):
-      value = tf.convert_to_tensor(value, name='value')
-      dependencies = []
-      if self.validate_args:
-        dependencies.append(distribution_util.assert_integer_form(
-            value, message='value has non-integer components.'))
-      with tf.control_dependencies(dependencies):
-        return value
-
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
@@ -573,4 +561,12 @@ class QuantizedDistribution(distributions.Distribution):
           low, high,
           message='`low` must be strictly less than `high`.'))
 
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(distribution_util.assert_integer_form(
+        x, message='Sample has non-integer components.'))
     return assertions

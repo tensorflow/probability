@@ -22,11 +22,12 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import affine_linear_operator as affine_linear_operator_bijector
 from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 
-__all__ = ["VectorExponentialLinearOperator"]
+__all__ = ['VectorExponentialLinearOperator']
 
 _mvn_sample_note = """
 `value` is a batch vector with compatible shape if `value` is a `Tensor` whose
@@ -142,7 +143,7 @@ class VectorExponentialLinearOperator(
                scale=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="VectorExponentialLinearOperator"):
+               name='VectorExponentialLinearOperator'):
     """Construct Vector Exponential distribution supported on a subset of `R^k`.
 
     The `batch_shape` is the broadcast shape between `loc` and `scale`
@@ -176,15 +177,15 @@ class VectorExponentialLinearOperator(
     """
     parameters = dict(locals())
     if scale is None:
-      raise ValueError("Missing required `scale` parameter.")
+      raise ValueError('Missing required `scale` parameter.')
     if not dtype_util.is_floating(scale.dtype):
-      raise TypeError("`scale` parameter must have floating-point dtype.")
+      raise TypeError('`scale` parameter must have floating-point dtype.')
 
     with tf.name_scope(name) as name:
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
       loc = loc if loc is None else tf.convert_to_tensor(
-          loc, name="loc", dtype=scale.dtype)
+          loc, name='loc', dtype=scale.dtype)
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale)
 
@@ -285,3 +286,13 @@ class VectorExponentialLinearOperator(
           self.event_shape_tensor(),
       ], 0)
     return shape
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    loc = 0. if self.loc is None else tf.convert_to_tensor(self.loc)
+    y = self.scale.solvevec(x - loc)
+    assertions.append(assert_util.assert_non_negative(
+        y, message='Sample is not contained in the support.'))
+    return assertions

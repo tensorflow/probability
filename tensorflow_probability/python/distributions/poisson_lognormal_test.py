@@ -119,6 +119,31 @@ class _PoissonLogNormalQuadratureCompoundTest(
     self.assertLen(grad, 2)
     self.assertFalse(any([g is None for g in grad]))
 
+  def testAssertValidSample(self):
+    pln = tfd.PoissonLogNormalQuadratureCompound(
+        loc=tf1.placeholder_with_default(
+            0., shape=[] if self.static_shape else None),
+        scale=tf1.placeholder_with_default(
+            1., shape=[] if self.static_shape else None),
+        quadrature_size=10,
+        validate_args=True)
+    with self.assertRaisesOpError('Sample must be non-negative.'):
+      self.evaluate(pln.log_prob([-1.2, 3., 4.2]))
+
+  def testPdfBoundary(self):
+    pln = tfd.PoissonLogNormalQuadratureCompound(
+        loc=tf1.placeholder_with_default(
+            0., shape=[] if self.static_shape else None),
+        scale=tf1.placeholder_with_default(
+            1., shape=[] if self.static_shape else None),
+        quadrature_size=10,
+        validate_args=True)
+
+    pdf = self.evaluate(pln.prob(0.))
+    log_pdf = self.evaluate(pln.log_prob(0.))
+    self.assertAllFinite(pdf)
+    self.assertAllFinite(log_pdf)
+
 
 @test_util.test_all_tf_execution_regimes
 class PoissonLogNormalQuadratureCompoundStaticShapeTest(

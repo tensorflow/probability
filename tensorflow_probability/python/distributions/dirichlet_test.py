@@ -62,11 +62,9 @@ class DirichletTest(test_util.TestCase):
     self.evaluate(dist.prob([.1, .3, .6]))
     self.evaluate(dist.prob([.2, .3, .5]))
     # Either condition can trigger.
-    with self.assertRaisesOpError('samples must be positive'):
+    with self.assertRaisesOpError('Samples must be non-negative'):
       self.evaluate(dist.prob([-1., 1.5, 0.5]))
-    with self.assertRaisesOpError('samples must be positive'):
-      self.evaluate(dist.prob([0., .1, .9]))
-    with self.assertRaisesOpError('sample last-dimension must sum to `1`'):
+    with self.assertRaisesOpError('Sample last-dimension must sum to `1`'):
       self.evaluate(dist.prob([.1, .2, .8]))
 
   def testLogPdfOnBoundaryIsFiniteWhenAlphaIsOne(self):
@@ -75,7 +73,7 @@ class DirichletTest(test_util.TestCase):
     concentration[range(10), range(10)] = 1.
     x = 1 / 9. * np.ones((10, 10)).astype(np.float32)
     x[range(10), range(10)] = 0.
-    dist = tfd.Dirichlet(concentration)
+    dist = tfd.Dirichlet(concentration, validate_args=True)
     log_prob = self.evaluate(dist.log_prob(x))
     self.assertAllEqual(
         np.ones_like(log_prob, dtype=np.bool), np.isfinite(log_prob))
@@ -85,6 +83,16 @@ class DirichletTest(test_util.TestCase):
     log_prob = self.evaluate(dist.log_prob(x))
     self.assertAllEqual(
         np.ones_like(log_prob, dtype=np.bool), np.isfinite(log_prob))
+
+  def testPdfOnBoundaryWhenAlphaGreaterThanOne(self):
+    dist = tfd.Dirichlet(9 * [2.])
+    x = 0.125 * np.ones(9).astype(np.float32)
+    x[3] = 0.
+    log_pdf = self.evaluate(dist.log_prob(x))
+    self.assertAllNegativeInf(log_pdf)
+
+    pdf = self.evaluate(dist.prob(x))
+    self.assertAllEqual(pdf, np.zeros_like(pdf))
 
   def testPdfZeroBatches(self):
     alpha = [1., 2]

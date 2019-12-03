@@ -348,59 +348,13 @@ class LKJ(distribution.Distribution):
         seed=seed,
         name=name)
 
-  def _has_valid_dimensions(self, x):
-    if tensorshape_util.is_fully_defined(x.shape[-2:]):
-      if (tensorshape_util.dims(x.shape)[-2] ==
-          tensorshape_util.dims(x.shape)[-1] ==
-          self.dimension):
-        return []
-      else:
-        raise ValueError(
-            'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
-                self.dimension, self.dimension, tensorshape_util.dims(x.shape)))
-    elif self.validate_args:
-      msg = 'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
-          self.dimension, self.dimension, tf.shape(x))
-      return [
-          assert_util.assert_equal(
-              tf.shape(x)[-2], self.dimension, message=msg),
-          assert_util.assert_equal(
-              tf.shape(x)[-1], self.dimension, message=msg)
-      ]
-    return []
-
-  def _is_valid_correlation_matrix(self, x):
-    if not self.validate_args or self.input_output_cholesky:
-      return []
-    return [
-        assert_util.assert_less_equal(
-            dtype_util.as_numpy_dtype(x.dtype)(-1),
-            x,
-            message='Correlations must be >= -1.'),
-        assert_util.assert_less_equal(
-            x,
-            dtype_util.as_numpy_dtype(x.dtype)(1),
-            message='Correlations must be <= 1.'),
-        assert_util.assert_near(
-            tf.linalg.diag_part(x),
-            dtype_util.as_numpy_dtype(x.dtype)(1),
-            message='Self-correlations must be = 1.'),
-        assert_util.assert_near(
-            x,
-            tf.linalg.matrix_transpose(x),
-            message='Correlation matrices must be symmetric')
-    ]
-
   def _log_prob(self, x):
     # Despite what one might infer from Eq 15 in [1], the formula
     # given for the normalization constant should be read in the sense
     # of division, not multiplication.
-    with tf.control_dependencies(
-        self._has_valid_dimensions(x) +
-        self._is_valid_correlation_matrix(x)):
-      concentration = tf.convert_to_tensor(self.concentration)
-      normalizer = self._log_normalization(concentration=concentration)
-      return self._log_unnorm_prob(x, concentration) - normalizer
+    concentration = tf.convert_to_tensor(self.concentration)
+    normalizer = self._log_normalization(concentration=concentration)
+    return self._log_unnorm_prob(x, concentration) - normalizer
 
   def _log_unnorm_prob(self, x, concentration, name=None):
     """Returns the unnormalized log density of an LKJ distribution.
@@ -491,13 +445,49 @@ class LKJ(distribution.Distribution):
     return answer
 
   def _parameter_control_dependencies(self, is_init):
-    if not self.validate_args:
-      return []
     assertions = []
+    if not self.validate_args:
+      return assertions
     if is_init != tensor_util.is_ref(self.concentration):
       # concentration >= 1
       # TODO(b/111451422, b/115950951) Generalize to concentration > 0.
       assertions.append(assert_util.assert_non_negative(
           self.concentration - 1,
           message='Argument `concentration` must be >= 1.'))
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if tensorshape_util.is_fully_defined(x.shape[-2:]):
+      if not (tensorshape_util.dims(x.shape)[-2] ==
+              tensorshape_util.dims(x.shape)[-1] ==
+              self.dimension):
+        raise ValueError(
+            'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
+                self.dimension, self.dimension, tensorshape_util.dims(x.shape)))
+    elif self.validate_args:
+      msg = 'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
+          self.dimension, self.dimension, tf.shape(x))
+      assertions.append(assert_util.assert_equal(
+          tf.shape(x)[-2], self.dimension, message=msg))
+      assertions.append(assert_util.assert_equal(
+          tf.shape(x)[-1], self.dimension, message=msg))
+
+    if self.validate_args and not self.input_output_cholesky:
+      assertions.append(assert_util.assert_less_equal(
+          dtype_util.as_numpy_dtype(x.dtype)(-1),
+          x,
+          message='Correlations must be >= -1.'))
+      assertions.append(assert_util.assert_less_equal(
+          x,
+          dtype_util.as_numpy_dtype(x.dtype)(1),
+          message='Correlations must be <= 1.'))
+      assertions.append(assert_util.assert_near(
+          tf.linalg.diag_part(x),
+          dtype_util.as_numpy_dtype(x.dtype)(1),
+          message='Self-correlations must be = 1.'))
+      assertions.append(assert_util.assert_near(
+          x,
+          tf.linalg.matrix_transpose(x),
+          message='Correlation matrices must be symmetric.'))
     return assertions

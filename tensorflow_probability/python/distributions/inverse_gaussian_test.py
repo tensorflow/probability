@@ -123,7 +123,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(loc, concentration,
                                            validate_args=True)
 
-    with self.assertRaisesOpError('must be positive.'):
+    with self.assertRaisesOpError('must be non-negative.'):
       self.evaluate(inverse_gaussian.log_prob(x))
 
   def testInverseGaussianPdfValidateArgs(self):
@@ -134,7 +134,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(loc, concentration,
                                            validate_args=True)
 
-    with self.assertRaisesOpError('must be positive.'):
+    with self.assertRaisesOpError('must be non-negative.'):
       self.evaluate(inverse_gaussian.prob(x))
 
   def testInverseGaussianLogPdfMultidimensional(self):
@@ -185,6 +185,15 @@ class _InverseGaussianTest(object):
         self.evaluate(cdf),
         _scipy_invgauss(loc_v, concentration_v).cdf(x_v))
 
+  # TODO(b/144948687) Avoid `nan` at boundary. Ideally we'd do this test:
+  # def testInverseGaussianPdfAtBoundary(self):
+  #   dist = tfd.InverseGaussian(loc=1., concentration=[2., 4., 5.],
+  #                              validate_args=True)
+  #   pdf = self.evaluate(dist.prob(0.))
+  #   log_pdf = self.evaluate(dist.log_prob(0.))
+  #   self.assertAllEqual(pdf, np.zeros_like(pdf))
+  #   self.assertTrue(np.isinf(log_pdf).all())
+
   def testInverseGaussianLogCdfValidateArgs(self):
     batch_size = 2
     loc = self.make_tensor([2.] * batch_size)
@@ -193,7 +202,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(loc, concentration,
                                            validate_args=True)
 
-    with self.assertRaisesOpError('must be positive.'):
+    with self.assertRaisesOpError('must be non-negative.'):
       self.evaluate(inverse_gaussian.log_cdf(x))
 
   def testInverseGaussianCdfValidateArgs(self):
@@ -204,7 +213,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(loc, concentration,
                                            validate_args=True)
 
-    with self.assertRaisesOpError('must be positive.'):
+    with self.assertRaisesOpError('must be non-negative.'):
       self.evaluate(inverse_gaussian.cdf(x))
 
   def testInverseGaussianLogCdfMultidimensional(self):

@@ -97,6 +97,13 @@ class _TriangularTest(object):
           low=0., high=1., peak=2., validate_args=True)
       self.evaluate(tri.mean())
 
+  def testAssertValidSample(self):
+    tri = tfd.Triangular(low=2., high=5., peak=3.3, validate_args=True)
+    with self.assertRaisesOpError('must be greater than or equal to `low`'):
+      self.evaluate(tri.cdf([2.3, 1.7, 4.]))
+    with self.assertRaisesOpError('must be less than or equal to `high`'):
+      self.evaluate(tri.survival_function([2.3, 5.2, 4.]))
+
   def testTriangularPDF(self):
     low = np.arange(1.0, 5.0, dtype=self._dtype)
     high = np.arange(7., 11., dtype=self._dtype)

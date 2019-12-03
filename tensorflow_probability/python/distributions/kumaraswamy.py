@@ -63,7 +63,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
 
   The Kumaraswamy distribution is defined over the `(0, 1)` interval using
   parameters
-  `concentration1` (aka "alpha") and `concentration0` (aka "beta").  It has a
+  `concentration1` (aka 'alpha') and `concentration0` (aka 'beta').  It has a
   shape similar to the Beta distribution, but is easier to reparameterize.
 
   #### Mathematical Details
@@ -133,18 +133,18 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
 
     Args:
       concentration1: Positive floating-point `Tensor` indicating mean
-        number of successes; aka "alpha". Implies `self.dtype` and
+        number of successes; aka 'alpha'. Implies `self.dtype` and
         `self.batch_shape`, i.e.,
         `concentration1.shape = [N1, N2, ..., Nm] = self.batch_shape`.
       concentration0: Positive floating-point `Tensor` indicating mean
-        number of failures; aka "beta". Otherwise has same semantics as
+        number of failures; aka 'beta'. Otherwise has same semantics as
         `concentration1`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
-        (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+        (e.g., mean, mode, variance) use the value '`NaN`' to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -255,3 +255,15 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
 
   def _parameter_control_dependencies(self, is_init):
     return self.bijector.bijector._parameter_control_dependencies(is_init)  # pylint: disable=protected-access
+
+  def _sample_control_dependencies(self, x):
+    """Checks the validity of a sample."""
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    assertions.append(assert_util.assert_less_equal(
+        x, tf.ones([], x.dtype),
+        message='Sample must be less than or equal to `1`.'))
+    return assertions

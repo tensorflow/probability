@@ -362,6 +362,33 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
         '`mean_direction` may not have scalar event shape'):
       self.evaluate(vmf.mean())
 
+  def testAssertValidSample(self):
+    mean_dir = tf.math.l2_normalize([[1., 2, 3], [-2, -3, -1]], axis=-1)
+    concentration = [[0.], [2.]]
+    vmf = tfp.distributions.VonMisesFisher(
+        mean_direction=mean_dir,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
+
+    with self.assertRaisesOpError('Samples must be unit length.'):
+      self.evaluate(vmf.prob([0.5, 0.5, 0.5]))
+
+    msg = 'must have innermost dimension matching'
+    static_shape_assertion = self.assertRaisesRegexp(ValueError, msg)
+    dynamic_shape_assertion = self.assertRaisesOpError(msg)
+
+    x = [[1., 0., 0., 0.]]
+    with static_shape_assertion:
+      self.evaluate(vmf.log_prob(x))
+
+    x_var = tf.Variable(x, shape=tf.TensorShape(None))
+    shape_assertion = (static_shape_assertion if tf.executing_eagerly()
+                       else dynamic_shape_assertion)
+    self.evaluate(x_var.initializer)
+    with shape_assertion:
+      self.evaluate(vmf.log_prob(x_var))
+
 
 if __name__ == '__main__':
   tf.test.main()

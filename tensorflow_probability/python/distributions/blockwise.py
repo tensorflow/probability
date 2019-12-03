@@ -283,37 +283,29 @@ class Blockwise(distribution_lib.Distribution):
     return tf.concat(tf.nest.flatten(x), axis=-1)
 
   def _split_and_reshape_event(self, x):
-    assertions = []
-    message = 'Input must have at least one dimension.'
-    if tensorshape_util.rank(x.shape) is not None:
-      if tensorshape_util.rank(x.shape) == 0:
-        raise ValueError(message)
-    elif self.validate_args:
-      assertions.append(assert_util.assert_rank_at_least(x, 1, message=message))
-    with tf.control_dependencies(assertions):
-      event_tensors = self._distribution.event_shape_tensor()
-      splits = [
-          ps.maximum(1, ps.reduce_prod(s))
-          for s in tf.nest.flatten(event_tensors)
-      ]
-      x = tf.nest.pack_sequence_as(event_tensors, tf.split(x, splits, axis=-1))
+    event_tensors = self._distribution.event_shape_tensor()
+    splits = [
+        ps.maximum(1, ps.reduce_prod(s))
+        for s in tf.nest.flatten(event_tensors)
+    ]
+    x = tf.nest.pack_sequence_as(event_tensors, tf.split(x, splits, axis=-1))
 
-      def _reshape_part(part, dtype, event_shape):
-        part = tf.cast(part, dtype)
-        static_rank = tf.get_static_value(ps.rank_from_shape(event_shape))
-        if static_rank == 1:
-          return part
-        new_shape = ps.concat([ps.shape(part)[:-1], event_shape], axis=-1)
-        return tf.reshape(part, ps.cast(new_shape, tf.int32))
+    def _reshape_part(part, dtype, event_shape):
+      part = tf.cast(part, dtype)
+      static_rank = tf.get_static_value(ps.rank_from_shape(event_shape))
+      if static_rank == 1:
+        return part
+      new_shape = ps.concat([ps.shape(part)[:-1], event_shape], axis=-1)
+      return tf.reshape(part, ps.cast(new_shape, tf.int32))
 
-      if all(
-          tensorshape_util.is_fully_defined(s)
-          for s in tf.nest.flatten(self._distribution.event_shape)):
-        x = tf.nest.map_structure(_reshape_part, x, self._distribution.dtype,
-                                  self._distribution.event_shape)
-      else:
-        x = tf.nest.map_structure(_reshape_part, x, self._distribution.dtype,
-                                  self._distribution.event_shape_tensor())
+    if all(
+        tensorshape_util.is_fully_defined(s)
+        for s in tf.nest.flatten(self._distribution.event_shape)):
+      x = tf.nest.map_structure(_reshape_part, x, self._distribution.dtype,
+                                self._distribution.event_shape)
+    else:
+      x = tf.nest.map_structure(_reshape_part, x, self._distribution.dtype,
+                                self._distribution.event_shape_tensor())
     return x
 
   def _sample_n(self, n, seed=None):
@@ -366,6 +358,16 @@ class Blockwise(distribution_lib.Distribution):
               message='{}.'.format(message))
           for b1, b2 in zip(batch_shapes[1:], batch_shapes[:-1]))
 
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    message = 'Input must have at least one dimension.'
+    if tensorshape_util.rank(x.shape) is not None:
+      if tensorshape_util.rank(x.shape) == 0:
+        raise ValueError(message)
+    elif self.validate_args:
+      assertions.append(assert_util.assert_rank_at_least(x, 1, message=message))
     return assertions
 
 

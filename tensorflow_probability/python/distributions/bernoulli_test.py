@@ -149,7 +149,7 @@ class BernoulliTest(test_util.TestCase):
     dist = tfd.Bernoulli(probs=p, validate_args=True)
     with self.assertRaisesOpError('must be non-negative.'):
       self.evaluate(dist.prob([1, 1, -1]))
-    with self.assertRaisesOpError('Elements cannot exceed 1.'):
+    with self.assertRaisesOpError('must be less than or equal to `1`'):
       self.evaluate(dist.prob([2, 0, 1]))
 
   def testPmfWithP(self):

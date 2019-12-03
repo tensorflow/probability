@@ -45,8 +45,8 @@ def make_relaxed_categorical(batch_shape, num_classes, dtype=tf.float32):
 class ExpRelaxedOneHotCategoricalTest(test_util.TestCase):
 
   def testProbs(self):
-    temperature = 1.0
-    logits = [2.0, 3.0, -4.0]
+    temperature = 1.
+    logits = [2., 3., -4.]
     dist = tfd.ExpRelaxedOneHotCategorical(
         temperature, logits, validate_args=True)
     expected_p = np.exp(logits)/np.sum(np.exp(logits))
@@ -54,8 +54,8 @@ class ExpRelaxedOneHotCategoricalTest(test_util.TestCase):
     self.assertAllEqual([3], dist.probs_parameter().shape)
 
   def testPdf(self):
-    temperature = .4
-    logits = [.3, .1, .4]
+    temperature = 0.4
+    logits = [0.3, 0.1, 0.4]
     k = len(logits)
     p = np.exp(logits)/np.sum(np.exp(logits))
     dist = tfd.ExpRelaxedOneHotCategorical(
@@ -93,7 +93,7 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     return self.assertRaisesOpError(msg)
 
   def testProbs(self):
-    temperature = 1.0
+    temperature = 1.
     probs = [0.1, 0.5, 0.4]
     dist = tfd.RelaxedOneHotCategorical(
         temperature, probs=probs, validate_args=True)
@@ -101,16 +101,16 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     self.assertAllEqual([3], dist.probs.shape)
 
   def testLogits(self):
-    temperature = 1.0
-    logits = [2.0, 3.0, -4.0]
+    temperature = 1.
+    logits = [2., 3., -4.]
     dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
     # check p for ExpRelaxed base distribution
     self.assertAllClose(logits, self.evaluate(dist.logits))
     self.assertAllEqual([3], dist.logits.shape)
 
   def testParamBroadcasting(self):
-    temperature = [1.0, 1.4]
-    logits = [2.0, 3.0, -4.0]
+    temperature = [1., 1.4]
+    logits = [2., 3., -4.]
     dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
     self.assertAllEqual([2], dist.batch_shape)
     self.assertAllEqual([3], dist.event_shape)
@@ -118,12 +118,12 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
   def testSample(self):
     temperature = 1.4
     # single logit
-    logits = [.3, .1, .4]
+    logits = [0.3, 0.1, 0.4]
     dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
     self.assertAllEqual([3], self.evaluate(dist.sample()).shape)
     self.assertAllEqual([5, 3], self.evaluate(dist.sample(5)).shape)
     # multiple distributions
-    logits = [[2.0, 3.0, -4.0], [.3, .1, .4]]
+    logits = [[2., 3., -4.], [0.3, 0.1, 0.4]]
     dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
     self.assertAllEqual([2, 3], self.evaluate(dist.sample()).shape)
     self.assertAllEqual([5, 2, 3], self.evaluate(dist.sample(5)).shape)
@@ -134,8 +134,8 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     self.assertAllEqual([5, 4, 1, 3], self.evaluate(dist.sample(5)).shape)
 
   def testPdf(self):
-    temperature = .4
-    logits = np.array([[.3, .1, .4]]).astype(np.float32)
+    temperature = 0.4
+    logits = np.array([[0.3, 0.1, 0.4]]).astype(np.float32)
     dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
     x = self.evaluate(dist.sample())
     pdf = self.evaluate(dist.prob(x))
@@ -143,7 +143,7 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     self.assertAllClose(expected_pdf.flatten(), pdf, rtol=1e-4)
 
     # variable batch size
-    logits = np.array([[.3, .1, .4], [.6, -.1, 2.]]).astype(np.float32)
+    logits = np.array([[0.3, 0.1, 0.4], [0.6, -0.1, 2.]]).astype(np.float32)
     temperatures = np.array([0.4, 2.3]).astype(np.float32)
     dist = tfd.RelaxedOneHotCategorical(
         temperatures, logits, validate_args=True)
@@ -153,7 +153,7 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     self.assertAllClose(expected_pdf.flatten(), pdf, rtol=1e-4)
 
     # broadcast logits over temparatures
-    logits = np.array([.3, .1, .4]).astype(np.float32)
+    logits = np.array([0.3, 0.1, 0.4]).astype(np.float32)
     temperatures = np.array([0.4, 2.3]).astype(np.float32)
     dist = tfd.RelaxedOneHotCategorical(
         temperatures, logits, validate_args=True)
@@ -181,8 +181,8 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
 
   def testUnknownShape(self):
-    logits_pl = tf1.placeholder_with_default(input=[.3, .1, .4], shape=None)
-    temperature = 1.0
+    logits_pl = tf1.placeholder_with_default(input=[0.3, 0.1, 0.4], shape=None)
+    temperature = 1.
     dist = tfd.ExpRelaxedOneHotCategorical(
         temperature, logits_pl, validate_args=True)
     self.assertAllEqual([3], self.evaluate(dist.sample()).shape)
@@ -200,8 +200,33 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     with self.assertRaises(
         ValueError, 'Argument `logits` must have final dimension >= 1.'):
       dist = tfd.ExpRelaxedOneHotCategorical(
-          12.0, logits=logits, validate_args=True)
+          12., logits=logits, validate_args=True)
       self.evaluate(dist.sample())
+
+  # TODO(b/144948687): Reimplement `log_prob` so it doesn't return `nan` at the
+  # boundary. Ideally we'd do this test:
+  # def testPdfAtBoundary(self):
+  #   dist = tfd.RelaxedOneHotCategorical(
+  #       temperature=0.1, logits=[[3., 5., 4.4], [3., 2., 1.]],
+  #       validate_args=True)
+  #   x = [[1., 0., 0], [0., 1., 0.]]
+  #   pdf_at_boundary = self.evaluate(dist.prob(x))
+  #   log_pdf_at_boundary = self.evaluate(dist.log_prob(x))
+  #   self.assertAllPositiveInf(pdf_at_boundary)
+  #   self.assertAllPositiveInf(log_pdf_at_boundary)
+
+  def testAssertValidSample(self):
+    temperature = 0.4
+    logits = np.array([[0.3, 0.1, 0.4]]).astype(np.float32)
+    dist = tfd.ExpRelaxedOneHotCategorical(
+        temperature, logits, validate_args=True)
+    with self.assertRaisesOpError('Samples must be less than or equal to'):
+      self.evaluate(dist.log_prob([-0.2, 0.5, 0.3]))
+
+    dist = tfd.RelaxedOneHotCategorical(
+        temperature, logits, validate_args=True)
+    with self.assertRaisesOpError('samples must sum to'):
+      self.evaluate(dist.prob([0.4, 0.1, 0.3]))
 
   def testEventSizeOfOne(self):
     d = tfd.ExpRelaxedOneHotCategorical(
@@ -270,7 +295,7 @@ class ExpRelaxedOneHotCategoricalFromVariableTest(test_util.TestCase):
     self.assertAllNotNone(g)
 
   def testAssertionsProbs(self):
-    probs = tf.Variable([0.1, 0.7, 0.0])
+    probs = tf.Variable([0.1, 0.7, 0.])
     with self.assertRaisesOpError('Argument `probs` must sum to 1.'):
       d = tfd.ExpRelaxedOneHotCategorical(0.3, probs=probs, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])

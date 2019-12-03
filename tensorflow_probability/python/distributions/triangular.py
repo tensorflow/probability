@@ -214,13 +214,6 @@ class Triangular(distribution.Distribution):
     high = tf.convert_to_tensor(self.high)
     peak = tf.convert_to_tensor(self.peak)
 
-    if self.validate_args:
-      with tf.control_dependencies([
-          assert_util.assert_greater_equal(x, low),
-          assert_util.assert_less_equal(x, high)
-      ]):
-        x = tf.identity(x)
-
     interval_length = high - low
     # This is the pdf function when a low <= high <= x. This looks like
     # a triangle, so we have to treat each line segment separately.
@@ -295,4 +288,14 @@ class Triangular(distribution.Distribution):
           assert_util.assert_less_equal(
               peak, high, message='triangular not defined when peak > high.'))
 
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_greater_equal(
+        x, self.low, message='Sample must be greater than or equal to `low`.'))
+    assertions.append(assert_util.assert_less_equal(
+        x, self.high, message='Sample must be less than or equal to `high`.'))
     return assertions

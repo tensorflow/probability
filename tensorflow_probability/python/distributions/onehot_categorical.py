@@ -202,7 +202,6 @@ class OneHotCategorical(distribution.Distribution):
     event_size = self._event_size(logits)
 
     x = tf.cast(x, logits.dtype)
-    x = self._maybe_assert_valid_sample(x, dtype=logits.dtype)
 
     # broadcast logits or x if need be.
     if (not tensorshape_util.is_fully_defined(x.shape) or
@@ -290,15 +289,15 @@ class OneHotCategorical(distribution.Distribution):
       return tf.identity(self._probs)
     return tf.math.softmax(self._logits)
 
-  def _maybe_assert_valid_sample(self, x, dtype):
+  def _sample_control_dependencies(self, x):
+    assertions = []
     if not self.validate_args:
-      return x
-    one = tf.ones([], dtype=dtype)
-    return distribution_util.with_dependencies([
-        assert_util.assert_non_negative(x),
-        assert_util.assert_less_equal(x, one),
-        assert_util.assert_near(one, tf.reduce_sum(x, axis=[-1])),
-    ], x)
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    assertions.append(assert_util.assert_equal(
+        tf.ones([], dtype=x.dtype), tf.reduce_sum(x, axis=[-1]),
+        message='Last dimension of sample must sum to 1.'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

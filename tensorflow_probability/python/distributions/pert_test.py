@@ -91,7 +91,7 @@ class PERTTest(test_util.TestCase):
 
   def testEdgeRangeOutput(self):
     dist = tfd.PERT(
-        low=3.0, peak=10.0, high=11.0, temperature=4.0, validate_args=True)
+        low=3.0, peak=10.0, high=11.0, temperature=4.0, validate_args=False)
     self.assertEqual(True, self.evaluate(tf.math.is_nan(dist.prob(1.))))
     self.assertEqual(True, self.evaluate(tf.math.is_nan(dist.log_prob(1.))))
     self.assertEqual(1., self.evaluate(dist.cdf(11.)))
@@ -201,6 +201,26 @@ class PERTTest(test_util.TestCase):
                                 '`high` must be greater than `peak`.'):
       with tf.control_dependencies([high.assign([0., 0., 0.])]):
         self.evaluate(dist.sample(1))
+
+  def testAssertValidSample(self):
+    low = [1., 2., 3.]
+    peak = [2., 3., 4.]
+    high = [3., 4., 5.]
+    dist = tfd.PERT(low, peak, high, validate_args=True)
+    with self.assertRaisesOpError('must be greater than or equal to `low`.'):
+      self.evaluate(dist.prob([1.3, 1., 3.5]))
+    with self.assertRaisesOpError('must be less than or equal to `high`.'):
+      self.evaluate(dist.prob([2.1, 3.2, 5.2]))
+
+  def testPdfAtBoundary(self):
+    low = [1., 2., 3.]
+    peak = [2., 3., 4.]
+    high = [3., 4., 5.]
+    dist = tfd.PERT(low, peak, high, validate_args=True)
+    pdf = self.evaluate(dist.prob([low, high]))
+    log_pdf = self.evaluate(dist.log_prob([low, high]))
+    self.assertAllEqual(pdf, np.zeros_like(pdf))
+    self.assertAllNegativeInf(log_pdf)
 
 
 if __name__ == '__main__':

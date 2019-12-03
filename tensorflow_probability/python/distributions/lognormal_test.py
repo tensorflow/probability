@@ -114,6 +114,19 @@ class LogNormalTest(test_util.TestCase):
     self.assertAllClose(
         kl_expected_from_formula, kl_sample_, atol=0.0, rtol=1e-2)
 
+  # TODO(b/144948687) Avoid `nan` at boundary. Ideally we'd do this test:
+  # def testPdfAtBoundary(self):
+  #   dist = tfd.LogNormal(loc=5., scale=2.)
+  #   pdf = self.evaluate(dist.prob(0.))
+  #   log_pdf = self.evaluate(dist.log_prob(0.))
+  #   self.assertEqual(pdf, 0.)
+  #   self.assertAllNegativeInf(log_pdf)
+
+  def testAssertValidSample(self):
+    dist = tfd.LogNormal(loc=[-3., 1., 4.], scale=2., validate_args=True)
+    with self.assertRaisesOpError('Sample must be non-negative.'):
+      self.evaluate(dist.cdf([3., -0.2, 1.]))
+
 
 if __name__ == '__main__':
   tf.test.main()

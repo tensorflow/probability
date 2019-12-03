@@ -25,6 +25,7 @@ from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import assert_util
 
 
 __all__ = [
@@ -135,6 +136,17 @@ class LogitNormal(transformed_distribution.TransformedDistribution):
   # def stddev_approx(self, name='stddev_approx'):
   #   with tf.name_scope(name):
   #     return tf.math.sqrt(self.variance_approx())
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    assertions.append(assert_util.assert_less_equal(
+        x, tf.ones([], x.dtype),
+        message='Sample must be less than or equal to `1`.'))
+    return assertions
 
 
 @kullback_leibler.RegisterKL(LogitNormal, LogitNormal)

@@ -33,7 +33,7 @@ tfd = tfp.distributions
 
 @test_util.test_all_tf_execution_regimes
 @parameterized.parameters(np.float32, np.float64)
-class CholeksyLKJTest(test_util.TestCase):
+class CholeskyLKJTest(test_util.TestCase):
 
   def testLogProbMatchesTransformedDistribution(self, dtype):
     dtype = np.float64
@@ -54,7 +54,7 @@ class CholeksyLKJTest(test_util.TestCase):
 
   def testDimensionGuard(self, dtype):
     testee_lkj = tfd.CholeskyLKJ(
-        dimension=3, concentration=dtype([1., 4.]), validate_args=True)
+        dimension=3, concentration=dtype([1., 4.]))
     with self.assertRaisesRegexp(ValueError, 'dimension mismatch'):
       testee_lkj.log_prob(tf.eye(4))
 

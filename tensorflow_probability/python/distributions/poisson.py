@@ -245,3 +245,10 @@ class Poisson(distribution.Distribution):
             self._rate,
             message='Argument `rate` must be positive.'))
     return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    return assertions

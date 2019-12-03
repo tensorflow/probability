@@ -349,6 +349,18 @@ class Categorical(distribution.Distribution):
     return maybe_assert_categorical_param_correctness(
         is_init, self.validate_args, self._probs, self._logits)
 
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    assertions.append(
+        assert_util.assert_less_equal(
+            x, tf.cast(self._num_categories(), x.dtype),
+            message=('Categorical samples must be between `0` and `n-1` '
+                     'where `n` is the number of categories.')))
+    return assertions
+
 
 def maybe_assert_categorical_param_correctness(
     is_init, validate_args, probs, logits):

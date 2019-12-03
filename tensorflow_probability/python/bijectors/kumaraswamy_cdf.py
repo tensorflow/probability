@@ -118,11 +118,11 @@ class KumaraswamyCDF(bijector.Bijector):
       return x
     return distribution_util.with_dependencies([
         assert_util.assert_non_negative(
-            x, message='sample must be non-negative'),
+            x, message='Sample must be non-negative.'),
         assert_util.assert_less_equal(
             x,
             tf.ones([], self.concentration0.dtype),
-            message='sample must be no larger than `1`.'),
+            message='Sample must be less than or equal to `1`.'),
     ], x)
 
   def _parameter_control_dependencies(self, is_init):

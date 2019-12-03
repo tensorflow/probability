@@ -206,19 +206,17 @@ class InverseGamma(distribution.Distribution):
         seed=seed)
 
   def _log_prob(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      concentration = tf.convert_to_tensor(self.concentration)
-      scale = tf.convert_to_tensor(self.scale)
-      unnormalized_prob = -(1. + concentration) * tf.math.log(x) - scale / x
-      normalization = (
-          tf.math.lgamma(concentration) - concentration * tf.math.log(scale))
-      return unnormalized_prob - normalization
+    concentration = tf.convert_to_tensor(self.concentration)
+    scale = tf.convert_to_tensor(self.scale)
+    unnormalized_prob = -(1. + concentration) * tf.math.log(x) - scale / x
+    normalization = (
+        tf.math.lgamma(concentration) - concentration * tf.math.log(scale))
+    return unnormalized_prob - normalization
 
   def _cdf(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      # Note that igammac returns the upper regularized incomplete gamma
-      # function Q(a, x), which is what we want for the CDF.
-      return tf.math.igammac(self.concentration, self.scale / x)
+    # Note that igammac returns the upper regularized incomplete gamma
+    # function Q(a, x), which is what we want for the CDF.
+    return tf.math.igammac(self.concentration, self.scale / x)
 
   def _entropy(self):
     concentration = tf.convert_to_tensor(self.concentration)
@@ -278,10 +276,13 @@ class InverseGamma(distribution.Distribution):
   def _mode(self):
     return self.scale / (1. + self.concentration)
 
-  def _maybe_assert_valid_sample(self, x):
+  def _sample_control_dependencies(self, x):
+    assertions = []
     if not self.validate_args:
-      return []
-    return [assert_util.assert_positive(x, message='Sample must be positive.')]
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

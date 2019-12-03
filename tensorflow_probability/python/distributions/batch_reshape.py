@@ -281,29 +281,28 @@ class BatchReshape(distribution_lib.Distribution):
     # Note: we take `extra_kwargs` as a dict rather than `**extra_kwargs`
     # because it is possible the user provided extra kwargs would itself
     # have `fn` and/or `x` as a key.
-    with tf.control_dependencies(self._validate_sample_arg(x)):
-      sample_shape, static_sample_shape = self._sample_shape(x)
-      old_shape = tf.concat(
-          [
-              sample_shape,
-              self.distribution.batch_shape_tensor(),
-              self.event_shape_tensor(),
-          ],
-          axis=0)
-      x_reshape = tf.reshape(x, old_shape)
-      result = fn(x_reshape, **extra_kwargs) if extra_kwargs else fn(x_reshape)
-      new_shape = tf.concat(
-          [
-              sample_shape,
-              self._batch_shape_unexpanded,
-          ], axis=0)
-      result = tf.reshape(result, new_shape)
-      if (tensorshape_util.rank(static_sample_shape) is not None and
-          tensorshape_util.rank(self.batch_shape) is not None):
-        new_shape = tensorshape_util.concatenate(static_sample_shape,
-                                                 self.batch_shape)
-        tensorshape_util.set_shape(result, new_shape)
-      return result
+    sample_shape, static_sample_shape = self._sample_shape(x)
+    old_shape = tf.concat(
+        [
+            sample_shape,
+            self.distribution.batch_shape_tensor(),
+            self.event_shape_tensor(),
+        ],
+        axis=0)
+    x_reshape = tf.reshape(x, old_shape)
+    result = fn(x_reshape, **extra_kwargs) if extra_kwargs else fn(x_reshape)
+    new_shape = tf.concat(
+        [
+            sample_shape,
+            self._batch_shape_unexpanded,
+        ], axis=0)
+    result = tf.reshape(result, new_shape)
+    if (tensorshape_util.rank(static_sample_shape) is not None and
+        tensorshape_util.rank(self.batch_shape) is not None):
+      new_shape = tensorshape_util.concatenate(static_sample_shape,
+                                               self.batch_shape)
+      tensorshape_util.set_shape(result, new_shape)
+    return result
 
   def _call_and_reshape_output(
       self,
@@ -334,90 +333,88 @@ class BatchReshape(distribution_lib.Distribution):
       tensorshape_util.set_shape(result, static_shape)
     return result
 
-  def _validate_sample_arg(self, x):
+  def _sample_control_dependencies(self, x):
     """Helper which validates sample arg, e.g., input to `log_prob`."""
-    with tf.name_scope('validate_sample_arg'):
-      x_ndims = (
-          tf.rank(x) if tensorshape_util.rank(x.shape) is None else
-          tensorshape_util.rank(x.shape))
-      event_ndims = (
-          tf.size(self.event_shape_tensor())
-          if tensorshape_util.rank(self.event_shape) is None else
-          tensorshape_util.rank(self.event_shape))
-      batch_ndims = (
-          tf.size(self._batch_shape_unexpanded)
-          if tensorshape_util.rank(self.batch_shape) is None else
-          tensorshape_util.rank(self.batch_shape))
-      expected_batch_event_ndims = batch_ndims + event_ndims
+    x_ndims = (
+        tf.rank(x) if tensorshape_util.rank(x.shape) is None else
+        tensorshape_util.rank(x.shape))
+    event_ndims = (
+        tf.size(self.event_shape_tensor())
+        if tensorshape_util.rank(self.event_shape) is None else
+        tensorshape_util.rank(self.event_shape))
+    batch_ndims = (
+        tf.size(self._batch_shape_unexpanded)
+        if tensorshape_util.rank(self.batch_shape) is None else
+        tensorshape_util.rank(self.batch_shape))
+    expected_batch_event_ndims = batch_ndims + event_ndims
 
-      if (isinstance(x_ndims, int) and
-          isinstance(expected_batch_event_ndims, int)):
-        if x_ndims < expected_batch_event_ndims:
-          raise NotImplementedError(
-              'Broadcasting is not supported; too few batch and event dims '
-              '(expected at least {}, saw {}).'.format(
-                  expected_batch_event_ndims, x_ndims))
-        ndims_assertion = []
-      elif self.validate_args:
-        ndims_assertion = [
-            assert_util.assert_greater_equal(
-                x_ndims,
-                expected_batch_event_ndims,
-                message=('Broadcasting is not supported; too few '
-                         'batch and event dims.'),
-                name='assert_batch_and_event_ndims_large_enough'),
-        ]
+    if (isinstance(x_ndims, int) and
+        isinstance(expected_batch_event_ndims, int)):
+      if x_ndims < expected_batch_event_ndims:
+        raise NotImplementedError(
+            'Broadcasting is not supported; too few batch and event dims '
+            '(expected at least {}, saw {}).'.format(
+                expected_batch_event_ndims, x_ndims))
+      ndims_assertion = []
+    elif self.validate_args:
+      ndims_assertion = [
+          assert_util.assert_greater_equal(
+              x_ndims,
+              expected_batch_event_ndims,
+              message=('Broadcasting is not supported; too few '
+                       'batch and event dims.'),
+              name='assert_batch_and_event_ndims_large_enough'),
+      ]
 
-      if (tensorshape_util.is_fully_defined(self.batch_shape) and
-          tensorshape_util.is_fully_defined(self.event_shape)):
-        expected_batch_event_shape = np.int32(
-            tensorshape_util.concatenate(self.batch_shape, self.event_shape))
-      else:
-        expected_batch_event_shape = tf.concat(
-            [
-                self.batch_shape_tensor(),
-                self.event_shape_tensor(),
-            ], axis=0)
+    if (tensorshape_util.is_fully_defined(self.batch_shape) and
+        tensorshape_util.is_fully_defined(self.event_shape)):
+      expected_batch_event_shape = np.int32(
+          tensorshape_util.concatenate(self.batch_shape, self.event_shape))
+    else:
+      expected_batch_event_shape = tf.concat(
+          [
+              self.batch_shape_tensor(),
+              self.event_shape_tensor(),
+          ], axis=0)
 
-      sample_ndims = x_ndims - expected_batch_event_ndims
-      if isinstance(sample_ndims, int):
-        sample_ndims = max(sample_ndims, 0)
-      if (isinstance(sample_ndims, int) and
-          tensorshape_util.is_fully_defined(x.shape[sample_ndims:])):
-        actual_batch_event_shape = np.int32(x.shape[sample_ndims:])
-      else:
-        sample_ndims = tf.maximum(sample_ndims, 0)
-        actual_batch_event_shape = tf.shape(x)[sample_ndims:]
+    sample_ndims = x_ndims - expected_batch_event_ndims
+    if isinstance(sample_ndims, int):
+      sample_ndims = max(sample_ndims, 0)
+    if (isinstance(sample_ndims, int) and
+        tensorshape_util.is_fully_defined(x.shape[sample_ndims:])):
+      actual_batch_event_shape = np.int32(x.shape[sample_ndims:])
+    else:
+      sample_ndims = tf.maximum(sample_ndims, 0)
+      actual_batch_event_shape = tf.shape(x)[sample_ndims:]
 
-      if (isinstance(expected_batch_event_shape, np.ndarray) and
-          isinstance(actual_batch_event_shape, np.ndarray)):
-        if any(expected_batch_event_shape != actual_batch_event_shape):
-          raise NotImplementedError('Broadcasting is not supported; '
-                                    'unexpected batch and event shape '
-                                    '(expected {}, saw {}).'.format(
-                                        expected_batch_event_shape,
-                                        actual_batch_event_shape))
-        # We need to set the final runtime-assertions to `ndims_assertion` since
-        # its possible this assertion was created. We could add a condition to
-        # only do so if `self.validate_args == True`, however this is redundant
-        # as `ndims_assertion` already encodes this information.
-        runtime_assertions = ndims_assertion
-      elif self.validate_args:
-        # We need to make the `ndims_assertion` a control dep because otherwise
-        # TF itself might raise an exception owing to this assertion being
-        # ill-defined, ie, one cannot even compare different rank Tensors.
-        with tf.control_dependencies(ndims_assertion):
-          shape_assertion = assert_util.assert_equal(
-              expected_batch_event_shape,
-              actual_batch_event_shape,
-              message=('Broadcasting is not supported; '
-                       'unexpected batch and event shape.'),
-              name='assert_batch_and_event_shape_same')
-        runtime_assertions = [shape_assertion]
-      else:
-        runtime_assertions = []
+    assertions = []
+    if (isinstance(expected_batch_event_shape, np.ndarray) and
+        isinstance(actual_batch_event_shape, np.ndarray)):
+      if any(expected_batch_event_shape != actual_batch_event_shape):
+        raise NotImplementedError('Broadcasting is not supported; '
+                                  'unexpected batch and event shape '
+                                  '(expected {}, saw {}).'.format(
+                                      expected_batch_event_shape,
+                                      actual_batch_event_shape))
+      # We need to set the final runtime-assertions to `ndims_assertion` since
+      # its possible this assertion was created. We could add a condition to
+      # only do so if `self.validate_args == True`, however this is redundant
+      # as `ndims_assertion` already encodes this information.
+      assertions.extend(ndims_assertion)
+    elif self.validate_args:
+      # We need to make the `ndims_assertion` a control dep because otherwise
+      # TF itself might raise an exception owing to this assertion being
+      # ill-defined, ie, one cannot even compare different rank Tensors.
+      with tf.control_dependencies(ndims_assertion):
+        shape_assertion = assert_util.assert_equal(
+            expected_batch_event_shape,
+            actual_batch_event_shape,
+            message=('Broadcasting is not supported; '
+                     'unexpected batch and event shape.'),
+            name='assert_batch_and_event_shape_same')
+      assertions.append(shape_assertion)
 
-      return runtime_assertions
+    return assertions
 
 
 def validate_init_args_statically(distribution, batch_shape):

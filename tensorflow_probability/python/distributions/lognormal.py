@@ -24,7 +24,7 @@ from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
-
+from tensorflow_probability.python.internal import assert_util
 
 __all__ = [
     'LogNormal',
@@ -98,6 +98,14 @@ class LogNormal(transformed_distribution.TransformedDistribution):
   def _entropy(self):
     return (self.distribution.mean() + 0.5 +
             tf.math.log(self.distribution.stddev()) + 0.5 * np.log(2 * np.pi))
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    return assertions
 
 
 @kullback_leibler.RegisterKL(LogNormal, LogNormal)

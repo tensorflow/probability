@@ -218,7 +218,6 @@ class Binomial(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_binomial_sample_note)
   def _log_prob(self, counts):
-    counts = self._maybe_assert_valid_sample(counts)
     logits = self._logits_parameter_no_checks()
     total_count = tf.convert_to_tensor(self.total_count)
     unnorm = _log_unnormalized_prob(logits, counts, total_count)
@@ -230,7 +229,6 @@ class Binomial(distribution.Distribution):
     return tf.exp(self._log_prob(counts))
 
   def _cdf(self, counts):
-    counts = self._maybe_assert_valid_sample(counts)
     probs = self._probs_parameter_no_checks()
     if not (tensorshape_util.is_fully_defined(counts.shape) and
             tensorshape_util.is_fully_defined(probs.shape) and
@@ -313,16 +311,18 @@ class Binomial(distribution.Distribution):
         distribution_util.assert_integer_form(total_count, message=msg2),
     ]
 
-  def _maybe_assert_valid_sample(self, counts):
-    """Check counts for proper shape, values, then return tensor version."""
+  def _sample_control_dependencies(self, counts):
+    """Check counts for proper values."""
+    assertions = []
     if not self.validate_args:
-      return counts
-    counts = distribution_util.embed_check_nonnegative_integer_form(counts)
-    msg = ('Sampled counts must be itemwise less than '
-           'or equal to `total_count` parameter.')
-    return distribution_util.with_dependencies([
-        assert_util.assert_less_equal(counts, self.total_count, message=msg),
-    ], counts)
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(counts))
+    assertions.append(
+        assert_util.assert_less_equal(
+            counts, self.total_count,
+            message=('Sampled counts must be itemwise less than '
+                     'or equal to `total_count` parameter.')))
+    return assertions
 
 
 def _log_unnormalized_prob(logits, counts, total_count):

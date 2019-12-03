@@ -146,24 +146,22 @@ class Geometric(distribution.Distribution):
     return tf.floor(tf.math.log(sampled) / tf.math.log1p(-probs))
 
   def _cdf(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      probs = self._probs_parameter_no_checks()
-      if not self.validate_args:
-        # Whether or not x is integer-form, the following is well-defined.
-        # However, scipy takes the floor, so we do too.
-        x = tf.floor(x)
-      return tf.where(x < 0., tf.zeros_like(x), -tf.math.expm1(
-          (1. + x) * tf.math.log1p(-probs)))
+    probs = self._probs_parameter_no_checks()
+    if not self.validate_args:
+      # Whether or not x is integer-form, the following is well-defined.
+      # However, scipy takes the floor, so we do too.
+      x = tf.floor(x)
+    return tf.where(x < 0., tf.zeros_like(x), -tf.math.expm1(
+        (1. + x) * tf.math.log1p(-probs)))
 
   def _log_prob(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      probs = self._probs_parameter_no_checks()
-      if not self.validate_args:
-        # For consistency with cdf, we take the floor.
-        x = tf.floor(x)
-      safe_domain = tf.where(
-          tf.equal(x, 0.), tf.zeros_like(probs), probs)
-      return x * tf.math.log1p(-safe_domain) + tf.math.log(probs)
+    probs = self._probs_parameter_no_checks()
+    if not self.validate_args:
+      # For consistency with cdf, we take the floor.
+      x = tf.floor(x)
+    safe_domain = tf.where(
+        tf.equal(x, 0.), tf.zeros_like(probs), probs)
+    return x * tf.math.log1p(-safe_domain) + tf.math.log(probs)
 
   def _entropy(self):
     logits, probs = self._logits_and_probs_no_checks()
@@ -239,10 +237,12 @@ class Geometric(distribution.Distribution):
       probs = tf.math.sigmoid(logits)
     return logits, probs
 
-  def _maybe_assert_valid_sample(self, x):
+  def _sample_control_dependencies(self, x):
+    assertions = []
     if not self.validate_args:
-      return []
-    return distribution_util.assert_nonnegative_integer_form(x)
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

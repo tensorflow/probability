@@ -105,10 +105,30 @@ class GammaGammaTest(test_util.TestCase):
         concentration=1.,
         mixing_concentration=[0.01, 0.1, 2, 3],
         mixing_rate=[0.01, 0.1, 2, 3],
-        validate_args=False)
+        validate_args=True)
     log_pdf = self.evaluate(gg.log_prob(0.))
     self.assertAllEqual(
         np.ones_like(log_pdf, dtype=np.bool), np.isfinite(log_pdf))
+
+    gg = tfd.GammaGamma(
+        concentration=2.,
+        mixing_concentration=[0.01, 0.1, 2, 3],
+        mixing_rate=[0.01, 0.1, 2, 3],
+        validate_args=True)
+    log_pdf = self.evaluate(gg.log_prob(0.))
+    self.assertAllNegativeInf(log_pdf)
+
+    pdf = self.evaluate(gg.prob(0.))
+    self.assertAllEqual(pdf, np.zeros_like(pdf))
+
+  def testAssertValidSample(self):
+    gg = tfd.GammaGamma(
+        concentration=2.,
+        mixing_concentration=.1,
+        mixing_rate=3.,
+        validate_args=True)
+    with self.assertRaisesOpError('Sample must be non-negative.'):
+      self.evaluate(gg.log_prob(-.1))
 
   def testGammaGammaLogPDFMultidimensional(self):
     batch_size = 6

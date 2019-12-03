@@ -246,3 +246,15 @@ class PERT(distribution.Distribution):
           assert_util.assert_positive(
               self.temperature, message='`temperature` must be positive.'))
     return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_greater_equal(
+        x, self.low,
+        message='Sample must be greater than or equal to `low`.'))
+    assertions.append(assert_util.assert_less_equal(
+        x, self.high,
+        message='Sample must be less than or equal to `high`.'))
+    return assertions

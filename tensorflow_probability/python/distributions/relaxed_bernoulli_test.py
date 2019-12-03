@@ -128,6 +128,25 @@ class RelaxedBernoulliTest(test_util.TestCase):
     self.assertAllClose(np.nan, self.evaluate(dist.log_prob(0.0)))
     self.assertAllClose([np.nan], [self.evaluate(dist.log_prob(1.0))])
 
+  # TODO(b/144948687): Reimplement `log_prob` so it doesn't return `nan` at the
+  # boundary. Ideally we'd do this test:
+  # def testPdfAtBoundary(self):
+  #   dist = tfd.RelaxedBernoulli(temperature=0.1, logits=[[3., 5.], [3., 2]],
+  #                               validate_args=True)
+  #   pdf_at_boundary = self.evaluate(dist.prob([0., 1.]))
+  #   log_pdf_at_boundary = self.evaluate(dist.log_prob([0., 1.]))
+  #   self.assertAllPositiveInf(pdf_at_boundary)
+  #   self.assertAllPositiveInf(log_pdf_at_boundary)
+
+  def testAssertValidSample(self):
+    temperature = 1e-2
+    p = [0.2, 0.6, 0.5]
+    dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
+    with self.assertRaisesOpError('Sample must be non-negative.'):
+      self.evaluate(dist.log_cdf([0.3, -0.2, 0.5]))
+    with self.assertRaisesOpError('Sample must be less than or equal to `1`.'):
+      self.evaluate(dist.prob([0.3, 0.1, 1.2]))
+
   def testSampleN(self):
     """mean of quantized samples still approximates the Bernoulli mean."""
     temperature = 1e-2

@@ -63,9 +63,23 @@ class GammaTest(test_util.TestCase):
     # When concentration = 1, we have an exponential distribution. Check that at
     # 0 we have finite log prob.
     rate = np.array([0.1, 0.5, 1., 2., 5., 10.], dtype=np.float32)
-    gamma = tfd.Gamma(concentration=1., rate=rate, validate_args=False)
+    gamma = tfd.Gamma(concentration=1., rate=rate, validate_args=True)
     log_pdf = gamma.log_prob(0.)
     self.assertAllClose(np.log(rate), self.evaluate(log_pdf))
+
+    gamma = tfd.Gamma(concentration=[2., 4., 0.5], rate=6., validate_args=True)
+    log_pdf = self.evaluate(gamma.log_prob(0.))
+    self.assertAllNegativeInf(log_pdf[:2])
+    self.assertAllPositiveInf(log_pdf[2])
+
+    pdf = self.evaluate(gamma.prob(0.))
+    self.assertAllPositiveInf(pdf[2])
+    self.assertAllFinite(pdf[:2])
+
+  def testAssertsValidSample(self):
+    g = tfd.Gamma(concentration=2., rate=3., validate_args=True)
+    with self.assertRaisesOpError('Sample must be non-negative.'):
+      self.evaluate(g.log_prob(-.1))
 
   def testGammaLogPDFMultidimensional(self):
     batch_size = 6
@@ -144,7 +158,7 @@ class GammaTest(test_util.TestCase):
         allow_nan_stats=False,
         validate_args=True)
     with self.assertRaisesOpError(
-        "Mode not defined when any concentration <= 1."):
+        'Mode not defined when any concentration <= 1.'):
       self.evaluate(gamma.mode())
 
   def testGammaModeAllowNanStatsIsTrueReturnsNaNforUndefinedBatchMembers(self):
@@ -309,15 +323,15 @@ class GammaTest(test_util.TestCase):
     self.assertNear(1., total, err=err)
 
   def testGammaNonPositiveInitializationParamsRaises(self):
-    alpha_v = tf.constant(0.0, name="alpha")
-    beta_v = tf.constant(1.0, name="beta")
-    with self.assertRaisesOpError("Argument `concentration` must be positive."):
+    alpha_v = tf.constant(0.0, name='alpha')
+    beta_v = tf.constant(1.0, name='beta')
+    with self.assertRaisesOpError('Argument `concentration` must be positive.'):
       gamma = tfd.Gamma(
           concentration=alpha_v, rate=beta_v, validate_args=True)
       self.evaluate(gamma.mean())
-    alpha_v = tf.constant(1.0, name="alpha")
-    beta_v = tf.constant(0.0, name="beta")
-    with self.assertRaisesOpError("Argument `rate` must be positive."):
+    alpha_v = tf.constant(1.0, name='alpha')
+    beta_v = tf.constant(0.0, name='beta')
+    with self.assertRaisesOpError('Argument `rate` must be positive.'):
       gamma = tfd.Gamma(
           concentration=alpha_v, rate=beta_v, validate_args=True)
       self.evaluate(gamma.mean())
@@ -366,7 +380,7 @@ class GammaTest(test_util.TestCase):
   def testAssertsPositiveConcentration(self):
     concentration = tf.Variable([1., 2., -3.])
     self.evaluate(concentration.initializer)
-    with self.assertRaisesOpError("Argument `concentration` must be positive."):
+    with self.assertRaisesOpError('Argument `concentration` must be positive.'):
       d = tfd.Gamma(concentration=concentration, rate=[5.], validate_args=True)
       self.evaluate(d.sample())
 
@@ -374,7 +388,7 @@ class GammaTest(test_util.TestCase):
     concentration = tf.Variable([1., 2., 3.])
     self.evaluate(concentration.initializer)
     d = tfd.Gamma(concentration=concentration, rate=[5.], validate_args=True)
-    with self.assertRaisesOpError("Argument `concentration` must be positive."):
+    with self.assertRaisesOpError('Argument `concentration` must be positive.'):
       with tf.control_dependencies([concentration.assign([1., 2., -3.])]):
         self.evaluate(d.sample())
 
@@ -390,7 +404,7 @@ class GammaTest(test_util.TestCase):
   def testAssertsPositiveRate(self):
     rate = tf.Variable([1., 2., -3.])
     self.evaluate(rate.initializer)
-    with self.assertRaisesOpError("Argument `rate` must be positive."):
+    with self.assertRaisesOpError('Argument `rate` must be positive.'):
       d = tfd.Gamma(concentration=[5.], rate=rate, validate_args=True)
       self.evaluate(d.sample())
 
@@ -399,9 +413,9 @@ class GammaTest(test_util.TestCase):
     self.evaluate(rate.initializer)
     d = tfd.Gamma(concentration=[3.], rate=rate, validate_args=True)
     self.evaluate(d.mean())
-    with self.assertRaisesOpError("Argument `rate` must be positive."):
+    with self.assertRaisesOpError('Argument `rate` must be positive.'):
       with tf.control_dependencies([rate.assign([1., 2., -3.])]):
         self.evaluate(d.sample())
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

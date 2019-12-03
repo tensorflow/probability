@@ -50,8 +50,8 @@ class PoissonTest(test_util.TestCase):
   def testInvalidLam(self):
     invalid_lams = [-.01, 0., -2.]
     for lam in invalid_lams:
-      with self.assertRaisesOpError("Argument `rate` must be positive."):
-        poisson = self._make_poisson(rate=lam, validate_args=True)
+      with self.assertRaisesOpError('Argument `rate` must be positive.'):
+        poisson = self._make_poisson(rate=lam)
         self.evaluate(poisson.rate_parameter())
 
   def testPoissonLogPmfDiscreteMatchesScipy(self):
@@ -59,8 +59,8 @@ class PoissonTest(test_util.TestCase):
     lam = tf.constant([3.0] * batch_size)
     lam_v = 3.0
     x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]
-    poisson = self._make_poisson(rate=lam,
-                                 interpolate_nondiscrete=False)
+    poisson = self._make_poisson(
+        rate=lam, interpolate_nondiscrete=False, validate_args=False)
     log_pmf = poisson.log_prob(x)
     self.assertEqual(log_pmf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(log_pmf), stats.poisson.logpmf(x, lam_v))
@@ -74,8 +74,8 @@ class PoissonTest(test_util.TestCase):
     lam = tf.constant([3.0] * batch_size)
     x = np.array([-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]).astype(
         np.float32)
-    poisson = self._make_poisson(rate=lam,
-                                 interpolate_nondiscrete=True)
+    poisson = self._make_poisson(
+        rate=lam, interpolate_nondiscrete=True, validate_args=False)
 
     expected_continuous_log_pmf = (
         x * poisson.log_rate - tf.math.lgamma(1. + x) - poisson.rate)
@@ -122,7 +122,8 @@ class PoissonTest(test_util.TestCase):
 
     def poisson_log_prob(lam):
       return self._make_poisson(
-          rate=lam, interpolate_nondiscrete=False).log_prob(x)
+          rate=lam, interpolate_nondiscrete=False, validate_args=False
+          ).log_prob(x)
     _, dlog_pmf_dlam = self.evaluate(tfp.math.value_and_gradient(
         poisson_log_prob, lam))
 
@@ -151,7 +152,8 @@ class PoissonTest(test_util.TestCase):
     lam_v = 3.0
     x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]
 
-    poisson = self._make_poisson(rate=lam, interpolate_nondiscrete=False)
+    poisson = self._make_poisson(
+        rate=lam, interpolate_nondiscrete=False, validate_args=False)
     log_cdf = poisson.log_cdf(x)
     self.assertEqual(log_cdf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(log_cdf), stats.poisson.logcdf(x, lam_v))
@@ -172,7 +174,8 @@ class PoissonTest(test_util.TestCase):
                                        tf.zeros_like(expected_continuous_cdf))
     expected_continuous_log_cdf = tf.math.log(expected_continuous_cdf)
 
-    poisson = self._make_poisson(rate=lam, interpolate_nondiscrete=True)
+    poisson = self._make_poisson(
+        rate=lam, interpolate_nondiscrete=True, validate_args=False)
     log_cdf = poisson.log_cdf(x)
     self.assertEqual(log_cdf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(log_cdf),
@@ -190,7 +193,8 @@ class PoissonTest(test_util.TestCase):
     x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]
 
     def cdf(lam):
-      return self._make_poisson(rate=lam, interpolate_nondiscrete=False).cdf(x)
+      return self._make_poisson(
+          rate=lam, interpolate_nondiscrete=False, validate_args=False).cdf(x)
     _, dcdf_dlam = self.evaluate(tfp.math.value_and_gradient(cdf, lam))
 
     # A finite difference approximation of the derivative.
@@ -269,6 +273,12 @@ class PoissonTest(test_util.TestCase):
         sample_values.mean(), stats.poisson.mean(lam_v), rtol=.01)
     self.assertAllClose(sample_values.var(), stats.poisson.var(lam_v), rtol=.01)
 
+  def testAssertValidSample(self):
+    lam_v = [1.0, 3.0, 2.5]
+    poisson = self._make_poisson(rate=lam_v)
+    with self.assertRaisesOpError('Condition x >= 0'):
+      self.evaluate(poisson.cdf([-1.2, 3., 4.2]))
+
   def testPoissonSampleMultidimensionalMean(self):
     lam_v = np.array([np.arange(1, 51, dtype=np.float32)])  # 1 x 50
     poisson = self._make_poisson(rate=lam_v)
@@ -309,7 +319,7 @@ class PoissonTest(test_util.TestCase):
   def testAssertsPositiveRate(self):
     rate = tf.Variable([1., 2., -3.])
     self.evaluate(rate.initializer)
-    with self.assertRaisesOpError("Argument `rate` must be positive."):
+    with self.assertRaisesOpError('Argument `rate` must be positive.'):
       dist = self._make_poisson(rate=rate, validate_args=True)
       self.evaluate(dist.sample())
 
@@ -318,7 +328,7 @@ class PoissonTest(test_util.TestCase):
     self.evaluate(rate.initializer)
     dist = self._make_poisson(rate=rate, validate_args=True)
     self.evaluate(dist.mean())
-    with self.assertRaisesOpError("Argument `rate` must be positive."):
+    with self.assertRaisesOpError('Argument `rate` must be positive.'):
       with tf.control_dependencies([rate.assign([1., 2., -3.])]):
         self.evaluate(dist.sample())
 
@@ -357,5 +367,5 @@ class PoissonLogRateTest(PoissonTest):
     self.assertLen(grad, 1)
     self.assertAllNotNone(grad)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

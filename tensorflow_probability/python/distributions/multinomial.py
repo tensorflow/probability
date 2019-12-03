@@ -251,14 +251,13 @@ class Multinomial(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_multinomial_sample_note)
   def _log_prob(self, counts):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(counts)):
-      log_p = (
-          tf.math.log(self._probs)
-          if self._logits is None else tf.math.log_softmax(self._logits))
-      k = tf.convert_to_tensor(self.total_count)
-      return (
-          tf.reduce_sum(counts * log_p, axis=-1) +        # log_unnorm_prob
-          tfp_math.log_combinations(k, counts))  # -log_normalization
+    log_p = (
+        tf.math.log(self._probs)
+        if self._logits is None else tf.math.log_softmax(self._logits))
+    return (
+        tf.reduce_sum(counts * log_p, axis=-1) +        # log_unnorm_prob
+        tfp_math.log_combinations(
+            self.total_count, counts))  # -log_normalization
 
   def _mean(self):
     p = self._probs_parameter_no_checks()
@@ -298,11 +297,12 @@ class Multinomial(distribution.Distribution):
       return tf.identity(self._probs)
     return tf.math.softmax(self._logits)
 
-  def _maybe_assert_valid_sample(self, counts):
+  def _sample_control_dependencies(self, counts):
     """Check counts for proper shape, values, then return tensor version."""
+    assertions = []
     if not self.validate_args:
-      return []
-    assertions = distribution_util.assert_nonnegative_integer_form(counts)
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(counts))
     assertions.append(assert_util.assert_equal(
         self.total_count,
         tf.reduce_sum(counts, axis=-1),

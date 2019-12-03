@@ -189,6 +189,15 @@ class HalfNormal(distribution.Distribution):
           self._scale, message='Argument `scale` must be positive.'))
     return assertions
 
+  def _sample_control_dependencies(self, x):
+    """Checks the validity of a sample."""
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    return assertions
+
 
 @kullback_leibler.RegisterKL(HalfNormal, HalfNormal)
 def _kl_half_normal_half_normal(a, b, name=None):

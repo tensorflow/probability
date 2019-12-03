@@ -25,7 +25,6 @@ from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
@@ -270,7 +269,6 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     temperature = tf.convert_to_tensor(self.temperature)
     logits = self._logits_parameter_no_checks()
 
-    x = self._assert_valid_sample(x)
     # broadcast logits or x if need be.
     if (not tensorshape_util.is_fully_defined(x.shape) or
         not tensorshape_util.is_fully_defined(logits.shape) or
@@ -307,14 +305,21 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
       return tf.identity(self._probs)
     return tf.math.softmax(self._logits)
 
-  def _assert_valid_sample(self, x):
+  def _sample_control_dependencies(self, x):
+    assertions = []
     if not self.validate_args:
-      return x
-    return distribution_util.with_dependencies([
-        assert_util.assert_non_positive(x),
-        assert_util.assert_near(
-            tf.zeros([], dtype=self.dtype), tf.reduce_logsumexp(x, axis=[-1])),
-    ], x)
+      return assertions
+    assertions.append(assert_util.assert_non_positive(
+        x,
+        message=('Samples must be less than or equal to `0` for '
+                 '`ExpRelaxedOneHotCategorical` or `1` for '
+                 '`RelaxedOneHotCategorical`.')))
+    assertions.append(assert_util.assert_near(
+        tf.zeros([], dtype=self.dtype), tf.reduce_logsumexp(x, axis=[-1]),
+        message=('Final dimension of samples must sum to `0` for ''.'
+                 '`ExpRelaxedOneHotCategorical` or `1` '
+                 'for `RelaxedOneHotCategorical`.')))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

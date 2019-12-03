@@ -33,9 +33,6 @@ rng = np.random.RandomState(123)
 @test_util.test_all_tf_execution_regimes
 class QuantizedDistributionTest(test_util.TestCase):
 
-  def _assert_all_finite(self, array):
-    self.assertTrue(np.isfinite(array).all())
-
   def testQuantizationOfUniformWithCutoffsHavingNoEffect(self):
     # The Quantized uniform with cutoffs == None divides the real line into:
     # R = ...(-1, 0](0, 1](1, 2](2, 3](3, 4]...
@@ -58,7 +55,7 @@ class QuantizedDistributionTest(test_util.TestCase):
           distribution=tfd.Uniform(low=0.0, high=3.0),
           low=lcut,
           high=ucut,
-          validate_args=True)
+          validate_args=False)
 
       # pmf
       pmf_n1, pmf_0, pmf_1, pmf_2, pmf_3, pmf_4, pmf_5 = self.evaluate(
@@ -103,7 +100,7 @@ class QuantizedDistributionTest(test_util.TestCase):
         distribution=tfd.Uniform(low=-3., high=3.),
         low=-1.0,
         high=1.0,
-        validate_args=True)
+        validate_args=False)
 
     # pmf
     cdf_n3, cdf_n2, cdf_n1, cdf_0, cdf_0p5, cdf_1, cdf_10 = self.evaluate(
@@ -339,8 +336,8 @@ class QuantizedDistributionTest(test_util.TestCase):
       self.evaluate([mu.initializer, sigma.initializer])
       value, grads = self.evaluate(tfp.math.value_and_gradient(
           quantized_log_prob(dtype), [mu, sigma]))
-      self._assert_all_finite(value)
-      self._assert_all_finite(grads)
+      self.assertAllFinite(value)
+      self.assertAllFinite(grads)
 
   def testProbAndGradGivesFiniteResultsForCommonEvents(self):
     def quantized_log_prob(mu, sigma):
@@ -356,8 +353,8 @@ class QuantizedDistributionTest(test_util.TestCase):
     self.evaluate([v.initializer for v in [mu, sigma]])
     value, grads = self.evaluate(tfp.math.value_and_gradient(
         quantized_log_prob, [mu, sigma]))
-    self._assert_all_finite(value)
-    self._assert_all_finite(grads)
+    self.assertAllFinite(value)
+    self.assertAllFinite(grads)
 
   def testLowerCutoffMustBeBelowUpperCutoffOrWeRaise(self):
     with self.assertRaisesOpError('must be strictly less'):
@@ -410,6 +407,15 @@ class QuantizedDistributionTest(test_util.TestCase):
 
     y = rng.randint(0, 5, size=batch_shape).astype(np.float32)
     self.assertEqual(batch_shape, qdist.prob(y).shape)
+
+  def testAssertValidSample(self):
+    qdist = tfd.QuantizedDistribution(
+        distribution=tfd.Uniform(low=-3., high=3.),
+        low=-1.0,
+        high=1.0,
+        validate_args=True)
+    with self.assertRaisesOpError('Sample has non-integer components.'):
+      self.evaluate(qdist.prob([2., -1.7, 0.]))
 
   def testVariableBounds(self):
     dist = tfd.Normal(0., scale=2.)

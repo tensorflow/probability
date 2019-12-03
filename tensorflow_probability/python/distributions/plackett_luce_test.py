@@ -141,6 +141,12 @@ class PlackettLuceTest(test_util.TestCase):
     self.assertFalse(np.any(sample_values > k))
     self.assertTrue(np.all(np.sum(sample_values, axis=-1) == (k-1)*k//2))
 
+  def testAssertValidSample(self):
+    scores = np.array([[[0.1, 2.3, 5.], [4.2, 0.5, 3.1]]])
+    dist = tfd.PlackettLuce(scores, validate_args=True)
+    with self.assertRaisesOpError('Sample must be a permutation'):
+      self.evaluate(dist.log_prob([1, 0, 1]))
+
 
 @test_util.test_all_tf_execution_regimes
 class PlackettLuceFromVariableTest(test_util.TestCase):

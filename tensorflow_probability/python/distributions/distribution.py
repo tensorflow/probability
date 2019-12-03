@@ -65,7 +65,11 @@ _DISTRIBUTION_PUBLIC_METHOD_WRAPPERS = [
     'variance',
 ]
 
+
 _ALWAYS_COPY_PUBLIC_METHOD_WRAPPERS = ['kl_divergence', 'cross_entropy']
+
+
+UNSET_VALUE = object()
 
 
 JAX_MODE = False  # Overwritten by rewrite script.
@@ -855,9 +859,8 @@ class Distribution(_BaseDistribution):
 
   def _call_log_prob(self, value, name, **kwargs):
     """Wrapper around _log_prob."""
-    with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_log_prob'):
         return self._log_prob(value, **kwargs)
       if hasattr(self, '_prob'):
@@ -881,9 +884,8 @@ class Distribution(_BaseDistribution):
 
   def _call_prob(self, value, name, **kwargs):
     """Wrapper around _prob."""
-    with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_prob'):
         return self._prob(value, **kwargs)
       if hasattr(self, '_log_prob'):
@@ -907,9 +909,8 @@ class Distribution(_BaseDistribution):
 
   def _call_log_cdf(self, value, name, **kwargs):
     """Wrapper around _log_cdf."""
-    with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_log_cdf'):
         return self._log_cdf(value, **kwargs)
       if hasattr(self, '_cdf'):
@@ -943,9 +944,8 @@ class Distribution(_BaseDistribution):
 
   def _call_cdf(self, value, name, **kwargs):
     """Wrapper around _cdf."""
-    with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_cdf'):
         return self._cdf(value, **kwargs)
       if hasattr(self, '_log_cdf'):
@@ -980,9 +980,8 @@ class Distribution(_BaseDistribution):
 
   def _call_log_survival_function(self, value, name, **kwargs):
     """Wrapper around _log_survival_function."""
-    with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    with self._name_and_control_scope(name, value, kwargs):
       try:
         return self._log_survival_function(value, **kwargs)
       except NotImplementedError as original_exception:
@@ -1023,9 +1022,8 @@ class Distribution(_BaseDistribution):
 
   def _call_survival_function(self, value, name, **kwargs):
     """Wrapper around _survival_function."""
-    with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    with self._name_and_control_scope(name, value, kwargs):
       try:
         return self._survival_function(value, **kwargs)
       except NotImplementedError as original_exception:
@@ -1327,15 +1325,18 @@ class Distribution(_BaseDistribution):
                 dtype=_str_dtype(self.dtype)))
 
   @contextlib.contextmanager
-  def _name_and_control_scope(self, name=None):
+  def _name_and_control_scope(self, name=None, value=UNSET_VALUE, kwargs=None):
     """Helper function to standardize op scope."""
+    # Note: we recieve `kwargs` and not `**kwargs` to ensure no collisions on
+    # other args we choose to take in this function.
     with tf.name_scope(self.name):
       with tf.name_scope(name) as name_scope:
-        deps = tuple(
-            d for d in (  # pylint: disable=g-complex-comprehension
-                tuple(self._initial_parameter_control_dependencies) +
-                tuple(self._parameter_control_dependencies(is_init=False)))
-            if d is not None)
+        deps = []
+        deps.extend(self._initial_parameter_control_dependencies)
+        deps.extend(self._parameter_control_dependencies(is_init=False))
+        if value is not UNSET_VALUE:
+          deps.extend(self._sample_control_dependencies(
+              value, **({} if kwargs is None else kwargs)))
         if not deps:
           yield name_scope
           return
@@ -1421,6 +1422,27 @@ class Distribution(_BaseDistribution):
     Returns:
       dependencies: `list`-like of ops to be executed in member functions with
         graph dependencies.
+    """
+    return ()
+
+  def _sample_control_dependencies(self, value, **kwargs):
+    """Returns a list of ops to be executed to validate distribution samples.
+
+    The ops are executed in methods that take distribution samples as an
+    argument (e.g. `log_prob` and `cdf`). They validate that `value` is
+    within the support of the distribution. Typically subclasses override this
+    function to return assertions specific to the distribution (e.g. samples
+    from `Beta` must be between `0` and `1`). By convention, finite bounds of
+    the support are considered valid samples, since `sample` may output values
+    that are numerically equivalent to the bounds.
+
+    Args:
+      value: `float` or `double` `Tensor`.
+      **kwargs: Additional keyword args.
+
+    Returns:
+      assertions: `list`-like of ops to be executed in member functions that
+        take distribution samples as input.
     """
     return ()
 

@@ -28,6 +28,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
@@ -426,6 +427,14 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
         axis=-1)
     return tf.reduce_logsumexp(
         mixture_dist.logits[..., tf.newaxis] + v, axis=[-2, -1])
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    return assertions
 
 
 def concat_vectors(*args):

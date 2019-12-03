@@ -225,10 +225,9 @@ class Dirichlet(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_dirichlet_sample_note)
   def _log_prob(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      concentration = tf.convert_to_tensor(self.concentration)
-      return (tf.reduce_sum(tf.math.xlogy(concentration - 1., x), axis=-1) -
-              tf.math.lbeta(concentration))
+    concentration = tf.convert_to_tensor(self.concentration)
+    return (tf.reduce_sum(tf.math.xlogy(concentration - 1., x), axis=-1) -
+            tf.math.lbeta(concentration))
 
   @distribution_util.AppendDocstring(_dirichlet_sample_note)
   def _prob(self, x):
@@ -291,17 +290,18 @@ class Dirichlet(distribution.Distribution):
     with tf.control_dependencies(assertions):
       return tf.identity(mode)
 
-  def _maybe_assert_valid_sample(self, x):
+  def _sample_control_dependencies(self, x):
     """Checks the validity of a sample."""
+    assertions = []
     if not self.validate_args:
-      return []
-    return [
-        assert_util.assert_positive(x, message='samples must be positive'),
-        assert_util.assert_near(
-            tf.ones([], dtype=self.dtype),
-            tf.reduce_sum(x, axis=-1),
-            message='sample last-dimension must sum to `1`'),
-    ]
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Samples must be non-negative.'))
+    assertions.append(assert_util.assert_near(
+        tf.ones([], dtype=self.dtype),
+        tf.reduce_sum(x, axis=-1),
+        message='Sample last-dimension must sum to `1`.'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     """Checks the validity of the concentration parameter."""

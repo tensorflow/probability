@@ -51,11 +51,20 @@ class ChiTest(test_util.TestCase):
 
   def testLogPdfAssertsOnInvalidSample(self):
     d = tfd.Chi(df=13.37, validate_args=True)
-    with self.assertRaisesOpError('All elements must be non-negative.'):
+    with self.assertRaisesOpError('Condition x >= 0'):
       self.evaluate(d.log_prob([14.2, -5.3]))
 
-    with self.assertRaisesOpError('Sample must be positive.'):
-      print(self.evaluate(d.log_prob([0.0, 0.0])))
+  def testPdfOnBoundary(self):
+    d = tfd.Chi(df=[1., 3.], validate_args=True)
+    log_prob_boundary = self.evaluate(d.log_prob(0.))
+
+    self.assertAllNegativeInf(log_prob_boundary[1])
+
+    # TODO(b/144948687) Avoid `nan` log_prob on the boundary when `df==1`.
+    # Ideally we'd do this test:
+    # self.assertTrue(np.isfinite(log_prob_boundary[0]))
+    # prob_boundary = self.evaluate(d.prob(0.))
+    # self.assertAllFinite(prob_boundary))
 
   def testChiCDF(self):
     df = np.arange(1, 6, dtype=np.float64)

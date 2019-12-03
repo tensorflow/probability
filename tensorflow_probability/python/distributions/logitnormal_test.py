@@ -72,6 +72,26 @@ class LogitNormalTest(test_util.TestCase):
     self.assertAllClose(
         kl_expected_from_formula, kl_sample_, atol=0.0, rtol=1e-2)
 
+    # TODO(b/144948687) Avoid `nan` at boundary. Ideally we'd do this test:
+#   def testPdfAtBoundary(self):
+#     dist = tfd.LogitNormal(loc=[-5., 3.], scale=[[1., 2.], [3., 2.]],
+#                            validate_args=True)
+#     pdf_at_boundary = self.evaluate(dist.prob(0.))
+#     self.assertAllEqual(pdf_at_boundary, np.zeros_like(pdf_at_boundary))
+#
+#     log_pdf_at_boundary = self.evaluate(dist.log_prob(0.))
+#     self.assertAllNegativeInf(log_pdf_at_boundary)
+
+  def testAssertValidSample(self):
+    dist = tfd.LogitNormal(loc=0., scale=3., validate_args=True)
+    self.evaluate(dist.prob([.1, .3, .6]))
+    self.evaluate(dist.prob([.2, .3, .5]))
+    # Either condition can trigger.
+    with self.assertRaisesOpError('Sample must be non-negative.'):
+      self.evaluate(dist.prob([-1., 0.1, 0.5]))
+    with self.assertRaisesOpError('Sample must be less than or equal to `1`.'):
+      self.evaluate(dist.prob([.1, .2, 1.2]))
+
 
 if __name__ == '__main__':
   tf.test.main()

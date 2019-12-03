@@ -60,6 +60,12 @@ class InverseGammaTest(test_util.TestCase):
     self.assertEqual(pdf.shape, (6,))
     self.assertAllClose(self.evaluate(pdf), np.exp(expected_log_pdf))
 
+    # TODO(b/144948687): Avoid `nan` at boundary. Ideally we'd do this test:
+    # log_pdf_at_boundary = self.evaluate(inv_gamma.log_prob(0.))
+    # self.assertTrue(np.isinf(log_pdf_at_boundary).all())
+    # pdf_at_boundary = self.evaluate(inv_gamma.prob(0.))
+    # self.assertAllEqual(pdf_at_boundary, np.zeros_like(pdf_at_boundary))
+
   def testInverseGammaLogPDFMultidimensional(self):
     batch_size = 6
     alpha = tf.constant([[2.0, 4.0]] * batch_size)
@@ -309,6 +315,12 @@ class InverseGammaTest(test_util.TestCase):
       total += (k[0] - prev[0]) * pair_pdf
       prev = k
     self.assertNear(1., total, err=err)
+
+  def testAssertsValidSample(self):
+    inv_gamma = tfd.InverseGamma(
+        concentration=[3., 5., 2.], scale=2., validate_args=True)
+    with self.assertRaisesOpError('Sample must be non-negative.'):
+      self.evaluate(inv_gamma.cdf([4., -1.7, 2.]))
 
   def testInverseGammaNonPositiveInitializationParamsRaises(self):
     alpha_v = tf.constant(0.0, name='alpha')

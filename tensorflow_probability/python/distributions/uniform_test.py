@@ -42,7 +42,7 @@ class UniformTest(test_util.TestCase):
   def testUniformPDF(self):
     a = tf.constant([-3.0] * 5 + [15.0])
     b = tf.constant([11.0] * 5 + [20.0])
-    uniform = tfd.Uniform(low=a, high=b, validate_args=True)
+    uniform = tfd.Uniform(low=a, high=b, validate_args=False)
 
     a_v = -3.0
     b_v = 11.0
@@ -92,7 +92,7 @@ class UniformTest(test_util.TestCase):
     b_v = 11.0
     x = np.array([-2.5, 2.5, 4.0, 0.0, 10.99, 12.0], dtype=np.float32)
 
-    uniform = tfd.Uniform(low=a, high=b, validate_args=True)
+    uniform = tfd.Uniform(low=a, high=b, validate_args=False)
 
     def _expected_cdf():
       cdf = (x - a_v) / (b_v - a_v)
@@ -206,7 +206,7 @@ class UniformTest(test_util.TestCase):
   def testUniformNans(self):
     a = 10.0
     b = [11.0, 100.0]
-    uniform = tfd.Uniform(low=a, high=b, validate_args=True)
+    uniform = tfd.Uniform(low=a, high=b, validate_args=False)
 
     no_nans = tf.constant(1.0)
     nans = tf.constant(0.0) / tf.constant(0.0)
@@ -229,7 +229,7 @@ class UniformTest(test_util.TestCase):
   def testUniformBroadcasting(self):
     a = 10.0
     b = [11.0, 20.0]
-    uniform = tfd.Uniform(a, b, validate_args=True)
+    uniform = tfd.Uniform(a, b, validate_args=False)
 
     pdf = uniform.prob([[10.5, 11.5], [9.0, 19.0], [10.5, 21.0]])
     expected_pdf = np.array([[1.0, 0.1], [0.0, 0.1], [1.0, 0.0]])
@@ -329,6 +329,18 @@ class UniformTest(test_util.TestCase):
 
     true_kl_, kl_ = self.evaluate([true_kl, kl])
     self.assertAllEqual(true_kl_, kl_)
+
+  def testPdfAtBoundary(self):
+    dist = tfd.Uniform(low=[-2., 3.], high=4., validate_args=True)
+    pdf_at_boundary = self.evaluate(dist.prob([[-2., 3.], [3.5, 4.]]))
+    self.assertAllFinite(pdf_at_boundary)
+
+  def testAssertValidSample(self):
+    dist = tfd.Uniform(low=2., high=5., validate_args=True)
+    with self.assertRaisesOpError('must be greater than or equal to `low`'):
+      self.evaluate(dist.cdf([2.3, 1.7, 4.]))
+    with self.assertRaisesOpError('must be less than or equal to `high`'):
+      self.evaluate(dist.survival_function([2.3, 5.2, 4.]))
 
   def testModifiedVariableAssertion(self):
     low = tf.Variable(0.)

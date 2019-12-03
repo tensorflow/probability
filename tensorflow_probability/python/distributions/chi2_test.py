@@ -50,11 +50,19 @@ class Chi2Test(test_util.TestCase):
 
   def testLogPdfAssertsOnInvalidSample(self):
     d = tfd.Chi2(df=13.37, validate_args=True)
-    with self.assertRaisesOpError('Sample must be positive.'):
+    with self.assertRaisesOpError('Sample must be non-negative.'):
       self.evaluate(d.log_prob([14.2, -5.3]))
 
-    with self.assertRaisesOpError('Sample must be positive.'):
-      self.evaluate(d.log_prob([0.0, 0.0]))
+  def testPdfOnBoundary(self):
+    d = tfd.Chi2(df=[2., 4., 1.], validate_args=True)
+    log_prob_boundary = self.evaluate(d.log_prob(0.))
+    self.assertAllFinite(log_prob_boundary[0])
+    self.assertAllNegativeInf(log_prob_boundary[1])
+    self.assertAllPositiveInf(log_prob_boundary[2])
+
+    prob_boundary = self.evaluate(d.prob(0.))
+    self.assertAllFinite(prob_boundary[:1])
+    self.assertAllPositiveInf(prob_boundary[2])
 
   def testChi2CDF(self):
     batch_size = 6

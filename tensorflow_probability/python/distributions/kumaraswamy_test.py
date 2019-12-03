@@ -111,9 +111,9 @@ class KumaraswamyTest(test_util.TestCase):
     self.evaluate(dist.prob([.1, .3, .6]))
     self.evaluate(dist.prob([.2, .3, .5]))
     # Either condition can trigger.
-    with self.assertRaisesOpError('sample must be non-negative'):
+    with self.assertRaisesOpError('Sample must be non-negative'):
       self.evaluate(dist.prob([-1., 0.1, 0.5]))
-    with self.assertRaisesOpError('sample must be no larger than `1`'):
+    with self.assertRaisesOpError('Sample must be less than or equal to `1`'):
       self.evaluate(dist.prob([.1, .2, 1.2]))
 
   def testPdfTwoBatches(self):
@@ -337,6 +337,30 @@ class KumaraswamyTest(test_util.TestCase):
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 0. <= x)
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
       self.assertAllClose(_kumaraswamy_cdf(a, b, x), actual)
+
+  def testPdfAtBoundary(self):
+    a = [0.5, 2.]
+    b = [0.5, 5.]
+    x = [[0.], [1.]]
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
+    pdf = self.evaluate(dist.prob(x))
+    log_pdf = self.evaluate(dist.log_prob(x))
+    self.assertAllPositiveInf(pdf[:, 0])
+    self.assertAllFinite(pdf[:, 1])
+    self.assertAllPositiveInf(log_pdf[:, 0])
+    self.assertAllNegativeInf(log_pdf[:, 1])
+
+  def testAssertValidSample(self):
+    a = [[1., 2, 3]]
+    b = [[2., 4, 3]]
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
+    self.evaluate(dist.prob([.1, .3, .6]))
+    self.evaluate(dist.prob([.2, .3, .5]))
+    # Either condition can trigger.
+    with self.assertRaisesOpError('Sample must be non-negative.'):
+      self.evaluate(dist.prob([-1., 0.1, 0.5]))
+    with self.assertRaisesOpError('Sample must be less than or equal to `1`.'):
+      self.evaluate(dist.prob([.1, .2, 1.2]))
 
   def testInvalidConcentration1(self):
     x = tf.Variable(1.)

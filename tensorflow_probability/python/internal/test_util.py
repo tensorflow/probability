@@ -90,6 +90,26 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
     all_true = np.ones_like(is_finite, dtype=np.bool)
     self.assertAllEqual(all_true, is_finite)
 
+  def assertAllPositiveInf(self, a):
+    """Assert that all entries in a `Tensor` are equal to positive infinity.
+
+    Args:
+      a: A `Tensor` whose entries must be verified as positive infinity.
+    """
+    is_positive_inf = np.isposinf(self._GetNdArray(a))
+    all_true = np.ones_like(is_positive_inf, dtype=np.bool)
+    self.assertAllEqual(all_true, is_positive_inf)
+
+  def assertAllNegativeInf(self, a):
+    """Assert that all entries in a `Tensor` are negative infinity.
+
+    Args:
+      a: A `Tensor` whose entries must be verified as negative infinity.
+    """
+    is_negative_inf = np.isneginf(self._GetNdArray(a))
+    all_true = np.ones_like(is_negative_inf, dtype=np.bool)
+    self.assertAllEqual(all_true, is_negative_inf)
+
   def assertAllNan(self, a):
     """Assert that every entry in a `Tensor` is NaN.
 

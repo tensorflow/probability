@@ -125,6 +125,14 @@ class OneHotCategoricalTest(test_util.TestCase):
       dist = tfd.OneHotCategorical(logits, validate_args=True)
       self.evaluate(dist.sample())
 
+  def testAssertValidSample(self):
+    logits = [0.1, 0.4, 0.5, 0.3, 0.1]
+    dist = tfd.OneHotCategorical(logits, validate_args=True)
+    with self.assertRaisesOpError('Condition x >= 0'):
+      self.evaluate(dist.prob([-1., 0., 1., 1., 0.]))
+    with self.assertRaisesOpError('Last dimension of sample must sum to 1.'):
+      self.evaluate(dist.log_prob([1., 0., 1., 0., 0.]))
+
   def testEntropyNoBatch(self):
     logits = np.log([0.2, 0.8]) - 50.
     dist = tfd.OneHotCategorical(logits, validate_args=True)

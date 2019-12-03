@@ -82,14 +82,10 @@ class BetaTest(test_util.TestCase):
     self.evaluate(dist.prob([.1, .3, .6]))
     self.evaluate(dist.prob([.2, .3, .5]))
     # Either condition can trigger.
-    with self.assertRaisesOpError("Sample must be positive."):
+    with self.assertRaisesOpError('Sample must be non-negative.'):
       self.evaluate(dist.prob([-1., 0.1, 0.5]))
-    with self.assertRaisesOpError("Sample must be positive."):
-      self.evaluate(dist.prob([0., 0.1, 0.5]))
-    with self.assertRaisesOpError("Sample must be less than `1`."):
+    with self.assertRaisesOpError('Sample must be less than or equal to `1`.'):
       self.evaluate(dist.prob([.1, .2, 1.2]))
-    with self.assertRaisesOpError("Sample must be less than `1`."):
-      self.evaluate(dist.prob([.1, .2, 1.0]))
 
   def testPdfTwoBatches(self):
     a = [1., 2]
@@ -154,7 +150,7 @@ class BetaTest(test_util.TestCase):
 
   def testLogPdfOnBoundaryIsFiniteWhenAlphaIsOne(self):
     b = [[0.01, 0.1, 1., 2], [5., 10., 2., 3]]
-    pdf = self.evaluate(tfd.Beta(1., b, validate_args=False).prob(0.))
+    pdf = self.evaluate(tfd.Beta(1., b, validate_args=True).prob(0.))
     self.assertAllEqual(np.ones_like(pdf, dtype=np.bool), np.isfinite(pdf))
 
   def testBetaMean(self):
@@ -185,13 +181,13 @@ class BetaTest(test_util.TestCase):
     a = np.array([1., 2, 3])
     b = np.array([2., 4, 1.2])
     dist = tfd.Beta(a, b, allow_nan_stats=False, validate_args=True)
-    with self.assertRaisesOpError("Condition x < y.*"):
+    with self.assertRaisesOpError('Condition x < y.*'):
       self.evaluate(dist.mode())
 
     a = np.array([2., 2, 3])
     b = np.array([1., 4, 1.2])
     dist = tfd.Beta(a, b, allow_nan_stats=False, validate_args=True)
-    with self.assertRaisesOpError("Condition x < y.*"):
+    with self.assertRaisesOpError('Condition x < y.*'):
       self.evaluate(dist.mode())
 
   def testBetaModeEnableAllowNanStats(self):
@@ -261,7 +257,7 @@ class BetaTest(test_util.TestCase):
     beta1 = tfd.Beta(
         concentration1=a_val,
         concentration0=b_val,
-        name="beta1",
+        name='beta1',
         validate_args=True)
     samples1 = self.evaluate(beta1.sample(n_val, seed=seed))
 
@@ -269,7 +265,7 @@ class BetaTest(test_util.TestCase):
     beta2 = tfd.Beta(
         concentration1=a_val,
         concentration0=b_val,
-        name="beta2",
+        name='beta2',
         validate_args=True)
     samples2 = self.evaluate(beta2.sample(n_val, seed=seed))
 
@@ -362,7 +358,7 @@ class BetaTest(test_util.TestCase):
   def testAssertsPositiveConcentration1(self):
     concentration1 = tf.Variable([1., 2., -3.])
     self.evaluate(concentration1.initializer)
-    with self.assertRaisesOpError("Concentration parameter must be positive."):
+    with self.assertRaisesOpError('Concentration parameter must be positive.'):
       d = tfd.Beta(
           concentration1=concentration1, concentration0=[5.],
           validate_args=True)
@@ -373,7 +369,7 @@ class BetaTest(test_util.TestCase):
     self.evaluate(concentration1.initializer)
     d = tfd.Beta(concentration1=concentration1, concentration0=[5.],
                  validate_args=True)
-    with self.assertRaisesOpError("Concentration parameter must be positive."):
+    with self.assertRaisesOpError('Concentration parameter must be positive.'):
       with tf.control_dependencies([concentration1.assign([1., 2., -3.])]):
         self.evaluate(d.sample())
 
@@ -390,7 +386,7 @@ class BetaTest(test_util.TestCase):
   def testAssertsPositiveConcentration0(self):
     concentration0 = tf.Variable([1., 2., -3.])
     self.evaluate(concentration0.initializer)
-    with self.assertRaisesOpError("Concentration parameter must be positive."):
+    with self.assertRaisesOpError('Concentration parameter must be positive.'):
       d = tfd.Beta(concentration0=concentration0, concentration1=[5.],
                    validate_args=True)
       self.evaluate(d.sample())
@@ -400,9 +396,17 @@ class BetaTest(test_util.TestCase):
     self.evaluate(concentration0.initializer)
     d = tfd.Beta(concentration0=concentration0, concentration1=[5.],
                  validate_args=True)
-    with self.assertRaisesOpError("Concentration parameter must be positive."):
+    with self.assertRaisesOpError('Concentration parameter must be positive.'):
       with tf.control_dependencies([concentration0.assign([1., 2., -3.])]):
         self.evaluate(d.sample())
 
-if __name__ == "__main__":
+  def testLogProbInfinityAtBoundary(self):
+    d = tfd.Beta(concentration0=[5., 0.5], concentration1=[5., 0.5],
+                 validate_args=True)
+    log_prob = self.evaluate(d.log_prob([[0.], [1.]]))
+    self.assertAllNegativeInf(log_prob[:, 0])
+    self.assertAllPositiveInf(log_prob[:, 1])
+
+
+if __name__ == '__main__':
   tf.test.main()

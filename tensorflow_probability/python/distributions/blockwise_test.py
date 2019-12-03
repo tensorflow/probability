@@ -121,6 +121,21 @@ class BlockwiseTest(test_util.TestCase):
       )
       self.evaluate(dist.mean())
 
+  def testAssertValidSample(self):
+    loc1 = tf1.placeholder_with_default(tf.zeros([2]), shape=None)
+    loc2 = tf1.placeholder_with_default(tf.zeros([2]), shape=None)
+    dist = tfd.Blockwise(
+        [
+            tfd.Normal(loc1, tf.ones_like(loc1)),
+            tfd.Normal(loc2, tf.ones_like(loc2)),
+        ],
+        validate_args=True,
+    )
+
+    with self.assertRaisesRegexp(
+        ValueError, 'must have at least one dimension'):
+      self.evaluate(dist.prob(3.))
+
   def testKlBlockwiseIsSum(self):
 
     gamma0 = tfd.Gamma(concentration=[1., 2., 3.], rate=1.)

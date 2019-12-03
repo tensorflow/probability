@@ -62,11 +62,6 @@ class _TruncatedNormalTestCase(test_util.TestCase):
   def setUp(self):
     self._rng = np.random.RandomState(42)
 
-  def assertAllFinite(self, a):
-    is_finite = np.isfinite(a)
-    all_true = np.ones_like(is_finite, dtype=np.bool)
-    self.assertAllEqual(all_true, is_finite)
-
   def assertAllGreaterEqual(self, a, b):
     comparison = a >= b
     all_true = np.ones_like(comparison, dtype=np.bool)
@@ -220,6 +215,20 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
           loc=0., scale=0.1, low=1.0, high=1.0, validate_args=True)
       self.evaluate(dist.mean())
 
+  def testAssertValidSample(self):
+    dist = tfd.TruncatedNormal(
+        loc=0., scale=2., low=-4., high=3., validate_args=True)
+    with self.assertRaisesOpError('must be greater than or equal to `low`'):
+      self.evaluate(dist.cdf([-4.2, 1.7, 2.3]))
+    with self.assertRaisesOpError('must be less than or equal to `high`'):
+      self.evaluate(dist.survival_function([2.3, -3.2, 4.]))
+
+  def testLogPdfAtBoundary(self):
+    dist = tfd.TruncatedNormal(
+        loc=[-2., 3.], scale=1., low=-4., high=2., validate_args=True)
+    log_pdf_at_boundary = self.evaluate(dist.log_prob([[-4.], [2.]]))
+    self.assertTrue(np.isfinite(log_pdf_at_boundary).all())
+
   def testNegativeSigmaFailsVarAssignment(self):
     dist = tfd.TruncatedNormal(
         loc=0., scale=tf.Variable(0.1), low=-1.0, high=1.0, validate_args=True)
@@ -301,7 +310,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
   def testReparametrizableBatch(self):
     def samples_sum(loc):
       dist = tfp.distributions.TruncatedNormal(
-          loc=loc, scale=1., low=-1., high=1.)
+          loc=loc, scale=1., low=-1., high=1., validate_args=True)
       return tf.reduce_sum(input_tensor=dist.sample(100))
 
     loc = tf.constant([0., 1.])
@@ -369,13 +378,13 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase):
   """Test by comparing TruncatedNormals with wide bounds and unbounded Normal.
   """
 
-  def constructDists(self, loc, scale):
+  def constructDists(self, loc, scale, validate_args=True):
     truncated_dist = tfd.TruncatedNormal(
         loc=loc,
         scale=scale,
         low=loc - (10. * scale),
         high=loc + (10. * scale),
-        validate_args=True)
+        validate_args=validate_args)
     normal_dist = tfd.Normal(loc=loc, scale=scale)
     return truncated_dist, normal_dist
 
@@ -406,7 +415,8 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase):
         truncated_samples, rejection_samples, rtol=1e-2, atol=1e-1)
 
   def testLogProb(self, loc, scale):
-    truncated_dist, normal_dist = self.constructDists(loc, scale)
+    truncated_dist, normal_dist = self.constructDists(
+        loc, scale, validate_args=False)
     low = self.evaluate(truncated_dist.low)
     high = self.evaluate(truncated_dist.high)
     test_x = list(np.float32(np.random.uniform(low, high, 10)))
@@ -445,9 +455,9 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase):
     (-2., 0.2, -1.5, -0.5))
 class TruncatedNormalTestCompareWithScipy(_TruncatedNormalTestCase):
 
-  def constructDists(self, loc, scale, low, high):
+  def constructDists(self, loc, scale, low, high, validate_args=True):
     tf_dist = tfd.TruncatedNormal(
-        loc=loc, scale=scale, low=low, high=high, validate_args=True)
+        loc=loc, scale=scale, low=low, high=high, validate_args=validate_args)
     sp_dist = scipy_trunc_norm_dist(loc, scale, low, high)
     return tf_dist, sp_dist
 
@@ -475,7 +485,8 @@ class TruncatedNormalTestCompareWithScipy(_TruncatedNormalTestCase):
         high - EPSILON
     ]
 
-    tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
+    tf_dist, sp_dist = self.constructDists(
+        loc, scale, low, high, validate_args=False)
 
     tf_log_prob = self.evaluate(tf_dist.log_prob(test_x))
     sp_log_prob = sp_dist.logpdf(test_x)
@@ -488,7 +499,8 @@ class TruncatedNormalTestCompareWithScipy(_TruncatedNormalTestCase):
         high - EPSILON, low - 100., high + 100.
     ]
 
-    tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
+    tf_dist, sp_dist = self.constructDists(
+        loc, scale, low, high, validate_args=False)
 
     tf_cdf = self.evaluate(tf_dist.cdf(test_x))
     sp_cdf = sp_dist.cdf(test_x)

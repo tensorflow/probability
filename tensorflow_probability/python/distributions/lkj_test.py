@@ -318,7 +318,19 @@ class LKJTest(test_util.TestCase):
     testee_lkj = tfd.LKJ(
         dimension=3, concentration=dtype([1., 4.]), validate_args=True)
     with self.assertRaisesRegexp(ValueError, 'dimension mismatch'):
-      testee_lkj.log_prob(tf.eye(4))
+      testee_lkj.log_prob(dtype(np.eye(4)))
+
+  def testAssertValidCorrelationMatrix(self, dtype):
+    lkj = tfd.LKJ(
+        dimension=2, concentration=dtype([1., 4.]), validate_args=True)
+    with self.assertRaisesOpError('Correlations must be >= -1.'):
+      self.evaluate(lkj.log_prob(dtype([[1., -1.3], [-1.3, 1.]])))
+    with self.assertRaisesOpError('Correlations must be <= 1.'):
+      self.evaluate(lkj.log_prob(dtype([[1., 1.3], [1.3, 1.]])))
+    with self.assertRaisesOpError('Self-correlations must be = 1.'):
+      self.evaluate(lkj.log_prob(dtype([[0.5, 0.5], [0.5, 1.]])))
+    with self.assertRaisesOpError('Correlation matrices must be symmetric.'):
+      self.evaluate(lkj.log_prob(dtype([[1., 0.2], [0.3, 1.]])))
 
   def testZeroDimension(self, dtype):
     testee_lkj = tfd.LKJ(

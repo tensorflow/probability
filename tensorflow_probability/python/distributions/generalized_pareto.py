@@ -225,16 +225,18 @@ class GeneralizedPareto(distribution.Distribution):
   def _log_prob(self, x):
     scale = tf.convert_to_tensor(self.scale)
     concentration = tf.convert_to_tensor(self.concentration)
-    z = self._z(x, scale, concentration)
+    z = self._z(x, scale)
     eq_zero = tf.equal(concentration, 0)  # Concentration = 0 ==> Exponential.
     nonzero_conc = tf.where(eq_zero, tf.constant(1, self.dtype), concentration)
-    where_nonzero = (1 / nonzero_conc + 1) * tf.math.log1p(nonzero_conc * z)
+    y = 1 / nonzero_conc + tf.ones_like(z, self.dtype)
+    where_nonzero = tf.where(
+        tf.equal(y, 0), y, y * tf.math.log1p(nonzero_conc * z))
     return -tf.math.log(scale) - tf.where(eq_zero, z, where_nonzero)
 
   def _log_survival_function(self, x):
     scale = tf.convert_to_tensor(self.scale)
     concentration = tf.convert_to_tensor(self.concentration)
-    z = self._z(x, scale, concentration)
+    z = self._z(x, scale)
     eq_zero = tf.equal(concentration, 0)  # Concentration = 0 ==> Exponential.
     nonzero_conc = tf.where(eq_zero, tf.constant(1, self.dtype), concentration)
     where_nonzero = -tf.math.log1p(nonzero_conc * z) / nonzero_conc
@@ -249,16 +251,8 @@ class GeneralizedPareto(distribution.Distribution):
     # always non-positive.
     return tfp_math.log1mexp(self._log_survival_function(x))
 
-  def _z(self, x, scale, concentration):
+  def _z(self, x, scale):
     loc = tf.convert_to_tensor(self.loc)
-    if self.validate_args:
-      valid = (x >= loc) & ((concentration >= 0) |
-                            (x <= loc - scale / concentration))
-      with tf.control_dependencies([
-          assert_util.assert_equal(
-              valid, True, message='`x` outside distribution\'s support.')
-      ]):
-        x = tf.identity(x)
     return (x - loc) / scale
 
   def _mean(self):
@@ -304,4 +298,21 @@ class GeneralizedPareto(distribution.Distribution):
       assertions.append(
           assert_util.assert_positive(
               self.scale, message='Argument `scale` must be positive.'))
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    concentration = tf.convert_to_tensor(self.concentration)
+    assertions.append(assert_util.assert_greater_equal(
+        x, loc, message='Sample must be greater than or equal to `loc`.'))
+    assertions.append(assert_util.assert_equal(
+        tf.logical_or(tf.greater_equal(concentration, 0),
+                      tf.less_equal(x, loc - scale / concentration)),
+        True,
+        message=('If `concentration < 0`, sample must be less than or '
+                 'equal to `loc - scale / concentration`.')))
     return assertions

@@ -186,7 +186,7 @@ class CategoricalTest(test_util.TestCase):
     # Note we're testing events outside [0, K-1].
     event = [0, 3, -1, 10]
     expected_cdf = [0.2, 0.8, 0.0, 1.0]
-    dist = tfd.Categorical(probs=histograms, validate_args=True)
+    dist = tfd.Categorical(probs=histograms, validate_args=False)
     cdf_op = dist.cdf(event)
 
     self.assertAllClose(expected_cdf, self.evaluate(cdf_op))
@@ -200,7 +200,7 @@ class CategoricalTest(test_util.TestCase):
     event = [-1., 10., 2.0, 2.5]
     expected_cdf = [0.0, 1.0, 0.6, 0.6]
     dist = tfd.Categorical(
-        probs=histograms, dtype=tf.float32, validate_args=True)
+        probs=histograms, dtype=tf.float32, validate_args=False)
     cdf_op = dist.cdf(event)
 
     self.assertAllClose(expected_cdf, self.evaluate(cdf_op))

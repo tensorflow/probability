@@ -164,7 +164,6 @@ class NegativeBinomial(distribution.Distribution):
         lam=rate, shape=[], dtype=self.dtype, seed=stream())
 
   def _cdf(self, x):
-    x = self._maybe_assert_valid_sample(x)
     logits = self._logits_parameter_no_checks()
     total_count = tf.convert_to_tensor(self.total_count)
     shape = self._batch_shape_tensor(
@@ -175,7 +174,6 @@ class NegativeBinomial(distribution.Distribution):
         tf.broadcast_to(tf.sigmoid(-logits), shape))
 
   def _log_prob(self, x):
-    x = self._maybe_assert_valid_sample(x)
     total_count = tf.convert_to_tensor(self.total_count)
     logits = self._logits_parameter_no_checks()
     log_unnormalized_prob = (total_count * tf.math.log_sigmoid(-logits) +
@@ -227,11 +225,13 @@ class NegativeBinomial(distribution.Distribution):
         is_init, self.validate_args, self._total_count, self._probs,
         self._logits)
 
-  def _maybe_assert_valid_sample(self, x):
+  def _sample_control_dependencies(self, x):
     """Check counts for proper shape and values, then return tensor version."""
+    assertions = []
     if not self.validate_args:
-      return x
-    return distribution_util.embed_check_nonnegative_integer_form(x)
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    return assertions
 
 
 def maybe_assert_negative_binomial_param_correctness(

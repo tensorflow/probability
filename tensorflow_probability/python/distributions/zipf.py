@@ -160,15 +160,8 @@ class Zipf(distribution.Distribution):
     # However, if interpolate_nondiscrete is True, we return the natural
     # continuous relaxation for x >= 1 which agrees with the log probability at
     # positive integer points.
-    #
-    # If interpolate_nondiscrete is False and validate_args is True, we check
-    # that the sample point x is in the support. That is, x is equivalent to a
-    # positive integer.
     power = power if power is not None else tf.convert_to_tensor(self.power)
     x = tf.cast(x, power.dtype)
-    if self.validate_args and not self.interpolate_nondiscrete:
-      x = distribution_util.embed_check_integer_casting_closed(
-          x, target_dtype=self.dtype, assert_positive=True)
     log_normalization = tf.math.log(tf.math.zeta(power, 1.))
 
     safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 1.)
@@ -330,4 +323,11 @@ class Zipf(distribution.Distribution):
       assertions.append(assert_util.assert_greater(
           self.power, np.ones([], dtype_util.as_numpy_dtype(self.power.dtype)),
           message='`power` must be greater than 1.'))
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args or self.interpolate_nondiscrete:
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
     return assertions

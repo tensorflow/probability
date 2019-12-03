@@ -293,3 +293,14 @@ class RelaxedBernoulli(distribution.Distribution):
         ])
 
     return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    assertions.append(assert_util.assert_less_equal(
+        x, tf.ones([], dtype=x.dtype),
+        message='Sample must be less than or equal to `1`.'))
+    return assertions

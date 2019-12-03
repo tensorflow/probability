@@ -300,7 +300,6 @@ class DirichletMultinomial(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_dirichlet_multinomial_sample_note)
   def _log_prob(self, counts):
-    counts = self._maybe_assert_valid_sample(counts)
     concentration = tf.convert_to_tensor(self.concentration)
     ordered_prob = (
         tf.math.lbeta(concentration + counts) -
@@ -374,17 +373,17 @@ class DirichletMultinomial(distribution.Distribution):
     c0 = self._compute_total_concentration(concentration)[..., tf.newaxis]
     return tf.sqrt((1. + c0 / total_count[..., tf.newaxis]) / (1. + c0))
 
-  def _maybe_assert_valid_sample(self, counts):
-    """Check counts for proper shape, values, then return tensor version."""
+  def _sample_control_dependencies(self, x):
+    """Checks the validity of a sample."""
+    assertions = []
     if not self.validate_args:
-      return counts
-    counts = distribution_util.embed_check_nonnegative_integer_form(counts)
-    return distribution_util.with_dependencies([
-        assert_util.assert_equal(
-            self.total_count,
-            tf.reduce_sum(counts, axis=-1),
-            message='counts last-dimension must sum to `self.total_count`'),
-    ], counts)
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    assertions.append(assert_util.assert_equal(
+        self.total_count,
+        tf.reduce_sum(x, axis=-1),
+        message='counts last-dimension must sum to `self.total_count`'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

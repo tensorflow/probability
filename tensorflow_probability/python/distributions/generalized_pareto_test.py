@@ -92,8 +92,36 @@ class GeneralizedParetoTest(test_util.TestCase):
     scale = np.array([0.1, 0.5, 1., 2., 5., 10.], dtype=np.float32)
     dist = tfd.GeneralizedPareto(
         loc=0, scale=scale, concentration=0, validate_args=True)
-    log_pdf = dist.log_prob(0.)
-    self.assertAllClose(-np.log(scale), self.evaluate(log_pdf), rtol=1e-5)
+    log_pdf = self.evaluate(dist.log_prob(0.))
+    self.assertAllClose(-np.log(scale), log_pdf, rtol=1e-5)
+
+    # Log prob should be finite on the boundary regardless of parameters.
+    loc = np.array([1., 2., 5.]).astype(np.float32)
+    scale = 2.
+    concentration = np.array([-5., -3.4, -1.]).astype(np.float32)
+    dist = tfd.GeneralizedPareto(
+        loc=loc, scale=scale, concentration=concentration, validate_args=True)
+    log_pdf_at_loc = self.evaluate(dist.log_prob(loc))
+    self.assertAllFinite(log_pdf_at_loc)
+
+    # TODO(b/144948687) Avoid `nan` at boundary. Ideally we'd do this test:
+    # boundary = loc - scale / concentration
+    # log_pdf_at_boundary = dist.log_prob(boundary)
+    # self.assertAllFinite(log_pdf_at_boundary)
+
+  def testAssertValidSample(self):
+    loc = np.array([1., 2., 5.]).astype(np.float32)
+    scale = 2.
+    concentration = np.array([-5., -3.4, 1.]).astype(np.float32)
+    dist = tfd.GeneralizedPareto(
+        loc=loc, scale=scale, concentration=concentration, validate_args=True)
+
+    with self.assertRaisesOpError('must be greater than or equal to `loc`'):
+      self.evaluate(dist.prob([1.3, 1.3, 6.]))
+
+    with self.assertRaisesOpError(
+        'less than or equal to `loc - scale / concentration`'):
+      self.evaluate(dist.cdf([1.5, 2.3, 6.]))
 
   @hp.given(generalized_paretos(batch_shape=[]))
   @tfp_hps.tfp_hp_settings()

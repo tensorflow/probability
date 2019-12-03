@@ -36,7 +36,7 @@ class VectorExponentialDiagTest(test_util.TestCase):
   def testScalarParams(self):
     mu = -1.
     diag = -5.
-    with self.assertRaisesRegexp(ValueError, "at least 1 dimension"):
+    with self.assertRaisesRegexp(ValueError, 'at least 1 dimension'):
       tfd.VectorExponentialDiag(mu, diag)
 
   def testVectorParams(self):
@@ -74,11 +74,16 @@ class VectorExponentialDiagTest(test_util.TestCase):
         [-2 + 1, 1. - 2], samps.mean(axis=0), atol=0., rtol=0.05)
     self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.05, rtol=0.05)
 
+  def testAssertValidSample(self):
+    v = tfd.VectorExponentialDiag(loc=[4., 5.], validate_args=True)
+    with self.assertRaisesOpError('Sample is not contained in the support.'):
+      self.evaluate(v.log_prob([3., 4.]))
+
   def testSingularScaleRaises(self):
     mu = [-1., 1]
     diag = [1., 0]
     dist = tfd.VectorExponentialDiag(mu, diag, validate_args=True)
-    with self.assertRaisesOpError("Singular"):
+    with self.assertRaisesOpError('Singular'):
       self.evaluate(dist.sample())
 
   def testSampleWithBroadcastScale(self):
@@ -175,5 +180,5 @@ class VectorExponentialDiagTest(test_util.TestCase):
         np.array([[3., 2, 1], [4., 5, 6]]), self.evaluate(vex.stddev()))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()
