@@ -309,7 +309,8 @@ class Blockwise(distribution_lib.Distribution):
     return x
 
   def _sample_n(self, n, seed=None):
-    return self._flatten_and_concat_event(self._distribution.sample(n))
+    return self._flatten_and_concat_event(
+        self._distribution.sample(n, seed=seed))
 
   def _log_prob(self, x):
     return self._distribution.log_prob(self._split_and_reshape_event(x))

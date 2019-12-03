@@ -27,6 +27,15 @@ from tensorflow_probability.python.internal import test_util
 tfd = tfp.distributions
 
 
+def _set_seed(seed):
+  """Helper which uses graph seed if using eager."""
+  # TODO(b/68017812): Deprecate once eager correctly supports seed.
+  if tf.executing_eagerly():
+    tf1.set_random_seed(seed)
+    return None
+  return seed
+
+
 @test_util.test_all_tf_execution_regimes
 class BlockwiseTest(test_util.TestCase):
 
@@ -78,6 +87,23 @@ class BlockwiseTest(test_util.TestCase):
     self.assertIs(tf.float32, x.dtype)
     self.assertEqual((2, 1), y_.shape)
     self.assertIs(tf.float32, y.dtype)
+
+  def testSampleReproducible(self):
+    Root = tfd.JointDistributionCoroutine.Root  # pylint: disable=invalid-name
+
+    def model():
+      e = yield Root(tfd.Independent(tfd.Exponential(rate=[100, 120]), 1))
+      g = yield tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])
+      n = yield Root(tfd.Normal(loc=0, scale=2.))
+      yield tfd.Normal(loc=n, scale=g)
+
+    joint = tfd.JointDistributionCoroutine(model)
+    d = tfd.Blockwise(joint, validate_args=True)
+
+    x = d.sample([2, 1], seed=_set_seed(42))
+    y = d.sample([2, 1], seed=_set_seed(42))
+    x_, y_ = self.evaluate([x, y])
+    self.assertAllClose(x_, y_)
 
   def testVaryingBatchShapeErrorStatic(self):
     with self.assertRaisesRegexp(
