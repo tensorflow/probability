@@ -716,9 +716,6 @@ class VariationalGaussianProcess(
   def jitter(self):
     return self._jitter
 
-  def _covariance(self):
-    return self._covariance_matrix
-
   def surrogate_posterior_kl_divergence_prior(self, name=None):
     """Compute `KL(surrogate inducing point posterior || prior)`.
 
