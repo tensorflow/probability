@@ -42,7 +42,3 @@ from tensorflow_probability.python.internal.backend.numpy.linear_operator_low_ra
 from tensorflow_probability.python.internal.backend.numpy.linear_operator_lower_triangular import *
 from tensorflow_probability.python.internal.backend.numpy.linear_operator_toeplitz import *
 from tensorflow_probability.python.internal.backend.numpy.linear_operator_zeros import *
-
-
-
-

@@ -41,9 +41,8 @@ __all__ = [
     'inv',
     'lu',
     'matmul',
-    'matrix_determinant',
+    'matvec',
     'matrix_rank',
-    'matrix_solve',
     'matrix_transpose',
     'norm',
     'pinv',
@@ -61,7 +60,6 @@ __all__ = [
     # 'logdet',
     # 'logm',
     # 'lstsq',
-    # 'matvec',
     # 'norm',
     # 'qr',
     # 'sqrtm',
@@ -194,6 +192,23 @@ def _matmul(a, b,
   return np.matmul(a, b)
 
 
+def _matvec(a, b,
+            transpose_a=False, transpose_b=False,
+            adjoint_a=False, adjoint_b=False,
+            a_is_sparse=False, b_is_sparse=False,
+            name=None):  # pylint: disable=unused-argument
+  """Numpy matvec wrapper."""
+  return np.squeeze(_matmul(
+      a,
+      b[..., np.newaxis],
+      transpose_a=transpose_a,
+      transpose_b=transpose_b,
+      adjoint_a=adjoint_a,
+      adjoint_b=adjoint_b,
+      a_is_sparse=a_is_sparse,
+      b_is_sparse=b_is_sparse), axis=-1)
+
+
 def _set_diag(input, diagonal, name=None):  # pylint: disable=unused-argument,redefined-builtin
   return np.where(np.eye(diagonal.shape[-1], dtype=np.bool),
                   diagonal[..., np.newaxis, :],
@@ -278,8 +293,6 @@ det = utils.copy_docstring(
     tf.linalg.det,
     lambda input, name=None: np.linalg.det(input))
 
-matrix_determinant = det
-
 diag = utils.copy_docstring(
     tf.linalg.diag,
     _diag)
@@ -303,6 +316,10 @@ lu = utils.copy_docstring(
 matmul = utils.copy_docstring(
     tf.linalg.matmul,
     _matmul)
+
+matvec = utils.copy_docstring(
+    tf.linalg.matvec,
+    _matvec)
 
 # TODO(b/140157055): Remove the try/except.
 matrix_rank = lambda input, name=None: np.linalg.matrix_rank(input)
@@ -348,7 +365,6 @@ matrix_transpose = utils.copy_docstring(
     _matrix_transpose)
 
 solve = utils.copy_docstring(tf.linalg.solve, _solve)
-matrix_solve = solve
 
 triangular_solve = utils.copy_docstring(
     tf.linalg.triangular_solve,

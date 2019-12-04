@@ -118,6 +118,8 @@ def main(argv):
       contents = contents.replace('np.bool', 'onp.bool')
       contents = contents.replace('np.dtype', 'onp.dtype')
       contents = contents.replace('np.unique', 'onp.unique')
+      contents = contents.replace('np.euler_gamma', 'onp.euler_gamma')
+      contents = contents.replace('np.nextafter', 'onp.nextafter')
     if is_test(argv[1]):  # Test-only rewrites.
       contents = contents.replace(
           'tf.test.main()',

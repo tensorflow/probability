@@ -117,13 +117,17 @@ def gen_module(module_name):
   code = code.replace('array_ops.broadcast_static_shape',
                       '_ops.broadcast_static_shape_as_tensorshape')
   code = code.replace('array_ops.broadcast_to', '_ops.broadcast_to')
+  code = code.replace('array_ops.matrix_diag', '_linalg.diag')
   code = code.replace('array_ops.matrix_band_part', '_linalg.band_part')
   code = code.replace('array_ops.matrix_diag_part', '_linalg.diag_part')
   code = code.replace('array_ops.matrix_set_diag', '_linalg.set_diag')
   code = code.replace('array_ops.matrix_transpose', '_linalg.matrix_transpose')
-  code = code.replace('math_ops.cast', '_ops.cast')
+  code = code.replace('array_ops.newaxis', '_ops.newaxis')
+  code = code.replace('linalg_ops.matrix_determinant', '_linalg.det')
+  code = code.replace('linalg_ops.matrix_solve', '_linalg.solve')
   code = code.replace('linalg_ops.matrix_triangular_solve',
                       'linalg_ops.triangular_solve')
+  code = code.replace('math_ops.cast', '_ops.cast')
   code = code.replace('math_ops.matmul', '_linalg.matmul')
 
   code = code.replace('self.dtype.real_dtype', 'dtypes.real_dtype(self.dtype)')

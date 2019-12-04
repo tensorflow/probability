@@ -28,6 +28,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import initializers
+from tensorflow_probability.python.internal.backend.numpy import linalg_impl
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import convert_to_tensor
@@ -64,6 +65,8 @@ __all__ = [
     'global_variables_initializer',
     'initializers',
     'logging',
+    'matrix_determinant',
+    'matrix_solve',
     'name_scope',
     'placeholder_with_default',
     'set_random_seed',
@@ -264,6 +267,9 @@ assert_rank_at_least = utils.copy_docstring(
 assert_rank_in = utils.copy_docstring(
     tf1.assert_rank_in,
     _assert_rank_in)
+
+matrix_determinant = linalg_impl.det
+matrix_solve = linalg_impl.solve
 
 colocate_with = utils.copy_docstring(
     tf1.colocate_with,
