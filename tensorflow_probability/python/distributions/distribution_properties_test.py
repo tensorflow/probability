@@ -24,7 +24,6 @@ import functools
 import inspect
 import re
 
-from absl import flags
 from absl import logging
 from absl.testing import parameterized
 import hypothesis as hp
@@ -41,12 +40,6 @@ from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-
-
-flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
-                  'TF execution mode to use')
-
-FLAGS = flags.FLAGS
 
 
 TF2_FRIENDLY_DISTS = (
@@ -1010,8 +1003,6 @@ class DistributionParamsAreVarsTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testDistribution(self, dist_name, data):
-    if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
-      return
     seed = test_util.test_seed()
     # Explicitly draw event_dim here to avoid relying on _params_event_ndims
     # later, so this test can support distributions that do not implement the
@@ -1190,7 +1181,6 @@ class ReproducibilityTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testDistribution(self, dist_name, data):
-    if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'): return
     dist = data.draw(distributions(dist_name=dist_name, enable_vars=False))
     seed = test_util.test_seed()
     s1 = self.evaluate(dist.sample(50, seed=seed))
@@ -1301,7 +1291,6 @@ class DistributionSlicingTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testDistributions(self, data):
-    if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'): return
     self._run_test(data)
 
   def disabled_testFailureCase(self):
@@ -1341,7 +1330,6 @@ class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testVmap(self, dist_name, data):
-    if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'): return
     dist = data.draw(distributions(
         dist_name=dist_name, enable_vars=False,
         validate_args=False))  # TODO(b/142826246): Enable validate_args.

@@ -17,7 +17,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from absl import flags
 from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
@@ -26,11 +25,6 @@ from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
 
-
-flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
-                  'TF execution mode to use')
-
-FLAGS = flags.FLAGS
 
 TF2_FRIENDLY_KERNELS = (
     'ExpSinSquared',
@@ -71,8 +65,6 @@ class KernelPropertiesTest(test_util.TestCase):
           hp.HealthCheck.too_slow,
           hp.HealthCheck.data_too_large])
   def testKernelGradient(self, kernel_name, data):
-    if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
-      return
     event_dim = data.draw(hps.integers(min_value=2, max_value=6))
     feature_ndims = data.draw(hps.integers(min_value=1, max_value=4))
     feature_dim = data.draw(hps.integers(min_value=2, max_value=6))

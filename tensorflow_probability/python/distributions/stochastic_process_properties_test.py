@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from absl import flags
 from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
@@ -32,12 +31,6 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
-
-
-flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
-                  'TF execution mode to use')
-
-FLAGS = flags.FLAGS
 
 
 PARAM_EVENT_NDIMS_BY_PROCESS_NAME = {
@@ -305,8 +298,6 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
       import unittest  # pylint: disable=g-import-not-at-top
       raise unittest.case.SkipTest('b/144181034')
 
-    if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
-      return
     seed = test_util.test_seed()
     process = data.draw(stochastic_processes(
         process_name=process_name, enable_vars=True))

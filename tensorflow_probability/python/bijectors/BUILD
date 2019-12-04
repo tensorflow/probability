@@ -108,15 +108,15 @@ py_library(
     ],
 )
 
-py_library(
-    name = "bijector_properties_testlib",
-    testonly = 1,
+py_test(
+    name = "bijector_properties_test",
+    size = "medium",
     srcs = ["bijector_properties_test.py"],
-    srcs_version = "PY2AND3",
+    shard_count = 10,
+    tags = ["hypothesis"],
     deps = [
         ":categorical_to_discrete",
         ":hypothesis_testlib",
-        # absl/flags dep,
         # absl/logging dep,
         # absl/testing:parameterized dep,
         # hypothesis dep,
@@ -129,42 +129,6 @@ py_library(
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_test(
-    name = "bijector_properties_test_eager",
-    size = "medium",
-    srcs = ["bijector_properties_test.py"],
-    args = ["--tf_mode=eager"],
-    main = "bijector_properties_test.py",
-    shard_count = 5,
-    tags = ["hypothesis"],
-    deps = [
-        ":bijector_properties_testlib",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_test(
-    name = "bijector_properties_test_graph",
-    size = "medium",
-    srcs = ["bijector_properties_test.py"],
-    args = ["--tf_mode=graph"],
-    main = "bijector_properties_test.py",
-    shard_count = 8,
-    tags = ["hypothesis"],
-    deps = [
-        ":bijector_properties_testlib",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-test_suite(
-    name = "bijector_properties_test",
-    tests = [
-        ":bijector_properties_test_eager",
-        ":bijector_properties_test_graph",
     ],
 )
 

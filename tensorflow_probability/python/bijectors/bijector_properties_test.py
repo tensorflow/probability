@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from absl import flags
 from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
@@ -31,11 +30,6 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
-
-flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
-                  'TF execution mode to use')
-
-FLAGS = flags.FLAGS
 
 TF2_FRIENDLY_BIJECTORS = (
     'AffineScalar',
@@ -457,8 +451,6 @@ class BijectorPropertiesTest(test_util.TestCase):
   @tfp_hps.tfp_hp_settings()
   def testBijector(self, bijector_name, data):
     tfp_hps.guitar_skip_if_matches('Tanh', bijector_name, 'b/144163991')
-    if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
-      return
     event_dim = data.draw(hps.integers(min_value=2, max_value=6))
     bijector = data.draw(
         bijectors(bijector_name=bijector_name, event_dim=event_dim,
