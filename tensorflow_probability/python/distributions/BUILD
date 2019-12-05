@@ -1858,7 +1858,7 @@ py_test(
 
 py_test(
     name = "horseshoe_test",
-    size = "small",
+    size = "medium",
     srcs = ["horseshoe_test.py"],
     deps = [
         # numpy dep,
