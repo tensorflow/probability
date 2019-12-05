@@ -25,6 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 
 @test_util.test_all_tf_execution_regimes
@@ -45,7 +46,10 @@ class _BatchReshapeTest(object):
                        old_batch_shape + [dims, dims])
     scale_ph = tf1.placeholder_with_default(
         scale, shape=scale.shape if self.is_static_shape else None)
-    wishart = tfd.Wishart(df=5, scale=scale_ph, validate_args=True)
+    wishart = tfd.WishartTriL(
+        df=5,
+        scale_tril=DeferredTensor(scale_ph, tf.linalg.cholesky),
+        validate_args=True)
     reshape_wishart = tfd.BatchReshape(
         distribution=wishart,
         batch_shape=new_batch_shape_ph,

@@ -306,7 +306,8 @@ class NutsTest(test_util.TestCase):
             name=name)
 
     strm = test_util.test_seed_stream()
-    wishart = tfd.Wishart(dim, scale=tf.eye(dim), input_output_cholesky=True)
+    wishart = tfd.WishartTriL(
+        dim, scale_tril=tf.eye(dim), input_output_cholesky=True)
     chol_precision = wishart.sample(seed=strm())
     mvn = MVNCholPrecisionTriL(
         loc=tf.zeros(dim), chol_precision_tril=chol_precision)
