@@ -2423,7 +2423,7 @@ py_test(
 
 py_test(
     name = "triangular_test",
-    size = "small",
+    size = "medium",
     srcs = ["triangular_test.py"],
     deps = [
         # numpy dep,
