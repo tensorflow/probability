@@ -121,7 +121,8 @@ class _ForecastTest(object):
 
     forecast_dist = tfp.sts.forecast(model, observed_time_series,
                                      parameter_samples=params,
-                                     num_steps_forecast=8)
+                                     num_steps_forecast=8,
+                                     include_observation_noise=True)
     forecast_mean = forecast_dist.mean()[..., 0]
     forecast_scale = forecast_dist.stddev()[..., 0]
     forecast_mean_, forecast_scale_ = self.evaluate(
@@ -142,6 +143,23 @@ class _ForecastTest(object):
     expected_forecast_scale = np.concatenate([
         [np.sqrt(observation_predictive_variance)] * 4,
         [np.sqrt(observation_predictive_variance + drift_scale**2)] * 4])
+    self.assertAllClose(forecast_mean_, expected_forecast_mean)
+    self.assertAllClose(forecast_scale_, expected_forecast_scale)
+
+    # Also test forecasting the noise-free function.
+    forecast_dist = tfp.sts.forecast(model, observed_time_series,
+                                     parameter_samples=params,
+                                     num_steps_forecast=8,
+                                     include_observation_noise=False)
+    forecast_mean = forecast_dist.mean()[..., 0]
+    forecast_scale = forecast_dist.stddev()[..., 0]
+    forecast_mean_, forecast_scale_ = self.evaluate(
+        (forecast_mean, forecast_scale))
+
+    noiseless_predictive_variance = (effect_posterior_variance + drift_scale**2)
+    expected_forecast_scale = np.concatenate([
+        [np.sqrt(noiseless_predictive_variance)] * 4,
+        [np.sqrt(noiseless_predictive_variance + drift_scale**2)] * 4])
     self.assertAllClose(forecast_mean_, expected_forecast_mean)
     self.assertAllClose(forecast_scale_, expected_forecast_scale)
 

@@ -171,7 +171,8 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
 def forecast(model,
              observed_time_series,
              parameter_samples,
-             num_steps_forecast):
+             num_steps_forecast,
+             include_observation_noise=True):
   """Construct predictive distribution over future observations.
 
   Given samples from the posterior over parameters, return the predictive
@@ -193,6 +194,11 @@ def forecast(model,
       model.parameters]`. This may optionally also be a map (Python `dict`) of
       parameter names to `Tensor` values.
     num_steps_forecast: scalar `int` `Tensor` number of steps to forecast.
+    include_observation_noise: Python `bool` indicating whether the forecast
+      distribution should include uncertainty from observation noise. If `True`,
+      the forecast is over future observations, if `False`, the forecast is over
+      future values of the latent noise-free time series.
+      Default value: `True`.
 
   Returns:
     forecast_dist: a `tfd.MixtureSameFamily` instance with event shape
@@ -338,6 +344,12 @@ def forecast(model,
       kwargs['constant_offset'] = tf.convert_to_tensor(
           value=model.constant_offset,
           dtype=forecast_prior.dtype)[..., tf.newaxis]
+
+    if not include_observation_noise:
+      parameter_samples_with_reordered_batch_dimension[
+          'observation_noise_scale'] = tf.zeros_like(
+              parameter_samples_with_reordered_batch_dimension[
+                  'observation_noise_scale'])
 
     # We assume that any STS model that has a `constant_offset` attribute
     # will allow it to be overridden as a kwarg. This is currently just
