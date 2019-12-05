@@ -200,7 +200,10 @@ _cumsum = functools.partial(_cumop, np.cumsum, initial_value=0.)
 
 def _lbeta(x, name=None):  # pylint: disable=unused-argument
   x = np.array(x)
-  return scipy_special.betaln(x[..., 0], x[..., 1])
+  log_prod_gamma_x = np.sum(scipy_special.gammaln(x), axis=-1)
+  sum_x = np.sum(x, axis=-1)
+  log_gamma_sum_x = scipy_special.gammaln(sum_x)
+  return log_prod_gamma_x - log_gamma_sum_x
 
 
 def _max_mask_non_finite(x, axis=-1, keepdims=False, mask=0):

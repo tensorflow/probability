@@ -189,12 +189,12 @@ class ProbitBernoulliTest(test_util.TestCase):
     self.assertEqual(2, len(self.evaluate(dist.log_prob([[1], [1]])).shape))
 
     dist = tfd.ProbitBernoulli(probs=0.5, validate_args=True)
-    self.assertEqual((), dist.log_prob(1).shape)
-    self.assertEqual((1), dist.log_prob([1]).shape)
-    self.assertEqual((2, 1), dist.log_prob([[1], [1]]).shape)
+    self.assertAllEqual([], dist.log_prob(1).shape)
+    self.assertAllEqual([1], dist.log_prob([1]).shape)
+    self.assertAllEqual([2, 1], dist.log_prob([[1], [1]]).shape)
 
     dist = tfd.ProbitBernoulli(probs=[[0.5], [0.5]], validate_args=True)
-    self.assertEqual((2, 1), dist.log_prob(1).shape)
+    self.assertAllEqual([2, 1], dist.log_prob(1).shape)
 
   def testBoundaryConditions(self):
     dist = tfd.ProbitBernoulli(probs=1.0, validate_args=True)

@@ -57,14 +57,14 @@ class MultinomialTest(test_util.TestCase):
     p = [[0.1, 0.2, 0.7], [0.2, 0.3, 0.5]]
     n = [[3.], [4]]
     dist = tfd.Multinomial(total_count=n, probs=p, validate_args=True)
-    self.assertEqual((2, 1), dist.total_count.shape)
+    self.assertAllEqual([2, 1], dist.total_count.shape)
     self.assertAllClose(n, self.evaluate(dist.total_count))
 
   def testP(self):
     p = [[0.1, 0.2, 0.7]]
     dist = tfd.Multinomial(total_count=3., probs=p, validate_args=True)
-    self.assertEqual((1, 3), dist.probs_parameter().shape)
-    self.assertEqual((1, 3), dist.logits_parameter().shape)
+    self.assertAllEqual([1, 3], dist.probs_parameter().shape)
+    self.assertAllEqual([1, 3], dist.logits_parameter().shape)
     self.assertAllClose(p, self.evaluate(dist.probs))
 
   def testLogits(self):
@@ -72,8 +72,8 @@ class MultinomialTest(test_util.TestCase):
     logits = np.log(p) - 50.
     multinom = tfd.Multinomial(
         total_count=3., logits=logits, validate_args=True)
-    self.assertEqual((1, 3), multinom.probs_parameter().shape)
-    self.assertEqual((1, 3), multinom.logits_parameter().shape)
+    self.assertAllEqual([1, 3], multinom.probs_parameter().shape)
+    self.assertAllEqual([1, 3], multinom.logits_parameter().shape)
     self.assertAllClose(p, self.evaluate(multinom.probs_parameter()))
     self.assertAllClose(logits, self.evaluate(multinom.logits_parameter()))
 
@@ -124,7 +124,7 @@ class MultinomialTest(test_util.TestCase):
     pmf = tfd.Multinomial(
         total_count=1., probs=p, validate_args=True).prob(counts)
     self.assertAllClose(0.5, self.evaluate(pmf))
-    self.assertEqual((), pmf.shape)
+    self.assertAllEqual([], pmf.shape)
 
   def testPmfBothZeroBatchesNontrivialN(self):
     # Both zero-batches.  No broadcast
@@ -134,7 +134,7 @@ class MultinomialTest(test_util.TestCase):
     pmf = dist.prob(counts)
     # 5 choose 3 = 5 choose 2 = 10. 10 * (.9)^2 * (.1)^3 = 81/10000.
     self.assertAllClose(81. / 10000, self.evaluate(pmf))
-    self.assertEqual((), pmf.shape)
+    self.assertAllEqual([], pmf.shape)
 
   def testPmfPStretchedInBroadcastWhenSameRank(self):
     p = [[0.1, 0.9]]
@@ -142,7 +142,7 @@ class MultinomialTest(test_util.TestCase):
     pmf = tfd.Multinomial(
         total_count=1., probs=p, validate_args=True).prob(counts)
     self.assertAllClose([0.1, 0.9], self.evaluate(pmf))
-    self.assertEqual((2), pmf.shape)
+    self.assertAllEqual([2], pmf.shape)
 
   def testPmfPStretchedInBroadcastWhenLowerRank(self):
     p = [0.1, 0.9]
@@ -150,7 +150,7 @@ class MultinomialTest(test_util.TestCase):
     pmf = tfd.Multinomial(
         total_count=1., probs=p, validate_args=True).prob(counts)
     self.assertAllClose([0.1, 0.9], self.evaluate(pmf))
-    self.assertEqual((2), pmf.shape)
+    self.assertAllEqual([2], pmf.shape)
 
   def testPmfCountsStretchedInBroadcastWhenSameRank(self):
     p = [[0.1, 0.9], [0.7, 0.3]]
@@ -158,7 +158,7 @@ class MultinomialTest(test_util.TestCase):
     pmf = tfd.Multinomial(
         total_count=1., probs=p, validate_args=True).prob(counts)
     self.assertAllClose(self.evaluate(pmf), [0.1, 0.7])
-    self.assertEqual((2), pmf.shape)
+    self.assertAllEqual([2], pmf.shape)
 
   def testPmfCountsStretchedInBroadcastWhenLowerRank(self):
     p = [[0.1, 0.9], [0.7, 0.3]]
@@ -166,7 +166,7 @@ class MultinomialTest(test_util.TestCase):
     pmf = tfd.Multinomial(
         total_count=1., probs=p, validate_args=True).prob(counts)
     self.assertAllClose(self.evaluate(pmf), [0.1, 0.7])
-    self.assertEqual(pmf.shape, (2))
+    self.assertAllEqual([2], pmf.shape)
 
   def testPmfShapeCountsStretchedN(self):
     # [2, 2, 2]
@@ -178,7 +178,7 @@ class MultinomialTest(test_util.TestCase):
     pmf = tfd.Multinomial(
         total_count=n, probs=p, validate_args=True).prob(counts)
     self.evaluate(pmf)
-    self.assertEqual(pmf.shape, (2, 2))
+    self.assertAllEqual([2, 2], pmf.shape)
 
   def testPmfShapeCountsPStretchedN(self):
     p = [0.1, 0.9]

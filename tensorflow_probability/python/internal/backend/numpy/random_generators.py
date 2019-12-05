@@ -105,7 +105,7 @@ def _gamma_jax(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):
   if seed is None:
     raise ValueError('Must provide PRNGKey to sample in JAX.')
   samps = jaxrand.gamma(key=seed, a=alpha, shape=shape, dtype=dtype)
-  return samps if beta is None else samps * beta
+  return samps if beta is None else samps / beta
 
 
 def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,

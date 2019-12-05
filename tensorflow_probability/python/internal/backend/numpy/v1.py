@@ -73,6 +73,9 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+
+
 def _assert_equal(x, y, data=None, summarize=None, message=None, name=None):
   del summarize
   del name
@@ -197,6 +200,14 @@ def _placeholder_with_default(input, shape, name=None):  # pylint: disable=redef
   return np.reshape(x, shape)
 
 
+def _set_random_seed(seed):
+  return np.random.seed(seed % (2**32 - 1))
+
+
+def _set_random_seed_jax(_):
+  pass
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 
@@ -289,7 +300,7 @@ global_variables_initializer = utils.copy_docstring(
 
 set_random_seed = utils.copy_docstring(
     tf1.set_random_seed,
-    lambda seed: np.random.seed(seed % (2**32 - 1)))
+    _set_random_seed_jax if JAX_MODE else _set_random_seed)
 
 
 class Session(object):

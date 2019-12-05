@@ -122,11 +122,13 @@ TEST_FILENAMES = [filename + "_test" for filename in FILENAMES if filename not i
 
 TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     "deprecated_linalg",
+    "gamma_gamma",
     "geometric",
     "gumbel",
     "inverse_gaussian",
-    "lognormal",
+    "kumaraswamy",
     "logitnormal",
+    "lognormal",
     "sample",
     "vector_sinh_arcsinh_diag",
 )]
