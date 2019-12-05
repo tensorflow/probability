@@ -80,6 +80,9 @@ py_test(
 )
 
 exports_files(
-    ["seed_stream.py"],
+    [
+        "seed_stream.py",
+        "seed_stream_test.py",
+    ],
     visibility = ["//tensorflow_probability:__subpackages__"],
 )

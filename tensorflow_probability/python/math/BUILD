@@ -335,10 +335,12 @@ py_test(
 
 exports_files(
     [
-        "gradient.py",
         "generic.py",
-        "numeric.py",
+        "generic_test.py",
+        "gradient.py",
+        "gradient_test.py",
         "linalg.py",
+        "numeric.py",
     ],
     visibility = ["//tensorflow_probability:__subpackages__"],
 )

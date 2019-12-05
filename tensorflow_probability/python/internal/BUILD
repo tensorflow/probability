@@ -368,6 +368,7 @@ exports_files(
         "prefer_static.py",
         "prefer_static_test.py",
         "special_math.py",
+        "special_math_test.py",
         "tensor_util.py",
         "test_combinations.py",
         "test_util.py",
