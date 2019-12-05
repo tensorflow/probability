@@ -131,7 +131,7 @@ class _IIDNormalTest(object):
             transition_variance=transition_variance_val,
             observation_variance=observation_variance_val)
 
-        x = iid_latents.sample([5, 3])
+        x = iid_latents.sample([5, 3], seed=test_util.test_seed())
         lp_kalman = iid_latents.log_prob(x)
 
         marginal_variance = tf.convert_to_tensor(
@@ -162,7 +162,7 @@ class _IIDNormalTest(object):
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -215,7 +215,8 @@ class SanityChecks(test_util.TestCase):
     expected_observations = (
         expected_latents * observation_coef + observation_shift)
 
-    mean_, sample_ = self.evaluate([model.mean(), model.sample()])
+    mean_, sample_ = self.evaluate(
+        [model.mean(), model.sample(seed=test_util.test_seed())])
     self.assertAllClose(mean_[..., 0], expected_observations)
     self.assertAllClose(sample_[..., 0], expected_observations)
 
@@ -280,7 +281,8 @@ class SanityChecks(test_util.TestCase):
             loc=[prior_mean], scale_diag=[prior_scale]),
         validate_args=True)
 
-    mean_, sample_ = self.evaluate([model.mean(), model.sample()])
+    mean_, sample_ = self.evaluate(
+        [model.mean(), model.sample(seed=test_util.test_seed())])
 
     # Manually compute the expected output of the model (i.e., the prior
     # mean). Since the model is near-deterministic, we expect any samples to
@@ -357,7 +359,9 @@ class SanityChecks(test_util.TestCase):
         validate_args=True)
 
     sample_, mean_, variance_ = self.evaluate(
-        [model.sample(), model.mean(), model.variance()])
+        [model.sample(seed=test_util.test_seed()),
+         model.mean(),
+         model.variance()])
 
     result_shape = [num_timesteps, latent_size]
     self.assertAllEqual(tensorshape_util.as_list(sample_.shape), result_shape)
@@ -479,7 +483,7 @@ class BatchTest(test_util.TestCase):
     self.assertEqual(tensorshape_util.as_list(model.event_shape), event_shape)
     self.assertEqual(tensorshape_util.as_list(model.batch_shape), batch_shape)
 
-    y = model.sample(sample_shape)
+    y = model.sample(sample_shape, seed=test_util.test_seed())
     self.assertEqual(
         tensorshape_util.as_list(y.shape),
         sample_shape + batch_shape + event_shape)
@@ -666,9 +670,9 @@ class MissingObservationsTests(test_util.TestCase):
     # use static shape, so we expect to catch any pervasive problems with both
     # approaches.
     observed_time_series = tf1.placeholder_with_default(
-        input=observed_time_series_, shape=None)
+        observed_time_series_, shape=None)
     observation_mask = tf1.placeholder_with_default(
-        input=observation_mask_, shape=None)
+        observation_mask_, shape=None)
 
     # In a random walk, skipping a timestep just adds variance, so we can
     # construct a model of the four 'unmasked' timesteps by directly collapsing
@@ -988,7 +992,7 @@ class KalmanSmootherTest(test_util.TestCase):
         dtype=np.float32)  # shape = [1, 5, 2]
     mask = np.array([[[False, False, True, False, False]]])  # shape = [1, 1, 5]
 
-    sample_shape = [5000, 2]
+    sample_shape = [8000, 2]
     posterior_samples = kf.posterior_sample(
         obs, sample_shape, seed=test_util.test_seed(), mask=mask)
     self.assertAllEqual(posterior_samples.shape,
@@ -1384,7 +1388,7 @@ class KalmanStepsTestDynamic(test_util.TestCase, _KalmanStepsTest):
 
   def build_tensor(self, tensor):
     return tf1.placeholder_with_default(
-        input=tf.convert_to_tensor(value=tensor), shape=None)
+        tf.convert_to_tensor(value=tensor), shape=None)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -1459,10 +1463,10 @@ class AugmentSampleShapeTestDynamic(test_util.TestCase,
 
   def build_inputs(self, full_batch_shape, partial_batch_shape):
     full_batch_shape = tf1.placeholder_with_default(
-        input=np.asarray(full_batch_shape, dtype=np.int32), shape=None)
+        np.asarray(full_batch_shape, dtype=np.int32), shape=None)
 
     partial_batch_shape = tf1.placeholder_with_default(
-        input=np.asarray(partial_batch_shape, dtype=np.int32), shape=None)
+        np.asarray(partial_batch_shape, dtype=np.int32), shape=None)
     dist = tfd.Normal(tf.random.normal(partial_batch_shape), 1.)
 
     return full_batch_shape, dist

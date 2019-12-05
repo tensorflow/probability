@@ -1286,7 +1286,7 @@ class DistributionSlicingTest(test_util.TestCase):
 
     # TODO(bjp): Enable sampling and log_prob checks. Currently, too many errors
     #     from out-of-domain samples.
-    # self.evaluate(dist.log_prob(dist.sample()))
+    # self.evaluate(dist.log_prob(dist.sample(seed=test_util.test_seed())))
 
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
@@ -1299,7 +1299,7 @@ class DistributionSlicingTest(test_util.TestCase):
     dist = tfd.TransformedDistribution(
         bijector=tfb.NormalCDF(), distribution=dist, batch_shape=[4])
     dist = tfb.Expm1()(dist)
-    samps = 1.7182817 + tf.zeros_like(dist.sample())
+    samps = 1.7182817 + tf.zeros_like(dist.sample(seed=test_util.test_seed()))
     self.assertAllClose(dist.log_prob(samps)[0], dist[0].log_prob(samps[0]))
 
 

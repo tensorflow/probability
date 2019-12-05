@@ -247,7 +247,7 @@ class GammaTest(test_util.TestCase):
     beta = tf.constant(3.0)
     _, [grad_alpha, grad_beta] = tfp.math.value_and_gradient(
         lambda a, b: tfd.Gamma(concentration=a, rate=b, validate_args=True).  # pylint: disable=g-long-lambda
-        sample(100), [alpha, beta])
+        sample(100, seed=test_util.test_seed()), [alpha, beta])
     self.assertIsNotNone(grad_alpha)
     self.assertIsNotNone(grad_beta)
 
@@ -382,7 +382,7 @@ class GammaTest(test_util.TestCase):
     self.evaluate(concentration.initializer)
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
       d = tfd.Gamma(concentration=concentration, rate=[5.], validate_args=True)
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveConcentrationAfterMutation(self):
     concentration = tf.Variable([1., 2., 3.])
@@ -390,7 +390,7 @@ class GammaTest(test_util.TestCase):
     d = tfd.Gamma(concentration=concentration, rate=[5.], validate_args=True)
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
       with tf.control_dependencies([concentration.assign([1., 2., -3.])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testGradientThroughRate(self):
     rate = tf.Variable(3.)
@@ -406,7 +406,7 @@ class GammaTest(test_util.TestCase):
     self.evaluate(rate.initializer)
     with self.assertRaisesOpError('Argument `rate` must be positive.'):
       d = tfd.Gamma(concentration=[5.], rate=rate, validate_args=True)
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveRateAfterMutation(self):
     rate = tf.Variable([1., 2., 3.])
@@ -415,7 +415,7 @@ class GammaTest(test_util.TestCase):
     self.evaluate(d.mean())
     with self.assertRaisesOpError('Argument `rate` must be positive.'):
       with tf.control_dependencies([rate.assign([1., 2., -3.])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
 if __name__ == '__main__':
   tf.test.main()

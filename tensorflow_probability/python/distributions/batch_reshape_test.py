@@ -487,7 +487,7 @@ class _BatchReshapeTest(object):
             tfd.BatchReshape(
                 distribution=mvn,
                 batch_shape=new_batch_shape_ph,
-                validate_args=True).sample())
+                validate_args=True).sample(seed=test_util.test_seed()))
 
   def test_non_positive_shape(self):
     dims = 2
@@ -521,7 +521,7 @@ class _BatchReshapeTest(object):
             tfd.BatchReshape(
                 distribution=mvn,
                 batch_shape=new_batch_shape_ph,
-                validate_args=True).sample())
+                validate_args=True).sample(seed=test_util.test_seed()))
 
   def test_non_vector_shape(self):
     if tf.executing_eagerly():
@@ -555,7 +555,7 @@ class _BatchReshapeTest(object):
             tfd.BatchReshape(
                 distribution=mvn,
                 batch_shape=new_batch_shape_ph,
-                validate_args=True).sample())
+                validate_args=True).sample(seed=test_util.test_seed()))
 
   def test_broadcasting_explicitly_unsupported(self):
     old_batch_shape = [4]
@@ -594,17 +594,17 @@ class _BatchReshapeTest(object):
     self.evaluate(batch_shape.initializer)
     with self.assertRaisesOpError('At most one dimension can be unknown'):
       d = tfd.BatchReshape(tfd.Normal(0, 1), batch_shape, validate_args=True)
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def test_mutated_at_most_one_implicit_dimension(self):
     batch_shape = tf.Variable([1, 1])
     self.evaluate(batch_shape.initializer)
     dist = tfd.Normal([[0]], [[1]])
     d = tfd.BatchReshape(dist, batch_shape, validate_args=True)
-    self.evaluate(d.sample())
+    self.evaluate(d.sample(seed=test_util.test_seed()))
     with self.assertRaisesOpError('At most one dimension can be unknown'):
       with tf.control_dependencies([batch_shape.assign([-1, -1])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
 
 @test_util.test_all_tf_execution_regimes

@@ -374,7 +374,7 @@ class LKJTest(test_util.TestCase):
     d = tfd.LKJ(dimension, concentration, validate_args=True)
     with self.assertRaisesOpError('Argument `concentration` must be >= 1.'):
       self.evaluate([v.initializer for v in d.variables])
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testValidateConcentrationAfterMutation(self, dtype):
     dimension = 3

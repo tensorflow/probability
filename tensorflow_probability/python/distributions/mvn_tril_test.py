@@ -151,7 +151,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     chol = [[1., 0.], [0., 0.]]
     with self.assertRaisesOpError("Singular operator"):
       mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
-      self.evaluate(mvn.sample())
+      self.evaluate(mvn.sample(seed=test_util.test_seed()))
 
   def testSampleWithSampleShape(self):
     mu = self._rng.rand(3, 5, 2)
@@ -572,7 +572,7 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
     self.evaluate(scale.initializer)
     with self.assertRaises(Exception):
       with tf.control_dependencies([scale.assign([[1., 0.], [1., 0.]])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
 
 if __name__ == "__main__":

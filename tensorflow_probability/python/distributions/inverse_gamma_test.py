@@ -239,7 +239,7 @@ class InverseGammaTest(test_util.TestCase):
     def inverse_gamma_sampler(alpha, beta):
       inv_gamma = tfd.InverseGamma(
           concentration=alpha, scale=beta, validate_args=True)
-      return inv_gamma.sample(100)
+      return inv_gamma.sample(100, seed=test_util.test_seed())
     _, [grad_alpha, grad_beta] = tfp.math.value_and_gradient(
         inverse_gamma_sampler, [alpha, beta])
     self.assertIsNotNone(grad_alpha)

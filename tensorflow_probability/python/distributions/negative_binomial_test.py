@@ -66,12 +66,12 @@ class NegativeBinomialTest(test_util.TestCase):
     invalid_ps = [-.01, 0., -2.,]
     with self.assertRaisesOpError('`probs` has components less than 0.'):
       negbinom = tfd.NegativeBinomial(5., probs=invalid_ps, validate_args=True)
-      self.evaluate(negbinom.sample())
+      self.evaluate(negbinom.sample(seed=test_util.test_seed()))
 
     invalid_ps = [1.01, 2., 1.001,]
     with self.assertRaisesOpError('`probs` has components greater than 1.'):
       negbinom = tfd.NegativeBinomial(5., probs=invalid_ps, validate_args=True)
-      self.evaluate(negbinom.sample())
+      self.evaluate(negbinom.sample(seed=test_util.test_seed()))
 
   def testInvalidNegativeCount(self):
     invalid_rs = [-3., 0., -2.,]
@@ -79,7 +79,7 @@ class NegativeBinomialTest(test_util.TestCase):
         '`total_count` has components less than 0.'):
       negbinom = tfd.NegativeBinomial(
           total_count=invalid_rs, probs=0.1, validate_args=True)
-      self.evaluate(negbinom.sample())
+      self.evaluate(negbinom.sample(seed=test_util.test_seed()))
 
   def testNegativeBinomialLogCdf(self):
     batch_size = 6
@@ -271,43 +271,43 @@ class NegativeBinomialFromVariableTest(test_util.TestCase):
     x = tf.Variable([0.1, 0.7, 0.0])
     d = tfd.NegativeBinomial(total_count=8., probs=x, validate_args=True)
     self.evaluate(x.initializer)
-    self.evaluate(d.sample())
+    self.evaluate(d.sample(seed=test_util.test_seed()))
     with tf.control_dependencies([x.assign([0.1, -0.7, 0.0])]):
       with self.assertRaisesOpError('`probs` has components less than 0.'):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
     with tf.control_dependencies([x.assign([0.1, 1.02, 0.0])]):
       with self.assertRaisesOpError('`probs` has components greater than 1.'):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertionProbsLessThanZero(self):
     x = tf.Variable([-0.1, 0.7, 0.0])
     d = tfd.NegativeBinomial(total_count=8., probs=x, validate_args=True)
     self.evaluate(x.initializer)
     with self.assertRaisesOpError('`probs` has components less than 0.'):
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertionProbsGreaterThanOne(self):
     x = tf.Variable([0.1, 1.07, 0.0])
     d = tfd.NegativeBinomial(total_count=8., probs=x, validate_args=True)
     self.evaluate(x.initializer)
     with self.assertRaisesOpError('`probs` has components greater than 1.'):
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertionsTotalCountMutation(self):
     x = tf.Variable([5., 3., 1.])
     d = tfd.NegativeBinomial(total_count=x, probs=0.7, validate_args=True)
     self.evaluate(x.initializer)
-    self.evaluate(d.sample())
+    self.evaluate(d.sample(seed=test_util.test_seed()))
     with tf.control_dependencies([x.assign([-5., 3., 1.])]):
       with self.assertRaisesOpError(
           '`total_count` has components less than 0.'):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
     with tf.control_dependencies([x.assign([5., 3.2, 1.])]):
       with self.assertRaisesOpError(
           '`total_count` has fractional components.'):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertionsTotalCount(self):
     x = tf.Variable([-5., 3., -1.])
@@ -315,14 +315,14 @@ class NegativeBinomialFromVariableTest(test_util.TestCase):
     self.evaluate(x.initializer)
     with self.assertRaisesOpError(
         '`total_count` has components less than 0.'):
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
     x = tf.Variable([5., 3.7, 1.])
     d = tfd.NegativeBinomial(total_count=x, probs=0.7, validate_args=True)
     self.evaluate(x.initializer)
     with self.assertRaisesOpError(
         '`total_count` has fractional components.'):
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
 
 if __name__ == '__main__':

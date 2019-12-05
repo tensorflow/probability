@@ -33,8 +33,9 @@ tfd = tfp.distributions
 
 
 def make_onehot_categorical(batch_shape, num_classes, dtype=tf.int32):
-  logits = tf.random.uniform(
-      list(batch_shape) + [num_classes], -10, 10, dtype=tf.float32) - 50.
+  logits = -50. + tf.random.uniform(
+      list(batch_shape) + [num_classes], -10, 10,
+      dtype=tf.float32, seed=test_util.test_seed())
   return tfd.OneHotCategorical(logits, dtype=dtype, validate_args=True)
 
 
@@ -89,11 +90,13 @@ class OneHotCategoricalTest(test_util.TestCase):
   def testDtype(self):
     dist = make_onehot_categorical([], 5, dtype=tf.int32)
     self.assertEqual(dist.dtype, tf.int32)
-    self.assertEqual(dist.dtype, dist.sample(5).dtype)
+    self.assertEqual(dist.dtype, dist.sample(
+        5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist.dtype, dist.mode().dtype)
     dist = make_onehot_categorical([], 5, dtype=tf.int64)
     self.assertEqual(dist.dtype, tf.int64)
-    self.assertEqual(dist.dtype, dist.sample(5).dtype)
+    self.assertEqual(dist.dtype, dist.sample(
+        5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist.dtype, dist.mode().dtype)
     self.assertEqual(dist.probs_parameter().dtype, tf.float32)
     self.assertEqual(dist.logits.dtype, tf.float32)
@@ -107,7 +110,7 @@ class OneHotCategoricalTest(test_util.TestCase):
     logits = tf1.placeholder_with_default(
         [[-1000.0, 1000.0], [1000.0, -1000.0]], shape=None)
     dist = tfd.OneHotCategorical(logits, validate_args=True)
-    sample = dist.sample()
+    sample = dist.sample(seed=test_util.test_seed())
     # Batch entry 0 will sample class 1, batch entry 1 will sample class 0.
     sample_value_batch = self.evaluate(sample)
     self.assertAllEqual([[0, 1], [1, 0]], sample_value_batch)
@@ -117,13 +120,13 @@ class OneHotCategoricalTest(test_util.TestCase):
     with self.assertRaises(
         ValueError, 'Argument `logits` must have rank at least 1.'):
       dist = tfd.OneHotCategorical(logits, validate_args=True)
-      self.evaluate(dist.sample())
+      self.evaluate(dist.sample(seed=test_util.test_seed()))
 
     logits = tf1.placeholder_with_default([[], []], shape=None)
     with self.assertRaises(
         ValueError, 'Argument `logits` must have final dimension >= 1.'):
       dist = tfd.OneHotCategorical(logits, validate_args=True)
-      self.evaluate(dist.sample())
+      self.evaluate(dist.sample(seed=test_util.test_seed()))
 
   def testAssertValidSample(self):
     logits = [0.1, 0.4, 0.5, 0.3, 0.1]
@@ -154,7 +157,7 @@ class OneHotCategoricalTest(test_util.TestCase):
     logits = self._rng.random_sample(size=(8, 2, 10))
     prob = np.exp(logits) / np.sum(np.exp(logits), axis=-1, keepdims=True)
     dist = tfd.OneHotCategorical(logits=logits, validate_args=True)
-    np_sample = self.evaluate(dist.sample())
+    np_sample = self.evaluate(dist.sample(seed=test_util.test_seed()))
     np_prob = self.evaluate(dist.prob(np_sample))
     expected_prob = prob[np_sample.astype(np.bool)]
     self.assertAllClose(expected_prob, np_prob.flatten())
@@ -164,7 +167,8 @@ class OneHotCategoricalTest(test_util.TestCase):
         probs=tf1.placeholder_with_default([1.], shape=None),
         validate_args=True)
     self.assertAllEqual(np.ones((5, 3, 1), dtype=np.int32),
-                        self.evaluate(d.sample([5, 3])))
+                        self.evaluate(d.sample(
+                            [5, 3], seed=test_util.test_seed())))
     self.assertAllClose([0., 0., 0., 0., 0.],
                         self.evaluate(d.log_prob(tf.ones((5, 1)))))
     self.assertAllClose(0., self.evaluate(d.entropy()))

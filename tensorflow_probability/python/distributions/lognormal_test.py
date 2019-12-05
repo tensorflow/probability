@@ -104,7 +104,7 @@ class LogNormalTest(test_util.TestCase):
     kl_expected_from_formula = ((mu_a - mu_b)**2 / (2 * sigma_b**2) + 0.5 * (
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
 
-    x = ln_a.sample(int(1e5), seed=test_util.test_seed())
+    x = ln_a.sample(int(2e5), seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(ln_a.log_prob(x) - ln_b.log_prob(x), axis=0)
     kl_sample_ = self.evaluate(kl_sample)
 

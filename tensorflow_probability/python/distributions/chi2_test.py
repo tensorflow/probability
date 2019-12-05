@@ -151,7 +151,7 @@ class Chi2Test(test_util.TestCase):
     with self.assertRaisesOpError('Argument `df` must be positive.'):
       d = tfd.Chi2(df, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveDfAfterMutation(self):
     df = tf.Variable([1., 2., 3.])

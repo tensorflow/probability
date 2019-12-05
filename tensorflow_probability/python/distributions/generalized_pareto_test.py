@@ -73,7 +73,7 @@ class GeneralizedParetoTest(test_util.TestCase):
   @hp.given(generalized_paretos(batch_shape=[]))
   @tfp_hps.tfp_hp_settings()
   def testLogPDF(self, dist):
-    xs = self.evaluate(dist.sample())
+    xs = self.evaluate(dist.sample(seed=test_util.test_seed()))
 
     logp = dist.log_prob(xs)
     self.assertEqual(dist.batch_shape, logp.shape)
@@ -126,7 +126,7 @@ class GeneralizedParetoTest(test_util.TestCase):
   @hp.given(generalized_paretos(batch_shape=[]))
   @tfp_hps.tfp_hp_settings()
   def testCDF(self, dist):
-    xs = self.evaluate(dist.sample())
+    xs = self.evaluate(dist.sample(seed=test_util.test_seed()))
     cdf = dist.cdf(xs)
     self.assertEqual(dist.batch_shape, cdf.shape)
 
@@ -292,7 +292,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       d = tfd.GeneralizedPareto(
           loc=0, scale=scale, concentration=1, validate_args=True)
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveScaleAfterMutation(self):
     scale = tf.Variable([1., 2., 3.])
@@ -302,7 +302,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     self.evaluate(d.mean())
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       with tf.control_dependencies([scale.assign([1., 2., -3.])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testGradientThroughLocScale(self):
     loc = tf.Variable(1.)

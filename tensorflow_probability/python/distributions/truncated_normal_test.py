@@ -123,7 +123,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
         tf.shape(
             input=tfd.TruncatedNormal(
                 loc=loc, scale=scale, low=low, high=high,
-                validate_args=True).sample()))
+                validate_args=True).sample(seed=test_util.test_seed())))
     self.assertAllEqual(desired_shape, sample_shape)
 
   def testParamShapes(self):
@@ -149,11 +149,13 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     self.assertEqual(dist.event_shape, ())
     self.assertAllEqual(self.evaluate(dist.event_shape_tensor()), [])
     self.assertAllEqual(self.evaluate(dist.batch_shape_tensor()), [2])
-    self.assertAllEqual(self.evaluate(dist.sample(5)).shape, [5, 2])
+    self.assertAllEqual(self.evaluate(
+        dist.sample(5, seed=test_util.test_seed())).shape, [5, 2])
 
     ub = tf1.placeholder_with_default(input=[[5., 11.]], shape=None)
     dist = tfd.TruncatedNormal(loc, scale, lb, ub, validate_args=True)
-    self.assertAllEqual(self.evaluate(dist.sample(5)).shape, [5, 1, 2])
+    self.assertAllEqual(self.evaluate(
+        dist.sample(5, seed=test_util.test_seed())).shape, [5, 1, 2])
 
   def testBatchSampling(self):
     """Check (empirically) the different parameters in a batch are respected.
@@ -312,7 +314,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     def samples_sum(loc):
       dist = tfp.distributions.TruncatedNormal(
           loc=loc, scale=1., low=-1., high=1., validate_args=True)
-      return tf.reduce_sum(input_tensor=dist.sample(100))
+      return tf.reduce_sum(dist.sample(100, seed=test_util.test_seed()))
 
     loc = tf.constant([0., 1.])
     _, dy_loc = self.evaluate(tfp.math.value_and_gradient(samples_sum, loc))

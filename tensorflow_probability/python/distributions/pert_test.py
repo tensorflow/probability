@@ -142,7 +142,7 @@ class PERTTest(test_util.TestCase):
     with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
                                 '`temperature` must be positive.'):
       dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
-      self.evaluate(dist.sample(1))
+      self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testTemperaturePositiveAfterMutation(self):
     temperature = tf.Variable(4.)
@@ -154,7 +154,7 @@ class PERTTest(test_util.TestCase):
     with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
                                 '`temperature` must be positive.'):
       with tf.control_dependencies([temperature.assign(-1.)]):
-        self.evaluate(dist.sample(1))
+        self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testPeakLowInequality(self):
     low = tf.Variable([1., 2., 3.])
@@ -165,7 +165,7 @@ class PERTTest(test_util.TestCase):
     with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
                                 '`peak` must be greater than `low`.'):
       dist = tfd.PERT(low, peak, high, validate_args=True)
-      self.evaluate(dist.sample(1))
+      self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testPeakLowInequalityAfterMutation(self):
     low = tf.Variable([1., 2., 3.])
@@ -177,7 +177,7 @@ class PERTTest(test_util.TestCase):
     with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
                                 '`peak` must be greater than `low`.'):
       with tf.control_dependencies([peak.assign([0., 0., 0.])]):
-        self.evaluate(dist.sample(1))
+        self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testHighPeakInequality(self):
     low = [1., 2., 3.]
@@ -188,7 +188,7 @@ class PERTTest(test_util.TestCase):
     with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
                                 '`high` must be greater than `peak`.'):
       dist = tfd.PERT(low, peak, high, validate_args=True)
-      self.evaluate(dist.sample(1))
+      self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testHighPeakInequalityAfterMutation(self):
     low = [1., 2., 3.]
@@ -200,7 +200,7 @@ class PERTTest(test_util.TestCase):
     with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
                                 '`high` must be greater than `peak`.'):
       with tf.control_dependencies([high.assign([0., 0., 0.])]):
-        self.evaluate(dist.sample(1))
+        self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testAssertValidSample(self):
     low = [1., 2., 3.]

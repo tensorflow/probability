@@ -196,19 +196,19 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample()
+    z = joint.sample(seed=test_util.test_seed())
 
     self.assertAllEqual(tf.shape(z[0]), [])
     self.assertAllEqual(tf.shape(z[1]), [])
     self.assertAllEqual(tf.shape(z[2]), [])
 
-    z = joint.sample(2)
+    z = joint.sample(2, seed=test_util.test_seed())
 
     self.assertAllEqual(tf.shape(z[0]), [2])
     self.assertAllEqual(tf.shape(z[1]), [2])
     self.assertAllEqual(tf.shape(z[2]), [2])
 
-    z = joint.sample([3, 2])
+    z = joint.sample([3, 2], seed=test_util.test_seed())
 
     self.assertAllEqual(tf.shape(z[0]), [3, 2])
     self.assertAllEqual(tf.shape(z[1]), [3, 2])
@@ -233,21 +233,21 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample()
+    z = joint.sample(seed=test_util.test_seed())
 
     self.assertAllEqual(tf.shape(z[0]), [])
     self.assertAllEqual(tf.shape(z[1]), [])
     self.assertAllEqual(tf.shape(z[2]), [20])
     self.assertAllEqual(tf.shape(z[3]), [20])
 
-    z = joint.sample(2)
+    z = joint.sample(2, seed=test_util.test_seed())
 
     self.assertAllEqual(tf.shape(z[0]), [2])
     self.assertAllEqual(tf.shape(z[1]), [2])
     self.assertAllEqual(tf.shape(z[2]), [2, 20])
     self.assertAllEqual(tf.shape(z[3]), [2, 20])
 
-    z = joint.sample([3, 2])
+    z = joint.sample([3, 2], seed=test_util.test_seed())
 
     self.assertAllEqual(tf.shape(z[0]), [3, 2])
     self.assertAllEqual(tf.shape(z[1]), [3, 2])
@@ -272,7 +272,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample()
+    z = joint.sample(seed=test_util.test_seed())
 
     log_prob = joint.log_prob(z)
 
@@ -307,7 +307,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample()
+    z = joint.sample(seed=test_util.test_seed())
     a, b, c = z  # pylint: disable=unbalanced-tuple-unpacking
 
     log_prob = joint.log_prob(z)
@@ -344,7 +344,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     with self.assertRaisesRegexp(
         Exception,
         'must be wrapped in `Root`'):
-      self.evaluate(joint.sample())
+      self.evaluate(joint.sample(seed=test_util.test_seed()))
 
   @parameterized.named_parameters(
       ('basic', basic_model_with_names_fn),
@@ -387,7 +387,8 @@ class JointDistributionCoroutineTest(test_util.TestCase):
   def test_singleton_model_works_with_args_and_kwargs(self, model_fn):
     d = tfd.JointDistributionCoroutine(model_fn)
 
-    xs = self.evaluate(d.sample())  # `xs` is a one-element list.
+    xs = self.evaluate(
+        d.sample(seed=test_util.test_seed()))  # `xs` is a one-element list.
 
     lp_from_structure = self.evaluate(d.log_prob(xs))
     lp_from_structure_kwarg = self.evaluate(d.log_prob(value=xs))
@@ -415,7 +416,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     with self.assertRaisesRegexp(
         Exception,
         'are not consistent with `sample_shape`'):
-      self.evaluate(joint.sample([3, 5]))
+      self.evaluate(joint.sample([3, 5], seed=test_util.test_seed()))
 
   def test_check_sample_shape(self):
     def dist():
@@ -433,7 +434,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     with self.assertRaisesRegexp(
         Exception,
         'are not consistent with `sample_shape`'):
-      self.evaluate(joint.sample([3, 5]))
+      self.evaluate(joint.sample([3, 5], seed=test_util.test_seed()))
 
   def test_log_prob_multiple_samples(self):
     # The joint distribution specified below corresponds to this
@@ -453,7 +454,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample(4)
+    z = joint.sample(4, seed=test_util.test_seed())
 
     log_prob = joint.log_prob(z)
 
@@ -487,7 +488,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample(4)
+    z = joint.sample(4, seed=test_util.test_seed())
 
     prob = joint.prob(z)
 
@@ -522,7 +523,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample()
+    z = joint.sample(seed=test_util.test_seed())
 
     a, b, c, d = z  # pylint: disable=unbalanced-tuple-unpacking
 
@@ -558,7 +559,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample([3, 5])
+    z = joint.sample([3, 5], seed=test_util.test_seed())
 
     a, b, c, d = z  # pylint: disable=unbalanced-tuple-unpacking
 
@@ -602,11 +603,13 @@ class JointDistributionCoroutineTest(test_util.TestCase):
         sample_dtype=sample_dtype,
         validate_args=True)
     self.assertAllEqual(sorted(sample_dtype._fields),
-                        sorted(joint.sample()._fields))
+                        sorted(joint.sample(
+                            seed=test_util.test_seed())._fields))
     ds, xs = joint.sample_distributions([2, 3])
     tf.nest.assert_same_structure(sample_dtype, ds)
     tf.nest.assert_same_structure(sample_dtype, xs)
-    self.assertEqual([3, 4], joint.log_prob(joint.sample([3, 4])).shape)
+    self.assertEqual([3, 4], joint.log_prob(
+        joint.sample([3, 4], seed=test_util.test_seed())).shape)
 
   def test_repr_with_custom_sample_dtype(self):
     def model():
@@ -690,7 +693,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     # Now, let's sample some "documents" and compute the log-prob of each.
     docs_shape = [2, 4]  # That is, 8 docs in the shape of [2, 4].
-    [n, theta, z, x] = lda.sample(docs_shape)
+    [n, theta, z, x] = lda.sample(docs_shape, seed=test_util.test_seed())
     log_probs = lda.log_prob([n, theta, z, x])
     self.assertEqual(docs_shape, log_probs.shape)
 

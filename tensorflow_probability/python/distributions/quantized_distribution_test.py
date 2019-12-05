@@ -364,7 +364,7 @@ class QuantizedDistributionTest(test_util.TestCase):
           high=1.,
           validate_args=True)
 
-      self.evaluate(qdist.sample())
+      self.evaluate(qdist.sample(seed=test_util.test_seed()))
 
   def testCutoffsMustBeIntegerValuedIfValidateArgsTrue(self):
     low = tf1.placeholder_with_default(1.5, shape=[])
@@ -374,7 +374,7 @@ class QuantizedDistributionTest(test_util.TestCase):
           low=low,
           high=10.,
           validate_args=True)
-      self.evaluate(qdist.sample())
+      self.evaluate(qdist.sample(seed=test_util.test_seed()))
 
   def testCutoffsCanBeFloatValuedIfValidateArgsFalse(self):
     qdist = tfd.QuantizedDistribution(
@@ -385,7 +385,7 @@ class QuantizedDistributionTest(test_util.TestCase):
     self.assertFalse(qdist.validate_args)  # Default is True.
 
     # Should not raise
-    self.evaluate(qdist.sample())
+    self.evaluate(qdist.sample(seed=test_util.test_seed()))
 
   def testDtypeAndShapeInheritedFromBaseDist(self):
     batch_shape = (2, 3)
@@ -425,7 +425,7 @@ class QuantizedDistributionTest(test_util.TestCase):
     with self.assertRaisesOpError('must be strictly less than'):
       d = tfd.QuantizedDistribution(
           dist, low=low, high=high, validate_args=True)
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testVariableLowAfterMutation(self):
     dist = tfd.Normal(0., scale=2.)
@@ -434,7 +434,7 @@ class QuantizedDistributionTest(test_util.TestCase):
     self.evaluate(low.initializer)
     with self.assertRaisesOpError('must be strictly less than'):
       with tf.control_dependencies([low.assign(6.)]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testVariableHighAfterMutation(self):
     dist = tfd.Normal(0., scale=2.)
@@ -460,7 +460,7 @@ class QuantizedDistributionTest(test_util.TestCase):
     self.evaluate(low.initializer)
     with self.assertRaisesOpError('has non-integer components.'):
       with tf.control_dependencies([low.assign(-3.3)]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testVariableNonScalar(self):
     dist = tfd.Normal(loc=tf.zeros((1, 4)), scale=2.)
@@ -469,7 +469,7 @@ class QuantizedDistributionTest(test_util.TestCase):
     d = tfd.QuantizedDistribution(dist, high=high, validate_args=True)
     self.evaluate(high.initializer)
     with self.assertRaisesOpError('adds extra batch dimensions'):
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testVariableNonScalarAfterMutation(self):
     dist = tfd.Normal(0., scale=2.)
@@ -478,7 +478,7 @@ class QuantizedDistributionTest(test_util.TestCase):
     self.evaluate(low.initializer)
     with self.assertRaisesOpError('adds extra batch dimensions'):
       with tf.control_dependencies([low.assign([[-2., 5., 1.]])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
 if __name__ == '__main__':
   tf.test.main()

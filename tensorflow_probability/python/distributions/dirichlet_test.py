@@ -251,7 +251,8 @@ class DirichletTest(test_util.TestCase):
   def testDirichletFullyReparameterized(self):
     alpha = tf.constant([1.0, 2.0, 3.0])
     _, grad_alpha = tfp.math.value_and_gradient(
-        lambda a: tfd.Dirichlet(a).sample(100), alpha)
+        lambda a: tfd.Dirichlet(a).sample(  # pylint: disable=g-long-lambda
+            100, seed=test_util.test_seed()), alpha)
     self.assertIsNotNone(grad_alpha)
 
   def testDirichletDirichletKL(self):

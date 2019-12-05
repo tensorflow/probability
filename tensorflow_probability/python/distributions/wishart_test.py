@@ -137,7 +137,7 @@ class WishartTest(test_util.TestCase):
 
   def testSamplingEmptyDist(self):
     w = tfd.WishartTriL(df=[1], scale_tril=[[1.]], validate_args=True)
-    self.evaluate(w[:0].sample())
+    self.evaluate(w[:0].sample(seed=test_util.test_seed()))
 
   def testLogProbEmptyDist(self):
     w = tfd.WishartTriL(df=[1], scale_tril=[[1.]], validate_args=True)
@@ -521,7 +521,7 @@ class WishartTest(test_util.TestCase):
     msg = ('cannot be less than dimension of scale matrix.')
     with self.assertRaisesOpError(msg):
       with tf.control_dependencies([df.assign(1.)]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsVariableScale(self):
     df = 4
@@ -537,7 +537,7 @@ class WishartTest(test_util.TestCase):
     self.evaluate(scale_tril.initializer)
     with self.assertRaisesOpError('cannot be less than'):
       d = tfd.WishartTriL(df=df, scale_tril=scale_tril, validate_args=True)
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsVariableScaleAfterMutation(self):
     df = tf.Variable(3.)
@@ -548,7 +548,7 @@ class WishartTest(test_util.TestCase):
     msg = 'cannot be less than dimension of scale matrix'
     with self.assertRaisesOpError(msg):
       with tf.control_dependencies([df.assign(-2.)]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
     invalid_scale_tril = chol(make_pd(2., 4.)).astype(np.float32)
     with self.assertRaisesOpError(msg):
@@ -578,7 +578,7 @@ class WishartTest(test_util.TestCase):
     with self.assertRaisesOpError('`scale_tril` must be positive definite.'):
       non_pd_scale = [[-2., 0.], [1., 3.]]
       with tf.control_dependencies([scale_tril.assign(non_pd_scale)]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
     with self.assertRaisesOpError('`scale_tril` must be square.'):
       non_square_scale = [[1., 0], [-2., 1.], [1., 1.]]

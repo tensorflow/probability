@@ -309,11 +309,14 @@ class DistributionTest(test_util.TestCase):
         params = dict([(name, tf.random.normal(shape))
                        for name, shape in param_shapes.items()])
         dist = cls(**params)
-        self.assertAllEqual(sample_shape,
-                            self.evaluate(tf.shape(dist.sample())))
+        self.assertAllEqual(
+            sample_shape,
+            self.evaluate(tf.shape(dist.sample(seed=test_util.test_seed()))))
         dist_copy = dist.copy()
-        self.assertAllEqual(sample_shape,
-                            self.evaluate(tf.shape(dist_copy.sample())))
+        self.assertAllEqual(
+            sample_shape,
+            self.evaluate(tf.shape(dist_copy.sample(
+                seed=test_util.test_seed()))))
         self.assertEqual(dist.parameters, dist_copy.parameters)
 
   def testCopyExtraArgs(self):
@@ -461,10 +464,13 @@ class DistributionTest(test_util.TestCase):
     x_duplicate = tfd.Normal(loc=0., scale=1., name='x')
     with tf.name_scope('y') as name:
       y = tfd.Bernoulli(logits=0., name=name)
-    x_sample = x.sample(name='custom_sample')
-    x_sample_duplicate = x.sample(name='custom_sample')
+    x_sample = x.sample(
+        name='custom_sample', seed=test_util.test_seed())
+    x_sample_duplicate = x.sample(
+        name='custom_sample', seed=test_util.test_seed())
     x_log_prob = x.log_prob(0., name='custom_log_prob')
-    x_duplicate_sample = x_duplicate.sample(name='custom_sample')
+    x_duplicate_sample = x_duplicate.sample(
+        name='custom_sample', seed=test_util.test_seed())
 
     self.assertStartsWith(x.name, 'x')
     self.assertStartsWith(y.name, 'y')

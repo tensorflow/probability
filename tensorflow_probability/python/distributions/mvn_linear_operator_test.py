@@ -134,7 +134,7 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
     self.evaluate(scale_tensor.initializer)
     with self.assertRaises(Exception):
       with tf.control_dependencies([scale_tensor.assign([[1., 0.], [1., 0.]])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testKLBatch(self):
     batch_shape = [2]

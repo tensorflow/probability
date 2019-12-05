@@ -40,7 +40,8 @@ class _HorseshoeTest(object):
     self.assertAllEqual(
         expected,
         self.evaluate(
-            tf.shape(tfd.Horseshoe(scale, validate_args=True).sample())))
+            tf.shape(tfd.Horseshoe(scale, validate_args=True).sample(
+                seed=test_util.test_seed()))))
 
   def _test_param_static_shapes(self, sample_shape, expected):
     param_shapes = tfd.Horseshoe.param_static_shapes(sample_shape)
@@ -121,7 +122,7 @@ class _HorseshoeTest(object):
   def testNegativeScaleFails(self):
     with self.assertRaisesOpError("Condition x > 0 did not hold"):
       dist = tfd.Horseshoe(scale=[self.dtype(-5)], validate_args=True, name="G")
-      self.evaluate(dist.sample(1))
+      self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testHorseshoeShape(self):
     scale = self._test_param([6.0] * 5)

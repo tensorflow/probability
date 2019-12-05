@@ -169,7 +169,8 @@ class LogisticTest(test_util.TestCase):
     dist = tfd.Logistic(loc, scale, validate_args=True)
     self.assertEqual(dist.dtype, tf.float32)
     self.assertEqual(dist.loc.dtype, dist.scale.dtype)
-    self.assertEqual(dist.dtype, dist.sample(5).dtype)
+    self.assertEqual(dist.dtype, dist.sample(
+        5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist.dtype, dist.mode().dtype)
     self.assertEqual(dist.loc.dtype, dist.mean().dtype)
     self.assertEqual(dist.loc.dtype, dist.variance().dtype)
@@ -182,7 +183,8 @@ class LogisticTest(test_util.TestCase):
     scale = tf.constant(1.0, dtype=tf.float64)
     dist64 = tfd.Logistic(loc, scale, validate_args=True)
     self.assertEqual(dist64.dtype, tf.float64)
-    self.assertEqual(dist64.dtype, dist64.sample(5).dtype)
+    self.assertEqual(dist64.dtype, dist64.sample(
+        5, seed=test_util.test_seed()).dtype)
 
   def testGradientThroughParams(self):
     loc = tf.Variable([-5., 0., 5.])
@@ -199,7 +201,7 @@ class LogisticTest(test_util.TestCase):
     with self.assertRaisesOpError("Argument `scale` must be positive."):
       d = tfd.Logistic(loc=0, scale=scale, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveScaleAfterMutation(self):
     scale = tf.Variable([1., 2., 3.])
@@ -207,7 +209,7 @@ class LogisticTest(test_util.TestCase):
     d = tfd.Logistic(loc=0., scale=scale, validate_args=True)
     with self.assertRaisesOpError("Argument `scale` must be positive."):
       with tf.control_dependencies([scale.assign([1., 2., -3.])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertParamsAreFloats(self):
     loc = tf.convert_to_tensor(0, dtype=tf.int32)

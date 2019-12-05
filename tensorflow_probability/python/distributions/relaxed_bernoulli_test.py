@@ -91,7 +91,7 @@ class RelaxedBernoulliTest(test_util.TestCase):
     p = tf.constant([0.1, 0.4])
     with self.assertRaises(tf.errors.InvalidArgumentError):
       dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
-      sample = dist.sample()
+      sample = dist.sample(seed=test_util.test_seed())
       self.evaluate(sample)
 
   def testDtype(self):
@@ -99,7 +99,8 @@ class RelaxedBernoulliTest(test_util.TestCase):
     p = tf.constant([0.1, 0.4], dtype=tf.float32)
     dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
     self.assertEqual(dist.dtype, tf.float32)
-    self.assertEqual(dist.dtype, dist.sample(5).dtype)
+    self.assertEqual(dist.dtype, dist.sample(
+        5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist.probs.dtype, dist.prob([0.0]).dtype)
     self.assertEqual(dist.probs.dtype, dist.log_prob([0.0]).dtype)
 
@@ -107,7 +108,8 @@ class RelaxedBernoulliTest(test_util.TestCase):
     p = tf.constant([0.1, 0.4], dtype=tf.float64)
     dist64 = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
     self.assertEqual(dist64.dtype, tf.float64)
-    self.assertEqual(dist64.dtype, dist64.sample(5).dtype)
+    self.assertEqual(dist64.dtype, dist64.sample(
+        5, seed=test_util.test_seed()).dtype)
 
   def testLogProb(self):
     t = np.array(1.0, dtype=np.float64)
@@ -188,12 +190,12 @@ class RelaxedBernoulliTest(test_util.TestCase):
     logits = tf.Variable(np.zeros((1, 5)), shape=tf.TensorShape((1, None)))
     d = tfd.RelaxedBernoulli(0.5, logits, validate_args=True)
     self.evaluate(logits.initializer)
-    d.sample()
+    d.sample(seed=test_util.test_seed())
 
     if not tf.executing_eagerly():
       logits = tf1.placeholder(tf.float32, shape=(1, None))
       d = tfd.RelaxedBernoulli(0.5, logits=logits, validate_args=True)
-      d.sample()
+      d.sample(seed=test_util.test_seed())
 
 
 @test_util.test_all_tf_execution_regimes
@@ -214,7 +216,7 @@ class RelaxedBernoulliFromVariableTest(test_util.TestCase):
     self.evaluate(x.initializer)
     d = tfd.RelaxedBernoulli(0.5, probs=x, validate_args=True)
     with tf.GradientTape() as tape:
-      loss = -d.sample()
+      loss = -d.sample(seed=test_util.test_seed())
     g = tape.gradient(loss, d.trainable_variables)
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
@@ -224,7 +226,7 @@ class RelaxedBernoulliFromVariableTest(test_util.TestCase):
     self.evaluate(x.initializer)
     d = tfd.RelaxedBernoulli(x, probs=[0.8, 0.5], validate_args=True)
     with tf.GradientTape() as tape:
-      loss = -d.sample()
+      loss = -d.sample(seed=test_util.test_seed())
     g = tape.gradient(loss, d.trainable_variables)
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
@@ -233,27 +235,27 @@ class RelaxedBernoulliFromVariableTest(test_util.TestCase):
     x = tf.Variable([0.1, 0.7, 0.0])
     d = tfd.RelaxedBernoulli(0.5, probs=x, validate_args=True)
     self.evaluate(x.initializer)
-    self.evaluate(d.sample())
+    self.evaluate(d.sample(seed=test_util.test_seed()))
     with tf.control_dependencies([x.assign([0.1, -0.7, 0.0])]):
       with self.assertRaisesOpError(
           'Argument `probs` has components less than 0.'):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
     with tf.control_dependencies([x.assign([0.1, 1.7, 0.0])]):
       with self.assertRaisesOpError(
           'Argument `probs` has components greater than 1.'):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertionsTemperature(self):
     x = tf.Variable(.8)
     probs = [0.1, .35, 0.7]
     d = tfd.RelaxedBernoulli(x, probs=probs, validate_args=True)
     self.evaluate(x.initializer)
-    self.evaluate(d.sample())
+    self.evaluate(d.sample(seed=test_util.test_seed()))
     with tf.control_dependencies([x.assign(-1.2)]):
       with self.assertRaisesOpError(
           'Argument `temperature` must be positive.'):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
 if __name__ == '__main__':
   tf.test.main()

@@ -226,7 +226,7 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
         quadrature_size=8,
         validate_args=True)
 
-    samps = vdm.sample(10000)
+    samps = vdm.sample(10000, seed=test_util.test_seed())
     self.assertAllEqual((10000, 3, 1), samps.shape)
     samps_ = self.evaluate(samps).reshape(10000, 3)  # Make scalar event shape.
 
@@ -262,7 +262,7 @@ class VectorDiffeomixtureTest(test_util.VectorDistributionTestHelpers,
         quadrature_size=8,
         validate_args=True)
 
-    samps = vdm.sample(10000)
+    samps = vdm.sample(10000, seed=test_util.test_seed())
     self.assertAllEqual((10000, 3, 1), samps.shape)
     samps_ = self.evaluate(samps).reshape(10000, 3)  # Make scalar event shape.
 

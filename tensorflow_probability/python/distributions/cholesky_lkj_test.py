@@ -61,13 +61,13 @@ class CholeskyLKJTest(test_util.TestCase):
   def testZeroDimension(self, dtype):
     testee_lkj = tfd.CholeskyLKJ(
         dimension=0, concentration=dtype([1., 4.]), validate_args=True)
-    results = testee_lkj.sample(sample_shape=[4, 3])
+    results = testee_lkj.sample(sample_shape=[4, 3], seed=test_util.test_seed())
     self.assertEqual(results.shape, [4, 3, 2, 0, 0])
 
   def testOneDimension(self, dtype):
     testee_lkj = tfd.CholeskyLKJ(
         dimension=1, concentration=dtype([1., 4.]), validate_args=True)
-    results = testee_lkj.sample(sample_shape=[4, 3])
+    results = testee_lkj.sample(sample_shape=[4, 3], seed=test_util.test_seed())
     self.assertEqual(results.shape, [4, 3, 2, 1, 1])
 
   def testValidateLowerTriangularInput(self, dtype):
@@ -82,7 +82,7 @@ class CholeskyLKJTest(test_util.TestCase):
     d = tfd.CholeskyLKJ(dimension, concentration, validate_args=True)
     with self.assertRaisesOpError('Argument `concentration` must be >= 1.'):
       self.evaluate([v.initializer for v in d.variables])
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testValidateConcentrationAfterMutation(self, dtype):
     dimension = 3
@@ -91,7 +91,7 @@ class CholeskyLKJTest(test_util.TestCase):
     self.evaluate([v.initializer for v in d.variables])
     with self.assertRaisesOpError('Argument `concentration` must be >= 1.'):
       with tf.control_dependencies([concentration.assign(0.5)]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
 
 if __name__ == '__main__':

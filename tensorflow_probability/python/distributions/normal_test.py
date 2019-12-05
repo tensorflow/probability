@@ -50,7 +50,8 @@ class NormalTest(test_util.TestCase):
     self.assertAllEqual(
         expected,
         self.evaluate(
-            tf.shape(tfd.Normal(mu, sigma, validate_args=True).sample())))
+            tf.shape(tfd.Normal(mu, sigma, validate_args=True).sample(
+                seed=test_util.test_seed()))))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.Normal.param_static_shapes(sample_shape)
@@ -380,7 +381,8 @@ class NormalTest(test_util.TestCase):
     mu = tf.constant(4.0)
     sigma = tf.constant(3.0)
     _, [grad_mu, grad_sigma] = tfp.math.value_and_gradient(
-        lambda m, s: tfd.Normal(loc=m, scale=s, validate_args=True).sample(100),
+        lambda m, s: tfd.Normal(loc=m, scale=s, validate_args=True).sample(  # pylint: disable=g-long-lambda
+            100, seed=test_util.test_seed()),
         [mu, sigma])
     grad_mu, grad_sigma = self.evaluate([grad_mu, grad_sigma])
     self.assertIsNotNone(grad_mu)

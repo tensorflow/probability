@@ -50,7 +50,9 @@ class DirichletMultinomialTest(test_util.TestCase):
     self.assertAllEqual([3, 2], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([2]), dist.event_shape)
     self.assertEqual(tf.TensorShape([3, 2]), dist.batch_shape)
-    self.assertEqual(tf.TensorShape([3, 2, 2]), dist.sample().shape)
+    self.assertEqual(
+        tf.TensorShape([3, 2, 2]), dist.sample(
+            seed=test_util.test_seed()).shape)
 
   def testNproperty(self):
     alpha = [[1., 2, 3]]
@@ -459,7 +461,7 @@ class DirichletMultinomialTest(test_util.TestCase):
     concentration = tf.constant([0.1, 0.1, 0.1])
     _, [grad_total_count, grad_concentration] = tfp.math.value_and_gradient(
         lambda n, c: tfd.DirichletMultinomial(n, c, validate_args=True).sample(  # pylint: disable=g-long-lambda
-            100), [total_count, concentration])
+            100, seed=test_util.test_seed()), [total_count, concentration])
     self.assertIsNone(grad_total_count)
     self.assertIsNone(grad_concentration)
 

@@ -156,7 +156,8 @@ class DeterministicTest(test_util.TestCase):
   def testSampleNoBatchDims(self):
     deterministic = tfd.Deterministic(0., validate_args=True)
     for sample_shape in [(), (4,)]:
-      sample = deterministic.sample(sample_shape)
+      sample = deterministic.sample(
+          sample_shape, seed=test_util.test_seed())
       self.assertAllEqual(sample_shape, sample.shape)
       self.assertAllClose(
           np.zeros(sample_shape).astype(np.float32), self.evaluate(sample))
@@ -164,7 +165,7 @@ class DeterministicTest(test_util.TestCase):
   def testSampleWithBatchDims(self):
     deterministic = tfd.Deterministic([0., 0.], validate_args=True)
     for sample_shape in [(), (4,)]:
-      sample = deterministic.sample(sample_shape)
+      sample = deterministic.sample(sample_shape, seed=test_util.test_seed())
       self.assertAllEqual(sample_shape + (2,), sample.shape)
       self.assertAllClose(
           np.zeros(sample_shape + (2,)).astype(np.float32),
@@ -173,7 +174,7 @@ class DeterministicTest(test_util.TestCase):
   def testSampleWithBatchAtol(self):
     deterministic = tfd.Deterministic(0., atol=[.1, .1], validate_args=True)
     for sample_shape in [(), (4,)]:
-      sample = deterministic.sample(sample_shape)
+      sample = deterministic.sample(sample_shape, seed=test_util.test_seed())
       self.assertAllEqual(sample_shape + (2,), sample.shape)
       self.assertAllClose(
           np.zeros(sample_shape + (2,)).astype(np.float32),
@@ -186,7 +187,8 @@ class DeterministicTest(test_util.TestCase):
     for sample_shape_ in [(), (4,)]:
       sample_shape = tf1.placeholder_with_default(
           np.array(sample_shape_, dtype=np.int32), shape=None)
-      sample_ = self.evaluate(deterministic.sample(sample_shape))
+      sample_ = self.evaluate(deterministic.sample(
+          sample_shape, seed=test_util.test_seed()))
       self.assertAllClose(
           np.zeros(sample_shape_ + (2,)).astype(np.float32), sample_)
 
@@ -226,7 +228,7 @@ class DeterministicTest(test_util.TestCase):
     loc = tf.Variable(1.)
     deterministic = tfd.Deterministic(loc=loc, validate_args=True)
     with tf.GradientTape() as tape:
-      s = deterministic.sample()
+      s = deterministic.sample(seed=test_util.test_seed())
     g = tape.gradient(s, deterministic.trainable_variables)
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
@@ -360,7 +362,7 @@ class VectorDeterministicTest(test_util.TestCase):
   def testSampleNoBatchDims(self):
     deterministic = tfd.VectorDeterministic([0.], validate_args=True)
     for sample_shape in [(), (4,)]:
-      sample = deterministic.sample(sample_shape)
+      sample = deterministic.sample(sample_shape, seed=test_util.test_seed())
       self.assertAllEqual(sample_shape + (1,), sample.shape)
       self.assertAllClose(
           np.zeros(sample_shape + (1,)).astype(np.float32),
@@ -369,7 +371,7 @@ class VectorDeterministicTest(test_util.TestCase):
   def testSampleWithBatchDims(self):
     deterministic = tfd.VectorDeterministic([[0.], [0.]], validate_args=True)
     for sample_shape in [(), (4,)]:
-      sample = deterministic.sample(sample_shape)
+      sample = deterministic.sample(sample_shape, seed=test_util.test_seed())
       self.assertAllEqual(sample_shape + (2, 1), sample.shape)
       self.assertAllClose(
           np.zeros(sample_shape + (2, 1)).astype(np.float32),
@@ -382,7 +384,8 @@ class VectorDeterministicTest(test_util.TestCase):
     for sample_shape_ in [(), (4,)]:
       sample_shape = tf1.placeholder_with_default(
           np.array(sample_shape_, dtype=np.int32), shape=None)
-      sample_ = self.evaluate(deterministic.sample(sample_shape))
+      sample_ = self.evaluate(deterministic.sample(
+          sample_shape, seed=test_util.test_seed()))
       self.assertAllClose(
           np.zeros(sample_shape_ + (2, 1)).astype(np.float32), sample_)
 
@@ -424,7 +427,7 @@ class VectorDeterministicTest(test_util.TestCase):
     loc = tf.Variable([1., 2.])
     deterministic = tfd.VectorDeterministic(loc=loc, validate_args=True)
     with tf.GradientTape() as tape:
-      s = deterministic.sample()
+      s = deterministic.sample(seed=test_util.test_seed())
     g = tape.gradient(s, deterministic.trainable_variables)
     self.assertLen(g, 1)
     self.assertAllNotNone(g)

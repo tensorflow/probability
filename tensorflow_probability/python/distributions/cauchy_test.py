@@ -54,7 +54,8 @@ class CauchyTest(test_util.TestCase):
         expected,
         self.evaluate(
             tf.shape(
-                input=tfd.Cauchy(loc, scale, validate_args=True).sample())))
+                tfd.Cauchy(loc, scale, validate_args=True).sample(
+                    seed=test_util.test_seed()))))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.Cauchy.param_static_shapes(sample_shape)
@@ -400,8 +401,8 @@ class CauchyTest(test_util.TestCase):
   def testCauchyShapeWithPlaceholders(self):
     if tf.executing_eagerly():
       return
-    loc = tf1.placeholder_with_default(input=5., shape=[])
-    scale = tf1.placeholder_with_default(input=[1., 2], shape=None)
+    loc = tf1.placeholder_with_default(5., shape=[])
+    scale = tf1.placeholder_with_default([1., 2], shape=None)
     cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
 
     # get_batch_shape should return an '<unknown>' tensor.
@@ -418,7 +419,7 @@ class CauchyTest(test_util.TestCase):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       d = tfd.Cauchy(loc, scale, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveScaleAfterMutation(self):
     loc, scale = (

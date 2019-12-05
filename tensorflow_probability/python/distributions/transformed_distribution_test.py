@@ -295,7 +295,8 @@ class TransformedDistributionTest(test_util.TestCase):
                         self.evaluate(multi_logit_normal.log_prob(y)))
     self.assertAllClose(
         [1, 2, 3, 2],
-        self.evaluate(tf.shape(multi_logit_normal.sample([1, 2, 3]))))
+        self.evaluate(tf.shape(multi_logit_normal.sample(
+            [1, 2, 3], seed=test_util.test_seed()))))
     self.assertAllEqual([2], multi_logit_normal.event_shape)
     self.assertAllEqual([2],
                         self.evaluate(multi_logit_normal.event_shape_tensor()))
@@ -316,7 +317,7 @@ class TransformedDistributionTest(test_util.TestCase):
         bijector=int_identity,
         validate_args=True)
 
-    y = normal.sample()
+    y = normal.sample(seed=test_util.test_seed())
     self.evaluate(normal.log_prob(y))
     self.evaluate(normal.prob(y))
     self.evaluate(normal.mean())
@@ -688,7 +689,8 @@ class ScalarToMultiTest(test_util.TestCase):
               tensorshape_util.as_list(mvn.batch_shape), batch_shape)
 
         for sample_shape in ([3], []):
-          sample_ = self.evaluate(mvn.sample(sample_shape))
+          sample_ = self.evaluate(mvn.sample(
+              sample_shape, seed=test_util.test_seed()))
           self.assertAllEqual(sample_.shape,
                               sample_shape + batch_shape + event_shape)
           self.assertAllEqual(
@@ -713,11 +715,11 @@ class ScalarToMultiTest(test_util.TestCase):
         batch_shape=batch_shape,
         validate_args=True)
     self.evaluate(batch_shape.initializer)
-    self.evaluate(d.sample())
+    self.evaluate(d.sample(seed=test_util.test_seed()))
     with tf.control_dependencies(
         [batch_shape.assign([[4, 2]])]):
       with self.assertRaisesOpError('must be a vector'):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testNonNegativeDynamicShapeOverrideWithMutation(self):
     batch_shape = tf.Variable([4], shape=tf.TensorShape(None), dtype=tf.int32)
@@ -727,10 +729,10 @@ class ScalarToMultiTest(test_util.TestCase):
         batch_shape=batch_shape,
         validate_args=True)
     self.evaluate(batch_shape.initializer)
-    self.evaluate(d.sample())
+    self.evaluate(d.sample(seed=test_util.test_seed()))
     with tf.control_dependencies([batch_shape.assign([-4])]):
       with self.assertRaisesOpError('must have non-negative elements'):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testNonScalarDynamicShapeOverrideWithMutation(self):
     loc = tf.Variable(3., shape=tf.TensorShape(None))
@@ -741,11 +743,11 @@ class ScalarToMultiTest(test_util.TestCase):
         batch_shape=tf.convert_to_tensor([3], dtype=tf.int32),
         validate_args=True)
     self.evaluate(loc.initializer)
-    self.evaluate(d.sample())
+    self.evaluate(d.sample(seed=test_util.test_seed()))
     with tf.control_dependencies([loc.assign([4., 2.])]):
       with self.assertRaisesWithPredicateMatch(
           Exception, 'Base distribution is not scalar'):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
 
 @test_util.test_all_tf_execution_regimes

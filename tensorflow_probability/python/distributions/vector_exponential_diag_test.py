@@ -43,7 +43,8 @@ class VectorExponentialDiagTest(test_util.TestCase):
     mu = [-1.]
     diag = [-5.]
     dist = tfd.VectorExponentialDiag(mu, diag, validate_args=True)
-    self.assertAllEqual([3, 1], dist.sample(3).shape)
+    self.assertAllEqual([3, 1], dist.sample(
+        3, seed=test_util.test_seed()).shape)
 
   def testMean(self):
     mu = [-1., 1]
@@ -84,7 +85,7 @@ class VectorExponentialDiagTest(test_util.TestCase):
     diag = [1., 0]
     dist = tfd.VectorExponentialDiag(mu, diag, validate_args=True)
     with self.assertRaisesOpError('Singular'):
-      self.evaluate(dist.sample())
+      self.evaluate(dist.sample(seed=test_util.test_seed()))
 
   def testSampleWithBroadcastScale(self):
     # mu corresponds to a 2-batch of 3-variate normals

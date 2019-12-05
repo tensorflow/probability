@@ -86,9 +86,7 @@ TEST_FILENAMES = [filename + "_test" for filename in FILENAMES]
 
 TAP_BLACKLIST = ["{}_test".format(f) for f in (
     "affine",
-    "scale",
     "scale_matvec_diag",
-    "scale_matvec_linear_operator",
     "scale_matvec_tril",
     "batch_normalization",
     "bijector",
@@ -99,7 +97,6 @@ TAP_BLACKLIST = ["{}_test".format(f) for f in (
     "permute",
     "rational_quadratic_spline",
     "reshape",
-    "shift",
     "sinh_arcsinh",
 )]
 

@@ -68,7 +68,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     dist = tfd.MultivariateStudentTLinearOperator(
         loc=loc, df=df, scale=scale, validate_args=True)
 
-    sample = dist.sample(3)
+    sample = dist.sample(3, seed=test_util.test_seed())
     log_prob = dist.log_prob(sample)
     mean = dist.mean()
     mode = dist.mode()
@@ -115,7 +115,7 @@ class MultivariateStudentTTestFloat32StaticShape(
               df=self._input(0.),
               scale=tf.linalg.LinearOperatorDiag(
                   self._input([1.]), is_non_singular=True),
-              validate_args=True).sample())
+              validate_args=True).sample(seed=test_util.test_seed()))
 
   def testBadScaleDType(self):
     with self.assertRaisesRegexp(TypeError,
@@ -356,7 +356,7 @@ class MultivariateStudentTTestFloat32StaticShape(
             loc=l,
             df=d,
             scale=tf.linalg.LinearOperatorDiag(s, is_non_singular=True),
-            validate_args=True).sample(100),
+            validate_args=True).sample(100, seed=test_util.test_seed()),
         [df, loc, diag])
     self.assertIsNotNone(grad_df)
     self.assertIsNotNone(grad_loc)
@@ -460,7 +460,7 @@ class MultivariateStudentTTestFloat32StaticShape(
         loc=1., df=df, scale=scale, validate_args=True)
     with self.assertRaisesOpError('`df` must be positive.'):
       with tf.control_dependencies([df.assign(-2.)]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testVariableScaleWithDeferredTensor(self):
     scale = tf.linalg.LinearOperatorDiag(
@@ -470,7 +470,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     d = tfd.MultivariateStudentTLinearOperator(
         loc=1., df=3., scale=scale, validate_args=True)
     with tf.GradientTape() as tape:
-      lp = d.log_prob(d.sample())
+      lp = d.log_prob(d.sample(seed=test_util.test_seed()))
     self.assertLen(d.trainable_variables, 1)
     self.assertIsNotNone(tape.gradient(lp, d.trainable_variables))
 

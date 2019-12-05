@@ -63,7 +63,7 @@ class SinhArcsinhTest(test_util.TestCase):
     sasnorm = tfd.SinhArcsinh(
         loc=loc, scale=scale, skewness=skewness, validate_args=True)
 
-    samp = self.evaluate(sasnorm.sample())
+    samp = self.evaluate(sasnorm.sample(seed=test_util.test_seed()))
     self.assertAllEqual((5,), samp.shape)
 
   def testPassingInLaplacePlusDefaultsIsSameAsLaplace(self):

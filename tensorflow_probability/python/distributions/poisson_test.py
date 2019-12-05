@@ -321,7 +321,7 @@ class PoissonTest(test_util.TestCase):
     self.evaluate(rate.initializer)
     with self.assertRaisesOpError('Argument `rate` must be positive.'):
       dist = self._make_poisson(rate=rate, validate_args=True)
-      self.evaluate(dist.sample())
+      self.evaluate(dist.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveRateAfterMutation(self):
     rate = tf.Variable([1., 2., 3.])
@@ -330,7 +330,7 @@ class PoissonTest(test_util.TestCase):
     self.evaluate(dist.mean())
     with self.assertRaisesOpError('Argument `rate` must be positive.'):
       with tf.control_dependencies([rate.assign([1., 2., -3.])]):
-        self.evaluate(dist.sample())
+        self.evaluate(dist.sample(seed=test_util.test_seed()))
 
 
 @test_util.test_all_tf_execution_regimes

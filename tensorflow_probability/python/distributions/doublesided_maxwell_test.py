@@ -46,7 +46,8 @@ class DoublesidedMaxwellTest(test_util.TestCase):
     mu = tf.zeros(mu_shape)
     sigma = tf.ones(sigma_shape)
     dsmaxwell = tfd.DoublesidedMaxwell(mu, sigma, validate_args=True)
-    self.assertAllEqual(expected, self.evaluate(tf.shape(dsmaxwell.sample())))
+    self.assertAllEqual(expected, self.evaluate(
+        tf.shape(dsmaxwell.sample(seed=test_util.test_seed()))))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.DoublesidedMaxwell.param_static_shapes(sample_shape)

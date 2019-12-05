@@ -330,7 +330,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
         tfd.Normal(tf1.placeholder_with_default(0., shape=None),
                    tf1.placeholder_with_default(1., shape=None)),
         lambda a: tfd.Normal(a, 1.)], validate_args=True)
-    lp = dist.log_prob(dist.sample(5))
+    lp = dist.log_prob(dist.sample(5, seed=test_util.test_seed()))
     self.assertAllEqual(self.evaluate(lp).shape, [5])
 
   @parameterized.named_parameters(
@@ -425,8 +425,10 @@ class JointDistributionSequentialTest(test_util.TestCase):
     avg_doc_length = 5
     u = tfd.Uniform(low=-1., high=1.)
     alpha = tfp.util.TransformedVariable(
-        u.sample([num_topics]), tfb.Softplus(), name='alpha')
-    beta = tf.Variable(u.sample([num_topics, num_words]), name='beta')
+        u.sample([num_topics], seed=test_util.test_seed()),
+        tfb.Softplus(), name='alpha')
+    beta = tf.Variable(u.sample([num_topics, num_words],
+                                seed=test_util.test_seed()), name='beta')
 
     # LDA Model.
     # Note near 1:1 with mathematical specification. The main distinction is the
@@ -445,7 +447,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
     # Now, let's sample some "documents" and compute the log-prob of each.
     docs_shape = [2, 4]  # That is, 8 docs in the shape of [2, 4].
-    [n, theta, z, x] = lda.sample(docs_shape)
+    [n, theta, z, x] = lda.sample(docs_shape, seed=test_util.test_seed())
     log_probs = lda.log_prob([n, theta, z, x])
     self.assertEqual(docs_shape, log_probs.shape)
 
@@ -499,8 +501,10 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
     # Verify model correctly "compiles".
     batch_shape = [3, 4]
-    self.assertEqual(batch_shape,
-                     joint.log_prob(joint.sample(batch_shape)).shape)
+    self.assertEqual(
+        batch_shape,
+        joint.log_prob(
+            joint.sample(batch_shape, seed=test_util.test_seed())).shape)
 
 
 class ResolveDistributionNamesTest(test_util.TestCase):

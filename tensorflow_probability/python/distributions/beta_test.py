@@ -242,7 +242,8 @@ class BetaTest(test_util.TestCase):
     a = tf.constant(1.0)
     b = tf.constant(2.0)
     _, [grad_a, grad_b] = tfp.math.value_and_gradient(
-        lambda a_, b_: tfd.Beta(a, b, validate_args=True).sample(100), [a, b])
+        lambda a_, b_: tfd.Beta(a, b, validate_args=True).sample(  # pylint: disable=g-long-lambda
+            100, seed=test_util.test_seed()), [a, b])
     self.assertIsNotNone(grad_a)
     self.assertIsNotNone(grad_b)
 
@@ -362,7 +363,7 @@ class BetaTest(test_util.TestCase):
       d = tfd.Beta(
           concentration1=concentration1, concentration0=[5.],
           validate_args=True)
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveConcentration1AfterMutation(self):
     concentration1 = tf.Variable([1., 2., 3.])
@@ -371,7 +372,7 @@ class BetaTest(test_util.TestCase):
                  validate_args=True)
     with self.assertRaisesOpError('Concentration parameter must be positive.'):
       with tf.control_dependencies([concentration1.assign([1., 2., -3.])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testGradientThroughConcentration0(self):
     concentration0 = tf.Variable(3.)
@@ -389,7 +390,7 @@ class BetaTest(test_util.TestCase):
     with self.assertRaisesOpError('Concentration parameter must be positive.'):
       d = tfd.Beta(concentration0=concentration0, concentration1=[5.],
                    validate_args=True)
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveConcentration0AfterMutation(self):
     concentration0 = tf.Variable([1., 2., 3.])
@@ -398,7 +399,7 @@ class BetaTest(test_util.TestCase):
                  validate_args=True)
     with self.assertRaisesOpError('Concentration parameter must be positive.'):
       with tf.control_dependencies([concentration0.assign([1., 2., -3.])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testLogProbInfinityAtBoundary(self):
     d = tfd.Beta(concentration0=[5., 0.5], concentration1=[5., 0.5],

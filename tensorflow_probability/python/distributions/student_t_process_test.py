@@ -59,7 +59,7 @@ class _StudentTProcessTest(object):
     event_shape = [25]
     sample_shape = [5, 3]
 
-    samples = tp.sample(sample_shape)
+    samples = tp.sample(sample_shape, seed=test_util.test_seed())
 
     if self.is_static or tf.executing_eagerly():
       self.assertAllEqual(tp.batch_shape_tensor(), batch_shape)

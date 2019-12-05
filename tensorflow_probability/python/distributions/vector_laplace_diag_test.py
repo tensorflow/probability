@@ -45,7 +45,8 @@ class VectorLaplaceDiagTest(test_util.TestCase):
     mu = [-1.]
     diag = [-5.]
     dist = tfd.VectorLaplaceDiag(mu, diag, validate_args=True)
-    self.assertAllEqual([3, 1], dist.sample(3).shape)
+    self.assertAllEqual([3, 1], dist.sample(
+        3, seed=test_util.test_seed()).shape)
 
   def testDistWithBatchShapeOneThenTransformedThroughSoftplus(self):
     # This complex combination of events resulted in a loss of static shape
@@ -57,7 +58,7 @@ class VectorLaplaceDiagTest(test_util.TestCase):
     base_dist = tfd.VectorLaplaceDiag(mu, diag, validate_args=True)
     dist = tfd.TransformedDistribution(
         base_dist, validate_args=True, bijector=tfp.bijectors.Softplus())
-    samps = dist.sample(5)  # Shape [5, 1, 3].
+    samps = dist.sample(5, seed=test_util.test_seed())  # Shape [5, 1, 3].
     self.assertAllEqual([5, 1], dist.log_prob(samps).shape)
 
   def testMean(self):
@@ -88,7 +89,7 @@ class VectorLaplaceDiagTest(test_util.TestCase):
     diag = [1., 0]
     dist = tfd.VectorLaplaceDiag(mu, diag, validate_args=True)
     with self.assertRaisesOpError("Singular"):
-      self.evaluate(dist.sample())
+      self.evaluate(dist.sample(seed=test_util.test_seed()))
 
   def testSampleWithBroadcastScale(self):
     # mu corresponds to a 2-batch of 3-variate normals

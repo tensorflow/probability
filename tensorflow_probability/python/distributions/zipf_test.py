@@ -80,8 +80,10 @@ class ZipfTest(test_util.TestCase):
         power = tf.constant(5., dtype=power_dtype)
         zipf = tfd.Zipf(power=power, dtype=event_dtype, validate_args=True)
         self.assertEqual(zipf.dtype, event_dtype)
-        self.assertEqual(zipf.dtype, zipf.sample(10).dtype)
-        self.assertEqual(zipf.dtype, zipf.sample(1).dtype)
+        self.assertEqual(
+            zipf.dtype, zipf.sample(10, seed=test_util.test_seed()).dtype)
+        self.assertEqual(
+            zipf.dtype, zipf.sample(1, seed=test_util.test_seed()).dtype)
         self.assertEqual(zipf.dtype, zipf.mode().dtype)
 
   def testInvalidEventDtype(self):
@@ -89,7 +91,7 @@ class ZipfTest(test_util.TestCase):
         TypeError, "power.dtype .* not a supported .* type"):
       power = tf.constant(5., dtype=tf.float16)
       zipf = tfd.Zipf(power=power, dtype=tf.int32, validate_args=True)
-      self.evaluate(zipf.sample())
+      self.evaluate(zipf.sample(seed=test_util.test_seed()))
 
   def testZipfLogPmf_InvalidArgs(self):
     power = tf.constant([4.0])

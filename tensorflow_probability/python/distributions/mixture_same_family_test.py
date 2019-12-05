@@ -176,7 +176,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
             reparameterize=True,
             validate_args=True)
 
-        sample = mixture.sample()
+        sample = mixture.sample(seed=test_util.test_seed())
       grad = gg.gradient(sample, logits)
 
     with self.assertRaises(LookupError):
@@ -394,7 +394,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     # from calling `self.components_distribution.is_scalar_event`.
 
     with tfp_hps.assert_no_excessive_var_usage('sample', max_permissible=4):
-      dist.sample()
+      dist.sample(seed=test_util.test_seed())
 
   def testSampleGradientsThroughParams(self):
     logits = self._build_variable(np.zeros(5), static_rank=True)
@@ -406,7 +406,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
             tfd.Logistic(loc=loc, scale=scale), reinterpreted_batch_ndims=2),
         reparameterize=True, validate_args=True)
     with tf.GradientTape() as tape:
-      loss = tf.reduce_sum(dist.sample(2))
+      loss = tf.reduce_sum(dist.sample(2, seed=test_util.test_seed()))
     grad = tape.gradient(loss, dist.trainable_variables)
     self.assertLen(grad, 3)
     self.assertAllNotNone(grad)
@@ -506,13 +506,13 @@ class MixtureSameFamilyTestDynamic32(
         validate_args=True)
 
     self.evaluate([v.initializer for v in [logits, loc, scale]])
-    self.evaluate(dist.sample())
+    self.evaluate(dist.sample(seed=test_util.test_seed()))
 
     msg = ('`mixture_distribution.batch_shape`.* is not compatible with '
            '`components_distribution.batch_shape')
     with self.assertRaisesRegex(Exception, msg):
       with tf.control_dependencies([logits.assign(np.zeros((4, 3, 5)))]):
-        self.evaluate(dist.sample())
+        self.evaluate(dist.sample(seed=test_util.test_seed()))
 
 
 @test_util.test_all_tf_execution_regimes

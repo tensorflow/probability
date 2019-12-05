@@ -46,7 +46,7 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
     for samples_shape in ([2], [2, 4], [4, 2, 4]):
       input_ = random_samples(samples_shape)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=samples_shape if self.static_shape else None)
+          input_, shape=samples_shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, validate_args=True)
       self.assertAllClose(input_ph, self.evaluate(dist.samples))
 
@@ -58,7 +58,7 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
     for samples_shape in ([2], [2, 4], [4, 2, 4]):
       input_ = random_samples(samples_shape)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=samples_shape if self.static_shape else None)
+          input_, shape=samples_shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, validate_args=True)
       self.assertAllEqual(samples_shape[:-1],
                           self.evaluate(dist.batch_shape_tensor()))
@@ -81,7 +81,7 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
     for event, expected_cdf in zip(events, expected_cdfs):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, validate_args=True)
       self.assertAllClose(self.evaluate(dist.cdf(event)),
                           expected_cdf)
@@ -104,7 +104,7 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
     for event, expected_cdf in zip(events, expected_cdfs):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, validate_args=True)
       self.assertAllClose(self.evaluate(dist.cdf(event)),
                           expected_cdf)
@@ -127,7 +127,7 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
     for event, expected_pmf in zip(events, expected_pmfs):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, validate_args=True)
       self.assertAllClose(self.evaluate(dist.prob(event)),
                           expected_pmf)
@@ -150,7 +150,7 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
     for event, expected_pmf in zip(events, expected_pmfs):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, validate_args=True)
       self.assertAllClose(self.evaluate(dist.prob(event)),
                           expected_pmf)
@@ -176,7 +176,7 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
     for sample, expected_entropy in zip(samples, expected_entropys):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float64)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, validate_args=True)
       self.assertAllClose(self.evaluate(dist.entropy()), expected_entropy)
 
@@ -184,10 +184,11 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
     for samples_shape in ([2], [2, 4], [4, 2, 4]):
       input_ = random_samples(samples_shape)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=samples_shape if self.static_shape else None)
+          input_, shape=samples_shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, validate_args=True)
       self.assertAllEqual(
-          self.evaluate(tf.shape(input=dist.sample())),
+          self.evaluate(
+              tf.shape(dist.sample(seed=test_util.test_seed()))),
           dist.batch_shape_tensor())
 
       n = 1000
@@ -214,7 +215,7 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
     for sample, expected_mean in zip(samples, expected_means):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, validate_args=True)
       self.assertAllClose(self.evaluate(dist.mean()), expected_mean)
 
@@ -234,7 +235,7 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
     for sample, expected_mode in zip(samples, expected_modes):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.int32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, validate_args=True)
       self.assertAllClose(self.evaluate(dist.mode()), expected_mode)
 
@@ -251,7 +252,7 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
     for sample, expected_variance in zip(samples, expected_variances):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, validate_args=True)
       self.assertAllClose(self.evaluate(dist.variance()),
                           expected_variance)
@@ -266,7 +267,7 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
     for samples_shape in ([2, 4], [4, 2, 4], [2, 2, 2, 4]):
       input_ = random_samples(samples_shape)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=samples_shape if self.static_shape else None)
+          input_, shape=samples_shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=1, validate_args=True)
       self.assertAllClose(input_ph, self.evaluate(dist.samples))
 
@@ -282,7 +283,7 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
     for samples_shape in ([2, 4], [4, 2, 4]):
       input_ = random_samples(samples_shape)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=samples_shape if self.static_shape else None)
+          input_, shape=samples_shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=1, validate_args=True)
       self.assertAllEqual(samples_shape[:-2],
                           self.evaluate(dist.batch_shape_tensor()))
@@ -306,7 +307,7 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
     for event, expected_cdf in zip(events, expected_cdfs):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=1, validate_args=True)
       self.assertAllClose(self.evaluate(dist.cdf(event)),
                           expected_cdf)
@@ -335,7 +336,7 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
     for event, expected_cdf in zip(events, expected_cdfs):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=1, validate_args=True)
       self.assertAllClose(self.evaluate(dist.cdf(event)),
                           expected_cdf)
@@ -359,7 +360,7 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
     for event, expected_pmf in zip(events, expected_pmfs):
       input_ = tf.convert_to_tensor(value=samples, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=1, validate_args=True)
       self.assertAllClose(self.evaluate(dist.prob(event)),
                           expected_pmf)
@@ -389,7 +390,7 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
     for event, expected_pmf in zip(events, expected_pmfs):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=1, validate_args=True)
       self.assertAllClose(self.evaluate(dist.prob(event)),
                           expected_pmf)
@@ -400,13 +401,15 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
     for samples_shape in ([2, 4], [4, 2, 4]):
       input_ = random_samples(samples_shape)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=samples_shape if self.static_shape else None)
+          input_, shape=samples_shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=1, validate_args=True)
       expected_shape = tf.concat(
           [dist.batch_shape_tensor(), dist.event_shape_tensor()],
           axis=0)
       self.assertAllEqual(
-          self.evaluate(tf.shape(input=dist.sample())), expected_shape)
+          self.evaluate(
+              tf.shape(dist.sample(seed=test_util.test_seed()))),
+          expected_shape)
 
       n = 1000
       seed = tf1.set_random_seed(42) if tf.executing_eagerly() else 42
@@ -430,7 +433,7 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
     for sample, expected_mean in zip(samples, expected_means):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=1, validate_args=True)
       self.assertAllClose(self.evaluate(dist.mean()), expected_mean)
 
@@ -448,7 +451,7 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
     for sample, expected_mode in zip(samples, expected_modes):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.int32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=1, validate_args=True)
       self.assertAllClose(self.evaluate(dist.mode()), expected_mode)
 
@@ -466,7 +469,7 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
     for sample, expected_entropy in zip(samples, expected_entropys):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float64)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=1, validate_args=True)
       self.assertAllClose(self.evaluate(dist.entropy()), expected_entropy)
 
@@ -484,7 +487,7 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
     for sample, expected_variance in zip(samples, expected_variances):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=1, validate_args=True)
       self.assertAllClose(self.evaluate(dist.variance()),
                           expected_variance)
@@ -500,7 +503,7 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
     for samples_shape in ([4, 2, 4], [4, 2, 2, 4]):
       input_ = random_samples(samples_shape)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=samples_shape if self.static_shape else None)
+          input_, shape=samples_shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=2, validate_args=True)
       self.assertAllClose(input_ph, self.evaluate(dist.samples))
 
@@ -511,7 +514,7 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
   )
   def testInvalidSamples(self, samples):
     input_ph = tf1.placeholder_with_default(
-        input=samples,
+        samples,
         shape=np.array(samples).shape if self.static_shape else None)
     with self.assertRaises(Exception):
       dist = tfd.Empirical(samples=input_ph, event_ndims=2, validate_args=True)
@@ -521,7 +524,7 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
     for samples_shape in ([2, 2, 4], [4, 2, 2, 4]):
       input_ = random_samples(samples_shape)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=samples_shape if self.static_shape else None)
+          input_, shape=samples_shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=2, validate_args=True)
       self.assertAllEqual(samples_shape[:-3],
                           self.evaluate(dist.batch_shape_tensor()))
@@ -546,7 +549,7 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
     for event, expected_cdf in zip(events, expected_cdfs):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=2, validate_args=True)
       self.assertAllClose(self.evaluate(dist.cdf(event)),
                           expected_cdf)
@@ -571,7 +574,7 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
     for event, expected_pmf in zip(events, expected_pmfs):
       input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=input_.shape if self.static_shape else None)
+          input_, shape=input_.shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=2, validate_args=True)
       self.assertAllClose(self.evaluate(dist.prob(event)),
                           expected_pmf)
@@ -582,13 +585,14 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
     for samples_shape in ([2, 2, 4], [4, 2, 2, 4]):
       input_ = random_samples(samples_shape)
       input_ph = tf1.placeholder_with_default(
-          input=input_, shape=samples_shape if self.static_shape else None)
+          input_, shape=samples_shape if self.static_shape else None)
       dist = tfd.Empirical(samples=input_ph, event_ndims=2, validate_args=True)
       expected_shape = tf.concat(
           [dist.batch_shape_tensor(), dist.event_shape_tensor()],
           axis=0)
       self.assertAllEqual(
-          self.evaluate(tf.shape(input=dist.sample())), expected_shape)
+          self.evaluate(tf.shape(
+              dist.sample(seed=test_util.test_seed()))), expected_shape)
 
       n = 1000
       seed = tf1.set_random_seed(42) if tf.executing_eagerly() else 42
@@ -608,7 +612,7 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
 
     input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
     input_ph = tf1.placeholder_with_default(
-        input=input_, shape=input_.shape if self.static_shape else None)
+        input_, shape=input_.shape if self.static_shape else None)
     dist = tfd.Empirical(samples=input_ph, event_ndims=2, validate_args=True)
     self.assertAllClose(self.evaluate(dist.mean()), expected_mean)
 
@@ -622,7 +626,7 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
 
     input_ = tf.convert_to_tensor(value=sample, dtype=np.int32)
     input_ph = tf1.placeholder_with_default(
-        input=input_, shape=input_.shape if self.static_shape else None)
+        input_, shape=input_.shape if self.static_shape else None)
     dist = tfd.Empirical(samples=input_ph, event_ndims=2, validate_args=True)
     self.assertAllClose(self.evaluate(dist.mode()), expected_mode)
 
@@ -636,7 +640,7 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
 
     input_ = tf.convert_to_tensor(value=sample, dtype=np.float64)
     input_ph = tf1.placeholder_with_default(
-        input=input_, shape=input_.shape if self.static_shape else None)
+        input_, shape=input_.shape if self.static_shape else None)
     dist = tfd.Empirical(samples=input_ph, event_ndims=2, validate_args=True)
     self.assertAllClose(self.evaluate(dist.entropy()), expected_entropy)
 
@@ -648,7 +652,7 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
 
     input_ = tf.convert_to_tensor(value=sample, dtype=np.float64)
     input_ph = tf1.placeholder_with_default(
-        input=input_, shape=input_.shape if self.static_shape else None)
+        input_, shape=input_.shape if self.static_shape else None)
     dist = tfd.Empirical(samples=input_ph, event_ndims=2, validate_args=True)
     self.assertAllClose(self.evaluate(dist.variance()),
                         expected_variance)
@@ -661,7 +665,7 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
     self.assertAllEqual((6,), dist.batch_shape)
     self.assertAllEqual((4,), dist.event_shape)
     sliced_dist = dist[:, tf.newaxis]
-    samples = self.evaluate(dist.sample())
+    samples = self.evaluate(dist.sample(seed=test_util.test_seed()))
     self.assertAllEqual((6, 4), samples.shape)
     lp, sliced_lp = self.evaluate([
         dist.log_prob(samples), sliced_dist.log_prob(samples[:, tf.newaxis])])

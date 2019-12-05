@@ -99,7 +99,8 @@ class _VariationalGaussianProcessTest(object):
     event_shape = [25]
     sample_shape = [9, 3]
 
-    samples = vgp.sample(sample_shape)
+    samples = vgp.sample(
+        sample_shape, seed=test_util.test_seed())
 
     if self.is_static or tf.executing_eagerly():
       self.assertAllEqual(vgp.batch_shape_tensor(), batch_shape)

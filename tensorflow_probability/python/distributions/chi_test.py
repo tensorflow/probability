@@ -154,7 +154,7 @@ class ChiTest(test_util.TestCase):
     self.evaluate([v.initializer for v in d.variables])
     with self.assertRaisesOpError('Argument `df` must be positive.'):
       with tf.control_dependencies([df.assign([1., 2., -3.])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
 
 if __name__ == '__main__':

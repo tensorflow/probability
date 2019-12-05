@@ -105,14 +105,13 @@ def _test_capture_normal_sample_outputs():
 
 def make_univariate_mixture(batch_shape, num_components, use_static_graph):
   batch_shape = tf.convert_to_tensor(value=batch_shape, dtype=tf.int32)
-  logits = tf.random.uniform(
+  seed_stream = test_util.test_seed_stream('univariate_mixture')
+  logits = -50. + tf.random.uniform(
       tf.concat((batch_shape, [num_components]), axis=0),
-      -1,
-      1,
-      dtype=tf.float32) - 50.
+      -1, 1, dtype=tf.float32, seed=seed_stream())
   components = [
-      tfd.Normal(loc=tf.random.normal(batch_shape),
-                 scale=10 * tf.random.uniform(batch_shape))
+      tfd.Normal(loc=tf.random.normal(batch_shape, seed=seed_stream()),
+                 scale=10 * tf.random.uniform(batch_shape, seed=seed_stream()))
       for _ in range(num_components)
   ]
   cat = tfd.Categorical(logits, dtype=tf.int32)
@@ -126,11 +125,10 @@ def make_multivariate_mixture(batch_shape, num_components, event_shape,
     batch_shape_tensor = batch_shape
   batch_shape_tensor = tf.convert_to_tensor(
       value=batch_shape_tensor, dtype=tf.int32)
-  logits = tf.random.uniform(
+  seed_stream = test_util.test_seed_stream('multivariate_mixture')
+  logits = -50. + tf.random.uniform(
       tf.concat((batch_shape_tensor, [num_components]), 0),
-      -1,
-      1,
-      dtype=tf.float32) - 50.
+      -1, 1, dtype=tf.float32, seed=seed_stream())
   tensorshape_util.set_shape(
       logits, tensorshape_util.concatenate(batch_shape, num_components))
   static_batch_and_event_shape = (
@@ -139,8 +137,9 @@ def make_multivariate_mixture(batch_shape, num_components, event_shape,
   batch_and_event_shape = tf.concat((batch_shape_tensor, event_shape), 0)
 
   def create_component():
-    loc = tf.random.normal(batch_and_event_shape)
-    scale_diag = 10 * tf.random.uniform(batch_and_event_shape)
+    loc = tf.random.normal(batch_and_event_shape, seed=seed_stream())
+    scale_diag = 10 * tf.random.uniform(
+        batch_and_event_shape, seed=seed_stream())
     tensorshape_util.set_shape(loc, static_batch_and_event_shape)
     tensorshape_util.set_shape(scale_diag, static_batch_and_event_shape)
     return tfd.MultivariateNormalDiag(
@@ -223,7 +222,7 @@ class MixtureTest(test_util.TestCase):
           ],
           validate_args=True,
           use_static_graph=self.use_static_graph)
-      self.evaluate([d.sample()])
+      self.evaluate([d.sample(seed=test_util.test_seed())])
 
   def testBrokenTypes(self):
     with self.assertRaisesWithPredicateMatch(TypeError, 'Categorical'):
@@ -821,7 +820,7 @@ class MixtureTest(test_util.TestCase):
         components=[tfd.Gamma(1., 2.), tfd.Gamma(2., 1.)],
         use_static_graph=self.use_static_graph,
         validate_args=True)
-    x_ = self.evaluate(gm.sample())
+    x_ = self.evaluate(gm.sample(seed=test_util.test_seed()))
     self.assertAllEqual([], x_.shape)
 
   def testGradientsThroughParams(self):
@@ -910,7 +909,7 @@ class MixtureBenchmark(tf.test.Benchmark):
             num_components=num_components,
             batch_size=batch_size,
             num_features=num_features)
-        sample_op = mixture.sample(sample_size).op
+        sample_op = mixture.sample(sample_size, seed=test_util.test_seed()).op
         sess.run(tf1.global_variables_initializer())
         reported = self.run_op_benchmark(
             sess,

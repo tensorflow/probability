@@ -150,7 +150,7 @@ class ExponentialTest(test_util.TestCase):
     lam = tf.constant([0.1, 1.0])
     _, grad_lam = tfp.math.value_and_gradient(
         lambda l: exponential_lib.Exponential(rate=lam, validate_args=True).  # pylint: disable=g-long-lambda
-        sample(100), lam)
+        sample(100, seed=test_util.test_seed()), lam)
     self.assertIsNotNone(grad_lam)
 
   def testExponentialExponentialKL(self):
@@ -195,7 +195,7 @@ class ExponentialTest(test_util.TestCase):
     self.evaluate(rate.initializer)
     with self.assertRaisesOpError("Argument `rate` must be positive."):
       d = tfd.Exponential(rate=rate, validate_args=True)
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveRateAfterMutation(self):
     rate = tf.Variable([1., 2., 3.])
@@ -204,7 +204,7 @@ class ExponentialTest(test_util.TestCase):
     self.evaluate(d.mean())
     with self.assertRaisesOpError("Argument `rate` must be positive."):
       with tf.control_dependencies([rate.assign([1., 2., -3.])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testExpontentialQuantile(self):
     exponential = exponential_lib.Exponential(rate=[1., 2.], validate_args=True)

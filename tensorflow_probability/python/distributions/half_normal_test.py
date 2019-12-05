@@ -56,7 +56,8 @@ class HalfNormalTest(test_util.TestCase):
     self.assertAllEqual(
         expected,
         self.evaluate(
-            tf.shape(tfd.HalfNormal(scale, validate_args=True).sample())))
+            tf.shape(tfd.HalfNormal(scale, validate_args=True).sample(
+                seed=test_util.test_seed()))))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.HalfNormal.param_static_shapes(sample_shape)
@@ -346,7 +347,7 @@ class HalfNormalTest(test_util.TestCase):
     with self.assertRaisesError('Argument `scale` must be positive.'):
       d = tfd.HalfNormal(scale=scale, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveScaleAfterMutation(self):
     scale = tf.Variable([1., 2., 3.])
@@ -354,7 +355,7 @@ class HalfNormalTest(test_util.TestCase):
     self.evaluate([v.initializer for v in d.variables])
     with self.assertRaisesError('Argument `scale` must be positive.'):
       with tf.control_dependencies([scale.assign([1., 2., -3.])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
 if __name__ == '__main__':
   tf.test.main()

@@ -49,7 +49,8 @@ class _HalfCauchyTest(object):
     self.assertAllEqual(
         expected,
         self.evaluate(
-            tf.shape(tfd.HalfCauchy(loc, scale, validate_args=True).sample())))
+            tf.shape(tfd.HalfCauchy(loc, scale, validate_args=True).sample(
+                seed=test_util.test_seed()))))
 
   def _test_param_static_shapes(self, sample_shape, expected):
     param_shapes = tfd.HalfCauchy.param_static_shapes(sample_shape)

@@ -210,7 +210,7 @@ class LaplaceTest(test_util.TestCase):
     scale = tf.constant(3.0)
     _, [grad_loc, grad_scale] = tfp.math.value_and_gradient(
         lambda l, s: tfd.Laplace(loc=l, scale=s, validate_args=True).sample(  # pylint: disable=g-long-lambda
-            100), [loc, scale])
+            100, seed=test_util.test_seed()), [loc, scale])
     self.assertIsNotNone(grad_loc)
     self.assertIsNotNone(grad_scale)
 
@@ -305,7 +305,7 @@ class LaplaceTest(test_util.TestCase):
     self.evaluate(scale.initializer)
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       d = tfd.Laplace(loc=0, scale=scale, validate_args=True)
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testLaplaceLaplaceKL(self):
     batch_size = 6

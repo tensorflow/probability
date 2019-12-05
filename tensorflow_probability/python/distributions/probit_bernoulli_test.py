@@ -95,7 +95,8 @@ class ProbitBernoulliTest(test_util.TestCase):
   def testDtype(self):
     dist = make_bernoulli([])
     self.assertEqual(dist.dtype, tf.int32)
-    self.assertEqual(dist.dtype, dist.sample(5).dtype)
+    self.assertEqual(dist.dtype, dist.sample(
+        5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist.dtype, dist.mode().dtype)
     self.assertEqual(dist.probs.dtype, dist.mean().dtype)
     self.assertEqual(dist.probs.dtype, dist.variance().dtype)
@@ -108,7 +109,8 @@ class ProbitBernoulliTest(test_util.TestCase):
 
     dist64 = make_bernoulli([], tf.int64)
     self.assertEqual(dist64.dtype, tf.int64)
-    self.assertEqual(dist64.dtype, dist64.sample(5).dtype)
+    self.assertEqual(dist64.dtype, dist64.sample(
+        5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist64.dtype, dist64.mode().dtype)
 
   def testFloatMode(self):
@@ -239,7 +241,9 @@ class ProbitBernoulliTest(test_util.TestCase):
     p = tf.constant([0.2, 0.6])
     _, grad_p = tfp.math.value_and_gradient(
         lambda x: tfd.ProbitBernoulli(  # pylint: disable=g-long-lambda
-            probs=x, validate_args=True).sample(100),
+            probs=x,
+            validate_args=True).sample(
+                100, seed=test_util.test_seed()),
         p)
     self.assertIsNone(grad_p)
 

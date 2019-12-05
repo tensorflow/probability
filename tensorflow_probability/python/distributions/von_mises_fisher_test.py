@@ -54,7 +54,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
         allow_nan_stats=False)
     self.assertEqual([5, 3], tensorshape_util.as_list(vmf.batch_shape))
     self.assertEqual([2], tensorshape_util.as_list(vmf.event_shape))
-    nsamples = 12000
+    nsamples = int(2e4)
     samples = vmf.sample(
         sample_shape=[nsamples], seed=test_util.test_seed())
     self.assertEqual([nsamples, 5, 3, 2],
@@ -178,7 +178,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
       rtol: Relative difference tolerable.
     """
     dim = tf.compat.dimension_value(vmf.event_shape[-1])
-    nsamples = 50000
+    nsamples = int(6e4)
     samples = vmf.sample(
         sample_shape=[nsamples], seed=test_util.test_seed())
     samples = tf.debugging.check_numerics(samples, 'samples')
@@ -304,7 +304,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     vmf = tfp.distributions.VonMisesFisher(
         mean_direction=mean_dir, concentration=concentration,
         validate_args=True, allow_nan_stats=False)
-    self.evaluate(vmf.sample(sample_shape))
+    self.evaluate(vmf.sample(sample_shape, seed=test_util.test_seed()))
 
   def testAssertsValidImmutableParams(self):
     with self.assertRaisesOpError('`concentration` must be non-negative'):

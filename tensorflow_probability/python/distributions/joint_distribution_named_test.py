@@ -529,7 +529,7 @@ class JointDistributionNamedTest(test_util.TestCase):
         ),
         d.resolve_graph())
 
-    x = d.sample()
+    x = d.sample(seed=test_util.test_seed())
     self.assertLen(x, 7)
 
     ds, s = d.sample_distributions()

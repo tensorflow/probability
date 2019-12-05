@@ -51,7 +51,8 @@ class MultinomialTest(test_util.TestCase):
     self.assertAllEqual([3, 2], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([2]), dist.event_shape)
     self.assertEqual(tf.TensorShape([3, 2]), dist.batch_shape)
-    self.assertEqual(tf.TensorShape([17, 3, 2, 2]), dist.sample(17).shape)
+    self.assertEqual(tf.TensorShape([17, 3, 2, 2]), dist.sample(
+        17, seed=test_util.test_seed()).shape)
 
   def testN(self):
     p = [[0.1, 0.2, 0.7], [0.2, 0.3, 0.5]]
@@ -346,7 +347,8 @@ class MultinomialTest(test_util.TestCase):
         lambda n, p: tfd.Multinomial(  # pylint: disable=g-long-lambda
             total_count=n,
             probs=p,
-            validate_args=True).sample(100),
+            validate_args=True).sample(
+                100, seed=test_util.test_seed()),
         [total_count, probs])
     self.assertIsNone(grad_total_count)
     self.assertIsNone(grad_probs)

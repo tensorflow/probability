@@ -35,9 +35,13 @@ tfd = tfp.distributions
 
 
 def make_relaxed_categorical(batch_shape, num_classes, dtype=tf.float32):
-  logits = tf.random.uniform(
-      list(batch_shape) + [num_classes], -10, 10, dtype=dtype) - 50.
-  temperatures = tf.random.uniform(list(batch_shape), 0.1, 10, dtype=tf.float32)
+  seed_stream = test_util.test_seed_stream('relaxed_categorical')
+  logits = -50. + tf.random.uniform(
+      list(batch_shape) + [num_classes], -10, 10,
+      dtype=dtype, seed=seed_stream())
+  temperatures = tf.random.uniform(
+      list(batch_shape), 0.1, 10,
+      dtype=tf.float32, seed=seed_stream())
   return tfd.RelaxedOneHotCategorical(temperatures, logits, validate_args=True)
 
 
@@ -60,7 +64,7 @@ class ExpRelaxedOneHotCategoricalTest(test_util.TestCase):
     p = np.exp(logits)/np.sum(np.exp(logits))
     dist = tfd.ExpRelaxedOneHotCategorical(
         temperature, logits, validate_args=True)
-    x = self.evaluate(dist.sample())
+    x = self.evaluate(dist.sample(seed=test_util.test_seed()))
     # analytical ExpConcrete density presented in Maddison et al. 2016
     prod_term = p * np.exp(-temperature * x)
     expected_pdf = (
@@ -120,24 +124,30 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     # single logit
     logits = [0.3, 0.1, 0.4]
     dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
-    self.assertAllEqual([3], self.evaluate(dist.sample()).shape)
-    self.assertAllEqual([5, 3], self.evaluate(dist.sample(5)).shape)
+    self.assertAllEqual([3], self.evaluate(
+        dist.sample(seed=test_util.test_seed())).shape)
+    self.assertAllEqual([5, 3], self.evaluate(dist.sample(
+        5, seed=test_util.test_seed())).shape)
     # multiple distributions
     logits = [[2., 3., -4.], [0.3, 0.1, 0.4]]
     dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
-    self.assertAllEqual([2, 3], self.evaluate(dist.sample()).shape)
-    self.assertAllEqual([5, 2, 3], self.evaluate(dist.sample(5)).shape)
+    self.assertAllEqual([2, 3], self.evaluate(
+        dist.sample(seed=test_util.test_seed())).shape)
+    self.assertAllEqual([5, 2, 3], self.evaluate(dist.sample(
+        5, seed=test_util.test_seed())).shape)
     # multiple distributions
     logits = np.random.uniform(size=(4, 1, 3)).astype(np.float32)
     dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
-    self.assertAllEqual([4, 1, 3], self.evaluate(dist.sample()).shape)
-    self.assertAllEqual([5, 4, 1, 3], self.evaluate(dist.sample(5)).shape)
+    self.assertAllEqual([4, 1, 3], self.evaluate(
+        dist.sample(seed=test_util.test_seed())).shape)
+    self.assertAllEqual([5, 4, 1, 3], self.evaluate(dist.sample(
+        5, seed=test_util.test_seed())).shape)
 
   def testPdf(self):
     temperature = 0.4
     logits = np.array([[0.3, 0.1, 0.4]]).astype(np.float32)
     dist = tfd.RelaxedOneHotCategorical(temperature, logits, validate_args=True)
-    x = self.evaluate(dist.sample())
+    x = self.evaluate(dist.sample(seed=test_util.test_seed()))
     pdf = self.evaluate(dist.prob(x))
     expected_pdf = analytical_pdf(x, temperature, logits)
     self.assertAllClose(expected_pdf.flatten(), pdf, rtol=1e-4)
@@ -147,7 +157,7 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     temperatures = np.array([0.4, 2.3]).astype(np.float32)
     dist = tfd.RelaxedOneHotCategorical(
         temperatures, logits, validate_args=True)
-    x = self.evaluate(dist.sample())
+    x = self.evaluate(dist.sample(seed=test_util.test_seed()))
     pdf = self.evaluate(dist.prob(x))
     expected_pdf = analytical_pdf(x, temperatures, logits)
     self.assertAllClose(expected_pdf.flatten(), pdf, rtol=1e-4)
@@ -157,7 +167,7 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     temperatures = np.array([0.4, 2.3]).astype(np.float32)
     dist = tfd.RelaxedOneHotCategorical(
         temperatures, logits, validate_args=True)
-    x = self.evaluate(dist.sample())
+    x = self.evaluate(dist.sample(seed=test_util.test_seed()))
     pdf = self.evaluate(dist.prob(x))
     expected_pdf = analytical_pdf(x, temperatures, logits)
     self.assertAllClose(expected_pdf.flatten(), pdf, rtol=1e-4)
@@ -185,8 +195,10 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     temperature = 1.
     dist = tfd.ExpRelaxedOneHotCategorical(
         temperature, logits_pl, validate_args=True)
-    self.assertAllEqual([3], self.evaluate(dist.sample()).shape)
-    self.assertAllEqual([5, 3], self.evaluate(dist.sample(5)).shape)
+    self.assertAllEqual([3], self.evaluate(
+        dist.sample(seed=test_util.test_seed())).shape)
+    self.assertAllEqual([5, 3], self.evaluate(dist.sample(
+        5, seed=test_util.test_seed())).shape)
 
   def testUnknownAndInvalidShape(self):
     logits = tf1.placeholder_with_default(19.84, shape=None)
@@ -194,14 +206,14 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
         ValueError, 'Argument `logits` must have rank at least 1.'):
       dist = tfd.ExpRelaxedOneHotCategorical(
           0.75, logits=logits, validate_args=True)
-      self.evaluate(dist.sample())
+      self.evaluate(dist.sample(seed=test_util.test_seed()))
 
     logits = tf1.placeholder_with_default([[], []], shape=None)
     with self.assertRaises(
         ValueError, 'Argument `logits` must have final dimension >= 1.'):
       dist = tfd.ExpRelaxedOneHotCategorical(
           12., logits=logits, validate_args=True)
-      self.evaluate(dist.sample())
+      self.evaluate(dist.sample(seed=test_util.test_seed()))
 
   # TODO(b/144948687): Reimplement `log_prob` so it doesn't return `nan` at the
   # boundary. Ideally we'd do this test:
@@ -234,17 +246,19 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
         logits=tf1.placeholder_with_default([0.], shape=None),
         validate_args=True)
     self.assertAllEqual(np.zeros((5, 3, 1), dtype=np.int32),
-                        self.evaluate(d.sample([5, 3])))
+                        self.evaluate(d.sample(
+                            [5, 3], seed=test_util.test_seed())))
     self.assertAllClose(np.ones(5),
                         self.evaluate(d.prob(np.zeros((5, 1)))))
 
   def testDTypes(self):
     # check that sampling and log_prob work for a range of dtypes
     for dtype in (tf.float16, tf.float32, tf.float64):
-      logits = tf.random.uniform(shape=[3, 3], dtype=dtype)
+      logits = tf.random.uniform(
+          shape=[3, 3], dtype=dtype, seed=test_util.test_seed())
       dist = tfd.RelaxedOneHotCategorical(
           temperature=0.5, logits=logits, validate_args=True)
-      dist.log_prob(dist.sample())
+      dist.log_prob(dist.sample(seed=test_util.test_seed()))
 
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])
@@ -299,7 +313,7 @@ class ExpRelaxedOneHotCategoricalFromVariableTest(test_util.TestCase):
     with self.assertRaisesOpError('Argument `probs` must sum to 1.'):
       d = tfd.ExpRelaxedOneHotCategorical(0.3, probs=probs, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertionsProbsAfterMutation(self):
     probs = tf.Variable([0.25, 0.25, 0.5])
@@ -316,7 +330,7 @@ class ExpRelaxedOneHotCategoricalFromVariableTest(test_util.TestCase):
       d = tfd.ExpRelaxedOneHotCategorical(
           0.7, logits=logits, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertionsTemperatureAfterMutation(self):
     t = tf.Variable(7.7)

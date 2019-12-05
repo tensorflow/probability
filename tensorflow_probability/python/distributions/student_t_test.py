@@ -239,7 +239,8 @@ class StudentTTest(test_util.TestCase):
       self.assertEqual(student.entropy().shape, (3,))
       self.assertEqual(student.log_prob(2.).shape, (3,))
       self.assertEqual(student.prob(2.).shape, (3,))
-      self.assertEqual(student.sample(37).shape, (37, 3,))
+      self.assertEqual(student.sample(
+          37, seed=test_util.test_seed()).shape, (37, 3,))
 
     _check(
         tfd.StudentT(df=[
@@ -467,7 +468,7 @@ class StudentTTest(test_util.TestCase):
     sigma = tf.constant(3.0)
     _, [grad_df, grad_mu, grad_sigma] = tfp.math.value_and_gradient(
         lambda d, m, s: tfd.StudentT(df=d, loc=m, scale=s, validate_args=True).  # pylint: disable=g-long-lambda
-        sample(100), [df, mu, sigma])
+        sample(100, seed=test_util.test_seed()), [df, mu, sigma])
     self.assertIsNotNone(grad_df)
     self.assertIsNotNone(grad_mu)
     self.assertIsNotNone(grad_sigma)

@@ -106,7 +106,7 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
     self.evaluate(num_steps.initializer)
 
     ar = tfd.Autoregressive(fn, num_steps=num_steps, validate_args=True)
-    sample = ar.sample()
+    sample = ar.sample(seed=test_util.test_seed())
     log_prob = ar.log_prob(sample)
     self.assertAllEqual([], sample.shape)
     self.assertAllEqual([], log_prob.shape)
@@ -131,7 +131,7 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
     self.evaluate([v.initializer for v in [loc, num_steps, event_ndims]])
 
     ar = tfd.Autoregressive(fn, num_steps=num_steps, validate_args=True)
-    sample = self.evaluate(ar.sample(3))
+    sample = self.evaluate(ar.sample(3, seed=test_util.test_seed()))
     self.assertAllEqual([3, 4, 2], sample.shape)
     self.assertAllEqual([2], self.evaluate(ar.event_shape_tensor()))
     self.assertAllEqual([4], self.evaluate(ar.batch_shape_tensor()))
@@ -182,16 +182,16 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
     with self.assertRaisesRegexp(Exception,
                                  'Argument `num_steps` must be a scalar'):
       ar = tfd.Autoregressive(fn, num_steps=num_steps, validate_args=True)
-      self.evaluate(ar.sample())
+      self.evaluate(ar.sample(seed=test_util.test_seed()))
 
     num_steps = tf.Variable(4, shape=tf.TensorShape(None))
     self.evaluate(num_steps.initializer)
     ar = tfd.Autoregressive(fn, num_steps=num_steps, validate_args=True)
-    self.evaluate(ar.sample())
+    self.evaluate(ar.sample(seed=test_util.test_seed()))
     with self.assertRaisesRegexp(Exception,
                                  'Argument `num_steps` must be a scalar'):
       with tf.control_dependencies([num_steps.assign([17, 3])]):
-        self.evaluate(ar.sample())
+        self.evaluate(ar.sample(seed=test_util.test_seed()))
 
   def testErrorOnNonPositiveNumSteps(self):
     def fn(sample=0.):
@@ -201,16 +201,16 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
     with self.assertRaisesRegexp(Exception,
                                  'Argument `num_steps` must be positive'):
       ar = tfd.Autoregressive(fn, num_steps=num_steps, validate_args=True)
-      self.evaluate(ar.sample())
+      self.evaluate(ar.sample(seed=test_util.test_seed()))
 
     num_steps = tf.Variable(13, shape=tf.TensorShape(None))
     self.evaluate(num_steps.initializer)
     ar = tfd.Autoregressive(fn, num_steps=num_steps, validate_args=True)
-    self.evaluate(ar.sample())
+    self.evaluate(ar.sample(seed=test_util.test_seed()))
     with self.assertRaisesRegexp(Exception,
                                  'Argument `num_steps` must be positive'):
       with tf.control_dependencies([num_steps.assign(-9)]):
-        self.evaluate(ar.sample())
+        self.evaluate(ar.sample(seed=test_util.test_seed()))
 
   def testGradientsThroughParams(self):
 
@@ -236,7 +236,8 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
 
     self.evaluate([v.initializer for v in ar.trainable_variables])
     with tf.GradientTape() as tape:
-      loss = tf.reduce_sum(tf.square(ar.sample()), axis=-1)
+      loss = tf.reduce_sum(
+          tf.square(ar.sample(seed=test_util.test_seed())), axis=-1)
     grad = tape.gradient(loss, ar.trainable_variables)
 
     self.assertLen(grad, 3)
