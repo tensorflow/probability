@@ -14,6 +14,8 @@
 # limitations under the License.
 # ============================================================================
 
+# Include seconds since script execution as a prefix for all command echo logs.
+PS4='+ $SECONDS s\011 '  # Octal 9, for tab
 set -x  # print commands as they are executed
 set -e  # fail and exit on any command erroring
 
