@@ -28,10 +28,36 @@ licenses(["notice"])  # Apache 2.0
 exports_files(["LICENSE"])
 
 py_library(
+    name = "logeinsumexp",
+    srcs = ["logeinsumexp.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # opt_einsum dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "logeinsumexp_test",
+    size = "medium",
+    srcs = [
+        "logeinsumexp_test.py",
+    ],
+    deps = [
+        ":logeinsumexp",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
     name = "marginalize",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":logeinsumexp",
         ":marginalizable",
         # tensorflow dep,
         "//tensorflow_probability",
@@ -43,6 +69,7 @@ py_library(
     srcs = ["marginalizable.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":logeinsumexp",
         # tensorflow dep,
         "//tensorflow_probability",
     ],

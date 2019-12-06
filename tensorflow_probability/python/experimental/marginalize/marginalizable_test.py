@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2019 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,12 +14,9 @@
 # ============================================================================
 """Test the MarginalizableJointDistributionCoroutine distribution class."""
 
-# pylint: disable=abstract-method, no-member
 
-# To aid readability by humans it is common practice to name the
-# values yielded inside joint distribution models even though
-# they aren't used by the Python interpreter.
-# pylint: disable=unused-variable
+# pylint: disable=abstract-method, no-member, unused-variable
+
 
 from __future__ import absolute_import
 from __future__ import division
@@ -108,7 +105,7 @@ def _tree_example(n, n_steps):
 class _MarginalizeTest(
     test_util.TestCase):
 
-  def test_basics(self):
+  def test_basics_einsum(self):
     probs = np.random.rand(20) + 0.001
     probs = probs / np.sum(probs)
 
@@ -121,13 +118,39 @@ class _MarginalizeTest(
 
     p = tf.exp(dist.marginalized_log_prob(['tabulate',
                                            'tabulate',
-                                           'tabulate']))
+                                           'tabulate'],
+                                          method='einsum'))
     self.assertEqual(p.shape, [20, 20, 20])
     self.assertAllClose(tf.reduce_sum(p), 1.0)
 
     s = tf.exp(dist.marginalized_log_prob(['marginalize',
                                            'marginalize',
-                                           'marginalize']))
+                                           'marginalize'],
+                                          method='einsum'))
+    self.assertAllClose(s, 1.0)
+
+  def test_basics_logeinsumexp(self):
+    probs = np.random.rand(20) + 0.001
+    probs = probs / np.sum(probs)
+
+    def model():
+      i = yield Root(tfd.Categorical(probs=probs, dtype=tf.int32))
+      j = yield tfd.Categorical(probs=probs, dtype=tf.int32)
+      k = yield tfd.Categorical(probs=probs, dtype=tf.int32)
+
+    dist = marginalize.MarginalizableJointDistributionCoroutine(model)
+
+    p = tf.exp(dist.marginalized_log_prob(['tabulate',
+                                           'tabulate',
+                                           'tabulate'],
+                                          method='logeinsumexp'))
+    self.assertEqual(p.shape, [20, 20, 20])
+    self.assertAllClose(tf.reduce_sum(p), 1.0)
+
+    s = tf.exp(dist.marginalized_log_prob(['marginalize',
+                                           'marginalize',
+                                           'marginalize'],
+                                          method='logeinsumexp'))
     self.assertAllClose(s, 1.0)
 
   def test_simple_network(self):
@@ -297,7 +320,11 @@ class _MarginalizeTest(
                                'marginalize',
                                'marginalize'] +
                     final_observations)
-    p = tf.exp(d.marginalized_log_prob(observations))
+    # Using `method='logeinsumexp' here creates a large intermediate
+    # that impacts performance. Because we are only setting
+    # `STEPS == 16` the probabilities involved aren't small enough
+    # to result in underflow.
+    p = tf.exp(d.marginalized_log_prob(observations, method='einsum'))
     q = _tree_example(n, n_steps)
 
     # Note that while p and q should be close in value there is a large

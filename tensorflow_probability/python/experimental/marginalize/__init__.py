@@ -16,8 +16,10 @@
 
 # pylint: disable=g-importing-member
 
+from tensorflow_probability.python.experimental.marginalize.logeinsumexp import logeinsumexp
 from tensorflow_probability.python.experimental.marginalize.marginalizable import MarginalizableJointDistributionCoroutine
 
 __all__ = [
     'MarginalizableJointDistributionCoroutine',
+    'logeinsumexp',
 ]

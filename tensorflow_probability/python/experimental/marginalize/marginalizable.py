@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2019 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,13 +14,15 @@
 # ============================================================================
 """Marginalizable probability distributions."""
 
-# pylint: disable=abstract-method, no-member
+# pylint: disable=abstract-method,no-member,g-importing-member
 
 from __future__ import print_function
 
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.marginalize.logeinsumexp import logeinsumexp
+
 
 __all__ = [
     'MarginalizableJointDistributionCoroutine',
@@ -32,7 +34,7 @@ tfd = tfp.distributions
 
 # TODO(b/144095516) remove this function when `tf.einsum` supports
 # broadcasting along size-1 dimensions.
-def _squeezed_einsum(formula, *args):
+def _squeezed_einsum(einsum_fn, formula, *args):
   """Modified einsum that squeezes size 1 dimensions from arguments."""
 
   lhs, rhs = formula.split('->')
@@ -53,7 +55,7 @@ def _squeezed_einsum(formula, *args):
     new_formula.append(new_indices)
 
   new_formula = '{}->{}'.format(','.join(new_formula), rhs)
-  result = tf.einsum(new_formula, *new_args)
+  result = einsum_fn(new_formula, *new_args)
   return result
 
 
@@ -164,7 +166,7 @@ class Marginalizable(object):
   """
 
   def marginalized_log_prob(self, values, name='marginalized_log_prob',
-                            internal_type=None):
+                            method='logeinsumexp', internal_type=None):
     """Log probability density/mass function.
 
     Args:
@@ -180,11 +182,16 @@ class Marginalizable(object):
         one axis of the tensor in the order they appear in the list
         of `values`.
       name: Python `str` prepended to names of ops created by this function.
-      internal_type: because of the absence of an analog of
-        einsum based on `logsumexp` it is easy to cause underflows at
-        intermediate stages of the computation. This can be alleviated slightly
-        by choosing `internal_type` to be a higher precision type such as
-        `tf.float64`.
+      method: Specifies method by which marginalization is carried out.
+        'einsum': use `einsum`. For very small probabilities this may
+        result in underflow causing log probabilities of `-inf` even when
+        the result shoukd be finite.
+        'logeinsumexp': performs an `einsum` designed to work in log space.
+        Although it preserves precision better than the 'einsum' method it
+        can be slow and use more memory.
+      internal_type: because the `einsum` method can cause underflow this
+        argument allows the user to specify the type in which the
+        `einsum` is computed. For example `tf.float64`.
 
     Returns:
       Return log probability density/mass of `value` for this distribution.
@@ -193,11 +200,6 @@ class Marginalizable(object):
       Currently only a single log probability can be computed, so lists or
       tensors containing multiple samples from the joint distribution are
       not supported.
-      The performance of this operation is very sensitive to the reduction
-      order chosen by `tf.einsum`. Incorrect ordering can result in
-      orders of magnitude difference in the time taken to compute the result.
-      This is work in progress and future versions may perform significantly
-      faster.
       The number of latent (i.e. marginalized or tabulated) variables is
       limited to 52 in this version.
       The individual samples in `tfd.Sample` are mathematically independent
@@ -279,7 +281,14 @@ class Marginalizable(object):
       lpp = self.log_prob_parts(new_values)
       if internal_type:
         lpp = [tf.cast(x, dtype=internal_type) for x in lpp]
-      return tf.math.log(_squeezed_einsum(formula, *map(tf.exp, lpp)))
+      if method == 'logeinsumexp':
+        return _squeezed_einsum(logeinsumexp, formula, *lpp)
+      elif method == 'einsum':
+        return tf.math.log(
+            _squeezed_einsum(tf.einsum, formula, *map(tf.exp, lpp)))
+      else:
+        raise ValueError(
+            'Unknown `marginalized_log_prob` method: \'{}\'.'.format(method))
 
 
 class MarginalizableJointDistributionCoroutine(
