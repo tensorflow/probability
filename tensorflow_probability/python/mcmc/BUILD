@@ -169,7 +169,7 @@ py_library(
 
 py_test(
     name = "nuts_test",
-    size = "medium",
+    size = "large",
     srcs = ["nuts_test.py"],
     shard_count = 7,
     srcs_version = "PY2AND3",
