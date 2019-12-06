@@ -30,7 +30,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
     'DirichletMultinomial',
@@ -228,14 +228,6 @@ class DirichletMultinomial(distribution.Distribution):
   def concentration(self):
     """Concentration parameter; expected prior counts for that coordinate."""
     return self._concentration
-
-  @property
-  @deprecation.deprecated(
-      '2019-11-08', 'The `total_concentration` property is deprecated. Use '
-      'DirichletMultinomial.compute_total_concentration() instead.')
-  def total_concentration(self):
-    """Sum of last dim of concentration parameter."""
-    return self._total_concentration
 
   def compute_total_concentration(self):
     """Compute and return the sum of last dim of concentration parameter."""
