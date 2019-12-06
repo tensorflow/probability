@@ -392,7 +392,7 @@ class WishartTest(test_util.TestCase):
       self.evaluate(chol_w.log_prob(np.asarray(x, dtype=np.float32)))
 
     with self.assertRaisesOpError('Cholesky decomposition was not successful'):
-      df_deferred = tf1.placeholder_with_default(2., shape=None)
+      df_deferred = tf1.placeholder_with_default(4., shape=None)
       chol_scale_deferred = tf1.placeholder_with_default(
           np.ones([3, 3], dtype=np.float32), shape=[3, 3])
       chol_w = tfd.Wishart(df=df_deferred, scale=chol_scale_deferred)

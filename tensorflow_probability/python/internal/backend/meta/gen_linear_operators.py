@@ -41,7 +41,7 @@ MODULE_MAPPINGS = {
     'framework import tensor_shape': 'ops as tensor_shape',
     'module import module': 'ops as module',
     'ops import array_ops': 'numpy_array as array_ops',
-    'ops import check_ops': 'v1 as check_ops',
+    'ops import check_ops': 'debugging as check_ops',
     'ops.signal import fft_ops': 'numpy_signal as fft_ops',
     'ops import control_flow_ops': 'control_flow as control_flow_ops',
     'ops import linalg_ops': 'linalg_impl as linalg_ops',

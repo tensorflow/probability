@@ -494,7 +494,6 @@ class Mixture(distribution.Distribution):
       # argument is `[]`.
       assertions.append(assert_util.assert_equal(
           batch_ranks[i], cat_batch_rank,
-          data=[batch_shapes[i], cat_batch_shape],
           message=check_message.format(i)))
       assertions.append(assert_util.assert_equal(
           batch_shapes[i], cat_batch_shape, message=check_message.format(i)))

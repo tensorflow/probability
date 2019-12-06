@@ -461,7 +461,7 @@ class Affine(bijector.Bijector):
         return distribution_util.with_dependencies([
             assert_util.assert_none_equal(
                 identity_multiplier, tf.zeros([], identity_multiplier.dtype),
-                ["identity_multiplier should be non-zero."])
+                message="identity_multiplier should be non-zero.")
         ], identity_multiplier)
       return identity_multiplier
 

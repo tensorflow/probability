@@ -20,7 +20,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions.internal import correlation_matrix_volumes_lib as corr
@@ -79,7 +78,7 @@ class CorrelationMatrixVolumesTest(tfp_test_util.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         rej_weights, low=0., high=rej_proposal_volume, expected=exact_volumes,
         false_fail_rate=1e-6)
-    chk2 = tf1.assert_less(
+    chk2 = tf.debugging.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples,
             low=0.,
@@ -103,7 +102,7 @@ class CorrelationMatrixVolumesTest(tfp_test_util.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         rej_weights, low=0., high=rej_proposal_volume, expected=exact_volumes,
         false_fail_rate=1e-6)
-    chk2 = tf1.assert_less(
+    chk2 = tf.debugging.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples,
             low=0.,
@@ -127,7 +126,7 @@ class CorrelationMatrixVolumesTest(tfp_test_util.TestCase):
     chk1 = st.assert_true_mean_equal_by_dkwm(
         rej_weights, low=0., high=rej_proposal_volume, expected=exact_volumes,
         false_fail_rate=1e-6)
-    chk2 = tf1.assert_less(
+    chk2 = tf.debugging.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
             num_samples,
             low=0.,

@@ -457,12 +457,10 @@ class VonMisesFisher(distribution.Distribution):
       with tf.control_dependencies([
           assert_util.assert_less_equal(
               samples_dim0,
-              dtype_util.as_numpy_dtype(self.dtype)(1.01),
-              data=[tf.math.top_k(tf.reshape(samples_dim0, [-1]))[0]]),
+              dtype_util.as_numpy_dtype(self.dtype)(1.01)),
           assert_util.assert_greater_equal(
               samples_dim0,
-              dtype_util.as_numpy_dtype(self.dtype)(-1.01),
-              data=[-tf.math.top_k(tf.reshape(-samples_dim0, [-1]))[0]])
+              dtype_util.as_numpy_dtype(self.dtype)(-1.01)),
       ]):
         samples_dim0 = tf.identity(samples_dim0)
     samples_otherdims_shape = tf.concat([sample_batch_shape, [event_dim - 1]],
@@ -481,16 +479,12 @@ class VonMisesFisher(distribution.Distribution):
 
     # Runtime assert that samples are unit length.
     if not self._allow_nan_stats:
-      worst, idx = tf.math.top_k(
+      worst, _ = tf.math.top_k(
           tf.reshape(tf.abs(1 - tf.linalg.norm(samples, axis=-1)), [-1]))
       with tf.control_dependencies([
           assert_util.assert_near(
               dtype_util.as_numpy_dtype(self.dtype)(0),
               worst,
-              data=[
-                  worst, idx,
-                  tf.gather(tf.reshape(samples, [-1, event_dim]), idx)
-              ],
               atol=1e-4,
               summarize=100)
       ]):

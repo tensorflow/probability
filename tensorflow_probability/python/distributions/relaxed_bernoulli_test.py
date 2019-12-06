@@ -86,10 +86,10 @@ class RelaxedBernoulliTest(test_util.TestCase):
       self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
 
   def testZeroTemperature(self):
-    """If validate_args, raises InvalidArgumentError when temperature is 0."""
+    """If validate_args, raises error when temperature is 0."""
     temperature = tf.constant(0.0)
     p = tf.constant([0.1, 0.4])
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('`temperature` must be positive.'):
       dist = tfd.RelaxedBernoulli(temperature, probs=p, validate_args=True)
       sample = dist.sample(seed=test_util.test_seed())
       self.evaluate(sample)

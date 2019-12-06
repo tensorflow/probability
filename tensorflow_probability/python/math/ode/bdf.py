@@ -247,7 +247,7 @@ class BDF(base.Solver):
       assert_ops = []
       if previous_solver_internal_state is not None:
         assert_initial_state_matches_previous_solver_internal_state = (
-            tf1.assert_near(
+            tf.debugging.assert_near(
                 tf.norm(
                     initial_state_vec -
                     previous_solver_internal_state.backward_differences[0],

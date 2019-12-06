@@ -1592,7 +1592,7 @@ py_test(
 
 py_test(
     name = "cholesky_lkj_test",
-    size = "small",
+    size = "medium",
     srcs = [
         "cholesky_lkj_test.py",
     ],

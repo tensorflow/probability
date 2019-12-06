@@ -413,7 +413,6 @@ def move_dimension(x, source_idx, dest_idx):
 
 
 def assert_integer_form(x,
-                        data=None,
                         summarize=None,
                         message=None,
                         int_dtype=None,
@@ -422,8 +421,6 @@ def assert_integer_form(x,
 
   Args:
     x: Floating-point `Tensor`
-    data: The tensors to print out if the condition is `False`. Defaults to
-      error message and first few entries of `x` and `y`.
     summarize: Print this many entries of each tensor.
     message: A string to prefix to the default message.
     int_dtype: A `tf.dtype` used to cast the float to. The default (`None`)
@@ -450,7 +447,6 @@ def assert_integer_form(x,
     return assert_util.assert_equal(
         x,
         tf.cast(tf.cast(x, int_dtype), x.dtype),
-        data=data,
         summarize=summarize,
         message=message,
         name=name)

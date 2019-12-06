@@ -218,14 +218,14 @@ def assert_true_cdf_equal_by_dkwm(
     samples = tf.convert_to_tensor(value=samples, name='samples', dtype=dtype)
     false_fail_rate = tf.convert_to_tensor(
         value=false_fail_rate, name='false_fail_rate', dtype=dtype)
-    tf1.assert_scalar(false_fail_rate)  # Static shape
+    tf.debugging.assert_scalar(false_fail_rate)  # Static shape
     itemwise_false_fail_rate = _itemwise_error_rate(
         total_rate=false_fail_rate,
         param_tensors=[], samples_tensor=samples)
     n = tf.shape(input=samples)[0]
     envelope = _dkwm_cdf_envelope(n, itemwise_false_fail_rate)
     distance = kolmogorov_smirnov_distance(samples, cdf, left_continuous_cdf)
-    return tf1.assert_less_equal(
+    return tf.debugging.assert_less_equal(
         distance, envelope, message='Empirical CDF outside K-S envelope')
 
 
@@ -647,8 +647,8 @@ def assert_true_cdf_equal_by_dkwm_two_sample(
         value=samples2, name='samples2', dtype=dtype)
     false_fail_rate = tf.convert_to_tensor(
         value=false_fail_rate, name='false_fail_rate', dtype=dtype)
-    tf1.assert_scalar(false_fail_rate)  # Static shape
-    compatible_samples = tf1.assert_equal(
+    tf.debugging.assert_scalar(false_fail_rate)  # Static shape
+    compatible_samples = tf.debugging.assert_equal(
         tf.shape(input=samples1)[1:],
         tf.shape(input=samples2)[1:])
     with tf.control_dependencies([compatible_samples]):
@@ -660,7 +660,7 @@ def assert_true_cdf_equal_by_dkwm_two_sample(
       n2 = tf.shape(input=samples2)[0]
       envelope2 = _dkwm_cdf_envelope(n2, itemwise_false_fail_rate)
       distance = kolmogorov_smirnov_distance_two_sample(samples1, samples2)
-      return tf1.assert_less_equal(
+      return tf.debugging.assert_less_equal(
           distance, envelope1 + envelope2,
           message='Empirical CDFs outside joint K-S envelope')
 
@@ -824,7 +824,7 @@ def _maximum_mean(samples, envelope, high, name=None):
 
     xmax = tf.reduce_max(input_tensor=samples, axis=[0])
     msg = 'Given sample maximum value exceeds expectations'
-    check_op = tf1.assert_less_equal(xmax, high, message=msg)
+    check_op = tf.debugging.assert_less_equal(xmax, high, message=msg)
     with tf.control_dependencies([check_op]):
       return tf.identity(_do_maximum_mean(samples, envelope, high))
 
@@ -871,7 +871,7 @@ def _minimum_mean(samples, envelope, low, name=None):
 
     xmin = tf.reduce_min(input_tensor=samples, axis=[0])
     msg = 'Given sample minimum value falls below expectations'
-    check_op = tf1.assert_greater_equal(xmin, low, message=msg)
+    check_op = tf.debugging.assert_greater_equal(xmin, low, message=msg)
     with tf.control_dependencies([check_op]):
       return - _do_maximum_mean(-samples, envelope, -low)
 
@@ -931,8 +931,8 @@ def _check_shape_dominates(samples, parameters):
     # This rank check ensures that I don't get a wrong answer from the
     # _shapes_ broadcasting against each other.
     samples_batch_ndims = tf.size(input=samples_batch_shape)
-    ge = tf1.assert_greater_equal(samples_batch_ndims, tf.rank(t))
-    eq = tf1.assert_equal(samples_batch_shape, broadcasted_batch_shape)
+    ge = tf.debugging.assert_greater_equal(samples_batch_ndims, tf.rank(t))
+    eq = tf.debugging.assert_equal(samples_batch_shape, broadcasted_batch_shape)
     return ge, eq
   checks = list(itertools.chain(*[check(t) for t in parameters]))
   with tf.control_dependencies(checks):
@@ -989,7 +989,7 @@ def true_mean_confidence_interval_by_dkwm(
     error_rate = tf.convert_to_tensor(
         value=error_rate, name='error_rate', dtype=dtype)
     samples = _check_shape_dominates(samples, [low, high])
-    tf1.assert_scalar(error_rate)  # Static shape
+    tf.debugging.assert_scalar(error_rate)  # Static shape
     itemwise_error_rate = _itemwise_error_rate(
         total_rate=error_rate, param_tensors=[low, high],
         samples_tensor=samples)
@@ -1260,13 +1260,13 @@ def assert_true_mean_in_interval_by_dkwm(
     # By DeMorgan's law, that's also equivalent to
     #   not (max_mean < expected_low or min_mean > expected_high),
     # which is a way of saying the two intervals are not disjoint.
-    check_confidence_interval_can_intersect = tf1.assert_greater_equal(
+    check_confidence_interval_can_intersect = tf.debugging.assert_greater_equal(
         max_mean,
         expected_low,
         message='Confidence interval does not '
         'intersect: true mean smaller than expected')
     with tf.control_dependencies([check_confidence_interval_can_intersect]):
-      return tf1.assert_less_equal(
+      return tf.debugging.assert_less_equal(
           min_mean,
           expected_high,
           message='Confidence interval does not '
@@ -1335,7 +1335,7 @@ def assert_true_mean_equal_by_dkwm_two_sample(
         value=false_fail_rate, name='false_fail_rate', dtype=dtype)
     samples1 = _check_shape_dominates(samples1, [low1, high1])
     samples2 = _check_shape_dominates(samples2, [low2, high2])
-    compatible_samples = tf1.assert_equal(
+    compatible_samples = tf.debugging.assert_equal(
         tf.shape(input=samples1)[1:],
         tf.shape(input=samples2)[1:])
     with tf.control_dependencies([compatible_samples]):
@@ -1595,8 +1595,8 @@ def assert_multivariate_true_cdf_equal_on_projections_two_sample(
         value=num_projections, name='num_projections')
     false_fail_rate = tf.convert_to_tensor(
         value=false_fail_rate, name='false_fail_rate', dtype=dtype)
-    tf1.assert_scalar(false_fail_rate)  # Static shape
-    compatible_samples = tf1.assert_equal(
+    tf.debugging.assert_scalar(false_fail_rate)  # Static shape
+    compatible_samples = tf.debugging.assert_equal(
         tf.shape(input=samples1)[1:],
         tf.shape(input=samples2)[1:])
     with tf.control_dependencies([compatible_samples]):

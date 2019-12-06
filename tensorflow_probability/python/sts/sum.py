@@ -253,7 +253,7 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         num_timesteps = component_ssms[0].num_timesteps
       if validate_args and len(static_num_timesteps) != len(component_ssms):
         assertions += [
-            tf1.assert_equal(
+            tf.debugging.assert_equal(  # pylint: disable=g-complex-comprehension
                 num_timesteps,
                 ssm.num_timesteps,
                 message='Additive model components must all have '

@@ -126,6 +126,7 @@ TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     "geometric",
     "gumbel",
     "inverse_gaussian",
+    "kullback_leibler",
     "kumaraswamy",
     "logitnormal",
     "lognormal",

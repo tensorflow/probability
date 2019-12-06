@@ -41,8 +41,10 @@ FILENAMES = [
 TEST_FILENAMES = ["{}_test".format(filename) for filename in FILENAMES if filename not in ("assert_util",)]
 
 TAP_WHITELIST = ["{}_test".format(f) for f in (
+    "dtype_util",
     "prefer_static",
     "special_math",
+    "test_combinations",
     "test_util",
 )]
 
@@ -58,6 +60,9 @@ DEPS = {
     ],
     "distribution_util_test": [
         "//tensorflow_probability/python/experimental/substrates/jax",
+    ],
+    "hypothesis_testlib": [
+        "//tensorflow_probability/python/experimental/substrates/jax/distributions:deprecated_linalg",
     ],
     "hypothesis_testlib_test": [
         ":hypothesis_testlib",
