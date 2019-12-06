@@ -372,7 +372,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     # LinearOperator instance, but we include it to demonstrate that it works as
     # expected.
     loc = tf.constant([1., 1.])
-    scale_identity_multiplier = tf.Variable(np.eye(2, dtype=np.float32))
+    scale_identity_multiplier = tf.Variable(np.ones(2, dtype=np.float32))
     d = tfd.MultivariateNormalDiag(
         loc,
         scale_identity_multiplier=scale_identity_multiplier,

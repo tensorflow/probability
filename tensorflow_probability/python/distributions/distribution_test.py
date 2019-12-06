@@ -303,20 +303,21 @@ class DistributionTest(test_util.TestCase):
     ]
 
     sample_shapes = [(), (10,), (10, 20, 30)]
+    seed_stream = test_util.test_seed_stream('param_shapes')
     for cls in classes:
       for sample_shape in sample_shapes:
         param_shapes = cls.param_shapes(sample_shape)
-        params = dict([(name, tf.random.normal(shape))
+        params = dict([(name, tf.random.normal(shape, seed=seed_stream()))
                        for name, shape in param_shapes.items()])
         dist = cls(**params)
         self.assertAllEqual(
             sample_shape,
-            self.evaluate(tf.shape(dist.sample(seed=test_util.test_seed()))))
+            self.evaluate(tf.shape(dist.sample(seed=seed_stream()))))
         dist_copy = dist.copy()
         self.assertAllEqual(
             sample_shape,
             self.evaluate(tf.shape(dist_copy.sample(
-                seed=test_util.test_seed()))))
+                seed=seed_stream()))))
         self.assertEqual(dist.parameters, dist_copy.parameters)
 
   def testCopyExtraArgs(self):
@@ -633,7 +634,10 @@ class ConditionalDistributionTest(test_util.TestCase):
                  'log_survival_function', 'survival_function']:
       method = getattr(d, name)
       with self.assertRaisesRegexp(ValueError, 'b1.*b2'):
-        method([] if name == 'sample' else 1.0, arg1='b1', arg2='b2')
+        if name == 'sample':
+          method([], seed=test_util.test_seed(), arg1='b1', arg2='b2')
+        else:
+          method(1.0, arg1='b1', arg2='b2')
 
   def _GetPartiallyImplementedDistribution(self):
     class _PartiallyImplementedDistribution(tfd.Distribution):

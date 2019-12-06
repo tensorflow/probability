@@ -74,8 +74,8 @@ class VectorLaplaceDiagTest(test_util.TestCase):
     self.assertAllEqual([-1., -1.], self.evaluate(dist.mean()))
 
   def testSample(self):
-    mu = [-1., 1]
-    diag = [1., -2]
+    mu = np.array([-1., 1])
+    diag = np.array([1., -2])
     dist = tfd.VectorLaplaceDiag(mu, diag, validate_args=True)
     seed = test_util.test_seed()
     samps = self.evaluate(dist.sample(int(2e4), seed=seed))

@@ -105,6 +105,9 @@ def gen_module(module_name):
   code = code.replace(
       'from tensorflow.python.ops.distributions import '
       'util as distribution_util', DIST_UTIL_IMPORT)
+  code = code.replace(
+      'control_flow_ops.with_dependencies',
+      'distribution_util.with_dependencies')
   code = code.replace('.base_dtype', '')
   code = code.replace('.get_shape()', '.shape')
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+\.shape)([^(_])',
@@ -138,6 +141,7 @@ def gen_module(module_name):
         'linalg_impl as _linalg')
   print('from tensorflow_probability.python.internal.backend.numpy import '
         'ops as _ops')
+  print(DIST_UTIL_IMPORT)
 
 
 def main(_):

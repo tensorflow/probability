@@ -65,8 +65,8 @@ class VectorExponentialDiagTest(test_util.TestCase):
     self.assertAllEqual([-1. + 1, -1. - 5], self.evaluate(dist.mean()))
 
   def testSample(self):
-    mu = [-2., 1]
-    diag = [1., -2]
+    mu = np.array([-2., 1])
+    diag = np.array([1., -2])
     dist = tfd.VectorExponentialDiag(mu, diag, validate_args=True)
     samps = self.evaluate(dist.sample(int(1e4), seed=test_util.test_seed()))
     cov_mat = self.evaluate(tf.linalg.diag(diag))**2

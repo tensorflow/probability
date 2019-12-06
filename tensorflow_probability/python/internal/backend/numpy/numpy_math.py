@@ -460,7 +460,7 @@ is_strictly_increasing = utils.copy_docstring(
 l2_normalize = utils.copy_docstring(
     tf.math.l2_normalize,
     lambda x, axis=None, epsilon=1e-12, name=None: (  # pylint: disable=g-long-lambda
-        np.linalg.norm(x, ord=2, axis=axis, keepdims=True)))
+        x / np.linalg.norm(x, ord=2, axis=axis, keepdims=True)))
 
 lbeta = utils.copy_docstring(
     tf.math.lbeta,

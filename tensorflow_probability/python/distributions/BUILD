@@ -2100,7 +2100,9 @@ py_test(
 
 py_test(
     name = "multivariate_student_t_test",
+    size = "medium",
     srcs = ["multivariate_student_t_test.py"],
+    shard_count = 3,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

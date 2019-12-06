@@ -482,9 +482,7 @@ class DirichletMultinomialFromVariableTest(test_util.TestCase):
     total_count = tf.Variable(-1.0)
     concentration = tf.constant([1., 1., 1.])
 
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
-        'must be non-negative'):
+    with self.assertRaisesOpError('must be non-negative'):
       d = tfd.DirichletMultinomial(total_count, concentration,
                                    validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
@@ -499,18 +497,14 @@ class DirichletMultinomialFromVariableTest(test_util.TestCase):
     self.evaluate(d.mean())
     self.evaluate(total_count.assign(-1.0))
 
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
-        'must be non-negative'):
+    with self.assertRaisesOpError('must be non-negative'):
       self.evaluate(d.mean())
 
   def testAssertionIntegerFormTotalCount(self):
     total_count = tf.Variable(0.5)
     concentration = tf.constant([1., 1., 1.])
 
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
-        'cannot contain fractional components'):
+    with self.assertRaisesOpError('cannot contain fractional components'):
       d = tfd.DirichletMultinomial(total_count, concentration,
                                    validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
@@ -525,18 +519,14 @@ class DirichletMultinomialFromVariableTest(test_util.TestCase):
     self.evaluate(d.mean())
     self.evaluate(total_count.assign(0.5))
 
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
-        'cannot contain fractional components'):
+    with self.assertRaisesOpError('cannot contain fractional components'):
       self.evaluate(d.mean())
 
   def testAssertionPositiveConcentration(self):
     total_count = tf.constant(10.0)
     concentration = tf.Variable([1., 1., -1.])
 
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
-        'Concentration parameter must be positive.'):
+    with self.assertRaisesOpError('Concentration parameter must be positive.'):
       d = tfd.DirichletMultinomial(total_count, concentration,
                                    validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
@@ -552,9 +542,7 @@ class DirichletMultinomialFromVariableTest(test_util.TestCase):
     self.evaluate(d.mean())
     self.evaluate(concentration.assign([1., 1., -1.]))
 
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
-        'Concentration parameter must be positive.'):
+    with self.assertRaisesOpError('Concentration parameter must be positive.'):
       self.evaluate(d.mean())
 
 

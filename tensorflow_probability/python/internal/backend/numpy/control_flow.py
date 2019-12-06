@@ -26,6 +26,7 @@ from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
 
 __all__ = [
+    'no_op',
     'while_loop',
     # 'case',
     # 'cond',
@@ -34,6 +35,10 @@ __all__ = [
     # 'map_fn',
     # 'scan',
 ]
+
+
+def _no_op(_):
+  pass
 
 
 def _while_loop(cond, body, loop_vars,
@@ -48,6 +53,10 @@ def _while_loop(cond, body, loop_vars,
   return loop_vars
 
 # --- Begin Public Functions --------------------------------------------------
+
+no_op = utils.copy_docstring(
+    tf.no_op,
+    _no_op)
 
 while_loop = utils.copy_docstring(
     tf.while_loop,

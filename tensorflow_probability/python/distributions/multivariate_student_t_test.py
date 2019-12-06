@@ -164,8 +164,8 @@ class MultivariateStudentTTestFloat32StaticShape(
             self._input([[1., 1.], [1., 1.]]), is_non_singular=True),
         allow_nan_stats=False,
         validate_args=True)
-    with self.assertRaisesRegexp(tf.errors.InvalidArgumentError,
-                                 'Mean not defined for components of df <= 1.'):
+    with self.assertRaisesOpError(
+        'Mean not defined for components of df <= 1.'):
       self.evaluate(dist.mean())
 
   def testMode(self):
@@ -226,8 +226,7 @@ class MultivariateStudentTTestFloat32StaticShape(
         scale=scale,
         allow_nan_stats=False,
         validate_args=True)
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
+    with self.assertRaisesOpError(
         'Covariance not defined for components of df <= 1.'):
       self.evaluate(dist.covariance())
 
@@ -293,12 +292,10 @@ class MultivariateStudentTTestFloat32StaticShape(
         scale=scale,
         allow_nan_stats=False,
         validate_args=True)
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
+    with self.assertRaisesOpError(
         'Variance not defined for components of df <= 1.'):
       self.evaluate(dist.variance())
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
+    with self.assertRaisesOpError(
         'Standard deviation not defined for components of df <= 1.'):
       self.evaluate(dist.stddev())
 

@@ -251,17 +251,19 @@ class ProbitBernoulliTest(test_util.TestCase):
     p = [0.2, 0.6]
     dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
     n = 1000
-    def _maybe_seed():
+    def _seed(seed=None):
+      seed = test_util.test_seed() if seed is None else seed
       if tf.executing_eagerly():
-        tf1.set_random_seed(42)
-        return None
-      return 42
+        tf1.set_random_seed(seed)
+      return seed
+    seed = _seed()
     self.assertAllEqual(
-        self.evaluate(dist.sample(n, _maybe_seed())),
-        self.evaluate(dist.sample([n], _maybe_seed())))
+        self.evaluate(dist.sample(n, seed)),
+        self.evaluate(dist.sample([n], _seed(seed))))
     n = tf1.placeholder_with_default(np.int32(1000), shape=None)
-    sample1 = dist.sample(n, _maybe_seed())
-    sample2 = dist.sample([n], _maybe_seed())
+    seed = _seed()
+    sample1 = dist.sample(n, seed)
+    sample2 = dist.sample([n], _seed(seed=seed))
     sample1, sample2 = self.evaluate([sample1, sample2])
     self.assertAllEqual(sample1, sample2)
 

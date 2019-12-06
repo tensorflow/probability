@@ -130,7 +130,11 @@ TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     "kumaraswamy",
     "logitnormal",
     "lognormal",
+    "mvn_diag_plus_low_rank",
+    "mvn_full_covariance",
     "sample",
+    "vector_exponential_diag",
+    "vector_laplace_diag",
     "vector_sinh_arcsinh_diag",
 )]
 

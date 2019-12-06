@@ -139,8 +139,7 @@ class PERTTest(test_util.TestCase):
     peak = [2., 3., 4.]
     high = [3., 4., 5.]
     self.evaluate(temperature.initializer)
-    with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
-                                '`temperature` must be positive.'):
+    with self.assertRaisesOpError('`temperature` must be positive.'):
       dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
       self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
@@ -151,8 +150,7 @@ class PERTTest(test_util.TestCase):
     high = [3., 4., 5.]
     self.evaluate(temperature.initializer)
     dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
-    with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
-                                '`temperature` must be positive.'):
+    with self.assertRaisesOpError('`temperature` must be positive.'):
       with tf.control_dependencies([temperature.assign(-1.)]):
         self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
@@ -162,8 +160,7 @@ class PERTTest(test_util.TestCase):
     high = [5., 5., 5.]
     self.evaluate(low.initializer)
     self.evaluate(peak.initializer)
-    with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
-                                '`peak` must be greater than `low`.'):
+    with self.assertRaisesOpError('`peak` must be greater than `low`.'):
       dist = tfd.PERT(low, peak, high, validate_args=True)
       self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
@@ -174,8 +171,7 @@ class PERTTest(test_util.TestCase):
     self.evaluate(low.initializer)
     self.evaluate(peak.initializer)
     dist = tfd.PERT(low, peak, high, validate_args=True)
-    with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
-                                '`peak` must be greater than `low`.'):
+    with self.assertRaisesOpError('`peak` must be greater than `low`.'):
       with tf.control_dependencies([peak.assign([0., 0., 0.])]):
         self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
@@ -185,8 +181,7 @@ class PERTTest(test_util.TestCase):
     high = tf.Variable([5., 5., 4.])
     self.evaluate(high.initializer)
     self.evaluate(peak.initializer)
-    with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
-                                '`high` must be greater than `peak`.'):
+    with self.assertRaisesOpError('`high` must be greater than `peak`.'):
       dist = tfd.PERT(low, peak, high, validate_args=True)
       self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
@@ -197,8 +192,7 @@ class PERTTest(test_util.TestCase):
     self.evaluate(high.initializer)
     self.evaluate(peak.initializer)
     dist = tfd.PERT(low, peak, high, validate_args=True)
-    with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
-                                '`high` must be greater than `peak`.'):
+    with self.assertRaisesOpError('`high` must be greater than `peak`.'):
       with tf.control_dependencies([high.assign([0., 0., 0.])]):
         self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 

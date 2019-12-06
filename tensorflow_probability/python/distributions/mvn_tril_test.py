@@ -149,7 +149,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
   def testSingularScaleRaises(self):
     mu = None
     chol = [[1., 0.], [0., 0.]]
-    with self.assertRaisesOpError("Singular operator"):
+    with self.assertRaisesOpError('Singular operator'):
       mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
       self.evaluate(mvn.sample(seed=test_util.test_seed()))
 
@@ -356,29 +356,29 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     sample_variance_ = np.diag(sample_covariance_)
     sample_stddev_ = np.sqrt(sample_variance_)
 
-    tf1.logging.vlog(2, "true_mean:\n{}  ".format(true_mean))
-    tf1.logging.vlog(2, "sample_mean:\n{}".format(sample_mean_))
-    tf1.logging.vlog(2, "analytical_mean:\n{}".format(analytical_mean_))
+    tf1.logging.vlog(2, 'true_mean:\n{}  '.format(true_mean))
+    tf1.logging.vlog(2, 'sample_mean:\n{}'.format(sample_mean_))
+    tf1.logging.vlog(2, 'analytical_mean:\n{}'.format(analytical_mean_))
 
-    tf1.logging.vlog(2, "true_covariance:\n{}".format(true_covariance))
-    tf1.logging.vlog(2, "sample_covariance:\n{}".format(sample_covariance_))
+    tf1.logging.vlog(2, 'true_covariance:\n{}'.format(true_covariance))
+    tf1.logging.vlog(2, 'sample_covariance:\n{}'.format(sample_covariance_))
     tf1.logging.vlog(
-        2, "analytical_covariance:\n{}".format(analytical_covariance_))
+        2, 'analytical_covariance:\n{}'.format(analytical_covariance_))
 
-    tf1.logging.vlog(2, "true_variance:\n{}".format(true_variance))
-    tf1.logging.vlog(2, "sample_variance:\n{}".format(sample_variance_))
-    tf1.logging.vlog(2, "analytical_variance:\n{}".format(analytical_variance_))
+    tf1.logging.vlog(2, 'true_variance:\n{}'.format(true_variance))
+    tf1.logging.vlog(2, 'sample_variance:\n{}'.format(sample_variance_))
+    tf1.logging.vlog(2, 'analytical_variance:\n{}'.format(analytical_variance_))
 
-    tf1.logging.vlog(2, "true_stddev:\n{}".format(true_stddev))
-    tf1.logging.vlog(2, "sample_stddev:\n{}".format(sample_stddev_))
-    tf1.logging.vlog(2, "analytical_stddev:\n{}".format(analytical_stddev_))
+    tf1.logging.vlog(2, 'true_stddev:\n{}'.format(true_stddev))
+    tf1.logging.vlog(2, 'sample_stddev:\n{}'.format(sample_stddev_))
+    tf1.logging.vlog(2, 'analytical_stddev:\n{}'.format(analytical_stddev_))
 
-    tf1.logging.vlog(2, "true_scale:\n{}".format(true_scale))
-    tf1.logging.vlog(2, "scale:\n{}".format(scale_))
+    tf1.logging.vlog(2, 'true_scale:\n{}'.format(true_scale))
+    tf1.logging.vlog(2, 'scale:\n{}'.format(scale_))
 
     tf1.logging.vlog(
         2,
-        "kl_chol:      analytical:{}  sample:{}".format(analytical_kl_chol_,
+        'kl_chol:      analytical:{}  sample:{}'.format(analytical_kl_chol_,
                                                         sample_kl_chol_))
 
     self.assertAllClose(true_mean, sample_mean_, atol=0., rtol=0.03)
@@ -532,10 +532,11 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
           self.evaluate(tf.reduce_sum(input_tensor=tf.abs(dlpdchol))), 0)
 
   def testDocstrSliceExample(self):
-    x = tf.random.normal([5, 3, 2, 2])
+    seed_stream = test_util.test_seed_stream('mvn_tril_docstr')
+    x = tf.random.normal([5, 3, 2, 2], seed=seed_stream())
     cov = tf.matmul(x, x, transpose_b=True)
     chol = tf.linalg.cholesky(cov)
-    loc = tf.random.normal([4, 1, 3, 1])
+    loc = tf.random.normal([4, 1, 3, 1], seed=seed_stream())
     mvn = tfd.MultivariateNormalTriL(loc, chol, validate_args=True)
     self.assertAllEqual((4, 5, 3), mvn.batch_shape)
     self.assertAllEqual((2,), mvn.event_shape)
@@ -575,5 +576,5 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()
