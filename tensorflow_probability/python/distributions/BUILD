@@ -2526,7 +2526,7 @@ py_test(
 
 py_test(
     name = "von_mises_fisher_test",
-    size = "small",
+    size = "medium",
     srcs = ["von_mises_fisher_test.py"],
     deps = [
         ":von_mises_fisher",
