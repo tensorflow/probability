@@ -53,7 +53,13 @@ def _map_fn(  # pylint: disable=unused-argument
       unflat_args = tree_util.tree_unflatten(in_tree, flat_args)
       return fn(unflat_args)
     return np.stack(map(func, elems_zipped))
-  return np.array([fn(x) for x in elems])
+
+  if isinstance(elems, np.ndarray):
+    return np.array([fn(x) for x in elems])
+
+  # In the NumPy backend, we do not yet support map_fn over lists, tuples, or
+  # other structures.
+  raise NotImplementedError
 
 
 def _scan(  # pylint: disable=unused-argument
