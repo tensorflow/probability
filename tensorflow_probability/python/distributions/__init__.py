@@ -102,7 +102,6 @@ from tensorflow_probability.python.distributions.vector_laplace_diag import Vect
 from tensorflow_probability.python.distributions.vector_sinh_arcsinh_diag import VectorSinhArcsinhDiag
 from tensorflow_probability.python.distributions.von_mises import VonMises
 from tensorflow_probability.python.distributions.von_mises_fisher import VonMisesFisher
-from tensorflow_probability.python.distributions.wishart import Wishart
 from tensorflow_probability.python.distributions.wishart import WishartLinearOperator
 from tensorflow_probability.python.distributions.wishart import WishartTriL
 from tensorflow_probability.python.distributions.zipf import Zipf
@@ -209,7 +208,6 @@ __all__ = [
     'VectorSinhArcsinhDiag',
     'VonMises',
     'VonMisesFisher',
-    'Wishart',
     'WishartLinearOperator',
     'WishartTriL',
     'TransformedDistribution',

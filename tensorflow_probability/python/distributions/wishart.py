@@ -25,7 +25,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
@@ -33,10 +32,8 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
-    'Wishart',
     'WishartLinearOperator',
     'WishartTriL',
 ]
@@ -460,194 +457,6 @@ class WishartLinearOperator(distribution.Distribution):
     return assertions
 
 
-class Wishart(WishartLinearOperator):
-  """The matrix Wishart distribution on positive definite matrices.
-
-  This distribution is defined by a scalar degrees of freedom `df` and a scale
-  matrix, which can either be a full symmetric matrix or a lower triangular
-  Cholesky factor.
-
-  #### Mathematical Details
-
-  The probability density function (pdf) is,
-
-  ```none
-  pdf(X; df, scale) = det(X)**(0.5 (df-k-1)) exp(-0.5 tr[inv(scale) X]) / Z
-  Z = 2**(0.5 df k) |det(scale)|**(0.5 df) Gamma_k(0.5 df)
-  ```
-
-  where:
-  * `df >= k` denotes the degrees of freedom,
-  * `scale` is a symmetric, positive definite, `k x k` matrix,
-  * `Z` is the normalizing constant, and,
-  * `Gamma_k` is the [multivariate Gamma function](
-    https://en.wikipedia.org/wiki/Multivariate_gamma_function).
-
-
-  #### Examples
-
-  ```python
-  # Initialize a single 3x3 Wishart with Cholesky factored scale matrix and 5
-  # degrees-of-freedom.(*)
-  df = 5
-  chol_scale = tf.cholesky(...)  # Shape is [3, 3].
-  dist = tfd.Wishart(df=df, scale_tril=chol_scale)
-
-  # Evaluate this on an observation in R^3, returning a scalar.
-  x = ...  # A 3x3 positive definite matrix.
-  dist.prob(x)  # Shape is [], a scalar.
-
-  # Evaluate this on a two observations, each in R^{3x3}, returning a length two
-  # Tensor.
-  x = [x0, x1]  # Shape is [2, 3, 3].
-  dist.prob(x)  # Shape is [2].
-
-  # Initialize two 3x3 Wisharts with full scale matrices.
-  df = [5, 4]
-  scale = ...  # Shape is [2, 3, 3].
-  dist = tfd.Wishart(df=df, scale=scale)
-
-  # Evaluate this on four observations.
-  x = [[x0, x1], [x2, x3]]  # Shape is [2, 2, 3, 3].
-  dist.prob(x)  # Shape is [2, 2].
-
-  # (*) - To efficiently create a trainable covariance matrix, see the example
-  #   in tfp.distributions.matrix_diag_transform.
-  ```
-  """
-
-  @deprecation.deprecated(
-      '2019-12-01',
-      '`Wishart` is deprecated, use `WishartTriL(df=df, '
-      'scale_tril=tf.linalg.cholesky(scale))` instead. Note: `Wishart` is not'
-      '"tape-safe" for TF2: if an instance is created outside of a'
-      '`tf.GradientTape`, the gradients with respect to the `scale` parameter'
-      'cannot be calculated.',
-      warn_once=True)
-  def __init__(self,
-               df,
-               scale=None,
-               scale_tril=None,
-               input_output_cholesky=False,
-               validate_args=False,
-               allow_nan_stats=True,
-               name='Wishart'):
-    """Construct Wishart distributions.
-
-    Args:
-      df: `float` or `double` `Tensor`. Degrees of freedom, must be greater than
-        or equal to dimension of the scale matrix.
-      scale: `float` or `double` `Tensor`. The symmetric positive definite
-        scale matrix of the distribution. Exactly one of `scale` and
-        'scale_tril` must be passed.
-      scale_tril: `float` or `double` `Tensor`. The Cholesky factorization
-        of the symmetric positive definite scale matrix of the distribution.
-        Exactly one of `scale` and 'scale_tril` must be passed.
-      input_output_cholesky: Python `bool`. If `True`, functions whose input or
-        output have the semantics of samples assume inputs are in Cholesky form
-        and return outputs in Cholesky form. In particular, if this flag is
-        `True`, input to `log_prob` is presumed of Cholesky form and output from
-        `sample`, `mean`, and `mode` are of Cholesky form.  Setting this
-        argument to `True` is purely a computational optimization and does not
-        change the underlying distribution; for instance, `mean` returns the
-        Cholesky of the mean, not the mean of Cholesky factors. The `variance`
-        and `stddev` methods are unaffected by this flag.
-        Default value: `False` (i.e., input/output does not have Cholesky
-        semantics).
-      validate_args: Python `bool`, default `False`. When `True` distribution
-        parameters are checked for validity despite possibly degrading runtime
-        performance. When `False` invalid inputs may silently render incorrect
-        outputs.
-      allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
-        (e.g., mean, mode, variance) use the value '`NaN`' to indicate the
-        result is undefined. When `False`, an exception is raised if one or
-        more of the statistic's batch members are undefined.
-      name: Python `str` name prefixed to Ops created by this class.
-    Raises:
-      ValueError: if zero or both of 'scale' and 'scale_tril' are passed in.
-    """
-    parameters = dict(locals())
-
-    with tf.name_scope(name) as name:
-      if (scale is None) == (scale_tril is None):
-        raise ValueError('Must pass scale or scale_tril, but not both.')
-
-      dtype = dtype_util.common_dtype([df, scale, scale_tril], tf.float32)
-      df = tensor_util.convert_nonref_to_tensor(df, name='df', dtype=dtype)
-      if scale is not None:
-        scale = tensor_util.convert_nonref_to_tensor(
-            scale, name='scale', dtype=dtype)
-        self._scale_tril = tf.linalg.cholesky(scale)
-      else:  # scale_tril is not None
-        self._scale_tril = tensor_util.convert_nonref_to_tensor(
-            scale_tril, name='scale_tril', dtype=dtype)
-      self._scale_full = scale
-
-      super(Wishart, self).__init__(
-          df=df,
-          scale=tf.linalg.LinearOperatorLowerTriangular(
-              tril=self._scale_tril,
-              is_non_singular=True,
-              is_positive_definite=True,
-              is_square=True),
-          input_output_cholesky=input_output_cholesky,
-          validate_args=validate_args,
-          allow_nan_stats=allow_nan_stats,
-          name=name)
-      self._parameters = parameters
-
-  @classmethod
-  def _params_event_ndims(cls):
-    return dict(df=0, scale=2, scale_tril=2)
-
-  @property
-  def scale_operator(self):
-    """Wishart distribution scale matrix as an Linear Operator."""
-    return self._scale
-
-  @property
-  def scale_tril(self):
-    """Cholesky decomposition of Wishart scale matrix."""
-    return self._scale_tril
-
-  @property
-  def scale(self):
-    """Wishart distribution scale matrix."""
-    return self._scale_full
-
-  @property
-  def dimension(self):
-    """Dimension of underlying vector space. The `p` in `R^(p*p)`."""
-    with self._name_and_control_scope('dimension'):
-      return tf.convert_to_tensor(
-          self._dimension(), dtype_hint=tf.float32, name='dimension')
-
-  def _parameter_control_dependencies(self, is_init):
-
-    assertions = super(Wishart, self)._parameter_control_dependencies(is_init)
-
-    if not self.validate_args:
-      assert not assertions
-      return []
-
-    if self._scale_full is None:
-      if is_init != tensor_util.is_ref(self._scale_tril):
-        shape = prefer_static.shape(self._scale_tril)
-        assertions.extend(
-            [assert_util.assert_positive(
-                tf.linalg.diag_part(self._scale_tril),
-                message='`scale_tril` must be positive definite.'),
-             assert_util.assert_equal(
-                 shape[-1],
-                 shape[-2],
-                 message='`scale_tril` must be square.')]
-            )
-    else:
-      if is_init != tensor_util.is_ref(self._scale_full):
-        assertions.append(distribution_util.assert_symmetric(self._scale_full))
-    return assertions
-
-
 class WishartTriL(WishartLinearOperator):
   """The matrix Wishart distribution parameterized with Cholesky factors.
 
@@ -678,8 +487,8 @@ class WishartTriL(WishartLinearOperator):
   # Initialize a single 3x3 Wishart with Cholesky factored scale matrix and 5
   # degrees-of-freedom.(*)
   df = 5
-  chol_scale = tf.cholesky(...)  # Shape is [3, 3].
-  dist = tfd.Wishart(df=df, scale_tril=chol_scale)
+  chol_scale = tf.linalg.cholesky(...)  # Shape is [3, 3].
+  dist = tfd.WishartTriL(df=df, scale_tril=chol_scale)
 
   # Evaluate this on an observation in R^3, returning a scalar.
   x = ...  # A 3x3 positive definite matrix.
