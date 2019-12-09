@@ -103,7 +103,7 @@ def _control_dependencies(control_inputs):
 def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint: disable=unused-argument
   """Emulates tf.convert_to_tensor."""
   assert not tf.is_tensor(value), value
-  if isinstance(value, np.ndarray):
+  if is_tensor(value):
     if dtype is not None:
       dtype = utils.numpy_dtype(dtype)
       # if np.result_type(value, dtype) != dtype:
@@ -373,7 +373,11 @@ class _TensorMeta(type(np.ndarray)):
 
   @classmethod
   def __instancecheck__(cls, instance):
-    return isinstance(instance, (np.ndarray, np.generic))
+    if JAX_MODE:
+      import jax  # pylint: disable=g-import-not-at-top
+      return isinstance(instance, (jax.xla.DeviceArray,
+                                   jax.abstract_arrays.UnshapedArray))
+    return isinstance(instance, np.ndarray)
 
 
 class Tensor(six.with_metaclass(_TensorMeta)):
