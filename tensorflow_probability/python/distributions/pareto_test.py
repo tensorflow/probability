@@ -267,7 +267,7 @@ class ParetoTest(test_util.TestCase):
   def testParetoSampleVariance(self):
     scale = 1.
     concentration = 3.
-    n = int(400e3)
+    n = int(6e5)
     pareto = tfd.Pareto(concentration, scale, validate_args=True)
     samples = pareto.sample(
         n, seed=test_util.test_seed(hardcoded_seed=123456))
@@ -277,14 +277,14 @@ class ParetoTest(test_util.TestCase):
     self.assertAllClose(
         sample_values.var(),
         self._scipy_pareto(concentration, scale).var(),
-        rtol=.03,
+        rtol=.05,
         atol=0)
 
   def testParetoSampleMultidimensionalMean(self):
     scale = np.array([np.arange(1, 21, dtype=np.float32)])
     concentration = 3.
     pareto = tfd.Pareto(concentration, scale, validate_args=True)
-    n = int(100e3)
+    n = int(2e5)
     samples = pareto.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 1, 20))
@@ -329,7 +329,7 @@ class ParetoTest(test_util.TestCase):
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(
-        int(1e5),
+        int(3e5),
         seed=test_util.test_seed(hardcoded_seed=0, set_eager_seed=False))
     kl_sample = tf.reduce_mean(
         input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)

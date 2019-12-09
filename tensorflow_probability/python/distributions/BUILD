@@ -1887,7 +1887,9 @@ py_test(
 
 py_test(
     name = "inverse_gamma_test",
+    size = "medium",
     srcs = ["inverse_gamma_test.py"],
+    shard_count = 5,
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2235,8 +2237,9 @@ py_test(
 
 py_test(
     name = "pareto_test",
-    size = "small",
+    size = "medium",
     srcs = ["pareto_test.py"],
+    shard_count = 3,
     deps = [
         # numpy dep,
         # scipy dep,

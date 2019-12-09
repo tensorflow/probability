@@ -214,7 +214,7 @@ class InverseGammaTest(test_util.TestCase):
     beta_v = 3.0
     alpha = tf.constant(alpha_v)
     beta = tf.constant(beta_v)
-    n = 100000
+    n = int(5e5)
     inv_gamma = tfd.InverseGamma(
         concentration=alpha, scale=beta, validate_args=True)
     samples = inv_gamma.sample(
@@ -226,7 +226,7 @@ class InverseGammaTest(test_util.TestCase):
         sample_values.mean(),
         stats.invgamma.mean(
             alpha_v, scale=beta_v),
-        atol=.0025)
+        atol=.0040)
     self.assertAllClose(
         sample_values.var(),
         stats.invgamma.var(alpha_v, scale=beta_v),
@@ -239,18 +239,18 @@ class InverseGammaTest(test_util.TestCase):
     def inverse_gamma_sampler(alpha, beta):
       inv_gamma = tfd.InverseGamma(
           concentration=alpha, scale=beta, validate_args=True)
-      return inv_gamma.sample(100, seed=test_util.test_seed())
+      return inv_gamma.sample(10, seed=test_util.test_seed())
     _, [grad_alpha, grad_beta] = tfp.math.value_and_gradient(
         inverse_gamma_sampler, [alpha, beta])
     self.assertIsNotNone(grad_alpha)
     self.assertIsNotNone(grad_beta)
 
   def testInverseGammaSampleMultiDimensional(self):
-    alpha_v = np.array([np.arange(3, 103, dtype=np.float32)])  # 1 x 100
+    alpha_v = np.array([np.arange(5, 105, dtype=np.float32)])  # 1 x 100
     beta_v = np.array([np.arange(1, 11, dtype=np.float32)]).T  # 10 x 1
     inv_gamma = tfd.InverseGamma(
         concentration=alpha_v, scale=beta_v, validate_args=True)
-    n = 10000
+    n = int(1e5)
     samples = inv_gamma.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 10, 100))
