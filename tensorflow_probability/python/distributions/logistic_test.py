@@ -186,6 +186,7 @@ class LogisticTest(test_util.TestCase):
     self.assertEqual(dist64.dtype, dist64.sample(
         5, seed=test_util.test_seed()).dtype)
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughParams(self):
     loc = tf.Variable([-5., 0., 5.])
     scale = tf.Variable(2.)

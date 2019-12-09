@@ -337,6 +337,7 @@ class LaplaceTest(test_util.TestCase):
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(true_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughParams(self):
     loc = tf.Variable([-5., 0., 5.])
     scale = tf.Variable(2.)

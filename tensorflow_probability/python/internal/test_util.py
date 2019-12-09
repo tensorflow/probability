@@ -397,6 +397,17 @@ def jax_disable_test_missing_functionality(issue_link):
   return f
 
 
+def tf_tape_safety_test(test_fn):
+  """Only run a test of TF2 tape safety against the TF backend."""
+
+  def new_test(self, *args, **kwargs):
+    if JAX_MODE or (tf.Variable == ops.NumpyVariable):
+      self.skipTest('Tape-safety tests are only run against TensorFlow.')
+    return test_fn(self, *args, **kwargs)
+
+  return new_test
+
+
 def test_seed(hardcoded_seed=None, set_eager_seed=True):
   """Returns a command-line-controllable PRNG seed for unit tests.
 

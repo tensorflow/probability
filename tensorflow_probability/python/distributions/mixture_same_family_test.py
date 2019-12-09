@@ -291,6 +291,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     sample_2 = self.evaluate(dist.sample([100], seed=seed))
     self.assertAllClose(sample_1, sample_2)
 
+  @test_util.tf_tape_safety_test
   def testGradientsThroughParams(self):
     logits = self._build_variable([1., 2., 3.])
     loc = self._build_variable([0., 0., 0])
@@ -396,6 +397,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     with tfp_hps.assert_no_excessive_var_usage('sample', max_permissible=4):
       dist.sample(seed=test_util.test_seed())
 
+  @test_util.tf_tape_safety_test
   def testSampleGradientsThroughParams(self):
     logits = self._build_variable(np.zeros(5), static_rank=True)
     loc = self._build_variable(np.zeros((4, 5, 2, 3)), static_rank=True)
