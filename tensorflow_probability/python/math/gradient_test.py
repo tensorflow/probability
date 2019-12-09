@@ -51,6 +51,16 @@ class GradientTest(test_util.TestCase):
     self.assertAllClose(g(*args), dydx, atol=1e-6, rtol=1e-6)
 
   @test_util.numpy_disable_gradient_test
+  def test_output_list(self):
+    f = lambda x, y: [x, x * y]
+    g = lambda x, y: [y + 1., x]
+    args = [np.linspace(0, 100, int(1e1)),
+            np.linspace(-100, 0, int(1e1))]
+    y, dydx = self.evaluate(tfp.math.value_and_gradient(f, args))
+    self.assertAllClose(f(*args), y, atol=1e-6, rtol=1e-6)
+    self.assertAllClose(g(*args), dydx, atol=1e-6, rtol=1e-6)
+
+  @test_util.numpy_disable_gradient_test
   def test_output_gradients(self):
     jacobian = np.float32([[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]])
     f = lambda x: tf.squeeze(tf.matmul(jacobian, x[:, tf.newaxis]))

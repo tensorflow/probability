@@ -132,6 +132,7 @@ JAX_MODE = False  # Rewritten by script.
 
 if JAX_MODE:
   import jax  # pylint: disable=g-import-not-at-top
+  import jax.numpy as np  # pylint: disable=g-import-not-at-top
 
   def value_and_gradient(f,  # pylint: disable=function-redefined
                          xs,
@@ -142,15 +143,14 @@ if JAX_MODE:
     del name
     del use_gradient_tape
     xs, is_xs_list_like = _prepare_args(xs)
-    if output_gradients is not None:
-      y, f_vjp = jax.vjp(f, *xs)
-      dydx = f_vjp(output_gradients)
-    else:
-      y = f(*xs)
-      g = jax.grad(f, argnums=tuple(range(len(xs))))
-      for _ in y.shape:  # vmap each batch dimension.
-        g = jax.vmap(g)
-      dydx = g(*xs)
+    y, f_vjp = jax.vjp(f, *xs)
+    if output_gradients is None:
+      if isinstance(y, list):
+        output_gradients = [np.ones_like(y_)
+                            for y_ in y]
+      else:
+        output_gradients = np.ones_like(y)
+    dydx = f_vjp(output_gradients)
     if not is_xs_list_like:
       dydx = dydx[0]
     return y, dydx

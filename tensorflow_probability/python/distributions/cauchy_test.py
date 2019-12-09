@@ -191,6 +191,7 @@ class CauchyTest(test_util.TestCase):
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0, rtol=1e-5)
 
   @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_variable_test
   def testFiniteGradientAtDifficultPoints(self):
     for dtype in [np.float32, np.float64]:
       loc = tf.Variable(dtype(0.0))
@@ -209,7 +210,6 @@ class CauchyTest(test_util.TestCase):
           'cdf', 'log_cdf', 'survival_function',
           'log_survival_function', 'log_prob', 'prob'
       ]:
-        print(func_name)
         value, grads = self.evaluate(tfp.math.value_and_gradient(
             cauchy_function(func_name, x), [loc, scale]))
         self.assertAllFinite(value)
