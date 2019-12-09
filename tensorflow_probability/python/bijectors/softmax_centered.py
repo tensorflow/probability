@@ -18,10 +18,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import pad as pad_lib
+from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 
 
@@ -94,8 +98,23 @@ class SoftmaxCentered(bijector.Bijector):
 
     # Do this first to make sure CSE catches that it'll happen again in
     # _inverse_log_det_jacobian.
-    x = tf.math.log(y)
-    x, log_normalization = tf.split(x, num_or_size_splits=[-1, 1], axis=-1)
+
+    assertions = []
+    if self.validate_args:
+      assertions.append(assert_util.assert_near(
+          tf.reduce_sum(y, axis=-1),
+          tf.ones([], y.dtype),
+          2. * np.finfo(dtype_util.as_numpy_dtype(y.dtype)).eps,
+          message='Last dimension of `y` must sum to `1`.'))
+      assertions.append(assert_util.assert_less_equal(
+          y, tf.ones([], y.dtype),
+          message='Elements of `y` must be less than or equal to `1`.'))
+      assertions.append(assert_util.assert_non_negative(
+          y, message='Elements of `y` must be non-negative.'))
+
+    with tf.control_dependencies(assertions):
+      x = tf.math.log(y)
+      x, log_normalization = tf.split(x, num_or_size_splits=[-1, 1], axis=-1)
     return x - log_normalization
 
   def _inverse_log_det_jacobian(self, y):
