@@ -104,7 +104,7 @@ class PlackettLuceTest(test_util.TestCase):
 
   def testUnknownShape(self):
     scores = tf1.placeholder_with_default(
-        input=[[1e-6, 1000.0], [1000.0, 1e-6]], shape=None)
+        [[1e-6, 1000.0], [1000.0, 1e-6]], shape=None)
     dist = tfd.PlackettLuce(scores, validate_args=True)
     sample = dist.sample(seed=test_util.test_seed())
     # Batch entry 0, 1 will sample permutations [1, 0], [0, 1].

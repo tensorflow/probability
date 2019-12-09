@@ -109,12 +109,12 @@ class DenseVariational(test_util.TestCase):
       del name, trainable, add_variable_fn  # unused
       # Deserialized Keras objects do not perform lexical scoping. Any modules
       # that the function requires must be imported within the function.
-      import tensorflow as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
+      import tensorflow.compat.v2 as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
       import tensorflow_probability as tfp  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
       tfd = tfp.distributions  # pylint: disable=redefined-outer-name
 
       dist = tfd.Normal(loc=tf.zeros(shape, dtype), scale=tf.ones(shape, dtype))
-      batch_ndims = tf.size(input=dist.batch_shape_tensor())
+      batch_ndims = tf.size(dist.batch_shape_tensor())
       return tfd.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
 
     kwargs = {'units': 3,

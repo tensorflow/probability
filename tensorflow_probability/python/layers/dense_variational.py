@@ -683,7 +683,7 @@ class DenseFlipout(_DenseVariational):
         self.kernel_posterior_tensor_fn(self.kernel_posterior_affine))
     self.kernel_posterior_tensor = None
 
-    input_shape = tf.shape(input=inputs)
+    input_shape = tf.shape(inputs)
     batch_shape = input_shape[:-1]
 
     seed_stream = SeedStream(self.seed, salt='DenseFlipout')

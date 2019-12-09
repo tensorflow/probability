@@ -34,7 +34,7 @@ class _TriangularTest(object):
   def make_tensor(self, x):
     x = tf.cast(x, self._dtype)
     return tf1.placeholder_with_default(
-        input=x, shape=x.shape if self._use_static_shape else None)
+        x, shape=x.shape if self._use_static_shape else None)
 
   def _create_triangular_dist(self, low, high, peak):
     return tfd.Triangular(

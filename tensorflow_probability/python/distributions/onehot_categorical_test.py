@@ -221,7 +221,7 @@ class OneHotCategoricalTest(test_util.TestCase):
         x = tf.cast(x, dtype=tf.float32)
         # Compute empirical KL(p||q).
         kl_sample = tf.reduce_mean(
-            input_tensor=p.log_prob(x) - q.log_prob(x), axis=0)
+            p.log_prob(x) - q.log_prob(x), axis=0)
 
         [kl_sample_, kl_actual_,
          kl_same_] = self.evaluate([kl_sample, kl_actual, kl_same])
@@ -236,7 +236,7 @@ class OneHotCategoricalTest(test_util.TestCase):
     n = int(3e3)
     x = dist.sample(n, seed=test_util.test_seed())
     x = tf.cast(x, dtype=tf.float32)
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+    sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = tf.transpose(a=x - sample_mean, perm=[1, 2, 3, 0])
     sample_covariance = tf.matmul(x_centered, x_centered, adjoint_b=True) / n
     [
@@ -262,7 +262,7 @@ class OneHotCategoricalTest(test_util.TestCase):
     n = int(1e4)
     x = dist.sample(n, seed=test_util.test_seed())
     x = tf.cast(x, dtype=tf.float32)
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)  # elementwise mean
+    sample_mean = tf.reduce_mean(x, axis=0)  # elementwise mean
     x_centered = x - sample_mean
     sample_covariance = tf.matmul(x_centered, x_centered, adjoint_a=True) / n
     [

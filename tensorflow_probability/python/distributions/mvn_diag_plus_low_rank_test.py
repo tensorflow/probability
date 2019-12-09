@@ -152,25 +152,25 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
     n = int(70e3)
     samps = dist.sample(
         n, seed=test_util.test_seed())
-    sample_mean = tf.reduce_mean(input_tensor=samps, axis=0)
+    sample_mean = tf.reduce_mean(samps, axis=0)
     x = samps - sample_mean
     sample_covariance = tf.matmul(x, x, transpose_a=True) / n
 
     sample_kl_identity = tf.reduce_mean(
-        input_tensor=dist.log_prob(samps) - mvn_identity.log_prob(samps),
+        dist.log_prob(samps) - mvn_identity.log_prob(samps),
         axis=0)
     analytical_kl_identity = tfd.kl_divergence(dist, mvn_identity)
 
     sample_kl_scaled = tf.reduce_mean(
-        input_tensor=dist.log_prob(samps) - mvn_scaled.log_prob(samps), axis=0)
+        dist.log_prob(samps) - mvn_scaled.log_prob(samps), axis=0)
     analytical_kl_scaled = tfd.kl_divergence(dist, mvn_scaled)
 
     sample_kl_diag = tf.reduce_mean(
-        input_tensor=dist.log_prob(samps) - mvn_diag.log_prob(samps), axis=0)
+        dist.log_prob(samps) - mvn_diag.log_prob(samps), axis=0)
     analytical_kl_diag = tfd.kl_divergence(dist, mvn_diag)
 
     sample_kl_chol = tf.reduce_mean(
-        input_tensor=dist.log_prob(samps) - mvn_chol.log_prob(samps), axis=0)
+        dist.log_prob(samps) - mvn_chol.log_prob(samps), axis=0)
     analytical_kl_chol = tfd.kl_divergence(dist, mvn_chol)
 
     n = int(10e3)
@@ -181,23 +181,23 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
     samps = baseline.sample(n, seed=test_util.test_seed())
 
     sample_kl_identity_diag_baseline = tf.reduce_mean(
-        input_tensor=baseline.log_prob(samps) - mvn_identity.log_prob(samps),
+        baseline.log_prob(samps) - mvn_identity.log_prob(samps),
         axis=0)
     analytical_kl_identity_diag_baseline = tfd.kl_divergence(
         baseline, mvn_identity)
 
     sample_kl_scaled_diag_baseline = tf.reduce_mean(
-        input_tensor=baseline.log_prob(samps) - mvn_scaled.log_prob(samps),
+        baseline.log_prob(samps) - mvn_scaled.log_prob(samps),
         axis=0)
     analytical_kl_scaled_diag_baseline = tfd.kl_divergence(baseline, mvn_scaled)
 
     sample_kl_diag_diag_baseline = tf.reduce_mean(
-        input_tensor=baseline.log_prob(samps) - mvn_diag.log_prob(samps),
+        baseline.log_prob(samps) - mvn_diag.log_prob(samps),
         axis=0)
     analytical_kl_diag_diag_baseline = tfd.kl_divergence(baseline, mvn_diag)
 
     sample_kl_chol_diag_baseline = tf.reduce_mean(
-        input_tensor=baseline.log_prob(samps) - mvn_chol.log_prob(samps),
+        baseline.log_prob(samps) - mvn_chol.log_prob(samps),
         axis=0)
     analytical_kl_chol_diag_baseline = tfd.kl_divergence(baseline, mvn_chol)
 

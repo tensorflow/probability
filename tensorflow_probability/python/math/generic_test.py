@@ -77,7 +77,7 @@ class ReduceWeightedLogSumExp(test_util.TestCase):
     logx = tf.constant(logx_)
     with tf.GradientTape() as tape:
       tape.watch(logx)
-      expected = tf.reduce_logsumexp(input_tensor=logx, axis=-1)
+      expected = tf.reduce_logsumexp(logx, axis=-1)
     grad_expected = tape.gradient(expected, logx)
     with tf.GradientTape() as tape:
       tape.watch(logx)

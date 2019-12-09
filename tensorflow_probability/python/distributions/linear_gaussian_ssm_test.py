@@ -138,7 +138,7 @@ class _IIDNormalTest(object):
             value=transition_variance_val + observation_variance_val,
             dtype=self.dtype)
         lp_iid = tf.reduce_sum(
-            input_tensor=tfd.Normal(
+            tfd.Normal(
                 loc=tf.zeros([], dtype=self.dtype),
                 scale=tf.sqrt(marginal_variance)).log_prob(x),
             axis=(-2, -1))
@@ -764,7 +764,7 @@ class MissingObservationsTests(test_util.TestCase):
       # https://stackoverflow.com/questions/33712178/tensorflow-nan-bug/42497444#42497444
       log_likelihoods, _, _, _, _, _, _ = model.forward_filter(
           x=observed_time_series, mask=observation_mask)
-      lp = tf.reduce_sum(input_tensor=log_likelihoods)
+      lp = tf.reduce_sum(log_likelihoods)
       return lp
 
     _, grads_ = self.evaluate(

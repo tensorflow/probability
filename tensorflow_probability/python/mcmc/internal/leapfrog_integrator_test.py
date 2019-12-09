@@ -50,7 +50,7 @@ class LeapfrogIntegratorTest(test_util.TestCase):
       log_prob: The log-pdf up to a normalizing constant.
     """
     return tf.reduce_sum(
-        input_tensor=self._shape_param * x - self._rate_param * tf.exp(x),
+        self._shape_param * x - self._rate_param * tf.exp(x),
         axis=event_dims)
 
   def _integrator_conserves_energy(self, x, independent_chain_ndims):
@@ -58,10 +58,9 @@ class LeapfrogIntegratorTest(test_util.TestCase):
 
     target_fn = lambda x: self._log_gamma_log_prob(x, event_dims)
 
-    m = tf.random.normal(tf.shape(input=x))
+    m = tf.random.normal(tf.shape(x))
     log_prob_0 = target_fn(x)
-    old_energy = -log_prob_0 + 0.5 * tf.reduce_sum(
-        input_tensor=m**2., axis=event_dims)
+    old_energy = -log_prob_0 + 0.5 * tf.reduce_sum(m**2., axis=event_dims)
 
     event_size = np.prod(
         self.evaluate(x).shape[independent_chain_ndims:])
@@ -73,8 +72,7 @@ class LeapfrogIntegratorTest(test_util.TestCase):
 
     [[new_m], [_], log_prob_1, [_]] = integrator([m], [x])
 
-    new_energy = -log_prob_1 + 0.5 * tf.reduce_sum(
-        input_tensor=new_m**2., axis=event_dims)
+    new_energy = -log_prob_1 + 0.5 * tf.reduce_sum(new_m**2., axis=event_dims)
 
     old_energy_, new_energy_ = self.evaluate([old_energy, new_energy])
     tf1.logging.vlog(

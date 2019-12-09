@@ -61,7 +61,7 @@ def sample_uniform_initial_state(parameter,
   unconstrained_prior_sample = parameter.bijector.inverse(
       parameter.prior.sample(init_sample_shape, seed=seed))
   uniform_initializer = 4 * tf.random.uniform(
-      tf.shape(input=unconstrained_prior_sample),
+      tf.shape(unconstrained_prior_sample),
       dtype=unconstrained_prior_sample.dtype,
       seed=seed) - 2
   if return_constrained:

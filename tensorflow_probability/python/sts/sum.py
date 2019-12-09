@@ -21,7 +21,6 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
@@ -214,10 +213,7 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       ValueError: if components have different `num_timesteps`.
     """
 
-    with tf1.name_scope(
-        name,
-        'AdditiveStateSpaceModel',
-        values=[observation_noise_scale, initial_step]) as name:
+    with tf.name_scope(name or 'AdditiveStateSpaceModel') as name:
       # Check that all components have the same dtype
       dtype = tf.debugging.assert_same_float_dtype(component_ssms)
 
@@ -414,8 +410,7 @@ class Sum(StructuralTimeSeries):
       ValueError: if components do not have unique names.
     """
 
-    with tf1.name_scope(
-        name, 'Sum', values=[observed_time_series]) as name:
+    with tf.name_scope(name or 'Sum') as name:
       if observed_time_series is not None:
         observed_mean, observed_stddev, _ = (
             sts_util.empirical_statistics(observed_time_series))
@@ -495,7 +490,7 @@ class Sum(StructuralTimeSeries):
         Distribution objects, in order corresponding to `self.components`.
     """
 
-    with tf1.name_scope('make_component_state_space_models'):
+    with tf.name_scope('make_component_state_space_models'):
 
       # List the model parameters in canonical order
       param_map = self._canonicalize_param_vals_as_map(param_vals)

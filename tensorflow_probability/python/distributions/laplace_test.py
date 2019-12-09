@@ -327,8 +327,7 @@ class LaplaceTest(test_util.TestCase):
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(1e4), seed=test_util.test_seed())
-    kl_sample = tf.reduce_mean(
-        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
 
     true_kl_, kl_, kl_sample_ = self.evaluate([true_kl, kl, kl_sample])
     self.assertAllClose(true_kl_, kl_, atol=1e-5, rtol=1e-5)

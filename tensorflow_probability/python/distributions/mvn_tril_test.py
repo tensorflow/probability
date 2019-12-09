@@ -321,12 +321,12 @@ class MultivariateNormalTriLTest(test_util.TestCase):
 
     n = int(10e3)
     samps = dist.sample(n, seed=test_util.test_seed())
-    sample_mean = tf.reduce_mean(input_tensor=samps, axis=0)
+    sample_mean = tf.reduce_mean(samps, axis=0)
     x = samps - sample_mean
     sample_covariance = tf.matmul(x, x, transpose_a=True) / n
 
     sample_kl_chol = tf.reduce_mean(
-        input_tensor=dist.log_prob(samps) - mvn_chol.log_prob(samps), axis=0)
+        dist.log_prob(samps) - mvn_chol.log_prob(samps), axis=0)
     analytical_kl_chol = tfd.kl_divergence(dist, mvn_chol)
 
     scale = dist.scale.to_dense()
@@ -527,9 +527,9 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
       self.assertIsNotNone(dlpdmu)
       self.assertIsNotNone(dlpdchol)
       self.assertGreater(
-          self.evaluate(tf.reduce_sum(input_tensor=tf.abs(dlpdmu))), 0)
+          self.evaluate(tf.reduce_sum(tf.abs(dlpdmu))), 0)
       self.assertGreater(
-          self.evaluate(tf.reduce_sum(input_tensor=tf.abs(dlpdchol))), 0)
+          self.evaluate(tf.reduce_sum(tf.abs(dlpdchol))), 0)
 
   def testDocstrSliceExample(self):
     seed_stream = test_util.test_seed_stream('mvn_tril_docstr')

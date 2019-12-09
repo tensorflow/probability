@@ -32,10 +32,10 @@ class FiniteDiscreteTest(object):
     # Enforce parameterized dtype and static/dynamic testing.
     ndarray = np.asarray(ndarray)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _get_shape(self, tensor):
-    return tensor.shape if self.use_static_shape else tf.shape(input=tensor)
+    return tensor.shape if self.use_static_shape else tf.shape(tensor)
 
 
 class FiniteDiscreteValidateArgsTest(FiniteDiscreteTest):

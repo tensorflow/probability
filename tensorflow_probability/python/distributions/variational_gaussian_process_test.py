@@ -176,8 +176,8 @@ class _VariationalGaussianProcessTest(object):
     # index points.
     # * [9] comes from the number of inducing points.
     # Similar reasoning applies to scale.
-    self.assertAllEqual([2, 4, 6, 1, 9], tf.shape(input=loc))
-    self.assertAllEqual([2, 4, 6, 1, 9, 9], tf.shape(input=scale))
+    self.assertAllEqual([2, 4, 6, 1, 9], tf.shape(loc))
+    self.assertAllEqual([2, 4, 6, 1, 9, 9], tf.shape(scale))
 
   def testVariationalLossShapes(self):
     # 2x2 grid of index points in R^2 and flatten to 4x2
@@ -254,7 +254,7 @@ class _VariationalGaussianProcessTest(object):
         observations=observations,
         observation_index_points=observation_index_points)
     # Expect a scalar loss.
-    self.assertAllClose([], tf.shape(input=loss))
+    self.assertAllClose([], tf.shape(loss))
 
 
 @test_util.test_all_tf_execution_regimes

@@ -51,7 +51,7 @@ class OptimizationTests(test_util.TestCase):
         1., tfb.Softplus(), name='scale')
     def trainable_log_prob(z):
       lp = tfd.Normal(0., 1.).log_prob(z)
-      lp += tf.reduce_sum(input_tensor=tfd.Normal(
+      lp += tf.reduce_sum(tfd.Normal(
           z[..., tf.newaxis], likelihood_scale).log_prob(x), axis=-1)
       return lp
 

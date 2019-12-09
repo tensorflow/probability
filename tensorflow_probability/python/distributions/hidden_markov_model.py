@@ -962,7 +962,7 @@ class HiddenMarkovModel(distribution.Distribution):
                           self._log_trans +
                           log_prob_observation[..., tf.newaxis, :])
               most_likely_given_successor = tf.argmax(log_prob, axis=-2)
-              max_log_p_given_successor = tf.reduce_max(input_tensor=log_prob,
+              max_log_p_given_successor = tf.reduce_max(log_prob,
                                                         axis=-2)
               return (max_log_p_given_successor, most_likely_given_successor)
 
@@ -985,10 +985,9 @@ class HiddenMarkovModel(distribution.Distribution):
             def backward_step(most_likely_successor,
                               most_likely_given_successor):
               return tf.reduce_sum(
-                  input_tensor=(most_likely_given_successor *
-                                tf.one_hot(most_likely_successor,
-                                           self._num_states,
-                                           dtype=tf.int64)),
+                  (most_likely_given_successor *
+                   tf.one_hot(most_likely_successor,
+                              self._num_states, dtype=tf.int64)),
                   axis=-1)
 
             backward_scan = tf.scan(

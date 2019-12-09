@@ -191,7 +191,7 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
       self.assertAllEqual([10], self.evaluate(dist.event_shape_tensor()))
 
   def testUnknownShape(self):
-    logits_pl = tf1.placeholder_with_default(input=[0.3, 0.1, 0.4], shape=None)
+    logits_pl = tf1.placeholder_with_default([0.3, 0.1, 0.4], shape=None)
     temperature = 1.
     dist = tfd.ExpRelaxedOneHotCategorical(
         temperature, logits_pl, validate_args=True)

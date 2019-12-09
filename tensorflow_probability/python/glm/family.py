@@ -21,7 +21,6 @@ from __future__ import print_function
 import contextlib
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors
 from tensorflow_probability.python import distributions as tfd
@@ -75,7 +74,7 @@ class ExponentialFamily(object):
         functions. Default value: `None` (i.e., the subclass name).
     """
     if not name or name[-1] != '/':  # `name` is not a name scope.
-      with tf1.name_scope(name or type(self).__name__) as name:
+      with tf.name_scope(name or type(self).__name__) as name:
         pass
     self._name = name
 
@@ -126,7 +125,7 @@ class ExponentialFamily(object):
         linear-response and given the prescribed linear-response to mean
         mapping.
     """
-    with self._name_scope(name, 'call', [predicted_linear_response]):
+    with self._name_scope(name, 'call'):
       predicted_linear_response = tf.convert_to_tensor(
           value=predicted_linear_response, name='predicted_linear_response')
       return self._call(predicted_linear_response)
@@ -152,8 +151,7 @@ class ExponentialFamily(object):
         `response`s.
     """
 
-    with self._name_scope(
-        name, 'log_prob', [response, predicted_linear_response]):
+    with self._name_scope(name, 'log_prob'):
       dtype = dtype_util.common_dtype([response, predicted_linear_response])
       response = tf.convert_to_tensor(
           value=response, dtype=dtype, name='response')
@@ -172,11 +170,10 @@ class ExponentialFamily(object):
         self_name=self.name)
 
   @contextlib.contextmanager
-  def _name_scope(self, name=None, default_name=None, values=None):
+  def _name_scope(self, name=None, default_name=None):
     """Helper function to standardize op scope."""
-    with tf1.name_scope(self.name):
-      with tf1.name_scope(
-          name, default_name, values=values or []) as scope:
+    with tf.name_scope(self.name):
+      with tf.name_scope(name or default_name) as scope:
         yield scope
 
 

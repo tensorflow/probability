@@ -142,7 +142,7 @@ class _AutoregressiveStateSpaceModelTest(test_util.TestCase):
     if self.use_static_shape:
       self.assertAllEqual(y.shape.as_list()[:-2], batch_shape)
     else:
-      self.assertAllEqual(self.evaluate(tf.shape(input=y))[:-2], batch_shape)
+      self.assertAllEqual(self.evaluate(tf.shape(y))[:-2], batch_shape)
 
   def _build_placeholder(self, ndarray):
     """Convert a numpy array to a TF placeholder.
@@ -158,7 +158,7 @@ class _AutoregressiveStateSpaceModelTest(test_util.TestCase):
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 @test_util.test_all_tf_execution_regimes

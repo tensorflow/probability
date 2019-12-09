@@ -168,7 +168,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
     else:
       self.assertAllEqual(self.evaluate(additive_ssm.batch_shape_tensor()),
                           batch_shape)
-      self.assertAllEqual(self.evaluate(tf.shape(input=y))[:-2], batch_shape)
+      self.assertAllEqual(self.evaluate(tf.shape(y))[:-2], batch_shape)
 
   def test_multivariate_observations(self):
 
@@ -196,7 +196,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
       self.assertAllEqual(self.evaluate(combined_ssm.event_shape_tensor()),
                           expected_event_shape)
       self.assertAllEqual(
-          self.evaluate(tf.shape(input=y))[-2:], expected_event_shape)
+          self.evaluate(tf.shape(y))[-2:], expected_event_shape)
 
   def test_mismatched_num_timesteps_error(self):
 
@@ -234,7 +234,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
       self.assertAllEqual(self.evaluate(additive_ssm.batch_shape_tensor()),
                           broadcast_batch_shape)
       self.assertAllEqual(
-          self.evaluate(tf.shape(input=y))[:-2], broadcast_batch_shape)
+          self.evaluate(tf.shape(y))[:-2], broadcast_batch_shape)
 
   def test_broadcasting_correctness(self):
 
@@ -386,7 +386,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
     dtype = dtype if dtype is not None else self.dtype
     ndarray = np.asarray(ndarray).astype(dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _dummy_model(self,
                    num_timesteps=5,
@@ -435,8 +435,7 @@ class AdditiveStateSpaceModelTestDynamicShape32(_AdditiveStateSpaceModelTest):
     # (not necessarily the first) has static num_timesteps.
     num_timesteps = 4
     dynamic_timesteps_component = self._dummy_model(
-        num_timesteps=tf1.placeholder_with_default(
-            input=num_timesteps, shape=None))
+        num_timesteps=tf1.placeholder_with_default(num_timesteps, shape=None))
     static_timesteps_component = self._dummy_model(
         num_timesteps=num_timesteps)
 

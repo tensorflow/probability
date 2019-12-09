@@ -85,7 +85,7 @@ class BlockwiseInitializer(tf.keras.initializers.Initializer):
         raise ValueError(message)
     elif self.validate_args:
       assertions.append(tf.debugging.assert_equal(
-          shape[-1], tf.reduce_sum(input_tensor=self.sizes), message=message))
+          shape[-1], tf.reduce_sum(self.sizes), message=message))
 
     s = (shape[:-1]
          if shape_ is None or any(s is None for s in shape_[:-1])

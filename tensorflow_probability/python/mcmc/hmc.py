@@ -133,10 +133,10 @@ def make_simple_step_size_update_policy(num_adaptation_steps,
       return tf.identity(step_size_var)
     log_n = tf.math.log(
         tf.cast(
-            tf.size(input=kernel_results.log_accept_ratio),
+            tf.size(kernel_results.log_accept_ratio),
             kernel_results.log_accept_ratio.dtype))
     log_mean_accept_ratio = tf.reduce_logsumexp(
-        input_tensor=tf.minimum(kernel_results.log_accept_ratio, 0.)) - log_n
+        tf.minimum(kernel_results.log_accept_ratio, 0.)) - log_n
     adjustment = tf.where(
         log_mean_accept_ratio < tf.cast(
             tf.math.log(target_rate), log_mean_accept_ratio.dtype),

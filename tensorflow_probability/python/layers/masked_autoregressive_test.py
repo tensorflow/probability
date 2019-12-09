@@ -53,7 +53,7 @@ class AutoregressiveTransformTest(test_util.TestCase):
         # matching batch_shape and event_shape of [2].
         # pylint: disable=g-long-lambda
         tfpl.DistributionLambda(lambda t: tfd.MultivariateNormalDiag(
-            loc=tf.zeros(tf.concat([tf.shape(input=t)[:-1], [2]], axis=0)),
+            loc=tf.zeros(tf.concat([tf.shape(t)[:-1], [2]], axis=0)),
             scale_diag=[1., 1.])),
 
         # Transform the standard normal distribution with event_shape of [2] to

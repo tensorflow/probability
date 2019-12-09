@@ -642,7 +642,7 @@ class MixtureTest(test_util.TestCase):
       batch_shape_tensor = [2, 3]
     else:
       batch_shape = [None, 3]
-      batch_shape_tensor = tf1.placeholder_with_default(input=[2, 3], shape=[2])
+      batch_shape_tensor = tf1.placeholder_with_default([2, 3], shape=[2])
 
     dist = make_multivariate_mixture(
         batch_shape=batch_shape,

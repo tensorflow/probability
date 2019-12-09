@@ -98,17 +98,17 @@ class ParetoTest(test_util.TestCase):
     pareto = tfd.Pareto(concentration, scale, validate_args=True)
 
     with self.assertRaisesOpError('not in the support'):
-      x = tf1.placeholder_with_default(input=[2., 3., 3.], shape=[3])
+      x = tf1.placeholder_with_default([2., 3., 3.], shape=[3])
       log_prob = pareto.log_prob(x)
       self.evaluate(log_prob)
 
     with self.assertRaisesOpError('not in the support'):
-      x = tf1.placeholder_with_default(input=[2., 2., 5.], shape=[3])
+      x = tf1.placeholder_with_default([2., 2., 5.], shape=[3])
       log_prob = pareto.log_prob(x)
       self.evaluate(log_prob)
 
     with self.assertRaisesOpError('not in the support'):
-      x = tf1.placeholder_with_default(input=[1., 3., 5.], shape=[3])
+      x = tf1.placeholder_with_default([1., 3., 5.], shape=[3])
       log_prob = pareto.log_prob(x)
       self.evaluate(log_prob)
 
@@ -331,8 +331,7 @@ class ParetoTest(test_util.TestCase):
     x = a.sample(
         int(3e5),
         seed=test_util.test_seed(hardcoded_seed=0, set_eager_seed=False))
-    kl_sample = tf.reduce_mean(
-        input_tensor=a.log_prob(x) - b.log_prob(x), axis=0)
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
     self.assertAllEqual(true_kl, kl_)

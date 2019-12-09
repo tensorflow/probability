@@ -81,9 +81,9 @@ class _RandomRayleigh(object):
     final_shape_ = [3, 2, int(1e3)]
     if self.use_static_shape:
       self.assertAllEqual(final_shape_, x.shape)
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=-1, keepdims=True)
+    sample_mean = tf.reduce_mean(x, axis=-1, keepdims=True)
     sample_var = tf.reduce_mean(
-        input_tensor=tf.math.squared_difference(x, sample_mean), axis=-1)
+        tf.math.squared_difference(x, sample_mean), axis=-1)
     [x_, sample_mean_, sample_var_] = self.evaluate([
         x, sample_mean[..., 0], sample_var])
     self.assertAllEqual(final_shape_, x_.shape)

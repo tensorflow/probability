@@ -164,7 +164,7 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
     if self.use_static_shape:
       y_batch_shape = y.shape.as_list()[:-2]
     else:
-      y_batch_shape = self.evaluate(tf.shape(input=y))[:-2]
+      y_batch_shape = self.evaluate(tf.shape(y))[:-2]
     self.assertAllEqual(y_batch_shape, batch_shape)
 
   def _build_placeholder(self, ndarray):
@@ -181,7 +181,7 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 @test_util.test_all_tf_execution_regimes

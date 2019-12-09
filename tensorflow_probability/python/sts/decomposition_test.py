@@ -130,7 +130,7 @@ class _DecompositionTest(test_util.TestCase):
       # If input shapes are static, result shapes should be too.
       return tensor.shape.as_list()
     else:
-      return self.evaluate(tf.shape(input=tensor))
+      return self.evaluate(tf.shape(tensor))
 
   def _build_tensor(self, ndarray):
     """Convert a numpy array to a TF placeholder.
@@ -146,7 +146,7 @@ class _DecompositionTest(test_util.TestCase):
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 @test_util.test_all_tf_execution_regimes

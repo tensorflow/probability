@@ -193,7 +193,7 @@ def default_mean_field_normal_fn(
       dist = deterministic_lib.Deterministic(loc=loc)
     else:
       dist = normal_lib.Normal(loc=loc, scale=scale)
-    batch_ndims = tf.size(input=dist.batch_shape_tensor())
+    batch_ndims = tf.size(dist.batch_shape_tensor())
     return independent_lib.Independent(
         dist, reinterpreted_batch_ndims=batch_ndims)
   return _fn
@@ -219,7 +219,7 @@ def default_multivariate_normal_fn(dtype, shape, name, trainable,
   del name, trainable, add_variable_fn   # unused
   dist = normal_lib.Normal(
       loc=tf.zeros(shape, dtype), scale=dtype.as_numpy_dtype(1))
-  batch_ndims = tf.size(input=dist.batch_shape_tensor())
+  batch_ndims = tf.size(dist.batch_shape_tensor())
   return independent_lib.Independent(
       dist, reinterpreted_batch_ndims=batch_ndims)
 

@@ -205,11 +205,10 @@ class DirichletMultinomialTest(test_util.TestCase):
     dist = tfd.DirichletMultinomial(n, alpha, validate_args=True)
     # Sample count chosen based on what can be drawn in about 1 minute.
     x = dist.sample(int(25e3), seed=test_util.test_seed())
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+    sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean[tf.newaxis, ...]
     sample_cov = tf.reduce_mean(
-        input_tensor=tf.matmul(x_centered[..., tf.newaxis],
-                               x_centered[..., tf.newaxis, :]),
+        tf.matmul(x_centered[..., tf.newaxis], x_centered[..., tf.newaxis, :]),
         axis=0)
     sample_var = tf.linalg.diag_part(sample_cov)
     sample_stddev = tf.sqrt(sample_var)
@@ -404,7 +403,7 @@ class DirichletMultinomialTest(test_util.TestCase):
         validate_args=True)
     n = int(3e3)
     x = dist.sample(n, seed=test_util.test_seed())
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+    sample_mean = tf.reduce_mean(x, axis=0)
     # Cyclically rotate event dims left.
     x_centered = tf.transpose(a=x - sample_mean, perm=[1, 2, 3, 0])
     sample_covariance = tf.matmul(
@@ -433,7 +432,7 @@ class DirichletMultinomialTest(test_util.TestCase):
         validate_args=True)
     n = int(5e3)
     x = dist.sample(n, seed=test_util.test_seed())
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+    sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean  # Already transposed to [n, 2].
     sample_covariance = tf.matmul(
         x_centered, x_centered, adjoint_a=True) / n

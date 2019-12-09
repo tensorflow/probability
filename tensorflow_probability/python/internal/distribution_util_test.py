@@ -366,9 +366,9 @@ class PickScalarConditionTest(test_util.TestCase):
     neg = -np.exp(np.random.randn(3, 2, 4)).astype(np.float32)
 
     # TF dynamic cond
-    dynamic_true = tf1.placeholder_with_default(input=True, shape=None)
+    dynamic_true = tf1.placeholder_with_default(True, shape=None)
     dynamic_false = tf1.placeholder_with_default(
-        input=False, shape=None)
+        False, shape=None)
     pos_ = self.evaluate(distribution_util.pick_scalar_condition(
         dynamic_true, pos, neg))
     neg_ = self.evaluate(distribution_util.pick_scalar_condition(
@@ -377,8 +377,8 @@ class PickScalarConditionTest(test_util.TestCase):
     self.assertAllEqual(neg_, neg)
 
     # TF dynamic everything
-    pos_dynamic = tf1.placeholder_with_default(input=pos, shape=None)
-    neg_dynamic = tf1.placeholder_with_default(input=neg, shape=None)
+    pos_dynamic = tf1.placeholder_with_default(pos, shape=None)
+    neg_dynamic = tf1.placeholder_with_default(neg, shape=None)
     pos_ = self.evaluate(distribution_util.pick_scalar_condition(
         dynamic_true, pos_dynamic, neg_dynamic))
     neg_ = self.evaluate(distribution_util.pick_scalar_condition(
@@ -413,7 +413,7 @@ class TestMoveDimension(test_util.TestCase):
   def test_move_dimension_dynamic_shape(self):
 
     x_ = tf.random.normal(shape=[200, 30, 4, 1, 6])
-    x = tf1.placeholder_with_default(input=x_, shape=None)
+    x = tf1.placeholder_with_default(x_, shape=None)
 
     x_perm1 = distribution_util.move_dimension(x, 1, 1)
     x_perm2 = distribution_util.move_dimension(x, 0, 3)
@@ -422,11 +422,11 @@ class TestMoveDimension(test_util.TestCase):
     x_perm5 = distribution_util.move_dimension(x, -1, 2)
 
     x_perm1_, x_perm2_, x_perm3_, x_perm4_, x_perm5_ = self.evaluate([
-        tf.shape(input=x_perm1),
-        tf.shape(input=x_perm2),
-        tf.shape(input=x_perm3),
-        tf.shape(input=x_perm4),
-        tf.shape(input=x_perm5)
+        tf.shape(x_perm1),
+        tf.shape(x_perm2),
+        tf.shape(x_perm3),
+        tf.shape(x_perm4),
+        tf.shape(x_perm5)
     ])
 
     self.assertAllEqual(x_perm1_, [200, 30, 4, 1, 6])
@@ -442,34 +442,34 @@ class TestMoveDimension(test_util.TestCase):
   def test_move_dimension_dynamic_indices(self):
 
     x_ = tf.random.normal(shape=[200, 30, 4, 1, 6])
-    x = tf1.placeholder_with_default(input=x_, shape=None)
+    x = tf1.placeholder_with_default(x_, shape=None)
 
     x_perm1 = distribution_util.move_dimension(
-        x, tf1.placeholder_with_default(input=1, shape=[]),
-        tf1.placeholder_with_default(input=1, shape=[]))
+        x, tf1.placeholder_with_default(1, shape=[]),
+        tf1.placeholder_with_default(1, shape=[]))
 
     x_perm2 = distribution_util.move_dimension(
-        x, tf1.placeholder_with_default(input=0, shape=[]),
-        tf1.placeholder_with_default(input=3, shape=[]))
+        x, tf1.placeholder_with_default(0, shape=[]),
+        tf1.placeholder_with_default(3, shape=[]))
 
     x_perm3 = distribution_util.move_dimension(
-        x, tf1.placeholder_with_default(input=0, shape=[]),
-        tf1.placeholder_with_default(input=-2, shape=[]))
+        x, tf1.placeholder_with_default(0, shape=[]),
+        tf1.placeholder_with_default(-2, shape=[]))
 
     x_perm4 = distribution_util.move_dimension(
-        x, tf1.placeholder_with_default(input=4, shape=[]),
-        tf1.placeholder_with_default(input=2, shape=[]))
+        x, tf1.placeholder_with_default(4, shape=[]),
+        tf1.placeholder_with_default(2, shape=[]))
 
     x_perm5 = distribution_util.move_dimension(
-        x, tf1.placeholder_with_default(input=-1, shape=[]),
-        tf1.placeholder_with_default(input=2, shape=[]))
+        x, tf1.placeholder_with_default(-1, shape=[]),
+        tf1.placeholder_with_default(2, shape=[]))
 
     x_perm1_, x_perm2_, x_perm3_, x_perm4_, x_perm5_ = self.evaluate([
-        tf.shape(input=x_perm1),
-        tf.shape(input=x_perm2),
-        tf.shape(input=x_perm3),
-        tf.shape(input=x_perm4),
-        tf.shape(input=x_perm5)
+        tf.shape(x_perm1),
+        tf.shape(x_perm2),
+        tf.shape(x_perm3),
+        tf.shape(x_perm4),
+        tf.shape(x_perm5)
     ])
 
     self.assertAllEqual(x_perm1_, [200, 30, 4, 1, 6])

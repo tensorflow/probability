@@ -65,7 +65,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     sample_dir = (
         sample_mean / np.linalg.norm(sample_mean, axis=-1, keepdims=True))
     inner_product = self.evaluate(
-        tf.reduce_sum(input_tensor=sample_dir * vmf.mean_direction, axis=-1))
+        tf.reduce_sum(sample_dir * vmf.mean_direction, axis=-1))
     # All except the 0-concentration distribution should have >0 inner product
     # with the mean direction of the distribution.
     self.assertAllGreater(inner_product[1:], 0.1)
@@ -106,7 +106,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     sample_dir = (
         sample_mean / np.linalg.norm(sample_mean, axis=-1, keepdims=True))
     inner_product = self.evaluate(
-        tf.reduce_sum(input_tensor=sample_dir * vmf.mean_direction, axis=-1))
+        tf.reduce_sum(sample_dir * vmf.mean_direction, axis=-1))
     # All except the 0-concentration distribution should have >0 inner product
     # with the mean direction of the distribution.
     self.assertAllGreater(inner_product[1:], 0.1)
@@ -187,7 +187,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     log_importance = -log_prob
     sphere_surface_area_estimate, samples, importance, conc = self.evaluate([
         tf.exp(
-            tf.reduce_logsumexp(input_tensor=log_importance, axis=0) -
+            tf.reduce_logsumexp(log_importance, axis=0) -
             tf.math.log(tf.cast(nsamples, dtype=tf.float32))), samples,
         tf.exp(log_importance), vmf.concentration
     ])

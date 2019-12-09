@@ -179,7 +179,7 @@ class SmartForLoopTest(test_util.TestCase):
 
   def test_tf_while_loop(self):
     iters = 10
-    n = tf1.placeholder_with_default(input=np.int64(iters), shape=())
+    n = tf1.placeholder_with_default(np.int64(iters), shape=())
     counter = collections.Counter()
     def body(x):
       counter['body_calls'] += 1

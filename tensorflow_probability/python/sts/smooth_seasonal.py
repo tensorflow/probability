@@ -225,7 +225,7 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       num_frequencies = static_num_frequencies(frequency_multipliers)
 
       observation_matrix = tf.tile(
-          input=tf.constant([[1., 0.]], dtype=dtype),
+          tf.constant([[1., 0.]], dtype=dtype),
           multiples=[1, num_frequencies])
 
       transition_matrix = build_smooth_seasonal_transition_matrix(

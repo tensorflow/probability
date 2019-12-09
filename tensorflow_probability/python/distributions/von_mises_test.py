@@ -39,7 +39,7 @@ class _VonMisesTest(object):
   def make_tensor(self, x):
     x = tf.cast(x, self.dtype)
     return tf1.placeholder_with_default(
-        input=x, shape=x.shape if self.use_static_shape else None)
+        x, shape=x.shape if self.use_static_shape else None)
 
   def testVonMisesShape(self):
     loc = self.make_tensor([.1] * 5)
@@ -248,7 +248,7 @@ class _VonMisesTest(object):
     kl_actual = tfd.kl_divergence(d1, d2)
     x = d1.sample(int(1e5), seed=test_util.test_seed(hardcoded_seed=0))
     kl_sample = tf.reduce_mean(
-        input_tensor=d1.log_prob(x) - d2.log_prob(x), axis=0)
+        d1.log_prob(x) - d2.log_prob(x), axis=0)
     kl_same = tfd.kl_divergence(d1, d1)
 
     [kl_actual_val, kl_sample_val,
@@ -275,13 +275,13 @@ class _VonMisesTest(object):
 
     expected_mean = von_mises.mean()
     actual_mean = tf.atan2(
-        tf.reduce_mean(input_tensor=tf.sin(samples), axis=0),
-        tf.reduce_mean(input_tensor=tf.cos(samples), axis=0))
+        tf.reduce_mean(tf.sin(samples), axis=0),
+        tf.reduce_mean(tf.cos(samples), axis=0))
 
     expected_variance = von_mises.variance()
     standardized_samples = samples - tf.expand_dims(von_mises.mean(), 0)
     actual_variance = 1. - tf.reduce_mean(
-        input_tensor=tf.cos(standardized_samples), axis=0)
+        tf.cos(standardized_samples), axis=0)
 
     [
         expected_mean_val, expected_variance_val, actual_mean_val,
@@ -304,7 +304,7 @@ class _VonMisesTest(object):
     expected_variance = 1.
     standardized_samples = samples - tf.expand_dims(von_mises.mean(), 0)
     actual_variance = 1. - tf.reduce_mean(
-        input_tensor=tf.cos(standardized_samples), axis=0)
+        tf.cos(standardized_samples), axis=0)
 
     self.assertAllClose(
         expected_variance, self.evaluate(actual_variance), rtol=0.1)
@@ -364,7 +364,7 @@ class _VonMisesTest(object):
     def loss(loc, concentration):
       von_mises = tfd.VonMises(loc, concentration, validate_args=True)
       samples = von_mises.sample(n, seed=test_util.test_seed())
-      return tf.reduce_mean(input_tensor=samples, axis=0)
+      return tf.reduce_mean(samples, axis=0)
 
     _, [grad_loc, grad_concentration] = self.evaluate(
         tfp.math.value_and_gradient(
@@ -382,7 +382,7 @@ class _VonMisesTest(object):
     def loss(loc, concentration):
       von_mises = tfd.VonMises(loc, concentration, validate_args=True)
       samples = von_mises.sample(n, seed=test_util.test_seed())
-      return tf.reduce_mean(input_tensor=1. - tf.cos(samples - loc), axis=0)
+      return tf.reduce_mean(1. - tf.cos(samples - loc), axis=0)
 
     _, [grad_loc, grad_concentration] = self.evaluate(
         tfp.math.value_and_gradient(

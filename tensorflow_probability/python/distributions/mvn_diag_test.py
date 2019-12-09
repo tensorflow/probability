@@ -236,7 +236,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     num_draws = 50
     dims = 3
     x = np.zeros([num_draws, dims], dtype=np.float32)
-    x_pl = tf1.placeholder_with_default(input=x, shape=[None, dims], name='x')
+    x_pl = tf1.placeholder_with_default(x, shape=[None, dims], name='x')
     mu_var = tf1.get_variable(
         name='mu',
         shape=[dims],
@@ -256,7 +256,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
       # http://stackoverflow.com/q/45109305. (The underlying issue was not
       # related to `Distributions` but that `reduce_prod` didn't correctly
       # handle negative indexes.)
-      return -tf.reduce_sum(input_tensor=tf.math.log(mvn.prob(x_pl)))
+      return -tf.reduce_sum(tf.math.log(mvn.prob(x_pl)))
 
     _, grad_neg_log_likelihood = tfp.math.value_and_gradient(
         neg_log_likelihood, mu_var)
@@ -273,9 +273,9 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     loc = np.float32(self._rng.rand(1, 1, 2))
     scale_diag = np.float32(self._rng.rand(1, 1, 2))
     mvn = tfd.MultivariateNormalDiag(
-        loc=tf1.placeholder_with_default(input=loc, shape=[None, None, 2]),
+        loc=tf1.placeholder_with_default(loc, shape=[None, None, 2]),
         scale_diag=tf1.placeholder_with_default(
-            input=scale_diag, shape=[None, None, 2]),
+            scale_diag, shape=[None, None, 2]),
         validate_args=True)
     self.assertListEqual(
         tensorshape_util.as_list(mvn.batch_shape), [None, None])
@@ -287,9 +287,9 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     loc = np.float32(self._rng.rand(2, 3, 2))
     scale_diag = np.float32(self._rng.rand(2, 3, 2))
     mvn = tfd.MultivariateNormalDiag(
-        loc=tf1.placeholder_with_default(input=loc, shape=[2, 3, None]),
+        loc=tf1.placeholder_with_default(loc, shape=[2, 3, None]),
         scale_diag=tf1.placeholder_with_default(
-            input=scale_diag, shape=[2, 3, None]),
+            scale_diag, shape=[2, 3, None]),
         validate_args=True)
     self.assertListEqual(tensorshape_util.as_list(mvn.batch_shape), [2, 3])
     self.assertListEqual(tensorshape_util.as_list(mvn.event_shape), [None])

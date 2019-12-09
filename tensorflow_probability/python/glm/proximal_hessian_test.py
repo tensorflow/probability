@@ -66,8 +66,8 @@ class _ProximalHessianTest(object):
         tf.linalg.norm(tensor=model_coefficients, axis=-1)[..., tf.newaxis])
 
     mask = tfd.Bernoulli(probs=0.5, dtype=tf.bool).sample(batch_shape + [d])
-    model_coefficients = tf1.where(mask, model_coefficients,
-                                   tf.zeros_like(model_coefficients))
+    model_coefficients = tf.where(
+        mask, model_coefficients, tf.zeros_like(model_coefficients))
     model_matrix = tfd.Normal(
         loc=np.array(0, dtype), scale=np.array(1, dtype)).sample(
             batch_shape + [n, d], seed=seed())
@@ -90,7 +90,7 @@ class _ProximalHessianTest(object):
 
   def _make_placeholder(self, x):
     return tf1.placeholder_with_default(
-        input=x, shape=(x.shape if self.use_static_shape else None))
+        x, shape=(x.shape if self.use_static_shape else None))
 
   def _adjust_dtype_and_shape_hints(self, x):
     x_ = tf.cast(x, self.dtype)
@@ -171,8 +171,7 @@ class _ProximalHessianTest(object):
 
     def _joint_log_prob(model_coefficients_):
       predicted_linear_response_ = tf.linalg.matvec(x_, model_coefficients_)
-      return tf.reduce_sum(
-          input_tensor=model.log_prob(y_, predicted_linear_response_))
+      return tf.reduce_sum(model.log_prob(y_, predicted_linear_response_))
 
     self.assertAllGreater(
         _joint_log_prob(model_coefficients_2_) -

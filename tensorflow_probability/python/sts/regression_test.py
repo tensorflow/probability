@@ -151,7 +151,7 @@ class _LinearRegressionTest(test_util.TestCase):
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -180,7 +180,7 @@ class _SparseLinearRegressionTest(test_util.TestCase):
     if self.use_static_shape:
       output_shape = ssm.sample().shape.as_list()
     else:
-      output_shape = self.evaluate(tf.shape(input=ssm.sample()))
+      output_shape = self.evaluate(tf.shape(ssm.sample()))
     self.assertAllEqual(output_shape, batch_shape + [num_timesteps, 1])
 
   def _build_placeholder(self, ndarray):
@@ -197,7 +197,7 @@ class _SparseLinearRegressionTest(test_util.TestCase):
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 class LinearRegressionTestStaticShape64(_LinearRegressionTest):

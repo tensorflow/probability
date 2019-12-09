@@ -110,7 +110,7 @@ class CalibrationTest(test_util.TestCase):
     logits_true = tf.matmul(data, weights) + tf.expand_dims(bias, 0)
     prob_true = tfp.distributions.Categorical(logits=logits_true)
     labels = prob_true.sample(1)
-    labels = tf.reshape(labels, (tf.size(input=labels),))
+    labels = tf.reshape(labels, (tf.size(labels),))
 
     return data, labels, weights, bias
 

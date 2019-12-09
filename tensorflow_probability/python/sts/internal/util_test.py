@@ -274,7 +274,7 @@ class _UtilityTests(test_util.TestCase):
     if self.use_static_shape:
       return tensor.shape.as_list()
     else:
-      return list(self.evaluate(tf.shape(input=tensor)))
+      return list(self.evaluate(tf.shape(tensor)))
 
   def _build_tensor(self, ndarray):
     """Convert a numpy array to a TF placeholder.
@@ -290,7 +290,7 @@ class _UtilityTests(test_util.TestCase):
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 class UtilityTestsDynamicFloat32(_UtilityTests):

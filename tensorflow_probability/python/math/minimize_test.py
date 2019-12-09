@@ -38,7 +38,7 @@ class MinimizeTests(test_util.TestCase):
     target_x = np.array([3., 4.]).astype(np.float32)
 
     x = tf.Variable(init_x)
-    loss_fn = lambda: tf.reduce_sum(input_tensor=(x - target_x)**2)
+    loss_fn = lambda: tf.reduce_sum((x - target_x)**2)
 
     # The trace_fn should determine the structure and values of the results.
     def trace_fn(loss, grads, variables):
@@ -59,7 +59,7 @@ class MinimizeTests(test_util.TestCase):
     # Variables not included in `trainable_variables` should stay fixed.
     x = tf.Variable(5.)
     y = tf.Variable(2.)
-    loss_fn = lambda: tf.reduce_sum(input_tensor=(x - y)**2)
+    loss_fn = lambda: tf.reduce_sum((x - y)**2)
 
     loss = tfp.math.minimize(loss_fn, num_steps=100,
                              optimizer=tf.optimizers.Adam(0.1),

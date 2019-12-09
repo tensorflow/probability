@@ -91,7 +91,7 @@ def random_rayleigh(shape, scale=None, dtype=tf.float32, seed=None, name=None):
       # Its important to expand the shape to match scale's, otherwise we won't
       # have independent draws.
       scale = tf.convert_to_tensor(scale, dtype=dtype, name='scale')
-      shape = tf.broadcast_dynamic_shape(shape, tf.shape(input=scale))
+      shape = tf.broadcast_dynamic_shape(shape, tf.shape(scale))
     x = tf.sqrt(-2. * tf.math.log(
         tf.random.uniform(shape, minval=0, maxval=1, dtype=dtype, seed=seed)))
     if scale is None:

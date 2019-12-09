@@ -256,7 +256,7 @@ class _HiddenMarkovModelTest(
         validate_args=True)
 
     x = model._sample_n(1)
-    x_shape = self.evaluate(tf.shape(input=x))
+    x_shape = self.evaluate(tf.shape(x))
 
     self.assertAllEqual(x_shape, [1, 1])
 
@@ -309,7 +309,7 @@ class _HiddenMarkovModelTest(
         validate_args=True)
 
     x = model.mean()
-    x_shape = self.evaluate(tf.shape(input=x))
+    x_shape = self.evaluate(tf.shape(x))
 
     self.assertAllEqual(x_shape, [1])
 
@@ -390,7 +390,7 @@ class _HiddenMarkovModelTest(
         validate_args=True)
 
     x = model.mean()
-    x_shape = self.evaluate(tf.shape(input=x))
+    x_shape = self.evaluate(tf.shape(x))
 
     self.assertAllEqual(x_shape, [3, 7, 2])
 

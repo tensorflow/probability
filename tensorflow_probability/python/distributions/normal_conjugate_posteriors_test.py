@@ -37,8 +37,8 @@ class NormalTest(test_util.TestCase):
       sigma0 = tf.constant([math.sqrt(10.0)])
       sigma = tf.constant([math.sqrt(2.0)])
       x = tf.constant([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0])
-      s = tf.reduce_sum(input_tensor=x)
-      n = tf.size(input=x)
+      s = tf.reduce_sum(x)
+      n = tf.size(x)
       prior = tfd.Normal(loc=mu0, scale=sigma0)
       posterior = tfd.normal_conjugates_known_scale_posterior(
           prior=prior, scale=sigma, s=s, n=n)
@@ -56,8 +56,8 @@ class NormalTest(test_util.TestCase):
       sigma = tf.constant([[math.sqrt(2.0)]] * batch_size)
       x = tf.transpose(
           a=tf.constant([[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0]], dtype=tf.float32))
-      s = tf.reduce_sum(input_tensor=x)
-      n = tf.size(input=x)
+      s = tf.reduce_sum(x)
+      n = tf.size(x)
       prior = tfd.Normal(loc=mu0, scale=sigma0)
       posterior = tfd.normal_conjugates_known_scale_posterior(
           prior=prior, scale=sigma, s=s, n=n)
@@ -76,7 +76,7 @@ class NormalTest(test_util.TestCase):
       x = tf.constant(
           [[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0], [2.5, -2.5, -4.0, 0.0, 1.0, -2.0]],
           dtype=tf.float32)
-      s = tf.reduce_sum(input_tensor=x, axis=[1])
+      s = tf.reduce_sum(x, axis=[1])
       x = tf.transpose(a=x)  # Reshape to shape (6, 2)
       n = tf.constant([6] * 2)
       prior = tfd.Normal(loc=mu0, scale=sigma0)
@@ -98,8 +98,8 @@ class NormalTest(test_util.TestCase):
       sigma0 = tf.constant([math.sqrt(10.0)] * batch_size)
       sigma = tf.constant([math.sqrt(2.0)] * batch_size)
       x = tf.constant([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0])
-      s = tf.reduce_sum(input_tensor=x)
-      n = tf.size(input=x)
+      s = tf.reduce_sum(x)
+      n = tf.size(x)
       prior = tfd.Normal(loc=mu0, scale=sigma0)
       predictive = tfd.normal_conjugates_known_scale_predictive(
           prior=prior, scale=sigma, s=s, n=n)

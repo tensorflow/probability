@@ -554,8 +554,8 @@ class DiscreteScalarDistributionTestHelpers(object):
     y = dist.sample(num_samples, seed=test_seed_stream(hardcoded_seed=seed))
     y = tf.reshape(y, shape=[num_samples, -1])
     if batch_size is None:
-      batch_size = tf.reduce_prod(input_tensor=dist.batch_shape_tensor())
-    batch_dims = tf.shape(input=dist.batch_shape_tensor())[0]
+      batch_size = tf.reduce_prod(dist.batch_shape_tensor())
+    batch_dims = tf.shape(dist.batch_shape_tensor())[0]
     edges_expanded_shape = 1 + tf.pad(tensor=[-2], paddings=[[0, batch_dims]])
     for b, x in enumerate(tf.unstack(y, num=batch_size, axis=1)):
       counts, edges = self.histogram(x)
@@ -598,9 +598,8 @@ class DiscreteScalarDistributionTestHelpers(object):
     x = tf.cast(dist.sample(num_samples,
                             seed=test_seed_stream(hardcoded_seed=seed)),
                 dtype=tf.float32)
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
-    sample_variance = tf.reduce_mean(
-        input_tensor=tf.square(x - sample_mean), axis=0)
+    sample_mean = tf.reduce_mean(x, axis=0)
+    sample_variance = tf.reduce_mean(tf.square(x - sample_mean), axis=0)
     sample_stddev = tf.sqrt(sample_variance)
 
     [
@@ -648,7 +647,7 @@ class DiscreteScalarDistributionTestHelpers(object):
       x = tf.convert_to_tensor(value=x, name='x')
       if value_range is None:
         value_range = [
-            tf.reduce_min(input_tensor=x), 1 + tf.reduce_max(input_tensor=x)
+            tf.reduce_min(x), 1 + tf.reduce_max(x)
         ]
       value_range = tf.convert_to_tensor(value=value_range, name='value_range')
       lo = value_range[0]
@@ -762,7 +761,7 @@ class VectorDistributionTestHelpers(object):
       importance_weights = tf1.where(
           tf.norm(tensor=x - center, axis=-1) <= radius, inverse_log_prob,
           tf.zeros_like(inverse_log_prob))
-      return tf.reduce_mean(input_tensor=importance_weights, axis=0)
+      return tf.reduce_mean(importance_weights, axis=0)
 
     # Build graph.
     with tf.name_scope('run_test_sample_consistent_log_prob'):
@@ -824,9 +823,9 @@ class VectorDistributionTestHelpers(object):
     """
 
     x = dist.sample(num_samples, seed=test_seed_stream(hardcoded_seed=seed))
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+    sample_mean = tf.reduce_mean(x, axis=0)
     sample_covariance = tf.reduce_mean(
-        input_tensor=_vec_outer_square(x - sample_mean), axis=0)
+        _vec_outer_square(x - sample_mean), axis=0)
     sample_variance = tf.linalg.diag_part(sample_covariance)
     sample_stddev = tf.sqrt(sample_variance)
 

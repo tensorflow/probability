@@ -101,7 +101,7 @@ class _StructuralTimeSeriesTests(object):
 
     ndarray = np.asarray(ndarray).astype(dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -372,7 +372,7 @@ class LinearRegressionTest(test_util.TestCase, _StsTestHarness):
       observed_time_series_tensor, _ = (
           sts_util.canonicalize_observed_time_series_with_mask(
               observed_time_series))
-      batch_shape = tf.shape(input=observed_time_series_tensor)[:-2]
+      batch_shape = tf.shape(observed_time_series_tensor)[:-2]
       prior = tfd.TransformedDistribution(prior, tfb.Identity(),
                                           event_shape=[num_features],
                                           batch_shape=batch_shape)
@@ -400,7 +400,7 @@ class SparseLinearRegressionTest(test_util.TestCase, _StsTestHarness):
       observed_time_series_tensor, _ = (
           sts_util.canonicalize_observed_time_series_with_mask(
               observed_time_series))
-      batch_shape = tf.shape(input=observed_time_series_tensor)[:-2]
+      batch_shape = tf.shape(observed_time_series_tensor)[:-2]
 
     regression = SparseLinearRegression(
         design_matrix=np.random.randn(

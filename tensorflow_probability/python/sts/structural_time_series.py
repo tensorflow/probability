@@ -20,7 +20,6 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import util as tfp_util
@@ -196,9 +195,7 @@ class StructuralTimeSeries(object):
     seed = tfp_util.SeedStream(
         seed, salt='StructuralTimeSeries_prior_sample')
 
-    with tf1.name_scope(
-        'prior_sample',
-        values=[num_timesteps, params_sample_shape, trajectories_sample_shape]):
+    with tf.name_scope('prior_sample'):
       param_samples = [
           p.prior.sample(params_sample_shape, seed=seed(), name=p.name)
           for p in self.parameters
@@ -233,8 +230,7 @@ class StructuralTimeSeries(object):
        inference.
     """
 
-    with tf1.name_scope(
-        'joint_log_prob', values=[observed_time_series]):
+    with tf.name_scope('joint_log_prob'):
       [
           observed_time_series,
           mask
@@ -242,7 +238,7 @@ class StructuralTimeSeries(object):
           observed_time_series)
 
       num_timesteps = distribution_util.prefer_static_value(
-          tf.shape(input=observed_time_series))[-2]
+          tf.shape(observed_time_series))[-2]
 
       def log_joint_fn(*param_vals, **param_kwargs):
         """Generated log-density function."""
@@ -273,7 +269,7 @@ class StructuralTimeSeries(object):
         sample_ndims = tf.maximum(0,
                                   tf.rank(observation_lp) - tf.rank(param_lp))
         observation_lp = tf.reduce_sum(
-            input_tensor=observation_lp, axis=tf.range(sample_ndims))
+            observation_lp, axis=tf.range(sample_ndims))
 
         return param_lp + observation_lp
 

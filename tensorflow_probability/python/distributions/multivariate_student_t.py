@@ -303,9 +303,9 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
         tf.concat(
             [tf.shape(self.df),
              tf.ones([statistic_ndims], dtype=tf.int32)], -1))
-    # We need to put the tf.where inside the outer tf1.where to ensure we never
+    # We need to put the tf.where inside the outer tf.where to ensure we never
     # hit a NaN in the gradient.
-    denom = tf.where(df > 2., df - 2., tf.ones_like(df))
+    denom = tf.where(df > 2., df - 2., dtype_util.as_numpy_dtype(df.dtype)(1.))
     statistic = statistic * df_factor_fn(df / denom)
     # When 1 < df <= 2, stddev/variance are infinite.
     result_where_defined = tf.where(

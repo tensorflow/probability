@@ -38,7 +38,7 @@ class _InverseGaussianTest(object):
   def make_tensor(self, x):
     x = tf.cast(x, self.dtype)
     return tf1.placeholder_with_default(
-        input=x, shape=x.shape if self.use_static_shape else None)
+        x, shape=x.shape if self.use_static_shape else None)
 
   def testInverseGaussianShape(self):
     loc = self.make_tensor([2.] * 5)

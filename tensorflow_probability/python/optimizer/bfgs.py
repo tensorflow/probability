@@ -412,7 +412,7 @@ def _bfgs_inv_hessian_update(grad_delta, position_delta, normalization_factor,
   # gradient change.
   conditioned_grad_delta = tf.linalg.matvec(inv_hessian_estimate, grad_delta)
   conditioned_grad_delta_norm = tf.reduce_sum(
-      input_tensor=conditioned_grad_delta * grad_delta, axis=-1)
+      conditioned_grad_delta * grad_delta, axis=-1)
 
   # The first rank 1 update term requires the outer product: s.y^T.
   cross_term = _tensor_product(position_delta, conditioned_grad_delta)

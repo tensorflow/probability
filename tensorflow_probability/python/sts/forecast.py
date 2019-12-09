@@ -29,7 +29,7 @@ def _prefer_static_event_ndims(distribution):
   if distribution.event_shape.ndims is not None:
     return distribution.event_shape.ndims
   else:
-    return tf.size(input=distribution.event_shape_tensor())
+    return tf.size(distribution.event_shape_tensor())
 
 
 def one_step_predictive(model, observed_time_series, parameter_samples):
@@ -155,7 +155,7 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
     # Run filtering over the training timesteps to extract the
     # predictive means and variances.
     num_timesteps = dist_util.prefer_static_value(
-        tf.shape(input=observed_time_series))[-2]
+        tf.shape(observed_time_series))[-2]
     lgssm = model.make_state_space_model(
         num_timesteps=num_timesteps, param_vals=parameter_samples)
     (_, _, _, _, _, observation_means, observation_covs
@@ -304,7 +304,7 @@ def forecast(model,
     # This is the prior for the forecast model ("today's prior
     # is yesterday's posterior").
     num_observed_steps = dist_util.prefer_static_value(
-        tf.shape(input=observed_time_series))[-2]
+        tf.shape(observed_time_series))[-2]
     observed_data_ssm = model.make_state_space_model(
         num_timesteps=num_observed_steps, param_vals=parameter_samples)
     (_, _, _, predictive_means, predictive_covs, _, _
@@ -458,7 +458,7 @@ def impute_missing_values(model,
     # Run smoothing over the training timesteps to extract the
     # predictive means and variances.
     num_timesteps = dist_util.prefer_static_value(
-        tf.shape(input=observed_time_series))[-2]
+        tf.shape(observed_time_series))[-2]
     lgssm = model.make_state_space_model(
         num_timesteps=num_timesteps, param_vals=parameter_samples)
     posterior_means, posterior_covs = lgssm.posterior_marginals(

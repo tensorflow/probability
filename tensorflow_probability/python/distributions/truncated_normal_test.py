@@ -121,7 +121,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     low = tf.zeros(tn_param_shapes['low'])
     sample_shape = self.evaluate(
         tf.shape(
-            input=tfd.TruncatedNormal(
+            tfd.TruncatedNormal(
                 loc=loc, scale=scale, low=low, high=high,
                 validate_args=True).sample(seed=test_util.test_seed())))
     self.assertAllEqual(desired_shape, sample_shape)
@@ -139,10 +139,10 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
   def testShapeWithPlaceholders(self):
     if tf.executing_eagerly():
       return
-    loc = tf1.placeholder_with_default(input=5., shape=None)
-    scale = tf1.placeholder_with_default(input=[1., 2], shape=None)
-    ub = tf1.placeholder_with_default(input=[10., 11.], shape=None)
-    lb = tf1.placeholder_with_default(input=[-1.], shape=None)
+    loc = tf1.placeholder_with_default(5., shape=None)
+    scale = tf1.placeholder_with_default([1., 2], shape=None)
+    ub = tf1.placeholder_with_default([10., 11.], shape=None)
+    lb = tf1.placeholder_with_default([-1.], shape=None)
     dist = tfd.TruncatedNormal(loc, scale, lb, ub, validate_args=True)
 
     self.assertEqual(dist.batch_shape, tf.TensorShape(None))
@@ -152,7 +152,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     self.assertAllEqual(self.evaluate(
         dist.sample(5, seed=test_util.test_seed())).shape, [5, 2])
 
-    ub = tf1.placeholder_with_default(input=[[5., 11.]], shape=None)
+    ub = tf1.placeholder_with_default([[5., 11.]], shape=None)
     dist = tfd.TruncatedNormal(loc, scale, lb, ub, validate_args=True)
     self.assertAllEqual(self.evaluate(
         dist.sample(5, seed=test_util.test_seed())).shape, [5, 1, 2])
@@ -303,7 +303,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
 
       n = int(2e5)
       return tf.reduce_mean(
-          input_tensor=tf.abs(dist.sample(n, seed=test_util.test_seed())))
+          tf.abs(dist.sample(n, seed=test_util.test_seed())))
 
     err = self.compute_max_gradient_error(f, [loc, scale, low, high], delta=0.1)
 

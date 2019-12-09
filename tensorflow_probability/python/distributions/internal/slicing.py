@@ -56,9 +56,9 @@ def _slice_single_param(param, param_event_ndims, slices, dist_batch_shape):
     new_param: A `Tensor`, batch-sliced according to slices.
   """
   # Extend param shape with ones on the left to match dist_batch_shape.
-  param_shape = tf.shape(input=param)
+  param_shape = tf.shape(param)
   insert_ones = tf.ones(
-      [tf.size(input=dist_batch_shape) + param_event_ndims - tf.rank(param)],
+      [tf.size(dist_batch_shape) + param_event_ndims - tf.rank(param)],
       dtype=param_shape.dtype)
   new_param_shape = tf.concat([insert_ones, param_shape], axis=0)
   full_batch_param = tf.reshape(param, new_param_shape)

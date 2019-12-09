@@ -62,13 +62,13 @@ class BlockwiseBijectorTest(test_util.TestCase):
       self.assertEqual(blockwise_x.shape, batch_shape + [6])
       self.assertEqual(blockwise_ildj.shape, batch_shape + [])
     self.assertAllEqual(
-        self.evaluate(tf.shape(input=blockwise_y)), batch_shape + [6])
+        self.evaluate(tf.shape(blockwise_y)), batch_shape + [6])
     self.assertAllEqual(
-        self.evaluate(tf.shape(input=blockwise_fldj)), batch_shape + [])
+        self.evaluate(tf.shape(blockwise_fldj)), batch_shape + [])
     self.assertAllEqual(
-        self.evaluate(tf.shape(input=blockwise_x)), batch_shape + [6])
+        self.evaluate(tf.shape(blockwise_x)), batch_shape + [6])
     self.assertAllEqual(
-        self.evaluate(tf.shape(input=blockwise_ildj)), batch_shape + [])
+        self.evaluate(tf.shape(blockwise_ildj)), batch_shape + [])
 
     expl_y = tf.concat([
         exp.forward(x[..., :2]),

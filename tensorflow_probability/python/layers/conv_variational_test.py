@@ -193,13 +193,13 @@ class ConvVariational(object):
       del name, trainable, add_variable_fn  # unused
       # Deserialized Keras objects do not perform lexical scoping. Any modules
       # that the function requires must be imported within the function.
-      import tensorflow as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
+      import tensorflow.compat.v2 as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
       import tensorflow_probability as tfp  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
       tfd = tfp.distributions  # pylint: disable=redefined-outer-name
 
       dist = tfd.Normal(loc=tf.zeros(shape, dtype),
                         scale=dtype.as_numpy_dtype(1))
-      batch_ndims = tf.size(input=dist.batch_shape_tensor())
+      batch_ndims = tf.size(dist.batch_shape_tensor())
       return tfd.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
 
     if layer_class in (tfp.layers.Convolution1DReparameterization,
@@ -446,7 +446,7 @@ class ConvVariational(object):
       expected_outputs = convolution_op(
           inputs, kernel_posterior.distribution.loc)
 
-      input_shape = tf.shape(input=inputs)
+      input_shape = tf.shape(inputs)
       batch_shape = tf.expand_dims(input_shape[0], 0)
       if self.data_format == 'channels_first':
         channels = input_shape[1]

@@ -74,7 +74,7 @@ def pad_batch_dimension_for_multiple_chains(
 
   model_batch_ndims = (
       model.batch_shape.ndims if model.batch_shape.ndims is not None else
-      tf.shape(input=model.batch_shape_tensor())[0])
+      tf.shape(model.batch_shape_tensor())[0])
 
   # Compute ndims from chain_batch_shape.
   chain_batch_shape = tf.convert_to_tensor(
@@ -88,9 +88,9 @@ def pad_batch_dimension_for_multiple_chains(
 
   def do_padding(observed_time_series_tensor):
     current_sample_shape = tf.shape(
-        input=observed_time_series_tensor)[:-(model_batch_ndims + event_ndims)]
+        observed_time_series_tensor)[:-(model_batch_ndims + event_ndims)]
     current_batch_and_event_shape = tf.shape(
-        input=observed_time_series_tensor)[-(model_batch_ndims + event_ndims):]
+        observed_time_series_tensor)[-(model_batch_ndims + event_ndims):]
     return tf.reshape(
         tensor=observed_time_series_tensor,
         shape=tf.concat([
@@ -227,7 +227,7 @@ def empirical_statistics(observed_time_series):
       observed_initial = squeezed_series[..., 0]
     else:
       broadcast_mask = tf.broadcast_to(tf.cast(mask, tf.bool),
-                                       tf.shape(input=squeezed_series))
+                                       tf.shape(squeezed_series))
       observed_mean, observed_variance = (
           missing_values_util.moments_of_masked_time_series(
               squeezed_series, broadcast_mask=broadcast_mask))
@@ -282,7 +282,7 @@ def _maybe_expand_trailing_dim(observed_time_series_tensor):
           else observed_time_series_tensor[..., tf.newaxis])
     else:
       expanded_time_series = tf.cond(
-          pred=tf.equal(tf.shape(input=observed_time_series_tensor)[-1], 1),
+          pred=tf.equal(tf.shape(observed_time_series_tensor)[-1], 1),
           true_fn=lambda: observed_time_series_tensor,
           false_fn=lambda: observed_time_series_tensor[..., tf.newaxis])
     return expanded_time_series
@@ -354,7 +354,7 @@ def mix_over_posterior_draws(means, variances):
 
   with tf.name_scope('mix_over_posterior_draws'):
     num_posterior_draws = dist_util.prefer_static_value(
-        tf.shape(input=means))[0]
+        tf.shape(means))[0]
 
     component_observations = tfd.Independent(
         distribution=tfd.Normal(

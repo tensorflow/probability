@@ -505,7 +505,7 @@ def _check_failure(population_values):
 def _find_best_in_population(population, values):
   """Finds the population member with the lowest value."""
   best_value = tf.math.reduce_min(values)
-  best_index = tf1.where(tf.math.equal(values, best_value))[0, 0]
+  best_index = tf.where(tf.math.equal(values, best_value))[0, 0]
 
   return ([population_part[best_index] for population_part in population],
           best_value)

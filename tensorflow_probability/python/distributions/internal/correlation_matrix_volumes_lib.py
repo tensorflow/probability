@@ -90,7 +90,7 @@ def _psd_mask(x):
   # have an exponential condition number.
   eigenvalues, _ = tf.linalg.eigh(x)
   return tf.cast(
-      tf.reduce_min(input_tensor=eigenvalues, axis=-1) >= 0, dtype=x.dtype)
+      tf.reduce_min(eigenvalues, axis=-1) >= 0, dtype=x.dtype)
 
 
 def _det_large_enough_mask(x, det_bounds):

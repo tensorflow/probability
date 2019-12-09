@@ -18,7 +18,6 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
@@ -147,9 +146,7 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         Default value: "LocalLevelStateSpaceModel".
     """
 
-    with tf1.name_scope(name, 'LocalLevelStateSpaceModel',
-                                 [level_scale]) as name:
-
+    with tf.name_scope(name or 'LocalLevelStateSpaceModel') as name:
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
       dtype = initial_state_prior.dtype
@@ -292,8 +289,7 @@ class LocalLevel(StructuralTimeSeries):
         Default value: 'LocalLevel'.
     """
 
-    with tf1.name_scope(
-        name, 'LocalLevel', values=[observed_time_series]) as name:
+    with tf.name_scope(name or 'LocalLevel') as name:
 
       dtype = dtype_util.common_dtype([level_scale_prior, initial_level_prior])
 

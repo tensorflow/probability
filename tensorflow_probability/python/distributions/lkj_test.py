@@ -33,7 +33,7 @@ from tensorflow_probability.python.internal import test_util
 def _det_ok_mask(x, det_bounds, input_output_cholesky=False):
   if input_output_cholesky:
     logdet = 2.0 * tf.reduce_sum(
-        input_tensor=tf.math.log(tf.linalg.diag_part(x)), axis=[-1])
+        tf.math.log(tf.linalg.diag_part(x)), axis=[-1])
   else:
     _, logdet = tf.linalg.slogdet(x)
 

@@ -166,8 +166,7 @@ class _TestCaseTest(object):
   def test_assert_all_nan_input_placeholder_with_default(self):
     all_nan = np.full((10, 10, 10),
                       np.nan).astype(dtype_util.as_numpy_dtype(self.dtype))
-    a = tf1.placeholder_with_default(
-        input=all_nan, shape=all_nan.shape)
+    a = tf1.placeholder_with_default(all_nan, shape=all_nan.shape)
     self.assertAllNan(a)
 
   def test_assert_all_are_not_none(self):

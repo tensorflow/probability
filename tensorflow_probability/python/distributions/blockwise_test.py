@@ -183,8 +183,8 @@ class BlockwiseTest(test_util.TestCase):
                        validate_args=True)
 
     kl_sum = tf.reduce_sum(
-        input_tensor=(tfd.kl_divergence(gamma0, gamma1) +
-                      tfd.kl_divergence(normal0, normal1)))
+        (tfd.kl_divergence(gamma0, gamma1) +
+         tfd.kl_divergence(normal0, normal1)))
 
     blockwise_kl = tfd.kl_divergence(d0, d1)
 

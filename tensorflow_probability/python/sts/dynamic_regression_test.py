@@ -138,7 +138,7 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
   def _build_placeholder(self, ndarray):
     ndarray = np.asarray(ndarray).astype(self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
 @test_util.test_all_tf_execution_regimes

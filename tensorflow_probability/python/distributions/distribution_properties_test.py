@@ -1354,14 +1354,14 @@ def ensure_high_gt_low(low, high):
         tensorshape_util.rank(new_high.shape) -
         tensorshape_util.rank(high.shape))
     new_high = tf.math.reduce_max(
-        input_tensor=new_high, axis=reduced_leading_axes)
+        new_high, axis=reduced_leading_axes)
   reduce_dims = [
       d for d in range(tensorshape_util.rank(high.shape))
       if high.shape[d] < new_high.shape[d]
   ]
   if reduce_dims:
     new_high = tf.math.reduce_max(
-        input_tensor=new_high, axis=reduce_dims, keepdims=True)
+        new_high, axis=reduce_dims, keepdims=True)
   return new_high
 
 
