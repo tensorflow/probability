@@ -93,6 +93,7 @@ py_library(
         ":onehot_categorical",
         ":pareto",
         ":pert",
+        ":pixel_cnn",
         ":plackett_luce",
         ":poisson",
         ":poisson_lognormal",
@@ -1040,6 +1041,27 @@ py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+py_library(
+    name = "pixel_cnn",
+    srcs = ["pixel_cnn.py"],
+    deps = [
+        ":categorical",
+        ":distribution",
+        ":independent",
+        ":logistic",
+        ":mixture_same_family",
+        ":quantized_distribution",
+        ":transformed_distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:shift",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/layers:weight_norm",
     ],
 )
 
@@ -2273,6 +2295,19 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "pixel_cnn_test",
+    size = "large",
+    srcs = ["pixel_cnn_test.py"],
+    shard_count = 8,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
