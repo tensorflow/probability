@@ -145,14 +145,23 @@ def _uniform(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
 
 def _uniform_jax(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
                  name=None):  # pylint: disable=unused-argument
+  """Jax uniform random sampler."""
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
   if seed is None:
     raise ValueError('Must provide PRNGKey to sample in JAX.')
   dtype = utils.common_dtype([minval, maxval], dtype_hint=dtype)
-  maxval = 1 if maxval is None else maxval
-  shape = _shape([], shape)
-  return jaxrand.uniform(key=seed, shape=shape, dtype=dtype, minval=minval,
-                         maxval=maxval)
+  if np.issubdtype(dtype, np.integer):
+    if maxval is None:
+      raise ValueError(
+          'Must specify maxval for integer dtype {}.'.format(dtype))
+    shape = _shape([], shape)
+    return jaxrand.randint(key=seed, shape=shape, minval=minval, maxval=maxval,
+                           dtype=dtype)
+  else:
+    maxval = 1 if maxval is None else maxval
+    shape = _shape([], shape)
+    return jaxrand.uniform(key=seed, shape=shape, dtype=dtype, minval=minval,
+                           maxval=maxval)
 
 
 # --- Begin Public Functions --------------------------------------------------

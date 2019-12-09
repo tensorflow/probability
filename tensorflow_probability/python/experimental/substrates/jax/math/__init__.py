@@ -32,3 +32,5 @@ from tensorflow_probability.python.experimental.substrates.jax.math.gradient imp
 from tensorflow_probability.python.experimental.substrates.jax.math.linalg import fill_triangular
 from tensorflow_probability.python.experimental.substrates.jax.math.linalg import fill_triangular_inverse
 from tensorflow_probability.python.experimental.substrates.jax.math.numeric import log1psquare
+from tensorflow_probability.python.experimental.substrates.jax.math.random_ops import random_rademacher
+from tensorflow_probability.python.experimental.substrates.jax.math.random_ops import random_rayleigh

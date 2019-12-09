@@ -36,7 +36,8 @@ class _RandomRademacher(object):
     shape = (
         tf.constant(shape_) if self.use_static_shape else
         tf1.placeholder_with_default(shape_, shape=None))
-    x = tfp.math.random_rademacher(shape, self.dtype, seed=42)
+    x = tfp.math.random_rademacher(shape, self.dtype,
+                                   seed=test_util.test_seed())
     if self.use_static_shape:
       self.assertAllEqual(shape_, x.shape)
     x_ = self.evaluate(x)
@@ -46,7 +47,7 @@ class _RandomRademacher(object):
     self.assertAllClose(
         np.zeros(shape_[:-1]),
         np.mean(x_, axis=-1),
-        atol=0.05, rtol=0.)
+        atol=0.07, rtol=0.)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -76,7 +77,7 @@ class _RandomRayleigh(object):
     x = tfp.math.random_rayleigh(shape,
                                  scale=scale[..., tf.newaxis],
                                  dtype=self.dtype,
-                                 seed=42)
+                                 seed=test_util.test_seed())
     self.assertEqual(self.dtype, dtype_util.as_numpy_dtype(x.dtype))
     final_shape_ = [3, 2, int(1e3)]
     if self.use_static_shape:

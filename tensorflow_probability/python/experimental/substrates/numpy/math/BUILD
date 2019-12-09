@@ -31,11 +31,13 @@ FILENAMES = [
     "gradient",
     "linalg",
     "numeric",
+    "random_ops",
 ]
 
 TEST_WHITELIST = [
     "generic",
     "gradient",
+    "random_ops",
 ]
 
 TEST_FILENAMES = [filename + "_test" for filename in TEST_WHITELIST]

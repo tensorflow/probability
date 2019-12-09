@@ -30,4 +30,6 @@ from tensorflow_probability.python.experimental.substrates.numpy.math.generic im
 from tensorflow_probability.python.experimental.substrates.numpy.math.linalg import fill_triangular
 from tensorflow_probability.python.experimental.substrates.numpy.math.linalg import fill_triangular_inverse
 from tensorflow_probability.python.experimental.substrates.numpy.math.numeric import log1psquare
+from tensorflow_probability.python.experimental.substrates.numpy.math.random_ops import random_rademacher
+from tensorflow_probability.python.experimental.substrates.numpy.math.random_ops import random_rayleigh
 value_and_gradient = None
