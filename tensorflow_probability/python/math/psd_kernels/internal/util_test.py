@@ -24,12 +24,12 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.math.psd_kernels.internal import util
 
 
-class UtilTest(tfp_test_util.TestCase):
+class UtilTest(test_util.TestCase):
 
   def testPadShapeRightWithOnes(self):
     # Test nominal behavior.
@@ -78,6 +78,8 @@ class UtilTest(tfp_test_util.TestCase):
     expanded = util.pad_shape_with_ones(x, 3)
     self.assertAllEqual([3, 1, 1, 1], self.evaluate(expanded).shape)
 
+  @test_util.jax_disable_test_missing_functionality(
+      'Graphs do not exist in Jax.')
   def testPadShapeRightWithOnesCanBeGraphNoop(self):
     # First ensure graph actually *is* changed when we use non-trivial ndims.
     # Use an explicitly created graph, to make sure no whacky test fixture graph

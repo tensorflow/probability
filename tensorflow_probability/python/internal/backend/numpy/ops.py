@@ -213,9 +213,34 @@ convert_to_tensor = utils.copy_docstring(
     tf.convert_to_tensor,
     _convert_to_tensor)
 
+
+def _custom_gradient(f):
+  """Jax implementation of tf.custom_gradient."""
+  if JAX_MODE:
+    import jax  # pylint: disable=g-import-not-at-top
+    def f_(*args, **kwargs):
+      value, vjp = f(*args, **kwargs)
+      def vjp_(cts_out):
+        cts_in = vjp(cts_out)
+        if not isinstance(cts_in, tuple):
+          cts_in = (cts_in,)
+        return cts_in
+      return value, vjp_
+    @jax.custom_transforms
+    def wrapped(*args, **kwargs):
+      value, _ = f(*args, **kwargs)
+      return value
+    jax.defvjp_all(wrapped, f_)
+  else:
+    # Numpy backend
+    # ignores custom gradients
+    def wrapped(*args, **kwargs):
+      value, _ = f(*args, **kwargs)
+      return value
+  return wrapped
+
 custom_gradient = utils.copy_docstring(
-    tf.custom_gradient,
-    lambda f: f)
+    tf.custom_gradient, _custom_gradient)
 
 executing_eagerly = utils.copy_docstring(
     tf.executing_eagerly,

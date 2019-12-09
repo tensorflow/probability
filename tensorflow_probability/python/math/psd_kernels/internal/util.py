@@ -161,7 +161,7 @@ def sqrt_with_finite_grads(x, name=None):
   """
   with tf.name_scope(name or 'sqrt_with_finite_grads'):
     x = tf.convert_to_tensor(value=x, name='x')
-    if not x.dtype.is_floating:
+    if not dtype_util.is_floating(x.dtype):
       raise TypeError('Input `x` must be floating type.')
     def grad(grad_ys):
       large_float_like_x = np.sqrt(
