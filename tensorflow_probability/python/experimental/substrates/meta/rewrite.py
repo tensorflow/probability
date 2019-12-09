@@ -109,6 +109,8 @@ def main(argv):
     contents = contents.replace('backend import numpy', 'backend import jax')
     contents = contents.replace('def _call_jax', 'def __call__')
     contents = contents.replace('JAX_MODE = False', 'JAX_MODE = True')
+    contents = contents.replace('SKIP_DTYPE_CHECKS = True',
+                                'SKIP_DTYPE_CHECKS = False')
     is_test = lambda x: x.endswith('_test.py') or x.endswith('_test_util.py')
     if not is_test(argv[1]):  # We leave tests with original np.
       contents = contents.replace(

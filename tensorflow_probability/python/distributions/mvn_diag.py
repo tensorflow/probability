@@ -223,6 +223,10 @@ class MultivariateNormalDiag(
         if num_rows is None:
           num_rows = tf.shape(loc)[-1]
         if scale_identity_multiplier is not None:
+          scale_identity_multiplier = tensor_util.convert_nonref_to_tensor(
+              scale_identity_multiplier,
+              name='scale_identity_multiplier',
+              dtype=dtype)
           scale = tf.linalg.LinearOperatorScaledIdentity(
               num_rows=num_rows,
               multiplier=scale_identity_multiplier,
