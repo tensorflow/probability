@@ -50,6 +50,9 @@ TAP_WHITELIST = ["{}_test".format(f) for f in (
 
 DEPS = {
     "distribution_util": [":prefer_static"],
+    "hypothesis_testlib": [
+        "//tensorflow_probability/python/experimental/substrates/jax/distributions:deprecated_linalg",
+    ],
     "test_util": [
         ":dtype_util",
         ":test_combinations",
@@ -59,13 +62,13 @@ DEPS = {
         "//tensorflow_probability/python/experimental/substrates/jax/math:gradient",
     ],
     "distribution_util_test": [
-        "//tensorflow_probability/python/experimental/substrates/jax",
-    ],
-    "hypothesis_testlib": [
-        "//tensorflow_probability/python/experimental/substrates/jax/distributions:deprecated_linalg",
+        "//tensorflow_probability",
     ],
     "hypothesis_testlib_test": [
         ":hypothesis_testlib",
+    ],
+    "tensor_util_test": [
+        "//tensorflow_probability",
     ],
 }
 

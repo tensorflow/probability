@@ -392,7 +392,8 @@ class TestMoveDimension(test_util.TestCase):
 
   def test_move_dimension_static_shape(self):
 
-    x = tf.random.normal(shape=[200, 30, 4, 1, 6])
+    x = tf.random.normal(
+        shape=[200, 30, 4, 1, 6], seed=test_util.test_seed())
 
     x_perm = distribution_util.move_dimension(x, 1, 1)
     self.assertAllEqual(
@@ -412,7 +413,8 @@ class TestMoveDimension(test_util.TestCase):
 
   def test_move_dimension_dynamic_shape(self):
 
-    x_ = tf.random.normal(shape=[200, 30, 4, 1, 6])
+    x_ = tf.random.normal(
+        shape=[200, 30, 4, 1, 6], seed=test_util.test_seed())
     x = tf1.placeholder_with_default(x_, shape=None)
 
     x_perm1 = distribution_util.move_dimension(x, 1, 1)
@@ -441,7 +443,8 @@ class TestMoveDimension(test_util.TestCase):
 
   def test_move_dimension_dynamic_indices(self):
 
-    x_ = tf.random.normal(shape=[200, 30, 4, 1, 6])
+    x_ = tf.random.normal(
+        shape=[200, 30, 4, 1, 6], seed=test_util.test_seed())
     x = tf1.placeholder_with_default(x_, shape=None)
 
     x_perm1 = distribution_util.move_dimension(
@@ -868,11 +871,7 @@ class RotateTransposeTest(test_util.TestCase):
     return np.transpose(x, np.roll(np.arange(len(x.shape)), shift))
 
   def testRollStatic(self):
-    if tf.executing_eagerly():
-      error_message = r'Attempt to convert a value \(None\)'
-    else:
-      error_message = 'None values not supported.'
-    with self.assertRaisesRegexp(ValueError, error_message):
+    with self.assertRaisesRegexp(Exception, 'None'):
       distribution_util.rotate_transpose(None, 1)
     for x in (np.ones(1), np.ones((2, 1)), np.ones((3, 2, 1))):
       for shift in np.arange(-5, 5):
@@ -1218,7 +1217,7 @@ class WithDependenciesTestCase(test_util.TestCase):
   def testTupleDependencies(self):
     counter = tf.Variable(0, name='my_counter')
     const_with_dep = distribution_util.with_dependencies(
-        (tf1.assign_add(counter, 1), tf.constant(42)),
+        (counter.assign_add(1), tf.constant(42)),
         tf.constant(7))
 
     self.evaluate(tf1.global_variables_initializer())
@@ -1230,7 +1229,7 @@ class WithDependenciesTestCase(test_util.TestCase):
   def testListDependencies(self):
     counter = tf.Variable(0, name='my_counter')
     const_with_dep = distribution_util.with_dependencies(
-        [tf1.assign_add(counter, 1), tf.constant(42)],
+        [counter.assign_add(1), tf.constant(42)],
         tf.constant(7))
 
     self.evaluate(tf1.global_variables_initializer())

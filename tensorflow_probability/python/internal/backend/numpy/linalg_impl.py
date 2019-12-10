@@ -37,6 +37,7 @@ __all__ = [
     'det',
     'diag',
     'diag_part',
+    'einsum',
     'eye',
     'inv',
     'lu',
@@ -49,11 +50,11 @@ __all__ = [
     'set_diag',
     'slogdet',
     'solve',
+    'tensordot',
     'triangular_solve',
     # 'cross',
     # 'eigh',
     # 'eigvalsh',
-    # 'einsum',
     # 'expm',
     # 'global_norm',
     # 'l2_normalize',
@@ -66,7 +67,6 @@ __all__ = [
     # 'svd',
     # 'tensor_diag',
     # 'tensor_diag_part',
-    # 'tensordot',
     # 'trace',
     # 'tridiagonal_solve',
 ]
@@ -114,6 +114,11 @@ def _diag(diagonal, name=None):
   return _set_diag(
       np.zeros(diagonal.shape + (diagonal.shape[-1],), dtype=diagonal.dtype),
       diagonal)
+
+
+def _einsum(equation, *inputs, **kwargs):
+  del kwargs
+  return np.einsum(equation, *inputs)
 
 
 def _eye(num_rows, num_columns=None, batch_shape=None,
@@ -209,6 +214,23 @@ def _matvec(a, b,
       b_is_sparse=b_is_sparse), axis=-1)
 
 
+def _norm(tensor, ord='euclidean', axis=None, keepdims=None,  # pylint: disable=redefined-builtin
+          name=None, keep_dims=None):
+  """Numpy norm wrapper."""
+  del name
+  del keep_dims
+  if axis is None:
+    tensor = np.reshape(tensor, [-1])
+    axis = -1
+  if isinstance(axis, (tuple, list)):
+    # JAX expects tuples or ints.
+    axis = tuple(axis)
+  return np.linalg.norm(
+      tensor,
+      ord=2 if ord == 'euclidean' else ord,
+      axis=axis, keepdims=bool(keepdims))
+
+
 def _set_diag(input, diagonal, name=None):  # pylint: disable=unused-argument,redefined-builtin
   return np.where(np.eye(diagonal.shape[-1], dtype=np.bool),
                   diagonal[..., np.newaxis, :],
@@ -241,6 +263,11 @@ def _solve(matrix, rhs, adjoint=False, name=None):  # pylint: disable=redefined-
     for i, (mat, rh) in enumerate(zip(flat_mat, flat_rhs)):
       result[i] = np.linalg.solve(mat, rh)
   return result.reshape(*rhs.shape)
+
+
+def _tensordot(a, b, axes, name=None):  # pylint: disable=redefined-outer-name
+  del name
+  return np.tensordot(a, b, axes=axes)
 
 
 def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):  # pylint: disable=redefined-outer-name
@@ -301,6 +328,10 @@ diag_part = utils.copy_docstring(
     tf.linalg.diag_part,
     lambda input, name=None: np.diagonal(input, axis1=-2, axis2=-1))
 
+einsum = utils.copy_docstring(
+    tf.linalg.einsum,
+    _einsum)
+
 eye = utils.copy_docstring(
     tf.eye,
     _eye)
@@ -333,12 +364,7 @@ except AttributeError:
 
 norm = utils.copy_docstring(
     tf.norm,
-    lambda tensor, ord='euclidean', axis=None, keepdims=None, name=None,  # pylint: disable=g-long-lambda
-           keep_dims=None: np.linalg.norm(
-               np.reshape(tensor, [-1]) if axis is None else tensor,
-               ord=2 if ord == 'euclidean' else ord,
-               axis=-1 if axis is None else axis, keepdims=bool(keepdims))
-)
+    _norm)
 
 # TODO(b/140157055): Remove the try/except.
 pinv = lambda input, name=None: np.linalg.pinv(input)
@@ -365,6 +391,10 @@ matrix_transpose = utils.copy_docstring(
     _matrix_transpose)
 
 solve = utils.copy_docstring(tf.linalg.solve, _solve)
+
+tensordot = utils.copy_docstring(
+    tf.linalg.tensordot,
+    _tensordot)
 
 triangular_solve = utils.copy_docstring(
     tf.linalg.triangular_solve,

@@ -335,20 +335,21 @@ class LKJTest(test_util.TestCase):
   def testZeroDimension(self, dtype):
     testee_lkj = tfd.LKJ(
         dimension=0, concentration=dtype([1., 4.]), validate_args=True)
-    results = testee_lkj.sample(sample_shape=[4, 3])
+    results = testee_lkj.sample(sample_shape=[4, 3], seed=test_util.test_seed())
     self.assertEqual(results.shape, [4, 3, 2, 0, 0])
 
   def testOneDimension(self, dtype):
     testee_lkj = tfd.LKJ(
         dimension=1, concentration=dtype([1., 4.]), validate_args=True)
-    results = testee_lkj.sample(sample_shape=[4, 3])
+    results = testee_lkj.sample(sample_shape=[4, 3], seed=test_util.test_seed())
     self.assertEqual(results.shape, [4, 3, 2, 1, 1])
 
   def testMean(self, dtype):
     testee_lkj = tfd.LKJ(
         dimension=3, concentration=dtype([1., 3., 5.]), validate_args=True)
     num_samples = 20000
-    results = testee_lkj.sample(sample_shape=[num_samples])
+    results = testee_lkj.sample(
+        sample_shape=[num_samples], seed=test_util.test_seed())
     mean = testee_lkj.mean()
     self.assertEqual(mean.shape, [3, 3, 3])
     check1 = st.assert_true_mean_equal_by_dkwm(

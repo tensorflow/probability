@@ -705,7 +705,9 @@ class ScalarToMultiTest(test_util.TestCase):
     self.assertAllClose(
         np.sign(
             self.evaluate(
-                conditional_normal.sample(5, bijector_kwargs={'z': z}))), z)
+                conditional_normal.sample(
+                    5, seed=test_util.test_seed(),
+                    bijector_kwargs={'z': z}))), z)
 
   def testVectorDynamicShapeOverrideWithMutation(self):
     batch_shape = tf.Variable([4], shape=tf.TensorShape(None), dtype=tf.int32)

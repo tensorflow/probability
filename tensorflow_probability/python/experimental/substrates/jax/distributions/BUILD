@@ -126,6 +126,7 @@ TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     "gamma_gamma",
     "geometric",
     "gumbel",
+    "half_cauchy",
     "inverse_gaussian",
     "kullback_leibler",
     "kumaraswamy",
@@ -135,6 +136,7 @@ TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     "mvn_full_covariance",
     "pareto",
     "sample",
+    "uniform",
     "vector_exponential_diag",
     "vector_laplace_diag",
     "vector_sinh_arcsinh_diag",
@@ -176,6 +178,33 @@ DEPS = {
     "cholesky_lkj": [":lkj"],
     "von_mises_fisher": [":beta"],
     "von_mises": [":normal"],
+    "generalized_pareto_test": [
+        "//tensorflow_probability/python/experimental/substrates/jax/internal:hypothesis_testlib",
+    ],
+    "independent_test": [
+        "//tensorflow_probability/python/experimental/substrates/jax/internal:hypothesis_testlib",
+    ],
+    "linear_gaussian_ssm_test": [
+        "//tensorflow_probability/python/experimental/substrates/jax/internal:hypothesis_testlib",
+    ],
+    "lkj_test": [
+        "//tensorflow_probability/python/experimental/substrates/jax/distributions/internal:statistical_testing",
+    ],
+    "mixture_same_family_test": [
+        "//tensorflow_probability/python/experimental/substrates/jax/internal:hypothesis_testlib",
+    ],
+    "mixture_test": [
+        "//tensorflow_probability/python/experimental/substrates/jax/internal:hypothesis_testlib",
+    ],
+    "pert_test": [
+        "//tensorflow_probability/python/experimental/substrates/jax/distributions/internal:statistical_testing",
+    ],
+    "transformed_distribution_test": [
+        "//tensorflow_probability/python/experimental/substrates/jax/internal:hypothesis_testlib",
+    ],
+    "triangular_test": [
+        "//tensorflow_probability/python/experimental/substrates/jax/distributions/internal:statistical_testing",
+    ],
 }
 
 [py_library(

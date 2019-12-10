@@ -28,9 +28,14 @@ exports_files(["LICENSE"])
 
 FILENAMES = [
     "slicing",
+    "statistical_testing",
 ]
 
 TEST_FILENAMES = [filename + "_test" for filename in FILENAMES]
+
+TAP_WHITELIST = [
+    "slicing",
+]
 
 [genrule(
     name = "rewrite_{}".format(filename),
@@ -56,7 +61,7 @@ TEST_FILENAMES = [filename + "_test" for filename in FILENAMES]
     name = filename,
     size = "medium",
     srcs = ["{}.py".format(filename)],
-    tags = ["tfp_jax"],
+    tags = ([] if filename in TAP_WHITELIST else ["notap"]) + ["tfp_jax"],
     deps = [
         ":internal",
         # absl/testing:parameterized dep,
@@ -73,5 +78,5 @@ TEST_FILENAMES = [filename + "_test" for filename in FILENAMES]
 py_library(
     name = "internal",
     srcs = ["__init__.py"],
-    deps = [":slicing"],
+    deps = [":{}".format(filename) for filename in FILENAMES if "test" not in filename],
 )
