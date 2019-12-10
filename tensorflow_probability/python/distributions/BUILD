@@ -2328,7 +2328,7 @@ py_test(
 
 py_test(
     name = "poisson_lognormal_test",
-    size = "small",
+    size = "medium",
     srcs = ["poisson_lognormal_test.py"],
     deps = [
         # numpy dep,
