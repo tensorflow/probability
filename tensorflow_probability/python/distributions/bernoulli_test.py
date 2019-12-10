@@ -194,11 +194,6 @@ class BernoulliTest(test_util.TestCase):
     dist = tfd.Bernoulli(probs=[[0.5], [0.5]], validate_args=True)
     self.assertAllEqual([2, 1], dist.log_prob(1).shape)
 
-  def testBoundaryConditions(self):
-    dist = tfd.Bernoulli(probs=1.0, validate_args=True)
-    self.assertAllClose(np.nan, self.evaluate(dist.log_prob(0)))
-    self.assertAllClose([np.nan], [self.evaluate(dist.log_prob(1))])
-
   def testEntropyNoBatch(self):
     p = 0.2
     dist = tfd.Bernoulli(probs=p, validate_args=True)
@@ -277,6 +272,41 @@ class BernoulliTest(test_util.TestCase):
                   [np.sqrt(var(0.5)), np.sqrt(var(0.4))]],
                  dtype=np.float32))
 
+  def testVarianceWhenProbCloseToOne(self):
+    # Prob is very close to 1.0, so the naive 1 - p will be (numerically) 0,
+    # which would make variance zero.  Main point of this test is to verify that
+    # the variance is > 0 ... we also verify that variance is correct.
+
+    # tf.sigmoid(logits) is < float eps away from 1.0, which means the naive
+    # 1 - tf.sigmoid(logits) will result in 0.0, which is a loss of precision.
+    one_minus_prob_64 = np.float64(np.finfo(np.float32).eps) / 2
+    logits_32 = np.float32(np.log((1. - one_minus_prob_64) / one_minus_prob_64))
+
+    # Verify that this value of logits results in loss of precision for a naive
+    # implementation (justifying our "fancy" implementation of sigmoid(-logits))
+    self.assertAllEqual(0., 1 - tf.sigmoid(logits_32))
+
+    # See! This one weird trick fixes everything.  Asserts below check that we
+    # used the trick correctly in our code.
+    self.assertGreater(self.evaluate(tf.sigmoid(-logits_32)), 0.)
+
+    dist = tfd.Bernoulli(logits=logits_32)
+
+    expected_variance = np.float32(one_minus_prob_64 * (1 - one_minus_prob_64))
+
+    self.assertGreater(expected_variance, 0.)
+
+    self.assertAllClose(
+        dist.variance(),
+        expected_variance,
+        # Equivalent to atol=0, rtol=1e-6, but less likely to confuse which
+        # element is being used for the "r" in rtol.
+        # Note this also ensures dist.variance() > 0, which the naive
+        # implementation would not be able to do.
+        atol=expected_variance * 1e-6,
+        rtol=0,
+    )
+
   def testBernoulliBernoulliKL(self):
     batch_size = 6
     a_p = np.array([0.6] * batch_size, dtype=np.float32)
@@ -293,6 +323,38 @@ class BernoulliTest(test_util.TestCase):
 
     self.assertEqual(kl.shape, (batch_size,))
     self.assertAllClose(kl_val, kl_expected)
+
+  def testBernoulliBernoulliKLWhenProbOneIsOne(self):
+    # KL[a || b] = Pa * Log[Pa / Pb] + (1 - Pa) * Log[(1 - Pa) / (1 - Pb)]
+    # This is defined iff (Pb = 0 ==> Pa = 0) AND (Pb = 1 ==> Pa = 1).
+    a = tfd.Bernoulli(probs=[1., 1., 1.])
+    b = tfd.Bernoulli(probs=[0.5, 1., 0.])
+    kl_expected = [
+        # The (1 - Pa) term kills the entire second term.
+        1 * np.log(1 / 0.5) + 0,
+        # P[b = 0] = 0, and P[a = 0] = 0, so absolute continuity holds.
+        1 * np.log(1 / 1) + 0,
+        # P[b = 1] = 0, but P[a = 1] != 0, so not absolutely continuous.
+        # Some would argue that NaN would be more correct...
+        np.inf
+    ]
+    self.assertAllClose(self.evaluate(tfd.kl_divergence(a, b)), kl_expected)
+
+  def testBernoulliBernoulliKLWhenProbOneIsZero(self):
+    # KL[a || b] = Pa * Log[Pa / Pb] + (1 - Pa) * Log[(1 - Pa) / (1 - Pb)]
+    # This is defined iff (Pb = 0 ==> Pa = 0) AND (Pb = 1 ==> Pa = 1).
+    a = tfd.Bernoulli(probs=[0., 0., 0.])
+    b = tfd.Bernoulli(probs=[0.5, 1., 0.])
+    kl_expected = [
+        # The Pa term kills the entire first term.
+        0 + 1 * np.log(1 / 0.5),
+        # P[b = 0] = 0, but P[a = 0] != 0, so not absolutely continuous.
+        # Some would argue that NaN would be more correct...
+        np.inf,
+        # P[b = 1] = 0, and P[a = 1] = 0, so absolute continuity holds.
+        0 + 1 * np.log(1 / 1)
+    ]
+    self.assertAllClose(self.evaluate(tfd.kl_divergence(a, b)), kl_expected)
 
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])
@@ -315,6 +377,50 @@ class BernoulliTest(test_util.TestCase):
     self.assertAllClose(
         *self.evaluate([d.prob(1.), d.probs_parameter()]),
         atol=0, rtol=1e-4)
+
+  def testLogProbWithInfiniteLogits(self):
+    logits = [np.inf, -np.inf]  # probs = [1, 0].
+    dist = tfd.Bernoulli(logits=logits)
+    self.assertAllEqual([0., -np.inf], dist.log_prob([1., 1.]))
+    self.assertAllEqual([-np.inf, 0.], dist.log_prob([0., 0.]))
+    self.assertAllEqual([np.nan, np.nan], dist.log_prob([np.nan, np.nan]))
+
+  def testLogProbWithZeroOrOneProbs(self):
+    probs = [1., 0.]  # logits = [np.inf, -np.inf]
+    dist = tfd.Bernoulli(probs=probs)
+    self.assertAllEqual([0., -np.inf], dist.log_prob([1., 1.]))
+    self.assertAllEqual([-np.inf, 0.], dist.log_prob([0., 0.]))
+    self.assertAllEqual([np.nan, np.nan], dist.log_prob([np.nan, np.nan]))
+
+  def testLogProbGrads(self):
+    logits = tf.Variable([0., np.inf, -np.inf])  # probs = [1/2, 1, 0].
+    dist = tfd.Bernoulli(logits=logits)
+    with tf.GradientTape() as tape:
+      loss = -dist.log_prob([1., 1., 0.])
+    grad = tape.gradient(loss, dist.trainable_variables)
+    self.assertLen(grad, 1)
+
+    # For finite logits, the grad is as expected (finite...to get value do math)
+    # For infinite logits, you can reason that a small perturbation of the
+    # logits doesn't change anything (adding epsilon to +-Inf doesn't change
+    # it), and thus gradient = 0 is expected.
+    self.evaluate([v.initializer for v in dist.variables])
+    self.assertAllEqual(grad[0], [-0.5, 0., 0.])
+
+  def testEntropyWithInfiniteLogits(self):
+    logits = [np.inf, -np.inf]  # probs = [1, 0]
+    dist = tfd.Bernoulli(logits=logits)
+    self.assertAllEqual([0., 0.], dist.entropy())
+
+  def testEntropyWithZeroOneProbs(self):
+    probs = [1., 0.]  # logits = [np.inf, -np.inf]
+    dist = tfd.Bernoulli(probs=probs)
+    self.assertAllEqual([0., 0.], dist.entropy())
+
+  def testMeanWithInfiniteLogits(self):
+    logits = [np.inf, -np.inf]  # probs = [1, 0]
+    dist = tfd.Bernoulli(logits=logits, validate_args=True)
+    self.assertAllEqual([1., 0.], dist.mean())
 
 
 class _MakeSlicer(object):

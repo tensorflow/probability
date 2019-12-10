@@ -60,6 +60,8 @@ def assert_finite(x, summarize=None, message=None, name=None):
     ValueError: If static checks determine `x` is not finite.
   """
   with tf.name_scope(name or 'assert_finite'):
+    if message is None:
+      message = '`Tensor` contained non-finite values.'
     x = tf.convert_to_tensor(x)
     x_ = tf.get_static_value(x)
     if x_ is not None:
@@ -68,6 +70,39 @@ def assert_finite(x, summarize=None, message=None, name=None):
       return x
     assertion = tf.debugging.assert_equal(
         tf.math.is_finite(x), tf.ones_like(x, tf.bool),
+        summarize=summarize, message=message)
+    with tf.control_dependencies([assertion]):
+      return tf.identity(x)
+
+
+def assert_not_nan(x, summarize=None, message=None, name=None):
+  """Assert all elements of `x` are not NaN.
+
+  Args:
+    x:  Numeric `Tensor`.
+    summarize: Print this many entries of each tensor.
+    message: A string to prefix to the default message.
+    name: A name for this operation (optional).
+      Defaults to "assert_finite".
+
+  Returns:
+    Op raising `InvalidArgumentError` unless `x` has specified rank or lower.
+    If static checks determine `x` has correct rank, a `no_op` is returned.
+
+  Raises:
+    ValueError: If static checks determine `x` is not finite.
+  """
+  with tf.name_scope(name or 'assert_not_nan'):
+    if message is None:
+      message = '`Tensor` contained NaN values.'
+    x = tf.convert_to_tensor(x)
+    x_ = tf.get_static_value(x)
+    if x_ is not None:
+      if np.any(np.isnan(x_)):
+        raise ValueError(message)
+      return x
+    assertion = tf.debugging.assert_equal(
+        tf.math.is_nan(x), tf.zeros_like(x, tf.bool),
         summarize=summarize, message=message)
     with tf.control_dependencies([assertion]):
       return tf.identity(x)
