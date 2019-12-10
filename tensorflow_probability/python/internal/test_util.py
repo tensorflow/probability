@@ -42,6 +42,7 @@ __all__ = [
     'jax_disable_test_missing_functionality',
     'test_all_tf_execution_regimes',
     'test_graph_and_eager_modes',
+    'test_graph_mode_only',
     'test_seed',
     'test_seed_stream',
     'DiscreteScalarDistributionTestHelpers',
@@ -324,6 +325,34 @@ def test_graph_and_eager_modes(test_class_or_method=None):
   """
   decorator = test_combinations.generate(
       test_combinations.combine(mode=['graph', 'eager']),
+      test_combinations=[EagerGraphCombination()])
+
+  if test_class_or_method:
+    return decorator(test_class_or_method)
+  return decorator
+
+
+def test_graph_mode_only(test_class_or_method=None):
+  """Decorator for ensuring tests run in graph mode.
+
+  Must be applied to subclasses of `parameterized.TestCase` (from
+  absl/testing), or a method of such a subclass.
+
+  When applied to a test method, this decorator results in the replacement of
+  that method with one new test method, executed in graph mode.
+
+  When applied to a test class, all the methods in the class are affected.
+
+  Args:
+    test_class_or_method: the `TestCase` class or method to decorate.
+
+  Returns:
+    decorator: A generated TF `test_combinations` decorator, or if
+    `test_class_or_method` is not `None`, the generated decorator applied to
+    that function.
+  """
+  decorator = test_combinations.generate(
+      test_combinations.combine(mode=['graph']),
       test_combinations=[EagerGraphCombination()])
 
   if test_class_or_method:

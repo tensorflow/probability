@@ -353,6 +353,36 @@ class StiffTest(test_util.TestCase):
     ('dormand_prince', tfp.math.ode.DormandPrince)])
 class GradientTest(test_util.TestCase):
 
+  def test_riccati(self, solver):
+    ode_fn = lambda time, state: (state - time)**2 + 1.
+    initial_time = 0.
+    initial_state_value = 0.5
+    initial_state = tf.constant(initial_state_value, dtype=tf.float64)
+    final_time = 1.
+    jacobian_fn = lambda time, state: 2. * (state - time)
+    solver_instance = solver(rtol=_RTOL, atol=_ATOL)
+    with tf.GradientTape() as tape:
+      tape.watch(initial_state)
+      results = solver_instance.solve(
+          ode_fn,
+          initial_time,
+          initial_state,
+          solution_times=[final_time],
+          jacobian_fn=jacobian_fn)
+      final_state = results.states[-1]
+    grad = self.evaluate(tape.gradient(final_state, initial_state))
+    grad_exact = 1. / (1. - initial_state_value * final_time)**2
+    self.assertAllClose(grad, grad_exact, rtol=1e-3, atol=1e-3)
+
+
+# Running pfor repeatedly to rebuild the Jacobian graph is too slow in Eager
+# mode.
+@test_util.test_graph_mode_only
+@parameterized.named_parameters([
+    ('bdf', tfp.math.ode.BDF),
+    ('dormand_prince', tfp.math.ode.DormandPrince)])
+class GradientTestPforJacobian(test_util.TestCase):
+
   def test_linear_dense(self, solver):
     initial_time = 0.
     jacobian = -np.float64([[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]])
@@ -381,27 +411,6 @@ class GradientTest(test_util.TestCase):
          [-1.5504970767866180, -0.7991765448018465, +0.9521439871829201]])
     grad_exact = np.dot(np.ones([num_odes]), matrix_exponential_of_jacobian)
     self.assertAllClose(grad, grad_exact)
-
-  def test_riccati(self, solver):
-    ode_fn = lambda time, state: (state - time)**2 + 1.
-    initial_time = 0.
-    initial_state_value = 0.5
-    initial_state = tf.constant(initial_state_value, dtype=tf.float64)
-    final_time = 1.
-    jacobian_fn = lambda time, state: 2. * (state - time)
-    solver_instance = solver(rtol=_RTOL, atol=_ATOL)
-    with tf.GradientTape() as tape:
-      tape.watch(initial_state)
-      results = solver_instance.solve(
-          ode_fn,
-          initial_time,
-          initial_state,
-          solution_times=[final_time],
-          jacobian_fn=jacobian_fn)
-      final_state = results.states[-1]
-    grad = self.evaluate(tape.gradient(final_state, initial_state))
-    grad_exact = 1. / (1. - initial_state_value * final_time)**2
-    self.assertAllClose(grad, grad_exact, rtol=1e-3, atol=1e-3)
 
   def test_tuple(self, solver):
     alpha = np.float32(0.7)
