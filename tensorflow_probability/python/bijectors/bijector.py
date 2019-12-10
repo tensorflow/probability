@@ -1112,8 +1112,11 @@ class Bijector(tf.Module):
         transformation, at whose value the ILDJ is to be computed. Can be
         `None` as long as `x` is not `None`.
       prefer_inverse_ldj_fn: Python `bool`, if `True`, will strictly prefer to
-        use the `_inverse_log_det_jacobian` to compute ILDJ; else, will
-        strictly prefer to use `_forward_log_det_jacobian`.
+        use the `_inverse_log_det_jacobian` to compute ILDJ; else, will strictly
+        prefer to use `_forward_log_det_jacobian`.  Why the switching behavior?
+        Because despite the name, this method is used as a helper for both
+        `_call_inverse_log_det_jacobian` and `_call_forward_log_det_jacobian`,
+        which prioritize different subclass methods.
       event_ndims: int-like `Tensor`, the number of dims of an event (in the
         pre- or post-transformed space, as appropriate). These need to be summed
         over to compute the total ildj.

@@ -27,7 +27,7 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 
 
-@test_util.test_all_tf_execution_regimes
+@test_util.test_graph_and_eager_modes
 class SliceSamplerTest(test_util.TestCase):
 
   def _get_mode_dependent_settings(self):
@@ -95,7 +95,7 @@ class SliceSamplerTest(test_util.TestCase):
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.SliceSampler(
-            target_log_prob_fn=target.log_prob,
+            target_log_prob_fn=tf.function(target.log_prob, autograph=False),
             step_size=1.0,
             max_doublings=5,
             seed=test_util.test_seed_stream()),
@@ -128,7 +128,7 @@ class SliceSamplerTest(test_util.TestCase):
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.SliceSampler(
-            target_log_prob_fn=target.log_prob,
+            target_log_prob_fn=tf.function(target.log_prob, autograph=False),
             step_size=1.0,
             max_doublings=5,
             seed=test_util.test_seed_stream()),
@@ -160,11 +160,13 @@ class SliceSamplerTest(test_util.TestCase):
     init_state = [np.ones([num_chains], dtype=dtype),
                   np.ones([num_chains], dtype=dtype)]
 
+    target_fn = tf.function(
+        lambda *states: target.log_prob(states), autograph=False)
     [states1, states2], _ = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.SliceSampler(
-            target_log_prob_fn=lambda *states: target.log_prob(states),
+            target_log_prob_fn=target_fn,
             step_size=1.0,
             max_doublings=5,
             seed=test_util.test_seed_stream()),
