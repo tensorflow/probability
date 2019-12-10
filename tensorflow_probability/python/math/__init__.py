@@ -42,8 +42,6 @@ from tensorflow_probability.python.math.linalg import fill_triangular_inverse
 from tensorflow_probability.python.math.linalg import lu_matrix_inverse
 from tensorflow_probability.python.math.linalg import lu_reconstruct
 from tensorflow_probability.python.math.linalg import lu_solve
-from tensorflow_probability.python.math.linalg import matrix_rank
-from tensorflow_probability.python.math.linalg import pinv
 from tensorflow_probability.python.math.linalg import pivoted_cholesky
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matmul
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
@@ -76,10 +74,8 @@ _allowed_symbols = [
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_solve',
-    'matrix_rank',
     'minimize',
     'ode',
-    'pinv',
     'pivoted_cholesky',
     'psd_kernels',
     'random_rademacher',
