@@ -98,14 +98,13 @@ class Sample(distribution_lib.Distribution):
                       reinterpreted_batch_ndims=1),
       sample_shape=[5, 4])
   x = s.sample([6, 1])
-  # ==> x.shape: [6, 1, 5, 4, 3, 2]
+  # ==> x.shape: [6, 1, 3, 5, 4, 2]
 
   lp = s.log_prob(x)
   # ==> lp.shape: [6, 1, 3]
-  #     Equivalently: tf.reduce_sum(s.distribution.log_prob(x), axis=[2, 3])
   #
   # `s.log_prob` will reduce over (intrinsic) event dims, i.e., dim `5`, then
-  # sums over `s.sample_shape` dims `[2, 3]` corresponding to shape (slice)
+  # sums over `s.sample_shape` dims `[3, 4]` corresponding to shape (slice)
   # `[5, 4]`.
   ```
 
