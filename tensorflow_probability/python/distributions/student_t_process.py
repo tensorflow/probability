@@ -121,7 +121,7 @@ class StudentTProcess(distribution.Distribution):
   import tensorflow_probability as tfp
 
   tfd = tfp.distributions
-  psd_kernels = tfp.positive_semidefinite_kernels
+  psd_kernels = tfp.math.psd_kernels
 
   num_points = 100
   # Index points should be a collection (100, here) of feature vectors. In this

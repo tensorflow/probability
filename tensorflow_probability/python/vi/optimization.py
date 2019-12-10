@@ -215,7 +215,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
   # Generative model.
   Root = tfd.JointDistributionCoroutine.Root
   def model_fn():
-    kernel = tfp.positive_semidefinite_kernels.ExponentiatedQuadratic(
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
         amplitude=tf.exp(kernel_log_amplitude),
         length_scale=tf.exp(kernel_log_lengthscale))
     latent_log_rates = yield Root(tfd.GaussianProcess(

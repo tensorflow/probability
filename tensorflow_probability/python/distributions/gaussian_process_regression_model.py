@@ -192,7 +192,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
   import tensorflow_probability as tfp
 
   tfd = tfp.distributions
-  psd_kernels = tfp.positive_semidefinite_kernels
+  psd_kernels = tfp.math.psd_kernels
 
   # Generate noisy observations from a known function at some random points.
   observation_noise_variance = .5

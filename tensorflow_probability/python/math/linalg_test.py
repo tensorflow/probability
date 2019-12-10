@@ -39,7 +39,7 @@ class _CholeskyExtend(test_util.TestCase):
     xs = np.random.random(7).astype(self.dtype)[:, tf.newaxis]
     xs = tf1.placeholder_with_default(
         xs, shape=xs.shape if self.use_static_shape else None)
-    k = tfp.positive_semidefinite_kernels.MaternOneHalf()
+    k = tfp.math.psd_kernels.MaternOneHalf()
     mat = k.matrix(xs, xs)
     chol = tf.linalg.cholesky(mat)
 
@@ -77,7 +77,7 @@ class _CholeskyExtend(test_util.TestCase):
     xs = tf1.placeholder_with_default(
         xs, shape=xs.shape if self.use_static_shape else None)
 
-    k = tfp.positive_semidefinite_kernels.MaternOneHalf()
+    k = tfp.math.psd_kernels.MaternOneHalf()
     mat = k.matrix(xs, xs) + jitter(n)
     chol = tf.linalg.cholesky(mat)
 

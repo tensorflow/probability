@@ -215,7 +215,7 @@ def feature_scaleds(
     scale_diag = tf.Variable(scale_diag, name='scale_diag')
     # Don't enable variable counting. This is because rescaling is
     # done for each input, which will exceed two convert_to_tensor calls.
-  result_kernel = tfp.positive_semidefinite_kernels.FeatureScaled(
+  result_kernel = tfp.math.psd_kernels.FeatureScaled(
       kernel=base_kernel,
       scale_diag=scale_diag,
       validate_args=True)
@@ -302,7 +302,7 @@ def schur_complements(
       if draw(hps.booleans()):
         schur_complement_params[param_name] = tfp_hps.defer_and_count_usage(
             schur_complement_params[param_name])
-  result_kernel = tfp.positive_semidefinite_kernels.SchurComplement(
+  result_kernel = tfp.math.psd_kernels.SchurComplement(
       base_kernel=base_kernel,
       fixed_inputs=schur_complement_params['fixed_inputs'],
       diag_shift=schur_complement_params['diag_shift'],
