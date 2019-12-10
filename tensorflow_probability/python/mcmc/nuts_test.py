@@ -225,49 +225,57 @@ class NutsTest(test_util.TestCase):
              tf.ones(batch_shape + [1]),
              tf.ones(batch_shape + [2, 2])]
 
-    def log_prob0(x):
-      return tf.squeeze(tfd.Independent(
-          tfd.Normal(tf.range(6, dtype=tf.float32),
-                     tf.constant(1.)),
-          reinterpreted_batch_ndims=1).log_prob(x))
-    kernel0 = tfp.mcmc.NoUTurnSampler(
-        log_prob0,
-        step_size=0.3,
-        parallel_iterations=1,
-        seed=strm())
-    [results0] = tfp.mcmc.sample_chain(
-        num_results=num_steps,
-        num_burnin_steps=10,
-        current_state=init0,
-        kernel=kernel0,
-        trace_fn=None,
-        parallel_iterations=1)
+    @tf.function(autograph=False)
+    def run_two_chains(init0, init1):
 
-    def log_prob1(state0, state1, state2):
-      return tf.squeeze(
-          tfd.Normal(tf.constant(0.), tf.constant(1.)).log_prob(state0)
-          + tfd.Independent(
-              tfd.Normal(tf.constant([1.]), tf.constant(1.)),
-              reinterpreted_batch_ndims=1).log_prob(state1)
-          + tfd.Independent(
-              tfd.Normal(tf.constant([[2., 3.], [4., 5.]]), tf.constant(1.)),
-              reinterpreted_batch_ndims=2).log_prob(state2)
-      )
-    kernel1 = tfp.mcmc.NoUTurnSampler(
-        log_prob1,
-        step_size=0.3,
-        parallel_iterations=1,
-        seed=strm())
-    results1_ = tfp.mcmc.sample_chain(
-        num_results=num_steps,
-        num_burnin_steps=10,
-        current_state=init1,
-        kernel=kernel1,
-        trace_fn=None,
-        parallel_iterations=1)
-    results1 = tf.concat(
-        [tf.reshape(x, [num_steps] + batch_shape + [-1]) for x in results1_],
-        axis=-1)
+      def log_prob0(x):
+        return tf.squeeze(tfd.Independent(
+            tfd.Normal(tf.range(6, dtype=tf.float32),
+                       tf.constant(1.)),
+            reinterpreted_batch_ndims=1).log_prob(x))
+      kernel0 = tfp.mcmc.NoUTurnSampler(
+          log_prob0,
+          step_size=0.3,
+          parallel_iterations=1,
+          seed=strm())
+      [results0] = tfp.mcmc.sample_chain(
+          num_results=num_steps,
+          num_burnin_steps=10,
+          current_state=init0,
+          kernel=kernel0,
+          trace_fn=None,
+          parallel_iterations=1)
+
+      def log_prob1(state0, state1, state2):
+        return tf.squeeze(
+            tfd.Normal(tf.constant(0.), tf.constant(1.)).log_prob(state0)
+            + tfd.Independent(
+                tfd.Normal(tf.constant([1.]), tf.constant(1.)),
+                reinterpreted_batch_ndims=1).log_prob(state1)
+            + tfd.Independent(
+                tfd.Normal(tf.constant([[2., 3.], [4., 5.]]), tf.constant(1.)),
+                reinterpreted_batch_ndims=2).log_prob(state2)
+        )
+      kernel1 = tfp.mcmc.NoUTurnSampler(
+          log_prob1,
+          step_size=0.3,
+          parallel_iterations=1,
+          seed=strm())
+      results1_ = tfp.mcmc.sample_chain(
+          num_results=num_steps,
+          num_burnin_steps=10,
+          current_state=init1,
+          kernel=kernel1,
+          trace_fn=None,
+          parallel_iterations=1)
+      results1 = tf.concat(
+          [tf.reshape(x, [num_steps] + batch_shape + [-1]) for x in results1_],
+          axis=-1)
+
+      return results0, results1
+
+    results0, results1 = run_two_chains(init0, init1)
+
     self.evaluate(
         st.assert_true_cdf_equal_by_dkwm_two_sample(results0, results1))
 
