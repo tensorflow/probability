@@ -284,6 +284,15 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
         *self.evaluate([x, d.probs_parameter()]),
         atol=0, rtol=1e-4)
 
+  def testSupportBijectorOutsideRange(self):
+    probs = np.array([0.45, 0.07, 0.32, 0.16])
+    temp = 1.
+    dist = tfd.RelaxedOneHotCategorical(temp, probs=probs, validate_args=True)
+    x = np.array([[0.3, 0.301, 0.2, 0.2], [0.15, 0.4, 0.3, 0.15]])
+    with self.assertRaisesOpError('must sum to `1`'):
+      self.evaluate(
+          dist._experimental_default_event_space_bijector().inverse(x))
+
 
 @test_util.test_all_tf_execution_regimes
 class ExpRelaxedOneHotCategoricalFromVariableTest(test_util.TestCase):

@@ -504,6 +504,12 @@ class _HalfCauchyTest(object):
       for grad in grads:
         self.assertAllFinite(grad)
 
+  def testSupportBijectorOutsideRange(self):
+    dist = tfd.HalfCauchy(loc=[-3., 2., 5.4], scale=2., validate_args=True)
+    with self.assertRaisesOpError('must be greater than 0'):
+      self.evaluate(dist._experimental_default_event_space_bijector().inverse(
+          [-4.2, 2. - 1e-6, 5.1]))
+
 
 @test_util.test_all_tf_execution_regimes
 class HalfCauchyTestStaticShapeFloat32(test_util.TestCase, _HalfCauchyTest):

@@ -23,6 +23,7 @@ import functools
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
@@ -435,6 +436,15 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
         # instances.
         dfn.append(_sliced_maker(d))
     return self.copy(model=self._model_unflatten(dfn))
+
+  def _default_event_space_bijector(self):
+    if not all(
+        isinstance(d, distribution_lib.Distribution) for d in self.model):
+      raise NotImplementedError(
+          '_default_event_space_bijector` is implemented only for instances'
+          ' of `JointDistributionSequential` for which all elements of `model` '
+          'are `tfp.distribution`s (not callables).')
+    return [d._experimental_default_event_space_bijector() for d in self.model]  # pylint: disable=protected-access
 
 
 def _unify_call_signature(i, dist_fn):

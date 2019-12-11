@@ -22,6 +22,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import exp as exp_bijector
+from tensorflow_probability.python.bijectors import scale as scale_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -191,6 +195,14 @@ class InverseGaussian(distribution.Distribution):
       """The variance of inverse Gaussian is `loc` ** 3 / `concentration`.""")
   def _variance(self):
     return self.loc ** 3 / self.concentration
+
+  def _default_event_space_bijector(self):
+    return chain_bijector.Chain([
+        softplus_bijector.Softplus(validate_args=self.validate_args),
+        scale_bijector.Scale(scale=-1., validate_args=self.validate_args),
+        exp_bijector.Log(validate_args=self.validate_args),
+        softplus_bijector.Softplus(validate_args=self.validate_args)
+    ], validate_args=self.validate_args)
 
   def _sample_control_dependencies(self, x):
     assertions = []

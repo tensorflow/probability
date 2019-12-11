@@ -506,6 +506,29 @@ class JointDistributionSequentialTest(test_util.TestCase):
         joint.log_prob(
             joint.sample(batch_shape, seed=test_util.test_seed())).shape)
 
+  def test_default_event_space_bijector(self):
+    joint = tfd.JointDistributionSequential(
+        [
+            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
+            tfd.HalfNormal(2.5),
+            tfd.Exponential(2),
+        ],
+        validate_args=True)
+    self.assertTrue(isinstance(b, tfp.bijectors.Bijector)
+                    for b in joint._experimental_default_event_space_bijector())
+
+    joint = tfd.JointDistributionSequential(
+        [
+            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),          # 0
+            lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),  # 1
+            tfd.HalfNormal(2.5),                                           # 2
+        ],
+        validate_args=True)
+
+    with self.assertRaisesRegex(
+        NotImplementedError, 'all elements of `model` are `tfp.distribution`s'):
+      joint._experimental_default_event_space_bijector()
+
 
 class ResolveDistributionNamesTest(test_util.TestCase):
 

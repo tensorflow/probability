@@ -365,6 +365,9 @@ class DirichletMultinomial(distribution.Distribution):
     c0 = self._compute_total_concentration(concentration)[..., tf.newaxis]
     return tf.sqrt((1. + c0 / total_count[..., tf.newaxis]) / (1. + c0))
 
+  def _default_event_space_bijector(self):
+    return
+
   def _sample_control_dependencies(self, x):
     """Checks the validity of a sample."""
     assertions = []

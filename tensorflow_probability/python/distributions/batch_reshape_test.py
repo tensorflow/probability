@@ -606,6 +606,18 @@ class _BatchReshapeTest(object):
       with tf.control_dependencies([batch_shape.assign([-1, -1])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  def test_default_event_space_bijector(self):
+    dist = tfd.Chi2([1., 2., 3., 6.], validate_args=True)
+    batch_shape = [2, 2, 1]
+    reshape_dist = tfd.BatchReshape(dist, batch_shape, validate_args=True)
+    x = self.evaluate(
+        dist._experimental_default_event_space_bijector()(
+            10. * tf.ones(dist.batch_shape)))
+    x_reshape = self.evaluate(
+        reshape_dist._experimental_default_event_space_bijector()(
+            10. * tf.ones(reshape_dist.batch_shape)))
+    self.assertAllEqual(tf.reshape(x, batch_shape), x_reshape)
+
 
 @test_util.test_all_tf_execution_regimes
 class BatchReshapeStaticTest(_BatchReshapeTest, test_util.TestCase):

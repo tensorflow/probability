@@ -25,6 +25,7 @@ import collections
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 
@@ -539,6 +540,33 @@ class JointDistributionNamedTest(test_util.TestCase):
     self.assertEqual(ds['y'].parameters['df'], s['df'])
     self.assertEqual(ds['y'].parameters['loc'], s['loc'])
     self.assertEqual(ds['y'].parameters['scale'], s['scale'])
+
+  def test_default_event_space_bijector(self):
+    # pylint: disable=bad-whitespace
+    d = tfd.JointDistributionNamed(dict(
+        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
+        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+        s    =          tfd.HalfNormal(2.5),
+        loc  =lambda s: tfd.Normal(loc=0, scale=s),
+        df   =          tfd.Exponential(2),
+        x    =          tfd.StudentT),
+                                   validate_args=True)
+    # pylint: enable=bad-whitespace
+    with self.assertRaisesRegex(
+        NotImplementedError, 'all elements of `model` are `tfp.distribution`s'):
+      d._experimental_default_event_space_bijector()
+
+    d = tfd.JointDistributionNamed(
+        dict(e=tfd.Independent(tfd.Exponential(rate=[10, 12]), 1),
+             x=tfd.Normal(loc=1, scale=1.),
+             s=tfd.HalfNormal(2.5)),
+        validate_args=True)
+    self.assertTrue(isinstance(b, tfb.Bijector)
+                    for b in d._model_flatten(
+                        d._experimental_default_event_space_bijector()))
+    self.assertSetEqual(set(d.model.keys()),
+                        set(d._experimental_default_event_space_bijector(
+                            ).keys()))
 
 
 if __name__ == '__main__':

@@ -386,6 +386,15 @@ class KumaraswamyTest(test_util.TestCase):
       with tf.control_dependencies([x.assign(-1.)]):
         self.evaluate(dist.event_shape_tensor())
 
+  def testSupportBijectorOutsideRange(self):
+    a = np.array([1., 2., 3.])
+    b = np.array([2., 4., 1.2])
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
+    eps = 1e-6
+    x = np.array([-2.3, -eps, 1. + eps, 1.4])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
 
 if __name__ == '__main__':
   tf.test.main()

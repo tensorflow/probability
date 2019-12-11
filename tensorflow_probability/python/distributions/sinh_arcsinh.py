@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import affine_scalar as affine_scalar_bijector
 from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import sinh_arcsinh as sinh_arcsinh_bijector
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -211,3 +212,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
   def skewness(self):
     """Controls the skewness.  `Skewness > 0` means right skew."""
     return self._skewness
+
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector.
+    return identity_bijector.Identity(validate_args=self.validate_args)

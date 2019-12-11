@@ -24,6 +24,7 @@ import warnings
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multivariate_student_t
 from tensorflow_probability.python.distributions import student_t
@@ -480,6 +481,9 @@ class StudentTProcess(distribution.Distribution):
 
   def _mode(self, index_points=None):
     return self.get_marginal_distribution(index_points).mode()
+
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

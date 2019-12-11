@@ -21,7 +21,9 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import exp as exp_bijector
+from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
@@ -383,6 +385,14 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
 
     return assertions
 
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector.
+    return chain_bijector.Chain([
+        exp_bijector.Log(validate_args=self.validate_args),
+        softmax_centered_bijector.SoftmaxCentered(
+            validate_args=self.validate_args),
+    ], validate_args=self.validate_args)
+
 
 class RelaxedOneHotCategorical(
     transformed_distribution.TransformedDistribution):
@@ -496,6 +506,7 @@ class RelaxedOneHotCategorical(
 
     super(RelaxedOneHotCategorical, self).__init__(dist,
                                                    exp_bijector.Exp(),
+                                                   validate_args=validate_args,
                                                    name=name)
 
   @property
@@ -529,3 +540,7 @@ class RelaxedOneHotCategorical(
   def probs_parameter(self, name=None):
     """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
     return self.distribution.probs_parameter(name)
+
+  def _default_event_space_bijector(self):
+    return softmax_centered_bijector.SoftmaxCentered(
+        validate_args=self.validate_args)

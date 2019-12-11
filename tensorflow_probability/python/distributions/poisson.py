@@ -235,6 +235,9 @@ class Poisson(distribution.Distribution):
   def _log_rate_deprecated_behavior(self):
     return self.log_rate_parameter()
 
+  def _default_event_space_bijector(self):
+    return
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []

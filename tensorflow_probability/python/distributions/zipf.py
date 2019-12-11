@@ -315,6 +315,9 @@ class Zipf(distribution.Distribution):
     t = power - 1.
     return tf.math.expm1(-(tf.math.log(t) + tf.math.log(x)) / t)
 
+  def _default_event_space_bijector(self):
+    return
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []

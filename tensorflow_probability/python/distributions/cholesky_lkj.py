@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import correlation_cholesky as correlation_cholesky_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import lkj
 from tensorflow_probability.python.internal import assert_util
@@ -229,6 +230,10 @@ class CholeskyLKJ(distribution.Distribution):
                                    (self.dimension - 1 - k) / 2.)
         ans = ans - tf.math.lgamma(concentration + (self.dimension - 1) / 2.)
       return ans
+
+  def _default_event_space_bijector(self):
+    return correlation_cholesky_bijector.CorrelationCholesky(
+        validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

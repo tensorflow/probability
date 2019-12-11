@@ -180,6 +180,16 @@ class VectorExponentialDiagTest(test_util.TestCase):
     self.assertAllClose(
         np.array([[3., 2, 1], [4., 5, 6]]), self.evaluate(vex.stddev()))
 
+  def testSupportBijectorOutsideRange(self):
+    vex = tfd.VectorExponentialDiag(
+        loc=tf.ones([3], dtype=tf.float32),
+        scale_diag=[[3., 2., 1.], [4., 5., 6.]],
+        validate_args=True)
+    x = np.array([[-8.3, -0.4, -1e-6]])
+    bijector_inverse_x = vex._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
+
 
 if __name__ == '__main__':
   tf.test.main()

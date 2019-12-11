@@ -253,6 +253,15 @@ class GammaGammaTest(test_util.TestCase):
     self.assertAllClose(
         self.evaluate(gg.mean()), sample_values.mean(axis=0), rtol=.02)
 
+  def testSupportBijectorOutsideRange(self):
+    dist = tfd.GammaGamma(
+        concentration=[3., 2., 5.4],
+        mixing_concentration=2.,
+        mixing_rate=1.,
+        validate_args=True)
+    with self.assertRaisesOpError('must be greater than 0'):
+      dist._experimental_default_event_space_bijector(
+          ).inverse([-4.2, -0.3, -1e-6])
 
 if __name__ == '__main__':
   tf.test.main()

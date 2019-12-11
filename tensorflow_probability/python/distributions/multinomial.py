@@ -297,6 +297,9 @@ class Multinomial(distribution.Distribution):
       return tf.identity(self._probs)
     return tf.math.softmax(self._logits)
 
+  def _default_event_space_bijector(self):
+    return
+
   def _sample_control_dependencies(self, counts):
     """Check counts for proper shape, values, then return tensor version."""
     assertions = []

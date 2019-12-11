@@ -772,6 +772,10 @@ class VectorDiffeomixture(distribution_lib.Distribution):
         axis=0)
     return tf.reshape(p, shape=expand_shape)
 
+  # TODO(b/145620027) Finalize choice of bijector, if any.
+  # def _default_event_space_bijector(self):
+  #   return
+
 
 def maybe_check_quadrature_param(param, name, validate_args):
   """Helper which checks validity of `loc` and `scale` init args."""

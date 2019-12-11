@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import gumbel_cdf as gumbel_cdf_bijector
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -195,6 +196,11 @@ class Gumbel(transformed_distribution.TransformedDistribution):
 
   def _mode(self):
     return self.loc * tf.ones_like(self.scale)
+
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector. Consider switching to
+    # Chain([Softplus(), Log()]) to lighten the doubly-exponential right tail.
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     return self._gumbel_bijector._parameter_control_dependencies(is_init)  # pylint: disable=protected-access

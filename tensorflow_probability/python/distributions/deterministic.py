@@ -151,6 +151,9 @@ class _BaseDeterministic(distribution.Distribution):
                    self._event_shape_tensor(loc=loc)],
                   axis=0))
 
+  def _default_event_space_bijector(self):
+    return
+
   def _parameter_control_dependencies(self, is_init):
     assertions = []
 

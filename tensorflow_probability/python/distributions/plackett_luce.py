@@ -248,6 +248,9 @@ class PlackettLuce(distribution.Distribution):
     with self._name_and_control_scope(name or 'scores_parameter'):
       return tf.identity(self._scores)
 
+  def _default_event_space_bijector(self):
+    return
+
   def _sample_control_dependencies(self, x):
     assertions = []
     if not self.validate_args:

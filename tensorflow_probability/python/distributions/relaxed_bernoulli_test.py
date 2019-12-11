@@ -260,5 +260,15 @@ class RelaxedBernoulliFromVariableTest(test_util.TestCase):
           'Argument `temperature` must be positive.'):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  def testSupportBijectorOutsideRange(self):
+    probs = np.array([0.45, 0.07, 0.32, 0.99])
+    temp = 1.
+    dist = tfd.RelaxedBernoulli(temp, probs=probs, validate_args=True)
+    eps = 1e-6
+    x = np.array([-2.3, -eps, 1. + eps, 1.4])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
+
 if __name__ == '__main__':
   tf.test.main()

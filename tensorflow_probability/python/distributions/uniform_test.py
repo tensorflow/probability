@@ -359,6 +359,28 @@ class UniformTest(test_util.TestCase):
       with tf.control_dependencies([low.assign(2.)]):
         self.evaluate(uniform.mean())
 
+  def testSupportBijectorOutsideRange(self):
+    low = np.array([1., 2., 3., -5.])
+    high = np.array([6., 7., 6., 1.])
+    dist = tfd.Uniform(low=low, high=high, validate_args=False)
+    eps = 1e-6
+    x = np.array([1. - eps, 1.5, 6. + eps, -5. - eps])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
+
+  def testDeferredBijectorParameters(self):
+    low = tf.Variable(2.)
+    high = tf.Variable(7.)
+    dist = tfd.Uniform(low, high, validate_args=True)
+
+    shift = dist._experimental_default_event_space_bijector().bijectors[0].shift
+    scale = dist._experimental_default_event_space_bijector().bijectors[1].scale
+    self.evaluate([low.initializer, high.initializer])
+    self.assertIsNone(tf.get_static_value(shift))
+    self.assertIsNone(tf.get_static_value(scale))
+    self.assertEqual(self.evaluate(tf.convert_to_tensor(scale)), 5.)
+    self.assertEqual(self.evaluate(tf.convert_to_tensor(shift)), 2.)
 
 if __name__ == '__main__':
   tf.test.main()

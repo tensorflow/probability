@@ -1288,6 +1288,31 @@ class Distribution(_BaseDistribution):
     # must ensure that assertions are applied for both `self` and `other`.
     return self._kl_divergence(other)
 
+  def _default_event_space_bijector(self):
+    raise NotImplementedError(
+        '_default_event_space_bijector` is not implemented: {}'.format(
+            type(self).__name__))
+
+  def _experimental_default_event_space_bijector(self):
+    """Bijector mapping the reals (R**n) to the event space of the distribution.
+
+    Returns:
+      event_space_bijector: `Bijector` instance or `None`.
+
+    Distributions with continuous support have a
+    `_default_event_space_bijector`, a subclass of `tfp.bijectors.Bijector`
+    that maps R**n to the distribution's event space. For example, the
+    `_default_event_space_bijector` of the `Beta` distribution is
+    `tfb.Sigmoid()`, which maps the real line to `[0, 1]`, the support of the
+    `Beta` distribution. The purpose of `_default_event_space_bijector` is
+    to enable gradient descent in an unconstrained space for Variational
+    Inference and Hamiltonian Monte Carlo methods. An effort has been made to
+    choose bijectors such that the tails of the distribution in the
+    unconstrained space are between Gaussian and Exponential. For distributions
+    with discrete event space, `_default_event_space_bijector` returns `None`.
+    """
+    return self._default_event_space_bijector()
+
   def __str__(self):
     if self.batch_shape:
       maybe_batch_shape = ', batch_shape=' + _str_tensorshape(self.batch_shape)

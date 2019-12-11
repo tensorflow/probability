@@ -313,10 +313,10 @@ class ParetoTest(test_util.TestCase):
         atol=0)
 
   def testParetoParetoKLFinite(self):
-    a_scale = np.arange(1.0, 5.0)
-    a_concentration = 1.0
-    b_scale = 1.0
-    b_concentration = np.arange(2.0, 10.0, 2)
+    a_scale = np.arange(1., 5.)
+    a_concentration = 1.
+    b_scale = 1.
+    b_concentration = np.arange(2., 10., 2)
 
     a = tfd.Pareto(
         concentration=a_concentration, scale=a_scale, validate_args=True)
@@ -325,7 +325,7 @@ class ParetoTest(test_util.TestCase):
 
     true_kl = (b_concentration * (np.log(a_scale) - np.log(b_scale)) +
                np.log(a_concentration) - np.log(b_concentration) +
-               b_concentration / a_concentration - 1.0)
+               b_concentration / a_concentration - 1.)
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(
@@ -342,8 +342,8 @@ class ParetoTest(test_util.TestCase):
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
   def testParetoParetoKLInfinite(self):
-    a = tfd.Pareto(concentration=1.0, scale=1.0, validate_args=True)
-    b = tfd.Pareto(concentration=1.0, scale=2.0, validate_args=True)
+    a = tfd.Pareto(concentration=1.0, scale=1., validate_args=True)
+    b = tfd.Pareto(concentration=1.0, scale=2., validate_args=True)
 
     kl = tfd.kl_divergence(a, b)
     kl_ = self.evaluate(kl)
@@ -352,7 +352,7 @@ class ParetoTest(test_util.TestCase):
   def testConcentrationVariable(self):
     c = tf.Variable([1., 2.])
     self.evaluate(c.initializer)
-    d = tfd.Pareto(concentration=c, scale=1.0, validate_args=True)
+    d = tfd.Pareto(concentration=c, scale=1., validate_args=True)
     self.assertIs(d.concentration, c)
     self.evaluate(d.mean())
     with self.assertRaisesOpError('`concentration` must be positive'):
@@ -362,12 +362,21 @@ class ParetoTest(test_util.TestCase):
   def testScaleVariable(self):
     s = tf.Variable([1., 2.])
     self.evaluate(s.initializer)
-    d = tfd.Pareto(concentration=1.0, scale=s, validate_args=True)
+    d = tfd.Pareto(concentration=1., scale=s, validate_args=True)
     self.assertIs(d.scale, s)
     self.evaluate(d.mean())
     with self.assertRaisesOpError('`scale` must be positive'):
       with tf.control_dependencies([s.assign([-1, 2.])]):
         self.evaluate(d.mean())
+
+  def testSupportBijectorOutsideRange(self):
+    dist = tfd.Pareto(
+        concentration=1., scale=[2., 5., 12.], validate_args=True)
+    eps = 1e-6
+    x = np.array([[2. - eps, 5. - eps, 12. - eps], [-0.5, 2.3, 10.]])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
 
 
 if __name__ == '__main__':

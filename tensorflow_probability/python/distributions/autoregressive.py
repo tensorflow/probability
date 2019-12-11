@@ -294,3 +294,8 @@ class Autoregressive(distribution.Distribution):
             self._num_steps, message='Argument `num_steps` must be positive'))
 
     return assertions
+
+  # pylint: disable=protected-access
+  def _default_event_space_bijector(self):
+    return self._get_distribution0(
+        )._experimental_default_event_space_bijector()

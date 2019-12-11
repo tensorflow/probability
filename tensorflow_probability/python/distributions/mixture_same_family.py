@@ -515,6 +515,10 @@ class MixtureSameFamily(distribution.Distribution):
           log_posterior_weights_x, axis=component_axis)
       return tf.reduce_sum(posterior_weights_x * cdf_x, axis=component_axis)
 
+  def _default_event_space_bijector(self):
+    return (self.components_distribution  # pylint: disable=protected-access
+            ._experimental_default_event_space_bijector())
+
   def _parameter_control_dependencies(self, is_init):
     assertions = []
 

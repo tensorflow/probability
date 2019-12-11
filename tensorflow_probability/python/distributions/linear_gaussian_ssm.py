@@ -25,6 +25,7 @@ import functools
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import util
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import mvn_tril
@@ -1267,6 +1268,9 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           observation_covs, source_idx=0, dest_idx=-3)
 
       return observation_means, observation_covs
+
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _sample_control_dependencies(self, x, mask=None):
     # Check event shape statically if possible

@@ -23,6 +23,7 @@ import functools
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -264,6 +265,9 @@ class GammaGamma(distribution.Distribution):
               mixing_concentration,
               message='variance undefined when `mixing_concentration` <= 2')]):
         return tf.identity(variance)
+
+  def _default_event_space_bijector(self):
+    return exp_bijector.Exp(validate_args=self.validate_args)
 
   def _sample_control_dependencies(self, x):
     dtype_util.assert_same_float_dtype(tensors=[x], dtype=self.dtype)

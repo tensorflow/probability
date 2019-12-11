@@ -22,6 +22,9 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import exp as exp_bijector
+from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -190,6 +193,13 @@ class HalfCauchy(distribution.Distribution):
   def _get_safe_input(self, x, loc, scale):
     safe_value = 0.5 * scale + loc
     return tf.where(x < loc, safe_value, x)
+
+  def _default_event_space_bijector(self):
+    return chain_bijector.Chain([
+        shift_bijector.Shift(
+            shift=self.loc, validate_args=self.validate_args),
+        exp_bijector.Exp(validate_args=self.validate_args)
+    ], validate_args=self.validate_args)
 
   def _sample_control_dependencies(self, x):
     """Checks the validity of a sample."""

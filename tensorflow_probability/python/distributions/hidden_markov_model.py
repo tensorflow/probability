@@ -1006,6 +1006,12 @@ class HiddenMarkovModel(distribution.Distribution):
               _reduce_multiple_steps,
               lambda: tf.argmax(log_prob, axis=-1)[..., tf.newaxis])
 
+  # pylint: disable=protected-access
+  def _default_event_space_bijector(self):
+    return (self._observation_distribution.
+            _experimental_default_event_space_bijector())
+  # pylint: enable=protected-access
+
 
 def _log_vector_matrix(vs, ms):
   """Multiply tensor of vectors by matrices assuming values stored are logs."""

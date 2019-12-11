@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -289,6 +290,11 @@ class Dirichlet(distribution.Distribution):
     ]
     with tf.control_dependencies(assertions):
       return tf.identity(mode)
+
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector.
+    return softmax_centered_bijector.SoftmaxCentered(
+        validate_args=self.validate_args)
 
   def _sample_control_dependencies(self, x):
     """Checks the validity of a sample."""

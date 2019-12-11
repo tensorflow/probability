@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -256,6 +257,9 @@ class Gamma(distribution.Distribution):
           concentration > 1.,
           mode,
           dtype_util.as_numpy_dtype(self.dtype)(np.nan))
+
+  def _default_event_space_bijector(self):
+    return softplus_bijector.Softplus(validate_args=self.validate_args)
 
   def _sample_control_dependencies(self, x):
     assertions = []

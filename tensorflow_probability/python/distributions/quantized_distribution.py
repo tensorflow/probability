@@ -521,6 +521,9 @@ class QuantizedDistribution(distributions.Distribution):
 
     return result_so_far
 
+  def _default_event_space_bijector(self):
+    return
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []

@@ -107,6 +107,9 @@ class LogNormal(transformed_distribution.TransformedDistribution):
         x, message='Sample must be non-negative.'))
     return assertions
 
+  def _default_event_space_bijector(self):
+    return exp_bijector.Exp(validate_args=self.validate_args)
+
 
 @kullback_leibler.RegisterKL(LogNormal, LogNormal)
 def _kl_lognormal_lognormal(a, b, name=None):

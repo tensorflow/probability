@@ -22,6 +22,10 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import invert as invert_bijector
+from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
+from tensorflow_probability.python.bijectors import square as square_bijector
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -504,6 +508,16 @@ class VonMisesFisher(distribution.Distribution):
       ]):
         return self._rotate(samples, mean_direction=mean_direction)
     return self._rotate(samples, mean_direction=mean_direction)
+
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector.
+    return chain_bijector.Chain([
+        invert_bijector.Invert(
+            square_bijector.Square(validate_args=self.validate_args),
+            validate_args=self.validate_args),
+        softmax_centered_bijector.SoftmaxCentered(
+            validate_args=self.validate_args)
+    ], validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

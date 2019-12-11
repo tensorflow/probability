@@ -290,6 +290,14 @@ class GeneralizedPareto(distribution.Distribution):
   def _entropy(self):
     return tf.math.log(self.scale) + self.concentration + 1
 
+  # TODO(b/145620027): Determine the correct bijector. Might have to
+  # implement a new bijector that returns shifted softmax if
+  # concentration >= 0, shifted/scaled sigmoid if concentration < 0.
+  # valid = (x >= loc) & ((concentration >= 0) |
+  #                   (x <= loc - scale / concentration))
+  # def _default_event_space_bijector(self):
+    # return
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []

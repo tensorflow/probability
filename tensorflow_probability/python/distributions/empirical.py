@@ -331,6 +331,9 @@ class Empirical(distribution.Distribution):
       prob = tf.cast(prob, self.dtype)
     return prob
 
+  def _default_event_space_bijector(self):
+    return
+
   def _parameter_control_dependencies(self, is_init):
     assertions = []
 

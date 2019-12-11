@@ -157,6 +157,13 @@ class ChiTest(test_util.TestCase):
       with tf.control_dependencies([df.assign([1., 2., -3.])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  def testSupportBijectorOutsideRange(self):
+    df = np.array([2., 4., 7.])
+    dist = tfd.Chi(df, validate_args=True)
+    x = np.array([-8.3, -0.4, -1e-6])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
 
 if __name__ == '__main__':
   tf.test.main()

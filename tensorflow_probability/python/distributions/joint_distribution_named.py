@@ -22,6 +22,7 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import joint_distribution_sequential
 from tensorflow_probability.python.internal import distribution_util
 
@@ -208,6 +209,17 @@ class JointDistributionNamed(
 
   def _flat_resolve_names(self, distribution_names=None, leaf_name='x'):
     return self._dist_fn_name
+
+  def _default_event_space_bijector(self):
+    if not all(
+        isinstance(d, distribution_lib.Distribution) for d in self._dist_fn):
+      raise NotImplementedError(
+          '_default_event_space_bijector` is implemented only for instances'
+          ' of `JointDistributionNamed` for which all elements of `model` are '
+          '`tfp.distribution`s (not callables).')
+    flat_bijectors = (d._experimental_default_event_space_bijector()  # pylint: disable=protected-access
+                      for d in self._model_flatten(self.model))
+    return self._model_unflatten(flat_bijectors)
 
 
 class _Node(object):

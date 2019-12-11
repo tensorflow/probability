@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import half_cauchy
 from tensorflow_probability.python.internal import assert_util
@@ -223,6 +224,10 @@ class Horseshoe(distribution.Distribution):
                      dtype_util.as_numpy_dtype(self.dtype)(np.nan))
     raise ValueError(
         '`variance` is undefined for Horseshoe distribution.')
+
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector.
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

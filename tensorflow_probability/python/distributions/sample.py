@@ -238,6 +238,9 @@ class Sample(distribution_lib.Distribution):
   _variance = _make_summary_statistic('variance')
   _mode = _make_summary_statistic('mode')
 
+  def _default_event_space_bijector(self):
+    return self.distribution._experimental_default_event_space_bijector()  # pylint: disable=protected-access
+
   def _parameter_control_dependencies(self, is_init):
     assertions = []
     sample_shape = None  # Memoize concretization.

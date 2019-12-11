@@ -787,6 +787,10 @@ class TransformedDistribution(distribution_lib.Distribution):
                 True, message=msg))
     return assertions
 
+  def _default_event_space_bijector(self):
+    return self.bijector(  # pylint: disable=not-callable
+        self.distribution._experimental_default_event_space_bijector())  # pylint: disable=protected-access, not-callable
+
   def _parameter_control_dependencies(self, is_init):
     assertions = []
 

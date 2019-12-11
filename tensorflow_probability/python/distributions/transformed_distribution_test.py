@@ -751,6 +751,16 @@ class ScalarToMultiTest(test_util.TestCase):
           Exception, 'Base distribution is not scalar'):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  def testSupportBijectorOutsideRange(self):
+    log_normal = tfd.TransformedDistribution(
+        distribution=tfd.Normal(loc=1., scale=2.),
+        bijector=tfb.Exp(),
+        validate_args=True)
+    x = np.array([-4.2, -1e-6, -1.3])
+    bijector_inverse_x = (
+        log_normal._experimental_default_event_space_bijector().inverse(x))
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
+
 
 @test_util.test_all_tf_execution_regimes
 class ExcessiveConcretizationTest(test_util.TestCase):

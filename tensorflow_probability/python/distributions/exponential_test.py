@@ -225,5 +225,13 @@ class ExponentialTest(test_util.TestCase):
     result = self.evaluate(exponential.cdf(exponential.quantile(values)))
     self.assertAllClose(result, values)
 
+  def testSupportBijectorOutsideRange(self):
+    rate = np.array([2., 4., 5.])
+    dist = tfd.Exponential(rate, validate_args=True)
+    x = np.array([-8.3, -0.4, -1e-6])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
+
 if __name__ == "__main__":
   tf.test.main()

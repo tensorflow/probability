@@ -294,6 +294,18 @@ class DirichletTest(test_util.TestCase):
     self.assertAllEqual(np.zeros(batch_shape)[1:0].shape,
                         d[1:0].batch_shape)
 
+  def testSupportBijectorOutsideRange(self):
+    conc = np.array([2., 4, 5])
+    dist = tfd.Dirichlet(conc, validate_args=True)
+    eps = 1e-5
+    with self.assertRaisesOpError('must sum to `1`'):
+      self.evaluate(dist._experimental_default_event_space_bijector(
+          ).inverse([0.2, 0.5 + eps, 0.3]))
+
+    with self.assertRaisesOpError('must be non-negative|must sum to `1`'):
+      self.evaluate(dist._experimental_default_event_space_bijector(
+          ).inverse([0.7, 0.3, -eps]))
+
 
 @test_util.test_all_tf_execution_regimes
 class DirichletFromVariableTest(test_util.TestCase):

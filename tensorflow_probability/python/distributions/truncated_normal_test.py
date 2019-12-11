@@ -385,6 +385,34 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     batch_lp_, pfor_lp_ = self.evaluate((batch_lp, pfor_lp))
     self.assertAllClose(batch_lp_, pfor_lp_, atol=1e-6)
 
+  def testSupportBijectorOutsideRange(self):
+    low = np.array([1., 2., 3., -5.]).astype(np.float32)
+    loc = np.array([4., 4., 4., -2.]).astype(np.float32)
+    high = np.array([6., 7., 6., 1.]).astype(np.float32)
+    dist = tfd.TruncatedNormal(
+        loc, scale=2., low=low, high=high, validate_args=False)
+    eps = 1e-6
+    x = np.array([1. - eps, 1.5, 6. + eps, -5. - eps]).astype(np.float32)
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
+
+  def testDeferredBijectorParameters(self):
+    loc = np.array([1., 3.]).astype(np.float32)
+    scale = 1.
+    low = tf.Variable(2.)
+    high = tf.Variable(7.)
+    dist = tfd.TruncatedNormal(
+        loc, scale, low=low, high=high, validate_args=True)
+
+    shift = dist._experimental_default_event_space_bijector().bijectors[0].shift
+    scale = dist._experimental_default_event_space_bijector().bijectors[1].scale
+    self.evaluate([low.initializer, high.initializer])
+    self.assertIsNone(tf.get_static_value(shift))
+    self.assertIsNone(tf.get_static_value(scale))
+    self.assertEqual(self.evaluate(tf.convert_to_tensor(scale)), 5.)
+    self.assertEqual(self.evaluate(tf.convert_to_tensor(shift)), 2.)
+
 
 @test_util.test_all_tf_execution_regimes
 @parameterized.parameters(

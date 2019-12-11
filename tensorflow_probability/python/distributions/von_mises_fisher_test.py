@@ -389,6 +389,24 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     with shape_assertion:
       self.evaluate(vmf.log_prob(x_var))
 
+  def testSupportBijectorOutsideRange(self):
+    mean_dir = np.array([[1., 2., 3.], [-2., -3., -1.]]).astype(np.float32)
+    mean_dir /= np.linalg.norm(mean_dir, axis=-1)[:, np.newaxis]
+    concentration = [[0], [0.1], [2], [40], [1000]]
+    dist = tfp.distributions.VonMisesFisher(
+        mean_direction=mean_dir,
+        concentration=concentration,
+        validate_args=True)
+
+    x = mean_dir
+    x[0][0] += 0.01
+    with self.assertRaisesOpError('must sum to `1`'):
+      self.evaluate(
+          dist._experimental_default_event_space_bijector().inverse(x[0]))
+
+    with self.assertRaisesOpError('must be non-negative'):
+      self.evaluate(
+          dist._experimental_default_event_space_bijector().inverse(x[1]))
 
 if __name__ == '__main__':
   tf.test.main()

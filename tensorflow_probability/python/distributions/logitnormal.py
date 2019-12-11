@@ -137,6 +137,9 @@ class LogitNormal(transformed_distribution.TransformedDistribution):
   #   with tf.name_scope(name):
   #     return tf.math.sqrt(self.variance_approx())
 
+  def _default_event_space_bijector(self):
+    return sigmoid_bijector.Sigmoid(validate_args=self.validate_args)
+
   def _sample_control_dependencies(self, x):
     assertions = []
     if not self.validate_args:

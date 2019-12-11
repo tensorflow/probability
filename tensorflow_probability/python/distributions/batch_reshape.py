@@ -252,6 +252,9 @@ class BatchReshape(distribution_lib.Distribution):
         [self.event_shape]*2,
         extra_kwargs=kwargs)
 
+  def _default_event_space_bijector(self):
+    return self.distribution._experimental_default_event_space_bijector()  # pylint: disable=protected-access
+
   def _sample_shape(self, x):
     """Computes graph and static `sample_shape`."""
     x_ndims = (

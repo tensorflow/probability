@@ -23,6 +23,11 @@ import math
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import cholesky_outer_product as cholesky_outer_product_bijector
+from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
+from tensorflow_probability.python.bijectors import transform_diagonal as transform_diagonal_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -420,6 +425,24 @@ class WishartLinearOperator(distribution.Distribution):
             tf.compat.dimension_value(self._scale.shape[-1]),
             dtype=self._scale.dtype,
             name='dimension')
+
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector.
+    tril_bijector = chain_bijector.Chain([
+        transform_diagonal_bijector.TransformDiagonal(
+            diag_bijector=softplus_bijector.Softplus(
+                validate_args=self.validate_args),
+            validate_args=self.validate_args),
+        fill_scale_tril_bijector.FillScaleTriL(
+            validate_args=self.validate_args)
+    ], validate_args=self.validate_args)
+    if self.input_output_cholesky:
+      return tril_bijector
+    return chain_bijector.Chain([
+        cholesky_outer_product_bijector.CholeskyOuterProduct(
+            validate_args=self.validate_args),
+        tril_bijector
+    ], validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

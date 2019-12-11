@@ -22,6 +22,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import invert as invert_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.bijectors import square as square_bijector
 from tensorflow_probability.python.distributions import chi2
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -118,6 +119,9 @@ class Chi(transformed_distribution.TransformedDistribution):
     return (tf.math.lgamma(0.5 * df) +
             0.5 * (df - np.log(2.) -
                    (df - 1.) * tf.math.digamma(0.5 * df)))
+
+  def _default_event_space_bijector(self):
+    return softplus_bijector.Softplus(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

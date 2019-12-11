@@ -270,6 +270,10 @@ class RelaxedBernoulli(distribution.Distribution):
   def _log_cdf(self, y, **kwargs):
     return self._transformed_logistic().log_cdf(y, **kwargs)
 
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector.
+    return sigmoid_bijector.Sigmoid(validate_args=self.validate_args)
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []

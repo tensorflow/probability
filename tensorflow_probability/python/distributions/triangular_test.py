@@ -364,6 +364,31 @@ class _TriangularTest(object):
       with tf.control_dependencies([low.assign(0.), peak.assign(1.2)]):
         self.evaluate(triangular.mean())
 
+  def testSupportBijectorOutsideRange(self):
+    low = np.array([1., 2., 3.])
+    peak = np.array([4., 4., 4.])
+    high = np.array([6., 7., 6.])
+    dist = tfd.Triangular(low, high, peak, validate_args=False)
+    eps = 1e-6
+    x = np.array([1. - eps, 1.5, 6. + eps])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
+
+  def testDeferredBijectorParameters(self):
+    low = tf.Variable(2.)
+    high = tf.Variable(7.)
+    peak = 3.
+    dist = tfd.Triangular(low, high, peak, validate_args=True)
+
+    shift = dist._experimental_default_event_space_bijector().bijectors[0].shift
+    scale = dist._experimental_default_event_space_bijector().bijectors[1].scale
+    self.evaluate([low.initializer, high.initializer])
+    self.assertIsNone(tf.get_static_value(shift))
+    self.assertIsNone(tf.get_static_value(scale))
+    self.assertEqual(self.evaluate(tf.convert_to_tensor(scale)), 5.)
+    self.assertEqual(self.evaluate(tf.convert_to_tensor(shift)), 2.)
+
 
 @test_util.test_all_tf_execution_regimes
 class TriangularTestStaticShape(test_util.TestCase, _TriangularTest):

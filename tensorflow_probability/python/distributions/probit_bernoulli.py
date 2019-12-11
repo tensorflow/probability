@@ -186,6 +186,9 @@ class ProbitBernoulli(distribution.Distribution):
       return tf.identity(self._probs)
     return special_math.ndtr(self._probits)
 
+  def _default_event_space_bijector(self):
+    return
+
   def _parameter_control_dependencies(self, is_init):
     return maybe_assert_bernoulli_param_correctness(
         is_init, self.validate_args, self._probs, self._probits)

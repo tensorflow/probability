@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -229,6 +230,9 @@ class DoublesidedMaxwell(distribution.Distribution):
 
   def _stddev(self):
     return np.sqrt(3.) * self.scale * tf.ones_like(self.loc)
+
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

@@ -298,6 +298,9 @@ class Binomial(distribution.Distribution):
       return tf.identity(self._probs)
     return tf.math.sigmoid(self._logits)
 
+  def _default_event_space_bijector(self):
+    return
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []

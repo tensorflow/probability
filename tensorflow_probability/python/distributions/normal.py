@@ -23,6 +23,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -227,6 +228,9 @@ class Normal(distribution.Distribution):
     """Standardize input `x` to a unit normal."""
     with tf.name_scope('standardize'):
       return (x - self.loc) / (self.scale if scale is None else scale)
+
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

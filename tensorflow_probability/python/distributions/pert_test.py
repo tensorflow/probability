@@ -216,6 +216,16 @@ class PERTTest(test_util.TestCase):
     self.assertAllEqual(pdf, np.zeros_like(pdf))
     self.assertAllNegativeInf(log_pdf)
 
+  def testSupportBijectorOutsideRange(self):
+    low = np.array([1., 2., 3.])
+    peak = np.array([4., 4., 4.])
+    high = np.array([6., 7., 6.])
+    dist = tfd.PERT(low, peak, high, validate_args=True)
+    eps = 1e-6
+    x = np.array([1. - eps, 1.5, 6. + eps])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
 
 if __name__ == '__main__':
   tf.test.main()

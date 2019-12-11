@@ -239,6 +239,17 @@ class BlockwiseTest(test_util.TestCase):
     blockwise_kl_, mvn_kl_ = self.evaluate([blockwise_kl, mvn_kl])
     self.assertAllClose(blockwise_kl_, mvn_kl_)
 
+  def testUnconstrainingBijector(self):
+    dist = tfd.Exponential(rate=[1., 2., 6.], validate_args=True)
+    blockwise_dist = tfd.Blockwise(dist, validate_args=True)
+    x = self.evaluate(
+        dist._experimental_default_event_space_bijector()(
+            tf.ones(dist.batch_shape)))
+    x_blockwise = self.evaluate(
+        blockwise_dist._experimental_default_event_space_bijector()(
+            tf.ones(blockwise_dist.batch_shape)))
+    self.assertAllEqual(x, x_blockwise)
+
 
 @test_util.test_all_tf_execution_regimes
 class BlockwiseTestStaticParams(test_util.TestCase):

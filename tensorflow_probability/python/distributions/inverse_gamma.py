@@ -22,6 +22,9 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import reciprocal as reciprocal_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -275,6 +278,12 @@ class InverseGamma(distribution.Distribution):
       1)`.""")
   def _mode(self):
     return self.scale / (1. + self.concentration)
+
+  def _default_event_space_bijector(self):
+    return chain_bijector.Chain([
+        reciprocal_bijector.Reciprocal(validate_args=self.validate_args),
+        softplus_bijector.Softplus(validate_args=self.validate_args)
+    ], validate_args=self.validate_args)
 
   def _sample_control_dependencies(self, x):
     assertions = []

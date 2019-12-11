@@ -387,6 +387,17 @@ class _InverseGaussianTest(object):
       with tf.control_dependencies([loc.assign(-2.), concentration.assign(2.)]):
         self.evaluate(inverse_gaussian.mean())
 
+  def testSupportBijectorOutsideRange(self):
+    dist = tfd.InverseGaussian(
+        loc=[7., 2., 5.],
+        concentration=2.,
+        validate_args=True)
+    eps = 1e-6
+    x = np.array([[-7.2, -eps, -1.3], [-5., -12., -eps]])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
+
 
 class InverseGaussianTestStaticShapeFloat32(test_util.TestCase,
                                             _InverseGaussianTest):

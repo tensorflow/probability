@@ -468,6 +468,10 @@ class Mixture(distribution.Distribution):
       x = self.cat.probs_parameter()
     return tf.unstack(x, num=self.num_components, axis=-1)
 
+  def _default_event_space_bijector(self):
+    return [
+        d._experimental_default_event_space_bijector() for d in self.components]  # pylint: disable=protected-access
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []

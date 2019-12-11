@@ -417,5 +417,13 @@ class GammaTest(test_util.TestCase):
       with tf.control_dependencies([rate.assign([1., 2., -3.])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  def testSupportBijectorOutsideRange(self):
+    dist = tfd.Gamma(
+        concentration=[3.], rate=[3., 2., 5.4], validate_args=True)
+    x = np.array([-4.2, -0.3, -1e-6])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
+
 if __name__ == '__main__':
   tf.test.main()

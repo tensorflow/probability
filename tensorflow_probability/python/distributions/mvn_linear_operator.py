@@ -20,8 +20,9 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
-from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -192,7 +193,8 @@ class MultivariateNormalLinearOperator(
     bijector = scale_matvec_linear_operator.ScaleMatvecLinearOperator(
         scale, validate_args=validate_args)
     if loc is not None:
-      bijector = shift.Shift(shift=loc, validate_args=validate_args)(bijector)
+      bijector = shift_bijector.Shift(
+          shift=loc, validate_args=validate_args)(bijector)
 
     super(MultivariateNormalLinearOperator, self).__init__(
         distribution=normal.Normal(
@@ -298,6 +300,9 @@ class MultivariateNormalLinearOperator(
 
   def _mode(self):
     return self._mean()
+
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     # Nothing to do here.

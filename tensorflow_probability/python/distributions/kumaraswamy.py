@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import kumaraswamy_cdf as kumaraswamy_cdf
+from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import assert_util
@@ -252,6 +253,9 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
             b,
             message='Mode undefined for concentration0 <= 1.')
     ], mode)
+
+  def _default_event_space_bijector(self):
+    return sigmoid_bijector.Sigmoid(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     return self.bijector.bijector._parameter_control_dependencies(is_init)  # pylint: disable=protected-access

@@ -220,6 +220,9 @@ class NegativeBinomial(distribution.Distribution):
     with self._name_and_control_scope(name or 'probs_parameter'):
       return self._probs_parameter_no_checks()
 
+  def _default_event_space_bijector(self):
+    return
+
   def _parameter_control_dependencies(self, is_init):
     return maybe_assert_negative_binomial_param_correctness(
         is_init, self.validate_args, self._total_count, self._probs,

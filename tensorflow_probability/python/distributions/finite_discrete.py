@@ -258,6 +258,9 @@ class FiniteDiscrete(distribution.Distribution):
     with self._name_and_control_scope(name or 'probs_parameter'):
       return self._categorical.probs_parameter()
 
+  def _default_event_space_bijector(self):
+    return
+
   def _parameter_control_dependencies(self, is_init):
     assertions = []
 

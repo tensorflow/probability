@@ -428,6 +428,9 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
     return tf.reduce_logsumexp(
         mixture_dist.logits[..., tf.newaxis] + v, axis=[-2, -1])
 
+  def _default_event_space_bijector(self):
+    return
+
   def _sample_control_dependencies(self, x):
     assertions = []
     if not self.validate_args:

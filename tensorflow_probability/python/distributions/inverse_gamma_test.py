@@ -349,6 +349,15 @@ class InverseGammaTest(test_util.TestCase):
       with tf.control_dependencies([c.assign(0.9), s.assign(-2.)]):
         self.evaluate(inv_gamma.mean())
 
+  def testSupportBijectorOutsideRange(self):
+    dist = tfd.InverseGamma(
+        concentration=[7., 2., 5.],
+        scale=2.,
+        validate_args=True)
+    x = np.array([-7.2, -1e-6, -1.3])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
 
 if __name__ == '__main__':
   tf.test.main()

@@ -24,6 +24,7 @@ import warnings
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
@@ -524,6 +525,9 @@ class GaussianProcess(distribution.Distribution):
 
   def _mode(self, index_points=None):
     return self.get_marginal_distribution(index_points).mode()
+
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
 
 def _assert_kl_compatible(marginal, other):
