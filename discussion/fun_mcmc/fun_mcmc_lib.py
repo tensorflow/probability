@@ -720,9 +720,10 @@ def blanes_3_stage_step(
     target_log_prob_fn: PotentialFn,
     kinetic_energy_fn: PotentialFn,
 ) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
-  """Blanes 4th order integrator `TransitionOperator`.
+  """Blanes 3 stage integrator `TransitionOperator`.
 
-  See [1] for details.
+  This integrator has second order. See [1] for details and [2] for further
+  analysis.
 
   Args:
     integrator_step_state: IntegratorStepState.
@@ -740,6 +741,9 @@ def blanes_3_stage_step(
   [1]: Sergio Blanes, Fernando Casas, J.M. Sanz-Serna. Numerical integrators for
        the Hybrid Monte Carlo method. SIAM J. Sci. Comput., 36(4), 2014.
        https://arxiv.org/pdf/1405.3153.pdf
+
+  [2]: Campos, C. M., & Sanz-Serna, J. M.. Palindromic 3-stage splitting
+       integrators, a roadmap, (8), 2017. https://arxiv.org/pdf/1703.09958.pdf
   """
   a1 = 0.11888010966
   b1 = 0.29619504261
@@ -759,9 +763,9 @@ def blanes_4_stage_step(
     target_log_prob_fn: PotentialFn,
     kinetic_energy_fn: PotentialFn,
 ) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
-  """Blanes 6th order integrator `TransitionOperator`.
+  """Blanes 4 stage integrator `TransitionOperator`.
 
-  See [1] for details.
+  See [1] for details. This integrator likely has second order.
 
   Args:
     integrator_step_state: IntegratorStepState.
