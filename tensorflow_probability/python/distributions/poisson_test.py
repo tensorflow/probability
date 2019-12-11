@@ -307,6 +307,7 @@ class PoissonTest(test_util.TestCase):
     self.assertAllClose(
         sample_values.var(axis=0), stats.poisson.var(lam_v), rtol=.03, atol=0)
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughRate(self):
     rate = tf.Variable(3.)
     dist = self._make_poisson(rate=rate)
@@ -358,6 +359,7 @@ class PoissonLogRateTest(PoissonTest):
 
   # The gradient is not tracked through tf.math.log(rate) in _make_poisson(),
   # so log_rate needs to be defined as a Variable and passed directly.
+  @test_util.tf_tape_safety_test
   def testGradientThroughRate(self):
     log_rate = tf.Variable(3.)
     dist = tfd.Poisson(log_rate=log_rate, validate_args=True)

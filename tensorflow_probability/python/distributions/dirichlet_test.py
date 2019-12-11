@@ -298,6 +298,7 @@ class DirichletTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class DirichletFromVariableTest(test_util.TestCase):
 
+  @test_util.tf_tape_safety_test
   def testGradients(self):
     x = tf.Variable([1., 1.1, 1.2])
     d = tfd.Dirichlet(concentration=x, validate_args=True)

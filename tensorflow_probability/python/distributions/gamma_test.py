@@ -365,8 +365,7 @@ class GammaTest(test_util.TestCase):
     self.assertAllClose(kl_expected, kl_actual_, atol=0., rtol=1e-6)
     self.assertAllClose(kl_sample_, kl_actual_, atol=0., rtol=1e-1)
 
-  @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_variable_test
+  @test_util.tf_tape_safety_test
   def testGradientThroughConcentration(self):
     concentration = tf.Variable(3.)
     d = tfd.Gamma(concentration=concentration, rate=5., validate_args=True)
@@ -392,6 +391,7 @@ class GammaTest(test_util.TestCase):
       with tf.control_dependencies([concentration.assign([1., 2., -3.])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughRate(self):
     rate = tf.Variable(3.)
     d = tfd.Gamma(concentration=1., rate=rate, validate_args=True)

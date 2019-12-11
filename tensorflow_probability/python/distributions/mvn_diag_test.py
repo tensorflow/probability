@@ -320,6 +320,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     p_ = self.evaluate(dist_test.prob(x_))
     self.assertFalse(np.isnan(p_))
 
+  @test_util.tf_tape_safety_test
   def testVariableLocation(self):
     loc = tf.Variable([1., 1.])
     scale_diag = tf.ones(2)
@@ -330,6 +331,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
       lp = d.log_prob([0., 0.])
     self.assertIsNotNone(tape.gradient(lp, loc))
 
+  @test_util.tf_tape_safety_test
   def testVariableScaleDiag(self):
     loc = tf.constant([1., 1.])
     scale_diag = tf.Variable(tf.ones(2))
@@ -340,6 +342,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
       lp = d.log_prob([0., 0.])
     self.assertIsNotNone(tape.gradient(lp, scale_diag))
 
+  @test_util.tf_tape_safety_test
   def testVariableScaleIdentityMultiplier(self):
     loc = tf.constant([1., 1.])
     scale_identity_multiplier = tf.Variable(3.14)

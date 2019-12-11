@@ -110,6 +110,7 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
             self.evaluate(scale.to_dense()),
             np.transpose(self.evaluate(scale.to_dense()), [0, 1, 3, 2])))
 
+  @test_util.tf_tape_safety_test
   def testVariableLocation(self):
     loc = tf.Variable([1., 1.])
     scale = tf.linalg.LinearOperatorLowerTriangular(

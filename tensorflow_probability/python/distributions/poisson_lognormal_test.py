@@ -93,6 +93,7 @@ class _PoissonLogNormalQuadratureCompoundTest(
     self.run_test_sample_consistent_mean_variance(
         self.evaluate, pln, rtol=0.1, atol=0.01)
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughParams(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
         loc=tf.Variable([0., -0.5], shape=[2] if self.static_shape
@@ -106,6 +107,7 @@ class _PoissonLogNormalQuadratureCompoundTest(
     self.assertLen(grad, 2)
     self.assertFalse(any([g is None for g in grad]))
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughNonVariableParams(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
         loc=tf.convert_to_tensor([0., -0.5]),

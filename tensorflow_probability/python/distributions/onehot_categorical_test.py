@@ -308,6 +308,7 @@ class OneHotCategoricalTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class OneHotCategoricalFromVariableTest(test_util.TestCase):
 
+  @test_util.tf_tape_safety_test
   def testGradientLogits(self):
     x = tf.Variable([-1., 0., 1])
     d = tfd.OneHotCategorical(logits=x, validate_args=True)
@@ -317,6 +318,7 @@ class OneHotCategoricalFromVariableTest(test_util.TestCase):
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
 
+  @test_util.tf_tape_safety_test
   def testGradientProbs(self):
     x = tf.Variable([0.1, 0.7, 0.2])
     d = tfd.OneHotCategorical(probs=x, validate_args=True)

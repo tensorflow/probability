@@ -127,6 +127,7 @@ class Chi2Test(test_util.TestCase):
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughParams(self):
     df = tf.Variable(19.43, dtype=tf.float64)
     d = tfd.Chi2(df, validate_args=True)
@@ -136,6 +137,7 @@ class Chi2Test(test_util.TestCase):
     self.assertLen(grad, 1)
     self.assertAllNotNone(grad)
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughNonVariableParams(self):
     df = tf.convert_to_tensor(13.37)
     d = tfd.Chi2(df, validate_args=True)

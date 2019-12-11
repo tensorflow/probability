@@ -288,6 +288,7 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class ExpRelaxedOneHotCategoricalFromVariableTest(test_util.TestCase):
 
+  @test_util.tf_tape_safety_test
   def testGradientLogits(self):
     t = tf.Variable([0.01, 1.])
     logits = tf.Variable([[-1., 0., 1], [3., 3., 3.]])
@@ -298,6 +299,7 @@ class ExpRelaxedOneHotCategoricalFromVariableTest(test_util.TestCase):
     self.assertLen(g, 2)
     self.assertAllNotNone(g)
 
+  @test_util.tf_tape_safety_test
   def testGradientProbs(self):
     t = tf.Variable(0.4)
     probs = tf.Variable([0.1, 0.7, 0.2])

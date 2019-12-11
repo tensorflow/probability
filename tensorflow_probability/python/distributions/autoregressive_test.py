@@ -212,6 +212,7 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
       with tf.control_dependencies([num_steps.assign(-9)]):
         self.evaluate(ar.sample(seed=test_util.test_seed()))
 
+  @test_util.tf_tape_safety_test
   def testGradientsThroughParams(self):
 
     class DistFn(tf.Module):

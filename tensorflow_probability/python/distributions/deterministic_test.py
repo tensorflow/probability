@@ -224,6 +224,7 @@ class DeterministicTest(test_util.TestCase):
     expected_kl_, actual_kl_ = self.evaluate([expected_kl, actual_kl])
     self.assertAllEqual(expected_kl_, actual_kl_)
 
+  @test_util.tf_tape_safety_test
   def testVariableGradients(self):
     loc = tf.Variable(1.)
     deterministic = tfd.Deterministic(loc=loc, validate_args=True)
@@ -423,6 +424,7 @@ class VectorDeterministicTest(test_util.TestCase):
     expected_kl_, actual_kl_ = self.evaluate([expected_kl, actual_kl])
     self.assertAllEqual(expected_kl_, actual_kl_)
 
+  @test_util.tf_tape_safety_test
   def testVariableGradients(self):
     loc = tf.Variable([1., 2.])
     deterministic = tfd.VectorDeterministic(loc=loc, validate_args=True)

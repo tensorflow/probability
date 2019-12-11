@@ -276,6 +276,7 @@ class GeneralizedParetoTest(test_util.TestCase):
           loc=0, scale=scale, concentration=1, validate_args=True)
       self.evaluate(dist.mean())
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughConcentration(self):
     concentration = tf.Variable(3.)
     d = tfd.GeneralizedPareto(
@@ -304,6 +305,7 @@ class GeneralizedParetoTest(test_util.TestCase):
       with tf.control_dependencies([scale.assign([1., 2., -3.])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughLocScale(self):
     loc = tf.Variable(1.)
     scale = tf.Variable(2.5)

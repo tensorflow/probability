@@ -132,6 +132,7 @@ class ChiTest(test_util.TestCase):
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughParams(self):
     df = tf.Variable(19.43, dtype=tf.float64)
     d = tfd.Chi(df, validate_args=True)

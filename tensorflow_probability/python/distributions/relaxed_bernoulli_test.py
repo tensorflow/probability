@@ -201,6 +201,7 @@ class RelaxedBernoulliTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class RelaxedBernoulliFromVariableTest(test_util.TestCase):
 
+  @test_util.tf_tape_safety_test
   def testGradientLogits(self):
     x = tf.Variable([-1., 1])
     self.evaluate(x.initializer)
@@ -211,6 +212,7 @@ class RelaxedBernoulliFromVariableTest(test_util.TestCase):
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
 
+  @test_util.tf_tape_safety_test
   def testGradientProbs(self):
     x = tf.Variable([0.1, 0.7])
     self.evaluate(x.initializer)
@@ -221,6 +223,7 @@ class RelaxedBernoulliFromVariableTest(test_util.TestCase):
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
 
+  @test_util.tf_tape_safety_test
   def testGradientTemperature(self):
     x = tf.Variable([0.2, 2.])
     self.evaluate(x.initializer)

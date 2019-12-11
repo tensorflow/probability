@@ -570,6 +570,7 @@ class TfModuleTest(test_util.TestCase):
     self.assertIsInstance(normal, tf.Module)
     self.assertEqual((scale,), normal.trainable_variables)
 
+  @test_util.tf_tape_safety_test
   def test_gradient(self):
     scale = tf.Variable(1.)
     normal = tfd.Normal(loc=0, scale=scale, validate_args=True)

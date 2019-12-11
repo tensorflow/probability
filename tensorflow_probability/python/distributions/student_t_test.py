@@ -517,6 +517,7 @@ class StudentTTest(test_util.TestCase):
           df=[2, -5.], loc=0., scale=1., validate_args=True, name='S')
       self.evaluate(student.mean())
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughParams(self):
     df = tf.Variable([[17.3], [14.]])
     loc = tf.Variable([[-5., 0., 5.]])

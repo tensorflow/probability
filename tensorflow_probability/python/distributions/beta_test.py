@@ -346,6 +346,7 @@ class BetaTest(test_util.TestCase):
       mean = self.evaluate(dist.mean())
       self.assertEqual(mean, 0.25)
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughConcentration1(self):
     concentration1 = tf.Variable(3.)
     d = tfd.Beta(
@@ -374,6 +375,7 @@ class BetaTest(test_util.TestCase):
       with tf.control_dependencies([concentration1.assign([1., 2., -3.])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughConcentration0(self):
     concentration0 = tf.Variable(3.)
     d = tfd.Beta(

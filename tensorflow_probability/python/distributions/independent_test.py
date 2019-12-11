@@ -379,6 +379,7 @@ class IndependentDistributionTest(test_util.TestCase):
     self.assertAllEqual([3, 5], d_sliceable[:3].batch_shape)
     self.assertAllEqual([6], d_sliceable[:3].event_shape)
 
+  @test_util.tf_tape_safety_test
   def testGradientsThroughParams(self):
     loc = tf.Variable(np.zeros((4, 5, 2, 3)), shape=tf.TensorShape(None))
     scale = tf.Variable(np.ones([]), shape=tf.TensorShape(None))

@@ -123,6 +123,7 @@ TEST_FILENAMES = [filename + "_test" for filename in FILENAMES if filename not i
 
 TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     "deprecated_linalg",
+    "exponential",
     "gamma_gamma",
     "geometric",
     "gumbel",
@@ -130,12 +131,15 @@ TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     "inverse_gaussian",
     "kullback_leibler",
     "kumaraswamy",
+    "laplace",
     "logitnormal",
     "lognormal",
     "mvn_diag_plus_low_rank",
     "mvn_full_covariance",
     "pareto",
+    "relaxed_bernoulli",
     "sample",
+    "sinh_arcsinh",
     "uniform",
     "vector_exponential_diag",
     "vector_laplace_diag",

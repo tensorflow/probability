@@ -181,8 +181,7 @@ class SampleDistributionTest(test_util.TestCase):
     actual_entropy = d.entropy()
     self.assertAllEqual(*self.evaluate([expected_entropy, actual_entropy]))
 
-  @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_variable_test
+  @test_util.tf_tape_safety_test
   def test_gradients_through_params(self):
     loc = tf.Variable(tf.zeros([4, 5, 3]), shape=tf.TensorShape(None))
     scale = tf.Variable(tf.ones([]), shape=tf.TensorShape(None))
@@ -201,8 +200,7 @@ class SampleDistributionTest(test_util.TestCase):
     self.assertAllNotNone(grad[:-1])
     self.assertIs(grad[-1], None)
 
-  @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_variable_test
+  @test_util.tf_tape_safety_test
   def test_variable_shape_change(self):
     loc = tf.Variable(tf.zeros([4, 5, 3]), shape=tf.TensorShape(None))
     scale = tf.Variable(tf.ones([]), shape=tf.TensorShape(None))

@@ -459,6 +459,7 @@ class MultivariateStudentTTestFloat32StaticShape(
       with tf.control_dependencies([df.assign(-2.)]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  @test_util.tf_tape_safety_test
   def testVariableScaleWithDeferredTensor(self):
     scale = tf.linalg.LinearOperatorDiag(
         tfp.util.TransformedVariable([2., 2.], tfb.Exp()),

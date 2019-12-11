@@ -823,6 +823,7 @@ class MixtureTest(test_util.TestCase):
     x_ = self.evaluate(gm.sample(seed=test_util.test_seed()))
     self.assertAllEqual([], x_.shape)
 
+  @test_util.tf_tape_safety_test
   def testGradientsThroughParams(self):
     logits = tf.Variable(np.zeros((3, 5, 2)), dtype=tf.float32,
                          shape=tf.TensorShape([None, None, 2]))

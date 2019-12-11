@@ -333,6 +333,7 @@ class HalfNormalTest(test_util.TestCase):
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughScale(self):
     scale = tf.Variable(2.)
     d = tfd.HalfNormal(scale=scale, validate_args=True)

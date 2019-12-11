@@ -183,7 +183,7 @@ class SinhArcsinhTest(test_util.TestCase):
     self.assertAllClose(*self.evaluate(
         [sas_pos_skew.prob(x), sas_neg_skew.prob(x[::-1])]))
 
-  @test_util.numpy_disable_gradient_test
+  @test_util.tf_tape_safety_test
   def testVariableGradients(self):
     b = 10
     scale = tf.Variable(rng.rand(b) + 0.5)
@@ -197,6 +197,7 @@ class SinhArcsinhTest(test_util.TestCase):
     self.assertLen(grads, 2)
     self.assertAllNotNone(grads)
 
+  @test_util.tf_tape_safety_test
   def testNonVariableGradients(self):
     b = 10
     scale = tf.convert_to_tensor(rng.rand(b) + 0.5)
