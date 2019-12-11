@@ -24,8 +24,9 @@ from scipy import special
 from scipy import stats
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability import distributions as tfd
+import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
+tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes

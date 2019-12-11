@@ -178,6 +178,12 @@ COMMON_DEPS = {
 DEPS = {
     "lkj": [":beta"],
     "cholesky_lkj": [":lkj"],
+    "chi": [
+        ":chi2",
+        ":transformed_distribution",
+        "//tensorflow_probability/python/experimental/substrates/jax/bijectors:invert",
+        "//tensorflow_probability/python/experimental/substrates/jax/bijectors:square",
+    ],
     "von_mises_fisher": [":beta"],
     "von_mises": [":normal"],
     "generalized_pareto_test": [
