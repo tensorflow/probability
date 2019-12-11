@@ -125,6 +125,8 @@ TensorSpecNest = Union['tf.TensorSpec', Sequence['tf.TensorSpec'],
                        Mapping[Any, 'tf.TensorSpec']]
 BijectorNest = Union[tfb.Bijector, Sequence[tfb.Bijector],
                      Mapping[Any, tfb.Bijector]]
+BooleanNest = Union[BooleanTensor, Sequence[BooleanTensor],
+                    Mapping[Any, BooleanTensor]]
 FloatNest = Union[FloatTensor, Sequence[FloatTensor], Mapping[Any, FloatTensor]]
 IntNest = Union[IntTensor, Sequence[IntTensor], Mapping[Any, IntTensor]]
 DTypeNest = Union['tf.DType', Sequence['tf.DType'], Mapping[Any, 'tf.DType']]
@@ -134,11 +136,17 @@ PotentialFn = Union[Callable[[TensorNest], Tuple['tf.Tensor', TensorNest]],
                     Callable[..., Tuple['tf.Tensor', TensorNest]]]
 
 
+def _trace_extra(state: State, extra: TensorNest) -> TensorNest:
+  del state
+  return extra
+
+
 def trace(
     state: State,
     fn: TransitionOperator,
     num_steps: IntTensor,
-    trace_fn: Callable[[State, TensorNest], TensorNest],
+    trace_fn: Callable[[State, TensorNest], TensorNest] = _trace_extra,
+    trace_mask: BooleanNest = True,
     parallel_iterations: int = 10,
 ) -> Tuple[State, TensorNest]:
   """`TransitionOperator` that runs `fn` repeatedly and traces its outputs.
@@ -148,16 +156,71 @@ def trace(
     fn: A `TransitionOperator`.
     num_steps: Number of steps to run the function for. Must be greater than 1.
     trace_fn: Callable that the unpacked outputs of `fn` and returns a nest of
-      `Tensor`s. These will be stacked and returned.
+      `Tensor`s. These will potentially be stacked and returned as the second
+      return value. By default, just the `extra` return from `fn` is returned.
+    trace_mask: A potentially shallow nest with boolean leaves applied to the
+      return value of `trace_fn`. This controls whether or not to actually trace
+      the quantities returned from `trace_fn`. For subtrees of return value of
+      `trace_fn` where the mask leaf is `True`, those subtrees are traced (i.e.
+      the corresponding subtrees in `traces` will contain an extra leading
+      dimension equalling `num_steps`). For subtrees of the return value of
+      `trace_fn` where the mask leaf is `False`, those subtrees are merely
+      propagated, and their corresponding subtrees in `traces` correspond to
+      their final value.
     parallel_iterations: Number of iterations of the while loop to run in
       parallel.
 
   Returns:
     state: The final state returned by `fn`.
-    traces: Stacked outputs of `trace_fn`.
+    traces: A nest with the same structure as that of `trace_fn` return value,
+      but with leaves replaced with stacked and unstacked values according to
+      the `trace_mask`.
+
+  #### Example
+
+  ```python
+  def fn(x):
+    return x + 1, (2 * x, 3 * x)
+
+  # Full trace.
+  state, traces = trace(0, fn, num_steps=3)
+  assert(state == 3)
+  assert(traces[0] == [0, 2, 4])
+  assert(traces[1] == [0, 3, 6])
+
+  # Partial trace.
+  state, traces = trace(0, fn, num_steps=3, trace_mask=(True, False))
+  assert(state == 3)
+  assert(traces[0] == [0, 2, 4])
+  assert(traces[1] == 6)
+
+  # No trace.
+  state, traces = trace(0, fn, num_steps=3, trace_mask=False)
+  assert(state == 3)
+  assert(traces[0] == 4)
+  assert(traces[1] == 6)
+  ```
+
   """
-  state = util.map_tree(lambda t: (t if t is None else tf.convert_to_tensor(t)),
-                        state)
+
+  def split_trace(trace_element):
+    # The two return values of this function share the same shallow structure as
+    # `trace_mask`, with the first return value being a version meant for
+    # tracing, and the second return value meant for mere propagation.
+    return (
+        util.map_tree_up_to(
+            trace_mask,
+            lambda m, s: s if m else (),
+            trace_mask,
+            trace_element,
+        ),
+        util.map_tree_up_to(
+            trace_mask,
+            lambda m, s: () if m else s,
+            trace_mask,
+            trace_element,
+        ),
+    )
 
   def wrapper(state):
     state, extra = util.map_tree(tf.convert_to_tensor,
@@ -165,50 +228,62 @@ def trace(
     trace_element = util.map_tree(tf.convert_to_tensor, trace_fn(state, extra))
     return state, trace_element
 
+  state = util.map_tree(lambda t: (t if t is None else tf.convert_to_tensor(t)),
+                        state)
+
   # JAX tracing/pre-compilation isn't as stable as TF's, so we won't use it to
   # start.
   if (backend.get_backend() != backend.TENSORFLOW or
       any(e is None for e in util.flatten_tree(state)) or
       tf.executing_eagerly()):
     state, first_trace = wrapper(state)
+    first_traced, first_untraced = split_trace(first_trace)
+
     trace_arrays = util.map_tree(
         lambda v: util.write_dynamic_array(  # pylint: disable=g-long-lambda
             util.make_dynamic_array(
                 v.dtype, size=num_steps, element_shape=v.shape), 0, v),
-        first_trace)
+        first_traced)
     start_idx = 1
   else:
     state_spec = util.map_tree(tf.TensorSpec.from_tensor, state)
     # We need the shapes and dtypes of the outputs of `wrapper` function to
-    # create the `TensorArray`s, we can get it by pre-compiling the wrapper
+    # create the `TensorArray`s etc., we can get it by pre-compiling the wrapper
     # function.
     wrapper = tf.function(autograph=False)(wrapper)
     concrete_wrapper = wrapper.get_concrete_function(state_spec)
     _, trace_dtypes = concrete_wrapper.output_dtypes
     _, trace_shapes = concrete_wrapper.output_shapes
+    traced_dtypes, untraced_dtypes = split_trace(trace_dtypes)
+    traced_shapes, untraced_shapes = split_trace(trace_shapes)
+
     trace_arrays = util.map_tree(
         lambda dtype, shape: tf.TensorArray(  # pylint: disable=g-long-lambda
             dtype,
             size=num_steps,
             element_shape=shape),
-        trace_dtypes,
-        trace_shapes)
+        traced_dtypes,
+        traced_shapes)
+    first_untraced = util.map_tree(
+        lambda dtype, shape: tf.zeros(shape, dtype=dtype), untraced_dtypes,
+        untraced_shapes)
     wrapper = lambda state: concrete_wrapper(*util.flatten_tree(state))
     start_idx = 0
 
-  def body(i, state, trace_arrays):
+  def body(i, state, trace_arrays, _):
     state, trace_element = wrapper(state)
+    traced, untraced = split_trace(trace_element)
     trace_arrays = util.map_tree(lambda a, v: util.write_dynamic_array(a, i, v),
-                                 trace_arrays, trace_element)
-    return i + 1, state, trace_arrays
+                                 trace_arrays, traced)
+    return i + 1, state, trace_arrays, untraced
 
   def cond(i, *_):
     return i < num_steps
 
-  _, state, trace_arrays = tf.while_loop(
+  _, state, trace_arrays, untraced = tf.while_loop(
       cond=cond,
       body=body,
-      loop_vars=(start_idx, state, trace_arrays),
+      loop_vars=(start_idx, state, trace_arrays, first_untraced),
       parallel_iterations=parallel_iterations)
 
   stacked_trace = util.map_tree(util.snapshot_dynamic_array, trace_arrays)
@@ -223,7 +298,14 @@ def trace(
 
     stacked_trace = util.map_tree(_merge_static_length, stacked_trace)
 
-  return state, stacked_trace
+  # Reconstitute the structure returned by `trace_fn`, with leaves replaced with
+  # traced and untraced elements according to the trace_mask. This is the
+  # inverse operation of `split_trace`.
+  combined_trace = util.map_tree_up_to(
+      trace_mask, lambda m, traced, untraced: traced  # pylint: disable=g-long-lambda
+      if m else untraced, trace_mask, stacked_trace, untraced)
+
+  return state, combined_trace
 
 
 def _tree_repr(tree: Any) -> Text:

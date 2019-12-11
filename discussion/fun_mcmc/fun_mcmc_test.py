@@ -168,10 +168,30 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
   def testTraceTrace(self):
 
     def fun(x):
-      return fun_mcmc.trace(x, lambda x: (x + 1., ()), 2, lambda *args: ())
+      return fun_mcmc.trace(x, lambda x: (x + 1., x + 1.), 2, trace_mask=False)
 
-    x, _ = fun_mcmc.trace(0., fun, 2, lambda *args: ())
+    x, trace = fun_mcmc.trace(0., fun, 2)
     self.assertAllEqual(4., x)
+    self.assertAllEqual([2., 4.], trace)
+
+  def testTraceMask(self):
+
+    def fun(x):
+      return x + 1, (2 * x, 3 * x)
+
+    x, (trace_1, trace_2) = fun_mcmc.trace(
+        state=0, fn=fun, num_steps=3, trace_mask=(True, False))
+
+    self.assertAllEqual(3, x)
+    self.assertAllEqual([0, 2, 4], trace_1)
+    self.assertAllEqual(6, trace_2)
+
+    x, (trace_1, trace_2) = fun_mcmc.trace(
+        state=0, fn=fun, num_steps=3, trace_mask=False)
+
+    self.assertAllEqual(3, x)
+    self.assertAllEqual(4, trace_1)
+    self.assertAllEqual(6, trace_2)
 
   def testCallFn(self):
     sum_fn = lambda *args: sum(args)
