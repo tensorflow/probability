@@ -23,9 +23,9 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import psd_kernels
 
 
 class _GaussianProcessTest(object):

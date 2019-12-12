@@ -501,7 +501,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/positive_semidefinite_kernels",
+        "//tensorflow_probability/python/math/psd_kernels",
         "//tensorflow_probability/python/util",
     ],
 )
@@ -1858,7 +1858,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/positive_semidefinite_kernels",
+        "//tensorflow_probability/python/math/psd_kernels",
     ],
 )
 
@@ -1873,7 +1873,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/positive_semidefinite_kernels",
+        "//tensorflow_probability/python/math/psd_kernels",
     ],
 )
 
@@ -2522,7 +2522,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/positive_semidefinite_kernels",
+        "//tensorflow_probability/python/math/psd_kernels",
     ],
 )
 

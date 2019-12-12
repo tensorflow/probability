@@ -38,9 +38,6 @@ from tensorflow.python.util.all_util import remove_undocumented  # pylint: disab
 
 edward2 = lazy_loader.LazyLoader('edward2', globals(),
                                  'tensorflow_probability.python.edward2')
-positive_semidefinite_kernels = lazy_loader.LazyLoader(
-    'positive_semidefinite_kernels', globals(),
-    'tensorflow_probability.python.positive_semidefinite_kernels')
 
 _allowed_symbols = [
     'bijectors',
@@ -54,7 +51,6 @@ _allowed_symbols = [
     'mcmc',
     'monte_carlo',
     'optimizer',
-    'positive_semidefinite_kernels',
     'stats',
     'sts',
     'util',

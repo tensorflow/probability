@@ -25,9 +25,9 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability import distributions as tfd
-from tensorflow_probability import positive_semidefinite_kernels as psd_kernels
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import psd_kernels
 
 
 def _np_kernel_matrix_fn(amp, length_scale, x, y):
