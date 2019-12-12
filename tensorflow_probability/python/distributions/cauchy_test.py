@@ -75,7 +75,7 @@ class CauchyTest(test_util.TestCase):
 
   def testCauchyLogPDF(self):
     batch_size = 6
-    loc = tf.constant([3.0] * batch_size)
+    loc = tf.constant([3.0] * batch_size, dtype=tf.float32)
     scale = tf.constant([np.sqrt(10.0, dtype=np.float32)] * batch_size)
     x = np.array([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0], dtype=np.float32)
     cauchy = tfd.Cauchy(loc=loc, scale=scale, validate_args=True)
@@ -104,7 +104,7 @@ class CauchyTest(test_util.TestCase):
 
   def testCauchyLogPDFMultidimensional(self):
     batch_size = 6
-    loc = tf.constant([[3.0, -3.0]] * batch_size)
+    loc = tf.constant([[3.0, -3.0]] * batch_size, dtype=tf.float32)
     scale = tf.constant([
         [np.sqrt(10.0, dtype=np.float32),
          np.sqrt(15.0, dtype=np.float32)]] * batch_size)
