@@ -52,7 +52,7 @@ def _map_fn(  # pylint: disable=unused-argument
     def func(flat_args):
       unflat_args = tree_util.tree_unflatten(in_tree, flat_args)
       return fn(unflat_args)
-    return np.stack(map(func, elems_zipped))
+    return np.stack([func(x) for x in elems_zipped])
 
   if isinstance(elems, np.ndarray):
     return np.array([fn(x) for x in elems])
