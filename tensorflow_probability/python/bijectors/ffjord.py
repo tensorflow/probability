@@ -20,8 +20,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import prefer_static
 
@@ -127,9 +127,9 @@ def trace_jacobian_exact(ode_fn, state_shape, dtype):
     state, _ = state_log_det_jac
     ode_fn_with_time = lambda x: ode_fn(time, x)
     batch_shape = [prefer_static.size0(state)]
-    state_time_derivative, diag_jac = tfp.math.diag_jacobian(
+    state_time_derivative, diag_jac = tfp_math.diag_jacobian(
         xs=state, fn=ode_fn_with_time, sample_shape=batch_shape)
-    # tfp.math.diag_jacobian returns lists
+    # tfp_math.diag_jacobian returns lists
     if isinstance(state_time_derivative, list):
       state_time_derivative = state_time_derivative[0]
     if isinstance(diag_jac, list):
@@ -302,7 +302,7 @@ class FFJORD(bijector.Bijector):
       self._final_time = final_time
       self._ode_solve_fn = ode_solve_fn
       if self._ode_solve_fn is None:
-        self._ode_solver = tfp.math.ode.DormandPrince()
+        self._ode_solver = tfp_math.ode.DormandPrince()
         self._ode_solve_fn = self._ode_solver.solve
       self._trace_augmentation_fn = trace_augmentation_fn
       self._state_time_derivative_fn = state_time_derivative_fn
