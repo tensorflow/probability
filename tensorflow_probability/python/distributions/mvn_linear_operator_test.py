@@ -23,6 +23,7 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -37,7 +38,7 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
 
   def _random_tril_matrix(self, shape):
     mat = self.rng.rand(*shape)
-    chol = tfd.matrix_diag_transform(mat, transform=tf.math.softplus)
+    chol = tfb.TransformDiagonal(tfb.Softplus())(mat)
     return tf.linalg.band_part(chol, -1, 0)
 
   def _random_loc_and_scale(self, batch_shape, event_shape):

@@ -108,8 +108,6 @@ from tensorflow_probability.python.distributions.wishart import WishartTriL
 from tensorflow_probability.python.distributions.zipf import Zipf
 
 # Utilities/Other:
-from tensorflow_probability.python.distributions.deprecated_linalg import matrix_diag_transform
-from tensorflow_probability.python.distributions.deprecated_linalg import tridiag
 from tensorflow_probability.python.distributions.kullback_leibler import RegisterKL
 from tensorflow_probability.python.distributions.kullback_leibler import kl_divergence
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import mvn_conjugate_linear_update
@@ -226,8 +224,6 @@ __all__ = [
     'Zipf',
     'kl_divergence',
     'RegisterKL',
-    'matrix_diag_transform',
-    'tridiag',
     'mvn_conjugate_linear_update',
     'normal_conjugates_known_scale_posterior',
     'normal_conjugates_known_scale_predictive',

@@ -158,7 +158,6 @@ py_library(
         # numpy dep,
         # scipy dep,
         # six dep,
-        "//tensorflow_probability/python/experimental/substrates/numpy/distributions:deprecated_linalg",
         "//tensorflow_probability/python/experimental/substrates/numpy/internal:assert_util",
         "//tensorflow_probability/python/experimental/substrates/numpy/internal:distribution_util",
         "//tensorflow_probability/python/experimental/substrates/numpy/internal:dtype_util",

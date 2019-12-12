@@ -38,7 +38,6 @@ FILENAMES = [
     "chi2",
     "chi",
     "cholesky_lkj",
-    "deprecated_linalg",
     "deterministic",
     "dirichlet_multinomial",
     "dirichlet",
@@ -123,7 +122,6 @@ TEST_FILENAMES = [filename + "_test" for filename in FILENAMES if filename not i
 
 TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     "cauchy",
-    "deprecated_linalg",
     "exponential",
     "gamma_gamma",
     "geometric",

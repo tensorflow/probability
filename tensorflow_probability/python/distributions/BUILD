@@ -43,7 +43,6 @@ py_library(
         ":chi",
         ":chi2",
         ":cholesky_lkj",
-        ":deprecated_linalg",
         ":deterministic",
         ":dirichlet",
         ":dirichlet_multinomial",
@@ -300,14 +299,6 @@ py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
-    ],
-)
-
-py_library(
-    name = "deprecated_linalg",
-    srcs = ["deprecated_linalg.py"],
-    deps = [
-        # tensorflow dep,
     ],
 )
 
@@ -1710,17 +1701,6 @@ py_test(
 )
 
 py_test(
-    name = "deprecated_linalg_test",
-    size = "small",
-    srcs = ["deprecated_linalg_test.py"],
-    deps = [
-        ":deprecated_linalg",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_test(
     name = "deterministic_test",
     size = "small",
     srcs = ["deterministic_test.py"],
@@ -2754,8 +2734,6 @@ exports_files(
         "chi.py",
         "chi2.py",
         "cholesky_lkj.py",
-        "deprecated_linalg.py",
-        "deprecated_linalg_test.py",
         "deterministic.py",
         "dirichlet.py",
         "dirichlet_multinomial.py",

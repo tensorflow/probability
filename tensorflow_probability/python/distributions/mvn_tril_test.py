@@ -25,6 +25,7 @@ import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -39,7 +40,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
 
   def _random_chol(self, *shape):
     mat = self._rng.rand(*shape)
-    chol = tfd.matrix_diag_transform(mat, transform=tf.math.softplus)
+    chol = tfb.TransformDiagonal(tfb.Softplus())(mat)
     chol = tf.linalg.band_part(chol, -1, 0)
     sigma = tf.matmul(chol, chol, adjoint_b=True)
     return self.evaluate(chol), self.evaluate(sigma)
@@ -435,7 +436,7 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
 
   def _random_chol(self, *shape):
     mat = self._rng.rand(*shape)
-    chol = tfd.matrix_diag_transform(mat, transform=tf.math.softplus)
+    chol = tfb.TransformDiagonal(tfb.Softplus())(mat)
     chol = tf.linalg.band_part(chol, -1, 0)
     sigma = tf.matmul(chol, chol, adjoint_b=True)
     return self.evaluate(chol), self.evaluate(sigma)
