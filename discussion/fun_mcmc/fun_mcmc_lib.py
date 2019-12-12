@@ -742,7 +742,7 @@ def blanes_3_stage_step(
        the Hybrid Monte Carlo method. SIAM J. Sci. Comput., 36(4), 2014.
        https://arxiv.org/pdf/1405.3153.pdf
 
-  [2]: Campos, C. M., & Sanz-Serna, J. M.. Palindromic 3-stage splitting
+  [2]: Campos, C. M., & Sanz-Serna, J. M. Palindromic 3-stage splitting
        integrators, a roadmap, (8), 2017. https://arxiv.org/pdf/1703.09958.pdf
   """
   a1 = 0.11888010966
@@ -1591,8 +1591,9 @@ def running_variance_init(shape: IntTensor,
 def running_variance_step(
     state: RunningVarianceState,
     vec: FloatNest,
-    axis: Union[int,
-                List[int]] = None) -> Tuple[RunningVarianceState, Tuple[()]]:
+    axis: Union[int, List[int]] = None,
+    window_size: IntNest = None,
+) -> Tuple[RunningVarianceState, Tuple[()]]:
   """Updates the `RunningVarianceState`.
 
   As a computational convenience, this allows computing both independent
@@ -1613,6 +1614,13 @@ def running_variance_step(
     vec: A Tensor to incorporate into the variance estimate.
     axis: If not `None`, treat these axes as being additional axes to aggregate
       over.
+    window_size: A nest of ints, broadcastable with the structure of `vec`. If
+      set, this will aggregate up to this many points. After the number of
+      points is exceeded, old points are discarded as if doing exponential
+      moving average with `alpha = window_size / (window_size + 1)` (this is
+      only exactly true if `axis` is `None` however). The estimator retains the
+      same bias guarantees if the distribution over the sequence of `vec` is
+      stationary.
 
   Returns:
     state: `RunningVarianceState`.
@@ -1662,6 +1670,9 @@ def running_variance_step(
                                      new_mean_variance_num_points)
   new_num_points = util.map_tree_up_to(state.mean, lambda x: x[2],
                                        new_mean_variance_num_points)
+  if window_size is not None:
+    window_size = maybe_broadcast_structure(window_size, new_num_points)
+    new_num_points = util.map_tree(tf.minimum, new_num_points, window_size)
   return RunningVarianceState(
       num_points=new_num_points, mean=new_mean, variance=new_variance), ()
 
@@ -1700,8 +1711,9 @@ def running_covariance_init(shape: IntTensor,
 def running_covariance_step(
     state: RunningCovarianceState,
     vec: FloatTensor,
-    axis: Union[int,
-                List[int]] = None) -> Tuple[RunningCovarianceState, Tuple[()]]:
+    axis: Union[int, List[int]] = None,
+    window_size: IntNest = None,
+) -> Tuple[RunningCovarianceState, Tuple[()]]:
   """Updates the `RunningCovarianceState`.
 
   As a computational convenience, this allows computing both independent
@@ -1726,6 +1738,13 @@ def running_covariance_step(
     vec: A Tensor to incorporate into the variance estimate.
     axis: If not `None`, treat these axes as being additional axes to aggregate
       over.
+    window_size: A nest of ints, broadcastable with the structure of `vec`. If
+      set, this will aggregate up to this many points. After the number of
+      points is exceeded, old points are discarded as if doing exponential
+      moving average with `alpha = window_size / (window_size + 1)` (this is
+      only exactly true if `axis` is `None` however). The estimator retains the
+      same bias guarantees if the distribution over the sequence of `vec` is
+      stationary.
 
   Returns:
     state: `RunningCovarianceState`.
@@ -1781,6 +1800,9 @@ def running_covariance_step(
                                        new_mean_covariance_num_points)
   new_num_points = util.map_tree_up_to(state.mean, lambda x: x[2],
                                        new_mean_covariance_num_points)
+  if window_size is not None:
+    window_size = maybe_broadcast_structure(window_size, new_num_points)
+    new_num_points = util.map_tree(tf.minimum, new_num_points, window_size)
   return RunningCovarianceState(
       num_points=new_num_points, mean=new_mean, covariance=new_covariance), ()
 
@@ -1808,7 +1830,8 @@ def running_mean_init(shape: IntTensor, dtype: DTypeNest) -> RunningMeanState:
 def running_mean_step(
     state: RunningMeanState,
     vec: FloatTensor,
-    axis: Union[int, List[int]] = None
+    axis: Union[int, List[int]] = None,
+    window_size: IntNest = None,
 ) -> Tuple[RunningMeanState, Tuple[()]]:
   """Updates the `RunningMeanState`.
 
@@ -1825,6 +1848,13 @@ def running_mean_step(
     vec: A Tensor to incorporate into the mean.
     axis: If not `None`, treat these axes as being additional axes to aggregate
       over.
+    window_size: A nest of ints, broadcastable with the structure of `vec`. If
+      set, this will aggregate up to this many points. After the number of
+      points is exceeded, old points are discarded as if doing exponential
+      moving average with `alpha = window_size / (window_size + 1)` (this is
+      only exactly true if `axis` is `None` however). The estimator retains the
+      same bias guarantees if the distribution over the sequence of `vec` is
+      stationary.
 
   Returns:
     state: `RunningMeanState`.
@@ -1848,7 +1878,7 @@ def running_mean_step(
       additional_points = tf.math.reduce_prod(tf.gather(vec_shape, axis))
       additional_points_f = tf.cast(additional_points, vec.dtype)
       centered_vec = tf.reduce_sum(centered_vec, axis)
-    new_mean = state.mean + centered_vec / (num_points_f + additional_points_f)
+    new_mean = mean + centered_vec / (num_points_f + additional_points_f)
     return new_mean, num_points + additional_points
 
   new_mean_num_points = util.map_tree(_one_part, vec, state.mean,
@@ -1858,6 +1888,9 @@ def running_mean_step(
                                  new_mean_num_points)
   new_num_points = util.map_tree_up_to(state.mean, lambda x: x[1],
                                        new_mean_num_points)
+  if window_size is not None:
+    window_size = maybe_broadcast_structure(window_size, new_num_points)
+    new_num_points = util.map_tree(tf.minimum, new_num_points, window_size)
   return RunningMeanState(num_points=new_num_points, mean=new_mean), ()
 
 
@@ -1948,7 +1981,7 @@ def potential_scale_reduction_extract(
     var_w = tf.reduce_mean(variance, independent_dims)
     # Between chain variance.
     var_b = num_chains / (num_chains - 1) * tf.math.reduce_variance(
-        state.mean, independent_dims)
+        mean, independent_dims)
     # Estimate of the true variance of the target distribution.
     sigma2p = var_w + var_b
     return ((num_chains + 1) / num_chains * sigma2p / var_w - (num_points - 1) /

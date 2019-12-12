@@ -914,6 +914,31 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
 
     self.assertAllClose(true_mean, rms.mean)
 
+  def testRunningMeanMaxPoints(self):
+    window_size = 100
+    rng = np.random.RandomState(_test_seed())
+    data = tf.convert_to_tensor(
+        np.concatenate(
+            [rng.randn(window_size), 1. + 2. * rng.randn(window_size * 10)],
+            axis=0))
+
+    def kernel(rms, idx):
+      rms, _ = fun_mcmc.running_mean_step(
+          rms, data[idx], window_size=window_size)
+      return (rms, idx + 1), rms.mean
+
+    _, mean = fun_mcmc.trace(
+        state=(fun_mcmc.running_mean_init([], data.dtype), 0),
+        fn=kernel,
+        num_steps=len(data),
+    )
+    # Up to window_size, we compute the running mean exactly.
+    self.assertAllClose(np.mean(data[:window_size]), mean[window_size - 1])
+    # After window_size, we're doing exponential moving average, and pick up the
+    # mean after the change in the distribution. Since the moving average is
+    # computed only over ~window_size points, this test is rather noisy.
+    self.assertAllClose(1., mean[-1], atol=0.2)
+
   @parameterized.named_parameters(
       ('Basic', (10, 3), None),
       ('Batched', (10, 4, 3), None),
@@ -944,6 +969,34 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(true_mean, rvs.mean)
     self.assertAllClose(true_var, rvs.variance)
 
+  def testRunningVarianceMaxPoints(self):
+    window_size = 100
+    rng = np.random.RandomState(_test_seed())
+    data = tf.convert_to_tensor(
+        np.concatenate(
+            [rng.randn(window_size), 1. + 2. * rng.randn(window_size * 10)],
+            axis=0))
+
+    def kernel(rvs, idx):
+      rvs, _ = fun_mcmc.running_variance_step(
+          rvs, data[idx], window_size=window_size)
+      return (rvs, idx + 1), (rvs.mean, rvs.variance)
+
+    _, (mean, var) = fun_mcmc.trace(
+        state=(fun_mcmc.running_variance_init([], data.dtype), 0),
+        fn=kernel,
+        num_steps=len(data),
+    )
+    # Up to window_size, we compute the running mean/variance exactly.
+    self.assertAllClose(np.mean(data[:window_size]), mean[window_size - 1])
+    self.assertAllClose(np.var(data[:window_size]), var[window_size - 1])
+    # After window_size, we're doing exponential moving average, and pick up the
+    # mean/variance after the change in the distribution. Since the moving
+    # average is computed only over ~window_size points, this test is rather
+    # noisy.
+    self.assertAllClose(1., mean[-1], atol=0.2)
+    self.assertAllClose(4., var[-1], atol=0.8)
+
   @parameterized.named_parameters(
       ('Basic', (10, 3), None),
       ('Batched', (10, 4, 3), None),
@@ -972,6 +1025,41 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
         trace_fn=lambda *args: ())
     self.assertAllClose(true_mean, rcs.mean)
     self.assertAllClose(true_cov, rcs.covariance)
+
+  def testRunningCovarianceMaxPoints(self):
+    window_size = 100
+    rng = np.random.RandomState(_test_seed())
+    data = tf.convert_to_tensor(
+        np.concatenate(
+            [
+                rng.randn(window_size, 2),
+                np.array([1., 2.]) +
+                np.array([2., 3.]) * rng.randn(window_size * 10, 2)
+            ],
+            axis=0,
+        ))
+
+    def kernel(rvs, idx):
+      rvs, _ = fun_mcmc.running_covariance_step(
+          rvs, data[idx], window_size=window_size)
+      return (rvs, idx + 1), (rvs.mean, rvs.covariance)
+
+    _, (mean, cov) = fun_mcmc.trace(
+        state=(fun_mcmc.running_covariance_init([2], data.dtype), 0),
+        fn=kernel,
+        num_steps=len(data),
+    )
+    # Up to window_size, we compute the running mean/variance exactly.
+    self.assertAllClose(
+        np.mean(data[:window_size], axis=0), mean[window_size - 1])
+    self.assertAllClose(
+        _gen_cov(data[:window_size], axis=0), cov[window_size - 1])
+    # After window_size, we're doing exponential moving average, and pick up the
+    # mean/variance after the change in the distribution. Since the moving
+    # average is computed only over ~window_size points, this test is rather
+    # noisy.
+    self.assertAllClose(np.array([1., 2.]), mean[-1], atol=0.2)
+    self.assertAllClose(np.array([[4., 0.], [0., 9.]]), cov[-1], atol=1.)
 
   @parameterized.named_parameters(
       ('BasicScalar', (10, 20), 1),
