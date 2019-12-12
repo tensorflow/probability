@@ -34,23 +34,6 @@ from tensorflow_probability.python.internal import tensor_util
 __all__ = ['QuantizedDistribution']
 
 
-def _logsum_expbig_minus_expsmall(big, small):
-  """Stable evaluation of `Log[exp{big} - exp{small}]`.
-
-  To work correctly, we should have the pointwise relation:  `small <= big`.
-
-  Args:
-    big: Floating-point `Tensor`
-    small: Floating-point `Tensor` with same `dtype` as `big` and broadcastable
-      shape.
-
-  Returns:
-    `Tensor` of same `dtype` of `big` and broadcast shape.
-  """
-  with tf.name_scope('logsum_expbig_minus_expsmall'):
-    return tf.math.log1p(-tf.exp(small - big)) + big
-
-
 _prob_base_note = """
 For whole numbers `y`,
 
@@ -345,7 +328,7 @@ class QuantizedDistribution(distributions.Distribution):
     high = None if self._high is None else tf.convert_to_tensor(self._high)
     return _logsum_expbig_minus_expsmall(
         self.log_cdf(y, low=low, high=high),
-        self.log_cdf(y - 1, low=low, high=high))
+        self.log_cdf(y - 1., low=low, high=high))
 
   def _log_prob_with_logsf_and_logcdf(self, y):
     """Compute log_prob(y) using log survival_function and cdf together."""
@@ -357,9 +340,9 @@ class QuantizedDistribution(distributions.Distribution):
     low = None if self._low is None else tf.convert_to_tensor(self._low)
     high = None if self._high is None else tf.convert_to_tensor(self._high)
     logsf_y = self._log_survival_function(y, low=low, high=high)
-    logsf_y_minus_1 = self._log_survival_function(y - 1, low=low, high=high)
+    logsf_y_minus_1 = self._log_survival_function(y - 1., low=low, high=high)
     logcdf_y = self._log_cdf(y, low=low, high=high)
-    logcdf_y_minus_1 = self._log_cdf(y - 1, low=low, high=high)
+    logcdf_y_minus_1 = self._log_cdf(y - 1., low=low, high=high)
 
     # Important:  Here we use select in a way such that no input is inf, this
     # prevents the troublesome case where the output of select can be finite,
@@ -386,20 +369,20 @@ class QuantizedDistribution(distributions.Distribution):
 
   def _prob_with_cdf(self, y):
     low = None if self._low is None else tf.convert_to_tensor(self._low)
-    high = None if self._low is None else tf.convert_to_tensor(self._low)
-    return self._cdf(y, low=low, high=high) - self._cdf(
-        y - 1, low=low, high=high)
+    high = None if self._high is None else tf.convert_to_tensor(self._high)
+    return (self._cdf(y, low=low, high=high) -
+            self._cdf(y - 1., low=low, high=high))
 
   def _prob_with_sf_and_cdf(self, y):
     # There are two options that would be equal if we had infinite precision:
-    # sf(y - 1) - sf(y)
-    # cdf(y) - cdf(y - 1)
+    # sf(y - 1.) - sf(y)
+    # cdf(y) - cdf(y - 1.)
     low = None if self._low is None else tf.convert_to_tensor(self._low)
     high = None if self._high is None else tf.convert_to_tensor(self._high)
     sf_y = self._survival_function(y, low=low, high=high)
-    sf_y_minus_1 = self._survival_function(y - 1, low=low, high=high)
+    sf_y_minus_1 = self._survival_function(y - 1., low=low, high=high)
     cdf_y = self._cdf(y, low=low, high=high)
-    cdf_y_minus_1 = self._cdf(y - 1, low=low, high=high)
+    cdf_y_minus_1 = self._cdf(y - 1., low=low, high=high)
 
     # sf_prob has greater precision iff we're on the right side of the median.
     return tf.where(
@@ -426,12 +409,11 @@ class QuantizedDistribution(distributions.Distribution):
     # Re-define values at the cutoffs.
     if low is not None:
       result_so_far = tf.where(
-          j < low,
-          dtype_util.as_numpy_dtype(self.dtype)(-np.inf),
-          result_so_far)
+          j < low, tf.constant(-np.inf, self.dtype), result_so_far)
+
     if high is not None:
       result_so_far = tf.where(
-          j >= high, tf.zeros_like(result_so_far), result_so_far)
+          j < high, result_so_far, tf.zeros([], self.dtype))
 
     return result_so_far
 
@@ -456,10 +438,11 @@ class QuantizedDistribution(distributions.Distribution):
     # Re-define values at the cutoffs.
     if low is not None:
       result_so_far = tf.where(
-          j < low, tf.zeros_like(result_so_far), result_so_far)
+          j < low, tf.zeros([], self.dtype), result_so_far)
+
     if high is not None:
       result_so_far = tf.where(
-          j >= high, tf.ones_like(result_so_far), result_so_far)
+          j < high, result_so_far, tf.ones([], self.dtype))
 
     return result_so_far
 
@@ -484,12 +467,11 @@ class QuantizedDistribution(distributions.Distribution):
     # Re-define values at the cutoffs.
     if low is not None:
       result_so_far = tf.where(
-          j < low, tf.zeros_like(result_so_far), result_so_far)
+          j < low, tf.zeros([], self.dtype), result_so_far)
+
     if high is not None:
       result_so_far = tf.where(
-          j >= high,
-          dtype_util.as_numpy_dtype(self.dtype)(-np.inf),
-          result_so_far)
+          j < high, result_so_far, tf.constant(-np.inf, self.dtype))
 
     return result_so_far
 
@@ -513,11 +495,12 @@ class QuantizedDistribution(distributions.Distribution):
 
     # Re-define values at the cutoffs.
     if low is not None:
-      result_so_far = tf.where(j < low, tf.ones_like(result_so_far),
-                               result_so_far)
+      result_so_far = tf.where(
+          j < low, tf.ones([], self.dtype), result_so_far)
+
     if high is not None:
-      result_so_far = tf.where(j >= high, tf.zeros_like(result_so_far),
-                               result_so_far)
+      result_so_far = tf.where(
+          j < high, result_so_far, tf.zeros([], self.dtype))
 
     return result_so_far
 
@@ -573,3 +556,20 @@ class QuantizedDistribution(distributions.Distribution):
     assertions.append(distribution_util.assert_integer_form(
         x, message='Sample has non-integer components.'))
     return assertions
+
+
+def _logsum_expbig_minus_expsmall(big, small):
+  """Stable evaluation of `Log[exp{big} - exp{small}]`.
+
+  To work correctly, we should have the pointwise relation:  `small <= big`.
+
+  Args:
+    big: Floating-point `Tensor`
+    small: Floating-point `Tensor` with same `dtype` as `big` and broadcastable
+      shape.
+
+  Returns:
+    log_sub_exp: `Tensor` of same `dtype` of `big` and broadcast shape.
+  """
+  with tf.name_scope('logsum_expbig_minus_expsmall'):
+    return big + tf.math.log1p(-tf.exp(small - big))
