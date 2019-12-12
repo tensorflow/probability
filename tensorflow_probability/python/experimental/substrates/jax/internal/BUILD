@@ -64,6 +64,9 @@ DEPS = {
     "hypothesis_testlib_test": [
         ":hypothesis_testlib",
     ],
+    "prefer_static": [
+        # decorator dep,
+    ],
     "tensor_util_test": [
         "//tensorflow_probability",
     ],

@@ -48,8 +48,8 @@ FILENAMES = [
     "finite_discrete",
     "gamma_gamma",
     "gamma",
-    # "gaussian_process",
-    # "gaussian_process_regression_model",
+    "gaussian_process",
+    "gaussian_process_regression_model",
     "generalized_pareto",
     "geometric",
     "gumbel",
@@ -120,10 +120,17 @@ NO_TESTS = ("joint_distribution", "vector_exponential_linear_operator", "vector_
 
 TEST_FILENAMES = [filename + "_test" for filename in FILENAMES if filename not in NO_TESTS]
 
+TEST_SIZES = {
+    "cholesky_lkj_test": "large",
+}
+
 TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     "cauchy",
+    "cholesky_lkj",
     "exponential",
     "gamma_gamma",
+    "gaussian_process",
+    "gaussian_process_regression_model",
     "geometric",
     "gumbel",
     "half_cauchy",
@@ -231,7 +238,7 @@ DEPS = {
 
 [py_test(
     name = filename,
-    size = "medium",
+    size = TEST_SIZES.get(filename, "medium"),
     srcs = ["{}.py".format(filename)],
     tags = ([] if filename in TAP_WHITELIST else ["notap"]) + ["tfp_jax"],
     deps = DEPS.get(filename, []) + [

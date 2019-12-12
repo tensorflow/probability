@@ -12,12 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""JAX util."""
+"""Jax implementation of deferred_tensor."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# pylint: disable=unused-import
 
-from tensorflow_probability.python.experimental.substrates.jax.util.deferred_tensor import DeferredTensor
-from tensorflow_probability.python.experimental.substrates.jax.util.seed_stream import SeedStream
+def DeferredTensor(pretransformed_input, transform_fn,
+                   dtype=None, shape='None', name=None):  # pylint: disable=unused-argument
+  # DeferredTensor is used to address tape-safety issues in TF2
+  # which do not exist in the JAX backend
+  # so it is safe to evaluate the function immediately
+  return transform_fn(pretransformed_input)
+
+
+def TransformedVariable(initial_value, bijector,  # pylint: disable=unused-argument
+                        dtype=None, name=None, **kwargs):  # pylint: disable=unused-argument
+  return DeferredTensor(initial_value, bijector)

@@ -46,7 +46,7 @@ TEST_FILENAMES = []
     name = filename,
     srcs = ["{}.py".format(filename)],
     deps = [
-        "//tensorflow_probability/python/internal/backend/numpy",
+        "//tensorflow_probability/python/internal/backend/jax",
     ],
 ) for filename in FILENAMES]
 
@@ -64,5 +64,13 @@ TEST_FILENAMES = []
 py_library(
     name = "util",
     srcs = ["__init__.py"],
-    deps = [":{}".format(filename) for filename in FILENAMES],
+    deps = [":{}".format(filename) for filename in FILENAMES] + [
+        ":deferred_tensor",
+    ],
+)
+
+py_library(
+    name = "deferred_tensor",
+    srcs = ["deferred_tensor.py"],
+    deps = [],
 )

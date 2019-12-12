@@ -44,12 +44,13 @@ TF_REPLACEMENTS = {
 }
 
 DISABLED_BIJECTORS = ('masked_autoregressive', 'scale_matvec_lu', 'real_nvp')
-DISABLED_DISTS = ('joint_distribution', 'gaussian_process',
+DISABLED_DISTS = ('joint_distribution',
                   'internal.moving_stats', 'student_t_process',
                   'variational_gaussian_process')
 LIBS = ('bijectors', 'distributions',
         'math', 'math.psd_kernels', 'math.psd_kernels.internal',
-        'stats', 'util.seed_stream')
+        'stats',
+        'util', 'util.seed_stream', 'util.deferred_tensor')
 INTERNALS = ('assert_util', 'distribution_util', 'dtype_util',
              'hypothesis_testlib', 'prefer_static', 'special_math',
              'tensor_util', 'test_combinations', 'test_util')
@@ -63,10 +64,14 @@ def main(argv):
       '# from tensorflow_probability.python.bijectors.{}'.format(bijector)
       for bijector in DISABLED_BIJECTORS
   })
+  if not FLAGS.numpy_to_jax:
+    disabled_dists = DISABLED_DISTS + ('gaussian_process',)
+  else:
+    disabled_dists = DISABLED_DISTS
   replacements.update({
       'from tensorflow_probability.python.distributions.{}'.format(dist):
       '# from tensorflow_probability.python.distributions.{}'.format(dist)
-      for dist in DISABLED_DISTS
+      for dist in disabled_dists
   })
   substrates_pkg = 'tensorflow_probability.python.experimental.substrates'
   replacements.update({

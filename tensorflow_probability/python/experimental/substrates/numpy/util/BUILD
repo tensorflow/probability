@@ -13,7 +13,6 @@
 # limitations under the License.
 # ============================================================================
 # Util with the numpy backend.
-
 # [internal] load python3.bzl
 
 licenses(["notice"])  # Apache 2.0
@@ -63,5 +62,13 @@ TEST_FILENAMES = ["{}_test".format(filename) for filename in FILENAMES]
 py_library(
     name = "util",
     srcs = ["__init__.py"],
-    deps = [":{}".format(filename) for filename in FILENAMES],
+    deps = [":{}".format(filename) for filename in FILENAMES] + [
+        ":deferred_tensor",
+    ],
+)
+
+py_library(
+    name = "deferred_tensor",
+    srcs = ["deferred_tensor.py"],
+    deps = [],
 )
