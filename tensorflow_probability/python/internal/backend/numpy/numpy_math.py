@@ -516,13 +516,11 @@ logical_xor = utils.copy_docstring(
 if JAX_MODE:
 
   @jax.custom_transforms
-  def _maximum_(x, y, name=None):
-    del name
+  def _maximum_(x, y, name=None):  # pylint: disable=unused-argument
     return np.maximum(x, y)
 
   @jax.custom_transforms
-  def _minimum_(x, y, name=None):
-    del name
+  def _minimum_(x, y, name=None):  # pylint: disable=unused-argument
     return np.minimum(x, y)
 
   # TF and Jax have differing behavior
@@ -545,21 +543,26 @@ if JAX_MODE:
       return (gx.astype(x.dtype), (g - gx).astype(y.dtype))
     return out_primals, vjp
   jax.defvjp_all(_minimum_, _minimum_vjp)
-  # Need to wrap in lambda because custom_transforms
+
+  # Need to wrap in a function because custom_transforms
   # returns an object, not a function
   # which breaks docstring wrapping
-  _maximum = lambda *args, **kwargs: _maximum_(*args, **kwargs)  # pylint: disable=unnecessary-lambda
-  _minimum = lambda *args, **kwargs: _minimum_(*args, **kwargs)  # pylint: disable=unnecessary-lambda
+
+  def _promote_dtypes(x, y):
+    # Need to explicitly promote types
+    # because of custom_transforms
+    out_dtype = np.result_type(x, y)
+    x = np.array(x, out_dtype)
+    y = np.array(y, out_dtype)
+    return x, y
+
+  _minimum = lambda x, y, name=None: _minimum_(*_promote_dtypes(x, y))
+  _maximum = lambda x, y, name=None: _maximum_(*_promote_dtypes(x, y))
+
 else:
 
-  def _maximum(x, y, name=None):
-    del name
-    return np.maximum(x, y)
-
-  def _minimum(x, y, name=None):
-    del name
-    return np.minimum(x, y)
-
+  _minimum = lambda x, y, name=None: np.minimum(x, y)
+  _maximum = lambda x, y, name=None: np.maximum(x, y)
 
 maximum = utils.copy_docstring(
     tf.math.maximum, _maximum)

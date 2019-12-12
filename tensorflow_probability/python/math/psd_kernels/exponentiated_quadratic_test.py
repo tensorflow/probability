@@ -66,7 +66,7 @@ class ExponentiatedQuadraticTest(test_util.TestCase):
   def testNoneShapes(self):
     k = tfp.math.psd_kernels.ExponentiatedQuadratic(
         amplitude=np.reshape(np.arange(12.), [2, 3, 2]))
-    self.assertEqual((2, 3, 2), k.batch_shape)
+    self.assertAllEqual((2, 3, 2), k.batch_shape)
 
   def testShapesAreCorrect(self):
     k = tfp.math.psd_kernels.ExponentiatedQuadratic(
@@ -98,13 +98,13 @@ class ExponentiatedQuadraticTest(test_util.TestCase):
     # Wrap -1 const in identity so that asserts don't fire at ExpSinSquared
     # construction time.
     minus_1 = tf.identity(tf.convert_to_tensor(-1.))
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('must be positive'):
       k = tfp.math.psd_kernels.ExponentiatedQuadratic(
           minus_1, minus_1, validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
     if not tf.executing_eagerly():
-      with self.assertRaises(tf.errors.InvalidArgumentError):
+      with self.assertRaisesOpError('must be positive'):
         self.evaluate(k.apply([1.], [1.]))
 
     # But `None`'s are ok

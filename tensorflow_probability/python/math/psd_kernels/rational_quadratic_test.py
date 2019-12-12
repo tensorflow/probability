@@ -121,7 +121,7 @@ class RationalQuadraticTest(test_util.TestCase):
         ).shape)
 
   def testValidateArgs(self):
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('amplitude must be positive'):
       k = tfp.math.psd_kernels.RationalQuadratic(
           amplitude=-1.,
           length_scale=1.,
@@ -129,7 +129,7 @@ class RationalQuadraticTest(test_util.TestCase):
           validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('length_scale must be positive'):
       k = tfp.math.psd_kernels.RationalQuadratic(
           amplitude=1.,
           length_scale=-1.,
@@ -137,7 +137,7 @@ class RationalQuadraticTest(test_util.TestCase):
           validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('scale_mixture_rate must be positive'):
       k = tfp.math.psd_kernels.RationalQuadratic(
           amplitude=1.,
           length_scale=1.,

@@ -19,6 +19,7 @@ from __future__ import print_function
 
 # pylint: disable=unused-import
 
+from tensorflow_probability.python.experimental.substrates.jax.math import psd_kernels
 from tensorflow_probability.python.experimental.substrates.jax.math.generic import log1mexp
 from tensorflow_probability.python.experimental.substrates.jax.math.generic import log_add_exp
 from tensorflow_probability.python.experimental.substrates.jax.math.generic import log_combinations

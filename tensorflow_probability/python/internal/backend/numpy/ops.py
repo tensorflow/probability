@@ -296,8 +296,6 @@ class name_scope(object):  # pylint: disable=invalid-name
   def __init__(self, name, *args, **kwargs):
     del args, kwargs
     self._name = name
-    if self._name is not None and not self._name.endswith('/'):
-      self._name += '/'
 
   def __enter__(self):
     return self._name

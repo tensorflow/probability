@@ -74,7 +74,7 @@ class ExpSinSquaredTest(test_util.TestCase):
   def testNoneShapes(self):
     k = tfp.math.psd_kernels.ExpSinSquared(
         amplitude=np.reshape([1.] * 6, [3, 2]))
-    self.assertEqual((3, 2), k.batch_shape)
+    self.assertAllEqual((3, 2), k.batch_shape)
 
   def testShapesAreCorrect(self):
     k = tfp.math.psd_kernels.ExpSinSquared(
@@ -107,7 +107,7 @@ class ExpSinSquaredTest(test_util.TestCase):
     # Wrap -1 const in identity so that asserts don't fire at ExpSinSquared
     # construction time.
     minus_1 = tf.identity(tf.convert_to_tensor(-1.))
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('must be positive'):
       k = tfp.math.psd_kernels.ExpSinSquared(
           amplitude=minus_1,
           length_scale=minus_1,
@@ -116,10 +116,10 @@ class ExpSinSquaredTest(test_util.TestCase):
       self.evaluate(k.apply([1.], [1.]))
 
     if not tf.executing_eagerly():
-      with self.assertRaises(tf.errors.InvalidArgumentError):
+      with self.assertRaisesOpError('must be positive'):
         self.evaluate(k.apply([1.], [1.]))
 
-      with self.assertRaises(tf.errors.InvalidArgumentError):
+      with self.assertRaisesOpError('must be positive'):
         self.evaluate(k.apply([1.], [1.]))
 
     # But `None`'s are ok

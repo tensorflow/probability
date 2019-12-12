@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Math with the JAX backend.
 
 # [internal] load python3.bzl
 
@@ -27,31 +26,31 @@ package(
 exports_files(["LICENSE"])
 
 FILENAMES = [
-    "generic",
-    "gradient",
-    "linalg",
-    "numeric",
-    "random_ops",
+    "exp_sin_squared",
+    "exponentiated_quadratic",
+    "feature_scaled",
+    "feature_transformed",
+    "kumaraswamy_transformed",
+    "matern",
+    "polynomial",
+    "positive_semidefinite_kernel",
+    "rational_quadratic",
+    "schur_complement",
 ]
 
-TEST_WHITELIST = [
-    "generic",
-    "gradient",
-    "random_ops",
-]
+TEST_FILENAMES = [filename + "_test" for filename in FILENAMES]
 
-TEST_FILENAMES = [filename + "_test" for filename in TEST_WHITELIST]
-
-DEPS = {
+TEST_SIZES = {
+    "schur_complement_test": "large",
 }
 
 [genrule(
     name = "rewrite_{}".format(filename),
-    srcs = ["//tensorflow_probability/python/math:{}.py".format(filename)],
+    srcs = ["//tensorflow_probability/python/math/psd_kernels:{}.py".format(filename)],
     outs = ["{}.py".format(filename)],
     cmd = "$(location //tensorflow_probability/python/experimental/substrates/meta:rewrite) $(SRCS) --numpy_to_jax > $@",
     tools = ["//tensorflow_probability/python/experimental/substrates/meta:rewrite"],
-) for filename in FILENAMES + TEST_FILENAMES]
+) for filename in FILENAMES + TEST_FILENAMES + ["__init__"]]
 
 [py_library(
     name = filename,
@@ -59,25 +58,25 @@ DEPS = {
     deps = [
         "//tensorflow_probability/python/internal/backend/jax",
     ],
-) for filename in FILENAMES]
+) for filename in FILENAMES + ["__init__"]]
 
 [py_test(
-    name = filename,
-    size = "medium",
-    srcs = ["{}.py".format(filename)],
+    name = test_filename,
+    size = TEST_SIZES.get(test_filename, "medium"),
+    srcs = ["{}.py".format(test_filename)],
     tags = ["tfp_jax"],
     deps = [
-        ":math",
+        ":psd_kernels",
         # jax dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/experimental/substrates/jax/internal:test_util",
-    ] + DEPS.get(filename, []),
-) for filename in TEST_FILENAMES]
+    ],
+) for test_filename in TEST_FILENAMES]
 
 py_library(
-    name = "math",
+    name = "psd_kernels",
     srcs = ["__init__.py"],
     deps = [":{}".format(filename) for filename in FILENAMES] + [
-        "//tensorflow_probability/python/experimental/substrates/jax/math/psd_kernels",
+        "//tensorflow_probability/python/experimental/substrates/jax/math/psd_kernels/internal",
     ],
 )

@@ -79,7 +79,7 @@ class PolynomialTest(test_util.TestCase):
   def testNoneShapes(self):
     k = tfp.math.psd_kernels.Polynomial(
         bias_variance=np.reshape(np.arange(12.), [2, 3, 2]))
-    self.assertEqual([2, 3, 2], k.batch_shape)
+    self.assertAllEqual([2, 3, 2], k.batch_shape)
 
   @parameterized.named_parameters(
       dict(

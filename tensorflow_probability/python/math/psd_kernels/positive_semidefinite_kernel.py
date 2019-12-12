@@ -25,6 +25,7 @@ import operator
 import six
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.psd_kernels.internal import util
 
@@ -884,11 +885,13 @@ class PositiveSemidefiniteKernel(tf.Module):
             ', dtype={dtype})'.format(
                 type_name=type(self).__name__,
                 self_name=self.name,
-                maybe_batch_shape=(', batch_shape={}'.format(self.batch_shape)
-                                   if self.batch_shape.ndims is not None else
-                                   ''),
+                maybe_batch_shape=(
+                    ', batch_shape={}'.format(self.batch_shape)
+                    if tensorshape_util.rank(self.batch_shape) is not None
+                    else ''),
                 feature_ndims=self.feature_ndims,
-                dtype=None if self.dtype is None else self.dtype.name))
+                dtype=None if self.dtype is None
+                else dtype_util.name(self.dtype)))
 
   def __repr__(self):
     return ('<tfp.math.psd_kernels.{type_name} '
@@ -900,7 +903,8 @@ class PositiveSemidefiniteKernel(tf.Module):
                 self_name=self.name,
                 batch_shape=self.batch_shape,
                 feature_ndims=self.feature_ndims,
-                dtype=None if self.dtype is None else self.dtype.name))
+                dtype=None if self.dtype is None
+                else dtype_util.name(self.dtype)))
 
   def _parameter_control_dependencies(self, is_init):
     """Returns a list of ops to be executed in members with graph deps.
