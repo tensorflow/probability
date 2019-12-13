@@ -44,9 +44,9 @@ TF_REPLACEMENTS = {
 }
 
 DISABLED_BIJECTORS = ('masked_autoregressive', 'scale_matvec_lu', 'real_nvp')
-DISABLED_DISTS = ('joint_distribution',
-                  'internal.moving_stats', 'student_t_process')
-NUMPY_DISABLED_DISTS = ('gaussian_process', 'variational_gaussian_process')
+DISABLED_DISTS = ('joint_distribution', 'internal.moving_stats')
+NUMPY_DISABLED_DISTS = ('gaussian_process', 'variational_gaussian_process',
+                        'student_t_process')
 LIBS = ('bijectors', 'distributions',
         'math', 'math.psd_kernels', 'math.psd_kernels.internal',
         'stats',
