@@ -95,7 +95,8 @@ def display_imgs(x, title=None, fignum=None):
 def tune_dataset(dataset,
                  batch_size=None,
                  shuffle_size=None,
-                 preprocess_fn=None):
+                 preprocess_fn=None,
+                 repeat_count=-1):
   """Sets generally recommended parameters for a `tf.data.Dataset`.
 
   Args:
@@ -106,6 +107,12 @@ def tune_dataset(dataset,
     shuffle_size: Python `int` representing the number of elements to shuffle
       (at a time).
     preprocess_fn: Python `callable` applied to each item in `dataset`.
+    repeat_count: Python `int`, representing the number of times the dataset
+      should be repeated. The default behavior (`repeat_count = -1`) is for the
+      dataset to be repeated indefinitely. If `repeat_count is None` repeat is
+      "off;" note that this is a deviation from `tf.data.Dataset.repeat` which
+      interprets `None` as "repeat indefinitely".
+      Default value: `-1` (i.e., repeat indefinitely).
 
   Returns:
     tuned_dataset: `tf.data.Dataset` instance tuned according to this functions
@@ -158,7 +165,8 @@ def tune_dataset(dataset,
   # ds = tf.data.Dataset.range(10).repeat(2).shuffle(5)
   # seen = set(e.numpy() for i, e in enumerate(ds) if i < 10)  # One epoch.
   # assert len(seen) == 10
-  dataset = dataset.repeat()
+  if repeat_count is not None:
+    dataset = dataset.repeat(repeat_count)
   if batch_size is not None:
     dataset = dataset.batch(batch_size, drop_remainder=True)
   dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
