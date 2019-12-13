@@ -63,8 +63,7 @@ DIST_UTIL_IMPORT = """
 from tensorflow.python.util import lazy_loader
 distribution_util = lazy_loader.LazyLoader(
     "distribution_util", globals(),
-    "tensorflow_probability.python.experimental.substrates.numpy.internal."
-    "distribution_util")
+    "tensorflow_probability.python.internal._numpy.distribution_util")
 """
 
 

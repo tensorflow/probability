@@ -19,5 +19,4 @@ from __future__ import print_function
 
 # pylint: disable=unused-import
 
-from tensorflow_probability.python.experimental.substrates.jax.util.deferred_tensor import DeferredTensor
-from tensorflow_probability.python.experimental.substrates.jax.util.seed_stream import SeedStream
+from tensorflow_probability.python.util._jax.seed_stream import SeedStream

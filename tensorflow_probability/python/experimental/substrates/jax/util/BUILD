@@ -14,8 +14,6 @@
 # ============================================================================
 # Util with the JAX backend.
 
-# [internal] load python3.bzl
-
 licenses(["notice"])  # Apache 2.0
 
 package(
@@ -26,51 +24,8 @@ package(
 
 exports_files(["LICENSE"])
 
-FILENAMES = [
-    "seed_stream",
-]
-
-# TODO(bjp): Enable the tests
-# TEST_FILENAMES = [filename + "_test" for filename in FILENAMES]
-TEST_FILENAMES = []
-
-[genrule(
-    name = "rewrite_{}".format(filename),
-    srcs = ["//tensorflow_probability/python/util:{}.py".format(filename)],
-    outs = ["{}.py".format(filename)],
-    cmd = "$(location //tensorflow_probability/python/experimental/substrates/meta:rewrite) $(SRCS) --numpy_to_jax > $@",
-    tools = ["//tensorflow_probability/python/experimental/substrates/meta:rewrite"],
-) for filename in FILENAMES + TEST_FILENAMES]
-
-[py_library(
-    name = filename,
-    srcs = ["{}.py".format(filename)],
-    deps = [
-        "//tensorflow_probability/python/internal/backend/jax",
-    ],
-) for filename in FILENAMES]
-
-[py_test(
-    name = filename,
-    size = "medium",
-    srcs = ["{}.py".format(filename)],
-    tags = ["tfp_jax"],
-    deps = [
-        ":util",
-        "//tensorflow_probability/python/experimental/substrates/jax/internal:test_util",
-    ],
-) for filename in TEST_FILENAMES]
-
 py_library(
     name = "util",
     srcs = ["__init__.py"],
-    deps = [":{}".format(filename) for filename in FILENAMES] + [
-        ":deferred_tensor",
-    ],
-)
-
-py_library(
-    name = "deferred_tensor",
-    srcs = ["deferred_tensor.py"],
-    deps = [],
+    deps = ["//tensorflow_probability/python/util:util.jax"],
 )

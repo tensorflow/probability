@@ -12,18 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
-"""Numpy implementation of deferred_tensor."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+"""Numpy bijectors."""
 
-
-def DeferredTensor(pretransformed_input, transform_fn,  # pylint: disable=unused-argument
-                   dtype=None, shape='None', name=None):  # pylint: disable=unused-argument
-  raise NotImplementedError
-
-
-def TransformedVariable(initial_value, bijector,  # pylint: disable=unused-argument
-                        dtype=None, name=None, **kwargs):  # pylint: disable=unused-argument
-  raise NotImplementedError
+from tensorflow_probability.python.bijectors._numpy import *  # pylint: disable=wildcard-import

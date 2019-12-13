@@ -19,7 +19,6 @@ from __future__ import print_function
 
 # pylint: disable=unused-import
 
-from tensorflow_probability.python.experimental.substrates.jax.stats.leave_one_out import log_loomean_exp
-from tensorflow_probability.python.experimental.substrates.jax.stats.leave_one_out import log_loosum_exp
-from tensorflow_probability.python.experimental.substrates.jax.stats.leave_one_out import log_soomean_exp
-from tensorflow_probability.python.experimental.substrates.jax.stats.leave_one_out import log_soosum_exp
+from tensorflow_probability.python.stats._jax.leave_one_out import log_loomean_exp
+from tensorflow_probability.python.stats._jax.leave_one_out import log_loosum_exp
+from tensorflow_probability.python.stats._jax.leave_one_out import log_soomean_exp

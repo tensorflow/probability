@@ -16,6 +16,11 @@
 #   Internal utilities for TensorFlow probability.
 
 # [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
 
 licenses(["notice"])  # Apache 2.0
 
@@ -28,13 +33,13 @@ package(
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
 )
 
-py_library(
+multi_substrate_py_library(
     name = "assert_util",
     srcs = ["assert_util.py"],
     srcs_version = "PY2AND3",
@@ -68,7 +73,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "dtype_util",
     srcs = ["dtype_util.py"],
     srcs_version = "PY2AND3",
@@ -78,7 +83,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "dtype_util_test",
     size = "small",
     srcs = ["dtype_util_test.py"],
@@ -91,7 +96,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "distribution_util",
     srcs = ["distribution_util.py"],
     srcs_version = "PY2AND3",
@@ -162,7 +167,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "prefer_static",
     srcs = ["prefer_static.py"],
     deps = [
@@ -175,7 +180,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "prefer_static_test",
     size = "small",
     srcs = ["prefer_static_test.py"],
@@ -193,7 +198,7 @@ py_library(
     srcs = ["reparameterization.py"],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "special_math",
     srcs = ["special_math.py"],
     deps = [
@@ -203,10 +208,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "special_math_test",
     size = "small",
     srcs = ["special_math_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         ":special_math",
         # numpy dep,
@@ -217,7 +223,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "tensor_util",
     srcs = ["tensor_util.py"],
     srcs_version = "PY2AND3",
@@ -258,7 +264,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "hypothesis_testlib",
     testonly = 1,
     srcs = ["hypothesis_testlib.py"],
@@ -288,7 +294,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "test_util",
     testonly = 1,
     srcs = ["test_util.py"],
@@ -306,7 +312,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "test_util_test",
     size = "small",
     srcs = ["test_util_test.py"],
@@ -320,7 +326,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "test_combinations",
     testonly = 1,
     srcs = ["test_combinations.py"],
@@ -332,7 +338,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "test_combinations_test",
     size = "small",
     srcs = ["test_combinations_test.py"],

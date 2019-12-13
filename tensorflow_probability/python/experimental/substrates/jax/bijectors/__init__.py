@@ -12,22 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# TFP with the JAX backend.
+"""JAX bijectors."""
 
-licenses(["notice"])  # Apache 2.0
-
-package(
-    default_visibility = [
-        "//tensorflow_probability:__subpackages__",
-    ],
-)
-
-exports_files(["LICENSE"])
-
-py_library(
-    name = "internal",
-    srcs = ["__init__.py"],
-    deps = [
-        "//tensorflow_probability/python/internal:internal.jax",
-    ],
-)
+from tensorflow_probability.python.bijectors._jax import *  # pylint: disable=wildcard-import

@@ -19,10 +19,9 @@ from __future__ import print_function
 
 # pylint: disable=unused-import
 
-from tensorflow_probability.python.experimental.substrates.numpy.stats.leave_one_out import log_loomean_exp
-from tensorflow_probability.python.experimental.substrates.numpy.stats.leave_one_out import log_loosum_exp
-from tensorflow_probability.python.experimental.substrates.numpy.stats.leave_one_out import log_soomean_exp
-from tensorflow_probability.python.experimental.substrates.numpy.stats.leave_one_out import log_soosum_exp
-from tensorflow_probability.python.experimental.substrates.numpy.stats.moving_stats import assign_log_moving_mean_exp
-from tensorflow_probability.python.experimental.substrates.numpy.stats.moving_stats import assign_moving_mean_variance
-from tensorflow_probability.python.experimental.substrates.numpy.stats.moving_stats import moving_mean_variance_zero_debias
+from tensorflow_probability.python.stats._numpy.leave_one_out import log_loomean_exp
+from tensorflow_probability.python.stats._numpy.leave_one_out import log_soomean_exp
+from tensorflow_probability.python.stats._numpy.leave_one_out import log_soosum_exp
+from tensorflow_probability.python.stats._numpy.moving_stats import assign_log_moving_mean_exp
+from tensorflow_probability.python.stats._numpy.moving_stats import assign_moving_mean_variance
+from tensorflow_probability.python.stats._numpy.moving_stats import moving_mean_variance_zero_debias

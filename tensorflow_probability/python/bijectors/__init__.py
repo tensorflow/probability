@@ -150,5 +150,5 @@ __all__ = [
     "WeibullCDF",
     "masked_autoregressive_default_template",
     "masked_dense",
-    "real_nvp_default_template"
+    "real_nvp_default_template",
 ]

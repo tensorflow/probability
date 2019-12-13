@@ -15,6 +15,11 @@
 # Library for representation of positive-semidefinite kernel functions.
 
 # [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
 
 licenses(["notice"])  # Apache 2.0
 
@@ -24,7 +29,7 @@ package(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "psd_kernels",
     srcs = ["__init__.py"],
     deps = [
@@ -43,7 +48,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "positive_semidefinite_kernel",
     srcs = ["positive_semidefinite_kernel.py"],
     deps = [
@@ -54,10 +59,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "positive_semidefinite_kernel_test",
     size = "small",
     srcs = ["positive_semidefinite_kernel_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
@@ -67,7 +73,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "exponentiated_quadratic",
     srcs = ["exponentiated_quadratic.py"],
     deps = [
@@ -78,10 +84,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "exponentiated_quadratic_test",
     size = "small",
     srcs = ["exponentiated_quadratic_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -91,7 +98,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "exp_sin_squared",
     srcs = ["exp_sin_squared.py"],
     deps = [
@@ -103,10 +110,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "exp_sin_squared_test",
     size = "small",
     srcs = ["exp_sin_squared_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -116,7 +124,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "matern",
     srcs = ["matern.py"],
     deps = [
@@ -128,10 +136,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "matern_test",
     size = "small",
     srcs = ["matern_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -141,7 +150,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "rational_quadratic",
     srcs = ["rational_quadratic.py"],
     deps = [
@@ -152,10 +161,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "rational_quadratic_test",
     size = "small",
     srcs = ["rational_quadratic_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -165,7 +175,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "polynomial",
     srcs = ["polynomial.py"],
     deps = [
@@ -176,10 +186,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "polynomial_test",
     size = "small",
     srcs = ["polynomial_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -189,7 +200,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "schur_complement",
     srcs = ["schur_complement.py"],
     deps = [
@@ -202,9 +213,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "schur_complement_test",
     srcs = ["schur_complement_test.py"],
+    jax_size = "large",
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -215,7 +228,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "feature_scaled",
     srcs = ["feature_scaled.py"],
     deps = [
@@ -226,7 +239,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "feature_scaled_test",
     size = "small",
     srcs = ["feature_scaled_test.py"],
@@ -239,7 +252,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "feature_transformed",
     srcs = ["feature_transformed.py"],
     deps = [
@@ -251,7 +264,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "feature_transformed_test",
     size = "small",
     srcs = ["feature_transformed_test.py"],
@@ -264,7 +277,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "kumaraswamy_transformed",
     srcs = ["kumaraswamy_transformed.py"],
     deps = [
@@ -275,9 +288,9 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "kumaraswamy_transformed_test",
-    size = "small",
+    size = "medium",
     srcs = ["kumaraswamy_transformed_test.py"],
     deps = [
         # absl/testing:parameterized dep,

@@ -17,6 +17,11 @@
 #   APIs here are meant to evolve over time.
 
 # [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
 
 licenses(["notice"])  # Apache 2.0
 
@@ -28,9 +33,14 @@ package(
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "bijectors",
     srcs = ["__init__.py"],
+    substrates_omit_deps = [
+        ":masked_autoregressive",
+        ":real_nvp",
+        ":scale_matvec_lu",
+    ],
     deps = [
         ":absolute_value",
         ":affine",
@@ -88,7 +98,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "bijector",
     srcs = [
         "bijector.py",
@@ -132,7 +142,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "absolute_value",
     srcs = ["absolute_value.py"],
     deps = [
@@ -143,7 +153,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "affine_linear_operator",
     srcs = ["affine_linear_operator.py"],
     deps = [
@@ -154,7 +164,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "affine_scalar",
     srcs = ["affine_scalar.py"],
     deps = [
@@ -167,7 +177,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "affine",
     srcs = ["affine.py"],
     deps = [
@@ -179,7 +189,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "scale",
     srcs = ["scale.py"],
     deps = [
@@ -190,7 +200,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "shift",
     srcs = ["shift.py"],
     deps = [
@@ -201,7 +211,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "scale_matvec_linear_operator",
     srcs = ["scale_matvec_linear_operator.py"],
     deps = [
@@ -212,7 +222,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "scale_matvec_diag",
     srcs = ["scale_matvec_diag.py"],
     deps = [
@@ -223,7 +233,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "scale_matvec_tril",
     srcs = ["scale_matvec_tril.py"],
     deps = [
@@ -234,7 +244,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "batch_normalization",
     srcs = ["batch_normalization.py"],
     deps = [
@@ -243,7 +253,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "blockwise",
     srcs = ["blockwise.py"],
     deps = [
@@ -254,7 +264,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "categorical_to_discrete",
     srcs = ["categorical_to_discrete.py"],
     deps = [
@@ -267,9 +277,9 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "chain",
-    srcs = ["chain.py"],
+    srcs = [],  # chain.py is already a src for :bijector
     deps = [
         ":bijector",
         # tensorflow dep,
@@ -279,7 +289,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "cholesky_outer_product",
     srcs = ["cholesky_outer_product.py"],
     deps = [
@@ -293,7 +303,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "cholesky_to_inv_cholesky",
     srcs = ["cholesky_to_inv_cholesky.py"],
     deps = [
@@ -305,7 +315,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "correlation_cholesky",
     srcs = ["correlation_cholesky.py"],
     deps = [
@@ -316,7 +326,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "cumsum",
     srcs = ["cumsum.py"],
     deps = [
@@ -326,7 +336,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "discrete_cosine_transform",
     srcs = ["discrete_cosine_transform.py"],
     deps = [
@@ -337,7 +347,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "exp",
     srcs = ["exp.py"],
     deps = [
@@ -346,7 +356,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "expm1",
     srcs = ["expm1.py"],
     deps = [
@@ -356,7 +366,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "ffjord",
     srcs = ["ffjord.py"],
     deps = [
@@ -369,7 +379,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "fill_triangular",
     srcs = ["fill_triangular.py"],
     deps = [
@@ -383,7 +393,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "gumbel_cdf",
     srcs = ["gumbel_cdf.py"],
     deps = [
@@ -395,7 +405,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "identity",
     srcs = ["identity.py"],
     deps = [
@@ -404,7 +414,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "inline",
     srcs = ["inline.py"],
     deps = [
@@ -413,7 +423,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "invert",
     srcs = ["invert.py"],
     deps = [
@@ -421,7 +431,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "kumaraswamy_cdf",
     srcs = ["kumaraswamy_cdf.py"],
     deps = [
@@ -450,7 +460,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "matrix_inverse_tril",
     srcs = ["matrix_inverse_tril.py"],
     deps = [
@@ -473,7 +483,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "normal_cdf",
     srcs = ["normal_cdf.py"],
     deps = [
@@ -486,7 +496,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "ordered",
     srcs = ["ordered.py"],
     deps = [
@@ -497,7 +507,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "pad",
     srcs = ["pad.py"],
     deps = [
@@ -511,7 +521,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "permute",
     srcs = ["permute.py"],
     deps = [
@@ -525,7 +535,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "power_transform",
     srcs = ["power_transform.py"],
     deps = [
@@ -535,7 +545,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "rational_quadratic_spline",
     srcs = ["rational_quadratic_spline.py"],
     srcs_version = "PY2AND3",
@@ -561,7 +571,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "reciprocal",
     srcs = ["reciprocal.py"],
     deps = [
@@ -572,7 +582,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "reshape",
     srcs = ["reshape.py"],
     deps = [
@@ -586,7 +596,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "fill_scale_tril",
     srcs = ["fill_scale_tril.py"],
     deps = [
@@ -601,7 +611,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sigmoid",
     srcs = ["sigmoid.py"],
     deps = [
@@ -610,7 +620,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sinh_arcsinh",
     srcs = ["sinh_arcsinh.py"],
     deps = [
@@ -623,7 +633,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "softfloor",
     srcs = ["softfloor.py"],
     deps = [
@@ -635,7 +645,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "softmax_centered",
     srcs = ["softmax_centered.py"],
     deps = [
@@ -649,7 +659,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "softplus",
     srcs = ["softplus.py"],
     deps = [
@@ -662,7 +672,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "softsign",
     srcs = ["softsign.py"],
     deps = [
@@ -674,7 +684,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "square",
     srcs = ["square.py"],
     deps = [
@@ -686,7 +696,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "iterated_sigmoid_centered",
     srcs = ["iterated_sigmoid_centered.py"],
     deps = [
@@ -697,7 +707,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "tanh",
     srcs = ["tanh.py"],
     deps = [
@@ -707,7 +717,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "transform_diagonal",
     srcs = ["transform_diagonal.py"],
     deps = [
@@ -716,7 +726,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "transpose",
     srcs = ["transpose.py"],
     deps = [
@@ -730,7 +740,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "weibull_cdf",
     srcs = ["weibull_cdf.py"],
     deps = [
@@ -741,7 +751,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "bijector_test_util",
     testonly = 1,
     srcs = ["bijector_test_util.py"],
@@ -758,7 +768,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "hypothesis_testlib",
     testonly = 1,
     srcs = ["hypothesis_testlib.py"],
@@ -772,10 +782,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "bijector_test",
     size = "small",
     srcs = ["bijector_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         ":bijectors",
         # mock dep,
@@ -786,7 +798,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "bijector_composition_test",
     size = "small",
     srcs = ["bijector_composition_test.py"],
@@ -800,7 +812,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "absolute_value_test",
     size = "small",
     srcs = ["absolute_value_test.py"],
@@ -811,7 +823,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "affine_test",
     size = "small",
     srcs = ["affine_test.py"],
@@ -825,7 +837,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "affine_linear_operator_test",
     size = "small",
     srcs = ["affine_linear_operator_test.py"],
@@ -837,7 +849,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "affine_scalar_test",
     size = "small",
     srcs = ["affine_scalar_test.py"],
@@ -850,7 +862,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "scale_test",
     size = "small",
     srcs = ["scale_test.py"],
@@ -863,7 +875,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "shift_test",
     size = "small",
     srcs = ["shift_test.py"],
@@ -876,7 +888,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "scale_matvec_diag_test",
     size = "small",
     srcs = ["scale_matvec_diag_test.py"],
@@ -889,7 +901,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "scale_matvec_tril_test",
     size = "small",
     srcs = ["scale_matvec_tril_test.py"],
@@ -902,7 +914,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "scale_matvec_linear_operator_test",
     size = "small",
     srcs = ["scale_matvec_linear_operator_test.py"],
@@ -914,10 +926,12 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "batch_normalization_test",
     size = "small",
     srcs = ["batch_normalization_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -929,7 +943,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "blockwise_test",
     size = "small",
     srcs = ["blockwise_test.py"],
@@ -943,10 +957,12 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "categorical_to_discrete_test",
     size = "small",
     srcs = ["categorical_to_discrete_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":categorical_to_discrete",
@@ -956,7 +972,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "chain_test",
     size = "small",
     srcs = ["chain_test.py"],
@@ -970,7 +986,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "cholesky_outer_product_test",
     size = "small",
     srcs = ["cholesky_outer_product_test.py"],
@@ -982,7 +998,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "cholesky_to_inv_cholesky_test",
     size = "small",
     srcs = ["cholesky_to_inv_cholesky_test.py"],
@@ -994,10 +1010,12 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "correlation_cholesky_test",
     size = "medium",
     srcs = ["correlation_cholesky_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1008,7 +1026,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "cumsum_test",
     size = "small",
     srcs = ["cumsum_test.py"],
@@ -1021,10 +1039,12 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "discrete_cosine_transform_test",
     size = "small",
     srcs = ["discrete_cosine_transform_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1035,7 +1055,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "exp_test",
     size = "small",
     srcs = ["exp_test.py"],
@@ -1048,7 +1068,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "expm1_test",
     size = "small",
     srcs = ["expm1_test.py"],
@@ -1061,10 +1081,12 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "ffjord_test",
     size = "medium",
     srcs = ["ffjord_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1076,7 +1098,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "fill_triangular_test",
     size = "small",
     srcs = ["fill_triangular_test.py"],
@@ -1089,7 +1111,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "gumbel_cdf_test",
     size = "small",
     srcs = ["gumbel_cdf_test.py"],
@@ -1103,7 +1125,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "identity_test",
     size = "small",
     srcs = ["identity_test.py"],
@@ -1115,7 +1137,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "inline_test",
     size = "small",
     srcs = ["inline_test.py"],
@@ -1128,7 +1150,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "invert_test",
     size = "small",
     srcs = ["invert_test.py"],
@@ -1143,7 +1165,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "kumaraswamy_cdf_test",
     size = "small",
     srcs = ["kumaraswamy_cdf_test.py"],
@@ -1173,7 +1195,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "matrix_inverse_tril_test",
     size = "small",
     srcs = ["matrix_inverse_tril_test.py"],
@@ -1199,7 +1221,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "normal_cdf_test",
     size = "small",
     srcs = ["normal_cdf_test.py"],
@@ -1213,7 +1235,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "ordered_test",
     size = "small",
     srcs = ["ordered_test.py"],
@@ -1227,7 +1249,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "pad_test",
     size = "small",
     srcs = ["pad_test.py"],
@@ -1239,10 +1261,12 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "permute_test",
     size = "small",
     srcs = ["permute_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1252,7 +1276,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "power_transform_test",
     size = "small",
     srcs = ["power_transform_test.py"],
@@ -1279,10 +1303,12 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "rational_quadratic_spline_test",
     size = "medium",
     srcs = ["rational_quadratic_spline_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     tags = ["hypothesis"],
     deps = [
         ":bijector_test_util",
@@ -1295,7 +1321,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "reciprocal_test",
     size = "small",
     srcs = ["reciprocal_test.py"],
@@ -1309,10 +1335,11 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "reshape_test",
     size = "small",
     srcs = ["reshape_test.py"],
+    jax_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1323,7 +1350,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "fill_scale_tril_test",
     size = "small",
     srcs = ["fill_scale_tril_test.py"],
@@ -1335,7 +1362,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "sigmoid_test",
     size = "small",
     srcs = ["sigmoid_test.py"],
@@ -1349,10 +1376,11 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "sinh_arcsinh_test",
     size = "small",
     srcs = ["sinh_arcsinh_test.py"],
+    jax_tags = ["notap"],
     tags = ["no_windows"],  # TODO: needs investigation on Windows.
     deps = [
         ":bijector_test_util",
@@ -1363,7 +1391,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "softmax_centered_test",
     size = "small",
     srcs = ["softmax_centered_test.py"],
@@ -1377,7 +1405,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "softplus_test",
     size = "small",
     srcs = ["softplus_test.py"],
@@ -1390,7 +1418,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "softsign_test",
     size = "small",
     srcs = ["softsign_test.py"],
@@ -1403,7 +1431,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "square_test",
     size = "small",
     srcs = ["square_test.py"],
@@ -1416,7 +1444,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "iterated_sigmoid_centered_test",
     size = "small",
     srcs = ["iterated_sigmoid_centered_test.py"],
@@ -1431,7 +1459,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "softfloor_test",
     size = "small",
     srcs = ["softfloor_test.py"],
@@ -1444,7 +1472,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "tanh_test",
     size = "small",
     srcs = ["tanh_test.py"],
@@ -1457,9 +1485,9 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "transform_diagonal_test",
-    size = "small",
+    size = "medium",
     srcs = ["transform_diagonal_test.py"],
     tags = ["hypothesis"],
     deps = [
@@ -1474,7 +1502,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "transpose_test",
     size = "small",
     srcs = ["transpose_test.py"],
@@ -1488,7 +1516,7 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "weibull_cdf_test",
     size = "small",
     srcs = ["weibull_cdf_test.py"],

@@ -13,8 +13,6 @@
 # limitations under the License.
 # ============================================================================
 
-# [internal] load python3.bzl
-
 licenses(["notice"])  # Apache 2.0
 
 package(
@@ -25,53 +23,10 @@ package(
 
 exports_files(["LICENSE"])
 
-FILENAMES = [
-    "util",
-]
-
-TEST_WHITELIST = [
-    "util",
-]
-
-TEST_FILENAMES = [filename + "_test" for filename in TEST_WHITELIST]
-
-DEPS = {
-    "util": [
-        "//tensorflow_probability/python/experimental/substrates/jax/internal:prefer_static",
-    ],
-}
-
-[genrule(
-    name = "rewrite_{}".format(filename),
-    srcs = ["//tensorflow_probability/python/math/psd_kernels/internal:{}.py".format(filename)],
-    outs = ["{}.py".format(filename)],
-    cmd = "$(location //tensorflow_probability/python/experimental/substrates/meta:rewrite) $(SRCS) --numpy_to_jax > $@",
-    tools = ["//tensorflow_probability/python/experimental/substrates/meta:rewrite"],
-) for filename in FILENAMES + TEST_FILENAMES]
-
-[py_library(
-    name = filename,
-    srcs = ["{}.py".format(filename)],
-    deps = [
-        "//tensorflow_probability/python/internal/backend/jax",
-    ] + DEPS.get(filename, []),
-) for filename in FILENAMES]
-
-[py_test(
-    name = filename,
-    size = "medium",
-    srcs = ["{}.py".format(filename)],
-    tags = ["tfp_jax"],
-    deps = [
-        ":internal",
-        # jax dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/experimental/substrates/jax/internal:test_util",
-    ],
-) for filename in TEST_FILENAMES]
-
 py_library(
     name = "internal",
     srcs = ["__init__.py"],
-    deps = [":{}".format(filename) for filename in FILENAMES],
+    deps = [
+        "//tensorflow_probability/python/math/psd_kernels/internal:internal.jax",
+    ],
 )

@@ -12,4 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""Numpy distributions."""
 
+from tensorflow_probability.python.distributions._numpy import *  # pylint: disable=wildcard-import

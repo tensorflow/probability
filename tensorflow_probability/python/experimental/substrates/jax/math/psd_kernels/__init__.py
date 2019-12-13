@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""JAX PSD kernels."""
 
-# The generated _init_prefix.py (a rewrite of distributions/__init__.py) and
-# this file (_init_suffix.py) are concatenated to produce
-# jax/distributions/__init__.py at build time, allowing for JAX-specific
-# wrapping / modification of the distributions package.
+from tensorflow_probability.python.math.psd_kernels._jax import *  # pylint: disable=wildcard-import

@@ -355,6 +355,16 @@ class NumpyVariable(wrapt.ObjectProxy):
     super(NumpyVariable, self).__init__(onp.array(value, dtype=self.dtype))
     return self
 
+  def assign_add(self, value):
+    super(NumpyVariable, self).__init__(
+        onp.array(self, dtype=self.dtype) + onp.array(value, dtype=self.dtype))
+    return self
+
+  def assign_sub(self, value):
+    super(NumpyVariable, self).__init__(
+        onp.array(self, dtype=self.dtype) - onp.array(value, dtype=self.dtype))
+    return self
+
 
 if JAX_MODE:
   from jax.interpreters.xla import canonicalize_dtype_handlers  # pylint: disable=g-import-not-at-top
@@ -379,7 +389,7 @@ class _TensorMeta(type(np.ndarray)):
 
 
 class Tensor(six.with_metaclass(_TensorMeta)):
-  pass
+  OVERLOADABLE_OPERATORS = ()
 
 
 class Module(object):

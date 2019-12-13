@@ -16,6 +16,11 @@
 #   Internal helper libraries for distributions.
 
 # [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
 
 licenses(["notice"])  # Apache 2.0
 
@@ -27,13 +32,13 @@ package(
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "init",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
 )
 
-py_library(
+multi_substrate_py_library(
     name = "statistical_testing",
     srcs = ["statistical_testing.py"],
     srcs_version = "PY2AND3",
@@ -107,7 +112,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "slicing",
     srcs = ["slicing.py"],
     deps = [
@@ -117,7 +122,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "slicing_test",
     size = "small",
     srcs = ["slicing_test.py"],

@@ -13,23 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Numpy math."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
-# pylint: disable=unused-import
+from tensorflow_probability.python.math._numpy import *  # pylint: disable=wildcard-import
 
-from tensorflow_probability.python.experimental.substrates.numpy.math.generic import log1mexp
-from tensorflow_probability.python.experimental.substrates.numpy.math.generic import log_add_exp
-from tensorflow_probability.python.experimental.substrates.numpy.math.generic import log_combinations
-from tensorflow_probability.python.experimental.substrates.numpy.math.generic import log_sub_exp
-from tensorflow_probability.python.experimental.substrates.numpy.math.generic import reduce_weighted_logsumexp
-from tensorflow_probability.python.experimental.substrates.numpy.math.generic import soft_sorting_matrix
-from tensorflow_probability.python.experimental.substrates.numpy.math.generic import soft_threshold
-from tensorflow_probability.python.experimental.substrates.numpy.math.generic import softplus_inverse
-from tensorflow_probability.python.experimental.substrates.numpy.math.linalg import fill_triangular
-from tensorflow_probability.python.experimental.substrates.numpy.math.linalg import fill_triangular_inverse
-from tensorflow_probability.python.experimental.substrates.numpy.math.numeric import log1psquare
-from tensorflow_probability.python.experimental.substrates.numpy.math.random_ops import random_rademacher
-from tensorflow_probability.python.experimental.substrates.numpy.math.random_ops import random_rayleigh
 value_and_gradient = None

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# TFP with the JAX backend.
 
 licenses(["notice"])  # Apache 2.0
 
@@ -25,9 +24,9 @@ package(
 exports_files(["LICENSE"])
 
 py_library(
-    name = "internal",
+    name = "psd_kernels",
     srcs = ["__init__.py"],
     deps = [
-        "//tensorflow_probability/python/internal:internal.jax",
+        "//tensorflow_probability/python/math/psd_kernels:psd_kernels.numpy",
     ],
 )

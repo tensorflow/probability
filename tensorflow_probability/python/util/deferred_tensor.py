@@ -35,6 +35,9 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+
+
 _identity = lambda x: x
 _tensor_op_fn = lambda fn, s, *a, **k: fn(s._value(), *a, **k)  # pylint: disable=protected-access
 
@@ -204,7 +207,7 @@ class DeferredTensor(tf.Module):
       dtype = (getattr(transform_fn, 'dtype', None) or
                dtype_util.base_dtype(pretransformed_input.dtype))
     try:
-      dtype = None if dtype is None else tf.dtypes.as_dtype(dtype)
+      dtype = None if dtype is None else tf.as_dtype(dtype)
     except TypeError:
       raise TypeError('Argument `dtype` must be convertible to a '
                       '`tf.dtypes.DType`; saw "{}" of type "{}".'.format(
@@ -253,7 +256,8 @@ class DeferredTensor(tf.Module):
     # ValueError: Graph parent item 0 is not a Tensor;
     #   <DeferredTensor: dtype=float32, shape=[2], fn=exp>.
     # TODO(b/140157055): Remove this shim after LinOp is patched in 2.0.
-    self.is_tensor_like = True
+    if not JAX_MODE:
+      self.is_tensor_like = True
 
   @property
   def transform_fn(self):
@@ -336,6 +340,13 @@ class DeferredTensor(tf.Module):
           'Actual shape ({}) is incompatible with deferred shape ({}).'.format(
               y.shape, self.shape))
     return tf.convert_to_tensor(y, dtype=dtype, name=name)
+
+  def __array__(self, dtype=None):
+    if not tf.executing_eagerly():
+      raise NotImplementedError(
+          'Cannot convert a symbolic (graph mode) `DeferredTensor` to a '
+          'numpy array.')
+    return self._value(dtype=dtype)
 
 
 class TransformedVariable(DeferredTensor):

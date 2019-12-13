@@ -12,22 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# TFP with the JAX backend.
+"""Numpy PSD kernels."""
 
-licenses(["notice"])  # Apache 2.0
-
-package(
-    default_visibility = [
-        "//tensorflow_probability:__subpackages__",
-    ],
-)
-
-exports_files(["LICENSE"])
-
-py_library(
-    name = "internal",
-    srcs = ["__init__.py"],
-    deps = [
-        "//tensorflow_probability/python/internal:internal.jax",
-    ],
-)
+from tensorflow_probability.python.math.psd_kernels.internal._numpy import *  # pylint: disable=wildcard-import

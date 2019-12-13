@@ -16,6 +16,10 @@
 #   Statistical Ops.
 
 # [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+)
 
 package(
     default_visibility = [
@@ -27,10 +31,16 @@ licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "stats",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+    substrates_omit_deps = [
+        ":calibration",
+        ":quantiles",
+        ":ranking",
+        ":sample_stats",
+    ],
     deps = [
         ":calibration",
         ":leave_one_out",
@@ -41,7 +51,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "leave_one_out",
     srcs = ["leave_one_out.py"],
     srcs_version = "PY2AND3",
@@ -67,7 +77,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "moving_stats",
     srcs = ["moving_stats.py"],
     deps = [

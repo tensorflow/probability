@@ -16,6 +16,11 @@
 #   TensorFlow Probability general math functions.
 
 # [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
 
 package(
     default_visibility = [
@@ -27,7 +32,7 @@ licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "math",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
@@ -73,7 +78,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "generic",
     srcs = [
         "generic.py",
@@ -87,7 +92,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "generic_test",
     size = "small",
     srcs = ["generic_test.py"],
@@ -100,7 +105,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "gradient",
     srcs = [
         "gradient.py",
@@ -111,7 +116,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "gradient_test",
     size = "small",
     srcs = ["gradient_test.py"],
@@ -151,7 +156,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "linalg",
     srcs = [
         "linalg.py",
@@ -209,7 +214,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "numeric",
     srcs = [
         "numeric.py",
@@ -237,7 +242,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "random_ops",
     srcs = [
         "random_ops.py",
@@ -248,7 +253,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "random_ops_test",
     size = "small",
     srcs = ["random_ops_test.py"],

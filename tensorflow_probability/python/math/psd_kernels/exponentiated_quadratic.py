@@ -111,12 +111,12 @@ class ExponentiatedQuadratic(PositiveSemidefiniteKernel):
       length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
           length_scale, example_ndims)
-      exponent /= length_scale**2
+      exponent = exponent / length_scale**2
 
     if self.amplitude is not None:
       amplitude = tf.convert_to_tensor(self.amplitude)
       amplitude = util.pad_shape_with_ones(amplitude, example_ndims)
-      exponent += 2. * tf.math.log(amplitude)
+      exponent = exponent + 2. * tf.math.log(amplitude)
 
     return tf.exp(exponent)
 
