@@ -127,6 +127,7 @@ TEST_SIZES = {
 TAP_WHITELIST = ["{}_test".format(filename) for filename in (
     "cauchy",
     "cholesky_lkj",
+    "doublesided_maxwell",
     "exponential",
     "gamma_gamma",
     "gaussian_process",

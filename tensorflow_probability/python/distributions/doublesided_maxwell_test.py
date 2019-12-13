@@ -88,7 +88,7 @@ class DoublesidedMaxwellTest(test_util.TestCase):
   def testDoublesidedMaxwellSample(self, loc, scale):
     n = int(100e3)
     dsmaxwell = tfd.DoublesidedMaxwell(loc=loc, scale=scale, validate_args=True)
-    samples = dsmaxwell.sample(n, seed=100)
+    samples = dsmaxwell.sample(n, seed=test_util.test_seed())
     mean = dsmaxwell.mean()
     variance = dsmaxwell.variance()
 
@@ -139,7 +139,7 @@ class DoublesidedMaxwellTest(test_util.TestCase):
     dsmaxwell = tfd.DoublesidedMaxwell(loc=loc, scale=sigma, validate_args=True)
 
     n = 10
-    samples = dsmaxwell.sample(n, seed=100)
+    samples = dsmaxwell.sample(n, seed=test_util.test_seed())
     self.assertAllEqual((n, 3,), samples.shape)
 
 if __name__ == '__main__':
