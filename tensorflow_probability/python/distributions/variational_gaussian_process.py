@@ -498,7 +498,7 @@ class VariationalGaussianProcess(
                jitter=1e-6,
                validate_args=False,
                allow_nan_stats=False,
-               name='VariataionalGaussianProcess'):
+               name='VariationalGaussianProcess'):
     """Instantiate a VariationalGaussianProcess Distribution.
 
     Args:

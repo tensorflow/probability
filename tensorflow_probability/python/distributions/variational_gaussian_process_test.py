@@ -24,10 +24,12 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability import distributions as tfd
+import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import psd_kernels
+
+tfd = tfp.distributions
 
 
 def _np_kernel_matrix_fn(amp, length_scale, x, y):

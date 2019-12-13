@@ -45,8 +45,8 @@ TF_REPLACEMENTS = {
 
 DISABLED_BIJECTORS = ('masked_autoregressive', 'scale_matvec_lu', 'real_nvp')
 DISABLED_DISTS = ('joint_distribution',
-                  'internal.moving_stats', 'student_t_process',
-                  'variational_gaussian_process')
+                  'internal.moving_stats', 'student_t_process')
+NUMPY_DISABLED_DISTS = ('gaussian_process', 'variational_gaussian_process')
 LIBS = ('bijectors', 'distributions',
         'math', 'math.psd_kernels', 'math.psd_kernels.internal',
         'stats',
@@ -65,7 +65,7 @@ def main(argv):
       for bijector in DISABLED_BIJECTORS
   })
   if not FLAGS.numpy_to_jax:
-    disabled_dists = DISABLED_DISTS + ('gaussian_process',)
+    disabled_dists = DISABLED_DISTS + NUMPY_DISABLED_DISTS
   else:
     disabled_dists = DISABLED_DISTS
   replacements.update({
