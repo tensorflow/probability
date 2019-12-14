@@ -73,6 +73,8 @@ class GeneralizedParetoTest(test_util.TestCase):
   @hp.given(generalized_paretos(batch_shape=[]))
   @tfp_hps.tfp_hp_settings()
   def testLogPDF(self, dist):
+    loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
+    hp.assume(abs(loc / scale) < 1e7)
     xs = self.evaluate(dist.sample(seed=test_util.test_seed()))
 
     logp = dist.log_prob(xs)
@@ -80,7 +82,6 @@ class GeneralizedParetoTest(test_util.TestCase):
     p = dist.prob(xs)
     self.assertEqual(dist.batch_shape, p.shape)
 
-    loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
     expected_logp = sp_stats.genpareto(conc, loc=loc, scale=scale).logpdf(xs)
     actual_logp = self.evaluate(logp)
     self.assertAllClose(expected_logp, actual_logp, rtol=1e-5)
@@ -131,6 +132,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     self.assertEqual(dist.batch_shape, cdf.shape)
 
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
+    hp.assume(abs(loc / scale) < 1e7)
     expected_cdf = sp_stats.genpareto(conc, loc=loc, scale=scale).cdf(xs)
     actual_cdf = self.evaluate(cdf)
     msg = ('Location: {}, scale: {}, concentration: {}, xs: {} '
