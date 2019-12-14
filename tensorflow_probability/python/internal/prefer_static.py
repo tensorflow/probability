@@ -33,14 +33,6 @@ from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-t
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
-def _maybe_get_static_args(args):
-  flat_args = tf.nest.flatten(args)
-  flat_args_ = [tf.get_static_value(a) for a in flat_args]
-  all_static = all(arg is None or arg_ is not None
-                   for arg, arg_ in zip(flat_args, flat_args_))
-  return tf.nest.pack_sequence_as(args, flat_args_), all_static
-
-
 def _prefer_static(original_fn, static_fn):
   """Wraps original_fn, preferring to call static_fn when inputs are static."""
   original_spec = tf_inspect.getfullargspec(original_fn)
@@ -51,9 +43,17 @@ def _prefer_static(original_fn, static_fn):
             original_spec, static_spec, original_fn))
   @decorator.decorator
   def wrap(wrapped_fn, *args, **kwargs):
+    """The actual wrapper."""
     del wrapped_fn
-    [args_, kwargs_], all_static = _maybe_get_static_args([args, kwargs])
+    flat_args = tf.nest.flatten([args, kwargs])
+    # N.B.: This `get_static_value` is nontrivial even in Eager mode, because
+    # Keras's symbolic Tensors can exist when executing eagerly, and their
+    # static values can be `None`.
+    flat_args_ = [tf.get_static_value(a) for a in flat_args]
+    all_static = all(arg is None or arg_ is not None
+                     for arg, arg_ in zip(flat_args, flat_args_))
     if all_static:
+      [args_, kwargs_] = tf.nest.pack_sequence_as([args, kwargs], flat_args_)
       return static_fn(*args_, **kwargs_)
     return original_fn(*args, **kwargs)
   return wrap(original_fn)
