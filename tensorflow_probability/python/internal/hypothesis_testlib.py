@@ -331,7 +331,8 @@ def constrained_tensors(constraint_fn, shape, dtype=np.float32):
 
 
 @hps.composite
-def tensors_in_support(draw, support, batch_shape=None, event_dim=None):
+def tensors_in_support(draw, support, batch_shape=None, event_dim=None,
+                       dtype=np.float32):
   """Strategy for drawing Tensors in the given support.
 
   Supports have a notion of event shape, which is the trailing dimensions in
@@ -347,6 +348,8 @@ def tensors_in_support(draw, support, batch_shape=None, event_dim=None):
     event_dim: Optional Python int giving the size of each event dimension.
       This is shared across all event dimensions, permitting square event
       matrices, etc. If omitted, Hypothesis will choose one.
+    dtype: DType to use in generating tensor data.
+      Default value: `np.float32`.
 
   Returns:
     tensors: A strategy for drawing such Tensors.
@@ -357,7 +360,7 @@ def tensors_in_support(draw, support, batch_shape=None, event_dim=None):
     batch_shape = tensorshape_util.as_list(draw(shapes()))
   shape = batch_shape + [event_dim] * min_rank_for_support(support)
   constraint_fn = constrainer(support)
-  return draw(constrained_tensors(constraint_fn, shape))
+  return draw(constrained_tensors(constraint_fn, shape, dtype=dtype))
 
 
 @hps.composite

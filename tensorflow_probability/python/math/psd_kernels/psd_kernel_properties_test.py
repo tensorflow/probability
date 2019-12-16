@@ -34,7 +34,10 @@ TF2_FRIENDLY_KERNELS = (
     'MaternOneHalf',
     'MaternThreeHalves',
     'MaternFiveHalves',
-    'Polynomial',
+    # TODO(b/146073659): Polynomial as currently configured often produces
+    # numerically ill-conditioned matrices. Disabled until we can make it more
+    # reliable in the context of hypothesis tests.
+    # 'Polynomial',
     'RationalQuadratic',
     'SchurComplement',
 )
@@ -65,9 +68,9 @@ class KernelPropertiesTest(test_util.TestCase):
           hp.HealthCheck.too_slow,
           hp.HealthCheck.data_too_large])
   def testKernelGradient(self, kernel_name, data):
-    event_dim = data.draw(hps.integers(min_value=2, max_value=6))
-    feature_ndims = data.draw(hps.integers(min_value=1, max_value=4))
-    feature_dim = data.draw(hps.integers(min_value=2, max_value=6))
+    event_dim = data.draw(hps.integers(min_value=2, max_value=4))
+    feature_ndims = data.draw(hps.integers(min_value=1, max_value=2))
+    feature_dim = data.draw(hps.integers(min_value=2, max_value=4))
 
     kernel, kernel_parameter_variable_names = data.draw(
         kernel_hps.kernels(
@@ -84,7 +87,7 @@ class KernelPropertiesTest(test_util.TestCase):
         set(kernel_parameter_variable_names),
         set(kernel_variables_names))
 
-    example_ndims = data.draw(hps.integers(min_value=1, max_value=3))
+    example_ndims = data.draw(hps.integers(min_value=1, max_value=2))
     input_batch_shape = data.draw(tfp_hps.broadcast_compatible_shape(
         kernel.batch_shape))
     xs = tf.identity(data.draw(kernel_hps.kernel_input(

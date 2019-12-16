@@ -46,6 +46,15 @@ MUTEX_PARAMS = set()
 PROCESS_HAS_EXCESSIVE_USAGE = set(['GaussianProcessRegressionModel'])
 
 
+def _stochastic_process_specific_hp_settings(test_method):
+  return tfp_hps.tfp_hp_settings(
+      default_max_examples=5,
+      suppress_health_check=[
+          hp.HealthCheck.too_slow,
+          hp.HealthCheck.filter_too_much,
+          hp.HealthCheck.data_too_large])(test_method)
+
+
 # pylint is unable to handle @hps.composite (e.g. complains "No value for
 # argument 'batch_shape' in function call"), so disable this lint for the file.
 
@@ -93,9 +102,9 @@ def stochastic_processes(draw,
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
   if event_dim is None:
-    event_dim = draw(hps.integers(min_value=2, max_value=6))
+    event_dim = draw(hps.integers(min_value=2, max_value=4))
   if feature_dim is None:
-    feature_dim = draw(hps.integers(min_value=2, max_value=6))
+    feature_dim = draw(hps.integers(min_value=2, max_value=4))
   if feature_ndims is None:
     feature_ndims = draw(hps.integers(min_value=1, max_value=3))
 
@@ -123,7 +132,7 @@ def stochastic_processes(draw,
         feature_dim=feature_dim,
         feature_ndims=feature_ndims,
         enable_vars=enable_vars))
-  raise ValueError('Stochastic process not found.')
+  raise ValueError('Stochastic process "{}" not found.'.format(process_name))
 
 
 @hps.composite
@@ -190,7 +199,7 @@ def gaussian_process_regression_models(draw,
       feature_ndims=feature_ndims,
       enable_vars=enable_vars,
       name='index_points'))
-  hp.note('Index points: {}'.format(index_points))
+  hp.note('Index points:\n{}'.format(index_points))
 
   observation_index_points = draw(
       kernel_hps.kernel_input(
@@ -200,27 +209,26 @@ def gaussian_process_regression_models(draw,
           feature_ndims=feature_ndims,
           enable_vars=enable_vars,
           name='observation_index_points'))
-  hp.note('Observation index points: {}'.format(observation_index_points))
+  hp.note('Observation index points:\n{}'.format(observation_index_points))
 
   observations = draw(kernel_hps.kernel_input(
       batch_shape=compatible_batch_shape,
       example_ndims=1,
       # This is the example dimension suggested observation_index_points.
-      example_dim=int(observation_index_points.shape[
-          -(feature_ndims + 1)]),
+      example_dim=int(observation_index_points.shape[-(feature_ndims + 1)]),
       # No feature dimensions.
       feature_dim=0,
       feature_ndims=0,
       enable_vars=enable_vars,
       name='observations'))
-  hp.note('Observations: {}'.format(observations))
+  hp.note('Observations:\n{}'.format(observations))
 
   params = draw(broadcasting_params(
       'GaussianProcessRegressionModel',
       compatible_batch_shape,
       event_dim=event_dim,
       enable_vars=enable_vars))
-  hp.note('Params: {}'.format(params))
+  hp.note('Params:\n{}'.format(params))
 
   gp = tfd.GaussianProcessRegressionModel(
       kernel=k,
@@ -284,80 +292,103 @@ def assert_shapes_unchanged(target_shaped_dict, possibly_bcast_dict):
 class StochasticProcessParamsAreVarsTest(test_util.TestCase):
 
   @parameterized.named_parameters(
-      {'testcase_name': sname, 'process_name': sname}
+      {'testcase_name': '_{}'.format(sname), 'process_name': sname}
       for sname in PARAM_EVENT_NDIMS_BY_PROCESS_NAME)
   @hp.given(hps.data())
-  @tfp_hps.tfp_hp_settings(
-      default_max_examples=10,
-      suppress_health_check=[
-          hp.HealthCheck.too_slow,
-          hp.HealthCheck.filter_too_much,
-          hp.HealthCheck.data_too_large])
-  def testProcess(self, process_name, data):
-    if process_name == 'GaussianProcessRegressionModel':
-      import unittest  # pylint: disable=g-import-not-at-top
-      raise unittest.case.SkipTest('b/144181034')
-
-    seed = test_util.test_seed()
-    process = data.draw(stochastic_processes(
-        process_name=process_name, enable_vars=True))
-    self.evaluate([var.initializer for var in process.variables])
-
+  @_stochastic_process_specific_hp_settings
+  def testVariableParametersArePreserved(self, process_name, data):
     # Check that the process passes Variables through to the accessor
     # properties (without converting them to Tensor or anything like that).
+    process = data.draw(stochastic_processes(process_name, enable_vars=True))
+    self.evaluate([var.initializer for var in process.variables])
+
     for k, v in six.iteritems(process.parameters):
       if not tensor_util.is_ref(v):
         continue
-      self.assertIs(getattr(process, k), v)
+      self.assertIs(
+          getattr(process, k), v,
+          'Parameter equivalance assertion failed for parameter `{}`'.format(k))
 
-    # Check that standard statistics do not read process parameters more
-    # than twice (once in the stat itself and up to once in any validation
-    # assertions).
-    for stat in ['mean', 'covariance', 'stddev', 'variance']:
-      hp.note('Testing excessive var usage in {}.{}'.format(process_name, stat))
+  @parameterized.named_parameters(
+      {'testcase_name': '_' + sname, 'process_name': sname}
+      for sname in PARAM_EVENT_NDIMS_BY_PROCESS_NAME)
+  @hp.given(hps.data())
+  @_stochastic_process_specific_hp_settings
+  def testExcessiveConcretizationInZeroArgPublicMethods(
+      self, process_name, data):
+    # Check that standard statistics do not concretize variables/deferred
+    # tensors more than the allowed amount.
+    process = data.draw(stochastic_processes(process_name, enable_vars=True))
+    self.evaluate([var.initializer for var in process.variables])
+
+    for stat in ['mean', 'covariance', 'stddev', 'variance', 'sample']:
+      hp.note('Testing excessive concretization in {}.{}'.format(process_name,
+                                                                 stat))
       try:
         with tfp_hps.assert_no_excessive_var_usage(
-            'statistic `{}` of `{}`'.format(stat, process),
+            'method `{}` of `{}`'.format(stat, process),
             max_permissible=excessive_usage_count(process_name)):
           getattr(process, stat)()
 
       except NotImplementedError:
         pass
 
-    # Check that `sample` doesn't read process parameters more than twice,
-    # and that it produces non-None gradients (if the process is fully
-    # reparameterized).
+  @parameterized.named_parameters(
+      {'testcase_name': '_' + sname, 'process_name': sname}
+      for sname in PARAM_EVENT_NDIMS_BY_PROCESS_NAME)
+  @hp.given(hps.data())
+  @_stochastic_process_specific_hp_settings
+  def testGradientsThroughSample(self, process_name, data):
+    process = data.draw(stochastic_processes(
+        process_name=process_name, enable_vars=True))
+    self.evaluate([var.initializer for var in process.variables])
+
     with tf.GradientTape() as tape:
-      with tfp_hps.assert_no_excessive_var_usage(
-          'method `sample` of `{}`'.format(process),
-          max_permissible=excessive_usage_count(process_name)):
-        sample = process.sample(seed=seed)
-    hp.note('Drew sample {}'.format(sample))
+      sample = process.sample()
     if process.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
       grads = tape.gradient(sample, process.variables)
       for grad, var in zip(grads, process.variables):
-        var_name = var.name.rstrip('_0123456789:')
-        if grad is None:
-          raise AssertionError(
-              'Missing sample -> {} grad for process {}'.format(
-                  var_name, process_name))
+        self.assertIsNotNone(
+            grad,
+            'Grad of sample was `None` for var: {}.'.format(var))
+
+  @parameterized.named_parameters(
+      {'testcase_name': '_' + sname, 'process_name': sname}
+      for sname in PARAM_EVENT_NDIMS_BY_PROCESS_NAME)
+  @hp.given(hps.data())
+  @_stochastic_process_specific_hp_settings
+  def testGradientsThroughLogProb(self, process_name, data):
+    process = data.draw(stochastic_processes(
+        process_name=process_name, enable_vars=True))
+    self.evaluate([var.initializer for var in process.variables])
 
     # Test that log_prob produces non-None gradients.
+    sample = process.sample()
     with tf.GradientTape() as tape:
-      lp = process.log_prob(tf.stop_gradient(sample))
+      lp = process.log_prob(sample)
     grads = tape.gradient(lp, process.variables)
     for grad, var in zip(grads, process.variables):
-      if grad is None:
-        raise AssertionError(
-            'Missing log_prob -> {} grad for process {}'.format(
-                var, process_name))
+      self.assertIsNotNone(
+          grad,
+          'Grad of log_prob was `None` for var: {}.'.format(var))
 
+  @parameterized.named_parameters(
+      {'testcase_name': '_' + sname, 'process_name': sname}
+      for sname in PARAM_EVENT_NDIMS_BY_PROCESS_NAME)
+  @hp.given(hps.data())
+  @_stochastic_process_specific_hp_settings
+  def testExcessiveConcretizationInLogProb(self, process_name, data):
     # Check that log_prob computations avoid reading process parameters
     # more than once.
+    process = data.draw(stochastic_processes(
+        process_name=process_name, enable_vars=True))
+    self.evaluate([var.initializer for var in process.variables])
+
     hp.note('Testing excessive var usage in {}.log_prob'.format(process_name))
+    sample = process.sample()
     try:
       with tfp_hps.assert_no_excessive_var_usage(
-          'evaluative `log_prob` of `{}`'.format(process),
+          'method `log_prob` of `{}`'.format(process),
           max_permissible=excessive_usage_count(process_name)):
         process.log_prob(sample)
     except NotImplementedError:

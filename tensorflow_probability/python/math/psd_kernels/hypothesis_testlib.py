@@ -38,8 +38,11 @@ INSTANTIABLE_BASE_KERNELS = {
     'MaternOneHalf': dict(amplitude=0, length_scale=0),
     'MaternThreeHalves': dict(amplitude=0, length_scale=0),
     'MaternFiveHalves': dict(amplitude=0, length_scale=0),
-    'Polynomial': dict(
-        bias_variance=0, slope_variance=0, shift=0, exponent=0),
+    # TODO(b/146073659): Polynomial as currently configured often produces
+    # numerically ill-conditioned matrices. Disabled until we can make it more
+    # reliable in the context of hypothesis tests.
+    # 'Polynomial': dict(
+    #    bias_variance=0, slope_variance=0, shift=0, exponent=0),
     'RationalQuadratic': dict(
         amplitude=0, length_scale=0, scale_mixture_rate=0),
 }
@@ -71,6 +74,13 @@ def kernel_input(
     name=None):
   """Strategy for drawing arbitrary Kernel input.
 
+  In order to avoid duplicates (or even numerically near-duplicates), we
+  generate inputs on a grid. We let hypothesis generate the number of grid
+  points and distance between grid points, within some reasonable pre-defined
+  ranges. The result will be a batch of example sets, within which each set of
+  examples has no duplicates (but no such duplication avoidance is applied
+  accross batches).
+
   Args:
     draw: Hypothesis function supplied by `@hps.composite`.
     batch_shape: `TensorShape`. The batch shape of the resulting
@@ -92,30 +102,58 @@ def kernel_input(
       (or an arbitrary one if omitted).
   """
   if example_ndims is None:
-    example_ndims = draw(hps.integers(min_value=1, max_value=4))
+    example_ndims = draw(hps.integers(min_value=1, max_value=2))
   if example_dim is None:
-    example_dim = draw(hps.integers(min_value=2, max_value=6))
+    example_dim = draw(hps.integers(min_value=2, max_value=4))
 
   if feature_ndims is None:
-    feature_ndims = draw(hps.integers(min_value=1, max_value=4))
+    feature_ndims = draw(hps.integers(min_value=1, max_value=2))
   if feature_dim is None:
-    feature_dim = draw(hps.integers(min_value=2, max_value=6))
+    feature_dim = draw(hps.integers(min_value=2, max_value=4))
 
-  input_shape = batch_shape
-  input_shape += [example_dim] * example_ndims
-  input_shape += [feature_dim] * feature_ndims
-  # We would like kernel inputs to be unique. This is to avoid computing kernel
-  # matrices that are semi-definite.
-  x = draw(hpnp.arrays(
-      dtype=np.float64,
-      shape=tensorshape_util.as_list(input_shape),
-      elements=hps.floats(-50, 50, allow_nan=False, allow_infinity=False),
-      unique=True))
+  batch_shape = tensorshape_util.as_list(batch_shape)
+  example_shape = [example_dim] * example_ndims
+  feature_shape = [feature_dim] * feature_ndims
+
+  batch_size = int(np.prod(batch_shape))
+  example_size = example_dim ** example_ndims
+  feature_size = feature_dim ** feature_ndims
+
+  # We would like each batch of examples to be unique, to avoid computing kernel
+  # matrices that are semi-definite. hypothesis.extra.numpy.arrays doesn't have
+  # a sense of tolerance, so we need to do some extra work to get points
+  # sufficiently far from each other.
+  grid_size = draw(hps.integers(min_value=10, max_value=100))
+  grid_spacing = draw(hps.floats(min_value=1e-2, max_value=2))
+  hp.note('Grid size {} and spacing {}'.format(grid_size, grid_spacing))
+
+  def _grid_indices_to_values(grid_indices):
+    return (grid_spacing *
+            (np.array(grid_indices, dtype=np.float64) - np.float64(grid_size)))
+
+  # We'll construct the result by stacking onto flattened batch, example and
+  # feature dims, then reshape to unflatten at the end.
+  result = np.zeros([0, example_size, feature_size])
+  for _ in range(batch_size):
+    seen = set()
+    index_array_strategy = hps.tuples(
+        *([hps.integers(0, grid_size + 1)] * feature_size)).filter(
+            lambda x, seen=seen: x not in seen)  # Default param to sate pylint.
+    examples = np.zeros([1, 0, feature_size])
+    for _ in range(example_size):
+      feature_grid_locations = draw(index_array_strategy)
+      seen.add(feature_grid_locations)
+      example = _grid_indices_to_values(feature_grid_locations)
+      example = example[np.newaxis, np.newaxis, ...]
+      examples = np.concatenate([examples, example], axis=1)
+    result = np.concatenate([result, examples], axis=0)
+  result = np.reshape(result, batch_shape + example_shape + feature_shape)
+
   if enable_vars and draw(hps.booleans()):
-    x = tf.Variable(x, name=name)
+    result = tf.Variable(result, name=name)
     if draw(hps.booleans()):
-      x = tfp_hps.defer_and_count_usage(x)
-  return x
+      result = tfp_hps.defer_and_count_usage(result)
+  return result
 
 
 @hps.composite
@@ -360,8 +398,8 @@ def base_kernels(
                           enable_vars=enable_vars))
   kernel_variable_names = [
       k for k in kernel_params if tensor_util.is_ref(kernel_params[k])]
-  hp.note('Forming kernel {} with constrained parameters {}'.format(
-      kernel_name, kernel_params))
+  hp.note('Forming kernel {} with feature_ndims {} and constrained parameters '
+          '{}'.format(kernel_name, feature_ndims, kernel_params))
   ctor = getattr(tfpk, kernel_name)
   result_kernel = ctor(
       validate_args=True,
@@ -456,10 +494,10 @@ CONSTRAINTS = {
     # Keep parameters large enough but not too large so matrices are
     # well-conditioned. The ranges below were chosen to ensure kernel
     # matrices are positive definite.
-    'amplitude': constrain_to_range(1., 6.),
+    'amplitude': constrain_to_range(1., 2.),
     'bias_variance': constrain_to_range(0.1, 0.5),
-    'slope_variance': constrain_to_range(2., 4.),
-    'exponent': constrain_to_range(1, 2.),
+    'slope_variance': constrain_to_range(0.1, 0.5),
+    'exponent': constrain_to_range(1, 1.5),
     'length_scale': constrain_to_range(1., 6.),
     'period': constrain_to_range(1., 6.),
     'scale_mixture_rate': constrain_to_range(1., 6.),
