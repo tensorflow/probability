@@ -43,14 +43,23 @@ TF_REPLACEMENTS = {
         'tfp = tfp.experimental.substrates.numpy',
 }
 
-DISABLED_BIJECTORS = ('masked_autoregressive', 'scale_matvec_lu', 'real_nvp')
-DISABLED_DISTS = ('joint_distribution', 'joint_distribution_coroutine',
-                  'joint_distribution_named', 'joint_distribution_sequential',
-                  'internal.moving_stats')
-DISABLED_MATH = ('ode', 'custom_gradient', 'diag_jacobian',
-                 'interpolation', 'minimize', 'root_search', 'sparse')
-DISABLED_STATS = ('calibration', 'quantiles', 'ranking', 'sample_stats')
-LIBS = ('bijectors', 'distributions', 'math', 'stats', 'util')
+DISABLED_BY_PKG = {
+    'bijectors':
+        ('masked_autoregressive', 'scale_matvec_lu', 'real_nvp'),
+    'distributions':
+        ('joint_distribution', 'joint_distribution_coroutine',
+         'joint_distribution_named', 'joint_distribution_sequential',
+         'internal.moving_stats'),
+    'math':
+        ('ode', 'custom_gradient', 'diag_jacobian',
+         'interpolation', 'minimize', 'root_search', 'sparse'),
+    'mcmc':
+        ('nuts', 'sample_annealed_importance', 'sample_halton_sequence',
+         'slice_sampler_kernel'),
+    'stats':
+        ('calibration', 'quantiles', 'ranking', 'sample_stats')
+}
+LIBS = ('bijectors', 'distributions', 'math', 'mcmc', 'stats', 'util')
 INTERNALS = ('assert_util', 'distribution_util', 'dtype_util',
              'hypothesis_testlib', 'prefer_static', 'special_math',
              'tensor_util', 'test_combinations', 'test_util')
@@ -59,31 +68,17 @@ INTERNALS = ('assert_util', 'distribution_util', 'dtype_util',
 def main(argv):
 
   replacements = collections.OrderedDict(TF_REPLACEMENTS)
-  replacements.update({
-      'from tensorflow_probability.python.bijectors.{}'.format(bijector):
-      '# from tensorflow_probability.python.bijectors.{}'.format(bijector)
-      for bijector in DISABLED_BIJECTORS
-  })
-  replacements.update({
-      'from tensorflow_probability.python.distributions.{}'.format(dist):
-      '# from tensorflow_probability.python.distributions.{}'.format(dist)
-      for dist in DISABLED_DISTS
-  })
-  replacements.update({
-      'from tensorflow_probability.python.math.{}'.format(maths):
-      '# from tensorflow_probability.python.math.{}'.format(maths)
-      for maths in DISABLED_MATH
-  })
-  replacements.update({
-      'from tensorflow_probability.python.math import {}'.format(maths):
-      '# from tensorflow_probability.python.math import {}'.format(maths)
-      for maths in DISABLED_MATH
-  })
-  replacements.update({
-      'from tensorflow_probability.python.stats.{}'.format(stat):
-      '# from tensorflow_probability.python.stats.{}'.format(stat)
-      for stat in DISABLED_STATS
-  })
+  for pkg, disabled in DISABLED_BY_PKG.items():
+    replacements.update({
+        'from tensorflow_probability.python.{}.{}'.format(pkg, item):
+        '# from tensorflow_probability.python.{}.{}'.format(pkg, item)
+        for item in disabled
+    })
+    replacements.update({
+        'from tensorflow_probability.python.{} import {}'.format(pkg, item):
+        '# from tensorflow_probability.python.{} import {}'.format(pkg, item)
+        for item in disabled
+    })
   replacements.update({
       'tensorflow_probability.python.{}'.format(lib):
       'tensorflow_probability.python.{}._numpy'.format(lib)
@@ -134,20 +129,17 @@ def main(argv):
 
   contents = open(argv[1]).read()
   if '__init__.py' in argv[1]:
-    for bijector in DISABLED_BIJECTORS:
-      for segment in contents.split(
-          'from tensorflow_probability.python.bijectors.{} import '.format(
-              bijector)):
-        disabled_name = segment.split('\n')[0]
-        replacements.update({
-            '"{}"'.format(disabled_name): '# "{}"'.format(disabled_name)})
-    for dist in DISABLED_DISTS:
-      for segment in contents.split(
-          'from tensorflow_probability.python.distributions.{} import '.format(
-              dist)):
-        disabled_name = segment.split('\n')[0]
-        replacements.update({
-            '\'{}\''.format(disabled_name): '# \'{}\''.format(disabled_name)})
+    # Comment out items from __all__.
+    for pkg, disabled in DISABLED_BY_PKG.items():
+      for item in disabled:
+        for segment in contents.split(
+            'from tensorflow_probability.python.{}.{} import '.format(
+                pkg, item)):
+          disabled_name = segment.split('\n')[0]
+          replacements.update({
+              '"{}"'.format(disabled_name): '# "{}"'.format(disabled_name),
+              '\'{}\''.format(disabled_name): '# \'{}\''.format(disabled_name),
+          })
 
   for find, replace in replacements.items():
     contents = contents.replace(find, replace)

@@ -147,6 +147,8 @@ def multi_substrate_py_test(
         tags = [],
         numpy_tags = [],
         jax_tags = [],
+        srcs_version = "PY2AND3",
+        timeout = None,
         shard_count = None):
     """A TFP `py2and3_test` for each of TF, Numpy, and JAX.
 
@@ -165,6 +167,8 @@ def multi_substrate_py_test(
             to produce the `test_suite`.
         numpy_tags: Tags specific to the Numpy test. (e.g. `'notap'`).
         jax_tags: Tags specific to the JAX test. (e.g. `'notap'`).
+        srcs_version: As with `py_test`.
+        timeout: As with `py_test`.
         shard_count: As with `py_test`.
     """
 
@@ -179,6 +183,8 @@ def multi_substrate_py_test(
         main = "{}.py".format(name),
         deps = deps,
         tags = tags,
+        srcs_version = srcs_version,
+        timeout = timeout,
         shard_count = shard_count,
     )
 
@@ -197,6 +203,8 @@ def multi_substrate_py_test(
         main = _substrate_src("{}.py".format(name), "numpy"),
         deps = _substrate_deps(deps, "numpy"),
         tags = tags + ["tfp_numpy"] + numpy_tags,
+        srcs_version = srcs_version,
+        timeout = timeout,
         shard_count = shard_count,
     )
 
@@ -218,6 +226,8 @@ def multi_substrate_py_test(
         main = _substrate_src("{}.py".format(name), "jax"),
         deps = jax_deps,
         tags = tags + ["tfp_jax"] + jax_tags,
+        srcs_version = srcs_version,
+        timeout = timeout,
         shard_count = shard_count,
     )
 

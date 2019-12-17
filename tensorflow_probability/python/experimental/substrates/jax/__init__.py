@@ -44,6 +44,7 @@ from tensorflow_probability.python.bijectors import _jax as bijectors
 from tensorflow_probability.python.distributions import _jax as distributions
 from tensorflow_probability.python.internal import _jax as internal
 from tensorflow_probability.python.math import _jax as math
+from tensorflow_probability.python.mcmc import _jax as mcmc
 from tensorflow_probability.python.stats import _jax as stats
 from tensorflow_probability.python.util import _jax as util
 

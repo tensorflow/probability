@@ -16,6 +16,11 @@
 #   MCMC methods, diagnostics, and related utilities.
 
 # [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
 
 package(
     default_visibility = [
@@ -27,10 +32,16 @@ licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "mcmc",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+    substrates_omit_deps = [
+        ":nuts",
+        ":sample_annealed_importance",
+        ":sample_halton_sequence",
+        ":slice_sampler_kernel",
+    ],
     deps = [
         ":diagnostic",
         ":dual_averaging_step_size_adaptation",
@@ -50,7 +61,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "diagnostic",
     srcs = ["diagnostic.py"],
     srcs_version = "PY2AND3",
@@ -64,10 +75,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "diagnostic_test",
     size = "small",
     srcs = ["diagnostic_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -76,7 +89,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "dual_averaging_step_size_adaptation",
     srcs = ["dual_averaging_step_size_adaptation.py"],
     srcs_version = "PY2AND3",
@@ -91,9 +104,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "dual_averaging_step_size_adaptation_test",
+    size = "medium",
     srcs = ["dual_averaging_step_size_adaptation_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
@@ -102,7 +118,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "hmc",
     srcs = ["hmc.py"],
     srcs_version = "PY2AND3",
@@ -119,11 +135,13 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "hmc_test",
     size = "medium",
     timeout = "long",
     srcs = ["hmc_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     shard_count = 6,
     deps = [
         # numpy dep,
@@ -198,7 +216,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "langevin",
     srcs = ["langevin.py"],
     srcs_version = "PY2AND3",
@@ -214,11 +232,13 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "langevin_test",
     size = "medium",
     timeout = "long",
     srcs = ["langevin_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -227,7 +247,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "kernel",
     srcs = ["kernel.py"],
     srcs_version = "PY2AND3",
@@ -236,7 +256,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "metropolis_hastings",
     srcs = ["metropolis_hastings.py"],
     srcs_version = "PY2AND3",
@@ -250,10 +270,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "metropolis_hastings_test",
     size = "small",
     srcs = ["metropolis_hastings_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -262,7 +284,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "random_walk_metropolis",
     srcs = ["random_walk_metropolis.py"],
     srcs_version = "PY2AND3",
@@ -276,10 +298,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "random_walk_metropolis_test",
     size = "medium",
     srcs = ["random_walk_metropolis_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -288,7 +312,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "replica_exchange_mc",
     srcs = ["replica_exchange_mc.py"],
     srcs_version = "PY2AND3",
@@ -303,11 +327,13 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "replica_exchange_mc_test",
     size = "medium",
     timeout = "long",
     srcs = ["replica_exchange_mc_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     shard_count = 6,
     deps = [
         # absl/logging dep,
@@ -319,7 +345,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sample",
     srcs = ["sample.py"],
     srcs_version = "PY2AND3",
@@ -330,11 +356,13 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "sample_test",
     size = "medium",
     timeout = "long",
     srcs = ["sample_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -423,7 +451,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "transformed_kernel",
     srcs = ["transformed_kernel.py"],
     srcs_version = "PY2AND3",
@@ -436,11 +464,13 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "transformed_kernel_test",
     size = "medium",
     timeout = "long",
     srcs = ["transformed_kernel_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     shard_count = 4,
     deps = [
         # numpy dep,
@@ -484,7 +514,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "simple_step_size_adaptation",
     srcs = ["simple_step_size_adaptation.py"],
     srcs_version = "PY2AND3",
@@ -501,9 +531,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "simple_step_size_adaptation_test",
     srcs = ["simple_step_size_adaptation_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
