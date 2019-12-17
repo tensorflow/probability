@@ -18,6 +18,7 @@
 PS4='+ $SECONDS s\011 '  # Octal 9, for tab
 set -x  # print commands as they are executed
 set -e  # fail and exit on any command erroring
+set -u  # fail and exit on any undefined variable reference
 
 # Make sure the environment variables are set.
 if [ -z "${SHARD}" ]; then
@@ -82,7 +83,7 @@ install_python_packages() {
   pip install hypothesis matplotlib mock
   # TODO(b/146429933): Unpin SciPy version. We only pin for python3 because
   # scipy stopped supporting py2 some number of versions ago.
-  if [[ "${python_version}" == "python2" ]]; then
+  if [[ "${FLAGS_python_version}" == "python2" ]]; then
     pip install scipy
   else
     pip install scipy==1.3.3
