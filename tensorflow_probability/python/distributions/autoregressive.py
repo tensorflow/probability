@@ -185,8 +185,8 @@ class Autoregressive(distribution.Distribution):
     return self._num_steps
 
   @deprecation.deprecated(
-      '2019-02-15',
-      'The `num_setps` property will return `None` when the distribution is '
+      '2020-02-15',
+      'The `num_steps` property will return `None` when the distribution is '
       'constructed with with `num_steps=None`.  Use '
       '`tf.reduce_prod(event_shape_tensor())` instead.',
       warn_once=True)
