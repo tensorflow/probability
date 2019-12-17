@@ -59,8 +59,6 @@ py_library(
     deps = [
         ":logeinsumexp",
         ":marginalizable",
-        # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )
 
@@ -71,7 +69,10 @@ py_library(
     deps = [
         ":logeinsumexp",
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:bernoulli",
+        "//tensorflow_probability/python/distributions:categorical",
+        "//tensorflow_probability/python/distributions:joint_distribution_coroutine",
+        "//tensorflow_probability/python/distributions:sample",
     ],
 )
 

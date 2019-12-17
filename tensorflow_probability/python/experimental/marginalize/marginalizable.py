@@ -20,16 +20,16 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import bernoulli as bernoulli_lib
+from tensorflow_probability.python.distributions import categorical as categorical_lib
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc_lib
+from tensorflow_probability.python.distributions import sample as sample_lib
 from tensorflow_probability.python.experimental.marginalize.logeinsumexp import logeinsumexp
 
 
 __all__ = [
     'MarginalizableJointDistributionCoroutine',
 ]
-
-
-tfd = tfp.distributions
 
 
 # TODO(b/144095516) remove this function when `tf.einsum` supports
@@ -105,11 +105,11 @@ def _support(dist):
     the underlying event type.
   """
 
-  if isinstance(dist, tfd.Bernoulli):
+  if isinstance(dist, bernoulli_lib.Bernoulli):
     return tf.range(2), 0
-  elif isinstance(dist, tfd.Categorical):
+  elif isinstance(dist, categorical_lib.Categorical):
     return tf.range(tf.shape(dist.probs_parameter())[-1]), 0
-  elif isinstance(dist, tfd.Sample):
+  elif isinstance(dist, sample_lib.Sample):
     # The support of `tfd.Sample` is the n-fold cartesian product
     # of the supports of the underlying distributions where
     # `n` is the total size of the sample shape.
@@ -292,6 +292,6 @@ class Marginalizable(object):
 
 
 class MarginalizableJointDistributionCoroutine(
-    tfd.JointDistributionCoroutine, Marginalizable):
+    jdc_lib.JointDistributionCoroutine, Marginalizable):
 
   pass
