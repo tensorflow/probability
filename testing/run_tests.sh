@@ -79,8 +79,15 @@ install_python_packages() {
   pip install tf-nightly==$TF_VERSION_STR
 
   # The following unofficial dependencies are used only by tests.
-  # TODO(b/141170087): Unpin Hypothesis version.
-  pip install scipy hypothesis matplotlib mock
+  pip install hypothesis matplotlib mock
+  # TODO(b/146429933): Unpin SciPy version. We only pin for python3 because
+  # scipy stopped supporting py2 some number of versions ago.
+  if [[ "${python_version}" == "python2" ]]; then
+    pip install scipy
+  else
+    pip install scipy==1.3.3
+  fi
+
 
   # Install additional TFP dependencies.
   pip install decorator cloudpickle
