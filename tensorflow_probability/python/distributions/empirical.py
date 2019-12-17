@@ -27,7 +27,6 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.ops import gen_array_ops  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -248,8 +247,7 @@ class Empirical(distribution.Distribution):
     # Samples count can vary by batch member. Use map_fn to compute mode for
     # each batch separately.
     def _get_mode(samples):
-      # TODO(b/123985779): Switch to tf.unique_with_counts_v2 when exposed
-      count = gen_array_ops.unique_with_counts_v2(samples, axis=[0]).count
+      count = tf.raw_ops.UniqueWithCountsV2(x=samples, axis=[0]).count
       return tf.argmax(count)
 
     if samples is None:
@@ -290,8 +288,7 @@ class Empirical(distribution.Distribution):
 
     # Use map_fn to compute entropy for each batch separately.
     def _get_entropy(samples):
-      # TODO(b/123985779): Switch to tf.unique_with_counts_v2 when exposed
-      count = gen_array_ops.unique_with_counts_v2(samples, axis=[0]).count
+      count = tf.raw_ops.UniqueWithCountsV2(x=samples, axis=[0]).count
       prob = tf.cast(count / num_samples, dtype=self.dtype)
       entropy = tf.reduce_sum(-prob * tf.math.log(prob))
       return entropy

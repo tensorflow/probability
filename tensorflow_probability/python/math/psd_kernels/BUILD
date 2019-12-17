@@ -215,6 +215,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "schur_complement_test",
+    size = "medium",
     srcs = ["schur_complement_test.py"],
     jax_size = "large",
     numpy_tags = ["notap"],
