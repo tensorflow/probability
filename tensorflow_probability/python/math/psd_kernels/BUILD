@@ -266,7 +266,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "feature_transformed_test",
-    size = "small",
+    size = "medium",
     srcs = ["feature_transformed_test.py"],
     deps = [
         # absl/testing:parameterized dep,
