@@ -61,7 +61,7 @@ class SampleChainTest(test_util.TestCase):
     self._rate_param = 10.
 
     super(SampleChainTest, self).setUp()
-    tf1.random.set_random_seed(10003)
+    tf.random.set_seed(10003)
     np.random.seed(10003)
 
   def testChainWorksCorrelatedMultivariate(self):

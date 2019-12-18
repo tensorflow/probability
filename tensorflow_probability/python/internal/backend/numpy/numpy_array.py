@@ -123,17 +123,15 @@ def _one_hot(  # pylint: disable=unused-argument
     on_value = 1
   if off_value is None:
     off_value = 0
-
-  zeros = np.zeros_like(indices)  # pylint: disable=redefined-outer-name
-  zeros = np.tile(zeros[..., None], [1] * indices.ndim + [int(depth)])
-
-  cond = np.abs(np.arange(depth, dtype=np.float32) - indices[..., None]) < 0.1
-
-  y_out = np.where(cond, zeros + on_value, zeros + off_value)
-
+  if dtype is None:
+    dtype = utils.common_dtype([on_value, off_value], np.float32)
+  indices = np.array(indices)
+  depth = np.array(depth)
+  pred = abs(np.arange(depth, dtype=indices.dtype) -
+             indices[..., np.newaxis]) > 0
+  y_out = np.where(pred, np.array(off_value, dtype), np.array(on_value, dtype))
   if axis is not None:
     y_out = np.moveaxis(y_out, -1, axis)
-
   return y_out
 
 

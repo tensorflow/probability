@@ -317,6 +317,7 @@ py_library(
         ":_utils",
         ":initializers",
         ":ops",
+        ":random_generators",
         ":tensor_array_ops",
     ],
 )

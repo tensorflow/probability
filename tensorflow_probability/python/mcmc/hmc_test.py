@@ -54,7 +54,7 @@ class HMCTest(test_util.TestCase):
     self._rate_param = 10.
 
     super(HMCTest, self).setUp()
-    tf1.random.set_random_seed(10003)
+    tf.random.set_seed(10003)
     np.random.seed(10003)
 
   def assertAllFinite(self, x):
@@ -801,7 +801,7 @@ class HMCAdaptiveStepSize(test_util.TestCase):
 
   def setUp(self):
     super(HMCAdaptiveStepSize, self).setUp()
-    tf1.random.set_random_seed(10014)
+    tf.random.set_seed(10014)
     np.random.seed(10014)
 
   def test_multiple_step_sizes_different_ranks(self):
@@ -921,7 +921,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
 
   def setUp(self):
     super(HMCEMAdaptiveStepSize, self).setUp()
-    tf1.random.set_random_seed(10014)
+    tf.random.set_seed(10014)
     np.random.seed(10014)
 
   def make_training_data(self, num_samples, dims, sigma):

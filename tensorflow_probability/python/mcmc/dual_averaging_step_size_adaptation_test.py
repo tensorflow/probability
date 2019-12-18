@@ -296,7 +296,7 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
       _impl()
 
   def testExample(self):
-    tf1.random.set_random_seed(test_util.test_seed())
+    tf.random.set_seed(test_util.test_seed())
     target_dist = tfd.JointDistributionSequential([
         tfd.Normal(0., 1.5),
         tfd.Independent(

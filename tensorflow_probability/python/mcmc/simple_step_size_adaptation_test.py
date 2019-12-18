@@ -351,7 +351,7 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
       _impl()
 
   def testExample(self):
-    tf1.random.set_random_seed(test_util.test_seed())
+    tf.random.set_seed(test_util.test_seed())
     target_log_prob_fn = tfd.Normal(loc=0., scale=1.).log_prob
     num_burnin_steps = 500
     num_results = 500

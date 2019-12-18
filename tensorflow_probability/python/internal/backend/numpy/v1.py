@@ -33,6 +33,7 @@ from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  
 from tensorflow_probability.python.internal.backend.numpy.ops import Module
 from tensorflow_probability.python.internal.backend.numpy.ops import name_scope
 from tensorflow_probability.python.internal.backend.numpy.ops import Variable
+from tensorflow_probability.python.internal.backend.numpy.random_generators import set_seed
 from tensorflow_probability.python.internal.backend.numpy.tensor_array_ops import TensorArray
 
 
@@ -41,7 +42,9 @@ __all__ = [
     'Session',
     'TensorArray',
     'colocate_with',
+    'control_flow_v2_enabled',
     'get_variable',
+    'get_variable_scope',
     'global_variables_initializer',
     'initializers',
     'logging',
@@ -50,6 +53,7 @@ __all__ = [
     'name_scope',
     'placeholder_with_default',
     'set_random_seed',
+    'variable_scope',
 ]
 
 
@@ -57,8 +61,8 @@ JAX_MODE = False
 
 
 @contextlib.contextmanager
-def _colocate_with(*_, **__):  # pylint: disable=unused-argument
-  pass
+def _dummy_scope(*_, **__):  # pylint: disable=unused-argument
+  yield
 
 
 def _get_variable(  # pylint: disable=unused-argument
@@ -83,14 +87,6 @@ def _placeholder_with_default(input, shape, name=None):  # pylint: disable=redef
   return np.reshape(x, shape)
 
 
-def _set_random_seed(seed):
-  return np.random.seed(seed % (2**32 - 1))
-
-
-def _set_random_seed_jax(_):
-  pass
-
-
 # --- Begin Public Functions --------------------------------------------------
 
 
@@ -99,11 +95,19 @@ matrix_solve = linalg_impl.solve
 
 colocate_with = utils.copy_docstring(
     tf1.colocate_with,
-    _colocate_with)
+    _dummy_scope)
+
+control_flow_v2_enabled = utils.copy_docstring(
+    tf1.control_flow_v2_enabled,
+    lambda: True)
 
 get_variable = utils.copy_docstring(
     tf1.get_variable,
     _get_variable)
+
+get_variable_scope = utils.copy_docstring(
+    tf1.get_variable_scope,
+    lambda: variable_scope(name_or_scope=None))
 
 placeholder_with_default = utils.copy_docstring(
     tf1.placeholder_with_default,
@@ -115,7 +119,7 @@ global_variables_initializer = utils.copy_docstring(
 
 set_random_seed = utils.copy_docstring(
     tf1.set_random_seed,
-    _set_random_seed_jax if JAX_MODE else _set_random_seed)
+    set_seed)
 
 
 class Session(object):
@@ -128,5 +132,31 @@ class Session(object):
 
   def run(self, *args, **_):
     return args
+
+
+class variable_scope(object):  # pylint: disable=invalid-name
+  """A context manager for defining ops that creates variables (layers)."""
+
+  def __init__(
+      self, name_or_scope, default_name=None, values=None, initializer=None,  # pylint: disable=unused-argument
+      regularizer=None, caching_device=None, partitioner=None,  # pylint: disable=unused-argument
+      custom_getter=None, reuse=None, dtype=None, use_resource=None,  # pylint: disable=unused-argument
+      constraint=None, auxiliary_name_scope=True):  # pylint: disable=unused-argument
+    self._caching_device = None
+
+  @property
+  def caching_device(self):
+    return self._caching_device
+
+  @caching_device.setter
+  def caching_device(self, val):
+    self._caching_device = val
+
+  def __enter__(self, *_, **__):
+    return self
+
+  def __exit__(self, *_, **__):
+    pass
+
 
 del tf

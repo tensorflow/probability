@@ -35,12 +35,12 @@ __all__ = [
     'normal',
     'poisson',
     'uniform',
+    'set_seed',
     # 'all_candidate_sampler',
     # 'experimental',
     # 'fixed_unigram_candidate_sampler',
     # 'learned_unigram_candidate_sampler',
     # 'log_uniform_candidate_sampler',
-    # 'set_seed',
     # 'shuffle',
     # 'stateless_categorical',
     # 'stateless_normal',
@@ -168,17 +168,26 @@ def _uniform_jax(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
 
 
 categorical = utils.copy_docstring(
-    tf.random.categorical, _categorical_jax if JAX_MODE else _categorical)
+    tf.random.categorical,
+    _categorical_jax if JAX_MODE else _categorical)
 
-gamma = utils.copy_docstring(tf.random.gamma,
-                             _gamma_jax if JAX_MODE else _gamma)
+gamma = utils.copy_docstring(
+    tf.random.gamma,
+    _gamma_jax if JAX_MODE else _gamma)
 
-normal = utils.copy_docstring(tf.random.normal,
-                              _normal_jax if JAX_MODE else _normal)
+normal = utils.copy_docstring(
+    tf.random.normal,
+    _normal_jax if JAX_MODE else _normal)
 
 poisson = utils.copy_docstring(
     tf.random.poisson,
     _poisson)
 
-uniform = utils.copy_docstring(tf.random.uniform,
-                               _uniform_jax if JAX_MODE else _uniform)
+uniform = utils.copy_docstring(
+    tf.random.uniform,
+    _uniform_jax if JAX_MODE else _uniform)
+
+set_seed = utils.copy_docstring(
+    tf.random.set_seed,
+    (lambda seed: None if JAX_MODE  # pylint: disable=g-long-lambda
+     else lambda seed: np.random.seed(seed % (2**32 - 1))))
