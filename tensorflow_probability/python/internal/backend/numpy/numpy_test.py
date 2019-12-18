@@ -161,7 +161,7 @@ def sliceable_and_slices(draw, strategy=None):
 def one_hot_params(draw):
   indices = draw(single_arrays(dtype=np.int32, elements=hps.integers(0, 8)))
   depth = np.maximum(1, np.max(indices)).astype(np.int32)
-  dtype = draw(hps.sampled_from((np.int32, np.float32, np.complex64)))
+  dtype = draw(hps.sampled_from((onp.int32, onp.float32, onp.complex64)))
   on_value = draw(hps.sampled_from((None, 1, 2)))
   on_value = on_value if on_value is None else dtype(on_value)
   off_value = draw(hps.sampled_from((None, 3, 7)))
