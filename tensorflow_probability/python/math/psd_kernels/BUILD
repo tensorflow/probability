@@ -259,7 +259,6 @@ multi_substrate_py_library(
     deps = [
         ":positive_semidefinite_kernel",
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:kumaraswamy_cdf",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
@@ -284,6 +283,7 @@ multi_substrate_py_library(
     deps = [
         ":feature_transformed",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:kumaraswamy_cdf",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],

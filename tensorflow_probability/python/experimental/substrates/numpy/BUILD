@@ -31,6 +31,7 @@ py_library(
         "//tensorflow_probability/python/experimental/substrates/numpy/bijectors",
         "//tensorflow_probability/python/experimental/substrates/numpy/distributions",
         "//tensorflow_probability/python/experimental/substrates/numpy/internal",
+        "//tensorflow_probability/python/experimental/substrates/numpy/stats",
         "//tensorflow_probability/python/experimental/substrates/numpy/util",
         "//tensorflow_probability/python/internal/backend",
         "//tensorflow_probability/python/mcmc:mcmc.numpy",

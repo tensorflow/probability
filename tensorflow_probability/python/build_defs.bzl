@@ -53,10 +53,6 @@ def _substrate_dep(dep, substrate):
         return "//tensorflow_probability/python/experimental/substrates/{}/bijectors".format(substrate)
     if dep_to_check.endswith("python/distributions") or dep_to_check.endswith("python/distributions:distributions"):
         return "//tensorflow_probability/python/experimental/substrates/{}/distributions".format(substrate)
-    if dep_to_check.endswith("math/psd_kernels") or dep_to_check.endswith("math/psd_kernels:psd_kernels"):
-        return "//tensorflow_probability/python/experimental/substrates/{}/math/psd_kernels".format(substrate)
-    if dep_to_check.endswith("python/math") or dep_to_check.endswith("python/math:math"):
-        return "//tensorflow_probability/python/experimental/substrates/{}/math".format(substrate)
     if "tensorflow_probability/" in dep or dep.startswith(":"):
         if "internal/backend" in dep:
             return dep

@@ -27,7 +27,6 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.math import psd_kernels
 
 tfd = tfp.distributions
 
@@ -84,7 +83,8 @@ class _VariationalGaussianProcessTest(object):
       variational_inducing_observations_scale = tf1.placeholder_with_default(
           variational_inducing_observations_scale, shape=None)
 
-    kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+        amplitude, length_scale)
 
     vgp = tfd.VariationalGaussianProcess(
         kernel=kernel,
@@ -162,7 +162,8 @@ class _VariationalGaussianProcessTest(object):
 
       inducing_index_points = tf1.placeholder_with_default(
           inducing_index_points, shape=None)
-    kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+        amplitude, length_scale)
 
     loc, scale = tfd.VariationalGaussianProcess.optimal_variational_posterior(
         kernel=kernel,
@@ -238,7 +239,8 @@ class _VariationalGaussianProcessTest(object):
       variational_inducing_observations_scale = tf1.placeholder_with_default(
           variational_inducing_observations_scale, shape=None)
 
-    kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+        amplitude, length_scale)
 
     vgp = tfd.VariationalGaussianProcess(
         kernel=kernel,

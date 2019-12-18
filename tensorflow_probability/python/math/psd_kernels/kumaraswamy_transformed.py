@@ -22,7 +22,7 @@ import functools
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import kumaraswamy_cdf
+from tensorflow_probability.python.bijectors.kumaraswamy_cdf import KumaraswamyCDF
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import feature_transformed
@@ -78,8 +78,9 @@ class KumaraswamyTransformed(feature_transformed.FeatureTransformed):
             self.concentration0,
             example_ndims,
             start=-(feature_ndims + 1))
-        bij = kumaraswamy_cdf.KumaraswamyCDF(
-            concentration1, concentration0, validate_args=validate_args)
+        bij = KumaraswamyCDF(concentration1,
+                             concentration0,
+                             validate_args=validate_args)
         return bij.forward(x)
 
       super(KumaraswamyTransformed, self).__init__(

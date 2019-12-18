@@ -23,10 +23,11 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math.linalg import fill_triangular
+from tensorflow_probability.python.math.linalg import fill_triangular_inverse
 
 
 __all__ = [
@@ -85,10 +86,10 @@ class FillTriangular(bijector.Bijector):
         name=name)
 
   def _forward(self, x):
-    return tfp_math.fill_triangular(x, upper=self._upper)
+    return fill_triangular(x, upper=self._upper)
 
   def _inverse(self, y):
-    return tfp_math.fill_triangular_inverse(y, upper=self._upper)
+    return fill_triangular_inverse(y, upper=self._upper)
 
   def _forward_log_det_jacobian(self, x):
     return tf.zeros([], dtype=x.dtype)

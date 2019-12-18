@@ -2616,8 +2616,6 @@ multi_substrate_py_test(
     name = "variational_gaussian_process_test",
     size = "medium",
     srcs = ["variational_gaussian_process_test.py"],
-    jax_tags = ["notap"],  # Circular import (passes py3, fails py2).
-    numpy_tags = ["notap"],  # Circular import (passes py3, fails py2).
     deps = [
         # numpy dep,
         # tensorflow dep,
