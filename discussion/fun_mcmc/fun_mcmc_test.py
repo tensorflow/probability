@@ -657,10 +657,10 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
       target_log_prob_fn, state = fun_mcmc.transform_log_prob_fn(
           orig_target_log_prob_fn, bijector, state)
 
-      def kernel(hmc_state, step_size, step):
+      def kernel(hmc_state, step_size_state, step):
         hmc_state, hmc_extra = fun_mcmc.hamiltonian_monte_carlo(
             hmc_state,
-            step_size=step_size,
+            step_size=tf.exp(step_size_state.state),
             num_integrator_steps=num_leapfrog_steps,
             target_log_prob_fn=target_log_prob_fn)
 
@@ -672,20 +672,21 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
             end_learning_rate=0.)
         mean_p_accept = tf.reduce_mean(
             tf.exp(tf.minimum(0., hmc_extra.log_accept_ratio)))
-        step_size = fun_mcmc.sign_adaptation(
-            step_size,
-            output=mean_p_accept,
-            set_point=0.9,
-            adaptation_rate=rate)
 
-        return (hmc_state, step_size, step + 1), hmc_extra
+        loss_fn = fun_mcmc.make_surrogate_loss_fn(
+            lambda _: (0.9 - mean_p_accept, ()))
+        step_size_state, _ = fun_mcmc.adam_step(
+            step_size_state, loss_fn, learning_rate=rate)
+
+        return ((hmc_state, step_size_state, step + 1),
+                (hmc_state.state_extra[0], hmc_extra.log_accept_ratio))
 
       _, (chain, log_accept_ratio_trace) = fun_mcmc.trace(
-          (fun_mcmc.HamiltonianMonteCarloState(state), step_size, 0),
-          kernel,
-          num_adapt_steps + num_steps,
-          trace_fn=lambda state, extra:  # pylint: disable=g-long-lambda
-          (state[0].state_extra[0], extra.log_accept_ratio))
+          state=(fun_mcmc.HamiltonianMonteCarloState(state),
+                 fun_mcmc.adam_init(tf.math.log(step_size)), 0),
+          fn=kernel,
+          num_steps=num_adapt_steps + num_steps,
+      )
       true_samples = target_dist.sample(4096, seed=_test_seed())
       return chain, log_accept_ratio_trace, true_samples
 
@@ -1164,6 +1165,38 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
         true_autocov,
         raac_state.auto_covariance / raac_state.auto_covariance[0],
         atol=0.1)
+
+  @parameterized.named_parameters(
+      ('Positional1', 0.),
+      ('Positional2', (0., 1.)),
+      ('Named1', {'a': 0.}),
+      ('Named2', {'a': 0., 'b': 1.}),
+  )
+  def testSurrogateLossFn(self, state):
+    def grad_fn(*args, **kwargs):
+      # This is uglier than user code due to the parameterized test...
+      new_state = util.unflatten_tree(state, util.flatten_tree((args, kwargs)))
+      return util.map_tree(lambda x: x + 1., new_state), new_state
+    loss_fn = fun_mcmc.make_surrogate_loss_fn(grad_fn)
+
+    # Mutate the state to make sure we didn't capture anything.
+    state = util.map_tree(lambda x: x + 1., state)
+    ret, extra, grads = fun_mcmc.call_potential_fn_with_grads(loss_fn, state)
+    # The default is 0.
+    self.assertAllClose(0., ret)
+    # The gradients of the surrogate loss are state + 1.
+    self.assertAllClose(util.map_tree(lambda x: x + 1., state), grads)
+    self.assertAllClose(state, extra)
+
+  def testSurrogateLossFnDecorator(self):
+    @fun_mcmc.make_surrogate_loss_fn(loss_value=1.)
+    def loss_fn(_):
+      return 3., 2.
+
+    ret, extra, grads = fun_mcmc.call_potential_fn_with_grads(loss_fn, 0.)
+    self.assertAllClose(1., ret)
+    self.assertAllClose(2., extra)
+    self.assertAllClose(3., grads)
 
 
 class FunMCMCTestJAX(FunMCMCTestTensorFlow):

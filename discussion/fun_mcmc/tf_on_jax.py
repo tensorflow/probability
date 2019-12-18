@@ -133,6 +133,7 @@ def _gather(params, indices):
 
 _impl(name='add_n')(sum)
 _impl(['nn'], name='softmax')(stax.softmax)
+_impl(name='custom_gradient')(jax.custom_gradient)
 
 tf.newaxis = None
 

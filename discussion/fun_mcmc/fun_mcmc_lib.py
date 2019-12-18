@@ -41,6 +41,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import functools
 
 import numpy as np
 
@@ -79,6 +80,7 @@ __all__ = [
     'IntegratorStepState',
     'leapfrog_step',
     'make_gaussian_kinetic_energy_fn',
+    'make_surrogate_loss_fn',
     'maybe_broadcast_structure',
     'mclachlan_optimal_4th_order_step',
     'metropolis_hastings_step',
@@ -134,6 +136,8 @@ State = TensorNest  # pylint: disable=invalid-name
 TransitionOperator = Callable[..., Tuple[State, TensorNest]]
 PotentialFn = Union[Callable[[TensorNest], Tuple['tf.Tensor', TensorNest]],
                     Callable[..., Tuple['tf.Tensor', TensorNest]]]
+GradFn = Union[Callable[[TensorNest], Tuple[TensorNest, TensorNest]],
+               Callable[..., Tuple[TensorNest, TensorNest]]]
 
 
 def _trace_extra(state: State, extra: TensorNest) -> TensorNest:
@@ -2159,3 +2163,56 @@ def running_approximate_auto_covariance_step(
       mean=new_mean,
   )
   return state, ()
+
+
+def make_surrogate_loss_fn(
+    grad_fn: GradFn = None,
+    loss_value: 'tf.Tensor' = 0.,
+) -> Any:
+  """Creates a surrogate loss function with specified gradients.
+
+  This wrapper converts `grad_fn` with signature `state -> grad, extra` which
+  computes the gradients of its arguments with respect to a surrogate loss given
+  the values of its arguments, namely:
+
+  ```python
+  loss_fn = make_surrogate_loss_fn(grad_fn, loss_value=loss_value)
+  loss, extra, grad = call_potential_fn_with_grads(loss_fn, state)
+
+  grad2, extra2 = grad(state)
+  assert loss == loss_value
+  assert extra == extra2
+  assert grad == grad2
+  ```
+
+  Args:
+    grad_fn: Wrapped gradient function. If `None`, then this function returns a
+      decorator with the signature of `GradFn -> PotentialFn`.
+    loss_value: A tensor that will be returned from the surrogate loss function.
+
+  Returns:
+    loss_fn: If grad_fn is not None. A `PotentialFn`, the surrogate loss
+      function.
+    make_surrogate_loss_fn: If grad_fn is None, this returns itself with
+      `loss_value` bound to the value passed to this function.
+  """
+  if grad_fn is None:
+    return functools.partial(make_surrogate_loss_fn, loss_value=loss_value)
+
+  def loss_fn(*args, **kwargs):
+    """The surrogate loss function."""
+
+    @tf.custom_gradient
+    def grad_wrapper(*flat_args_kwargs):
+      new_args, new_kwargs = util.unflatten_tree((args, kwargs),
+                                                 flat_args_kwargs)
+      g, e = grad_fn(*new_args, **new_kwargs)  # pytype: disable=wrong-arg-count
+
+      def inner_grad_fn(*_):
+        return tuple(util.flatten_tree(g))
+
+      return (loss_value, e), inner_grad_fn
+
+    return grad_wrapper(*util.flatten_tree((args, kwargs)))
+
+  return loss_fn

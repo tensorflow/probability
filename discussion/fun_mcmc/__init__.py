@@ -47,6 +47,7 @@ from discussion.fun_mcmc.fun_mcmc_lib import IntegratorStep
 from discussion.fun_mcmc.fun_mcmc_lib import IntegratorStepState
 from discussion.fun_mcmc.fun_mcmc_lib import leapfrog_step
 from discussion.fun_mcmc.fun_mcmc_lib import make_gaussian_kinetic_energy_fn
+from discussion.fun_mcmc.fun_mcmc_lib import make_surrogate_loss_fn
 from discussion.fun_mcmc.fun_mcmc_lib import maybe_broadcast_structure
 from discussion.fun_mcmc.fun_mcmc_lib import mclachlan_optimal_4th_order_step
 from discussion.fun_mcmc.fun_mcmc_lib import metropolis_hastings_step
@@ -109,6 +110,7 @@ __all__ = [
     'JAX',
     'leapfrog_step',
     'make_gaussian_kinetic_energy_fn',
+    'make_surrogate_loss_fn',
     'maybe_broadcast_structure',
     'mclachlan_optimal_4th_order_step',
     'metropolis_hastings_step',
