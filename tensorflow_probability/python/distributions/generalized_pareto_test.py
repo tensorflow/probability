@@ -187,7 +187,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     loc = np.float32(-7.5)
     scale = np.float32(3.5)
     conc = np.float32(0.07)
-    n = 100000
+    n = 10**5
     dist = tfd.GeneralizedPareto(
         loc=loc, scale=scale, concentration=conc, validate_args=True)
     samples = dist.sample(n, seed=test_util.test_seed())
@@ -198,11 +198,11 @@ class GeneralizedParetoTest(test_util.TestCase):
     self.assertAllClose(
         sp_stats.genpareto.mean(conc, loc=loc, scale=scale),
         sample_values.mean(),
-        rtol=.005)
+        rtol=.02)
     self.assertAllClose(
         sp_stats.genpareto.var(conc, loc=loc, scale=scale),
         sample_values.var(),
-        rtol=.01)
+        rtol=.08)
 
   def testFullyReparameterized(self):
     loc = tf.constant(4.0)
@@ -221,7 +221,7 @@ class GeneralizedParetoTest(test_util.TestCase):
 
     dist = tfd.GeneralizedPareto(
         loc=loc, scale=scale, concentration=conc, validate_args=True)
-    n = 10000
+    n = 10**4
     samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual((n, 3, 5, 7), samples.shape)
@@ -235,7 +235,7 @@ class GeneralizedParetoTest(test_util.TestCase):
           samps = sample_values[:, li, si, ci]
           trials += 1
           fails += 0 if self._kstest(l, s, c, samps) else 1
-    self.assertLess(fails, trials * 0.01)
+    self.assertLess(fails, trials * 0.03)
 
   def _kstest(self, loc, scale, conc, samples):
     # Uses the Kolmogorov-Smirnov test for goodness of fit.
