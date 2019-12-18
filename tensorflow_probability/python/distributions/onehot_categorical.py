@@ -29,7 +29,6 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 class OneHotCategorical(distribution.Distribution):
@@ -134,16 +133,6 @@ class OneHotCategorical(distribution.Distribution):
   @classmethod
   def _params_event_ndims(cls):
     return dict(logits=1, probs=1)
-
-  @property
-  @deprecation.deprecated(
-      '2019-10-01', 'The `event_size` property is deprecated.  Use '
-      '`tf.shape(self.probs if self.logits is None else self.logits)[-1]` '
-      'instead.')
-  def event_size(self):
-    """Scalar `int32` tensor: the number of classes."""
-    with self._name_and_control_scope('event_size'):
-      return self._event_size()
 
   def _event_size(self, param=None):
     if param is None:
