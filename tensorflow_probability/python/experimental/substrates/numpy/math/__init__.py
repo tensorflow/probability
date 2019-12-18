@@ -16,4 +16,5 @@
 
 from tensorflow_probability.python.math._numpy import *  # pylint: disable=wildcard-import
 
+custom_gradient = None
 value_and_gradient = None

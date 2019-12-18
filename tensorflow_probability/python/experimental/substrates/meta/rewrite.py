@@ -51,7 +51,7 @@ DISABLED_BY_PKG = {
          'joint_distribution_named', 'joint_distribution_sequential',
          'internal.moving_stats'),
     'math':
-        ('ode', 'custom_gradient', 'diag_jacobian',
+        ('ode', 'diag_jacobian',
          'interpolation', 'minimize', 'root_search', 'sparse'),
     'mcmc':
         ('nuts', 'sample_annealed_importance', 'sample_halton_sequence',

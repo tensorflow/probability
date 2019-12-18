@@ -22,7 +22,6 @@ NO_REWRITE_NEEDED = [
     "internal:reparameterization",
     "internal:tensorshape_util",
     "layers",
-    "math:custom_gradient",
     "math:diag_jacobian",
     "math:interpolation",
     "math:minimize",

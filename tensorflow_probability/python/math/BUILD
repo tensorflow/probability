@@ -53,7 +53,7 @@ multi_substrate_py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "custom_gradient",
     srcs = [
         "custom_gradient.py",
@@ -66,7 +66,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "custom_gradient_test",
     size = "small",
     srcs = ["custom_gradient_test.py"],

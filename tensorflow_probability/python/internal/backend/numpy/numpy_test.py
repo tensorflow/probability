@@ -639,7 +639,7 @@ class NumpyTest(test_util.TestCase):
     tensor_shape = convert_to_tensor(shape)
     self.assertNotIsInstance(tensor_shape, tf1.Dimension)
 
-  def test_convert_to_tensor_dimension_list(self):
+  def test_convert_to_tensor_tensorshape(self):
     convert_to_tensor = numpy_backend.convert_to_tensor
     shape = tf.TensorShape((1, 2))
 
@@ -647,7 +647,7 @@ class NumpyTest(test_util.TestCase):
     for dim in tensor_shape:
       self.assertNotIsInstance(dim, tf1.Dimension)
 
-    shape = [tf1.Dimension(1), tf1.Dimension(2)]
+    shape = tf.TensorShape((1, 2, 3))[:2]
     tensor_shape = convert_to_tensor(shape)
 
     for dim in tensor_shape:

@@ -113,10 +113,8 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
     return value
   if isinstance(value, Dimension):
     value = _dimension_value(value)
-  if isinstance(value, TensorShape):
-    value = [_dimension_value(d) for d in value.as_list()]
-  if tf.nest.is_nested(value):
-    value = tf.nest.map_structure(_convert_to_tensor, value)
+  elif isinstance(value, TensorShape):
+    value = value.as_list()
   if dtype is None and dtype_hint is not None:
     dtype_hint = utils.numpy_dtype(dtype_hint)
     value = np.array(value)
@@ -216,27 +214,23 @@ convert_to_tensor = utils.copy_docstring(
 
 def _custom_gradient(f):
   """Jax implementation of tf.custom_gradient."""
-  if JAX_MODE:
-    import jax  # pylint: disable=g-import-not-at-top
-    def f_(*args, **kwargs):
-      value, vjp = f(*args, **kwargs)
-      def vjp_(cts_out):
-        cts_in = vjp(cts_out)
-        if not isinstance(cts_in, tuple):
-          cts_in = (cts_in,)
-        return cts_in
-      return value, vjp_
-    @jax.custom_transforms
-    def wrapped(*args, **kwargs):
-      value, _ = f(*args, **kwargs)
-      return value
-    jax.defvjp_all(wrapped, f_)
-  else:
-    # Numpy backend
-    # ignores custom gradients
-    def wrapped(*args, **kwargs):
-      value, _ = f(*args, **kwargs)
-      return value
+  if not JAX_MODE:
+    # Numpy backend ignores custom gradients, so we do too.
+    return lambda *args, **kwargs: f(*args, **kwargs)[0]
+  import jax  # pylint: disable=g-import-not-at-top
+  def f_(*args, **kwargs):
+    value, vjp = f(*args, **kwargs)
+    def vjp_(cts_out):
+      cts_in = vjp(cts_out)
+      if not isinstance(cts_in, tuple):
+        cts_in = (cts_in,)
+      return cts_in
+    return value, vjp_
+  @jax.custom_transforms
+  def wrapped(*args, **kwargs):
+    value, _ = f(*args, **kwargs)
+    return value
+  jax.defvjp_all(wrapped, f_)
   return wrapped
 
 custom_gradient = utils.copy_docstring(
@@ -306,9 +300,15 @@ class name_scope(object):  # pylint: disable=invalid-name
 
 newaxis = np.newaxis
 
-stop_gradient = utils.copy_docstring(
-    tf.stop_gradient,
-    lambda input, name=None: np.array(input))
+if JAX_MODE:
+  from jax import lax  # pylint: disable=g-import-not-at-top
+  stop_gradient = utils.copy_docstring(
+      tf.stop_gradient,
+      lambda input, name=None: lax.stop_gradient(input))
+else:
+  stop_gradient = utils.copy_docstring(
+      tf.stop_gradient,
+      lambda input, name=None: np.array(input))
 
 TensorShape = tf.TensorShape
 Dimension = tf1.Dimension

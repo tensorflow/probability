@@ -60,6 +60,12 @@ def as_list(x):
   return tf.TensorShape(x).as_list()
 
 
+def _cast_tensorshape(x, x_type):
+  if issubclass(x_type, tf.TensorShape):
+    return x
+  return x_type(as_list(x))
+
+
 def assert_has_rank(x, rank):  # pylint: disable=redefined-outer-name
   """Raises an exception if `x` is not compatible with the given `rank`.
 
@@ -116,7 +122,7 @@ def concatenate(x, other):
     new_shape: an object like `x` whose elements are the concatenation of the
       dimensions in `x` and `other`.
   """
-  return type(x)(tf.TensorShape(x).concatenate(other))
+  return _cast_tensorshape(tf.TensorShape(x).concatenate(other), type(x))
 
 
 def constant_value_as_shape(tensor):  # pylint: disable=invalid-name
@@ -233,7 +239,7 @@ def merge_with(x, other):
   Raises:
     ValueError: If `x` and `other` are not compatible.
   """
-  return type(x)(tf.TensorShape(x).merge_with(other))
+  return _cast_tensorshape(tf.TensorShape(x).merge_with(other), type(x))
 
 
 def num_elements(x):
@@ -331,7 +337,7 @@ def with_rank(x, rank):  # pylint: disable=redefined-outer-name
   Raises:
     ValueError: If `x` does not represent a shape with the given `rank`.
   """
-  return type(x)(tf.TensorShape(x).with_rank(rank))
+  return _cast_tensorshape(tf.TensorShape(x).with_rank(rank), type(x))
 
 
 def with_rank_at_least(x, rank):  # pylint: disable=redefined-outer-name
@@ -352,4 +358,4 @@ def with_rank_at_least(x, rank):  # pylint: disable=redefined-outer-name
     ValueError: If `x` does not represent a shape with at least the given
       `rank`.
   """
-  return type(x)(tf.TensorShape(x).with_rank_at_least(rank))
+  return _cast_tensorshape(tf.TensorShape(x).with_rank_at_least(rank), type(x))
