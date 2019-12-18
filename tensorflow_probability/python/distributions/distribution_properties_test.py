@@ -175,6 +175,7 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Multinomial',  # Seemingly runs, but gives `NaN`s sometimes.
     'OneHotCategorical',  # Seemingly runs, but gives `NaN`s sometimes.
     'PlackettLuce',  # Shape error because pfor gather ignores `batch_dims`.
+    'ProbitBernoulli',  # Seemingly runs, but gives `NaN`s sometimes.
     'TruncatedNormal',  # Numerical problem: b/145554459
     'VonMisesFisher',  # No converter for CheckNumerics
     'Wishart',  # Actually works, but disabled because log_prob of sample is
