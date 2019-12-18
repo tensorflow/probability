@@ -394,20 +394,19 @@ class BernoulliTest(test_util.TestCase):
     self.assertAllEqual([-np.inf, 0.], dist.log_prob([0., 0.]))
     self.assertAllEqual([np.nan, np.nan], dist.log_prob([np.nan, np.nan]))
 
+  @test_util.numpy_disable_gradient_test
   def testLogProbGrads(self):
-    logits = tf.Variable([0., np.inf, -np.inf])  # probs = [1/2, 1, 0].
-    dist = tfd.Bernoulli(logits=logits)
-    with tf.GradientTape() as tape:
-      loss = -dist.log_prob([1., 1., 0.])
-    grad = tape.gradient(loss, dist.trainable_variables)
-    self.assertLen(grad, 1)
+    # probs = [1/2, 1, 0].
+    logits = tf.constant([0., np.inf, -np.inf], dtype=tf.float32)
+    _, grad = tfp.math.value_and_gradient(
+        lambda x: -tfd.Bernoulli(logits=x).log_prob([1., 1., 0.]),
+        logits)
 
     # For finite logits, the grad is as expected (finite...to get value do math)
     # For infinite logits, you can reason that a small perturbation of the
     # logits doesn't change anything (adding epsilon to +-Inf doesn't change
     # it), and thus gradient = 0 is expected.
-    self.evaluate([v.initializer for v in dist.variables])
-    self.assertAllEqual(grad[0], [-0.5, 0., 0.])
+    self.assertAllEqual(grad, [-0.5, 0., 0.])
 
   def testEntropyWithInfiniteLogits(self):
     logits = [np.inf, -np.inf]  # probs = [1, 0]
@@ -565,6 +564,7 @@ class BernoulliSlicingTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class BernoulliFromVariableTest(test_util.TestCase):
 
+  @test_util.tf_tape_safety_test
   def testGradientLogits(self):
     x = tf.Variable([-1., 1])
     self.evaluate(x.initializer)
@@ -575,6 +575,7 @@ class BernoulliFromVariableTest(test_util.TestCase):
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
 
+  @test_util.tf_tape_safety_test
   def testGradientProbs(self):
     x = tf.Variable([0.1, 0.7])
     self.evaluate(x.initializer)
@@ -585,6 +586,7 @@ class BernoulliFromVariableTest(test_util.TestCase):
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
 
+  @test_util.jax_disable_variable_test
   def testAssertionsProbs(self):
     x = tf.Variable([0.1, 0.7, 0.0])
     d = tfd.Bernoulli(probs=x, validate_args=True)

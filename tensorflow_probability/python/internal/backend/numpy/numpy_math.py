@@ -373,12 +373,15 @@ divide = utils.copy_docstring(
     tf.math.divide,
     lambda x, y, name=None: np.divide(x, y))
 
+
+def _divide_no_nan(x, y, name=None):  # pylint: disable=unused-argument
+  dtype = np.result_type(x, y)
+  y_is_zero = np.equal(y, 0.)
+  div = np.divide(x, np.where(y_is_zero, np.ones((), dtype=dtype), y))
+  return np.where(y_is_zero, np.zeros((), dtype=dtype), div)
+
 divide_no_nan = utils.copy_docstring(
-    tf.math.divide_no_nan,
-    lambda x, y, name=None: np.where(  # pylint: disable=g-long-lambda
-        np.broadcast_to(np.equal(y, 0.), np.array(x).shape),
-        np.zeros_like(np.divide(x, y)),
-        np.divide(x, y)))
+    tf.math.divide_no_nan, _divide_no_nan)
 
 equal = utils.copy_docstring(
     tf.math.equal,
@@ -574,12 +577,15 @@ multiply = utils.copy_docstring(
     tf.math.multiply,
     lambda x, y, name=None: np.multiply(x, y))
 
+
+def _multiply_no_nan(x, y, name=None):  # pylint: disable=unused-argument
+  dtype = np.result_type(x, y)
+  # TODO(b/146385087): The gradient should be
+  # `lambda dz: [multiply_no_nan(dz, y), multiply_no_nan(x, dz)]`.
+  return np.where(np.equal(y, 0.), np.zeros((), dtype=dtype), np.multiply(x, y))
+
 multiply_no_nan = utils.copy_docstring(
-    tf.math.multiply_no_nan,
-    lambda x, y, name=None: np.where(  # pylint: disable=g-long-lambda
-        np.broadcast_to(np.equal(y, 0.), np.array(x).shape),
-        np.zeros_like(np.multiply(x, y)),
-        np.multiply(x, y)))
+    tf.math.multiply_no_nan, _multiply_no_nan)
 
 negative = utils.copy_docstring(
     tf.math.negative,
