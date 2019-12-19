@@ -386,7 +386,8 @@ class _TriangularTest(object):
     self.evaluate([low.initializer, high.initializer])
     self.assertIsNone(tf.get_static_value(shift))
     self.assertIsNone(tf.get_static_value(scale))
-    self.assertEqual(self.evaluate(tf.convert_to_tensor(scale)), 5.)
+    self.assertAllClose(
+        self.evaluate(tf.convert_to_tensor(scale)), 5., rtol=1e-5, atol=0)
     self.assertEqual(self.evaluate(tf.convert_to_tensor(shift)), 2.)
 
 

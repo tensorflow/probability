@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import affine_linear_operator as affine_linear_operator_bijector
-from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
@@ -299,4 +298,7 @@ class VectorExponentialLinearOperator(
     return assertions
 
   def _default_event_space_bijector(self):
-    return softplus_bijector.Softplus(validate_args=self.validate_args)
+    # TODO(emilyaf): Implement the correct bijector as
+    # Chain([Shift(shift=self.loc), ScaleMatvecLinearOperator(scale=self.scale),
+    # Softplus()])
+    return

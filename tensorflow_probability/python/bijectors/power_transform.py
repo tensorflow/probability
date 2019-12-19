@@ -111,5 +111,6 @@ class PowerTransform(bijector.Bijector):
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:
       return []
-    return [assert_util.assert_positive(
-        y, message='Inverse transformation input must be greater than 0.')]
+    return [assert_util.assert_non_negative(
+        y, message=('Inverse transformation input must be greater than or '
+                    'equal to 0.'))]

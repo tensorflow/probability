@@ -29,9 +29,6 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import chain as chain_bijector
-from tensorflow_probability.python.bijectors import cholesky_outer_product as cholesky_outer_product_bijector
-from tensorflow_probability.python.bijectors import correlation_cholesky as correlation_cholesky_bijector
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import normal
@@ -447,17 +444,21 @@ class LKJ(distribution.Distribution):
     tensorshape_util.set_shape(answer, shape)
     return answer
 
+  # TODO(b/146522000): The output of tfb.CorrelationCholesky() can have
+  # values > 1. Enable this bijector when that's fixed.
+  # def _default_event_space_bijector(self):
+  #   # TODO(b/145620027) Finalize choice of bijector.
+  #   cholesky_bijector = correlation_cholesky_bijector.CorrelationCholesky(
+  #       validate_args=self.validate_args)
+  #   if self.input_output_cholesky:
+  #     return cholesky_bijector
+  #   return chain_bijector.Chain([
+  #       cholesky_outer_product_bijector.CholeskyOuterProduct(
+  #           validate_args=self.validate_args),
+  #       cholesky_bijector
+  #   ], validate_args=self.validate_args)
   def _default_event_space_bijector(self):
-    # TODO(b/145620027) Finalize choice of bijector.
-    cholesky_bijector = correlation_cholesky_bijector.CorrelationCholesky(
-        validate_args=self.validate_args)
-    if self.input_output_cholesky:
-      return cholesky_bijector
-    return chain_bijector.Chain([
-        cholesky_outer_product_bijector.CholeskyOuterProduct(
-            validate_args=self.validate_args),
-        cholesky_bijector
-    ], validate_args=self.validate_args)
+    return
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

@@ -129,7 +129,7 @@ class LogNormalTest(test_util.TestCase):
 
   def testSupportBijectorOutsideRange(self):
     dist = tfd.LogNormal(loc=1., scale=2., validate_args=True)
-    with self.assertRaisesOpError('must be greater than 0'):
+    with self.assertRaisesOpError('must be greater than or equal to 0'):
       dist._experimental_default_event_space_bijector().inverse(
           [-4.2, -1e-6, -1.3])
 

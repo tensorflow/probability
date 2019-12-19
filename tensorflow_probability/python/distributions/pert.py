@@ -23,7 +23,6 @@ import functools
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import scale as scale_bijector
 from tensorflow_probability.python.bijectors import shift as shift_bijector
@@ -36,6 +35,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 __all__ = [
     'PERT',
@@ -233,10 +233,17 @@ class PERT(distribution.Distribution):
     return self._transformed_beta().quantile(value)
 
   def _default_event_space_bijector(self):
-    low = tfp_util.DeferredTensor(self.low, lambda x: x)
-    scale = tfp_util.DeferredTensor(self.high, lambda x: x - self.low)
+    # TODO(b/146568897): Resolve numerical issues by implementing a new bijector
+    # instead of multiplying `scale` by `(1. - 1e-6)`.
+    if tensor_util.is_ref(self.low) or tensor_util.is_ref(self.high):
+      scale = DeferredTensor(
+          self.high,
+          lambda x: (x - self.low) * (1. - 1e-6),
+          shape=tf.broadcast_static_shape(self.high.shape, self.low.shape))
+    else:
+      scale = (self.high - self.low) * (1. - 1e-6)
     return chain_bijector.Chain([
-        shift_bijector.Shift(shift=low, validate_args=self.validate_args),
+        shift_bijector.Shift(shift=self.low, validate_args=self.validate_args),
         scale_bijector.Scale(scale=scale, validate_args=self.validate_args),
         sigmoid_bijector.Sigmoid(validate_args=self.validate_args)
     ], validate_args=self.validate_args)

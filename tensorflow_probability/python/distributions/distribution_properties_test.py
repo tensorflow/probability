@@ -183,6 +183,15 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'WishartTriL',  # Same as Wishart.
 ]
 
+EVENT_SPACE_BIJECTOR_IS_BROKEN = [
+    'InverseGamma',  # TODO(b/143090143): Enable this when the bug is fixed.
+                     # (Reciprocal(Softplus(x)) -> inf for small x)
+    'GeneralizedPareto',  # TODO(emilyaf): Enable this when the
+                          # `event_space_bijector` is checked in
+    'BatchReshape',    # TODO(emilyaf): Enable this when the
+                       # `event_space_bijector` is checked in
+]
+
 # Vectorization can rewrite computations in ways that (apparently) lead to
 # minor floating-point inconsistency.
 # TODO(b/142827327): Bring tolerance down to 0 for all distributions.
@@ -1189,6 +1198,50 @@ class ReproducibilityTest(test_util.TestCase):
       tf.random.set_seed(seed)
     s2 = self.evaluate(dist.sample(50, seed=seed))
     self.assertAllEqual(s1, s2)
+
+
+@test_util.test_all_tf_execution_regimes
+class EventSpaceBijectorsTest(test_util.TestCase):
+
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistribution(self, data):
+    enable_vars = data.draw(hps.booleans())
+
+    # TODO(b/146572907): Fix `enable_vars` for metadistributions.
+    broken_dists = EVENT_SPACE_BIJECTOR_IS_BROKEN
+    if enable_vars:
+      broken_dists.append(INSTANTIABLE_META_DISTS)
+
+    dist = data.draw(
+        distributions(
+            enable_vars=enable_vars,
+            eligibility_filter=(lambda name: name not in broken_dists)))
+
+    event_space_bijector = dist._experimental_default_event_space_bijector()
+    if event_space_bijector is None:
+      return
+
+    total_sample_shape = tensorshape_util.concatenate(
+        # Draw a sample shape
+        data.draw(tfp_hps.shapes()),
+        # Draw a shape that broadcasts with `[batch_shape, inverse_event_shape]`
+        # where `inverse_event_shape` is the event shape in the bijector's
+        # domain. This is the shape of `y` in R**n, such that
+        # x = event_space_bijector(y) has the event shape of the distribution.
+        data.draw(tfp_hps.broadcasting_shapes(
+            tensorshape_util.concatenate(
+                dist.batch_shape,
+                event_space_bijector.inverse_event_shape(
+                    dist.event_shape)), n=1))[0])
+
+    y = data.draw(
+        tfp_hps.constrained_tensors(
+            tfp_hps.identity_fn, total_sample_shape.as_list()))
+    x = event_space_bijector(y)
+    self.evaluate([var.initializer for var in dist.variables])
+    with tf.control_dependencies(dist._sample_control_dependencies(x)):
+      self.evaluate(tf.identity(x))
 
 
 @test_util.test_all_tf_execution_regimes

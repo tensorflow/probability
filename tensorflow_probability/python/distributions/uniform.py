@@ -211,9 +211,12 @@ class Uniform(distribution.Distribution):
 
   def _default_event_space_bijector(self):
     if tensor_util.is_ref(self.low) or tensor_util.is_ref(self.high):
-      scale = DeferredTensor(self.high, lambda x: x - self.low)
+      scale = DeferredTensor(
+          self.high,
+          lambda x: (x - self.low) * (1. - 1e-6),
+          shape=self.batch_shape)
     else:
-      scale = self.high - self.low
+      scale = (self.high - self.low) * (1. - 1e-6)
     return chain_bijector.Chain([
         shift_bijector.Shift(shift=self.low, validate_args=self.validate_args),
         scale_bijector.Scale(scale=scale, validate_args=self.validate_args),
