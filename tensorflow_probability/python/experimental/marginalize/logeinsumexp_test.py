@@ -14,10 +14,14 @@
 # ============================================================================
 """Compute einsums in log space."""
 
+import hypothesis
+from hypothesis.extra import numpy as hpnp
+import hypothesis.strategies as hps
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability.python.experimental.marginalize.logeinsumexp as logeinsumexp
 from tensorflow_probability.python.internal import test_util
+import tensorflow_probability.python.internal.hypothesis_testlib as testlib
 
 
 # pylint: disable=no-member
@@ -36,6 +40,72 @@ def _random_sparse_tensor(shape, min_value=0., max_value=1.0):
   # By including sparsity we test elements whose logs are -inf.
   sparsity = np.random.rand(*shape) < 0.5
   return tf.where(sparsity, elements, np.zeros(shape))
+
+
+@hps.composite
+def tensor_shape_and_indices(draw, rank, min_dim=1, max_dim=4,
+                             dimensions=(2, 2, 2, 2, 3, 3, 4),
+                             letters='ijklmno'):
+  """Return a shape and a set of indices consistent with its dimensions."""
+
+  # We don't draw dimensions directly but from an array of dimensions
+  # so that we can ensure that all appearances of a particular letter
+  # in a formula correspond to the same dimension.
+  indices = draw(hps.tuples(*(rank * [hps.integers(min_dim, max_dim)])))
+  shape = tuple(dimensions[i] for i in indices)
+  formula = ''.join(letters[i] for i in indices)
+  return formula, shape
+
+
+@hps.composite
+def indexed_tensor(draw, n, min_value=None, max_value=None, shape=None):
+  """Return tensor paired with a set of indices suitable for it."""
+
+  formula, shape = draw(tensor_shape_and_indices(n))
+  t = draw(hpnp.arrays(dtype=np.float64, shape=shape,
+                       elements=hps.floats(min_value=min_value,
+                                           max_value=max_value)))
+  return formula, t
+
+
+@hps.composite
+def nary_einsum(draw, max_num_tensors):
+  """Return an entire `einsum` example."""
+
+  n = draw(hps.integers(min_value=1, max_value=max_num_tensors))
+  lhss = []
+  tensors = []
+  for _ in range(n):
+    rank = draw(hps.integers(min_value=0, max_value=4))
+    # Deliberately choosing values in a restricted range so as not to cause
+    # underflow making results comparable with ordinary `einsum`.
+    lhs_t, t = draw(indexed_tensor(rank, min_value=1e-5, max_value=1.))
+    lhss.append(lhs_t)
+    tensors.append(t)
+
+  # Find all indices in use anywhere on left hand side of formula.
+  # We build a right hand side by selecting a list of these
+  # letters using each letter at most once.
+  letters = list(set(''.join(lhss)))
+  rhs_letters = draw(hps.lists(hps.sampled_from(letters),
+                               max_size=len(letters),
+                               unique=True))
+  rhs = ''.join(rhs_letters)
+
+  # Combine pieces on left hand side with right hand side to make
+  # a single formula.
+  # Some example formulas this strategy can produce:
+  #
+  #  'kjjm,mllm,j,kmk->jmlk'
+  #  'l,lllk,kkll,->'
+  #  'mm,jk,l,kll->'
+  #  ',km,,jkjl->m'
+  #  'jmm,k,m,km->km'
+  #  'k,l,kjl,ml->jkl'
+
+  formula = '{}->{}'.format(','.join(lhss), rhs)
+
+  return formula, tensors
 
 
 # Tests
@@ -135,9 +205,9 @@ class _EinLogSumExpTest(test_util.TestCase):
 
     np.random.seed(42)
 
-    a = _random_sparse_tensor(8 * [2])
-    u = tf.transpose(a, perm=[1, 2, 3, 4, 5, 6, 7, 0])
-    v = logeinsumexp.logeinsumexp('abcdefgh->bcdefgha', a)
+    t = _random_sparse_tensor(8 * [2])
+    u = tf.transpose(t, perm=[2, 3, 4, 5, 6, 7, 0, 1])
+    v = logeinsumexp.logeinsumexp('abcdefgh->cdefghab', t)
 
     self.assertAllClose(u, v)
 
@@ -145,8 +215,8 @@ class _EinLogSumExpTest(test_util.TestCase):
   # method described on stackoverflow:
   # https://stackoverflow.com/questions/23630277/numerically-stable-way-to-multiply-log-probability-matrices-in-np
   def test_counterexample(self):
-    a = tf.convert_to_tensor(np.array([0., -1000.]), dtype=tf.float32)
-    b = tf.convert_to_tensor(np.array([-1000., 0.]), dtype=tf.float32)
+    a = tf.convert_to_tensor(np.array([0., -1000.]), dtype=tf.float64)
+    b = tf.convert_to_tensor(np.array([-1000., 0.]), dtype=tf.float64)
     v = logeinsumexp.logeinsumexp('i,i->', a, b)
 
     self.assertAllClose(np.log(2.) - 1000., v)
@@ -164,9 +234,9 @@ class _EinLogSumExpTest(test_util.TestCase):
     m16 = _logmatmulexp(m8, m8)
     u = _logmatmulexp(m16, m16)
 
-    # Compute product of 25 matrices as a single `logeinsumexp` over
-    # 26 dimensions ensuring that:
-    # (1) a 26-dimensional intermediate isn't materialized
+    # Compute product of 32 matrices as a single `logeinsumexp` over
+    # 33 dimensions ensuring that:
+    # (1) a 33-dimensional intermediate isn't materialized
     # (2) we can work with logs of quantities that would otherwise
     #     cause an underflow.
     # (3) we can in fact do this with a batch of matrices.
@@ -176,6 +246,19 @@ class _EinLogSumExpTest(test_util.TestCase):
     formula = '{}->{}'.format(lhs, rhs)
     log_as = 32 * [m]
     v = logeinsumexp.logeinsumexp(formula, *log_as)
+
+    self.assertAllClose(u, v)
+
+  @hypothesis.given(nary_einsum(3))
+  # Hypothesis complains about the large test size but it's
+  # important to use substantial examples to test `logeinsumexp`.
+  @testlib.tfp_hp_settings(default_max_examples=10)
+  def test_einsum(self, data):
+    formula, tensors = data
+    tensors = [tf.convert_to_tensor(a, dtype=tf.float64) for a in tensors]
+    u = tf.math.log(tf.einsum(formula, *tensors))
+    log_tensors = [tf.math.log(t) for t in tensors]
+    v = logeinsumexp.logeinsumexp(formula, *log_tensors)
 
     self.assertAllClose(u, v)
 
