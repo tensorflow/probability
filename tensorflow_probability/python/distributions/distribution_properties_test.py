@@ -1211,7 +1211,7 @@ class EventSpaceBijectorsTest(test_util.TestCase):
     # TODO(b/146572907): Fix `enable_vars` for metadistributions.
     broken_dists = EVENT_SPACE_BIJECTOR_IS_BROKEN
     if enable_vars:
-      broken_dists.append(INSTANTIABLE_META_DISTS)
+      broken_dists.extend(INSTANTIABLE_META_DISTS)
 
     dist = data.draw(
         distributions(
