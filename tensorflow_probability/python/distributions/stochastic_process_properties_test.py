@@ -37,13 +37,16 @@ PARAM_EVENT_NDIMS_BY_PROCESS_NAME = {
     'GaussianProcess': dict(observation_noise_variance=0),
     'GaussianProcessRegressionModel': dict(observation_noise_variance=0),
     'StudentTProcess': dict(df=0),
+    'VariationalGaussianProcess': dict(obseration_noise_variance=0)
 }
 
 
 MUTEX_PARAMS = set()
 
 
-PROCESS_HAS_EXCESSIVE_USAGE = set(['GaussianProcessRegressionModel'])
+MAX_CONVERSIONS_BY_CLASS = dict(
+    GaussianProcessRegressionModel=4,
+    VariationalGaussianProcess=9)
 
 
 def _stochastic_process_specific_hp_settings(test_method):
@@ -118,6 +121,14 @@ def stochastic_processes(draw,
         enable_vars=enable_vars))
   elif process_name == 'GaussianProcessRegressionModel':
     return draw(gaussian_process_regression_models(
+        kernel_name=kernel_name,
+        batch_shape=batch_shape,
+        event_dim=event_dim,
+        feature_dim=feature_dim,
+        feature_ndims=feature_ndims,
+        enable_vars=enable_vars))
+  elif process_name == 'VariationalGaussianProcess':
+    return draw(variational_gaussian_processes(
         kernel_name=kernel_name,
         batch_shape=batch_shape,
         event_dim=event_dim,
@@ -199,7 +210,7 @@ def gaussian_process_regression_models(draw,
       feature_ndims=feature_ndims,
       enable_vars=enable_vars,
       name='index_points'))
-  hp.note('Index points:\n{}'.format(index_points))
+  hp.note('Index points:\n{}'.format(repr(index_points)))
 
   observation_index_points = draw(
       kernel_hps.kernel_input(
@@ -209,7 +220,8 @@ def gaussian_process_regression_models(draw,
           feature_ndims=feature_ndims,
           enable_vars=enable_vars,
           name='observation_index_points'))
-  hp.note('Observation index points:\n{}'.format(observation_index_points))
+  hp.note('Observation index points:\n{}'.format(
+      repr(observation_index_points)))
 
   observations = draw(kernel_hps.kernel_input(
       batch_shape=compatible_batch_shape,
@@ -221,14 +233,14 @@ def gaussian_process_regression_models(draw,
       feature_ndims=0,
       enable_vars=enable_vars,
       name='observations'))
-  hp.note('Observations:\n{}'.format(observations))
+  hp.note('Observations:\n{}'.format(repr(observations)))
 
   params = draw(broadcasting_params(
       'GaussianProcessRegressionModel',
       compatible_batch_shape,
       event_dim=event_dim,
       enable_vars=enable_vars))
-  hp.note('Params:\n{}'.format(params))
+  hp.note('Params:\n{}'.format(repr(params)))
 
   gp = tfd.GaussianProcessRegressionModel(
       kernel=k,
@@ -238,6 +250,83 @@ def gaussian_process_regression_models(draw,
       observation_noise_variance=params[
           'observation_noise_variance'])
   return gp
+
+
+@hps.composite
+def variational_gaussian_processes(draw,
+                                   kernel_name=None,
+                                   batch_shape=None,
+                                   event_dim=None,
+                                   feature_dim=None,
+                                   feature_ndims=None,
+                                   enable_vars=False):
+  # First draw a kernel.
+  k, _ = draw(kernel_hps.base_kernels(
+      kernel_name=kernel_name,
+      batch_shape=batch_shape,
+      event_dim=event_dim,
+      feature_dim=feature_dim,
+      feature_ndims=feature_ndims,
+      # Disable variables
+      enable_vars=False))
+  compatible_batch_shape = draw(
+      tfp_hps.broadcast_compatible_shape(k.batch_shape))
+  index_points = draw(kernel_hps.kernel_input(
+      batch_shape=compatible_batch_shape,
+      example_ndims=1,
+      feature_dim=feature_dim,
+      feature_ndims=feature_ndims,
+      enable_vars=enable_vars,
+      name='index_points'))
+  hp.note('Index points:\n{}'.format(repr(index_points)))
+
+  inducing_index_points = draw(kernel_hps.kernel_input(
+      batch_shape=compatible_batch_shape,
+      example_ndims=1,
+      feature_dim=feature_dim,
+      feature_ndims=feature_ndims,
+      enable_vars=enable_vars,
+      name='inducing_index_points'))
+  hp.note('Inducing index points:\n{}'.format(repr(inducing_index_points)))
+  num_inducing_points = int(inducing_index_points.shape[-(feature_ndims + 1)])
+
+  variational_inducing_observations_loc = draw(kernel_hps.kernel_input(
+      batch_shape=compatible_batch_shape,
+      example_ndims=1,
+      example_dim=num_inducing_points,
+      feature_dim=0,
+      feature_ndims=0,
+      enable_vars=enable_vars,
+      name='variational_inducing_observations_loc'))
+  hp.note('Variational inducing observations loc:\n{}'.format(
+      repr(variational_inducing_observations_loc)))
+
+  variational_inducing_observations_scale = draw(tfp_hps.tensors_in_support(
+      support=tfp_hps.Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE,
+      batch_shape=compatible_batch_shape.as_list(),
+      event_dim=num_inducing_points,
+      dtype=np.float64))
+  hp.note('Variational inducing observations scale:\n{}'.format(
+      repr(variational_inducing_observations_scale)))
+
+  params = draw(broadcasting_params(
+      'GaussianProcessRegressionModel',
+      compatible_batch_shape,
+      event_dim=event_dim,
+      enable_vars=enable_vars))
+  hp.note('Params:\n{}'.format(repr(params)))
+
+  vgp = tfd.VariationalGaussianProcess(
+      kernel=k,
+      index_points=index_points,
+      inducing_index_points=inducing_index_points,
+      variational_inducing_observations_loc=(
+          variational_inducing_observations_loc),
+      variational_inducing_observations_scale=(
+          variational_inducing_observations_scale),
+      observation_noise_variance=params[
+          'observation_noise_variance'])
+  return vgp
 
 
 @hps.composite
@@ -327,7 +416,7 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
       try:
         with tfp_hps.assert_no_excessive_var_usage(
             'method `{}` of `{}`'.format(stat, process),
-            max_permissible=excessive_usage_count(process_name)):
+            max_permissible=MAX_CONVERSIONS_BY_CLASS.get(process_name, 1)):
           getattr(process, stat)()
 
       except NotImplementedError:
@@ -389,7 +478,7 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
     try:
       with tfp_hps.assert_no_excessive_var_usage(
           'method `log_prob` of `{}`'.format(process),
-          max_permissible=excessive_usage_count(process_name)):
+          max_permissible=MAX_CONVERSIONS_BY_CLASS.get(process_name, 1)):
         process.log_prob(sample)
     except NotImplementedError:
       pass
@@ -415,12 +504,6 @@ def constraint_for(process=None, param=None):
     return CONSTRAINTS.get('{}.{}'.format(process, param),
                            CONSTRAINTS.get(param, tfp_hps.identity_fn))
   return CONSTRAINTS.get(process, tfp_hps.identity_fn)
-
-
-def excessive_usage_count(process_name):
-  # For GPRM, the observation_noise_variance is used in a few places
-  # giving it's usage to be around 4.
-  return 4 if process_name in PROCESS_HAS_EXCESSIVE_USAGE else 1
 
 
 if __name__ == '__main__':
