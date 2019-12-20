@@ -262,7 +262,9 @@ py_library(
     srcs = ["random_generators.py"],
     deps = [
         ":_utils",
+        ":numpy_array",
         ":numpy_math",
+        ":ops",
         # numpy dep,
         # tensorflow dep,
     ],

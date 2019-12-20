@@ -27,6 +27,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import _reverse
+from tensorflow_probability.python.internal.backend.numpy.ops import _custom_gradient
 
 scipy_special = utils.try_import('scipy.special')
 
@@ -730,9 +731,17 @@ softmax = utils.copy_docstring(
     tf.math.softmax,
     _softmax)
 
+
+@_custom_gradient
+def _softplus(x, name=None):  # pylint: disable=unused-argument
+  def grad(dy):
+    return dy * scipy_special.expit(x)
+  # TODO(b/146563881): Investigate improving numerical accuracy here.
+  return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.), grad
+
 softplus = utils.copy_docstring(
     tf.math.softplus,
-    lambda x, name=None: np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.))
+    _softplus)
 
 softsign = utils.copy_docstring(
     tf.math.softsign,
