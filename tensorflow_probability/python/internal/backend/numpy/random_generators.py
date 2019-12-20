@@ -134,6 +134,57 @@ def _poisson(shape, lam, dtype=tf.float32, seed=None,
   return rng.poisson(lam=lam, size=shape).astype(dtype)
 
 
+if JAX_MODE:
+  from jax import jit  # pylint: disable=g-import-not-at-top
+  from jax import lax  # pylint: disable=g-import-not-at-top
+  from jax import random  # pylint: disable=g-import-not-at-top
+  from jax.util import partial  # pylint: disable=g-import-not-at-top
+
+  # Jitting the implementation because
+  # sampling is very slow outside of JIT
+  # and causes tests to timeout.
+  @partial(jit, static_argnums=(2, 3, 4, 5))
+  def _poisson_jax_impl(lam, seed, shape, dtype, name, max_iters):  # pylint: disable=unused-argument
+    """Jit-able implementation of Knuth Poisson random sampler."""
+    # Based on the TF implementation for lam < 10 in
+    # https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/kernels/random_poisson_op.cc
+    # which uses the Knuth algorithm.
+    # Reference:
+    # https://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables
+    # This implementation can be improved using the
+    # transformed rejection sampling algorithm for
+    # lam > 10. A reference implementation can be found here:
+    # https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/kernels/random_poisson_op.cc#L159-L239
+
+    shape = _shape([lam], shape)
+    max_iters = (max_iters
+                 if max_iters is not None
+                 else np.iinfo(np.int32).max)
+
+    def body_fn(carry):
+      """Inner loop of Knuth algorithm."""
+      i, k, rng, log_prod = carry
+      rng, subkey = random.split(rng)
+      k = np.where(log_prod > -lam, k + 1, k)
+      return i + 1, k, rng, log_prod + np.log(random.uniform(subkey, shape))
+
+    def cond_fn(carry):
+      i, log_prod = carry[0], carry[3]
+      return np.any(log_prod > -lam) & (i < max_iters)
+
+    k = lax.while_loop(cond_fn, body_fn,
+                       (0, np.zeros(shape, dtype=np.int32),
+                        seed, np.zeros(shape)))[1]
+    return (k - 1).astype(dtype)
+
+
+def _poisson_jax(shape, lam, dtype=tf.float32, seed=None,
+                 name=None, max_iters=None):  # pylint: disable=unused-argument
+  """Jax Poisson random sampler."""
+  # TODO(b/146674643): use transformed rejection sampling with lam > 10.
+  return _poisson_jax_impl(lam, seed, shape, dtype, name, max_iters)
+
+
 def _uniform(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
@@ -181,7 +232,7 @@ normal = utils.copy_docstring(
 
 poisson = utils.copy_docstring(
     tf.random.poisson,
-    _poisson)
+    _poisson_jax if JAX_MODE else _poisson)
 
 uniform = utils.copy_docstring(
     tf.random.uniform,

@@ -58,7 +58,8 @@ class PoissonTest(test_util.TestCase):
     batch_size = 12
     lam = tf.constant([3.0] * batch_size)
     lam_v = 3.0
-    x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]
+    x = np.array([-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.],
+                 dtype=np.float32)
     poisson = self._make_poisson(
         rate=lam, interpolate_nondiscrete=False, validate_args=False)
     log_pmf = poisson.log_prob(x)
@@ -72,8 +73,7 @@ class PoissonTest(test_util.TestCase):
   def testPoissonLogPmfContinuousRelaxation(self):
     batch_size = 12
     lam = tf.constant([3.0] * batch_size)
-    x = np.array([-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]).astype(
-        np.float32)
+    x = tf.constant([-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.])
     poisson = self._make_poisson(
         rate=lam, interpolate_nondiscrete=True, validate_args=False)
 
@@ -95,13 +95,14 @@ class PoissonTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(pmf),
                         self.evaluate(expected_continuous_pmf))
 
+  @test_util.numpy_disable_gradient_test
   def testPoissonLogPmfGradient(self):
     batch_size = 6
     lam = tf.constant([3.0] * batch_size)
     lam_v = 3.0
     # Only non-negative values, as negative ones cause nans in the expected
     # value.
-    x = [0., 2., 3., 4., 5., 6.]
+    x = np.array([0., 2., 3., 4., 5., 6.], dtype=np.float32)
 
     _, dlog_pmf_dlam = self.evaluate(tfp.math.value_and_gradient(
         lambda lam: self._make_poisson(rate=lam).log_prob(x), lam))
@@ -114,11 +115,12 @@ class PoissonTest(test_util.TestCase):
     self.assertEqual(dlog_pmf_dlam.shape, (batch_size,))
     self.assertAllClose(dlog_pmf_dlam, expected)
 
+  @test_util.numpy_disable_gradient_test
   def testPoissonLogPmfGradientAtZeroPmf(self):
     # Check that the derivative wrt parameter at the zero-prob points is zero.
     batch_size = 6
     lam = tf.constant([3.0] * batch_size)
-    x = [-2., -1., -0.5, 0.2, 1.5, 10.5]
+    x = tf.constant([-2., -1., -0.5, 0.2, 1.5, 10.5])
 
     def poisson_log_prob(lam):
       return self._make_poisson(
@@ -128,13 +130,12 @@ class PoissonTest(test_util.TestCase):
         poisson_log_prob, lam))
 
     self.assertEqual(dlog_pmf_dlam.shape, (batch_size,))
-    print(dlog_pmf_dlam)
     self.assertAllClose(dlog_pmf_dlam, np.zeros([batch_size]))
 
   def testPoissonLogPmfMultidimensional(self):
     batch_size = 6
     lam = tf.constant([[2.0, 4.0, 5.0]] * batch_size)
-    lam_v = [2.0, 4.0, 5.0]
+    lam_v = np.array([2.0, 4.0, 5.0], dtype=np.float32)
     x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=np.float32).T
 
     poisson = self._make_poisson(rate=lam)
@@ -146,11 +147,14 @@ class PoissonTest(test_util.TestCase):
     self.assertEqual(pmf.shape, (6, 3))
     self.assertAllClose(self.evaluate(pmf), stats.poisson.pmf(x, lam_v))
 
+  @test_util.jax_disable_test_missing_functionality(
+      '`tf.math.igammac` is unimplemented in JAX backend.')
   def testPoissonCdf(self):
     batch_size = 12
     lam = tf.constant([3.0] * batch_size)
     lam_v = 3.0
-    x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]
+    x = np.array([-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.],
+                 dtype=np.float32)
 
     poisson = self._make_poisson(
         rate=lam, interpolate_nondiscrete=False, validate_args=False)
@@ -162,12 +166,13 @@ class PoissonTest(test_util.TestCase):
     self.assertEqual(cdf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(cdf), stats.poisson.cdf(x, lam_v))
 
+  @test_util.jax_disable_test_missing_functionality(
+      '`tf.math.igammac` is unimplemented in JAX backend.')
   def testPoissonCdfContinuousRelaxation(self):
     batch_size = 12
     lam = tf.constant([3.0] * batch_size)
-    x = np.array(
-        [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]).astype(
-            np.float32)
+    x = np.array([-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.],
+                 dtype=np.float32)
 
     expected_continuous_cdf = tf.math.igammac(1. + x, lam)
     expected_continuous_cdf = tf.where(x >= 0., expected_continuous_cdf,
@@ -186,11 +191,15 @@ class PoissonTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(cdf),
                         self.evaluate(expected_continuous_cdf))
 
+  @test_util.jax_disable_test_missing_functionality(
+      '`tf.math.igammac` is unimplemented in JAX backend.')
+  @test_util.numpy_disable_gradient_test
   def testPoissonCdfGradient(self):
     batch_size = 12
     lam = tf.constant([3.0] * batch_size)
     lam_v = 3.0
-    x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.]
+    x = np.array([-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.],
+                 dtype=np.float32)
 
     def cdf(lam):
       return self._make_poisson(
@@ -205,10 +214,12 @@ class PoissonTest(test_util.TestCase):
     self.assertEqual(dcdf_dlam.shape, (batch_size,))
     self.assertAllClose(dcdf_dlam, expected)
 
+  @test_util.jax_disable_test_missing_functionality(
+      '`tf.math.igammac` is unimplemented in JAX backend.')
   def testPoissonCdfMultidimensional(self):
     batch_size = 6
     lam = tf.constant([[2.0, 4.0, 5.0]] * batch_size)
-    lam_v = [2.0, 4.0, 5.0]
+    lam_v = np.array([2.0, 4.0, 5.0], dtype=np.float32)
     x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=np.float32).T
 
     poisson = self._make_poisson(rate=lam, interpolate_nondiscrete=False)
@@ -221,7 +232,7 @@ class PoissonTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(cdf), stats.poisson.cdf(x, lam_v))
 
   def testPoissonMean(self):
-    lam_v = [1.0, 3.0, 2.5]
+    lam_v = np.array([1.0, 3.0, 2.5], dtype=np.float32)
     poisson = self._make_poisson(rate=lam_v)
     self.assertEqual(poisson.mean().shape, (3,))
     self.assertAllClose(
@@ -229,7 +240,7 @@ class PoissonTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(poisson.mean()), lam_v)
 
   def testPoissonVariance(self):
-    lam_v = [1.0, 3.0, 2.5]
+    lam_v = np.array([1.0, 3.0, 2.5], dtype=np.float32)
     poisson = self._make_poisson(rate=lam_v)
     self.assertEqual(poisson.variance().shape, (3,))
     self.assertAllClose(
@@ -237,7 +248,7 @@ class PoissonTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(poisson.variance()), lam_v)
 
   def testPoissonStd(self):
-    lam_v = [1.0, 3.0, 2.5]
+    lam_v = np.array([1.0, 3.0, 2.5], dtype=np.float32)
     poisson = self._make_poisson(rate=lam_v)
     self.assertEqual(poisson.stddev().shape, (3,))
     self.assertAllClose(
@@ -245,13 +256,13 @@ class PoissonTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(poisson.stddev()), np.sqrt(lam_v))
 
   def testPoissonMode(self):
-    lam_v = [1.0, 3.0, 2.5, 3.2, 1.1, 0.05]
+    lam_v = np.array([1.0, 3.0, 2.5, 3.2, 1.1, 0.05], dtype=np.float32)
     poisson = self._make_poisson(rate=lam_v)
     self.assertEqual(poisson.mode().shape, (6,))
     self.assertAllClose(self.evaluate(poisson.mode()), np.floor(lam_v))
 
   def testPoissonMultipleMode(self):
-    lam_v = [1.0, 3.0, 2.0, 4.0, 5.0, 10.0]
+    lam_v = np.array([1.0, 3.0, 2.0, 4.0, 5.0, 10.0], dtype=np.float32)
     poisson = self._make_poisson(rate=lam_v)
     # For the case where lam is an integer, the modes are: lam and lam - 1.
     # In this case, we get back the larger of the two modes.
@@ -274,7 +285,7 @@ class PoissonTest(test_util.TestCase):
     self.assertAllClose(sample_values.var(), stats.poisson.var(lam_v), rtol=.01)
 
   def testAssertValidSample(self):
-    lam_v = [1.0, 3.0, 2.5]
+    lam_v = np.array([1.0, 3.0, 2.5], dtype=np.float32)
     poisson = self._make_poisson(rate=lam_v)
     with self.assertRaisesOpError('Condition x >= 0'):
       self.evaluate(poisson.cdf([-1.2, 3., 4.2]))
