@@ -30,7 +30,7 @@ from tensorflow_probability.python.internal import test_util
 def make_lognormal(mean):
   """Helper which creates a LogNormal with a specific mean."""
   mean = tf.convert_to_tensor(value=mean, name='mean')
-  s2 = np.log(2.).astype(mean.dtype.as_numpy_dtype())
+  s2 = np.log(2.).astype(mean.dtype.as_numpy_dtype)
   return tfd.LogNormal(tf.math.log(mean) - 0.5 * s2, np.sqrt(s2))
 
 

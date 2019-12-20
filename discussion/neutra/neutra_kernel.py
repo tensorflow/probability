@@ -265,7 +265,7 @@ class NeuTra(tfp.mcmc.TransitionKernel):
     kernel = tfp.mcmc.SimpleStepSizeAdaptation(
         kernel,
         num_adaptation_steps=num_step_size_adaptation_steps,
-        target_accept_prob=np.array(0.9, dtype.as_numpy_dtype()))
+        target_accept_prob=np.array(0.9, dtype.as_numpy_dtype))
     self._kernel = kernel
 
   @property
@@ -412,7 +412,7 @@ class NeuTra(tfp.mcmc.TransitionKernel):
 
     learning_rate = tf.compat.v2.optimizers.schedules.PiecewiseConstantDecay(
         list(self.num_train_steps *
-             np.array([0.2, 0.8]).astype(dtype.as_numpy_dtype())),
+             np.array([0.2, 0.8]).astype(dtype.as_numpy_dtype)),
         [lr, lr * 0.1, lr * 0.01])
 
     opt = tf.compat.v2.optimizers.Adam(learning_rate)

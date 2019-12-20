@@ -392,7 +392,7 @@ class MultivariateNormalTriL(DistributionLambda):
     with tf.name_scope(name or 'MultivariateNormalTriL'):
       params = tf.convert_to_tensor(params, name='params')
       scale_tril = fill_scale_tril_lib.FillScaleTriL(
-          diag_shift=np.array(1e-5, params.dtype.as_numpy_dtype()),
+          diag_shift=np.array(1e-5, params.dtype.as_numpy_dtype),
           validate_args=validate_args)
       return mvn_tril_lib.MultivariateNormalTriL(
           loc=params[..., :event_size],

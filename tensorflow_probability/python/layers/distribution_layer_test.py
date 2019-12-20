@@ -327,7 +327,7 @@ class DistributionLambdaSerializationTest(test_util.TestCase):
     batch_shape = [batch_size]
 
     input_shape = batch_shape + model.input.shape[1:].as_list()
-    dtype = model.input.dtype.as_numpy_dtype()
+    dtype = model.input.dtype.as_numpy_dtype
 
     model_file = self.create_tempfile()
     model.save(model_file.full_path, save_format='h5')
@@ -355,7 +355,7 @@ class DistributionLambdaSerializationTest(test_util.TestCase):
     batch_shape = [batch_size]
 
     input_shape = batch_shape + model.input.shape[1:].as_list()
-    dtype = model.input.dtype.as_numpy_dtype()
+    dtype = model.input.dtype.as_numpy_dtype
 
     model_dir = self.create_tempdir()
     tf1.keras.experimental.export_saved_model(model, model_dir.full_path)
