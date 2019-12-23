@@ -201,7 +201,7 @@ class InterpRegular1DGridTest(test_util.TestCase):
 
     # make sure some values are not in [x_ref_min, x_ref_max]
     x = np.linspace(
-        x_ref_min - 0.5, x_ref_max + 0.5, np.prod(x_shape),
+        x_ref_min - 0.5, x_ref_max + 0.5, np.int32(np.prod(x_shape)),
         dtype=dtype).reshape(x_shape)
 
     y = tfp.math.interp_regular_1d_grid(
