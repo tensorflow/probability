@@ -384,7 +384,8 @@ class _TensorMeta(type(np.ndarray)):
     if JAX_MODE:
       import jax  # pylint: disable=g-import-not-at-top
       return isinstance(instance, (jax.xla.DeviceArray,
-                                   jax.abstract_arrays.UnshapedArray))
+                                   jax.abstract_arrays.UnshapedArray,
+                                   jax.core.Tracer))
     return isinstance(instance, np.ndarray)
 
 
