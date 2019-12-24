@@ -252,12 +252,12 @@ class ContinuousBernoulli(distribution.Distribution):
         assertions = []
         if not self.validate_args:
             return assertions
-        assertions.append(assert_util.assert_non_negative(
-            x, message='Sample must be non-negative.'))
+        assertions.append(assert_util.assert_positive(
+            x, message='Sample must be positive.'))
         assertions.append(
-            assert_util.assert_less_equal(
+            assert_util.assert_less(
                 x, tf.ones([], dtype=x.dtype),
-                message='Sample must be less than or equal to `1`.'))
+                message='Sample must be less than `1`.'))
         return assertions
 
 
@@ -280,10 +280,10 @@ def maybe_assert_continuous_bernoulli_param_correctness(
             lams = tf.convert_to_tensor(lams)
             one = tf.constant(1., lams.dtype)
             assertions += [
-                assert_util.assert_non_negative(
-                    lams, message='lams has components less than 0.'),
-                assert_util.assert_less_equal(
-                    lams, one, message='lams has components greater than 1.')
+                assert_util.assert_positive(
+                    lams, message='lams has components less than or equal to 0.'),
+                assert_util.assert_less(
+                    lams, one, message='lams has components greater than or equal to 1.')
             ]
 
     return assertions
