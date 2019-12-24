@@ -250,7 +250,8 @@ class MNISTSequence(tf.keras.utils.Sequence):
               assigned a unique integer.
     '''
     images = np.random.randint(low=0, high=256,
-                               size=(num_images, IMAGE_SHAPE[0], IMAGE_SHAPE[1]))
+                               size=(num_images, IMAGE_SHAPE[0],
+                                     IMAGE_SHAPE[1]))
     labels = np.random.randint(low=0, high=num_classes,
                                size=num_images)
     return images, labels

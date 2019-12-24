@@ -28,6 +28,45 @@ package(
 exports_files(["LICENSE"])
 
 py_binary(
+    name = "keras_bayesian_neural_network",
+    srcs = ["keras_bayesian_neural_network.py"],
+    python_version = "PY2",
+    srcs_version = "PY2AND3",
+    deps = [":keras_bayesian_neural_network_lib"],
+)
+
+py_library(
+    name = "keras_bayesian_neural_network_lib",
+    srcs = ["keras_bayesian_neural_network.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # matplotlib dep,
+        # numpy dep,
+        # seaborn dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "keras_bayesian_neural_network_test",
+    size = "small",
+    srcs = ["keras_bayesian_neural_network.py"],
+    args = [
+        "--fake_data",
+        "--num_epochs=1",
+        "--viz_steps=1000",
+    ],
+    main = "keras_bayesian_neural_network.py",
+    srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
+    deps = [
+        ":keras_bayesian_neural_network_lib",
+    ],
+)
+
+py_binary(
     name = "bayesian_neural_network",
     srcs = ["bayesian_neural_network.py"],
     python_version = "PY2",
@@ -283,6 +322,45 @@ py_test(
     srcs_version = "PY2AND3",
     deps = [
         ":latent_dirichlet_allocation_edward2_lib",
+    ],
+)
+
+py_binary(
+    name = "keras_logistic_regression",
+    srcs = ["keras_logistic_regression.py"],
+    python_version = "PY2",
+    srcs_version = "PY2AND3",
+    deps = [":keras_logistic_regression_lib"],
+)
+
+py_library(
+    name = "keras_logistic_regression_lib",
+    srcs = ["keras_logistic_regression.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # absl/flags dep,
+        # matplotlib dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "keras_logistic_regression_test",
+    size = "small",
+    srcs = [
+        "keras_logistic_regression.py",
+    ],
+    args = [
+        "--num_examples=32",
+        "--batch_size=8",
+    ],
+    main = "keras_logistic_regression.py",
+    srcs_version = "PY2AND3",
+    tags = ["tf2-kokoro-broken"],
+    deps = [
+        ":keras_logistic_regression_lib",
     ],
 )
 

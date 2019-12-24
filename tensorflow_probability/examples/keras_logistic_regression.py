@@ -53,6 +53,8 @@ flags.DEFINE_integer("num_monte_carlo",
                      help="Monte Carlo samples to visualize weight posterior.")
 
 FLAGS = flags.FLAGS
+# The dimensions of the example data, ie shape=(256, 2)
+NUM_DIMENSIONS = 2
 
 
 def visualize_decision(features, labels, true_w_b, candidate_w_bs, fname):
@@ -139,7 +141,8 @@ class ToyDataSequence(tf.keras.utils.Sequence):
 
   Args:
     features: Numpy `array` of features, indexed by the first dimension.
-    labels: Numpy `array` of features, with the same first dimension as `features`.
+    labels: Numpy `array` of features, with the same first dimension as
+            `features`.
     batch_size: Integer, number of elements in each training batch.
 
   '''
@@ -208,11 +211,10 @@ def main(argv):
 
   # Generate a toy classification dataset.
   w_true, b_true, features, labels = toy_logistic_data(FLAGS.num_examples)
-  num_train_samples, num_dimensions = features.shape
   toy_logistic_sequence = ToyDataSequence(features, labels, FLAGS.batch_size)
 
   # Define and train a bayesian logistic regression model.
-  model = create_model(num_train_samples, num_dimensions)
+  model = create_model(FLAGS.num_examples, NUM_DIMENSIONS)
   model.fit_generator(toy_logistic_sequence, epochs=FLAGS.num_epochs,
                       shuffle=True)
   # Visualize some draws from the weights posterior.
