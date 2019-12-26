@@ -788,7 +788,6 @@ class VectorDistributionTestHelpers(object):
       # https://en.wikipedia.org/wiki/Volume_of_an_n-ball
       # Using tf.lgamma because we'd have to otherwise use SciPy which is not
       # a required dependency of core.
-      radius = np.asarray(radius)
       dims = tf.cast(dims, dtype=radius.dtype)
       return tf.exp((dims / 2.) * np.log(np.pi) -
                     tf.math.lgamma(1. + dims / 2.) + dims * tf.math.log(radius))
@@ -805,6 +804,8 @@ class VectorDistributionTestHelpers(object):
 
     # Build graph.
     with tf.name_scope('run_test_sample_consistent_log_prob'):
+      radius = tf.convert_to_tensor(radius, dist.dtype)
+      center = tf.convert_to_tensor(center, dist.dtype)
       batch_shape = dist.batch_shape_tensor()
       actual_volume = actual_hypersphere_volume(
           dims=dist.event_shape_tensor()[0],

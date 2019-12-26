@@ -163,10 +163,21 @@ __all__ = [
 
 
 def _astuple(x):
+  """Attempt to convert the given argument to be a Python tuple."""
   try:
     return tuple(x)
   except TypeError:
-    return x
+    pass
+
+  # If `x` is a scalar array, then the above call `tuple(x)` will have failed,
+  # because scalar arrays do not support iteration in NumPy or JAX.
+  if getattr(x, 'shape', None) == ():  # pylint: disable=g-explicit-bool-comparison
+    try:
+      return tuple(x[np.newaxis])
+    except TypeError:
+      pass
+
+  return x
 
 
 def _bincount(arr, weights=None, minlength=None, maxlength=None,  # pylint: disable=unused-argument
