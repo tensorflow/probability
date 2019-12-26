@@ -38,7 +38,7 @@ matplotlib.use("Agg")
 from matplotlib import figure  # pylint: disable=g-import-not-at-top
 from matplotlib.backends import backend_agg
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
 from tensorflow.contrib.learn.python.learn.datasets import mnist

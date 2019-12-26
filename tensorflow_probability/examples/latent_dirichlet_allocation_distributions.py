@@ -105,7 +105,7 @@ import numpy as np
 import scipy.sparse
 from six.moves import cPickle as pickle
 from six.moves import urllib
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions

@@ -26,7 +26,7 @@ from matplotlib import cm
 from matplotlib import figure
 from matplotlib.backends import backend_agg
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
