@@ -450,7 +450,7 @@ imag = utils.copy_docstring(
 # TODO(b/256095991): Add unit-test.
 invert_permutation = utils.copy_docstring(
     tf.math.invert_permutation,
-    lambda x, name=None: np.argsort)
+    lambda x, name=None: np.argsort(x))
 
 is_finite = utils.copy_docstring(
     tf.math.is_finite,
