@@ -68,8 +68,7 @@ def quantile(p, lams):
     return (np.log(p * (2.0 * lams - 1.0) + 1.0 - lams) - np.log(1.0 - lams)) / (np.log(lams) - np.log(1.0 - lams))
 
 
-# @test_util.test_all_tf_execution_regimes
-@test_util.test_graph_mode_only
+@test_util.test_all_tf_execution_regimes
 class ContinuousBernoulliTest(test_util.TestCase):
 
     def testLam(self):
@@ -360,8 +359,7 @@ class _MakeSlicer(object):
 make_slicer = _MakeSlicer()
 
 
-# @test_util.test_all_tf_execution_regimes
-@test_util.test_graph_mode_only
+@test_util.test_all_tf_execution_regimes
 class ContinuousBernoulliSlicingTest(test_util.TestCase):
 
     def testScalarSlice(self):
@@ -490,8 +488,7 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
         self.assertAllEqual((3, 1, 5, 2, 4), cb2.batch_shape)
 
 
-# @test_util.test_all_tf_execution_regimes
-@test_util.test_graph_mode_only
+@test_util.test_all_tf_execution_regimes
 class ContinuousBernoulliFromVariableTest(test_util.TestCase):
 
     @test_util.tf_tape_safety_test
