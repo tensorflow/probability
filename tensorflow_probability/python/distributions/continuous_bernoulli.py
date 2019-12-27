@@ -131,7 +131,7 @@ class ContinuousBernoulli(distribution.Distribution):
         uniform = tf.random.uniform(new_shape, seed=seed, dtype=lams.dtype)
         sample = tf.where(tf.logical_or(tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])),
                           (tf.math.log(uniform * (2.0 * cut_lams - 1.0) + 1.0 - cut_lams)
-                           - tf.math.log(1.0 - cut_lams)) / (tf.log(cut_lams) - tf.math.log(1.0 - cut_lams)),
+                           - tf.math.log(1.0 - cut_lams)) / (tf.math.log(cut_lams) - tf.math.log(1.0 - cut_lams)),
                           uniform)
         return tf.cast(sample, self.dtype)
 
@@ -185,7 +185,7 @@ class ContinuousBernoulli(distribution.Distribution):
 
     def _entropy(self):
         log_lams0, log_lams1 = self._outcome_log_lams()
-        return self._mean() * (log_lams1 - log_lams0) - self._cont_bern_log_norm() - log_lams1
+        return self._mean() * (log_lams0 - log_lams1) - self._cont_bern_log_norm() - log_lams0
 
     def _mean(self):
         lams = self._lams_parameter_no_checks()
@@ -210,7 +210,7 @@ class ContinuousBernoulli(distribution.Distribution):
                             lams, self._lims[0] * tf.ones_like(lams))
         return tf.where(tf.logical_or(tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])),
                         (tf.math.log(p * (2.0 * cut_lams - 1.0) + 1.0 - cut_lams)
-                         - tf.math.log(1.0 - cut_lams)) / (tf.log(cut_lams) - tf.math.log(1.0 - cut_lams)),
+                         - tf.math.log(1.0 - cut_lams)) / (tf.math.log(cut_lams) - tf.math.log(1.0 - cut_lams)),
                         p)
 
     def _stddev(self):
@@ -310,6 +310,6 @@ def _kl_bernoulli_bernoulli(a, b, name=None):
         b_log_norm = b._cont_bern_log_norm() # pylint:disable=protected-access
 
         return (
-                a_mean * (a_log_lams0 + b_log_lams1 - a_log_lams1 - b_log_lams0) + a_log_norm - b_log_norm +
-                a_log_lams1 - b_log_lams1
+                a_mean * (a_log_lams1 + b_log_lams0 - a_log_lams0 - b_log_lams1) + a_log_norm - b_log_norm +
+                a_log_lams0 - b_log_lams0
         )

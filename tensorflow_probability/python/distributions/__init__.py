@@ -31,6 +31,7 @@ from tensorflow_probability.python.distributions.cauchy import Cauchy
 from tensorflow_probability.python.distributions.chi import Chi
 from tensorflow_probability.python.distributions.chi2 import Chi2
 from tensorflow_probability.python.distributions.cholesky_lkj import CholeskyLKJ
+from tensorflow_probability.python.distributions.continuous_bernoulli import ContinuousBernoulli
 from tensorflow_probability.python.distributions.deterministic import Deterministic
 from tensorflow_probability.python.distributions.deterministic import VectorDeterministic
 from tensorflow_probability.python.distributions.dirichlet import Dirichlet
