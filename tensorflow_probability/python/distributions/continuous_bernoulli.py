@@ -38,6 +38,8 @@ class ContinuousBernoulli(distribution.Distribution):
     for more details, see:
     The continuous Bernoulli: fixing a pervasive error in variational autoencoders, Loaiza-Ganem and Cunningham,
     NeurIPS 2019, https://arxiv.org/abs/1907.06845
+    NOTE: Unlike the Bernoulli, numerical instabilities can happen for lams very close to 0 or 1.
+    Current implementation allows any value in (0,1), but this could be changed to (1e-6, 1-1e-6) to avoid these issues.
 
     """
 
