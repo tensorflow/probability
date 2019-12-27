@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -147,9 +148,10 @@ class ContinuousBernoulli(distribution.Distribution):
     def _log_prob(self, event):
         log_lams0, log_lams1 = self._outcome_log_lams()
         event = tf.cast(event, log_lams0.dtype)
-        return (tf.math.multiply_no_nan(log_lams0, 1 - event) +
-                tf.math.multiply_no_nan(log_lams1, event) +
-                self._cont_bern_log_norm())
+        tentative_log_pdf = tf.math.multiply_no_nan(log_lams0, 1.0 - event) +\
+                             tf.math.multiply_no_nan(log_lams1, event) +self._cont_bern_log_norm()
+        return tf.where(tf.logical_or(event < 0, event > 1), -float('Inf') * tf.ones_like(tentative_log_pdf),
+                        tentative_log_pdf )
 
     def _log_cdf(self, x):
         return tf.math.log(self._cdf(x))
@@ -214,11 +216,11 @@ class ContinuousBernoulli(distribution.Distribution):
                         p)
 
     def _stddev(self):
-        return tf.math.sqrt(self._variance)
+        return tf.math.sqrt(self._variance())
 
     def _mode(self):
         """Returns `1` if `prob > 0.5` and `0` otherwise."""
-        return tf.cast(self._probs_parameter_no_checks() > 0.5, self.dtype)
+        return tf.cast(self._lams_parameter_no_checks() > 0.5, self.dtype)
 
     def logits_parameter(self, name=None):
         """Logits computed from non-`None` input arg (`lams` or `logits`)."""
@@ -227,7 +229,7 @@ class ContinuousBernoulli(distribution.Distribution):
 
     def _logits_parameter_no_checks(self):
         if self._logits is None:
-            lams = tf.convert_to_tensor(self._lamss)
+            lams = tf.convert_to_tensor(self._lams)
             return tf.math.log(lams) - tf.math.log1p(-lams)
         return tf.identity(self._logits)
 
@@ -242,7 +244,7 @@ class ContinuousBernoulli(distribution.Distribution):
         return tf.math.sigmoid(self._logits)
 
     def _default_event_space_bijector(self):
-        return
+        return sigmoid_bijector.Sigmoid(validate_args=self.validate_args)
 
     def _parameter_control_dependencies(self, is_init):
         return maybe_assert_continuous_bernoulli_param_correctness(
