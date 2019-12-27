@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 # Dependency imports
 import numpy as np
 
@@ -68,6 +69,13 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+
+
+if JAX_MODE:
+  import jax  # pylint: disable=g-import-not-at-top
+
+
 def _astuple(x):
   try:
     return tuple(x)
@@ -75,7 +83,6 @@ def _astuple(x):
     return x
 
 
-# TODO(b/136555907): Add unit-test.
 def _gather(  # pylint: disable=unused-argument
     params,
     indices,
@@ -87,11 +94,23 @@ def _gather(  # pylint: disable=unused-argument
   if validate_indices is not None:
     raise NotImplementedError(
         'Argument `validate_indices != None` is currently unimplemented.')
-  # NOTE: For only the numpy backend, this function could create a single result
-  # ndarray and use in-place updates.  For the Jax backend, this function could
-  # vmap `np.take`.
+  if batch_dims < 0:
+    raise NotImplementedError('Negative `batch_dims` is currently unsupported.')
   if axis is None:
     axis = batch_dims
+  if axis < 0:
+    axis = axis + len(params.shape)
+  # NOTE: For only the numpy backend, this function could create a single result
+  # ndarray and use in-place updates.  For the Jax backend, this function
+  # vmaps `np.take`.
+  if JAX_MODE:
+    take = lambda params, indices: np.take(params, indices,  # pylint: disable=g-long-lambda
+                                           axis=axis - batch_dims)
+    take = functools.reduce(
+        lambda g, f: f(g), [jax.vmap] * batch_dims,
+        take
+    )
+    return take(params, indices)
   res = np.array([
       np.take(params[i], indices[i], axis=axis - batch_dims)
       for i in np.ndindex(*params.shape[:batch_dims])
@@ -101,13 +120,29 @@ def _gather(  # pylint: disable=unused-argument
       params.shape[:axis] + indices.shape[batch_dims:] + params.shape[axis+1:])
 
 
+def _gather_nd_single(params, indices):
+  idx = tuple(np.moveaxis(indices, -1, 0))
+  return params[idx]
+
+
 def _gather_nd(  # pylint: disable=unused-argument
     params,
     indices,
     batch_dims=0,
     name=None):
   """gather_nd."""
-  raise NotImplementedError
+  if batch_dims < 0:
+    raise NotImplementedError('Negative `batch_dims` is currently unsupported.')
+  if not JAX_MODE and batch_dims > 0:
+    raise NotImplementedError(
+        '`batch_dims > 0` currently unsupported in NumPy backend.')
+  gather_nd_ = _gather_nd_single
+  if JAX_MODE:
+    gather_nd_ = functools.reduce(
+        lambda g, f: f(g), [jax.vmap] * batch_dims,
+        gather_nd_
+    )
+  return gather_nd_(params, indices)
 
 
 def _one_hot(  # pylint: disable=unused-argument
@@ -231,7 +266,7 @@ expand_dims = utils.copy_docstring(
 
 fill = utils.copy_docstring(
     tf.fill,
-    lambda dims, value, name=None: value * np.ones(dims, np.array(value).dtype))
+    lambda dims, value, name=None: np.full(dims, value))
 
 gather = utils.copy_docstring(
     tf.gather,

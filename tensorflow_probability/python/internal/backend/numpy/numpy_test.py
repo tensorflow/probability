@@ -114,12 +114,12 @@ def fft_shapes(fft_dim):
 
 @hps.composite
 def n_same_shape(draw, n, shape=shapes(), dtype=None, elements=None,
-                 as_tuple=True):
+                 as_tuple=True, batch_shape=()):
   if elements is None:
     elements = floats()
   if dtype is None:
     dtype = np.float64
-  shape = draw(shape)
+  shape = tuple(batch_shape) + draw(shape)
 
   ensure_array = lambda x: onp.array(x, dtype=dtype)
   if isinstance(elements, (list, tuple)):
@@ -235,6 +235,64 @@ def gamma_params():
            include_beta=hps.booleans(),
            dtype=hps.sampled_from([tf.float32, tf.float64]))
       ).map(dict_to_params)  # dtype
+
+
+@hps.composite
+def gather_params(draw):
+  params_shape = shapes(min_dims=1)
+  params = draw(single_arrays(shape=params_shape))
+  rank = len(params.shape)
+  # Restricting batch_dims to be positive for now
+  # Batch dims can only be > 0 if rank > 1
+  batch_dims = draw(hps.integers(0, max(0, rank - 2)))
+  # Axis is constrained to be >= batch_dims
+  axis = draw(hps.one_of(
+      hps.integers(batch_dims, rank - 1),
+      hps.integers(-rank + batch_dims, -1),
+  ))
+  elements = hps.integers(0, params.shape[axis] - 1)
+  indices_shape = shapes(min_dims=0)
+  batch_shape = params.shape[:batch_dims]
+  indices = draw(single_arrays(dtype=np.int32, elements=elements,
+                               shape=indices_shape,
+                               batch_shape=batch_shape))
+  return params, indices, None, axis, batch_dims
+
+
+@hps.composite
+def gather_nd_params(draw):
+  if JAX_MODE:
+  # Restricting batch_dims to be positive for now
+    batch_dims = draw(hps.integers(min_value=0, max_value=4))
+  else:
+    batch_dims = 0
+  if batch_dims == 0:
+    batch_shape = ()
+  else:
+    batch_shape = draw(shapes(min_dims=batch_dims, max_dims=batch_dims))
+
+  params = draw(single_arrays(
+      shape=hps.just(batch_shape + draw(shapes(min_dims=1)))
+  ))
+  params_shape = params.shape
+  rank = len(params_shape)
+
+  indices_shape = draw(hps.integers(min_value=1, max_value=rank - batch_dims))
+  indices_batch_shape = draw(shapes())
+  batches = []
+  for idx in range(indices_shape):
+    batches.append(
+        draw(single_arrays(
+            dtype=np.int32,
+            elements=hps.integers(
+                0, params.shape[batch_dims + idx] - 1
+            ),
+            batch_shape=batch_shape + indices_batch_shape,
+            shape=hps.just((1,))
+        ))
+    )
+  indices = np.concatenate(batches, -1)
+  return params, indices, batch_dims, None
 
 
 # __Currently untested:__
@@ -598,6 +656,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
         assert_shape_only=True),
 
     # Array ops.
+    TestCase('gather', [gather_params()]),
+    TestCase('gather_nd', [gather_nd_params()]),
     TestCase('one_hot', [one_hot_params()]),
     TestCase('slice', [sliceable_and_slices()]),
 ]
