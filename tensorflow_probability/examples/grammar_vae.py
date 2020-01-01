@@ -63,7 +63,7 @@ import time
 # Dependency imports
 from absl import flags
 import six
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability import edward2 as ed

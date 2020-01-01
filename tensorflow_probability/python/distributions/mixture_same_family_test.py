@@ -442,8 +442,9 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
 
   def _build_tensor(self, ndarray, dtype=None):
     # Enforce parameterized dtype and static/dynamic testing.
-    ndarray = np.asarray(ndarray).astype(
-        dtype if dtype is not None else self.dtype)
+    if dtype is None:
+      dtype = self.dtype
+    ndarray = np.array(ndarray, dtype=dtype)
     if self.use_static_shape:
       return tf.convert_to_tensor(ndarray)
     else:
@@ -452,7 +453,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
   def _build_variable(self, ndarray, name=None, dtype=None, static_rank=False):
     if dtype is None:
       dtype = self.dtype
-    ndarray = np.asarray(ndarray).astype(dtype)
+    ndarray = np.array(ndarray, dtype=dtype)
     if self.use_static_shape:
       return tf.Variable(ndarray, name=name, dtype=dtype)
     elif static_rank:

@@ -43,7 +43,7 @@ Below are TensorFlow Probability-specific conventions. In the event of conflict,
 they supersede all previous conventions.
 
 1.  __Importing submodule aliases.__ Use the Pythonic style `from
-    tensorflow_probability import edward2 as ed`. For now, do not use this style
+    tensorflow_probability import sts`. For now, do not use this style
     for `tfd`, `tfb`, and `tfe`; use variable assignment via `tfd =
     tfp.distributions`. We will change the latter to use the Pythonic style in
     the future.

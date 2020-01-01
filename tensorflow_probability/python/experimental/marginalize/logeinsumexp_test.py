@@ -18,7 +18,7 @@ import hypothesis
 from hypothesis.extra import numpy as hpnp
 import hypothesis.strategies as hps
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability.python.experimental.marginalize.logeinsumexp as logeinsumexp
 from tensorflow_probability.python.internal import test_util
 import tensorflow_probability.python.internal.hypothesis_testlib as testlib

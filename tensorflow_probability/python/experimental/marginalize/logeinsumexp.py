@@ -15,7 +15,7 @@
 """Compute einsums in log space."""
 
 import opt_einsum as oe
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 # pylint: disable=no-member

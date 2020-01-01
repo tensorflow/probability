@@ -37,7 +37,7 @@ import zipfile
 
 from absl import flags
 from six.moves import urllib
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import lookup as contrib_lookup
 
 

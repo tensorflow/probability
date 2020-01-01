@@ -106,7 +106,7 @@ import functools
 
 from absl import app
 from absl import flags
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.examples import sprites_dataset
