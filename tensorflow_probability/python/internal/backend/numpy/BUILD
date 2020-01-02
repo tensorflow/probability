@@ -46,6 +46,7 @@ py_library(
         ":numpy_math",
         ":numpy_signal",
         ":ops",
+        ":private",
         ":random_generators",
         ":sets_lib",
         ":sparse_lib",
@@ -233,6 +234,16 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         # wrapt dep,
+    ],
+)
+
+py_library(
+    name = "private",
+    srcs = ["private.py"],
+    deps = [
+        ":_utils",
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 

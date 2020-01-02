@@ -45,6 +45,7 @@ FILENAMES = [
     "numpy_signal",
     "numpy_test",
     "ops",
+    "private",
     "random_generators",
     "sets_lib",
     "sparse_lib",
