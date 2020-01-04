@@ -33,14 +33,15 @@ from tensorflow_probability.python.internal import test_util
 @test_util.test_all_tf_execution_regimes
 class RealNVPTest(test_util.TestCase):
 
-  @parameterized.named_parameters((4, 4 / 8))
-  def testBijectorWithTrivialTransform(self, num_masked):
+  @parameterized.parameters((4, None), (None, 4 / 8))
+  def testBijectorWithTrivialTransform(self, num_masked, proportion_masked):
     input_depth = 8
     flat_x_ = np.random.normal(0., 1., input_depth).astype(np.float32)
     batched_x_ = np.random.normal(0., 1., (3, input_depth)).astype(np.float32)
     for x_ in [flat_x_, batched_x_]:
       nvp = tfb.RealNVP(
           num_masked=num_masked,
+          proportion_masked=proportion_masked,
           validate_args=True,
           shift_and_log_scale_fn=lambda x, _: (x, x),
           is_constant_jacobian=False)
@@ -63,14 +64,15 @@ class RealNVPTest(test_util.TestCase):
       self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
       self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
-  @parameterized.named_parameters((-5, -0.625))
-  def testBijectorWithReverseMask(self, num_masked):
+  @parameterized.parameters((-5, None), (None, -0.625))
+  def testBijectorWithReverseMask(self, num_masked, proportion_masked):
     input_depth = 8
     flat_x_ = np.random.normal(0., 1., input_depth).astype(np.float32)
     batched_x_ = np.random.normal(0., 1., (3, input_depth)).astype(np.float32)
     for x_ in [flat_x_, batched_x_]:
       flip_nvp = tfb.RealNVP(
           num_masked=num_masked,
+          proportion_masked=proportion_masked,
           validate_args=True,
           shift_and_log_scale_fn=tfb.real_nvp_default_template(
               hidden_layers=[3], shift_only=False),
@@ -81,17 +83,20 @@ class RealNVPTest(test_util.TestCase):
       forward_x = flip_nvp.forward(x)
 
       expected_num_masked = (
-        num_masked
-        if isinstance(num_masked, (int, np.integer))
-        else np.floor(input_depth * num_masked))
+          num_masked
+          if num_masked is not None
+          else np.floor(input_depth * proportion_masked))
 
-      self.assertEqual(flip_nvp.num_masked, expected_num_masked)
+      self.assertEqual(flip_nvp._masked_size, expected_num_masked)
 
-      _, x2_ = np.split(x_, [input_depth - abs(flip_nvp.num_masked)], axis=-1)
+      _, x2_ = np.split(x_, [input_depth - abs(flip_nvp._masked_size)], axis=-1)
 
       # Check latter half is the same after passing thru reversed mask RealNVP.
-      _, forward_x2 = tf.split(forward_x, [input_depth - abs(flip_nvp.num_masked),
-                                           abs(flip_nvp.num_masked)], axis=-1)
+      _, forward_x2 = tf.split(
+          forward_x,
+          [input_depth - abs(flip_nvp._masked_size),
+           abs(flip_nvp._masked_size)],
+          axis=-1)
       self.evaluate(tf1.global_variables_initializer())
       forward_x2_ = self.evaluate(forward_x2)
 
