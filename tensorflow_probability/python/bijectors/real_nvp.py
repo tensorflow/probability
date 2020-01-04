@@ -214,7 +214,7 @@ class RealNVP(bijector_lib.Bijector):
     if isinstance(self._num_masked, (int, np.integer)):
       return self._num_masked
     elif np.issubdtype(type(self._num_masked), np.floating):
-      return int(np.floor(self._input_depth * self._num_masked))
+      return int(np.round(self._input_depth * self._num_masked))
     else:
       raise ValueError(
         "_num_masked should be either `int` or `float`. Got {}"
