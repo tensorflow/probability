@@ -64,7 +64,7 @@ class RealNVPTest(test_util.TestCase):
       self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
       self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
-  @parameterized.parameters((-5, None), (None, -0.625))
+  @parameterized.parameters((-5, None), (None, -5 / 8))
   def testBijectorWithReverseMask(self, num_masked, fraction_masked):
     input_depth = 8
     flat_x_ = np.random.normal(0., 1., input_depth).astype(np.float32)
