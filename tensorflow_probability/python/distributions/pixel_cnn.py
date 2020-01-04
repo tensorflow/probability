@@ -691,7 +691,7 @@ class _PixelCNNNetwork(tf.keras.layers.Layer):
       def layer_wrapper(layer):
         def wrapped_layer(*args, **kwargs):
           return weight_norm.WeightNorm(
-              layer(*args, dtype=dtype, **kwargs), data_init=use_data_init)
+              layer(*args, **kwargs), data_init=use_data_init)
         return wrapped_layer
       self._layer_wrapper = layer_wrapper
     else:

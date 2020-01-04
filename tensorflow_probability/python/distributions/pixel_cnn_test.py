@@ -29,7 +29,9 @@ from tensorflow_probability.python.internal import test_util
 tfd = tfp.distributions
 
 
-@test_util.test_all_tf_execution_regimes
+# Not decorating with `test_util.test_all_tf_execution_regimes` since the
+# `WeightNorm` layer wrapper fails in Eager without `tf.function`.
+@test_util.test_graph_and_eager_modes
 class PixelCnnTest(test_util.TestCase):
 
   def setUp(self):
@@ -40,7 +42,7 @@ class PixelCnnTest(test_util.TestCase):
     self.h_shape = None
     self.num_logistic_mix = 1
 
-  def _make_pixel_cnn(self):
+  def _make_pixel_cnn(self, use_weight_norm_and_data_init=False):
     return tfd.PixelCNN(
         image_shape=self.image_shape,
         conditional_shape=self.h_shape,
@@ -49,8 +51,8 @@ class PixelCnnTest(test_util.TestCase):
         num_filters=1,
         num_logistic_mix=self.num_logistic_mix,
         high=self.high,
-        use_weight_norm=False,
-        use_data_init=False)
+        use_weight_norm=use_weight_norm_and_data_init,
+        use_data_init=use_weight_norm_and_data_init)
 
   def _make_fake_images(self):
     return np.random.randint(
@@ -127,10 +129,15 @@ class PixelCnnTest(test_util.TestCase):
 
   def testSample(self):
 
-    num_samples = 3
+    num_samples = 2
     h = self._make_fake_conditional()
 
-    dist = self._make_pixel_cnn()
+    # Weight normalization and data-dependent initialization work only in Eager
+    # so we enable them only if executing eagerly. We use them only in this
+    # test, since they add significantly to run time, and using them in
+    # additional tests wouldn't meaningfully increase coverage.
+    dist = self._make_pixel_cnn(
+        use_weight_norm_and_data_init=tf.executing_eagerly())
     self.evaluate([v.initializer for v in dist.network.weights])
     sample_shape = ((num_samples,) if h is None
                     else (num_samples,) + self.batch_shape)
@@ -243,7 +250,10 @@ class PixelCnnTest(test_util.TestCase):
                      dist64.sample(sample_shape, conditional_input=h).dtype)
 
 
-@test_util.test_all_tf_execution_regimes
+# As with `PixelCnnTest`, we do not use
+# `test_util.test_all_tf_execution_regimes` since the `WeightNorm` layer wrapper
+# fails in Eager without `tf.function`.
+@test_util.test_graph_and_eager_modes
 class ConditionalPixelCnnTest(PixelCnnTest):
 
   def setUp(self):
