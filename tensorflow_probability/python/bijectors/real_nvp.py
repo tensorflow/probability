@@ -207,9 +207,10 @@ class RealNVP(bijector_lib.Bijector):
       self._proportion_masked = float(proportion_masked)
       self._reverse_mask = self._proportion_masked < 0
 
-    if bool(shift_and_log_scale_fn) == bool(bijector_fn):
-      raise ValueError('Exactly one of `shift_and_log_scale_fn` and '
-                       '`bijector_fn` should be specified.')
+    if shift_and_log_scale_fn is not None and bijector_fn is not None:
+      raise ValueError("Exactly one of `shift_and_log_scale_fn` and "
+                       "`bijector_fn` should be specified.")
+
     if shift_and_log_scale_fn:
       def _bijector_fn(x0, input_depth, **condition_kwargs):
         shift, log_scale = shift_and_log_scale_fn(x0, input_depth,
