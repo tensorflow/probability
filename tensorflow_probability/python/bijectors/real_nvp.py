@@ -137,7 +137,7 @@ class RealNVP(bijector_lib.Bijector):
 
   def __init__(self,
                num_masked=None,
-               proportion_masked=None,
+               fraction_masked=None,
                shift_and_log_scale_fn=None,
                bijector_fn=None,
                is_constant_jacobian=False,
@@ -150,13 +150,13 @@ class RealNVP(bijector_lib.Bijector):
         event that should should be masked. Must be in the closed interval
         `[0, D-1]`, where `D` is the event size of the base distribution.
         If the value is negative, then the last `d` units of the event are
-        masked instead. Must be `None` if `proportion_masked` is defined.
-      proportion_masked: Python `float`, indicating the number of units of the
+        masked instead. Must be `None` if `fraction_masked` is defined.
+      fraction_masked: Python `float`, indicating the number of units of the
         event that should should be masked. Must be in the closed interval
-        `[-1, 1]`, and the value represents the proportion of the values to be
+        `[-1, 1]`, and the value represents the fraction of the values to be
         masked. The final number of values to be masked will be the input size
-        times the proportion, rounded to the the nearest integer towards zero.
-        If negative, then the last proportion of units will of the are masked
+        times the fraction, rounded to the the nearest integer towards zero.
+        If negative, then the last fraction of units will of the are masked
         instead. Must be `None` if `num_masked` is defined.
       shift_and_log_scale_fn: Python `callable` which computes `shift` and
         `log_scale` from both the forward domain (`x`) and the inverse domain
@@ -188,24 +188,24 @@ class RealNVP(bijector_lib.Bijector):
 
     # At construction time, we don't know input_depth.
     self._input_depth = None
-    if num_masked is not None and proportion_masked is not None:
+    if num_masked is not None and fraction_masked is not None:
       raise ValueError("Exactly one of `num_masked` and "
-                       "`proportion_masked` should be specified.")
+                       "`fraction_masked` should be specified.")
 
     if num_masked is not None:
       assert int(num_masked) == num_masked, (
           "`num_masked` should be an integer. Got: {} of type {}"
           "".format(num_masked, type(num_masked)))
       self._num_masked = int(num_masked)
-      self._proportion_masked = None
+      self._fraction_masked = None
       self._reverse_mask = self._num_masked < 0
     else:
-      assert np.issubdtype(type(proportion_masked), np.floating), (
-          "`proportion_masked` should be a float. Got: {} of type {}"
-          "".format(proportion_masked, type(proportion_masked)))
+      assert np.issubdtype(type(fraction_masked), np.floating), (
+          "`fraction_masked` should be a float. Got: {} of type {}"
+          "".format(fraction_masked, type(fraction_masked)))
       self._num_masked = None
-      self._proportion_masked = float(proportion_masked)
-      self._reverse_mask = self._proportion_masked < 0
+      self._fraction_masked = float(fraction_masked)
+      self._reverse_mask = self._fraction_masked < 0
 
     if shift_and_log_scale_fn is not None and bijector_fn is not None:
       raise ValueError("Exactly one of `shift_and_log_scale_fn` and "
@@ -237,7 +237,7 @@ class RealNVP(bijector_lib.Bijector):
     masked_size = (
         self._num_masked
         if self._num_masked is not None
-        else int(np.round(self._input_depth * self._proportion_masked)))
+        else int(np.round(self._input_depth * self._fraction_masked)))
     return masked_size
 
   def _cache_input_depth(self, x):

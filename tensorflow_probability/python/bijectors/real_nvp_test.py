@@ -34,14 +34,14 @@ from tensorflow_probability.python.internal import test_util
 class RealNVPTest(test_util.TestCase):
 
   @parameterized.parameters((4, None), (None, 4 / 8))
-  def testBijectorWithTrivialTransform(self, num_masked, proportion_masked):
+  def testBijectorWithTrivialTransform(self, num_masked, fraction_masked):
     input_depth = 8
     flat_x_ = np.random.normal(0., 1., input_depth).astype(np.float32)
     batched_x_ = np.random.normal(0., 1., (3, input_depth)).astype(np.float32)
     for x_ in [flat_x_, batched_x_]:
       nvp = tfb.RealNVP(
           num_masked=num_masked,
-          proportion_masked=proportion_masked,
+          fraction_masked=fraction_masked,
           validate_args=True,
           shift_and_log_scale_fn=lambda x, _: (x, x),
           is_constant_jacobian=False)
@@ -65,14 +65,14 @@ class RealNVPTest(test_util.TestCase):
       self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
   @parameterized.parameters((-5, None), (None, -0.625))
-  def testBijectorWithReverseMask(self, num_masked, proportion_masked):
+  def testBijectorWithReverseMask(self, num_masked, fraction_masked):
     input_depth = 8
     flat_x_ = np.random.normal(0., 1., input_depth).astype(np.float32)
     batched_x_ = np.random.normal(0., 1., (3, input_depth)).astype(np.float32)
     for x_ in [flat_x_, batched_x_]:
       flip_nvp = tfb.RealNVP(
           num_masked=num_masked,
-          proportion_masked=proportion_masked,
+          fraction_masked=fraction_masked,
           validate_args=True,
           shift_and_log_scale_fn=tfb.real_nvp_default_template(
               hidden_layers=[3], shift_only=False),
@@ -85,7 +85,7 @@ class RealNVPTest(test_util.TestCase):
       expected_num_masked = (
           num_masked
           if num_masked is not None
-          else np.floor(input_depth * proportion_masked))
+          else np.floor(input_depth * fraction_masked))
 
       self.assertEqual(flip_nvp._masked_size, expected_num_masked)
 
