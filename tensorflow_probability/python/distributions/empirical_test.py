@@ -192,9 +192,9 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
           dist.batch_shape_tensor())
 
       n = 1000
-      seed = tf1.set_random_seed(42) if tf.executing_eagerly() else 42
+      seed = tf.random.set_seed(42) if tf.executing_eagerly() else 42
       samples1 = dist.sample(n, seed)
-      seed = tf1.set_random_seed(42) if tf.executing_eagerly() else 42
+      seed = tf.random.set_seed(42) if tf.executing_eagerly() else 42
       samples2 = dist.sample(n, seed)
       self.assertAllEqual(
           self.evaluate(samples1), self.evaluate(samples2))
@@ -412,9 +412,9 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
           expected_shape)
 
       n = 1000
-      seed = tf1.set_random_seed(42) if tf.executing_eagerly() else 42
+      seed = tf.random.set_seed(42) if tf.executing_eagerly() else 42
       samples1 = dist.sample(n, seed)
-      seed = tf1.set_random_seed(42) if tf.executing_eagerly() else 42
+      seed = tf.random.set_seed(42) if tf.executing_eagerly() else 42
       samples2 = dist.sample(n, seed)
       self.assertAllEqual(
           self.evaluate(samples1), self.evaluate(samples2))
@@ -595,9 +595,9 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
               dist.sample(seed=test_util.test_seed()))), expected_shape)
 
       n = 1000
-      seed = tf1.set_random_seed(42) if tf.executing_eagerly() else 42
+      seed = tf.random.set_seed(42) if tf.executing_eagerly() else 42
       samples1 = dist.sample(n, seed)
-      seed = tf1.set_random_seed(42) if tf.executing_eagerly() else 42
+      seed = tf.random.set_seed(42) if tf.executing_eagerly() else 42
       samples2 = dist.sample(n, seed)
       self.assertAllEqual(
           self.evaluate(samples1), self.evaluate(samples2))

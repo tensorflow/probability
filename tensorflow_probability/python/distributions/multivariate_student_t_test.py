@@ -334,11 +334,11 @@ class MultivariateStudentTTestFloat32StaticShape(
          [-1., 2.]]), is_non_singular=True)
     # pyformat: enable
     seed = test_util.test_seed()
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     dist1 = tfd.MultivariateStudentTLinearOperator(
         loc=[1., 2.], df=5., scale=scale, validate_args=True)
     samples1 = self.evaluate(dist1.sample(100, seed=seed))
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     dist2 = tfd.MultivariateStudentTLinearOperator(
         loc=[1., 2.], df=5., scale=scale, validate_args=True)
     samples2 = self.evaluate(dist2.sample(100, seed=seed))

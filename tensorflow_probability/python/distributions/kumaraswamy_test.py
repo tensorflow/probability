@@ -283,7 +283,7 @@ class KumaraswamyTest(test_util.TestCase):
     n_val = 100
     seed = test_util.test_seed()
 
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     kumaraswamy1 = tfd.Kumaraswamy(
         concentration1=a_val,
         concentration0=b_val,
@@ -291,7 +291,7 @@ class KumaraswamyTest(test_util.TestCase):
         validate_args=True)
     samples1 = self.evaluate(kumaraswamy1.sample(n_val, seed=seed))
 
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     kumaraswamy2 = tfd.Kumaraswamy(
         concentration1=a_val,
         concentration0=b_val,

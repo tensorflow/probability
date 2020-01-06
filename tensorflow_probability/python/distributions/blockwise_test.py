@@ -31,7 +31,7 @@ def _set_seed(seed):
   """Helper which uses graph seed if using eager."""
   # TODO(b/68017812): Deprecate once eager correctly supports seed.
   if tf.executing_eagerly():
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     return None
   return seed
 
