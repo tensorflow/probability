@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 from discussion.mcmc import elliptical_slice_sampler as elliptical
 from tensorflow_probability.python.internal import test_util as tfp_test_util

@@ -78,7 +78,8 @@ class PoissonTest(test_util.TestCase):
         rate=lam, interpolate_nondiscrete=True, validate_args=False)
 
     expected_continuous_log_pmf = (
-        x * poisson.log_rate - tf.math.lgamma(1. + x) - poisson.rate)
+        x * poisson.log_rate_parameter()
+        - tf.math.lgamma(1. + x) - poisson.rate_parameter())
     expected_continuous_log_pmf = tf.where(
         x >= 0., expected_continuous_log_pmf,
         dtype_util.as_numpy_dtype(
