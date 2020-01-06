@@ -299,7 +299,7 @@ class RealNVP(bijector_lib.Bijector):
 
     return self._bijector_fn(x0, self._bijector_input_units(),
                              **condition_kwargs).forward_log_det_jacobian(
-                               x1, event_ndims=1)
+                                 x1, event_ndims=1)
 
   def _inverse_log_det_jacobian(self, y, **condition_kwargs):
     self._cache_input_depth(y)
@@ -311,7 +311,7 @@ class RealNVP(bijector_lib.Bijector):
 
     return self._bijector_fn(y0, self._bijector_input_units(),
                              **condition_kwargs).inverse_log_det_jacobian(
-                               y1, event_ndims=1)
+                                 y1, event_ndims=1)
 
 
 def real_nvp_default_template(hidden_layers,
