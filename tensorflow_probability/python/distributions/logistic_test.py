@@ -39,8 +39,7 @@ class LogisticTest(test_util.TestCase):
     loc = tf.constant(np_loc)
     scale = 1.5
     dist = tfd.Logistic(loc, scale, validate_args=True)
-    self.assertTrue(
-        dist.reparameterization_type == tfd.FULLY_REPARAMETERIZED)
+    self.assertEqual(tfd.FULLY_REPARAMETERIZED, dist.reparameterization_type)
 
   def testLogisticLogProb(self):
     batch_size = 6

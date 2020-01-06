@@ -261,7 +261,7 @@ def _ndtri(p):
   ww = w ** 2
   x_for_big_p = w + w * ww * (_create_polynomial(ww, p0)
                               / _create_polynomial(ww, q0))
-  x_for_big_p *= -np.sqrt(2. * np.pi)
+  x_for_big_p *= tf.constant(-np.sqrt(2. * np.pi), dtype=p.dtype)
 
   # Compute x for p <= exp(-2): x = z - log(z)/z - (1/z) P(1/z) / Q(1/z),
   # where z = sqrt(-2. * log(p)), and P/Q are chosen between two different
@@ -348,11 +348,11 @@ def log_ndtr(x, series_order=3, name="log_ndtr"):
     x = tf.convert_to_tensor(x, name="x")
 
     if dtype_util.base_equal(x.dtype, tf.float64):
-      lower_segment = np.array(LOGNDTR_FLOAT64_LOWER, np.float64)
-      upper_segment = np.array(LOGNDTR_FLOAT64_UPPER, np.float64)
+      lower_segment = np.array(LOGNDTR_FLOAT64_LOWER, dtype=np.float64)
+      upper_segment = np.array(LOGNDTR_FLOAT64_UPPER, dtype=np.float64)
     elif dtype_util.base_equal(x.dtype, tf.float32):
-      lower_segment = np.array(LOGNDTR_FLOAT32_LOWER, np.float32)
-      upper_segment = np.array(LOGNDTR_FLOAT32_UPPER, np.float32)
+      lower_segment = np.array(LOGNDTR_FLOAT32_LOWER, dtype=np.float32)
+      upper_segment = np.array(LOGNDTR_FLOAT32_UPPER, dtype=np.float32)
     else:
       raise TypeError("x.dtype=%s is not supported." % x.dtype)
 
@@ -383,7 +383,8 @@ def _log_ndtr_lower(x, series_order):
   """Asymptotic expansion version of `Log[cdf(x)]`, appropriate for `x<<-1`."""
   x_2 = tf.square(x)
   # Log of the term multiplying (1 + sum)
-  log_scale = -0.5 * x_2 - tf.math.log(-x) - 0.5 * np.log(2. * np.pi)
+  log_scale = (-0.5 * x_2 - tf.math.log(-x)
+               - tf.constant(0.5 * np.log(2. * np.pi), dtype=x.dtype))
   return log_scale + tf.math.log(_log_ndtr_asymptotic_series(x, series_order))
 
 
@@ -425,7 +426,7 @@ def erfinv(x, name="erfinv"):
     if dtype_util.as_numpy_dtype(x.dtype) not in [np.float32, np.float64]:
       raise TypeError("x.dtype={} is not handled, see docstring for supported "
                       "types.".format(dtype_util.name(x.dtype)))
-    return ndtri((x + 1.) / 2.) / np.sqrt(2.)
+    return ndtri((x + 1.) / 2.) / tf.constant(np.sqrt(2.), dtype=x.dtype)
 
 
 def _double_factorial(n):
@@ -466,7 +467,7 @@ def log_cdf_laplace(x, name="log_cdf_laplace"):
     x = tf.convert_to_tensor(x, name="x")
 
     # For x < 0, L(x) = 0.5 * exp{x} exactly, so Log[L(x)] = log(0.5) + x.
-    lower_solution = -np.log(2.) + x
+    lower_solution = tf.constant(-np.log(2.), dtype=x.dtype) + x
 
     # safe_exp_neg_x = exp{-x} for x > 0, but is
     # bounded above by 1, which avoids
