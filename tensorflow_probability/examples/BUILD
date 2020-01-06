@@ -52,7 +52,7 @@ py_library(
 py_test(
     name = "bayesian_neural_network_test",
     size = "small",
-    srcs = [bayesian_neural_network.py"],
+    srcs = ["bayesian_neural_network.py"],
     args = [
         "--fake_data",
         "--num_epochs=1",
