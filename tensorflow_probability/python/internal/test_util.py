@@ -468,7 +468,7 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
     hardcoded_seed: Optional Python value.  The seed to use instead of 17 if
       both the `--vary_seed` and `--fixed_seed` flags are unset.  This should
       usually be unnecessary, since a test should pass with any seed.
-    set_eager_seed: Python bool.  If true (default), invoke `tf.set_random_seed`
+    set_eager_seed: Python bool.  If true (default), invoke `tf.random.set_seed`
       in Eager mode to get more reproducibility.  Should become unnecessary
       once b/68017812 is resolved.
 
@@ -496,7 +496,7 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
 def _wrap_seed(seed, set_eager_seed):
   # TODO(b/68017812): Remove this clause once eager correctly supports seeding.
   if tf.executing_eagerly() and set_eager_seed:
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
   return seed
 
 
