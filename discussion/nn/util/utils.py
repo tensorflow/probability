@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2019 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,6 +25,7 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 
+from six.moves import zip
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors.chain import Chain
@@ -303,8 +305,8 @@ def variables_load(filename, variables):
       raise ValueError(
           'File "{}" has incorrect number of variables '
           '(saw: {}, expected: {}).'.format(filename, len(data), len(vars_)))
-    return tf.group([v.assign(x) for v, (_, x) in
-                     zip(vars_, data.items())])
+    return tf.group(
+        [v.assign(x) for v, (_, x) in zip(vars_, list(data.items()))])
 
 
 def variables_summary(variables, name=None):

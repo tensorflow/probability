@@ -311,6 +311,7 @@ def constrain_forward_shape(bijector, shape):
   if is_invert(bijector):
     return constrain_inverse_shape(bijector.bijector, shape=shape)
 
+  # TODO(b/146897388): Enable bijectors with parameter-dependent support.
   support = bijector_hps.bijector_supports()[
       type(bijector).__name__].forward
   if support == tfp_hps.Support.VECTOR_SIZE_TRIANGULAR:

@@ -197,7 +197,7 @@ class WishartTest(test_util.TestCase):
     n_val = 100
     seed = test_util.test_seed()
 
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     chol_w1 = tfd.WishartTriL(
         df=df,
         scale_tril=chol(make_pd(1., 3)),
@@ -207,7 +207,7 @@ class WishartTest(test_util.TestCase):
 
     samples1 = self.evaluate(chol_w1.sample(n_val, seed=seed))
 
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     chol_w2 = tfd.WishartTriL(
         df=df,
         scale_tril=chol(make_pd(1., 3)),

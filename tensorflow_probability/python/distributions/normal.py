@@ -193,7 +193,8 @@ class Normal(distribution.Distribution):
     scale = tf.convert_to_tensor(self.scale)
     log_unnormalized = -0.5 * tf.math.squared_difference(
         x / scale, self.loc / scale)
-    log_normalization = 0.5 * np.log(2. * np.pi) + tf.math.log(scale)
+    log_normalization = tf.constant(
+        0.5 * np.log(2. * np.pi), dtype=self.dtype) + tf.math.log(scale)
     return log_unnormalized - log_normalization
 
   def _log_cdf(self, x):
@@ -209,7 +210,8 @@ class Normal(distribution.Distribution):
     return special_math.ndtr(-self._z(x))
 
   def _entropy(self):
-    log_normalization = 0.5 * np.log(2. * np.pi) + tf.math.log(self.scale)
+    log_normalization = tf.constant(
+        0.5 * np.log(2. * np.pi), dtype=self.dtype) + tf.math.log(self.scale)
     entropy = 0.5 + log_normalization
     return entropy * tf.ones_like(self.loc)
 

@@ -618,6 +618,8 @@ multi_substrate_py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 

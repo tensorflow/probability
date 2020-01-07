@@ -42,7 +42,7 @@ def _set_seed(seed):
   """Helper which uses graph seed if using TFE."""
   # TODO(b/68017812): Deprecate once TFE supports seed.
   if tf.executing_eagerly():
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     return None
   return seed
 
@@ -553,7 +553,7 @@ class MixtureTest(test_util.TestCase):
     n = 100
     seed = test_util.test_seed()
 
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     components = [
         tfd.Normal(loc=mu, scale=sigma) for mu, sigma in zip(mus, sigmas)
     ]
@@ -566,7 +566,7 @@ class MixtureTest(test_util.TestCase):
         validate_args=True)
     samples1 = self.evaluate(dist1.sample(n, seed=seed))
 
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     components2 = [
         tfd.Normal(loc=mu, scale=sigma) for mu, sigma in zip(mus, sigmas)
     ]
@@ -904,7 +904,7 @@ class MixtureBenchmark(tf.test.Benchmark):
     config.allow_soft_placement = True
     np.random.seed(127)
     with tf1.Session(config=config, graph=tf.Graph()) as sess:
-      tf1.set_random_seed(0)
+      tf.random.set_seed(0)
       with tf.device('/device:GPU:0' if use_gpu else '/cpu:0'):
         mixture = create_distribution(
             num_components=num_components,

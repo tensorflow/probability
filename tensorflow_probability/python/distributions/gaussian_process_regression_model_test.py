@@ -40,25 +40,28 @@ np.random.seed(42)
 class _GaussianProcessRegressionModelTest(test_util.TestCase):
 
   def testShapes(self):
+    # We'll use a batch shape of [2, 3, 5, 7, 11]
+
     # 5x5 grid of index points in R^2 and flatten to 25x2
     index_points = np.linspace(-4., 4., 5, dtype=np.float64)
     index_points = np.stack(np.meshgrid(index_points, index_points), axis=-1)
     index_points = np.reshape(index_points, [-1, 2])
     # ==> shape = [25, 2]
-    batched_index_points = np.expand_dims(np.stack([index_points]*6), -3)
-    # ==> shape = [6, 1, 25, 2]
+    batched_index_points = np.reshape(index_points, [1, 1, 25, 2])
+    batched_index_points = np.stack([batched_index_points] * 5)
+    # ==> shape = [5, 1, 1, 25, 2]
 
-    # Kernel with batch_shape [2, 4, 1, 3]
-    amplitude = np.array([1., 2.], np.float64).reshape([2, 1, 1, 1])
-    length_scale = np.array([.1, .2, .3, .4], np.float64).reshape(
-        [1, 4, 1, 1])
+    # Kernel with batch_shape [2, 3, 1, 1, 1]
+    amplitude = np.array([1., 2.], np.float64).reshape([2, 1, 1, 1, 1])
+    length_scale = np.array([.1, .2, .3], np.float64).reshape(
+        [1, 3, 1, 1, 1])
     observation_noise_variance = np.array(
-        [1e-5, 1e-6, 1e-9], np.float64).reshape([1, 1, 1, 3])
+        [1e-9], np.float64).reshape([1, 1, 1, 1, 1])
 
     jitter = np.float64(1e-6)
     observation_index_points = (
-        np.random.uniform(-1., 1., (3, 7, 2)).astype(np.float64))
-    observations = np.random.uniform(-1., 1., (3, 7)).astype(np.float64)
+        np.random.uniform(-1., 1., (7, 1, 7, 2)).astype(np.float64))
+    observations = np.random.uniform(-1., 1., (11, 7)).astype(np.float64)
 
     if not self.is_static:
       amplitude = tf1.placeholder_with_default(amplitude, shape=None)
@@ -81,7 +84,7 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         jitter=jitter,
         validate_args=True)
 
-    batch_shape = [2, 4, 6, 3]
+    batch_shape = [2, 3, 5, 7, 11]
     event_shape = [25]
     sample_shape = [9, 3]
 

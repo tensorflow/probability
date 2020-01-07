@@ -22,7 +22,6 @@ import numpy as np
 from scipy import special as sp_special
 from scipy import stats as sp_stats
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -254,7 +253,7 @@ class BetaTest(test_util.TestCase):
     n_val = 100
     seed = test_util.test_seed()
 
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     beta1 = tfd.Beta(
         concentration1=a_val,
         concentration0=b_val,
@@ -262,7 +261,7 @@ class BetaTest(test_util.TestCase):
         validate_args=True)
     samples1 = self.evaluate(beta1.sample(n_val, seed=seed))
 
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     beta2 = tfd.Beta(
         concentration1=a_val,
         concentration0=b_val,

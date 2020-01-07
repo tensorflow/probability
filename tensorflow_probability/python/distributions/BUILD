@@ -2135,7 +2135,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "logistic_test",
     srcs = ["logistic_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2322,7 +2321,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "normal_test",
     srcs = ["normal_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,

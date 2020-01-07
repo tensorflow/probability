@@ -128,6 +128,19 @@ class GeometricTest(test_util.TestCase):
     self.assertEqual([6, 3], cdf.shape)
     self.assertAllClose(expected_cdf, self.evaluate(cdf))
 
+  def testGeometricSurvivalFunction(self):
+    batch_size = 6
+    probs = tf.constant([[.2, .4, .5]] * batch_size)
+    probs_v = np.array([.2, .4, .5])
+    x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=np.float32).T
+
+    geom = tfd.Geometric(probs=probs, validate_args=True)
+    expected_sf = stats.geom.sf(x, probs_v, loc=-1)
+
+    sf = geom.survival_function(x)
+    self.assertEqual([6, 3], sf.shape)
+    self.assertAllClose(expected_sf, self.evaluate(sf))
+
   def testGeometricEntropy(self):
     probs_v = np.array([.1, .3, .25], dtype=np.float32)
     geom = tfd.Geometric(probs=probs_v, validate_args=True)

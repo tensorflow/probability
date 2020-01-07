@@ -215,8 +215,9 @@ class Logistic(distribution.Distribution):
 
   def _stddev(self):
     scale = tf.convert_to_tensor(self.scale)
-    return tf.broadcast_to(scale * np.pi / np.sqrt(3),
-                           self._batch_shape_tensor(scale=scale))
+    return tf.broadcast_to(
+        scale * tf.constant(np.pi / np.sqrt(3), dtype=scale.dtype),
+        self._batch_shape_tensor(scale=scale))
 
   def _mode(self):
     return self._mean()

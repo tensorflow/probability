@@ -21,6 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -145,14 +146,27 @@ class Geometric(distribution.Distribution):
 
     return tf.floor(tf.math.log(sampled) / tf.math.log1p(-probs))
 
-  def _cdf(self, x):
+  def _log_survival_function(self, x):
     probs = self._probs_parameter_no_checks()
     if not self.validate_args:
       # Whether or not x is integer-form, the following is well-defined.
       # However, scipy takes the floor, so we do too.
       x = tf.floor(x)
-    return tf.where(x < 0., tf.zeros_like(x), -tf.math.expm1(
-        (1. + x) * tf.math.log1p(-probs)))
+    return tf.where(
+        x < 0.,
+        dtype_util.as_numpy_dtype(x.dtype)(-np.inf),
+        (1. + x) * tf.math.log1p(-probs))
+
+  def _log_cdf(self, x):
+    probs = self._probs_parameter_no_checks()
+    if not self.validate_args:
+      # Whether or not x is integer-form, the following is well-defined.
+      # However, scipy takes the floor, so we do too.
+      x = tf.floor(x)
+    return tf.where(
+        x < 0.,
+        dtype_util.as_numpy_dtype(x.dtype)(-np.inf),
+        tfp_math.log1mexp((1. + x) * tf.math.log1p(-probs)))
 
   def _log_prob(self, x):
     probs = self._probs_parameter_no_checks()

@@ -25,6 +25,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "util",
     srcs = ["__init__.py"],
+    srcs_version = "PY2AND3",
     deps = [
         ":utils",
     ],
@@ -33,9 +34,11 @@ py_library(
 py_library(
     name = "utils",
     srcs = ["utils.py"],
+    srcs_version = "PY2AND3",
     deps = [
         # matplotlib dep,
         # numpy dep,
+        # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:chain",
         "//tensorflow_probability/python/bijectors:shift",

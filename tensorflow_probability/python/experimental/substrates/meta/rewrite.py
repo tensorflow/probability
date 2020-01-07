@@ -64,6 +64,8 @@ INTERNALS = ('assert_util', 'distribution_util', 'dtype_util',
              'hypothesis_testlib', 'prefer_static', 'special_math',
              'tensor_util', 'test_combinations', 'test_util')
 
+PRIVATE_TF_PKGS = ('array_ops', 'random_ops')
+
 
 def main(argv):
 
@@ -114,6 +116,15 @@ def main(argv):
       'tensorflow_probability.python.internal._numpy import {}'.format(internal)
       for internal in INTERNALS
   })
+  # pylint: disable=g-complex-comprehension
+  replacements.update({
+      'tensorflow.python.ops import {}'.format(private):
+      'tensorflow_probability.python.internal.backend.numpy import private'
+      ' as {}'.format(private)
+      for private in PRIVATE_TF_PKGS
+  })
+  # pylint: enable=g-complex-comprehension
+
   replacements.update({
       'self._maybe_assert_dtype': '# self._maybe_assert_dtype',
       'SKIP_DTYPE_CHECKS = False': 'SKIP_DTYPE_CHECKS = True',

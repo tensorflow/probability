@@ -27,6 +27,9 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+
+
 class TensorArray(object):
   """Stand-in for tf.TensorArray."""
 
@@ -41,9 +44,15 @@ class TensorArray(object):
                infer_shape=True,
                element_shape=None,
                colocate_with_first_write_call=True,
+               data=None,
                name=None):
-    self._data = [None]*(size if size else 0)
     self._dtype = utils.numpy_dtype(dtype)
+    if data is None:
+      if JAX_MODE and size is not None and element_shape is not None:
+        data = np.empty((size,) + element_shape, dtype=self._dtype)
+      else:
+        data = [None]*(0 if size is None else int(size))
+    self._data = data
     self._size = size
     self._dynamic_size = dynamic_size
     self._clear_after_read = clear_after_read
@@ -72,24 +81,38 @@ class TensorArray(object):
 
   def gather(self, indices, name=None):  # pylint: disable=unused-argument
     indices = np.array(indices, dtype=np.int32)
-    return np.array([self.read(i) for i in indices], dtype=self.dtype)
+    return np.take(self._data, indices)
 
   def stack(self, name=None):  # pylint: disable=unused-argument
     return np.array(self._data, dtype=self.dtype)
 
   def unstack(self, value, name=None):  # pylint: disable=unused-argument
-    self._data = [np.array(x, dtype=self.dtype) for x in value]
-    return self
+    data = np.array(value, dtype=self.dtype)
+    return TensorArray(self.dtype, data=data,
+                       size=data.shape[0], element_shape=data.shape[1:])
 
   def read(self, index, name=None):  # pylint: disable=unused-argument
-    return self._data[int(index)]
+    index = np.array(index, dtype=np.int32)
+    return self._data[index]
 
   def write(self, index, value, name=None):  # pylint: disable=unused-argument
-    index = int(index)
-    if self._size is None:
-      self._data.extend([None]*(index - len(self._data) + 1))
-    self._data[index] = np.array(value, dtype=self.dtype)
-    return self
+    """Writes `value` at position `index`."""
+    index = np.array(index, dtype=np.int32)
+    value = np.array(value, dtype=self.dtype)
+    if isinstance(self._data, list):
+      new_data = list(self._data)
+      if self.dynamic_size:
+        new_data.extend([None]*(int(index) - len(new_data) + 1))
+      new_data[index] = value
+    elif JAX_MODE:
+      import jax  # pylint: disable=g-import-not-at-top
+      new_data = jax.ops.index_update(self._data, index, value)
+    else:
+      raise ValueError('Unexpected type: {}'.format(type(self._data)))
+    return TensorArray(self.dtype, data=new_data,
+                       dynamic_size=self.dynamic_size,
+                       element_shape=self.element_shape,
+                       infer_shape=self._infer_shape)
 
   def close(self, name=None):  # pylint: disable=unused-argument
     return self
@@ -124,3 +147,22 @@ class TensorArray(object):
   def split(self, value, lengths, name=None):
     raise NotImplementedError('If you need this feature, please email '
                               '`tfprobability@tensorflow.org`.')
+
+
+if JAX_MODE:
+  from jax import tree_util  # pylint: disable=g-import-not-at-top
+
+  def to_tree(val):
+    vals = (val._data,)  # pylint: disable=protected-access
+    aux = dict(dtype=val.dtype, element_shape=val.element_shape,
+               dynamic_size=val.dynamic_size)
+    return vals, aux
+
+  def from_tree(aux, vals):
+    return TensorArray(data=vals[0], **aux)
+
+  tree_util.register_pytree_node(
+      TensorArray,
+      to_tree,
+      from_tree
+  )

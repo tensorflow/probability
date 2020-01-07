@@ -19,7 +19,6 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 from scipy import stats
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -402,11 +401,11 @@ class ZipfTest(test_util.TestCase):
     power = 1.5
 
     zipf1 = tfd.Zipf(power=power, name="zipf1", validate_args=True)
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     samples1 = self.evaluate(zipf1.sample(n, seed=seed))
 
     zipf2 = tfd.Zipf(power=power, name="zipf2", validate_args=True)
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     samples2 = self.evaluate(zipf2.sample(n, seed=seed))
 
     self.assertAllEqual(samples1, samples2)

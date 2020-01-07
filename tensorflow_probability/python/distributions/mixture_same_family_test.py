@@ -281,13 +281,13 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
 
   def testDeterministicSampling(self):
     seed = test_util.test_seed()
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     dist = tfd.MixtureSameFamily(
         mixture_distribution=tfd.Categorical(logits=[0., 0.]),
         components_distribution=tfd.Normal(loc=[0., 200.], scale=[1., 1.]),
         validate_args=True)
     sample_1 = self.evaluate(dist.sample([100], seed=seed))
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     sample_2 = self.evaluate(dist.sample([100], seed=seed))
     self.assertAllClose(sample_1, sample_2)
 

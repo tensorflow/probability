@@ -90,7 +90,7 @@ class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
                base_kernel,
                inducing_index_points,
                variational_scale,
-               name='_VariationalKernel'):
+               name='VariationalKernel'):
     """Construct a _VariationalKernel instance.
 
     Args:
@@ -109,7 +109,7 @@ class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
         broadcast-compatible with the batch shape of `base_kernel` and
         `inducing_index_points`.
       name: Python `str` name prefixed to `Op`A created by this class.
-        Default value: `"_VariationalKernel"`
+        Default value: `"VariationalKernel"`
     """
     parameters = dict(locals())
     with tf.name_scope(name):
