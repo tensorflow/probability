@@ -15,7 +15,6 @@
 # Description:
 #   Functional MCMC API.
 
-# [internal] load python3.bzl
 # [internal] load pytype.bzl
 
 licenses(["notice"])  # Apache 2.0
@@ -42,7 +41,7 @@ py_library(
 py_library(
     name = "util_jax",
     srcs = ["util_jax.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # jax dep,
         # jax:stax dep,
@@ -54,7 +53,7 @@ py_library(
 py_library(
     name = "tf_on_jax",
     srcs = ["tf_on_jax.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # jax dep,
         # jax:stax dep,
@@ -76,7 +75,7 @@ py_library(
 py_library(
     name = "backend",
     srcs = ["backend.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # TODO(siege): Add a target that doesn't link everything.
         ":tf_on_jax",
@@ -89,7 +88,7 @@ py_library(
 py_library(
     name = "fun_mcmc_lib",
     srcs = ["fun_mcmc_lib.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":backend",
         # numpy dep,
@@ -101,6 +100,7 @@ py_library(
 py_test(
     name = "fun_mcmc_test",
     srcs = ["fun_mcmc_test.py"],
+    python_version = "PY3",
     shard_count = 8,
     deps = [
         ":fun_mcmc",

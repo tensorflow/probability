@@ -37,6 +37,7 @@ py_test(
 py_test(
     name = "jax_integration_test",
     srcs = ["jax_integration_test.py"],
+    python_version = "PY3",
     tags = ["tfp_jax"],
     deps = [
         # jax dep,

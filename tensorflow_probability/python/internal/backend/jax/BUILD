@@ -108,12 +108,11 @@ py_library(
     ],
 )
 
-# [internal] load python3.bzl
-
 py_test(
     name = "tensor_array_ops_test",
     srcs = ["tensor_array_ops_test.py"],
     main = "tensor_array_ops_test.py",
+    python_version = "PY3",
     tags = ["tfp_jax"],
     deps = [
         ":jax",
@@ -131,6 +130,7 @@ py_test(
     name = "jax_test",
     srcs = ["numpy_test.py"],
     main = "numpy_test.py",
+    python_version = "PY3",
     shard_count = 5,
     tags = ["tfp_jax"],
     deps = [

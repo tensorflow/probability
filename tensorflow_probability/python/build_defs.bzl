@@ -222,6 +222,7 @@ def multi_substrate_py_test(
         deps = jax_deps,
         tags = tags + ["tfp_jax"] + jax_tags,
         srcs_version = srcs_version,
+        python_version = "PY3",
         timeout = timeout,
         shard_count = shard_count,
     )
