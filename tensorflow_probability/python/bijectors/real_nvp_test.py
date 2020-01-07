@@ -89,7 +89,7 @@ class RealNVPTest(test_util.TestCase):
 
       self.assertEqual(flip_nvp._masked_size, expected_num_masked)
 
-      _, x2_ = np.split(x_, [input_depth - abs(flip_nvp._masked_size)], axis=-1)
+      _, x2_ = np.split(x_, [input_depth - abs(flip_nvp._masked_size)], axis=-1)  # pylint: disable=unbalanced-tuple-unpacking
 
       # Check latter half is the same after passing thru reversed mask RealNVP.
       _, forward_x2 = tf.split(
