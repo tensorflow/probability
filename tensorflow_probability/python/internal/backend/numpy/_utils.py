@@ -68,7 +68,7 @@ def common_dtype(args_list, dtype_hint=None):
     if dtype is None:
       dtype = dt
     elif dtype != dt:
-      raise TypeError('Found incompatible dtypes, {} and {}.'.format(dtype, dt))
+      raise TypeError('Found incompatible dtypes, {} and {}'.format(dtype, dt))
   if dtype is None and dtype_hint is None:
     return None
   return (dtype_hint if dtype is None else dtype).as_numpy_dtype

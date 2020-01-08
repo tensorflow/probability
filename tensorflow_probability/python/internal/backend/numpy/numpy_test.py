@@ -34,6 +34,7 @@ import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal.backend import numpy as numpy_backend
 
@@ -80,6 +81,10 @@ def floats(min_value=-1e16,
            allow_nan=ALLOW_NAN,
            allow_infinity=ALLOW_INFINITY):
   return hps.floats(min_value, max_value, allow_nan, allow_infinity)
+
+
+def integers(min_value=-2**30, max_value=2**30):
+  return hps.integers(min_value, max_value)
 
 
 def complex_numbers(min_magnitude=0.,
@@ -217,6 +222,51 @@ def nonsingular_matrices(draw):
           tuple(int(dim) for dim in mat.shape[:-2]) + (1, 1),
           elements=hps.sampled_from([-1., 1.])))
   return mat * signs
+
+
+def tensorshapes_to_tuples(tensorshapes):
+  return tuple(tuple(tensorshape.as_list()) for tensorshape in tensorshapes)
+
+
+@hps.composite
+def normal_params(draw):
+  shape = draw(shapes())
+  arg_shapes = draw(
+      tfp_hps.broadcasting_shapes(shape, 3).map(tensorshapes_to_tuples))
+  include_arg = draw(hps.lists(hps.booleans(), min_size=2, max_size=2))
+  dtype = draw(hps.sampled_from([np.float32, np.float64]))
+  mean = (
+      draw(single_arrays(shape=hps.just(arg_shapes[1]), dtype=dtype,
+                         elements=floats()))
+      if include_arg[0] else 0)
+  stddev = (
+      draw(single_arrays(shape=hps.just(arg_shapes[2]), dtype=dtype,
+                         elements=positive_floats()))
+      if include_arg[1] else 1)
+  return (arg_shapes[0], mean, stddev, dtype)
+
+
+@hps.composite
+def uniform_params(draw):
+  shape = draw(shapes())
+  arg_shapes = draw(
+      tfp_hps.broadcasting_shapes(shape, 3).map(tensorshapes_to_tuples))
+  include_arg = draw(hps.lists(hps.booleans(), min_size=2, max_size=2))
+  dtype = draw(hps.sampled_from([np.int32, np.int64, np.float32, np.float64]))
+  elements = floats(), positive_floats()
+  if dtype == np.int32 or dtype == np.int64:
+    # TF RandomUniformInt only supports scalar min/max.
+    arg_shapes = (arg_shapes[0], (), ())
+    elements = integers(), integers(min_value=1)
+  minval = (
+      draw(single_arrays(shape=hps.just(arg_shapes[1]), dtype=dtype,
+                         elements=elements[0]))
+      if include_arg[0] else 0)
+  maxval = minval + (
+      draw(single_arrays(shape=hps.just(arg_shapes[2]), dtype=dtype,
+                         elements=elements[1]))
+      if include_arg[1] else dtype(10))
+  return (arg_shapes[0], minval, maxval, dtype)
 
 
 def gamma_params():
@@ -649,11 +699,11 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
         jax_kwargs=_add_jax_prng_key_as_seed,
         assert_shape_only=True),
     TestCase(
-        'random.normal', [hps.tuples(shapes())],
+        'random.normal', [normal_params()],
         jax_kwargs=_add_jax_prng_key_as_seed,
         assert_shape_only=True),
     TestCase(
-        'random.uniform', [hps.tuples(shapes())],
+        'random.uniform', [uniform_params()],
         jax_kwargs=_add_jax_prng_key_as_seed,
         assert_shape_only=True),
 

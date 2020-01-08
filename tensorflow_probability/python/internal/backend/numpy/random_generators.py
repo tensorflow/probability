@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 # Dependency imports
 import numpy as np
 
@@ -54,16 +52,22 @@ __all__ = [
 JAX_MODE = False
 
 
-def _shape(args, size):
+def _ensure_tuple(t):
   try:
-    size = tuple(size)
+    return tuple(t)
   except TypeError:
-    size = (size,)
+    return (t,)
+
+
+def _bcast_shape(base_shape, args):
+  base_shape = _ensure_tuple(base_shape)
   if not args:
-    return size
-  if len(args) == 1:
-    return size + np.array(args[0]).shape
-  return size + functools.reduce(np.broadcast, args).shape
+    return base_shape
+  bc_arr = np.zeros(base_shape + (0,))
+  for arg in args:
+    if arg is not None:
+      bc_arr = bc_arr + np.zeros(np.shape(arg) + (0,))
+  return bc_arr.shape[:-1]
 
 
 def _categorical(logits, num_samples, dtype=None, seed=None, name=None):  # pylint: disable=unused-argument
@@ -78,6 +82,7 @@ def _categorical(logits, num_samples, dtype=None, seed=None, name=None):  # pyli
 
 
 def _categorical_jax(logits, num_samples, dtype=None, seed=None, name=None):  # pylint: disable=unused-argument
+  """Jax implementation of `tf.random.categorical`."""
   dtype = utils.numpy_dtype(dtype or np.int64)
   if not hasattr(logits, 'shape') or not hasattr(logits, 'dtype'):
     logits = np.array(logits, np.float32)
@@ -94,13 +99,13 @@ def _gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None,
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
   scale = 1. if beta is None else (1. / beta)
-  shape = _shape([alpha, scale], shape)
+  shape = _ensure_tuple(shape) + _bcast_shape((), [alpha, scale])
   return rng.gamma(shape=alpha, scale=scale, size=shape).astype(dtype)
 
 
 def _gamma_jax(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):  # pylint: disable=unused-argument
   dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
-  shape = _shape([alpha, beta], shape)
+  shape = _ensure_tuple(shape) + _bcast_shape((), [alpha, beta])
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
   if seed is None:
     raise ValueError('Must provide PRNGKey to sample in JAX.')
@@ -112,14 +117,14 @@ def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
             name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([mean, stddev], dtype_hint=dtype)
-  shape = _shape([mean, stddev], shape)
+  shape = _bcast_shape(shape, [mean, stddev])
   return rng.normal(loc=mean, scale=stddev, size=shape).astype(dtype)
 
 
 def _normal_jax(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
                 name=None):  # pylint: disable=unused-argument
   dtype = utils.common_dtype([mean, stddev], dtype_hint=dtype)
-  shape = _shape([mean, stddev], shape)
+  shape = _bcast_shape(shape, [mean, stddev])
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
   if seed is None:
     raise ValueError('Must provide PRNGKey to sample in JAX.')
@@ -130,7 +135,7 @@ def _poisson(shape, lam, dtype=tf.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([lam], dtype_hint=dtype)
-  shape = _shape([lam], shape)
+  shape = _ensure_tuple(shape) + np.shape(lam)
   return rng.poisson(lam=lam, size=shape).astype(dtype)
 
 
@@ -156,7 +161,7 @@ if JAX_MODE:
     # lam > 10. A reference implementation can be found here:
     # https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/kernels/random_poisson_op.cc#L159-L239
 
-    shape = _shape([lam], shape)
+    shape = _ensure_tuple(shape) + np.shape(lam)
     max_iters = (max_iters
                  if max_iters is not None
                  else np.iinfo(np.int32).max)
@@ -190,7 +195,7 @@ def _uniform(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([minval, maxval], dtype_hint=dtype)
   maxval = 1 if maxval is None else maxval
-  shape = _shape([minval, maxval], shape)
+  shape = _bcast_shape(shape, [minval, maxval])
   return rng.uniform(low=minval, high=maxval, size=shape).astype(dtype)
 
 
@@ -201,16 +206,22 @@ def _uniform_jax(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
   if seed is None:
     raise ValueError('Must provide PRNGKey to sample in JAX.')
   dtype = utils.common_dtype([minval, maxval], dtype_hint=dtype)
+  final_rank = max([len(shape), len(np.shape(minval)), len(np.shape(maxval))])
   if np.issubdtype(dtype, np.integer):
     if maxval is None:
       raise ValueError(
           'Must specify maxval for integer dtype {}.'.format(dtype))
-    shape = _shape([], shape)
+    shape = _bcast_shape(shape, [minval, maxval])
+    # We must match ranks, as lax.max refuses to broadcast different-rank args.
+    minval = minval + np.zeros([1] * final_rank, dtype=dtype)
     return jaxrand.randint(key=seed, shape=shape, minval=minval, maxval=maxval,
                            dtype=dtype)
   else:
-    maxval = 1 if maxval is None else maxval
-    shape = _shape([], shape)
+    maxval = dtype(1) if maxval is None else maxval
+    shape = _bcast_shape(shape, [minval, maxval])
+    # We must match ranks, as lax.max refuses to broadcast different-rank args.
+    minval = minval + np.zeros([1] * final_rank, dtype=dtype)
+    maxval = maxval + np.zeros([1] * final_rank, dtype=dtype)
     return jaxrand.uniform(key=seed, shape=shape, dtype=dtype, minval=minval,
                            maxval=maxval)
 
