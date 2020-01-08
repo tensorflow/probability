@@ -137,20 +137,14 @@ if JAX_MODE:
   def value_and_gradient(f,  # pylint: disable=function-redefined
                          xs,
                          output_gradients=None,
-                         use_gradient_tape=False,
-                         name=None):
+                         use_gradient_tape=False,  # pylint: disable=unused-argument
+                         name=None):  # pylint: disable=unused-argument
     """Computes `f(*xs)` and its gradients wrt to `*xs`."""
-    del name
-    del use_gradient_tape
     xs, is_xs_list_like = _prepare_args(xs)
     y, f_vjp = jax.vjp(f, *xs)
     if output_gradients is None:
-      if isinstance(y, list):
-        output_gradients = [np.ones_like(y_)
-                            for y_ in y]
-      else:
-        output_gradients = np.ones_like(y)
-    dydx = f_vjp(output_gradients)
+      output_gradients = tf.nest.map_structure(np.ones_like, y)
+    dydx = list(f_vjp(output_gradients))
     if not is_xs_list_like:
       dydx = dydx[0]
     return y, dydx
