@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+import numpy as np
 
 import tensorflow.compat.v2 as tf
 
@@ -67,6 +68,7 @@ def _while_loop(cond, body, loop_vars,  # pylint: disable=redefined-outer-name
                 shape_invariants=None, parallel_iterations=10,  # pylint: disable=unused-argument
                 back_prop=True, swap_memory=False,  # pylint: disable=unused-argument
                 maximum_iterations=None, name=None):  # pylint: disable=unused-argument
+  """Numpy implementation of `tf.while_loop`."""
   i = 0
   while (cond(*loop_vars) and
          (maximum_iterations is None or i < maximum_iterations)):
@@ -79,12 +81,23 @@ def _while_loop_jax(cond, body, loop_vars,  # pylint: disable=redefined-outer-na
                     shape_invariants=None, parallel_iterations=10,  # pylint: disable=unused-argument
                     back_prop=True, swap_memory=False,  # pylint: disable=unused-argument
                     maximum_iterations=None, name=None):  # pylint: disable=unused-argument
-  def override_body_fn(args):
-    return body(*args)
-  def override_cond_fn(args):
-    return cond(*args)
+  """Jax implementation of `tf.while_loop`."""
   from jax import lax  # pylint: disable=g-import-not-at-top
-  return lax.while_loop(override_cond_fn, override_body_fn, loop_vars)
+  if maximum_iterations is None:
+    def override_body_fn(args):
+      return body(*args)
+    def override_cond_fn(args):
+      return cond(*args)
+    return lax.while_loop(override_cond_fn, override_body_fn, loop_vars)
+  else:  # Use else to avoid linter saying these functions are already defined.
+    def override_body_fn(args):
+      i, args = args
+      return i + 1, body(*args)
+    def override_cond_fn(args):
+      i, args = args
+      return cond(*args) & (i < maximum_iterations)
+    return lax.while_loop(
+        override_cond_fn, override_body_fn, (np.array(0), loop_vars))[1]
 
 
 # --- Begin Public Functions --------------------------------------------------
