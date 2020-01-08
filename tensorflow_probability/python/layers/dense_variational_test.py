@@ -21,7 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -312,14 +311,14 @@ class DenseVariational(test_util.TestCase):
   def testDenseLocalReparameterization(self):
     batch_size, in_size, out_size = 2, 3, 4
     with self.cached_session() as sess:
-      tf1.set_random_seed(9068)
+      tf.random.set_seed(9068)
       (kernel_posterior, kernel_prior, kernel_divergence,
        bias_posterior, bias_prior, bias_divergence, layer, inputs,
        outputs, kl_penalty) = self._testDenseSetUp(
            tfp.layers.DenseLocalReparameterization,
            batch_size, in_size, out_size)
 
-      tf1.set_random_seed(9068)
+      tf.random.set_seed(9068)
       expected_kernel_posterior_affine = tfd.Normal(
           loc=tf.matmul(inputs, kernel_posterior.result_loc),
           scale=tf.matmul(
@@ -377,14 +376,14 @@ class DenseVariational(test_util.TestCase):
   def testDenseFlipout(self):
     batch_size, in_size, out_size = 2, 3, 4
     with self.cached_session() as sess:
-      tf1.set_random_seed(9069)
+      tf.random.set_seed(9069)
       (kernel_posterior, kernel_prior, kernel_divergence,
        bias_posterior, bias_prior, bias_divergence, layer, inputs,
        outputs, kl_penalty) = self._testDenseSetUp(
            tfp.layers.DenseFlipout,
            batch_size, in_size, out_size, seed=44)
 
-      tf1.set_random_seed(9069)
+      tf.random.set_seed(9069)
       expected_kernel_posterior_affine = tfd.Normal(
           loc=tf.zeros_like(kernel_posterior.result_loc),
           scale=kernel_posterior.result_scale)

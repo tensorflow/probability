@@ -62,7 +62,7 @@ class StochasticGradientLangevinDynamics(tf.optimizers.Optimizer):
 
   with tf.Session(graph=tf.Graph()) as sess:
     # Set up random seed for the optimizer
-    tf.set_random_seed(42)
+    tf.random.set_seed(42)
     true_mean = dtype([0, 0, 0])
     true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
     # Loss is defined through the Cholesky decomposition

@@ -354,7 +354,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
 
     with self.cached_session():
       # Set up random seed for the optimizer
-      tf1.set_random_seed(42)
+      tf.random.set_seed(42)
       dtype = np.float32
       true_mean = dtype([0, 0, 0])
       true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
