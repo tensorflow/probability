@@ -239,7 +239,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     #   self._dist_fn_wrapped
     #   self._dist_fn_args
     #   self._always_use_specified_sample_shape
-    seed = SeedStream('JointDistributionSequential', seed)
+    seed = SeedStream(seed, salt='JointDistributionSequential')
     ds = []
     xs = [None]*len(self._dist_fn_wrapped) if value is None else list(value)
     if len(xs) != len(self._dist_fn_wrapped):

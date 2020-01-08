@@ -201,10 +201,10 @@ def fit_surrogate_posterior(target_log_prob_fn,
 
   ```python
   # Toy 1D data.
-  index_points = np.array(
-      [-10., -7.2, -4., -1., 0.8, 4., 6.2, 9.]).astype(np.float32)
+  index_points = np.array([-10., -7.2, -4., -0.1, 0.1, 4., 6.2, 9.]).reshape(
+      [-1, 1]).astype(np.float32)
   observed_counts = np.array(
-      [100, 90, 60, 1, 4, 37, 55, 42]).astype(np.float32)
+      [100, 90, 60, 13, 18, 37, 55, 42]).astype(np.float32)
 
   # Trainable GP hyperparameters.
   kernel_log_amplitude = tf.Variable(0., name='kernel_log_amplitude')

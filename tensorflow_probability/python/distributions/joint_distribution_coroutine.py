@@ -228,7 +228,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     """Executes `model`, creating both samples and distributions."""
     ds = []
     values_out = []
-    seed = SeedStream('JointDistributionCoroutine', seed)
+    seed = SeedStream(seed, salt='JointDistributionCoroutine')
     gen = self._model()
     index = 0
     d = next(gen)

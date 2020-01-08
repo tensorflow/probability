@@ -577,7 +577,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     log_prob = joint.log_prob(z)
 
     self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]),
-                        rtol=1e-5)
+                        rtol=1e-4, atol=1e-5)
 
   def test_sample_dtype_structures_output(self):
     def noncentered_horseshoe_prior(num_features):
@@ -648,7 +648,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     lp = self.evaluate(joint.log_prob(x))
     lp_with_tensor_as_list = self.evaluate(
         joint.log_prob(x_with_tensor_as_list))
-    self.assertAllEqual(lp, lp_with_tensor_as_list)
+    self.assertAllClose(lp, lp_with_tensor_as_list)
 
   def test_matrix_factorization(self):
     # A matrix factorization model based on
