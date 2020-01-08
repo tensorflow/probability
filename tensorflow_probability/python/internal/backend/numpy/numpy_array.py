@@ -170,11 +170,8 @@ def _one_hot(  # pylint: disable=unused-argument
   return y_out
 
 
-def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
-  s = _shape(input)
-  if isinstance(s, (np.ndarray, np.generic)):
-    return np.ones(s, utils.numpy_dtype(dtype or input.dtype))
-  return tf.ones(s, dtype or s.dtype, name)
+def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin,unused-argument
+  return np.ones_like(input, dtype=utils.numpy_dtype(dtype))
 
 
 # TODO(b/136555907): Add unit-test.
@@ -245,11 +242,8 @@ def _transpose(a, perm=None, conjugate=False, name='transpose'):  # pylint: disa
   return np.conjugate(x) if conjugate else x
 
 
-def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
-  s = _shape(input)
-  if isinstance(s, (np.ndarray, np.generic)):
-    return np.zeros(s, utils.numpy_dtype(dtype or input.dtype))
-  return tf.zeros(s, dtype or s.dtype, name)
+def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin,unused-argument
+  return np.zeros_like(input, dtype=utils.numpy_dtype(dtype))
 
 
 # --- Begin Public Functions --------------------------------------------------
