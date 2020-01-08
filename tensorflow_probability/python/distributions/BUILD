@@ -1705,7 +1705,7 @@ multi_substrate_py_test(
     srcs = [
         "cholesky_lkj_test.py",
     ],
-    jax_size = "large",
+    jax_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

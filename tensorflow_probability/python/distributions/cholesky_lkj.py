@@ -46,6 +46,16 @@ class CholeskyLKJ(distribution.Distribution):
 
   In other words, if If `X ~ CholeskyLKJ(c)`, then `X @ X^T ~ LKJ(c)`.
 
+  The distribution is supported on lower triangular N x N matrices which are
+  Cholesky factors of correlation matrices; equivalently, matrices whose rows
+  have Euclidean norm 1 and diagonal entries are positive. The probability
+  density function is given by:
+
+    pdf(X; c) = (1/Z(c)) prod_i X_ii^{n-i+2c-3}  (0 <= i < n)
+
+  where there are n(n-1)/2 independent variables X_ij (0 <= i < j < n) and
+  Z(c) is the normalizing constant; the same one as that of LKJ(c).
+
   For more details on the LKJ distribution, see `tfp.distributions.LKJ`.
 
   #### Examples
@@ -169,11 +179,9 @@ class CholeskyLKJ(distribution.Distribution):
     # This log_prob comes from using a change of variables via the Cholesky
     # decomposition on the LKJ's log_prob.
     # The first term represents the change of variables of the LKJ's
-    # unnormalized log_prob, the second is the normalization term coming
-    # from the LKJ distribution, and the final is a normalization term
-    # coming from the change of variables.
-    return (self._log_unnorm_prob(x, concentration) -
-            normalizer + self.dimension * np.log(2.))
+    # unnormalized log_prob and the second is the normalization term coming
+    # from the LKJ distribution.
+    return self._log_unnorm_prob(x, concentration) - normalizer
 
   def _log_unnorm_prob(self, x, concentration, name=None):
     """Returns the unnormalized log density of a CholeskyLKJ distribution.
@@ -195,12 +203,26 @@ class CholeskyLKJ(distribution.Distribution):
       x = tf.convert_to_tensor(x, name='x')
       logdiag = tf.math.log(tf.linalg.diag_part(x))
       # We pick up a weighted sum of the log(diag) due to the jacobian
-      # of the cholesky decomposition. See `tfp.bijectors.CholeskyOuterProduct`
-      # for details.
+      # of the cholesky decomposition. By an argument similar to that of
+      # `tfp.bijectors.CholeskyOuterProduct`, the jacobian is given by:
+      #   prod_i x_ii^{n-i-1} (0 <= i < n).
+      #
+      # To see this, observe that if x @ x^T = p, then p_ij depends only on
+      # those x_kl where k<=i and l<=j. Therefore, on vectorizing the strictly
+      # lower triangular parts of x and p, we get that the jacobian matrix
+      # [d/dvec(x) vec(p)] is lower triangular. The jacobian determinant is then
+      # the product of the n(n-1)/2 diagonal entries:
+      #   J = prod_ij d/dx_ij p_ij  (0 <= j < i < n)
+      #     = prod_ij d/dx_ij (x_i0 * x_j0 + x_i1 * x_j1 + ... + x_ij * x_jj)
+      #     = prod_ij x_jj
+      #     = prod_i x_ii^{n-i-1}
+      #
+      # For more details, see `tfp.bijectors.CholeskyOuterProduct`.
       dimension_range = np.linspace(
+          self.dimension - 1,
+          0.,
           self.dimension,
-          1., self.dimension, dtype=dtype_util.as_numpy_dtype(
-              concentration.dtype))
+          dtype=dtype_util.as_numpy_dtype(concentration.dtype))
       return tf.reduce_sum(
           (2. * concentration[..., tf.newaxis] - 2. + dimension_range) *
           logdiag, axis=-1)
