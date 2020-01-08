@@ -203,7 +203,9 @@ class Laplace(distribution.Distribution):
     return self._mean()
 
   def _quantile(self, x):
-    return tf.where(x > 0.5,self.loc - self.scale*tf.math.log(2*(1-x)), self.loc + self.scale*tf.math.log(2*x))
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    return tf.where(x > 0.5,loc - scale*tf.math.log(2*(1-x)), loc + scale*tf.math.log(2*x))
 
   def _z(self, x):
     return (x - self.loc) / self.scale
