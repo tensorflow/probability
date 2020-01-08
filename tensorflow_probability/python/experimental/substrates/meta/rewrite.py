@@ -47,9 +47,7 @@ DISABLED_BY_PKG = {
     'bijectors':
         ('masked_autoregressive', 'scale_matvec_lu', 'real_nvp'),
     'distributions':
-        ('joint_distribution', 'joint_distribution_coroutine',
-         'joint_distribution_named', 'joint_distribution_sequential',
-         'internal.moving_stats'),
+        ('internal.moving_stats',),
     'math':
         ('ode', 'diag_jacobian',
          'interpolation', 'minimize', 'root_search', 'sparse'),

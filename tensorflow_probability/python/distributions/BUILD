@@ -2037,9 +2037,11 @@ multi_substrate_py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "joint_distribution_coroutine_test",
     srcs = ["joint_distribution_coroutine_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2048,9 +2050,11 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "joint_distribution_named_test",
     srcs = ["joint_distribution_named_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
@@ -2059,9 +2063,11 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "joint_distribution_sequential_test",
     srcs = ["joint_distribution_sequential_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
