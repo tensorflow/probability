@@ -532,6 +532,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
                             dtype=np.complex64, elements=complex_numbers())]),
     TestCase('linalg.slogdet', [nonsingular_matrices()]),
     # ArgSpec(args=['x', 'name'], varargs=None, keywords=None, defaults=(None,))
+    TestCase('complex', [n_same_shape(n=2, dtype=np.float32),
+                         n_same_shape(n=2, dtype=np.float64)]),
     TestCase('math.abs', [single_arrays()]),
     TestCase('math.acos', [single_arrays(elements=floats(-1., 1.))]),
     TestCase('math.acosh', [single_arrays(elements=positive_floats())]),
