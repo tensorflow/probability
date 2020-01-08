@@ -350,7 +350,19 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
     else:
       _impl()
 
-  def testExample(self):
+  def testIsCalibrated(self):
+    test_kernel = collections.namedtuple('TestKernel', 'is_calibrated')
+    self.assertTrue(
+        tfp.mcmc.SimpleStepSizeAdaptation(test_kernel(True), 1).is_calibrated)
+    self.assertFalse(
+        tfp.mcmc.SimpleStepSizeAdaptation(test_kernel(False), 1).is_calibrated)
+
+
+# Reduce test weight by not running the (slow) `eager_no_tf_function` regime.
+@test_util.test_graph_and_eager_modes()
+class SimpleStepSizeAdaptationExampleTest(test_util.TestCase):
+
+  def test_example(self):
     tf.random.set_seed(test_util.test_seed())
     target_log_prob_fn = tfd.Normal(loc=0., scale=1.).log_prob
     num_burnin_steps = 500
@@ -366,24 +378,21 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
     kernel = tfp.mcmc.SimpleStepSizeAdaptation(
         inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8))
 
-    _, log_accept_ratio = tfp.mcmc.sample_chain(
-        num_results=num_results,
-        num_burnin_steps=num_burnin_steps,
-        current_state=tf.zeros(num_chains),
-        kernel=kernel,
-        trace_fn=lambda _, pkr: pkr.inner_results.log_accept_ratio)
+    @tf.function(autograph=False)
+    def do_sampling():
+      _, log_accept_ratio = tfp.mcmc.sample_chain(
+          num_results=num_results,
+          num_burnin_steps=num_burnin_steps,
+          current_state=tf.zeros(num_chains),
+          kernel=kernel,
+          trace_fn=lambda _, pkr: pkr.inner_results.log_accept_ratio)
+      return log_accept_ratio
 
+    log_accept_ratio = do_sampling()
     p_accept = tf.math.exp(tfp.math.reduce_logmeanexp(
         tf.minimum(log_accept_ratio, 0.)))
 
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
-
-  def testIsCalibrated(self):
-    test_kernel = collections.namedtuple('TestKernel', 'is_calibrated')
-    self.assertTrue(
-        tfp.mcmc.SimpleStepSizeAdaptation(test_kernel(True), 1).is_calibrated)
-    self.assertFalse(
-        tfp.mcmc.SimpleStepSizeAdaptation(test_kernel(False), 1).is_calibrated)
 
 
 @test_util.test_all_tf_execution_regimes
