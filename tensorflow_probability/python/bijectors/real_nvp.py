@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
@@ -135,7 +136,8 @@ class RealNVP(bijector_lib.Bijector):
   """
 
   def __init__(self,
-               num_masked,
+               num_masked=None,
+               fraction_masked=None,
                shift_and_log_scale_fn=None,
                bijector_fn=None,
                is_constant_jacobian=False,
@@ -144,10 +146,18 @@ class RealNVP(bijector_lib.Bijector):
     """Creates the Real NVP or NICE bijector.
 
     Args:
-      num_masked: Python `int` indicating that the first `d` units of the event
-        should be masked. Must be in the closed interval `[0, D-1]`, where `D`
-        is the event size of the base distribution. If the value is negative,
-        then the last `d` units of the event are masked instead.
+      num_masked: Python `int`, indicating the number of units of the
+        event that should should be masked. Must be in the closed interval
+        `[0, D-1]`, where `D` is the event size of the base distribution.
+        If the value is negative, then the last `d` units of the event are
+        masked instead. Must be `None` if `fraction_masked` is defined.
+      fraction_masked: Python `float`, indicating the number of units of the
+        event that should should be masked. Must be in the closed interval
+        `[-1, 1]`, and the value represents the fraction of the values to be
+        masked. The final number of values to be masked will be the input size
+        times the fraction, rounded to the the nearest integer towards zero.
+        If negative, then the last fraction of units are masked instead. Must
+        be `None` if `num_masked` is defined.
       shift_and_log_scale_fn: Python `callable` which computes `shift` and
         `log_scale` from both the forward domain (`x`) and the inverse domain
         (`y`). Calculation must respect the 'autoregressive property' (see class
@@ -171,20 +181,40 @@ class RealNVP(bijector_lib.Bijector):
       name: Python `str`, name given to ops managed by this object.
 
     Raises:
-      ValueError: If num_masked < 0.
       ValueError: If both or none of `shift_and_log_scale_fn` and `bijector_fn`
           are specified.
     """
     name = name or 'real_nvp'
 
-    self._num_masked = num_masked
-
-    self._reverse_mask = self._num_masked < 0
     # At construction time, we don't know input_depth.
     self._input_depth = None
-    if bool(shift_and_log_scale_fn) == bool(bijector_fn):
+    if num_masked is not None and fraction_masked is not None:
+      raise ValueError('Exactly one of `num_masked` and '
+                       '`fraction_masked` should be specified.')
+
+    if num_masked is not None:
+      if int(num_masked) != num_masked:
+        raise TypeError('`num_masked` must be an integer. Got: {} of type {}'
+                        ''.format(num_masked, type(num_masked)))
+      self._num_masked = int(num_masked)
+      self._fraction_masked = None
+      self._reverse_mask = self._num_masked < 0
+    else:
+      if not np.issubdtype(type(fraction_masked), np.floating):
+        raise TypeError('`fraction_masked` must be a float. Got: {} of type {}'
+                        ''.format(fraction_masked, type(fraction_masked)))
+      if np.abs(fraction_masked) >= 1.:
+        raise ValueError(
+            '`fraction_masked` must be in (-1, 1), but is {}.'.format(
+                fraction_masked))
+      self._num_masked = None
+      self._fraction_masked = float(fraction_masked)
+      self._reverse_mask = self._fraction_masked < 0
+
+    if shift_and_log_scale_fn is not None and bijector_fn is not None:
       raise ValueError('Exactly one of `shift_and_log_scale_fn` and '
                        '`bijector_fn` should be specified.')
+
     if shift_and_log_scale_fn:
       def _bijector_fn(x0, input_depth, **condition_kwargs):
         shift, log_scale = shift_and_log_scale_fn(x0, input_depth,
@@ -206,6 +236,13 @@ class RealNVP(bijector_lib.Bijector):
         validate_args=validate_args,
         name=name)
 
+  @property
+  def _masked_size(self):
+    masked_size = (
+        self._num_masked if self._num_masked is not None else int(
+            np.round(self._input_depth * self._fraction_masked)))
+    return masked_size
+
   def _cache_input_depth(self, x):
     if self._input_depth is None:
       self._input_depth = tf.compat.dimension_value(
@@ -213,17 +250,19 @@ class RealNVP(bijector_lib.Bijector):
       if self._input_depth is None:
         raise NotImplementedError(
             'Rightmost dimension must be known prior to graph execution.')
-      if self._num_masked >= self._input_depth:
+
+      if abs(self._masked_size) >= self._input_depth:
         raise ValueError(
-            'Number of masked units must be smaller than the event size.')
+            'Number of masked units {} must be smaller than the event size {}.'
+            .format(self._masked_size, self._input_depth))
 
   def _bijector_input_units(self):
-    return self._input_depth - abs(self._num_masked)
+    return self._input_depth - abs(self._masked_size)
 
   def _forward(self, x, **condition_kwargs):
     self._cache_input_depth(x)
 
-    x0, x1 = x[..., :self._num_masked], x[..., self._num_masked:]
+    x0, x1 = x[..., :self._masked_size], x[..., self._masked_size:]
 
     if self._reverse_mask:
       x0, x1 = x1, x0
@@ -240,7 +279,7 @@ class RealNVP(bijector_lib.Bijector):
   def _inverse(self, y, **condition_kwargs):
     self._cache_input_depth(y)
 
-    y0, y1 = y[..., :self._num_masked], y[..., self._num_masked:]
+    y0, y1 = y[..., :self._masked_size], y[..., self._masked_size:]
 
     if self._reverse_mask:
       y0, y1 = y1, y0
@@ -257,7 +296,7 @@ class RealNVP(bijector_lib.Bijector):
   def _forward_log_det_jacobian(self, x, **condition_kwargs):
     self._cache_input_depth(x)
 
-    x0, x1 = x[..., :self._num_masked], x[..., self._num_masked:]
+    x0, x1 = x[..., :self._masked_size], x[..., self._masked_size:]
 
     if self._reverse_mask:
       x0, x1 = x1, x0
@@ -269,7 +308,7 @@ class RealNVP(bijector_lib.Bijector):
   def _inverse_log_det_jacobian(self, y, **condition_kwargs):
     self._cache_input_depth(y)
 
-    y0, y1 = y[..., :self._num_masked], y[..., self._num_masked:]
+    y0, y1 = y[..., :self._masked_size], y[..., self._masked_size:]
 
     if self._reverse_mask:
       y0, y1 = y1, y0

@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for MaskedAutoregressiveFlow."""
+"""Tests for RealNVP."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -32,12 +33,15 @@ from tensorflow_probability.python.internal import test_util
 @test_util.test_all_tf_execution_regimes
 class RealNVPTest(test_util.TestCase):
 
-  def testBijectorWithTrivialTransform(self):
-    flat_x_ = np.random.normal(0., 1., 8).astype(np.float32)
-    batched_x_ = np.random.normal(0., 1., (3, 8)).astype(np.float32)
+  @parameterized.parameters((4, None), (None, 4. / 8.))
+  def testBijectorWithTrivialTransform(self, num_masked, fraction_masked):
+    input_depth = 8
+    flat_x_ = np.random.normal(0., 1., input_depth).astype(np.float32)
+    batched_x_ = np.random.normal(0., 1., (3, input_depth)).astype(np.float32)
     for x_ in [flat_x_, batched_x_]:
       nvp = tfb.RealNVP(
-          num_masked=4,
+          num_masked=num_masked,
+          fraction_masked=fraction_masked,
           validate_args=True,
           shift_and_log_scale_fn=lambda x, _: (x, x),
           is_constant_jacobian=False)
@@ -60,25 +64,39 @@ class RealNVPTest(test_util.TestCase):
       self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
       self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
-  def testBijectorWithReverseMask(self):
-    flat_x_ = np.random.normal(0., 1., 8).astype(np.float32)
-    batched_x_ = np.random.normal(0., 1., (3, 8)).astype(np.float32)
-    num_masked = -5
+  @parameterized.parameters((-5, None), (None, -5. / 8.))
+  def testBijectorWithReverseMask(self, num_masked, fraction_masked):
+    input_depth = 8
+    flat_x_ = np.random.normal(0., 1., input_depth).astype(np.float32)
+    batched_x_ = np.random.normal(0., 1., (3, input_depth)).astype(np.float32)
     for x_ in [flat_x_, batched_x_]:
       flip_nvp = tfb.RealNVP(
           num_masked=num_masked,
+          fraction_masked=fraction_masked,
           validate_args=True,
           shift_and_log_scale_fn=tfb.real_nvp_default_template(
               hidden_layers=[3], shift_only=False),
           is_constant_jacobian=False)
 
-      _, x2_ = np.split(x_, [8 - abs(num_masked)], axis=-1)
       x = tf.constant(x_)
 
-      # Check latter half is the same after passing thru reversed mask RealNVP.
       forward_x = flip_nvp.forward(x)
-      _, forward_x2 = tf.split(forward_x, [8 - abs(num_masked),
-                                           abs(num_masked)], axis=-1)
+
+      expected_num_masked = (
+          num_masked if num_masked is not None else np.floor(input_depth *
+                                                             fraction_masked))
+
+      self.assertEqual(flip_nvp._masked_size, expected_num_masked)
+
+      _, x2_ = np.split(x_, [input_depth - abs(flip_nvp._masked_size)], axis=-1)  # pylint: disable=unbalanced-tuple-unpacking
+
+      # Check latter half is the same after passing thru reversed mask RealNVP.
+      _, forward_x2 = tf.split(
+          forward_x, [
+              input_depth - abs(flip_nvp._masked_size),
+              abs(flip_nvp._masked_size)
+          ],
+          axis=-1)
       self.evaluate(tf1.global_variables_initializer())
       forward_x2_ = self.evaluate(forward_x2)
 
@@ -137,27 +155,6 @@ class RealNVPTest(test_util.TestCase):
     self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-5, atol=1e-5)
     self.assertAllClose(x_, inverse_y_, rtol=1e-5, atol=1e-5)
     self.assertAllClose(ildj_, -fldj_, rtol=1e-5, atol=1e-5)
-
-  def testMatrixBijectorRaises(self):
-    with self.assertRaisesRegexp(
-        ValueError,
-        'Bijectors with `forward_min_event_ndims` > 1 are not supported'):
-
-      def bijector_fn(*args, **kwargs):
-        del args, kwargs
-        return tfb.Inline(forward_min_event_ndims=2)
-      rnvp = tfb.RealNVP(1, bijector_fn=bijector_fn, validate_args=True)
-      rnvp.forward([1., 2.])
-
-  def testRankChangingBijectorRaises(self):
-    with self.assertRaisesRegexp(
-        ValueError, 'Bijectors which alter `event_ndims` are not supported.'):
-
-      def bijector_fn(*args, **kwargs):
-        del args, kwargs
-        return tfb.Inline(forward_min_event_ndims=1, inverse_min_event_ndims=0)
-      rnvp = tfb.RealNVP(1, bijector_fn=bijector_fn, validate_args=True)
-      rnvp.forward([1., 2.])
 
 
 @test_util.test_all_tf_execution_regimes
@@ -330,6 +327,69 @@ class GatedTest(RealNVPTestKwargs):
     return {
         'bijector_fn': _make_gated_bijector_fn(),
     }
+
+
+class RealNVPTestAsserts(test_util.TestCase):
+
+  def testMatrixBijectorRaises(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        'Bijectors with `forward_min_event_ndims` > 1 are not supported'):
+
+      def bijector_fn(*args, **kwargs):
+        del args, kwargs
+        return tfb.Inline(forward_min_event_ndims=2)
+
+      rnvp = tfb.RealNVP(1, bijector_fn=bijector_fn, validate_args=True)
+      rnvp.forward([1., 2.])
+
+  def testRankChangingBijectorRaises(self):
+    with self.assertRaisesRegexp(
+        ValueError, 'Bijectors which alter `event_ndims` are not supported.'):
+
+      def bijector_fn(*args, **kwargs):
+        del args, kwargs
+        return tfb.Inline(forward_min_event_ndims=1, inverse_min_event_ndims=0)
+
+      rnvp = tfb.RealNVP(1, bijector_fn=bijector_fn, validate_args=True)
+      rnvp.forward([1., 2.])
+
+  def testNonIntegerNumMaskedRaises(self):
+    with self.assertRaisesRegexp(TypeError, '`num_masked` must be an integer'):
+      tfb.RealNVP(num_masked=0.5, shift_and_log_scale_fn=lambda x, _: (x, x))
+
+  def testNonFloatFractionMaskedRaises(self):
+    with self.assertRaisesRegexp(TypeError,
+                                 '`fraction_masked` must be a float'):
+      tfb.RealNVP(fraction_masked=1, shift_and_log_scale_fn=lambda x, _: (x, x))
+
+  @parameterized.named_parameters(
+      ('TooLarge', 1.1),
+      ('TooNegative', -1.1),
+      ('LowerBoundary', -1.),
+      ('UpperBoundary', 1.),
+  )
+  def testBadFractionRaises(self, fraction_masked):
+    with self.assertRaisesRegexp(ValueError, '`fraction_masked` must be in'):
+      tfb.RealNVP(
+          fraction_masked=fraction_masked,
+          shift_and_log_scale_fn=lambda x, _: (x, x))
+
+  @parameterized.named_parameters(
+      ('TooLarge', 2),
+      ('TooNegative', -2),
+      ('LowerBoundary', -1),
+      ('UpperBoundary', 1),
+  )
+  def testBadNumMaskRaises(self, num_masked):
+    with self.assertRaisesRegexp(
+        ValueError,
+        'Number of masked units {} must be smaller than the event size 1'
+        .format(num_masked)):
+      rnvp = tfb.RealNVP(
+          num_masked=num_masked, shift_and_log_scale_fn=lambda x, _: (x, x))
+      rnvp.forward(np.zeros(1))
+
 
 if __name__ == '__main__':
   tf.test.main()
