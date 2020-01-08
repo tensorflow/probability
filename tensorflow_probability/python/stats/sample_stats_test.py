@@ -544,7 +544,7 @@ class StddevTest(test_util.TestCase):
 class LogAverageProbsTest(test_util.TestCase):
 
   def test_mathematical_correctness_bernoulli(self):
-    logits = tf.random.normal([10, 3, 4], seed=42)
+    logits = tf.random.normal([10, 3, 4], seed=test_util.test_seed())
     # The "expected" calculation is numerically naive.
     probs = tf.math.sigmoid(logits)
     expected = tf.math.log(tf.reduce_mean(probs, axis=0))
@@ -552,7 +552,7 @@ class LogAverageProbsTest(test_util.TestCase):
     self.assertAllClose(*self.evaluate([expected, actual]), rtol=1e-5, atol=0.)
 
   def test_mathematical_correctness_categorical(self):
-    logits = tf.random.normal([10, 3, 4], seed=43)
+    logits = tf.random.normal([10, 3, 4], seed=test_util.test_seed())
     # The "expected" calculation is numerically naive.
     probs = tf.math.softmax(logits, axis=-1)
     expected = tf.math.log(tf.reduce_mean(probs, axis=0))
@@ -561,7 +561,7 @@ class LogAverageProbsTest(test_util.TestCase):
     self.assertAllClose(*self.evaluate([expected, actual]), rtol=1e-5, atol=0.)
 
   def test_bad_axis_static(self):
-    logits = tf.random.normal([10, 3, 4], seed=44)
+    logits = tf.random.normal([10, 3, 4], seed=test_util.test_seed())
     with self.assertRaisesRegexp(ValueError, r'.*must be distinct.'):
       tfp.stats.log_average_probs(
           logits,

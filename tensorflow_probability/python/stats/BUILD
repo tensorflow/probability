@@ -19,6 +19,7 @@
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
 package(
@@ -39,7 +40,6 @@ multi_substrate_py_library(
         ":calibration",
         ":quantiles",
         ":ranking",
-        ":sample_stats",
     ],
     deps = [
         ":calibration",
@@ -124,7 +124,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sample_stats",
     srcs = ["sample_stats.py"],
     srcs_version = "PY2AND3",
@@ -140,10 +140,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "sample_stats_test",
     size = "small",
     srcs = ["sample_stats_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,

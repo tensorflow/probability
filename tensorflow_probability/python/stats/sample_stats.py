@@ -376,11 +376,13 @@ def covariance(x,
 
     # If we get lucky and axis is statically defined, we can do some checks.
     if _is_list_like(event_axis) and _is_list_like(sample_axis):
+      event_axis = tuple(map(int, event_axis))
+      sample_axis = tuple(map(int, sample_axis))
       if set(event_axis).intersection(sample_axis):
         raise ValueError(
             'sample_axis ({}) and event_axis ({}) overlapped'.format(
                 sample_axis, event_axis))
-      if (np.diff(sorted(event_axis)) > 1).any():
+      if (np.diff(np.array(sorted(event_axis))) > 1).any():
         raise ValueError(
             'event_axis must be contiguous. Found: {}'.format(event_axis))
       batch_axis = list(

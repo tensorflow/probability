@@ -22,3 +22,4 @@ from __future__ import print_function
 from tensorflow_probability.python.stats._jax.leave_one_out import log_loomean_exp
 from tensorflow_probability.python.stats._jax.leave_one_out import log_loosum_exp
 from tensorflow_probability.python.stats._jax.leave_one_out import log_soomean_exp
+from tensorflow_probability.python.stats._jax.sample_stats import *  # pylint: disable=wildcard-import

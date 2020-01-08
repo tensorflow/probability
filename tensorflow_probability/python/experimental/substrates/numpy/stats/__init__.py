@@ -25,3 +25,4 @@ from tensorflow_probability.python.stats._numpy.leave_one_out import log_soosum_
 from tensorflow_probability.python.stats._numpy.moving_stats import assign_log_moving_mean_exp
 from tensorflow_probability.python.stats._numpy.moving_stats import assign_moving_mean_variance
 from tensorflow_probability.python.stats._numpy.moving_stats import moving_mean_variance_zero_debias
+from tensorflow_probability.python.stats._numpy.sample_stats import *  # pylint: disable=wildcard-import

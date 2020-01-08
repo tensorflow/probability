@@ -312,11 +312,11 @@ range = utils.copy_docstring(  # pylint: disable=redefined-builtin
     tf.range,
     lambda start, limit=None, delta=1, dtype=None, name='range': np.arange(  # pylint: disable=g-long-lambda
         start, limit, delta).astype(utils.numpy_dtype(
-            dtype or np.array(start).dtype)))
+            dtype or utils.common_dtype([start], np.int32))))
 
 rank = utils.copy_docstring(
     tf.rank,
-    lambda input, name=None: np.array(input).ndim)  # pylint: disable=redefined-builtin,g-long-lambda
+    lambda input, name=None: np.int32(np.array(input).ndim))  # pylint: disable=redefined-builtin,g-long-lambda
 
 reshape = utils.copy_docstring(
     tf.reshape,

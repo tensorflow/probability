@@ -23,6 +23,7 @@ from tensorflow_probability.python.distributions import _numpy as distributions
 from tensorflow_probability.python.internal import _numpy as internal
 from tensorflow_probability.python.math import _numpy as math
 from tensorflow_probability.python.mcmc import _numpy as mcmc
+from tensorflow_probability.python.stats import _numpy as stats
 from tensorflow_probability.python.util import _numpy as util
 
 from tensorflow_probability.python.internal.backend import numpy as tf2numpy
