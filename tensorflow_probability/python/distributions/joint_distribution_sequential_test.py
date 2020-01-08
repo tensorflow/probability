@@ -400,6 +400,61 @@ class JointDistributionSequentialTest(test_util.TestCase):
         joint.log_prob(x_with_tensor_as_list))
     self.assertAllEqual(lp, lp_with_tensor_as_list)
 
+  def test_matrix_factorization(self):
+    # A matrix factorization model based on
+    # Probabilistic Matrix Factorization by
+    # Ruslan Salakhutdinov and Andriy Mnih
+    # https://papers.nips.cc/paper/3208-probabilistic-matrix-factorization.pdf
+    #
+    #       users
+    # +-----3-+
+    # | U     |
+    # | | +-------+
+    # | | |   |   |
+    # | +-->R<--+ |
+    # |   |   | | |
+    # +---|---+ | |
+    #     |     V |
+    #     +-5-----+
+    #       items
+    n_users = 3
+    n_items = 5
+    n_factors = 2
+
+    user_trait_prior_scale = 10.
+    item_trait_prior_scale = 10.
+    observation_noise_prior_scale = 1.
+
+    dist = tfd.JointDistributionSequential([
+        tfd.Sample(tfd.Normal(loc=0.,
+                              scale=user_trait_prior_scale),
+                   sample_shape=[n_factors, n_users]),  # U
+
+        tfd.Sample(tfd.Normal(loc=0.,
+                              scale=item_trait_prior_scale),
+                   sample_shape=[n_factors, n_items]),  # V
+
+        lambda item_traits, user_traits: tfd.Independent(  # pylint: disable=g-long-lambda
+            tfd.Normal(loc=tf.matmul(user_traits, item_traits,  # R
+                                     adjoint_a=True),
+                       scale=observation_noise_prior_scale),
+            reinterpreted_batch_ndims=2)], validate_args=True)
+    self.assertAllEqual(dist.event_shape, [[2, 3], [2, 5], [3, 5]])
+
+    z = dist.sample(seed=test_util.test_seed())
+    self.assertAllEqual(tf.shape(z[0]), [2, 3])
+    self.assertAllEqual(tf.shape(z[1]), [2, 5])
+    self.assertAllEqual(tf.shape(z[2]), [3, 5])
+    lp = dist.log_prob(z)
+    self.assertEqual(lp.shape, [])
+
+    z = dist.sample((7, 9), seed=test_util.test_seed())
+    self.assertAllEqual(tf.shape(z[0]), [7, 9, 2, 3])
+    self.assertAllEqual(tf.shape(z[1]), [7, 9, 2, 5])
+    self.assertAllEqual(tf.shape(z[2]), [7, 9, 3, 5])
+    lp = dist.log_prob(z)
+    self.assertEqual(lp.shape, [7, 9])
+
   def test_latent_dirichlet_allocation(self):
     """Tests Latent Dirichlet Allocation joint model.
 
