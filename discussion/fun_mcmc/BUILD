@@ -34,6 +34,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":fun_mcmc_lib",
+        ":util_tfp",
     ],
 )
 
@@ -80,6 +81,8 @@ py_library(
         ":tf_on_jax",
         ":util_tf",
         ":util_jax",
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/substrates",
     ],
 )
 
@@ -92,7 +95,7 @@ py_library(
         ":backend",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/mcmc/internal:util",
     ],
 )
 
@@ -101,6 +104,35 @@ py_test(
     srcs = ["fun_mcmc_test.py"],
     python_version = "PY3",
     shard_count = 8,
+    deps = [
+        ":fun_mcmc",
+        # absl/testing:parameterized dep,
+        # jax dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+# pytype
+py_library(
+    name = "util_tfp",
+    srcs = ["util_tfp.py"],
+    deps = [
+        ":backend",
+        ":fun_mcmc_lib",
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+py_test(
+    name = "util_tfp_test",
+    srcs = ["util_tfp_test.py"],
+    python_version = "PY3",
+    shard_count = 2,
     deps = [
         ":fun_mcmc",
         # absl/testing:parameterized dep,

@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,14 +41,14 @@ import functools
 
 import numpy as np
 
-import tensorflow_probability as tfp
 from discussion.fun_mcmc import backend
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from typing import Any, Callable, List, Mapping, Optional, Sequence, Text, Tuple, Union
 
 tf = backend.tf
+tfp = backend.tfp
 util = backend.util
 tfb = tfp.bijectors
-mcmc_util = tfp.mcmc.internal.util
 
 __all__ = [
     'adam_init',
@@ -60,6 +60,8 @@ __all__ = [
     'call_fn',
     'call_potential_fn',
     'call_potential_fn_with_grads',
+    'call_transport_map',
+    'call_transport_map_with_ldj',
     'call_transition_operator',
     'gaussian_momentum_sample',
     'gradient_descent_step',
@@ -90,6 +92,7 @@ __all__ = [
     'random_walk_metropolis_init',
     'RandomWalkMetropolisExtra',
     'RandomWalkMetropolisState',
+    'reparameterize_potential_fn',
     'running_approximate_auto_covariance_init',
     'running_approximate_auto_covariance_step',
     'running_covariance_init',
@@ -108,8 +111,8 @@ __all__ = [
     'State',
     'trace',
     'transform_log_prob_fn',
-    'transition_kernel_wrapper',
     'TransitionOperator',
+    'TransportMap',
 ]
 
 # We quote tf types to avoid unconditionally loading the TF backend.
@@ -130,6 +133,7 @@ IntNest = Union[IntTensor, Sequence[IntTensor], Mapping[Any, IntTensor]]
 DTypeNest = Union['tf.DType', Sequence['tf.DType'], Mapping[Any, 'tf.DType']]
 State = TensorNest  # pylint: disable=invalid-name
 TransitionOperator = Callable[..., Tuple[State, TensorNest]]
+TransportMap = Callable[..., Tuple[State, TensorNest]]
 PotentialFn = Union[Callable[[TensorNest], Tuple['tf.Tensor', TensorNest]],
                     Callable[..., Tuple['tf.Tensor', TensorNest]]]
 GradFn = Union[Callable[[TensorNest], Tuple[TensorNest, TensorNest]],
@@ -332,8 +336,8 @@ def call_potential_fn(
 
 def call_transition_operator(
     fn: TransitionOperator,
-    args: Union[Tuple[Any], Mapping[Text, Any], Any],
-) -> Tuple[Any, Any]:
+    args: State,
+) -> Tuple[State, TensorNest]:
   """Calls a transition operator with `args`.
 
   `fn` must fulfill the `TransitionOperator` contract:
@@ -391,14 +395,76 @@ def call_transition_operator(
   return new_args, extra
 
 
+def call_transport_map(
+    fn: TransportMap,
+    args: State,
+) -> Tuple[State, TensorNest]:
+  """Calls a transport map with `args`.
+
+  `fn` must fulfill the `TransportMap` contract:
+
+  ```python
+  out, extra = call_fn(fn, args)
+  ```
+
+  Args:
+    fn: `TransitionOperator`.
+    args: Arguments to `fn`.
+
+  Returns:
+    ret: Return value of `fn`.
+
+  Raises:
+    TypeError: If `fn` doesn't fulfill the contract.
+  """
+
+  ret = call_fn(fn, args)
+  error_template = ('`{fn:}` must have a signature '
+                    '`fn(args) -> (out, extra)`'
+                    ' but when called with `args=`\n{args:}\nreturned '
+                    '`ret=`\n{ret:}\ninstead. The structure of '
+                    '`args=`\n{args_s:}\nThe structure of `ret=`\n{ret_s:}\n'
+                    'A common solution is to adjust the `return`s in `fn` to '
+                    'be `return args, ()`.')
+
+  if not isinstance(ret, collections.Sequence) or len(ret) != 2:
+    args_s = _tree_repr(args)
+    ret_s = _tree_repr(ret)
+    raise TypeError(
+        error_template.format(
+            fn=fn, args=args, ret=ret, args_s=args_s, ret_s=ret_s))
+  return ret
+
+
+def call_transport_map_with_ldj(
+    fn: TransitionOperator,
+    args: State,
+) -> Tuple[State, TensorNest, TensorNest]:
+  """Calls `fn` and returns the log-det jacobian to `fn`'s first output.
+
+  Args:
+    fn: A `TransitionOperator`.
+    args: Arguments to `fn`.
+
+  Returns:
+    ret: First output of `fn`.
+    extra: Second output of `fn`.
+    ldj: Log-det jacobian of `fn`.
+  """
+  def wrapper(args):
+    return call_transport_map(fn, args)
+
+  return util.value_and_ldj(wrapper, args)
+
+
 def call_potential_fn_with_grads(
-    fn: TransitionOperator, args: Union[Tuple[Any], Mapping[Text, Any], Any]
+    fn: PotentialFn, args: Union[Tuple[Any], Mapping[Text, Any], Any]
 ) -> Tuple['tf.Tensor', TensorNest, TensorNest]:
   """Calls `fn` and returns the gradients with respect to `fn`'s first output.
 
   Args:
-    fn: A `TransitionOperator`.
-    args: Arguments to `fn`
+    fn: A `PotentialFn`.
+    args: Arguments to `fn`.
 
   Returns:
     ret: First output of `fn`.
@@ -431,6 +497,101 @@ def maybe_broadcast_structure(from_structure: Any, to_structure: Any) -> Any:
   if len(flat_from) == 1:
     flat_from *= len(flat_to)
   return util.unflatten_tree(to_structure, flat_from)
+
+
+def reparameterize_potential_fn(
+    potential_fn: PotentialFn,
+    transport_map_fn: TransportMap,
+    init_state: State = None,
+    state_structure: Any = None,
+    track_volume: bool = True,
+) -> Tuple[PotentialFn, Optional[State]]:
+  """Performs a change of variables of a potential function.
+
+  This takes a potential function and creates a new potential function that now
+  takes takes state in the domain of the `transport_map_fn`, transforms that
+  state and calls the original potential function. If `track_volume` is True,
+  then thay potential is treated as a log density of a volume element and is
+  corrected with the log-det jacobian of `transport_map_fn`.
+
+  This can be used to pre-condition and constrain probabilistic inference and
+  optimization algorithms.
+
+  The wrapped function has the following signature:
+  ```none
+    (*args, **kwargs) ->
+      transformed_potential, [original_space_state, potential_extra,
+                              transport_map_fn_extra]
+  ```
+  Note that currently it is forbidden to pass both `args` and `kwargs` to the
+  wrapper.
+
+  You can also pass `init_state` in the original space and this function will
+  return the inverse transformed state as the 2nd return value. This requires
+  that the `transport_map_fn` is invertible. If it is not, or the inverse is too
+  expensive, you can skip passing `init_state` but then you need to pass
+  `state_structure` so the code knows what state structure it should return (it
+  is inferred from `init_state` otherwise).
+
+  Args:
+    potential_fn: A potential function.
+    transport_map_fn: A `TransitionOperator` representing the transport map
+      operating on the state. The action of this operator should take states
+      from the transformed space to the original space.
+    init_state: Initial state, in the original space.
+    state_structure: Same structure as `init_state`. Mandatory if `init_state`
+      is not provided.
+    track_volume: Indicates that `potential_fn` represents a density and you
+      want to transform the volume element. For example, this is True when
+      `potential_fn` is used as `target_log_prob_fn` in probabilistic inference,
+      and False when `potential_fn` is used in optimization.
+
+  Returns:
+    transformed_potential_fn: Transformed log prob fn.
+    transformed_init_state: Initial state in the transformed space.
+  """
+
+  if state_structure is None and init_state is None:
+    raise ValueError(
+        'At least one of `state_structure` or `init_state` must be '
+        'passed in.')
+
+  def wrapper(*args, **kwargs):
+    """Transformed wrapper."""
+    if args and kwargs:
+      raise ValueError('It is forbidden to pass both `args` and `kwargs` to '
+                       'this wrapper.')
+    if kwargs:
+      args = kwargs
+
+    real_state_structure = state_structure if init_state is None else init_state
+    # Use state_structure to recover the structure of args that has been lossily
+    # transmitted via *args and **kwargs.
+    transformed_state = util.unflatten_tree(real_state_structure,
+                                            util.flatten_tree(args))
+
+    if track_volume:
+      state, map_extra, ldj = call_transport_map_with_ldj(
+          transport_map_fn, transformed_state)
+    else:
+      state, map_extra = call_transport_map(transport_map_fn,
+                                            transformed_state)
+
+    potential, extra = call_potential_fn(potential_fn, state)
+
+    if track_volume:
+      potential += ldj
+
+    return potential, [state, extra, map_extra]
+
+  if init_state is not None:
+    inverse_transform_map_fn = util.inverse_fn(transport_map_fn)
+    transformed_state, _ = call_transport_map(inverse_transform_map_fn,
+                                              init_state)
+  else:
+    transformed_state = None
+
+  return wrapper, transformed_state
 
 
 def transform_log_prob_fn(log_prob_fn: PotentialFn,
@@ -1225,30 +1386,6 @@ def sign_adaptation(control: FloatNest,
   set_point = maybe_broadcast_structure(set_point, control)
 
   return util.map_tree(_get_new_control, control, output, set_point)
-
-
-def transition_kernel_wrapper(
-    current_state: FloatNest, kernel_results: Optional[Any],
-    kernel: tfp.mcmc.TransitionKernel) -> Tuple[FloatNest, Any]:
-  """Wraps a `tfp.mcmc.TransitionKernel` as a `TransitionOperator`.
-
-  Args:
-    current_state: Current state passed to the transition kernel.
-    kernel_results: Kernel results passed to the transition kernel. Can be
-      `None`.
-    kernel: The transition kernel.
-
-  Returns:
-    state: A tuple of:
-      current_state: Current state returned by the transition kernel.
-      kernel_results: Kernel results returned by the transition kernel.
-    extra: An empty tuple.
-  """
-  flat_current_state = util.flatten_tree(current_state)
-  flat_current_state, kernel_results = kernel.one_step(flat_current_state,
-                                                       kernel_results)
-  return (util.unflatten_tree(current_state,
-                              flat_current_state), kernel_results), ()
 
 
 def _choose(is_accepted, accepted, rejected, name='choose'):

@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -134,7 +134,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
 
   def setUp(self):
     super(FunMCMCTestTensorFlow, self).setUp()
-    backend.set_backend(backend.TENSORFLOW)
+    backend.set_backend(backend.TENSORFLOW, backend.MANUAL_TRANSFORMS)
 
   def _make_seed(self, seed):
     return seed
@@ -735,36 +735,6 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
         control=1., output=0.5, set_point=0., adaptation_rate=0.1)
     self.assertAllClose(new_control, 1. * 1.1)
 
-  def testWrapTransitionKernel(self):
-
-    class TestKernel(tfp.mcmc.TransitionKernel):
-
-      def one_step(self, current_state, previous_kernel_results):
-        return [x + 1 for x in current_state], previous_kernel_results + 1
-
-      def bootstrap_results(self, current_state):
-        return sum(current_state)
-
-      def is_calibrated(self):
-        return True
-
-    def kernel(state, pkr):
-      return fun_mcmc.transition_kernel_wrapper(state, pkr, TestKernel())
-
-    state = {'x': 0., 'y': 1.}
-    kr = 1.
-    (final_state, final_kr), _ = fun_mcmc.trace(
-        (state, kr),
-        kernel,
-        2,
-        trace_fn=lambda *args: (),
-    )
-    self.assertAllEqual({
-        'x': 2.,
-        'y': 3.
-    }, util.map_tree(np.array, final_state))
-    self.assertAllEqual(1. + 2., final_kr)
-
   def testRaggedIntegrator(self):
 
     def target_log_prob_fn(q):
@@ -1215,6 +1185,37 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(2., extra)
     self.assertAllClose(3., grads)
 
+  @parameterized.named_parameters(
+      ('Probability', True),
+      ('Loss', False),
+  )
+  def testReparameterizeFn(self, track_volume):
+
+    def potential_fn(x, y):
+      return -x**2 + -y**2, ()
+
+    def transport_map_fn(x, y):
+      return [2 * x, 3 * y], ((), tf.math.log(2.) + tf.math.log(3.))
+
+    def inverse_map_fn(x, y):
+      return [x / 2, y / 3], ((), -tf.math.log(2.) - tf.math.log(3.))
+
+    transport_map_fn.inverse = inverse_map_fn
+
+    (transformed_potential_fn,
+     transformed_init_state) = fun_mcmc.reparameterize_potential_fn(
+         potential_fn, transport_map_fn, [2., 3.], track_volume=track_volume)
+
+    self.assertIsInstance(transformed_init_state, list)
+    self.assertAllClose([1., 1.], transformed_init_state)
+    transformed_potential, (orig_space, _, _) = transformed_potential_fn(1., 1.)
+    potential = potential_fn(2., 3.)[0]
+    if track_volume:
+      potential += tf.math.log(2.) + tf.math.log(3.)
+
+    self.assertAllClose([2., 3.], orig_space)
+    self.assertAllClose(potential, transformed_potential)
+
 
 class FunMCMCTestJAX(FunMCMCTestTensorFlow):
 
@@ -1222,7 +1223,7 @@ class FunMCMCTestJAX(FunMCMCTestTensorFlow):
 
   def setUp(self):
     super(FunMCMCTestJAX, self).setUp()
-    backend.set_backend(backend.JAX)
+    backend.set_backend(backend.JAX, backend.MANUAL_TRANSFORMS)
 
   def _make_seed(self, seed):
     return jax_random.PRNGKey(seed)
