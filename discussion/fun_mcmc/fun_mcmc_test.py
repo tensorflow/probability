@@ -63,7 +63,7 @@ def _skip_on_jax(fn):
 
   @functools.wraps(fn)
   def _wrapper(self, *args, **kwargs):
-    if backend.get_backend() != backend.JAX:
+    if not self._is_on_jax:
       return fn(self, *args, **kwargs)
 
   return _wrapper
@@ -129,6 +129,8 @@ class GenCovTest(real_tf.test.TestCase):
 
 
 class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
+
+  _is_on_jax = False
 
   def setUp(self):
     super(FunMCMCTestTensorFlow, self).setUp()
@@ -339,7 +341,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
         target_log_prob_fn=target_log_prob_fn,
         kinetic_energy_fn=kinetic_energy_fn)
 
-    if num_tlp_calls_jax is not None and backend.get_backend() == backend.JAX:
+    if num_tlp_calls_jax is not None and self._is_on_jax:
       num_tlp_calls = num_tlp_calls_jax
     self.assertEqual(num_tlp_calls, tlp_call_counter[0])
     self.assertEqual(1., extras.state_extra)
@@ -499,7 +501,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
           (x - base_mean) / base_scale), -1), ()
 
     def kernel(hmc_state, seed):
-      if backend.get_backend() == backend.TENSORFLOW:
+      if not self._is_on_jax:
         hmc_seed = _test_seed()
       else:
         hmc_seed, seed = util.split_seed(seed, 2)
@@ -511,7 +513,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
           seed=hmc_seed)
       return (hmc_state, seed), hmc_extra
 
-    if backend.get_backend() == backend.TENSORFLOW:
+    if not self._is_on_jax:
       seed = _test_seed()
     else:
       seed = self._make_seed(_test_seed())
@@ -873,7 +875,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
       return tf.cast(proposal, x.dtype), ((), proposed_logits - current_logits)
 
     def kernel(rwm_state, seed):
-      if backend.get_backend() == backend.TENSORFLOW:
+      if not self._is_on_jax:
         rwm_seed = _test_seed()
       else:
         rwm_seed, seed = util.split_seed(seed, 2)
@@ -884,7 +886,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
           seed=rwm_seed)
       return (rwm_state, seed), rwm_extra
 
-    if backend.get_backend() == backend.TENSORFLOW:
+    if not self._is_on_jax:
       seed = _test_seed()
     else:
       seed = self._make_seed(_test_seed())
@@ -1131,7 +1133,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
         return tf.reduce_sum(lp, -1), ()
 
     def kernel(hmc_state, raac_state, seed):
-      if backend.get_backend() == backend.TENSORFLOW:
+      if not self._is_on_jax:
         hmc_seed = _test_seed()
       else:
         hmc_seed, seed = util.split_seed(seed, 2)
@@ -1145,7 +1147,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
           raac_state, hmc_state.state, axis=aggregation)
       return (hmc_state, raac_state, seed), hmc_extra
 
-    if backend.get_backend() == backend.TENSORFLOW:
+    if not self._is_on_jax:
       seed = _test_seed()
     else:
       seed = self._make_seed(_test_seed())
@@ -1217,6 +1219,8 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
 
 class FunMCMCTestJAX(FunMCMCTestTensorFlow):
 
+  _is_on_jax = True
+
   def setUp(self):
     super(FunMCMCTestJAX, self).setUp()
     backend.set_backend(backend.JAX)
@@ -1226,4 +1230,4 @@ class FunMCMCTestJAX(FunMCMCTestTensorFlow):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  real_tf.test.main()
