@@ -140,12 +140,10 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
   def testTraceSingle(self):
 
     def fun(x):
-      if x is None:
-        x = 0.
       return x + 1., 2 * x
 
     x, e_trace = fun_mcmc.trace(
-        state=None, fn=fun, num_steps=5, trace_fn=lambda _, xp1: xp1)
+        state=0., fn=fun, num_steps=5, trace_fn=lambda _, xp1: xp1)
 
     self.assertAllEqual(5., x)
     self.assertAllEqual([0., 2., 4., 6., 8.], e_trace)
@@ -153,12 +151,10 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
   def testTraceNested(self):
 
     def fun(x, y):
-      if x is None:
-        x = 0.
       return (x + 1., y + 2.), ()
 
     (x, y), (x_trace, y_trace) = fun_mcmc.trace(
-        state=(None, 0.), fn=fun, num_steps=5, trace_fn=lambda xy, _: xy)
+        state=(0., 0.), fn=fun, num_steps=5, trace_fn=lambda xy, _: xy)
 
     self.assertAllEqual(5., x)
     self.assertAllEqual(10., y)
@@ -311,13 +307,13 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(lp, tlp)
 
   # The +1's here are because we initialize the `state_grads` at 1, which
-  # require an extra call to `target_log_prob_fn` for most integrators.
+  # require an extra call to `target_log_prob_fn`.
   @parameterized.parameters(
       (fun_mcmc.leapfrog_step, 1 + 1),
       (fun_mcmc.ruth4_step, 3 + 1),
       (fun_mcmc.blanes_3_stage_step, 3 + 1),
       (_fwd_mclachlan_optimal_4th_order_step, 4 + 1, 9),
-      (_rev_mclachlan_optimal_4th_order_step, 4, 9),
+      (_rev_mclachlan_optimal_4th_order_step, 4 + 1, 9),
   )
   def testIntegratorStep(self, method, num_tlp_calls, num_tlp_calls_jax=None):
 
@@ -330,9 +326,15 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     def kinetic_energy_fn(p):
       return tf.abs(p)**3., 2.
 
+    state = 1.
+    _, _, state_grads = fun_mcmc.call_potential_fn_with_grads(
+        target_log_prob_fn,
+        state,
+    )
+
     state, extras = method(
         integrator_step_state=fun_mcmc.IntegratorStepState(
-            state=1., state_grads=None, momentum=2.),
+            state=state, state_grads=state_grads, momentum=2.),
         step_size=0.1,
         target_log_prob_fn=target_log_prob_fn,
         kinetic_energy_fn=kinetic_energy_fn)
@@ -364,10 +366,16 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
 
     seed = self._make_seed(_test_seed())
 
+    state = 1.
+    _, _, state_grads = fun_mcmc.call_potential_fn_with_grads(
+        target_log_prob_fn,
+        state,
+    )
+
     state_fwd, _ = method(
         integrator_step_state=fun_mcmc.IntegratorStepState(
-            state=1.,
-            state_grads=None,
+            state=state,
+            state_grads=state_grads,
             momentum=util.random_normal([], tf.float32, seed)),
         step_size=0.1,
         target_log_prob_fn=target_log_prob_fn,
@@ -379,7 +387,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
         target_log_prob_fn=target_log_prob_fn,
         kinetic_energy_fn=kinetic_energy_fn)
 
-    self.assertAllClose(1., state_rev.state, atol=1e-6)
+    self.assertAllClose(state, state_rev.state, atol=1e-6)
 
   def testMclachlanIntegratorStepReversible(self):
 
@@ -391,10 +399,16 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
 
     seed = self._make_seed(_test_seed())
 
+    state = 1.
+    _, _, state_grads = fun_mcmc.call_potential_fn_with_grads(
+        target_log_prob_fn,
+        state,
+    )
+
     state_fwd, _ = _fwd_mclachlan_optimal_4th_order_step(
         integrator_step_state=fun_mcmc.IntegratorStepState(
-            state=1.,
-            state_grads=None,
+            state=state,
+            state_grads=state_grads,
             momentum=util.random_normal([], tf.float32, seed)),
         step_size=0.1,
         target_log_prob_fn=target_log_prob_fn,
@@ -406,7 +420,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
         target_log_prob_fn=target_log_prob_fn,
         kinetic_energy_fn=kinetic_energy_fn)
 
-    self.assertAllClose(1., state_rev.state, atol=1e-6)
+    self.assertAllClose(state, state_rev.state, atol=1e-6)
 
   def testMetropolisHastingsStep(self):
     seed = self._make_seed(_test_seed())
@@ -427,12 +441,12 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual(False, mh_extra.is_accepted)
 
     accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
-        current_state=None, proposed_state=1., energy_change=np.nan, seed=seed)
-    self.assertAllEqual(1., accepted)
+        current_state=0., proposed_state=1., energy_change=np.nan, seed=seed)
+    self.assertAllEqual(0., accepted)
     self.assertAllEqual(False, mh_extra.is_accepted)
 
     accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
-        current_state=None,
+        current_state=0.,
         proposed_state=1.,
         log_uniform=-10.,
         energy_change=-np.log(0.5),
@@ -441,12 +455,12 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual(True, mh_extra.is_accepted)
 
     accepted, mh_extra = fun_mcmc.metropolis_hastings_step(
-        current_state=None,
+        current_state=0.,
         proposed_state=1.,
         log_uniform=0.,
         energy_change=-np.log(0.5),
         seed=seed)
-    self.assertAllEqual(1., accepted)
+    self.assertAllEqual(0., accepted)
     self.assertAllEqual(False, mh_extra.is_accepted)
 
     accepted, _ = fun_mcmc.metropolis_hastings_step(
@@ -505,7 +519,8 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
     # for the jit to do anything.
     _, chain = tf.function(lambda state, seed: fun_mcmc.trace(  # pylint: disable=g-long-lambda
-        state=(fun_mcmc.HamiltonianMonteCarloState(state), seed),
+        state=(fun_mcmc.hamiltonian_monte_carlo_init(state, target_log_prob_fn),
+               seed),
         fn=kernel,
         num_steps=num_steps,
         trace_fn=lambda state, extra: state[0].state))(state, seed)
@@ -554,7 +569,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
         seed=_test_seed()))
 
     _, chain = fun_mcmc.trace(
-        state=fun_mcmc.HamiltonianMonteCarloState(state),
+        state=fun_mcmc.hamiltonian_monte_carlo_init(state, target_log_prob_fn),
         fn=kernel,
         num_steps=num_steps,
         trace_fn=lambda state, extra: state.state_extra[0])
@@ -572,7 +587,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(true_mean, sample_mean, rtol=0.1, atol=0.1)
     self.assertAllClose(true_cov, sample_cov, rtol=0.1, atol=0.1)
 
-  @parameterized.parameters((tf.function, 1), (_no_compile, 3))
+  @parameterized.parameters((tf.function, 1), (_no_compile, 2))
   @_skip_on_jax  # `trace` doesn't have an efficient path in JAX yet.
   def testHMCCountTargetLogProb(self, compile_fn, expected_count):
 
@@ -594,7 +609,8 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
           seed=_test_seed())
 
       fun_mcmc.trace(
-          state=fun_mcmc.HamiltonianMonteCarloState(tf.zeros([1])),
+          state=fun_mcmc.hamiltonian_monte_carlo_init(
+              tf.zeros([1]), target_log_prob_fn),
           fn=kernel,
           num_steps=4,
           trace_fn=lambda *args: ())
@@ -682,7 +698,8 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
                 (hmc_state.state_extra[0], hmc_extra.log_accept_ratio))
 
       _, (chain, log_accept_ratio_trace) = fun_mcmc.trace(
-          state=(fun_mcmc.HamiltonianMonteCarloState(state),
+          state=(fun_mcmc.hamiltonian_monte_carlo_init(state,
+                                                       target_log_prob_fn),
                  fun_mcmc.adam_init(tf.math.log(step_size)), 0),
           fn=kernel,
           num_steps=num_adapt_steps + num_steps,
@@ -733,11 +750,10 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     def kernel(state, pkr):
       return fun_mcmc.transition_kernel_wrapper(state, pkr, TestKernel())
 
+    state = {'x': 0., 'y': 1.}
+    kr = 1.
     (final_state, final_kr), _ = fun_mcmc.trace(
-        ({
-            'x': 0.,
-            'y': 1.
-        }, None),
+        (state, kr),
         kernel,
         2,
         trace_fn=lambda *args: (),
@@ -1138,7 +1154,7 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     # for the jit to do anything.
     (_, raac_state, _), chain = tf.function(lambda state, seed: fun_mcmc.trace(  # pylint: disable=g-long-lambda
         state=(
-            fun_mcmc.HamiltonianMonteCarloState(state),
+            fun_mcmc.hamiltonian_monte_carlo_init(state, target_log_prob_fn),
             fun_mcmc.running_approximate_auto_covariance_init(
                 max_lags=max_lags,
                 state_shape=state_shape,

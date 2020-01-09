@@ -31,16 +31,14 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 __all__ = [
     'assert_same_shallow_tree',
     'flatten_tree',
-    'make_dynamic_array',
     'map_tree',
     'map_tree_up_to',
     'random_categorical',
     'random_normal',
     'random_uniform',
-    'snapshot_dynamic_array',
     'split_seed',
+    'trace',
     'value_and_grad',
-    'write_dynamic_array',
 ]
 
 
@@ -67,21 +65,6 @@ def map_tree_up_to(shallow, fn, tree, *rest):
 def assert_same_shallow_tree(shallow, tree):
   """Asserts that `tree` has the same shallow structure as `shallow`."""
   nest.assert_shallow_structure(shallow, tree)
-
-
-def make_dynamic_array(dtype, size, element_shape):
-  """Creates an array that can be written to dynamically."""
-  return np.empty((size,) + element_shape, dtype=dtype)
-
-
-def write_dynamic_array(array, i, e):
-  """Writes to an index in a dynamic array."""
-  return jax.ops.index_update(array, i, e)
-
-
-def snapshot_dynamic_array(array):
-  """Converts a dynamic array back to a static array."""
-  return array
 
 
 def value_and_grad(fn, args):
@@ -135,3 +118,28 @@ def random_categorical(logits, num_samples, seed):
   flat_cum_sum = cum_sum.reshape([-1, cum_sum.shape[-1]])
   flat_eta = eta.reshape([-1])
   return jax.vmap(_searchsorted)(flat_cum_sum, flat_eta).reshape(eta.shape).T
+
+
+def trace(state, fn, num_steps, **_):
+  """Implementation of `trace` operator, without the calling convention."""
+  # We need the shapes and dtypes of the untraced outputs of `fn`.
+  _, untraced_spec, _ = jax.eval_shape(
+      fn,
+      tf.nest.map_structure(lambda s: jax.ShapeDtypeStruct(s.shape, s.dtype),
+                            state))
+
+  def wrapper(state_untraced, _):
+    state, untraced, traced = fn(state_untraced[0])
+    return (state, untraced), traced
+
+  (state, untraced), traced = lax.scan(
+      wrapper,
+      (
+          state,
+          tf.nest.map_structure(lambda spec: np.zeros(spec.shape, spec.dtype),
+                                untraced_spec),
+      ),
+      xs=None,
+      length=num_steps,
+  )
+  return state, untraced, traced

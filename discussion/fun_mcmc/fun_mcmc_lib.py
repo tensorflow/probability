@@ -29,10 +29,6 @@ state = ...
 while not_done:
   state, extra = transition_operator(*state)
 ```
-
-`state` is allowed to be partially specified (i.e. have `None` elements), which
-the transition operator must impute when it returns the new state. See
-`call_transition_operator` for more details of the calling convention.
 """
 
 from __future__ import absolute_import
@@ -226,90 +222,34 @@ def trace(
         ),
     )
 
+  def combine_trace(traced, untraced):
+    # Reconstitute the structure returned by `trace_fn`, with leaves replaced
+    # with traced and untraced elements according to the trace_mask. This is the
+    # inverse operation of `split_trace`.
+    def _select(trace_mask, traced, untraced):
+      return traced if trace_mask else untraced
+
+    return util.map_tree_up_to(trace_mask, _select, trace_mask, traced,
+                               untraced)
+
   def wrapper(state):
     state, extra = util.map_tree(tf.convert_to_tensor,
                                  call_transition_operator(fn, state))
     trace_element = util.map_tree(tf.convert_to_tensor, trace_fn(state, extra))
-    return state, trace_element
+    traced, untraced = split_trace(trace_element)
+    return state, untraced, traced
 
   state = util.map_tree(lambda t: (t if t is None else tf.convert_to_tensor(t)),
                         state)
 
-  # JAX tracing/pre-compilation isn't as stable as TF's, so we won't use it to
-  # start.
-  if (backend.get_backend() != backend.TENSORFLOW or
-      any(e is None for e in util.flatten_tree(state)) or
-      tf.executing_eagerly()):
-    state, first_trace = wrapper(state)
-    first_traced, first_untraced = split_trace(first_trace)
+  state, untraced, traced = util.trace(
+      state=state,
+      fn=wrapper,
+      num_steps=num_steps,
+      parallel_iterations=parallel_iterations,
+  )
 
-    trace_arrays = util.map_tree(
-        lambda v: util.write_dynamic_array(  # pylint: disable=g-long-lambda
-            util.make_dynamic_array(
-                v.dtype, size=num_steps, element_shape=v.shape), 0, v),
-        first_traced)
-    start_idx = 1
-  else:
-    state_spec = util.map_tree(tf.TensorSpec.from_tensor, state)
-    # We need the shapes and dtypes of the outputs of `wrapper` function to
-    # create the `TensorArray`s etc., we can get it by pre-compiling the wrapper
-    # function.
-    wrapper = tf.function(autograph=False)(wrapper)
-    concrete_wrapper = wrapper.get_concrete_function(state_spec)
-    _, trace_dtypes = concrete_wrapper.output_dtypes
-    _, trace_shapes = concrete_wrapper.output_shapes
-    traced_dtypes, untraced_dtypes = split_trace(trace_dtypes)
-    traced_shapes, untraced_shapes = split_trace(trace_shapes)
-
-    trace_arrays = util.map_tree(
-        lambda dtype, shape: tf.TensorArray(  # pylint: disable=g-long-lambda
-            dtype,
-            size=num_steps,
-            element_shape=shape),
-        traced_dtypes,
-        traced_shapes)
-    first_untraced = util.map_tree(
-        lambda dtype, shape: tf.zeros(shape, dtype=dtype), untraced_dtypes,
-        untraced_shapes)
-    wrapper = lambda state: concrete_wrapper(*util.flatten_tree(state))
-    start_idx = 0
-
-  def body(i, state, trace_arrays, _):
-    state, trace_element = wrapper(state)
-    traced, untraced = split_trace(trace_element)
-    trace_arrays = util.map_tree(lambda a, v: util.write_dynamic_array(a, i, v),
-                                 trace_arrays, traced)
-    return i + 1, state, trace_arrays, untraced
-
-  def cond(i, *_):
-    return i < num_steps
-
-  _, state, trace_arrays, untraced = tf.while_loop(
-      cond=cond,
-      body=body,
-      loop_vars=(start_idx, state, trace_arrays, first_untraced),
-      parallel_iterations=parallel_iterations)
-
-  stacked_trace = util.map_tree(util.snapshot_dynamic_array, trace_arrays)
-
-  # TensorFlow often loses the static shape information.
-  if backend.get_backend() == backend.TENSORFLOW:
-    static_length = tf.get_static_value(num_steps)
-
-    def _merge_static_length(x):
-      x.set_shape(tf.TensorShape(static_length).concatenate(x.shape[1:]))
-      return x
-
-    stacked_trace = util.map_tree(_merge_static_length, stacked_trace)
-
-  # Reconstitute the structure returned by `trace_fn`, with leaves replaced with
-  # traced and untraced elements according to the trace_mask. This is the
-  # inverse operation of `split_trace`.
-  combined_trace = util.map_tree_up_to(
-      trace_mask, lambda m, traced, untraced: traced  # pylint: disable=g-long-lambda
-      if m else untraced, trace_mask, stacked_trace, untraced)
-
-  return state, combined_trace
+  return state, combine_trace(traced, untraced)
 
 
 def _tree_repr(tree: Any) -> Text:
@@ -626,11 +566,8 @@ def spliting_integrator_step(
   for i, c in idx_and_coefficients:
     # pylint: disable=cell-var-from-loop
     if i % 2 == 0:
-      if state_grads is None:
-        _, _, state_grads = call_potential_fn_with_grads(
-            target_log_prob_fn, state)
-      else:
-        state_grads = util.map_tree(tf.convert_to_tensor, state_grads)
+      # Update momentum.
+      state_grads = util.map_tree(tf.convert_to_tensor, state_grads)
 
       momentum = util.map_tree(lambda m, sg, s: m + c * sg * s, momentum,
                                state_grads, step_size)
@@ -638,6 +575,7 @@ def spliting_integrator_step(
       kinetic_energy, kinetic_energy_extra, momentum_grads = call_potential_fn_with_grads(
           kinetic_energy_fn, momentum)
     else:
+      # Update position.
       if momentum_grads is None:
         _, _, momentum_grads = call_potential_fn_with_grads(
             kinetic_energy_fn, momentum)
@@ -892,14 +830,6 @@ def metropolis_hastings_step(
     new_state: The chosen state.
     mh_extra: MetropolisHastingsExtra.
   """
-  # Impute the None's in the current state.
-  current_state = util.map_tree_up_to(
-      current_state,
-      lambda c, p: p  # pylint: disable=g-long-lambda
-      if c is None else c,
-      current_state,
-      proposed_state)
-
   current_state = util.map_tree(tf.convert_to_tensor, current_state)
   proposed_state = util.map_tree(tf.convert_to_tensor, proposed_state)
   energy_change = tf.convert_to_tensor(energy_change)
@@ -1090,9 +1020,6 @@ def hamiltonian_monte_carlo(
     hmc_state: HamiltonianMonteCarloState
     hmc_extra: HamiltonianMonteCarloExtra
   """
-  if any(e is None for e in util.flatten_tree(hmc_state)):
-    hmc_state = hamiltonian_monte_carlo_init(hmc_state.state,
-                                             target_log_prob_fn)
   state = hmc_state.state
   state_grads = hmc_state.state_grads
   target_log_prob = hmc_state.target_log_prob
@@ -1318,8 +1245,6 @@ def transition_kernel_wrapper(
     extra: An empty tuple.
   """
   flat_current_state = util.flatten_tree(current_state)
-  if kernel_results is None:
-    kernel_results = kernel.bootstrap_results(flat_current_state)
   flat_current_state, kernel_results = kernel.one_step(flat_current_state,
                                                        kernel_results)
   return (util.unflatten_tree(current_state,
@@ -1403,8 +1328,6 @@ def adam_step(adam_state: AdamState,
        Optimization. International Conference on Learning Representations
        2015, 1-15.
   """
-  if any(e is None for e in util.flatten_tree(adam_state)):
-    adam_state = adam_init(adam_state.state)
   state = adam_state.state
   m = adam_state.m
   v = adam_state.v
@@ -1530,9 +1453,6 @@ def random_walk_metropolis(
     rwm_state: RandomWalkMetropolisState
     rwm_extra: RandomWalkMetropolisExtra
   """
-  if any(e is None for e in util.flatten_tree(rwm_state)):
-    rwm_state = random_walk_metropolis_init(rwm_state.state, target_log_prob_fn)
-
   seed, sample_seed = util.split_seed(seed, 2)
   proposed_state, (proposal_extra,
                    log_proposed_bias) = proposal_fn(rwm_state.state,
