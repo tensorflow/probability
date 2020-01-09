@@ -445,6 +445,7 @@ exports_files(
         "numpy_signal.py",
         "numpy_test.py",
         "ops.py",
+        "private.py",
         "random_generators.py",
         "sets_lib.py",
         "sparse_lib.py",
