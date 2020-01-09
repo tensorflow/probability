@@ -307,7 +307,7 @@ def gather_params(draw):
       hps.integers(-rank + batch_dims, -1),
   ))
   elements = hps.integers(0, params.shape[axis] - 1)
-  indices_shape = shapes(min_dims=0)
+  indices_shape = shapes(min_dims=batch_dims + 1)
   batch_shape = params.shape[:batch_dims]
   indices = draw(single_arrays(dtype=np.int32, elements=elements,
                                shape=indices_shape,
