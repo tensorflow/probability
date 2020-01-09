@@ -45,7 +45,6 @@ py_library(
     deps = [
         # jax dep,
         # jax:stax dep,
-        # tensorflow dep,
     ],
 )
 

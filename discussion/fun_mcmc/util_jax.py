@@ -22,11 +22,9 @@ from __future__ import print_function
 import jax
 from jax import lax
 from jax import random
+from jax import tree_util
 from jax.experimental import stax
 import jax.numpy as np
-# TODO(siege): Switch to a JAX-specific nested structure API.
-import tensorflow.compat.v2 as tf
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'assert_same_shallow_tree',
@@ -44,27 +42,32 @@ __all__ = [
 
 def map_tree(fn, tree, *args):
   """Maps `fn` over the leaves of a nested structure."""
-  return tf.nest.map_structure(fn, tree, *args)
+  return tree_util.tree_multimap(fn, tree, *args)
 
 
 def flatten_tree(tree):
   """Flattens a nested structure to a list."""
-  return tf.nest.flatten(tree)
+  return tree_util.tree_flatten(tree)[0]
 
 
 def unflatten_tree(tree, xs):
   """Inverse operation of `flatten_tree`."""
-  return tf.nest.pack_sequence_as(tree, xs)
+  return tree_util.tree_unflatten(tree_util.tree_structure(tree), xs)
 
 
 def map_tree_up_to(shallow, fn, tree, *rest):
   """`map_tree` with recursion depth defined by depth of `shallow`."""
-  return nest.map_structure_up_to(shallow, fn, tree, *rest)
+  def wrapper(_, *rest):
+    return fn(*rest)
+
+  return tree_util.tree_multimap(wrapper, shallow, tree, *rest)
 
 
 def assert_same_shallow_tree(shallow, tree):
   """Asserts that `tree` has the same shallow structure as `shallow`."""
-  nest.assert_shallow_structure(shallow, tree)
+  # Do a dummy multimap for the side-effect of verifying that the structures are
+  # the same. This doesn't catch all the errors we actually care about, sadly.
+  map_tree_up_to(shallow, lambda *args: (), tree)
 
 
 def value_and_grad(fn, args):
@@ -124,9 +127,7 @@ def trace(state, fn, num_steps, **_):
   """Implementation of `trace` operator, without the calling convention."""
   # We need the shapes and dtypes of the untraced outputs of `fn`.
   _, untraced_spec, _ = jax.eval_shape(
-      fn,
-      tf.nest.map_structure(lambda s: jax.ShapeDtypeStruct(s.shape, s.dtype),
-                            state))
+      fn, map_tree(lambda s: jax.ShapeDtypeStruct(s.shape, s.dtype), state))
 
   def wrapper(state_untraced, _):
     state, untraced, traced = fn(state_untraced[0])
@@ -136,8 +137,8 @@ def trace(state, fn, num_steps, **_):
       wrapper,
       (
           state,
-          tf.nest.map_structure(lambda spec: np.zeros(spec.shape, spec.dtype),
-                                untraced_spec),
+          map_tree(lambda spec: np.zeros(spec.shape, spec.dtype),
+                   untraced_spec),
       ),
       xs=None,
       length=num_steps,

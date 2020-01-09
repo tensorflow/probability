@@ -247,7 +247,6 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     with self.assertRaisesRegexp(TypeError, 'A common solution is to adjust'):
       fun_mcmc.call_transition_operator(potential, 0.)
 
-  @_skip_on_jax  # JAX backend cant' catch this error yet.
   def testCallTransitionOperatorBadArgs(self):
 
     def potential(x, y, z):
