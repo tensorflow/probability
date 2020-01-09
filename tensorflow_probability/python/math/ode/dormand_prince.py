@@ -416,7 +416,7 @@ class DormandPrince(base.Solver):
   ):
     """Constructs dynamic assertions that validate input values to `_solve`."""
     assert_ops = []
-    if self._validate_args is None:
+    if not self._validate_args:
       return assert_ops
     if solution_times_by_solver:
       final_time = solution_times.final_time
