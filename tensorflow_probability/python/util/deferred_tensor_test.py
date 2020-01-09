@@ -146,7 +146,7 @@ class TransformedVariableTest(test_util.TestCase):
                    scale=tfp.util.TransformedVariable(
                        [1., 2.], tfb.Softplus(validate_args=True)))
     self.evaluate([v.initializer for v in d.trainable_variables])
-    self.assertAllEqual([1., 2.], self.evaluate(d.stddev()))
+    self.assertAllClose([1., 2.], self.evaluate(d.stddev()), atol=0., rtol=1e-5)
     with tf.control_dependencies([d.scale.assign_add([0.5, 1.])]):
       self.assertAllClose([1.5, 3.], self.evaluate(d.stddev()),
                           atol=0., rtol=1e-5)
