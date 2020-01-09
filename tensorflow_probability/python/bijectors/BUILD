@@ -61,6 +61,7 @@ multi_substrate_py_library(
         ":ffjord",
         ":fill_scale_tril",
         ":fill_triangular",
+        ":generalized_pareto",
         ":gumbel_cdf",
         ":identity",
         ":inline",
@@ -391,6 +392,22 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math:linalg",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "generalized_pareto",
+    srcs = ["generalized_pareto.py"],
+    deps = [
+        ":bijector",
+        ":chain",
+        ":scale",
+        ":shift",
+        ":sigmoid",
+        ":softplus",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1116,6 +1133,21 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "generalized_pareto_test",
+    size = "small",
+    srcs = ["generalized_pareto_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "gumbel_cdf_test",
     size = "small",
     srcs = ["gumbel_cdf_test.py"],
@@ -1570,6 +1602,8 @@ exports_files(
         "fill_scale_tril_test.py",
         "fill_triangular.py",
         "fill_triangular_test.py",
+        "generalized_pareto.py",
+        "generalized_pareto_test.py",
         "gumbel.py",
         "gumbel_cdf.py",
         "gumbel_cdf_test.py",

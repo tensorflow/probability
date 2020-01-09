@@ -149,6 +149,7 @@ multi_substrate_py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
@@ -508,6 +509,7 @@ multi_substrate_py_library(
     deps = [
         ":distribution",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:generalized_pareto",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
@@ -1585,6 +1587,7 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:bijector_test_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

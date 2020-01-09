@@ -186,10 +186,6 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
 EVENT_SPACE_BIJECTOR_IS_BROKEN = [
     'InverseGamma',  # TODO(b/143090143): Enable this when the bug is fixed.
                      # (Reciprocal(Softplus(x)) -> inf for small x)
-    'GeneralizedPareto',  # TODO(emilyaf): Enable this when the
-                          # `event_space_bijector` is checked in
-    'BatchReshape',    # TODO(emilyaf): Enable this when the
-                       # `event_space_bijector` is checked in
 ]
 
 # Vectorization can rewrite computations in ways that (apparently) lead to

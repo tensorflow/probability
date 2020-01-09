@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -253,17 +254,28 @@ class BatchReshape(distribution_lib.Distribution):
         extra_kwargs=kwargs)
 
   def _default_event_space_bijector(self):
-    return self.distribution._experimental_default_event_space_bijector()  # pylint: disable=protected-access
+    base_bijector = (
+        self.distribution._experimental_default_event_space_bijector())  # pylint: disable=protected-access
+    if base_bijector is None:
+      return None
+    inverse_event_shape = base_bijector.inverse_event_shape(self.event_shape)
+    inverse_event_shape_tensor = base_bijector.inverse_event_shape_tensor(
+        self.event_shape_tensor())
+    return _BatchReshapeBijector(
+        base_bijector,
+        self._call_reshape_input_output,
+        inverse_event_shape,
+        inverse_event_shape_tensor)
 
-  def _sample_shape(self, x):
+  def _sample_shape(self, x, event_shape, event_shape_tensor):
     """Computes graph and static `sample_shape`."""
     x_ndims = (
         tf.rank(x) if tensorshape_util.rank(x.shape) is None else
         tensorshape_util.rank(x.shape))
     event_ndims = (
-        tf.size(self.event_shape_tensor())
-        if tensorshape_util.rank(self.event_shape) is None else
-        tensorshape_util.rank(self.event_shape))
+        tf.size(event_shape_tensor)
+        if tensorshape_util.rank(event_shape) is None else
+        tensorshape_util.rank(event_shape))
     batch_ndims = (
         tf.size(self._batch_shape_unexpanded)
         if tensorshape_util.rank(self.batch_shape) is None else
@@ -279,17 +291,36 @@ class BatchReshape(distribution_lib.Distribution):
       sample_shape = tf.shape(x)[:sample_ndims]
     return sample_shape, static_sample_shape
 
-  def _call_reshape_input_output(self, fn, x, extra_kwargs=None):
+  def _call_reshape_input_output(
+      self, fn, x, input_event_shape=None, output_event_shape=None,
+      keep_event_dims=False, extra_kwargs=None):
     """Calls `fn`, appropriately reshaping its input `x` and output."""
     # Note: we take `extra_kwargs` as a dict rather than `**extra_kwargs`
     # because it is possible the user provided extra kwargs would itself
     # have `fn` and/or `x` as a key.
-    sample_shape, static_sample_shape = self._sample_shape(x)
+    if input_event_shape is None:
+      static_input_event_shape, input_event_shape_tensor = (
+          self.event_shape, self.event_shape_tensor())
+    else:
+      static_input_event_shape, input_event_shape_tensor = input_event_shape
+
+    if output_event_shape is None:
+      if input_event_shape is None:
+        static_output_event_shape, output_event_shape_tensor = (
+            static_input_event_shape, input_event_shape_tensor)
+      else:
+        static_output_event_shape, output_event_shape_tensor = (
+            self.event_shape, self.event_shape_tensor())
+    else:
+      static_output_event_shape, output_event_shape_tensor = output_event_shape
+
+    sample_shape, static_sample_shape = self._sample_shape(
+        x, static_input_event_shape, input_event_shape_tensor)
     old_shape = tf.concat(
         [
             sample_shape,
             self.distribution.batch_shape_tensor(),
-            self.event_shape_tensor(),
+            input_event_shape_tensor,
         ],
         axis=0)
     x_reshape = tf.reshape(x, old_shape)
@@ -299,11 +330,16 @@ class BatchReshape(distribution_lib.Distribution):
             sample_shape,
             self._batch_shape_unexpanded,
         ], axis=0)
+    if keep_event_dims:
+      new_shape = tf.concat([new_shape, output_event_shape_tensor], axis=0)
     result = tf.reshape(result, new_shape)
     if (tensorshape_util.rank(static_sample_shape) is not None and
         tensorshape_util.rank(self.batch_shape) is not None):
       new_shape = tensorshape_util.concatenate(static_sample_shape,
                                                self.batch_shape)
+      if keep_event_dims:
+        new_shape = tensorshape_util.concatenate(
+            new_shape, static_output_event_shape)
       tensorshape_util.set_shape(result, new_shape)
     return result
 
@@ -444,3 +480,72 @@ def validate_init_args_statically(distribution, batch_shape):
         tf.compat.dimension_value(dim) is not None and
         tf.compat.dimension_value(dim) < 1 for dim in batch_shape_static):
       raise ValueError('`batch_shape` elements must be >=-1.')
+
+
+class _BatchReshapeBijector(bijector_lib.Bijector):
+  """The `default_event_shape_bijector` for `tfd.BatchReshape`."""
+
+  def __init__(
+      self,
+      base_bijector,
+      reshape_fn,
+      static_inverse_event_shape,
+      inverse_event_shape_tensor):
+    self._base_bijector = base_bijector
+    self._reshape_fn = reshape_fn
+    self._inverse_event_shapes = (
+        static_inverse_event_shape, inverse_event_shape_tensor)
+    super(_BatchReshapeBijector, self).__init__(
+        is_constant_jacobian=base_bijector.is_constant_jacobian,
+        validate_args=base_bijector.validate_args,
+        dtype=base_bijector.dtype,
+        forward_min_event_ndims=base_bijector.forward_min_event_ndims,
+        inverse_min_event_ndims=base_bijector.inverse_min_event_ndims,
+        name='batch_reshape_bijector')
+
+  def _is_increasing(self):
+    return self._base_bijector.is_increasing()
+
+  def _forward(self, x):
+    return self._reshape_fn(
+        self._base_bijector.forward,
+        x,
+        input_event_shape=self._inverse_event_shapes,
+        keep_event_dims=True)
+
+  def _inverse(self, y):
+    return self._reshape_fn(
+        self._base_bijector.inverse,
+        y,
+        output_event_shape=self._inverse_event_shapes,
+        keep_event_dims=True)
+
+  def _forward_log_det_jacobian(self, x):
+    event_ndims = self._maybe_get_static_event_ndims(
+        self.forward_min_event_ndims)
+    return self._reshape_fn(
+        lambda x_: self._base_bijector.forward_log_det_jacobian(  # pylint: disable=g-long-lambda
+            x_, event_ndims=event_ndims),
+        x,
+        input_event_shape=self._inverse_event_shapes)
+
+  def _inverse_log_det_jacobian(self, y):
+    event_ndims = self._maybe_get_static_event_ndims(
+        self.forward_min_event_ndims)
+    return self._reshape_fn(
+        lambda y_: self._base_bijector.inverse_log_det_jacobian(  # pylint: disable=g-long-lambda
+            y_, event_ndims=event_ndims),
+        y,
+        output_event_shape=self._inverse_event_shapes)
+
+  def _forward_event_shape_tensor(self, input_shape):
+    return self._base_bijector.forward_event_shape_tensor(input_shape)
+
+  def _forward_event_shape(self, input_shape):
+    return self._base_bijector.forward_event_shape(input_shape)
+
+  def _inverse_event_shape_tensor(self, output_shape):
+    return self._base_bijector.inverse_event_shape_tensor(output_shape)
+
+  def _inverse_event_shape(self, output_shape):
+    return self._base_bijector.inverse_event_shape(output_shape)

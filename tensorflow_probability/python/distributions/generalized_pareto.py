@@ -23,6 +23,7 @@ import functools
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import generalized_pareto as generalized_pareto_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -290,13 +291,13 @@ class GeneralizedPareto(distribution.Distribution):
   def _entropy(self):
     return tf.math.log(self.scale) + self.concentration + 1
 
-  # TODO(b/145620027): Determine the correct bijector. Might have to
-  # implement a new bijector that returns shifted softmax if
-  # concentration >= 0, shifted/scaled sigmoid if concentration < 0.
-  # valid = (x >= loc) & ((concentration >= 0) |
-  #                   (x <= loc - scale / concentration))
-  # def _default_event_space_bijector(self):
-    # return
+  # TODO(b/145620027): Finalize choice of bijector.
+  def _default_event_space_bijector(self):
+    return generalized_pareto_bijector.GeneralizedPareto(
+        self.loc,
+        scale=self.scale,
+        concentration=self.concentration,
+        validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

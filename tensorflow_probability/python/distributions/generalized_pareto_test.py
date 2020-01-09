@@ -124,6 +124,18 @@ class GeneralizedParetoTest(test_util.TestCase):
         'less than or equal to `loc - scale / concentration`'):
       self.evaluate(dist.cdf([1.5, 2.3, 6.]))
 
+  def testSupportBijectorOutsideRange(self):
+    loc = np.array([1., 2., 5.]).astype(np.float32)
+    scale = 2.
+    concentration = np.array([-5., -2., 1.]).astype(np.float32)
+    dist = tfd.GeneralizedPareto(
+        loc=loc, scale=scale, concentration=concentration, validate_args=True)
+
+    x = np.array([1. - 1e-6, 3.1, 4.9]).astype(np.float32)
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
+
   @hp.given(generalized_paretos(batch_shape=[]))
   @tfp_hps.tfp_hp_settings()
   def testCDF(self, dist):

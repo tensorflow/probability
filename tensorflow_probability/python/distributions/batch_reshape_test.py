@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
@@ -606,10 +607,11 @@ class _BatchReshapeTest(object):
       with tf.control_dependencies([batch_shape.assign([-1, -1])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
-  def test_default_event_space_bijector(self):
-    dist = tfd.Chi2([1., 2., 3., 6.], validate_args=True)
+  def test_default_event_space_bijector_shape(self):
+    dist = tfd.Uniform(low=[1., 2., 3., 6.], high=10., validate_args=True)
     batch_shape = [2, 2, 1]
-    reshape_dist = tfd.BatchReshape(dist, batch_shape, validate_args=True)
+    reshape_dist = tfd.BatchReshape(
+        dist, batch_shape=batch_shape, validate_args=True)
     x = self.evaluate(
         dist._experimental_default_event_space_bijector()(
             10. * tf.ones(dist.batch_shape)))
@@ -617,6 +619,36 @@ class _BatchReshapeTest(object):
         reshape_dist._experimental_default_event_space_bijector()(
             10. * tf.ones(reshape_dist.batch_shape)))
     self.assertAllEqual(tf.reshape(x, batch_shape), x_reshape)
+
+  def test_default_event_space_bijector_scalar_congruency(self):
+    dist = tfd.Triangular(low=2., high=10., peak=7., validate_args=True)
+    reshape_dist = tfd.BatchReshape(dist, batch_shape=(), validate_args=True)
+    eps = 1e-6
+    bijector_test_util.assert_scalar_congruency(
+        reshape_dist._experimental_default_event_space_bijector(),
+        lower_x=2+eps, upper_x=10-eps, eval_func=self.evaluate)
+
+  def test_default_event_space_bijector_bijective_and_finite(self):
+    batch_shape = [5, 1, 4]
+    batch_size = np.prod(batch_shape)
+    low = tf.Variable(
+        np.linspace(-5., 5., batch_size).astype(self.dtype),
+        shape=(batch_size,) if self.is_static_shape else None)
+    dist = tfd.Uniform(
+        low=low,
+        high=30.,
+        validate_args=True)
+    reshape_dist = tfd.BatchReshape(
+        dist, batch_shape=batch_shape, validate_args=True)
+    x = np.linspace(
+        -10., 10., batch_size).astype(self.dtype).reshape(batch_shape)
+    y = np.linspace(
+        5., 30 - 1e-4, batch_size).astype(self.dtype).reshape(batch_shape)
+
+    self.evaluate(low.initializer)
+    bijector_test_util.assert_bijective_and_finite(
+        reshape_dist._experimental_default_event_space_bijector(),
+        x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-4)
 
 
 @test_util.test_all_tf_execution_regimes
