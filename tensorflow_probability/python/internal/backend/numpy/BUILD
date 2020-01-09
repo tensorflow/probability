@@ -447,6 +447,7 @@ exports_files(
         "ops.py",
         "private.py",
         "random_generators.py",
+        "raw_ops.py",
         "sets_lib.py",
         "sparse_lib.py",
         "tensor_array_ops.py",
