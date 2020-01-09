@@ -47,6 +47,7 @@ FILENAMES = [
     "ops",
     "private",
     "random_generators",
+    "raw_ops",
     "sets_lib",
     "sparse_lib",
     "tensor_array_ops",

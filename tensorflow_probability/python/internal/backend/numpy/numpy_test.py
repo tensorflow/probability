@@ -45,6 +45,12 @@ ALLOW_INFINITY = False
 JAX_MODE = False
 
 
+class Kwargs(dict):
+  """Sentinel to indicate a single item arg is actually a **kwargs."""
+  # See usage with raw_ops.MatrixDiagPartV2.
+  pass
+
+
 def _add_jax_prng_key_as_seed():
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
   return dict(seed=jaxrand.PRNGKey(123))
@@ -472,6 +478,11 @@ NUMPY_TEST_CASES = [
     TestCase('linalg.cholesky', [pd_matrices()]),
     TestCase('linalg.lu', [nonsingular_matrices()]),
     TestCase('linalg.diag_part', [single_arrays(shape=shapes(min_dims=2))]),
+    TestCase('raw_ops.MatrixDiagPartV2', [
+        hps.fixed_dictionaries(dict(
+            input=single_arrays(shape=shapes(min_dims=2, min_side=2)),
+            k=hps.sampled_from([-1, 0, 1]),
+            padding_value=hps.just(0.))).map(Kwargs)]),
     TestCase('identity', [single_arrays()]),
 
     # ArgSpec(args=['input', 'num_lower', 'num_upper', 'name'], varargs=None,
@@ -612,8 +623,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
              [single_arrays(elements=non_zero_floats(-1e4, 1e4))]),
     TestCase('math.erf', [single_arrays()]),
     TestCase('math.erfc', [single_arrays()]),
-    TestCase('math.exp',
-             [single_arrays(elements=floats(min_value=-1e3, max_value=1e3))]),
+    TestCase('math.exp',  # TODO(b/147394924): max_value=1e3
+             [single_arrays(elements=floats(min_value=-1e3, max_value=85))]),
     TestCase('math.expm1',
              [single_arrays(elements=floats(min_value=-1e3, max_value=1e3))]),
     TestCase('math.floor', [single_arrays()]),
@@ -718,8 +729,9 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
 def _maybe_convert_to_tensors(args):
   # Ensures we go from JAX np -> original np -> tf.Tensor. (no-op for non-JAX.)
   convert = lambda a: tf.convert_to_tensor(onp.array(a))
-  return tuple(
-      convert(arg) if isinstance(arg, np.ndarray) else arg for arg in args)
+  return tf.nest.map_structure(
+      lambda arg: convert(arg) if isinstance(arg, np.ndarray) else arg,
+      args)
 
 
 class NumpyTest(test_util.TestCase):
@@ -815,9 +827,15 @@ class NumpyTest(test_util.TestCase):
         # If `args` is a single item, put it in a tuple
         if isinstance(args, np.ndarray) or tf.is_tensor(args):
           args = (args,)
+        kwargs = {}
+        if isinstance(args, Kwargs):
+          kwargs = args
+          args = ()
         tensorflow_value = self.evaluate(
-            tf_fn(*_maybe_convert_to_tensors(args)))
-        kwargs = jax_kwargs() if JAX_MODE else {}
+            tf_fn(*_maybe_convert_to_tensors(args),
+                  **_maybe_convert_to_tensors(kwargs)))
+
+        kwargs.update(jax_kwargs() if JAX_MODE else {})
         numpy_value = np_fn(*args, **kwargs)
         if assert_shape_only:
 

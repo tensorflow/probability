@@ -1484,9 +1484,9 @@ CONSTRAINTS = {
     'Zipf.power':
         tfp_hps.softplus_plus_eps(1 + 1e-6),  # strictly > 1
     'Geometric.logits':  # TODO(b/128410109): re-enable down to -50
-        # Capping at 16. so that probability is less than 1, and entropy is
-        # defined.
-        lambda x: tf.minimum(tf.maximum(x, -16.), 16.),  # works around the bug
+        # Capping at 15. so that probability is less than 1, and entropy is
+        # defined. b/147394924
+        lambda x: tf.minimum(tf.maximum(x, -16.), 15.),  # works around the bug
     'Geometric.probs':
         constrain_between_eps_and_one_minus_eps(),
     'Binomial.probs':

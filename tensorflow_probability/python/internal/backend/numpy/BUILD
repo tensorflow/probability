@@ -48,6 +48,7 @@ py_library(
         ":ops",
         ":private",
         ":random_generators",
+        ":raw_ops",
         ":sets_lib",
         ":sparse_lib",
         ":tensor_array_ops",
@@ -72,6 +73,7 @@ py_library(
     srcs = ["control_flow.py"],
     deps = [
         ":_utils",
+        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -271,6 +273,19 @@ py_test(
 py_library(
     name = "random_generators",
     srcs = ["random_generators.py"],
+    deps = [
+        ":_utils",
+        ":numpy_array",
+        ":numpy_math",
+        ":ops",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "raw_ops",
+    srcs = ["raw_ops.py"],
     deps = [
         ":_utils",
         ":numpy_array",
