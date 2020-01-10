@@ -210,9 +210,9 @@ class SeedStream(object):
 
   def _call_jax(self):
     """A __call__ impl for JAX `PRNGKey`s."""
-    if self._seed is None:
-      return None
     self._counter += 1
+    if self._seed is None:
+      raise ValueError('Must provide a PRNGKey for JAX SeedStream.')
     composite = str((self._salt, self._counter)).encode('utf-8')
     import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
     return jaxrand.fold_in(
