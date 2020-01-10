@@ -396,7 +396,7 @@ class JointDistribution(distribution_lib.Distribution):
   def _map_measure_over_dists(self, attr, value):
     if any(x is None for x in tf.nest.flatten(value)):
       raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
-    ds, xs = self._call_flat_sample_distributions(value=value)
+    ds, xs = self._call_flat_sample_distributions(value=value, seed=42)
     return maybe_check_wont_broadcast(
         (getattr(d, attr)(x) for d, x in zip(ds, xs)),
         self.validate_args)

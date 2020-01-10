@@ -1695,7 +1695,7 @@ multi_substrate_py_test(
     srcs = [
         "cholesky_lkj_test.py",
     ],
-    jax_tags = ["notap"],
+    jax_size = "large",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -1738,7 +1738,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "dirichlet_test",
     srcs = ["dirichlet_test.py"],
-    jax_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2285,7 +2284,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "mvn_tril_test",
     srcs = ["mvn_tril_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 5,
     tags = ["nomsan"],
