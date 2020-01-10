@@ -43,6 +43,7 @@ from tensorflow.python.autograph.converters import return_statements
 from tensorflow.python.autograph.core import converter
 from tensorflow.python.autograph.core import naming
 from tensorflow.python.autograph.pyct import anno
+from tensorflow.python.autograph.pyct import gast_util
 from tensorflow.python.autograph.pyct import inspect_utils
 from tensorflow.python.autograph.pyct import parser
 from tensorflow.python.autograph.pyct import qual_names
@@ -140,36 +141,6 @@ def _parse_and_analyze(f, autobatch_functions):
   return node, ctx
 
 
-def _is_literal(node):
-  """Detects whether the given node is a literal.
-
-  This is surprisingly difficult to do robustly across versions of Python and
-  gast, as the parsing of constants has changed, if I may, constantly.
-
-  Args:
-    node: The node whose status to check.
-
-  Returns:
-    literal: A Python `bool` giving whether the node is constant or not.
-  """
-  try:
-    # TODO(b/140808434): Once we or TF decide to roll forward to gast 0.3, we
-    # won't need this clause.
-    # gast pre-0.3
-    literals = (gast.Num, gast.Str, gast.Bytes, gast.Ellipsis,
-                gast.NameConstant)
-    if isinstance(node, literals):
-      return True
-  except AttributeError:
-    # gast 0.3+
-    if isinstance(node, gast.Constant):
-      return True
-  # Python 2
-  if isinstance(node, gast.Name) and node.id in ['True', 'False', 'None']:
-    return True
-  return False
-
-
 class _AutoBatchingTransformer(transformer.Base):
   """A subclass of `pyct.transformer.Base` implementing auto-batching.
 
@@ -232,7 +203,7 @@ class _AutoBatchingTransformer(transformer.Base):
       local_declarations.append(templates.replace(
           'target = _tfp_autobatching_context_.param(name=target_name)',
           target=arg.id,
-          target_name=gast.Str(arg.id))[0])
+          target_name=gast_util.Str(arg.id))[0])
 
     # Visit the content of the function
     node = self.generic_visit(node)
@@ -246,8 +217,9 @@ class _AutoBatchingTransformer(transformer.Base):
     # the auto-batching `ProgramBuilder` and the `instruction.Function`s that
     # may be called in the body) can be passed in through regular Python
     # variable references.
-    callable_function_names = [gast.Name(n, ctx=gast.Store(), annotation=None)
-                               for n in self.known_functions]
+    callable_function_names = [
+        gast_util.Name(n, ctx=gast.Store(), annotation=None)
+        for n in self.known_functions]
     node = templates.replace(
         '''
         def func(_tfp_autobatching_context_,
@@ -281,7 +253,7 @@ class _AutoBatchingTransformer(transformer.Base):
     """
     # If we're assigning a constant value, use the `ProgramBuilder.const`
     # shorthand.
-    if _is_literal(node.value):
+    if gast_util.is_literal(node.value):
       # Emit `_tfp_autobatching_context_.const`
       node = templates.replace(
           'target = _tfp_autobatching_context_.const(value)',
@@ -359,7 +331,7 @@ class _AutoBatchingTransformer(transformer.Base):
     if isinstance(node, (gast.Name, qual_names.QN)):
       return templates.replace_as_expression(
           '_tfp_autobatching_context_.var.name', name=node)
-    elif _is_literal(node):
+    elif gast_util.is_literal(node):
       raise ValueError('TODO(axch): Support literals, not just variables')
     else:
       msg = 'Expected trivial node, got {}.  Is the input in A-normal form?'
@@ -389,7 +361,7 @@ class _AutoBatchingTransformer(transformer.Base):
     # NOTE: this is a little hackery to make sure that prepending works
     # properly. Wrapping a list of statements in a Module ensures
     # that the AST-visiting machinery won't choke on, e.g., a list.
-    then = self.generic_visit(gast.Module(node.body)).body
+    then = self.generic_visit(gast_util.Module(node.body)).body
 
     # Construct header (goes in the `with`s).
     then_header = templates.replace_as_expression(
@@ -402,7 +374,7 @@ class _AutoBatchingTransformer(transformer.Base):
         'with header: body', header=then_header, body=then)[0]
 
     if node.orelse:
-      orelse = self.generic_visit(gast.Module(node.orelse)).body
+      orelse = self.generic_visit(gast_util.Module(node.orelse)).body
       orelse_header = templates.replace_as_expression(
           '_tfp_autobatching_context_.else_()')
       orelse_node = templates.replace(
