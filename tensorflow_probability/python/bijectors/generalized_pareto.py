@@ -21,7 +21,6 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import chain as chain_bijector
-from tensorflow_probability.python.bijectors import scale as scale_bijector
 from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
@@ -91,18 +90,11 @@ class GeneralizedPareto(bijector_lib.Bijector):
     return self._concentration
 
   def _negative_concentration_bijector(self):
-    # Constructed dynamically so that `scale * reciprocal(concentration)` is
+    # Constructed dynamically so that `loc + scale / concentration` is
     # tape-safe.
-    return chain_bijector.Chain([
-        shift_bijector.Shift(shift=self.loc, validate_args=self.validate_args),
-        # TODO(b/146568897): Resolve numerical issues by implementing a new
-        # bijector instead of multiplying `scale` by `(1. - 1e-6)`.
-        scale_bijector.Scale(
-            scale=-(self.scale *
-                    tf.math.reciprocal(self.concentration) * (1. - 1e-6)),
-            validate_args=self.validate_args),
-        sigmoid_bijector.Sigmoid(validate_args=self.validate_args)
-    ], validate_args=self.validate_args)
+    high = self.loc + tf.math.abs(self.scale / self.concentration)
+    return sigmoid_bijector.Sigmoid(
+        low=self.loc, high=high, validate_args=self.validate_args)
 
   def _forward(self, x):
     return tf.where(self._concentration < 0.,

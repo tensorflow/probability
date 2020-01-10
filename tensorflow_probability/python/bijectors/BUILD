@@ -401,7 +401,6 @@ multi_substrate_py_library(
     deps = [
         ":bijector",
         ":chain",
-        ":scale",
         ":shift",
         ":sigmoid",
         ":softplus",

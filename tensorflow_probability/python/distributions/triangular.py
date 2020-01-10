@@ -23,16 +23,12 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import chain as chain_bijector
-from tensorflow_probability.python.bijectors import scale as scale_bijector
-from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
@@ -272,20 +268,8 @@ class Triangular(distribution.Distribution):
             tf.math.squared_difference(peak, low)) / 36.
 
   def _default_event_space_bijector(self):
-    # TODO(b/146568897): Resolve numerical issues by implementing a new bijector
-    # instead of multiplying `scale` by `(1. - 1e-6)`.
-    if tensor_util.is_ref(self.low) or tensor_util.is_ref(self.high):
-      scale = DeferredTensor(
-          self.high,
-          lambda x: (x - self.low) * (1. - 1e-6),
-          shape=tf.broadcast_static_shape(self.low.shape, self.high.shape))
-    else:
-      scale = (self.high - self.low) * (1. - 1e-6)
-    return chain_bijector.Chain([
-        shift_bijector.Shift(shift=self.low, validate_args=self.validate_args),
-        scale_bijector.Scale(scale=scale, validate_args=self.validate_args),
-        sigmoid_bijector.Sigmoid(validate_args=self.validate_args)
-    ], validate_args=self.validate_args)
+    return sigmoid_bijector.Sigmoid(
+        low=self.low, high=self.high, validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

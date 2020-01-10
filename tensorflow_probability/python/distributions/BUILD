@@ -1083,7 +1083,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
-        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
 
@@ -1304,15 +1303,11 @@ multi_substrate_py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:chain",
-        "//tensorflow_probability/python/bijectors:scale",
-        "//tensorflow_probability/python/bijectors:shift",
         "//tensorflow_probability/python/bijectors:sigmoid",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
-        "//tensorflow_probability/python/util:deferred_tensor",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -1340,16 +1335,12 @@ multi_substrate_py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:chain",
-        "//tensorflow_probability/python/bijectors:scale",
-        "//tensorflow_probability/python/bijectors:shift",
         "//tensorflow_probability/python/bijectors:sigmoid",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:special_math",
-        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
 
@@ -1361,15 +1352,11 @@ multi_substrate_py_library(
         ":kullback_leibler",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:chain",
-        "//tensorflow_probability/python/bijectors:scale",
-        "//tensorflow_probability/python/bijectors:shift",
         "//tensorflow_probability/python/bijectors:sigmoid",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
-        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
 

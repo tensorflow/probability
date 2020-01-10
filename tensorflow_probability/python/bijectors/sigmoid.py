@@ -69,9 +69,9 @@ class Sigmoid(bijector.Bijector):
       elif low is not None and high is not None:
         self._is_standard_sigmoid = False
       else:
-        raise ValueError('Either both or neither of `low` and `high` must be '
-                         'passed. Received `low={}`, high={}`'.format(low, high)
-                        )
+        raise ValueError(
+            'Either both or neither of `low` and `high` must be passed. '
+            'Received `low={}`, `high={}`'.format(low, high))
 
       self._low = tensor_util.convert_nonref_to_tensor(low)
       self._high = tensor_util.convert_nonref_to_tensor(high)

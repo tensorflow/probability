@@ -375,21 +375,6 @@ class _TriangularTest(object):
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 
-  def testDeferredBijectorParameters(self):
-    low = tf.Variable(2.)
-    high = tf.Variable(7.)
-    peak = 3.
-    dist = tfd.Triangular(low, high, peak, validate_args=True)
-
-    shift = dist._experimental_default_event_space_bijector().bijectors[0].shift
-    scale = dist._experimental_default_event_space_bijector().bijectors[1].scale
-    self.evaluate([low.initializer, high.initializer])
-    self.assertIsNone(tf.get_static_value(shift))
-    self.assertIsNone(tf.get_static_value(scale))
-    self.assertAllClose(
-        self.evaluate(tf.convert_to_tensor(scale)), 5., rtol=1e-5, atol=0)
-    self.assertEqual(self.evaluate(tf.convert_to_tensor(shift)), 2.)
-
 
 @test_util.test_all_tf_execution_regimes
 class TriangularTestStaticShape(test_util.TestCase, _TriangularTest):
