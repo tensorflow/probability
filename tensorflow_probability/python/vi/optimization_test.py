@@ -92,7 +92,7 @@ class OptimizationTests(test_util.TestCase):
 
     # The Q family is a joint distribution that can express any 2D MVN.
     b = tf.Variable([0., 0.])
-    l = tfp.util.TransformedVariable(tf.eye(2), tfb.ScaleTriL())
+    l = tfp.util.TransformedVariable(tf.eye(2), tfb.FillScaleTriL())
     def trainable_q_fn():
       z = yield tfd.JointDistributionCoroutine.Root(
           tfd.Normal(b[0], l[0, 0], name='z'))

@@ -165,7 +165,7 @@ class NormalTest(test_util.TestCase):
     prior_mean = tf.ones([num_latents])
     prior_scale = tf.eye(num_latents) * 5.
     likelihood_scale = tf.linalg.LinearOperatorLowerTriangular(
-        tfb.ScaleTriL().forward(
+        tfb.FillScaleTriL().forward(
             tf.random.normal(
                 shape=batch_shape + [int(num_outputs * (num_outputs + 1) / 2)],
                 seed=strm())))
