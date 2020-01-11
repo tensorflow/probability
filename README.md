@@ -183,7 +183,7 @@ environment.
   or answer technical questions.
 * [GitHub](https://github.com/tensorflow/probability/issues): Report bugs or
   make feature requests.
-* [TensorFlow Blog](https://medium.com/tensorflow): Stay up to date on content
+* [TensorFlow Blog](https://blog.tensorflow.org/): Stay up to date on content
   from the TensorFlow team and best articles from the community.
 * [Youtube Channel](http://youtube.com/tensorflow/): Follow TensorFlow shows.
 * [tfprobability@tensorflow.org](https://groups.google.com/a/tensorflow.org/forum/#!forum/tfprobability):
