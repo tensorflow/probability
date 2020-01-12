@@ -31,6 +31,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions.internal import slicing
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
@@ -1080,6 +1081,11 @@ class Distribution(_BaseDistribution):
     with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name='value', dtype_hint=self.dtype)
+      if self.validate_args:
+        value = distribution_util.with_dependencies([
+            assert_util.assert_less_equal(value, tf.cast(1, value.dtype)),
+            assert_util.assert_greater_equal(value, tf.cast(0, value.dtype))
+        ], value)
       return self._quantile(value, **kwargs)
 
   def quantile(self, value, name='quantile', **kwargs):
