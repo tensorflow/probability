@@ -23,7 +23,6 @@ NO_REWRITE_NEEDED = [
     "internal:tensorshape_util",
     "layers",
     "math:diag_jacobian",
-    "math:interpolation",
     "math:minimize",
     "math:root_search",
     "math:sparse",

@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy.ops import convert_to_tensor
+from tensorflow_probability.python.internal.backend.numpy.ops import is_tensor
 from tensorflow_probability.python.internal.backend.numpy.ops import Tensor
 
 
@@ -254,8 +255,10 @@ assert_rank_in = utils.copy_docstring(
     tf.debugging.assert_rank_in,
     _assert_rank_in)
 
-
 check_numerics = utils.copy_docstring(
     tf.debugging.check_numerics,
-    lambda x, *_, **__: x
-)
+    lambda x, *_, **__: x)
+
+is_numeric_tensor = utils.copy_docstring(
+    tf.debugging.is_numeric_tensor,
+    lambda x: is_tensor(x) and np.issubdtype(x.dtype, np.number))

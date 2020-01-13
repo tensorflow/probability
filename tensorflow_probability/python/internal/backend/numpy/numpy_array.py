@@ -91,6 +91,7 @@ def _gather(  # pylint: disable=unused-argument
     batch_dims=0,
     name=None):
   """gather."""
+  indices = ops.convert_to_tensor(indices, dtype_hint=np.int32)
   if validate_indices is not None:
     raise NotImplementedError(
         'Argument `validate_indices != None` is currently unimplemented.')
@@ -107,7 +108,7 @@ def _gather(  # pylint: disable=unused-argument
     take = lambda params, indices: np.take(params, indices,  # pylint: disable=g-long-lambda
                                            axis=axis - batch_dims)
     take = functools.reduce(
-        lambda g, f: f(g), [jax.vmap] * batch_dims,
+        lambda g, f: f(g), [jax.vmap] * int(batch_dims),
         take
     )
     return take(params, indices)
@@ -131,6 +132,7 @@ def _gather_nd(  # pylint: disable=unused-argument
     batch_dims=0,
     name=None):
   """gather_nd."""
+  indices = ops.convert_to_tensor(indices, dtype_hint=np.int32)
   if batch_dims < 0:
     raise NotImplementedError('Negative `batch_dims` is currently unsupported.')
   if not JAX_MODE and batch_dims > 0:
@@ -139,7 +141,7 @@ def _gather_nd(  # pylint: disable=unused-argument
   gather_nd_ = _gather_nd_single
   if JAX_MODE:
     gather_nd_ = functools.reduce(
-        lambda g, f: f(g), [jax.vmap] * batch_dims,
+        lambda g, f: f(g), [jax.vmap] * int(batch_dims),
         gather_nd_
     )
   return gather_nd_(params, indices)

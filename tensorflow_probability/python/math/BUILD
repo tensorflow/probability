@@ -128,7 +128,7 @@ multi_substrate_py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "interpolation",
     srcs = [
         "interpolation.py",
@@ -143,10 +143,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "interpolation_test",
     size = "small",
     srcs = ["interpolation_test.py"],
+    jax_size = "medium",
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
