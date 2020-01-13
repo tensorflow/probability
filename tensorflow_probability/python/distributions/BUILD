@@ -2114,6 +2114,7 @@ multi_substrate_py_test(
     srcs = [
         "lkj_test.py",
     ],
+    jax_size = "large",
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
@@ -2692,6 +2693,7 @@ multi_substrate_py_test(
     name = "von_mises_test",
     size = "medium",
     srcs = ["von_mises_test.py"],
+    jax_size = "large",
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
@@ -2707,6 +2709,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "wishart_test",
     srcs = ["wishart_test.py"],
+    jax_size = "large",
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
