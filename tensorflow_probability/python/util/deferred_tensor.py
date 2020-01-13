@@ -488,3 +488,17 @@ class TransformedVariable(DeferredTensor):
         use_locking=use_locking,
         name=name,
         read_value=read_value)
+
+
+if JAX_MODE:
+
+  def DeferredTensor(pretransformed_input, transform_fn,  # pylint: disable=function-redefined,invalid-name
+                     dtype=None, shape='None', name=None):  # pylint: disable=unused-argument
+    # DeferredTensor is used to address tape-safety issues in TF2
+    # which do not exist in the JAX backend
+    # so it is safe to evaluate the function immediately
+    return transform_fn(pretransformed_input)
+
+  def TransformedVariable(initial_value, bijector,  # pylint: disable=unused-argument,function-redefined,invalid-name
+                          dtype=None, name=None, **kwargs):  # pylint: disable=unused-argument
+    return DeferredTensor(initial_value, bijector)
