@@ -569,8 +569,8 @@ class JointDistributionSequentialTest(test_util.TestCase):
             tfd.Exponential(2),
         ],
         validate_args=True)
-    self.assertTrue(isinstance(b, tfp.bijectors.Bijector)
-                    for b in joint._experimental_default_event_space_bijector())
+    for b in joint._experimental_default_event_space_bijector():
+      self.assertIsInstance(b, tfp.bijectors.Bijector)
 
     joint = tfd.JointDistributionSequential(
         [

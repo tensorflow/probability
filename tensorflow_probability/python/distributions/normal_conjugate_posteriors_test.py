@@ -44,7 +44,7 @@ class NormalTest(test_util.TestCase):
           prior=prior, scale=sigma, s=s, n=n)
 
       # Smoke test
-      self.assertTrue(isinstance(posterior, tfd.Normal))
+      self.assertIsInstance(posterior, tfd.Normal)
       posterior_log_pdf = self.evaluate(posterior.log_prob(x))
       self.assertEqual(posterior_log_pdf.shape, (6,))
 
@@ -63,7 +63,7 @@ class NormalTest(test_util.TestCase):
           prior=prior, scale=sigma, s=s, n=n)
 
       # Smoke test
-      self.assertTrue(isinstance(posterior, tfd.Normal))
+      self.assertIsInstance(posterior, tfd.Normal)
       posterior_log_pdf = self.evaluate(posterior.log_prob(x))
       self.assertEqual(posterior_log_pdf.shape, (6, 2))
 
@@ -84,7 +84,7 @@ class NormalTest(test_util.TestCase):
           prior=prior, scale=sigma, s=s, n=n)
 
       # Smoke test
-      self.assertTrue(isinstance(posterior, tfd.Normal))
+      self.assertIsInstance(posterior, tfd.Normal)
 
       # Calculate log_pdf under the 2 models
       posterior_log_pdf = posterior.log_prob(x)
@@ -105,7 +105,7 @@ class NormalTest(test_util.TestCase):
           prior=prior, scale=sigma, s=s, n=n)
 
       # Smoke test
-      self.assertTrue(isinstance(predictive, tfd.Normal))
+      self.assertIsInstance(predictive, tfd.Normal)
       predictive_log_pdf = self.evaluate(predictive.log_prob(x))
       self.assertEqual(predictive_log_pdf.shape, (6,))
 

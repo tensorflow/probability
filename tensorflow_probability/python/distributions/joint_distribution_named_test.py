@@ -561,9 +561,8 @@ class JointDistributionNamedTest(test_util.TestCase):
              x=tfd.Normal(loc=1, scale=1.),
              s=tfd.HalfNormal(2.5)),
         validate_args=True)
-    self.assertTrue(isinstance(b, tfb.Bijector)
-                    for b in d._model_flatten(
-                        d._experimental_default_event_space_bijector()))
+    for b in d._model_flatten(d._experimental_default_event_space_bijector()):
+      self.assertIsInstance(b, tfb.Bijector)
     self.assertSetEqual(set(d.model.keys()),
                         set(d._experimental_default_event_space_bijector(
                             ).keys()))
