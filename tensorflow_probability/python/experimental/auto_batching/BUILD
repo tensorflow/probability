@@ -176,6 +176,7 @@ py_library(
     name = "frontend",
     srcs = [
         "frontend.py",
+        "gast_util.py",
     ],
     srcs_version = "PY2AND3",
     deps = [

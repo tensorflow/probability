@@ -27,6 +27,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
 from tensorflow_probability.python.experimental.auto_batching import dsl
+from tensorflow_probability.python.experimental.auto_batching import gast_util
 from tensorflow_probability.python.experimental.auto_batching import instructions
 from tensorflow_probability.python.experimental.auto_batching import lowering
 from tensorflow_probability.python.experimental.auto_batching import stack_optimization as stack
@@ -43,7 +44,6 @@ from tensorflow.python.autograph.converters import return_statements
 from tensorflow.python.autograph.core import converter
 from tensorflow.python.autograph.core import naming
 from tensorflow.python.autograph.pyct import anno
-from tensorflow.python.autograph.pyct import gast_util
 from tensorflow.python.autograph.pyct import inspect_utils
 from tensorflow.python.autograph.pyct import parser
 from tensorflow.python.autograph.pyct import qual_names
