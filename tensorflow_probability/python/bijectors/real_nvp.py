@@ -186,55 +186,56 @@ class RealNVP(bijector_lib.Bijector):
     """
     name = name or 'real_nvp'
 
-    # At construction time, we don't know input_depth.
-    self._input_depth = None
-    if num_masked is not None and fraction_masked is not None:
-      raise ValueError('Exactly one of `num_masked` and '
-                       '`fraction_masked` should be specified.')
+    with tf.name_scope(name) as name:
+      # At construction time, we don't know input_depth.
+      self._input_depth = None
+      if num_masked is not None and fraction_masked is not None:
+        raise ValueError('Exactly one of `num_masked` and '
+                         '`fraction_masked` should be specified.')
 
-    if num_masked is not None:
-      if int(num_masked) != num_masked:
-        raise TypeError('`num_masked` must be an integer. Got: {} of type {}'
-                        ''.format(num_masked, type(num_masked)))
-      self._num_masked = int(num_masked)
-      self._fraction_masked = None
-      self._reverse_mask = self._num_masked < 0
-    else:
-      if not np.issubdtype(type(fraction_masked), np.floating):
-        raise TypeError('`fraction_masked` must be a float. Got: {} of type {}'
-                        ''.format(fraction_masked, type(fraction_masked)))
-      if np.abs(fraction_masked) >= 1.:
-        raise ValueError(
-            '`fraction_masked` must be in (-1, 1), but is {}.'.format(
-                fraction_masked))
-      self._num_masked = None
-      self._fraction_masked = float(fraction_masked)
-      self._reverse_mask = self._fraction_masked < 0
+      if num_masked is not None:
+        if int(num_masked) != num_masked:
+          raise TypeError('`num_masked` must be an integer. Got: {} of type {}'
+                          ''.format(num_masked, type(num_masked)))
+        self._num_masked = int(num_masked)
+        self._fraction_masked = None
+        self._reverse_mask = self._num_masked < 0
+      else:
+        if not np.issubdtype(type(fraction_masked), np.floating):
+          raise TypeError('`fraction_masked` must be a float. Got: {} of type '
+                          '{}'.format(fraction_masked, type(fraction_masked)))
+        if np.abs(fraction_masked) >= 1.:
+          raise ValueError(
+              '`fraction_masked` must be in (-1, 1), but is {}.'.format(
+                  fraction_masked))
+        self._num_masked = None
+        self._fraction_masked = float(fraction_masked)
+        self._reverse_mask = self._fraction_masked < 0
 
-    if shift_and_log_scale_fn is not None and bijector_fn is not None:
-      raise ValueError('Exactly one of `shift_and_log_scale_fn` and '
-                       '`bijector_fn` should be specified.')
+      if shift_and_log_scale_fn is not None and bijector_fn is not None:
+        raise ValueError('Exactly one of `shift_and_log_scale_fn` and '
+                         '`bijector_fn` should be specified.')
 
-    if shift_and_log_scale_fn:
-      def _bijector_fn(x0, input_depth, **condition_kwargs):
-        shift, log_scale = shift_and_log_scale_fn(x0, input_depth,
-                                                  **condition_kwargs)
-        return affine_scalar.AffineScalar(shift=shift, log_scale=log_scale)
+      if shift_and_log_scale_fn:
+        def _bijector_fn(x0, input_depth, **condition_kwargs):
+          shift, log_scale = shift_and_log_scale_fn(x0, input_depth,
+                                                    **condition_kwargs)
+          return affine_scalar.AffineScalar(shift=shift, log_scale=log_scale)
 
-      bijector_fn = _bijector_fn
+        bijector_fn = _bijector_fn
 
-    if validate_args:
-      bijector_fn = _validate_bijector_fn(bijector_fn)
+      if validate_args:
+        bijector_fn = _validate_bijector_fn(bijector_fn)
 
-    # Still do this assignment for variable tracking.
-    self._shift_and_log_scale_fn = shift_and_log_scale_fn
-    self._bijector_fn = bijector_fn
+      # Still do this assignment for variable tracking.
+      self._shift_and_log_scale_fn = shift_and_log_scale_fn
+      self._bijector_fn = bijector_fn
 
-    super(RealNVP, self).__init__(
-        forward_min_event_ndims=1,
-        is_constant_jacobian=is_constant_jacobian,
-        validate_args=validate_args,
-        name=name)
+      super(RealNVP, self).__init__(
+          forward_min_event_ndims=1,
+          is_constant_jacobian=is_constant_jacobian,
+          validate_args=validate_args,
+          name=name)
 
   @property
   def _masked_size(self):

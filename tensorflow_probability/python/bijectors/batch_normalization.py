@@ -147,20 +147,21 @@ class BatchNormalization(bijector.Bijector):
         `tf.layers.BatchNormalization`, or if it is specified with `renorm=True`
         or a virtual batch size.
     """
-    # Scale must be positive.
-    g_constraint = lambda x: tf.nn.relu(x) + 1e-6
-    self.batchnorm = batchnorm_layer or tf.keras.layers.BatchNormalization(
-        gamma_constraint=g_constraint)
-    self._validate_bn_layer(self.batchnorm)
-    self._training = training
-    if isinstance(self.batchnorm.axis, int):
-      forward_min_event_ndims = 1
-    else:
-      forward_min_event_ndims = len(self.batchnorm.axis)
-    super(BatchNormalization, self).__init__(
-        forward_min_event_ndims=forward_min_event_ndims,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      # Scale must be positive.
+      g_constraint = lambda x: tf.nn.relu(x) + 1e-6
+      self.batchnorm = batchnorm_layer or tf.keras.layers.BatchNormalization(
+          gamma_constraint=g_constraint)
+      self._validate_bn_layer(self.batchnorm)
+      self._training = training
+      if isinstance(self.batchnorm.axis, int):
+        forward_min_event_ndims = 1
+      else:
+        forward_min_event_ndims = len(self.batchnorm.axis)
+      super(BatchNormalization, self).__init__(
+          forward_min_event_ndims=forward_min_event_ndims,
+          validate_args=validate_args,
+          name=name)
 
   def _validate_bn_layer(self, layer):
     """Check for valid BatchNormalization layer.

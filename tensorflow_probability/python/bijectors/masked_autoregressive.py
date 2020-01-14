@@ -295,32 +295,33 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
           are specified.
     """
     name = name or 'masked_autoregressive_flow'
-    self._unroll_loop = unroll_loop
-    self._event_ndims = event_ndims
-    if bool(shift_and_log_scale_fn) == bool(bijector_fn):
-      raise ValueError('Exactly one of `shift_and_log_scale_fn` and '
-                       '`bijector_fn` should be specified.')
-    if shift_and_log_scale_fn:
-      def _bijector_fn(x, **condition_kwargs):
-        params = shift_and_log_scale_fn(x, **condition_kwargs)
-        if tf.is_tensor(params):
-          shift, log_scale = tf.unstack(params, num=2, axis=-1)
-        else:
-          shift, log_scale = params
-        return affine_scalar.AffineScalar(shift=shift, log_scale=log_scale)
+    with tf.name_scope(name) as name:
+      self._unroll_loop = unroll_loop
+      self._event_ndims = event_ndims
+      if bool(shift_and_log_scale_fn) == bool(bijector_fn):
+        raise ValueError('Exactly one of `shift_and_log_scale_fn` and '
+                         '`bijector_fn` should be specified.')
+      if shift_and_log_scale_fn:
+        def _bijector_fn(x, **condition_kwargs):
+          params = shift_and_log_scale_fn(x, **condition_kwargs)
+          if tf.is_tensor(params):
+            shift, log_scale = tf.unstack(params, num=2, axis=-1)
+          else:
+            shift, log_scale = params
+          return affine_scalar.AffineScalar(shift=shift, log_scale=log_scale)
 
-      bijector_fn = _bijector_fn
+        bijector_fn = _bijector_fn
 
-    if validate_args:
-      bijector_fn = _validate_bijector_fn(bijector_fn)
-    # Still do this assignment for variable tracking.
-    self._shift_and_log_scale_fn = shift_and_log_scale_fn
-    self._bijector_fn = bijector_fn
-    super(MaskedAutoregressiveFlow, self).__init__(
-        forward_min_event_ndims=self._event_ndims,
-        is_constant_jacobian=is_constant_jacobian,
-        validate_args=validate_args,
-        name=name)
+      if validate_args:
+        bijector_fn = _validate_bijector_fn(bijector_fn)
+      # Still do this assignment for variable tracking.
+      self._shift_and_log_scale_fn = shift_and_log_scale_fn
+      self._bijector_fn = bijector_fn
+      super(MaskedAutoregressiveFlow, self).__init__(
+          forward_min_event_ndims=self._event_ndims,
+          is_constant_jacobian=is_constant_jacobian,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x, **kwargs):
     static_event_size = tensorshape_util.num_elements(

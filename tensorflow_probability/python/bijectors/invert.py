@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 
 __all__ = [
@@ -64,14 +66,16 @@ class Invert(bijector_lib.Bijector):
       raise NotImplementedError(
           "Invert is not implemented for non-injective bijectors.")
 
-    self._bijector = bijector
-    super(Invert, self).__init__(
-        forward_min_event_ndims=bijector.inverse_min_event_ndims,
-        inverse_min_event_ndims=bijector.forward_min_event_ndims,
-        is_constant_jacobian=bijector.is_constant_jacobian,
-        validate_args=validate_args,
-        dtype=bijector.dtype,
-        name=name or "_".join(["invert", bijector.name]))
+    name = name or "_".join(["invert", bijector.name])
+    with tf.name_scope(name) as name:
+      self._bijector = bijector
+      super(Invert, self).__init__(
+          forward_min_event_ndims=bijector.inverse_min_event_ndims,
+          inverse_min_event_ndims=bijector.forward_min_event_ndims,
+          is_constant_jacobian=bijector.is_constant_jacobian,
+          validate_args=validate_args,
+          dtype=bijector.dtype,
+          name=name)
 
   def forward_event_shape(self, input_shape):
     return self.bijector.inverse_event_shape(input_shape)

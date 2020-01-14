@@ -62,15 +62,16 @@ class DiscreteCosineTransform(bijector.Bijector):
       name: Python `str` name given to ops managed by this object.
     """
     # TODO(b/115910664): Support other DCT types.
-    if dct_type not in (2, 3):
-      raise NotImplementedError('`type` must be one of 2 or 3')
-    self._dct_type = dct_type
-    super(DiscreteCosineTransform, self).__init__(
-        forward_min_event_ndims=1,
-        inverse_min_event_ndims=1,
-        is_constant_jacobian=True,
-        validate_args=validate_args,
-        name=name)
+    with tf.name_scope(name) as name:
+      if dct_type not in (2, 3):
+        raise NotImplementedError('`type` must be one of 2 or 3')
+      self._dct_type = dct_type
+      super(DiscreteCosineTransform, self).__init__(
+          forward_min_event_ndims=1,
+          inverse_min_event_ndims=1,
+          is_constant_jacobian=True,
+          validate_args=validate_args,
+          name=name)
 
   def _forward(self, x):
     return tf.signal.dct(x, type=self._dct_type, norm='ortho')
