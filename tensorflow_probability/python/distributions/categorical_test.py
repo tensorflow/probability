@@ -400,6 +400,8 @@ class CategoricalTest(test_util.TestCase):
     self.assertAllClose(
         [0.4**2 + 0.6**2], [prob_val[:, :, :, 1].mean()], atol=1e-2)
 
+  @test_util.jax_disable_test_missing_functionality(
+      'JAX does not return None for gradients.')
   def testNotReparameterized(self):
     p = tf.constant([0.3, 0.3, 0.4])
     _, grad_p = tfp.math.value_and_gradient(

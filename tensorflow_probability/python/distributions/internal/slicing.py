@@ -101,7 +101,7 @@ def _slice_single_param(param, param_event_ndims, slices, dist_batch_shape):
     param_dim_idx += 1
     batch_dim_idx += 1
   param_slices.extend([ALL_SLICE] * param_event_ndims)
-  return full_batch_param.__getitem__(param_slices)
+  return full_batch_param.__getitem__(tuple(param_slices))
 
 
 def _slice_params_to_dict(dist, params_event_ndims, slices):

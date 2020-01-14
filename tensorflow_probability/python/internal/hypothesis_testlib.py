@@ -319,9 +319,9 @@ def constrained_tensors(constraint_fn, shape, dtype=np.float32):
     x = constraint_fn(tf.convert_to_tensor(x, dtype_hint=dtype))
     if dtype_util.is_floating(x.dtype) and tf.executing_eagerly():
       # We'll skip this check in graph mode; too expensive.
-      if not np.all(np.isfinite(x.numpy())):
+      if not np.all(np.isfinite(np.array(x))):
         raise AssertionError('{} generated non-finite param value: {}'.format(
-            constraint_fn, x.numpy()))
+            constraint_fn, np.array(x)))
     return x
 
   return hpnp.arrays(dtype=dtype, shape=shape, elements=floats).map(mapper)
@@ -569,7 +569,7 @@ def _compute_rank_and_fullsize_reqd(draw, target_shape, current_shape, is_last):
       corresponding axis of the shape must be full-sized (True) or is allowed to
       be 1 (i.e., broadcast) (False).
   """
-  target_rank = target_shape.ndims
+  target_rank = tensorshape_util.rank(target_shape)
   if is_last:
     # We must force full size dim on any mismatched axes, and proper rank.
     full_rank_current = tf.broadcast_static_shape(
@@ -579,7 +579,7 @@ def _compute_rank_and_fullsize_reqd(draw, target_shape, current_shape, is_last):
         full_rank_current[i] != target_shape[i] for i in range(target_rank)
     ]
     min_rank = target_rank
-    if current_shape.ndims == target_rank:
+    if tensorshape_util.rank(current_shape) == target_rank:
       # Current rank might be already correct, but we could have a case like
       # batch_shape=[4,3,2] and current_batch_shape=[4,1,2], in which case
       # we must have at least 2 axes on this param's batch shape.
@@ -623,7 +623,7 @@ def broadcasting_shapes(draw, target_shape, n):
       fully defined.
   """
   target_shape = tf.TensorShape(target_shape)
-  target_rank = target_shape.ndims
+  target_rank = tensorshape_util.rank(target_shape)
   result = []
   current_shape = tf.TensorShape([])
   for is_last in [False] * (n - 1) + [True]:

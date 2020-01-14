@@ -43,7 +43,7 @@ class DeterministicTest(test_util.TestCase):
 
   def testInvalidTolRaises(self):
     loc = rng.rand(2, 3, 4).astype(np.float32)
-    with self.assertRaisesOpError("Condition x >= 0"):
+    with self.assertRaisesOpError('Condition x >= 0'):
       deterministic = tfd.Deterministic(loc, atol=-1, validate_args=True)
       self.evaluate(deterministic.prob(0.))
 
@@ -73,7 +73,7 @@ class DeterministicTest(test_util.TestCase):
     x = [[0, 2], [1, 3]]
     deterministic = tfd.Deterministic(
         tf.constant(loc, dtype=tf.int32), validate_args=True)
-    expected_logprob = [[0., float("-inf")], [float("-inf"), 0.]]
+    expected_logprob = [[0., float('-inf')], [float('-inf'), 0.]]
     prob = deterministic.log_prob(x)
     self.assertAllEqual((2, 2), prob.shape)
     self.assertAllEqual(expected_logprob, self.evaluate(prob))
@@ -245,13 +245,13 @@ class DeterministicTest(test_util.TestCase):
 
     self.evaluate(atol.assign(-1.))
     with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 "Condition x >= 0"):
+                                 'Condition x >= 0'):
       self.evaluate(deterministic.log_prob(1.))
 
     self.evaluate(atol.assign(0.1))
     self.evaluate(rtol.assign(-1.))
     with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 "Condition x >= 0"):
+                                 'Condition x >= 0'):
       self.evaluate(deterministic.log_prob(1.))
 
 
@@ -288,14 +288,14 @@ class VectorDeterministicTest(test_util.TestCase):
   def testInvalidTolRaises(self):
     loc = rng.rand(2, 3, 4).astype(np.float32)
     with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 "Condition x >= 0"):
+                                 'Condition x >= 0'):
       deterministic = tfd.VectorDeterministic(loc, atol=-1, validate_args=True)
       self.evaluate(deterministic.prob(loc))
 
   def testInvalidXRaises(self):
     loc = rng.rand(2, 3, 4).astype(np.float32)
     with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 "must have rank at least 1"):
+                                 'rank at least 1'):
       deterministic = tfd.VectorDeterministic(loc, atol=1, validate_args=True)
       self.evaluate(deterministic.prob(0.))
 
@@ -357,7 +357,7 @@ class VectorDeterministicTest(test_util.TestCase):
       self):
     # 0 batch of deterministics on R^0.
     deterministic = tfd.VectorDeterministic([], validate_args=True)
-    with self.assertRaisesOpError("not defined in the same space"):
+    with self.assertRaisesOpError('not defined in the same space'):
       self.evaluate(deterministic.prob([1.]))
 
   def testSampleNoBatchDims(self):
@@ -445,15 +445,15 @@ class VectorDeterministicTest(test_util.TestCase):
 
     self.evaluate(atol.assign(-1.))
     with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 "Condition x >= 0"):
+                                 'Condition x >= 0'):
       self.evaluate(deterministic.log_prob([1.]))
 
     self.evaluate(atol.assign(0.1))
     self.evaluate(rtol.assign(-1.))
     with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 "Condition x >= 0"):
+                                 'Condition x >= 0'):
       self.evaluate(deterministic.log_prob([1.]))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

@@ -557,13 +557,14 @@ class ParametersTest(test_util.TestCase):
 
     scale = 0.25
     self.assertNear(0.5 * np.log(2. * np.pi * np.e * scale**2.),
-                    normal_differential_entropy(scale).numpy(),
+                    self.evaluate(normal_differential_entropy(scale)),
                     err=1e-5)
 
 
 @test_util.test_all_tf_execution_regimes
 class TfModuleTest(test_util.TestCase):
 
+  @test_util.jax_disable_variable_test
   def test_variable_tracking_works(self):
     scale = tf.Variable(1.)
     normal = tfd.Normal(loc=0, scale=scale, validate_args=True)

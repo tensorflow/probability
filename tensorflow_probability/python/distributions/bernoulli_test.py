@@ -228,6 +228,9 @@ class BernoulliTest(test_util.TestCase):
     x = dist.sample(1, seed=test_util.test_seed())
     self.assertAllEqual((1, 2), tensorshape_util.as_list(x.shape))
 
+  @test_util.jax_disable_test_missing_functionality(
+      'JAX does not return None for gradients.')
+  @test_util.numpy_disable_gradient_test
   def testNotReparameterized(self):
     p = tf.constant([0.2, 0.6])
     _, grad_p = tfp.math.value_and_gradient(
