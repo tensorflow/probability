@@ -59,7 +59,12 @@ py_test(
     ],
     main = "bayesian_neural_network.py",
     srcs_version = "PY2AND3",
-    tags = ["tf2-kokoro-broken"],
+    tags = [
+        "tf2-kokoro-broken",
+        # TODO(b/147689726) Re-enable this test after contrib references are
+        # rm'ed.
+        "notap",
+    ],
     deps = [
         ":bayesian_neural_network_lib",
     ],
@@ -145,6 +150,9 @@ py_test(
     srcs_version = "PY2AND3",
     tags = [
         "tf2-kokoro-broken",
+        # TODO(b/147689726) Re-enable this test after contrib references are
+        # rm'ed.
+        "notap",
     ],
     deps = [
         ":disentangled_vae_lib",
@@ -410,7 +418,12 @@ py_test(
     ],
     main = "vq_vae.py",
     srcs_version = "PY2AND3",
-    tags = ["tf2-kokoro-broken"],
+    tags = [
+        "tf2-kokoro-broken",
+        # TODO(b/147689726) Re-enable this test after contrib references are
+        # rm'ed.
+        "notap",
+    ],
     deps = [
         ":vq_vae_lib",
     ],
