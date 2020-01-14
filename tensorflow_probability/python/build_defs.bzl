@@ -197,6 +197,7 @@ def multi_substrate_py_test(
         deps = _substrate_deps(deps, "numpy"),
         tags = tags + ["tfp_numpy"] + numpy_tags,
         srcs_version = srcs_version,
+        python_version = "PY3",
         timeout = timeout,
         shard_count = shard_count,
     )
