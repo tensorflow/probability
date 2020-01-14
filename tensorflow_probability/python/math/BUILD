@@ -174,10 +174,12 @@ multi_substrate_py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "linalg_test",
     size = "small",
     srcs = ["linalg_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     shard_count = 5,
     tags = ["hypothesis"],
     deps = [
@@ -268,7 +270,7 @@ multi_substrate_py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "diag_jacobian",
     srcs = [
         "diag_jacobian.py",
@@ -280,10 +282,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "diag_jacobian_test",
     size = "small",
     srcs = ["diag_jacobian_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,

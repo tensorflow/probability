@@ -49,7 +49,7 @@ DISABLED_BY_PKG = {
     'distributions':
         ('internal.moving_stats',),
     'math':
-        ('ode', 'diag_jacobian', 'minimize', 'root_search', 'sparse'),
+        ('ode', 'minimize', 'root_search', 'sparse'),
     'mcmc':
         ('nuts', 'sample_annealed_importance', 'sample_halton_sequence',
          'slice_sampler_kernel'),

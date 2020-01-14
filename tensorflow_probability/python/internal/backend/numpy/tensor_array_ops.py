@@ -49,7 +49,7 @@ class TensorArray(object):
     self._dtype = utils.numpy_dtype(dtype)
     if data is None:
       if JAX_MODE and size is not None and element_shape is not None:
-        data = np.empty((size,) + element_shape, dtype=self._dtype)
+        data = np.empty((size,) + tuple(element_shape), dtype=self._dtype)
       else:
         data = [None]*(0 if size is None else int(size))
     self._data = data

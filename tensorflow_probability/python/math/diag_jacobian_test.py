@@ -89,7 +89,7 @@ class JacobianTest(test_util.TestCase):
 
     # Assume that the state is passed as a 2x2 matrix of sample_shape = [5, 3]:
     sample_shape = [5, 3]
-    def target_fn(*x):
+    def target_fn(x):
       z = tf.reshape(x, sample_shape + [4])
       return target.log_prob(z)
 
