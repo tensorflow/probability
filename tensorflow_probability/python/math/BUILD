@@ -178,7 +178,7 @@ multi_substrate_py_test(
     name = "linalg_test",
     size = "small",
     srcs = ["linalg_test.py"],
-    jax_tags = ["notap"],
+    jax_size = "medium",
     numpy_tags = ["notap"],
     shard_count = 5,
     tags = ["hypothesis"],
@@ -189,6 +189,7 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

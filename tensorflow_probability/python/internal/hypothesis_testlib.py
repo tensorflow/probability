@@ -575,8 +575,11 @@ def _compute_rank_and_fullsize_reqd(draw, target_shape, current_shape, is_last):
     full_rank_current = tf.broadcast_static_shape(
         current_shape, tf.TensorShape([1] * target_rank))
     # Identify axes in which the target shape is not yet matched.
+    full_rank_current_list = tensorshape_util.as_list(full_rank_current)
+    target_shape_list = tensorshape_util.as_list(target_shape)
     axis_is_mismatched = [
-        full_rank_current[i] != target_shape[i] for i in range(target_rank)
+        full_rank_current_list[i] !=
+        target_shape_list[i] for i in range(target_rank)
     ]
     min_rank = target_rank
     if tensorshape_util.rank(current_shape) == target_rank:
@@ -631,7 +634,8 @@ def broadcasting_shapes(draw, target_shape, n):
         draw, target_shape, current_shape, is_last=is_last)
 
     # Get the last next_rank (possibly 0!) dimensions.
-    next_shape = target_shape[target_rank - next_rank:].as_list()
+    next_shape = tensorshape_util.as_list(
+        target_shape[target_rank - next_rank:])
     for i, force_fullsize in enumerate(force_fullsize_dim):
       if not force_fullsize and draw(hps.booleans()):
         # Choose to make this param broadcast against some other param.

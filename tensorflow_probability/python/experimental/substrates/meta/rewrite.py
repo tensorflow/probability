@@ -41,6 +41,8 @@ TF_REPLACEMENTS = {
     'import tensorflow_probability as tfp':
         'import tensorflow_probability as tfp; '
         'tfp = tfp.experimental.substrates.numpy',
+    'from tensorflow.python.ops.linalg':
+        'from tensorflow_probability.python.internal.backend.numpy'
 }
 
 DISABLED_BY_PKG = {
