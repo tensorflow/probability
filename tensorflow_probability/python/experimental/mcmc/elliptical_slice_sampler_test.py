@@ -19,11 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow.compat.v1 as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from discussion.mcmc import elliptical_slice_sampler as elliptical
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
+
 
 tfd = tfp.distributions
 
@@ -80,8 +79,7 @@ def normal_normal_posterior(
   return posterior_mean, posterior_variance
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class _EllipticalSliceSamplerTest(object):
+class _EllipticalSliceSamplerTest(test_util.TestCase):
 
   def testSampleChainSeedReproducible(self):
     normal_prior = tfd.Normal(5 * [[0., 0.]], 1.)
@@ -90,19 +88,19 @@ class _EllipticalSliceSamplerTest(object):
       return normal_prior.sample(seed=seed)
 
     def normal_log_likelihood(state):
-      return tf.reduce_sum(
+      return tf.math.reduce_sum(
           tfd.Normal(state, 2.).log_prob(0.),
           axis=-1)
 
     num_results = 10
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     current_state = np.float32(np.random.rand(5, 2))
     samples0 = tf.function(lambda: tfp.mcmc.sample_chain(  # pylint: disable=g-long-lambda
         num_results=2 * num_results,
         num_steps_between_results=0,
         current_state=current_state,
-        kernel=elliptical.EllipticalSliceSampler(
+        kernel=tfp.experimental.mcmc.EllipticalSliceSampler(
             normal_sampler_fn=normal_sampler,
             log_likelihood_fn=normal_log_likelihood,
             seed=seed),
@@ -114,7 +112,7 @@ class _EllipticalSliceSamplerTest(object):
         num_results=num_results,
         num_steps_between_results=1,
         current_state=current_state,
-        kernel=elliptical.EllipticalSliceSampler(
+        kernel=tfp.experimental.mcmc.EllipticalSliceSampler(
             normal_sampler_fn=normal_sampler,
             log_likelihood_fn=normal_log_likelihood,
             seed=seed),
@@ -139,14 +137,14 @@ class _EllipticalSliceSamplerTest(object):
     # The state is expected to be 2 dimensional, so
     # we reduce sum on the last axis.
     def normal_log_likelihood(state):
-      return tf.reduce_sum(
+      return tf.math.reduce_sum(
           tfd.Normal(state, self.dtype(2.)).log_prob(self.dtype(0.)),
           axis=-1)
 
-    kernel = elliptical.EllipticalSliceSampler(
+    kernel = tfp.experimental.mcmc.EllipticalSliceSampler(
         normal_sampler_fn=normal_sampler,
         log_likelihood_fn=normal_log_likelihood,
-        seed=tfp_test_util.test_seed(),
+        seed=test_util.test_seed(),
     )
 
     samples = tf.function(lambda: tfp.mcmc.sample_chain(  # pylint: disable=g-long-lambda
@@ -180,15 +178,15 @@ class _EllipticalSliceSamplerTest(object):
 
     # 10 samples at 2 chains.
     def normal_log_likelihood(state):
-      return tf.reduce_sum(
+      return tf.math.reduce_sum(
           tfd.Normal(state, likelihood_stddev).log_prob(data),
           axis=[0, -1],
       )
 
-    kernel = elliptical.EllipticalSliceSampler(
+    kernel = tfp.experimental.mcmc.EllipticalSliceSampler(
         normal_sampler_fn=normal_sampler,
         log_likelihood_fn=normal_log_likelihood,
-        seed=tfp_test_util.test_seed(),
+        seed=test_util.test_seed(),
     )
 
     samples = tf.function(lambda: tfp.mcmc.sample_chain(  # pylint: disable=g-long-lambda
@@ -211,14 +209,17 @@ class _EllipticalSliceSamplerTest(object):
     self.assertAllClose(posterior_variance, variance, rtol=5e-2)
 
 
-class EllipticalSliceSamplerTestFloat32(
-    tf.test.TestCase, _EllipticalSliceSamplerTest):
+@test_util.test_all_tf_execution_regimes
+class EllipticalSliceSamplerTestFloat32(_EllipticalSliceSamplerTest):
   dtype = np.float32
 
 
-class EllipticalSliceSamplerTestFloat64(
-    tf.test.TestCase, _EllipticalSliceSamplerTest):
+@test_util.test_all_tf_execution_regimes
+class EllipticalSliceSamplerTestFloat64(_EllipticalSliceSamplerTest):
   dtype = np.float64
+
+
+del _EllipticalSliceSamplerTest
 
 
 if __name__ == '__main__':
