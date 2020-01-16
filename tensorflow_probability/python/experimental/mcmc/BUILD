@@ -35,8 +35,37 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":elliptical_slice_sampler",
         ":nuts_autobatching",
         # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "elliptical_slice_sampler",
+    srcs = ["elliptical_slice_sampler.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc/internal",
+        "//tensorflow_probability/python/util",
+    ],
+)
+
+py_test(
+    name = "elliptical_slice_sampler_test",
+    size = "large",
+    timeout = "long",
+    srcs = ["elliptical_slice_sampler_test.py"],
+    shard_count = 6,
+    deps = [
+        ":elliptical_slice_sampler",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
