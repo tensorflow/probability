@@ -19,10 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import contextlib
 import functools
 import inspect
-import re
 
 from absl import logging
 from absl.testing import parameterized
@@ -1142,41 +1140,6 @@ class DistributionParamsAreVarsTest(test_util.TestCase):
         pass
 
 
-@contextlib.contextmanager
-def no_tf_rank_errors():
-  # TODO(axch): Instead of catching and `assume`ing away rank errors, could try
-  # harder to avoid generating them in the first place.  For instance, could add
-  # a parameter to `valid_slices` that limits how much the rank may increase
-  # after the slice.  Trouble is, predicting what limits to set is difficult
-  # because rank handling is non-uniform, and actually meeting them is also
-  # non-trivial because in addition to the batch shape there is the event shape,
-  # and at least one more dimention added by `sample`, and the parameters may
-  # have larger "event" shapes than the distribution itself.
-  rank_bcast_pat = (r'Broadcast between \[([0-9]*,){8,}[0-9]*\] '
-                    r'and \[([0-9]*,){8,}[0-9]*\] is not supported yet')
-  input_dims_pat = r'Unhandled input dimensions (8|9|[1-9][0-9]+)'
-  input_rank_pat = r'inputs rank not in \[0,([6-9]|[1-9][0-9]+)\]'
-  try:
-    yield
-  except tf.errors.UnimplementedError as e:
-    # TODO(b/138385438): This really shouldn't be so complicated.
-    msg = str(e)
-    if re.search(rank_bcast_pat, msg):
-      # We asked some TF op (SelectV2?) to broadcast Tensors of rank >= 9.
-      # Let's not.
-      hp.assume(False)
-    elif re.search(input_dims_pat, msg):
-      # We asked some TF op (StridedSlice?) to operate on a Tensor of rank >= 8.
-      # Let's not.
-      hp.assume(False)
-    elif re.search(input_rank_pat, msg):
-      # We asked some TF op (PadV2?) to operate on a Tensor of rank >= 7.
-      # Let's not.
-      hp.assume(False)
-    else:
-      raise
-
-
 @test_util.test_all_tf_execution_regimes
 class ReproducibilityTest(test_util.TestCase):
 
@@ -1264,7 +1227,7 @@ class DistributionSlicingTest(test_util.TestCase):
       return
 
     # Check that sampling of sliced distributions executes.
-    with no_tf_rank_errors():
+    with tfp_hps.no_tf_rank_errors():
       samples = self.evaluate(dist.sample(seed=strm()))
       sliced_samples = self.evaluate(sliced_dist.sample(seed=strm()))
 
@@ -1286,7 +1249,7 @@ class DistributionSlicingTest(test_util.TestCase):
 
     # Check that a sliced distribution can compute the log_prob of its own
     # samples (up to numerical validation errors).
-    with no_tf_rank_errors():
+    with tfp_hps.no_tf_rank_errors():
       try:
         lp = self.evaluate(dist.log_prob(samples))
       except tf.errors.InvalidArgumentError:
