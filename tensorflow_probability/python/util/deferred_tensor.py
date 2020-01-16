@@ -256,8 +256,7 @@ class DeferredTensor(tf.Module):
     # ValueError: Graph parent item 0 is not a Tensor;
     #   <DeferredTensor: dtype=float32, shape=[2], fn=exp>.
     # TODO(b/140157055): Remove this shim after LinOp is patched in 2.0.
-    if not JAX_MODE:
-      self.is_tensor_like = True
+    self.is_tensor_like = True
 
   @property
   def transform_fn(self):
