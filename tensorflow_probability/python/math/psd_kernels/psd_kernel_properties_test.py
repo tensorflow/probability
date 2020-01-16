@@ -104,7 +104,8 @@ class KernelPropertiesTest(test_util.TestCase):
       with tfp_hps.assert_no_excessive_var_usage(
           'method `apply` of {}'.format(kernel)):
         tape.watch(wrt_vars)
-        diag = kernel.apply(xs, xs, example_ndims=example_ndims)
+        with tfp_hps.no_tf_rank_errors():
+          diag = kernel.apply(xs, xs, example_ndims=example_ndims)
     grads = tape.gradient(diag, wrt_vars)
     assert_no_none_grad(kernel, 'apply', wrt_vars, grads)
 
