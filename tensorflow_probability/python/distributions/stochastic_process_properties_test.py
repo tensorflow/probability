@@ -405,6 +405,8 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
   @_stochastic_process_specific_hp_settings
   def testExcessiveConcretizationInZeroArgPublicMethods(
       self, process_name, data):
+    tfp_hps.guitar_skip_if_matches(
+        'VariationalGaussianProcess', process_name, 'b/147770193')
     # Check that standard statistics do not concretize variables/deferred
     # tensors more than the allowed amount.
     process = data.draw(stochastic_processes(process_name, enable_vars=True))
@@ -428,6 +430,8 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
   @hp.given(hps.data())
   @_stochastic_process_specific_hp_settings
   def testGradientsThroughSample(self, process_name, data):
+    tfp_hps.guitar_skip_if_matches(
+        'VariationalGaussianProcess', process_name, 'b/147770193')
     process = data.draw(stochastic_processes(
         process_name=process_name, enable_vars=True))
     self.evaluate([var.initializer for var in process.variables])
@@ -447,6 +451,8 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
   @hp.given(hps.data())
   @_stochastic_process_specific_hp_settings
   def testGradientsThroughLogProb(self, process_name, data):
+    tfp_hps.guitar_skip_if_matches(
+        'VariationalGaussianProcess', process_name, 'b/147770193')
     process = data.draw(stochastic_processes(
         process_name=process_name, enable_vars=True))
     self.evaluate([var.initializer for var in process.variables])
@@ -469,6 +475,8 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
   def testExcessiveConcretizationInLogProb(self, process_name, data):
     # Check that log_prob computations avoid reading process parameters
     # more than once.
+    tfp_hps.guitar_skip_if_matches(
+        'VariationalGaussianProcess', process_name, 'b/147770193')
     process = data.draw(stochastic_processes(
         process_name=process_name, enable_vars=True))
     self.evaluate([var.initializer for var in process.variables])
