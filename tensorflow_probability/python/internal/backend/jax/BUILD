@@ -26,6 +26,7 @@ exports_files(["LICENSE"])
 
 FILENAMES = [
     "__init__",
+    "bitwise",
     "compat",
     "control_flow",
     "debugging",

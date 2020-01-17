@@ -202,7 +202,7 @@ def _cumop(op, x, axis=0, exclusive=False, reverse=False, initial_value=None):
     slices = [slice(None)] * result.ndim
     for ax in axis:
       slices[ax] = slice(1, None) if reverse else slice(None, -1)
-    result = result[slices]
+    result = result[tuple(slices)]
   return result
 
 

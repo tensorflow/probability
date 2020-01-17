@@ -348,7 +348,7 @@ stack = utils.copy_docstring(
 
 tile = utils.copy_docstring(
     tf.tile,
-    lambda input, multiples, name=None: np.tile(input, multiples))
+    lambda input, multiples, name=None: np.tile(np.array(input), multiples))
 
 transpose = utils.copy_docstring(
     tf.transpose,

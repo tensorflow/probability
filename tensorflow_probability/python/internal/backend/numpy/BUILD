@@ -31,6 +31,7 @@ py_library(
     name = "numpy",
     srcs = ["__init__.py"],
     deps = [
+        ":bitwise",
         ":compat",
         ":control_flow",
         ":debugging",
@@ -53,6 +54,16 @@ py_library(
         ":sparse_lib",
         ":tensor_array_ops",
         ":test_lib",
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "bitwise",
+    srcs = ["bitwise.py"],
+    deps = [
+        ":_utils",
+        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -426,6 +437,7 @@ exports_files(
     [
         "__init__.py",
         "_utils.py",
+        "bitwise.py",
         "compat.py",
         "control_flow.py",
         "debugging.py",
