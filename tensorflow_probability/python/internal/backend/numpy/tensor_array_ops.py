@@ -21,6 +21,7 @@ from __future__ import print_function
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
 
 __all__ = [
     'TensorArray',
@@ -81,7 +82,7 @@ class TensorArray(object):
 
   def gather(self, indices, name=None):  # pylint: disable=unused-argument
     indices = np.array(indices, dtype=np.int32)
-    return np.take(self._data, indices)
+    return array_ops.gather(np.array(self._data), indices)
 
   def stack(self, name=None):  # pylint: disable=unused-argument
     return np.array(self._data, dtype=self.dtype)

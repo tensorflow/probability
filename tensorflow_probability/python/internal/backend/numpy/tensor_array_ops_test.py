@@ -71,6 +71,12 @@ class TensorArrayTest(test_util.TestCase):
     w2 = w1.write(2, -1.)
     self.assertAllEqual([-3., -3., -1., -2.], w2.gather([0, 0, 2, 1]))
 
+  def test_gather_nonscalar_elements(self):
+    ta = nptf.compat.v2.TensorArray(
+        dtype=tf.int32, tensor_array_name='foo', size=3).unstack(
+            np.int32([[0, 0], [1, 1], [2, 2]]))
+    self.assertAllEqual([1, 1], ta.gather([1])[0])
+
   def test_stack(self):
     ta = nptf.compat.v2.TensorArray(
         dtype=tf.float32, tensor_array_name='foo', size=3)

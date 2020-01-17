@@ -521,7 +521,7 @@ def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
 
   To those ends, this function returns a `SeedStream` seeded with `test_seed`
   (which see).  The latter respects the command line flags `--fixed_seed=<seed>`
-  and `--vary-seed` (Boolean, default False).  `--vary_seed` uses system entropy
+  and `--vary_seed` (Boolean, default False).  `--vary_seed` uses system entropy
   to produce unpredictable seeds.  `--fixed_seed` takes precedence over
   `--vary_seed` when both are present.
 

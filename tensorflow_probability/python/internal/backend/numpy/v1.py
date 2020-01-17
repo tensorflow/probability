@@ -82,6 +82,8 @@ def _get_variable(  # pylint: disable=unused-argument
 
 def _placeholder_with_default(input, shape, name=None):  # pylint: disable=redefined-builtin,unused-argument
   x = np.array(input)
+  if hasattr(shape, 'as_list'):
+    shape = shape.as_list()
   if shape is None or any(s is None for s in shape):
     return x
   return np.reshape(x, shape)

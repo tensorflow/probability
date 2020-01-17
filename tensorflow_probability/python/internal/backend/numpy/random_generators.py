@@ -34,12 +34,12 @@ __all__ = [
     'poisson',
     'uniform',
     'set_seed',
+    'shuffle',
     # 'all_candidate_sampler',
     # 'experimental',
     # 'fixed_unigram_candidate_sampler',
     # 'learned_unigram_candidate_sampler',
     # 'log_uniform_candidate_sampler',
-    # 'shuffle',
     # 'stateless_categorical',
     # 'stateless_normal',
     # 'stateless_truncated_normal',
@@ -190,6 +190,20 @@ def _poisson_jax(shape, lam, dtype=tf.float32, seed=None,
   return _poisson_jax_impl(lam, seed, shape, dtype, name, max_iters)
 
 
+def _shuffle(value, seed=None, name=None):  # pylint: disable=unused-argument
+  rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
+  ret = np.array(value)
+  rng.shuffle(ret)
+  return ret
+
+
+def _shuffle_jax(value, seed=None, name=None):  # pylint: disable=unused-argument
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  if seed is None:
+    raise ValueError('Must provide PRNGKey to sample in JAX.')
+  return jaxrand.shuffle(seed, value, axis=0)
+
+
 def _uniform(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
@@ -244,6 +258,10 @@ normal = utils.copy_docstring(
 poisson = utils.copy_docstring(
     tf.random.poisson,
     _poisson_jax if JAX_MODE else _poisson)
+
+shuffle = utils.copy_docstring(
+    tf.random.shuffle,
+    _shuffle_jax if JAX_MODE else _shuffle)
 
 uniform = utils.copy_docstring(
     tf.random.uniform,

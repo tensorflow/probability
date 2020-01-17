@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 # pylint: disable=unused-import
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import bitwise
 from tensorflow_probability.python.internal.backend.numpy import debugging
 from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy import keras
@@ -76,6 +77,5 @@ function = utils.copy_docstring(
 
 eye = linalg.eye
 matmul = linalg.matmul
-
 
 del collections, tf, utils
