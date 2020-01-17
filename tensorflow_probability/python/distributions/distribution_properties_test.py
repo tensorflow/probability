@@ -1331,6 +1331,7 @@ class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
     hp.note('Drew samples {}'.format(sample))
 
     tfp_hps.guitar_skip_if_matches('NegativeBinomial', dist_name, 'b/147743999')
+    tfp_hps.guitar_skip_if_matches('Binomial', dist_name, 'b/147743999')
     if dist_name not in LOGPROB_AUTOVECTORIZATION_IS_BROKEN:
       pfor_lp = tf.vectorized_map(dist.log_prob, tf.convert_to_tensor(sample))
       batch_lp = dist.log_prob(sample)
