@@ -323,5 +323,6 @@ class GeneralizedPareto(distribution.Distribution):
                       tf.less_equal(x, loc - scale / concentration)),
         True,
         message=('If `concentration < 0`, sample must be less than or '
-                 'equal to `loc - scale / concentration`.')))
+                 'equal to `loc - scale / concentration`.'),
+        summarize=100))
     return assertions

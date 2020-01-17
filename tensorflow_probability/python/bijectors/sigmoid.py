@@ -95,7 +95,22 @@ class Sigmoid(bijector.Bijector):
   def _forward(self, x):
     if self._is_standard_sigmoid:
       return tf.sigmoid(x)
-    return self.high * tf.sigmoid(x) + self.low * tf.sigmoid(-x)
+    lo = tf.convert_to_tensor(self.low)  # Concretize only once
+    hi = tf.convert_to_tensor(self.high)
+    diff = hi - lo
+    left = lo + diff * tf.math.sigmoid(x)
+    right = hi - diff * tf.math.sigmoid(-x)
+    return tf.where(x < 0, left, right)
+    # Alternative:
+    #   ans = hi * tf.sigmoid(x) + lo * tf.sigmoid(-x)
+    #   return tfp_math.clip_by_value_preserve_gradient(ans, lo, hi)
+    # Apparent pros of this alternative
+    # - 2 fewer subtracts and 1 fewer tf.where, but another add and
+    #   tf.clip_by_value
+    # - The answer obviously falls into [lo, hi]
+    # Apparent cons of this alternative
+    # - Messing around with clipping and stopping gradients
+    # - Suppresses any potential severe numerical errors
 
   def _inverse(self, y):
     if self._is_standard_sigmoid:

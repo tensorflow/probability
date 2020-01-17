@@ -1516,4 +1516,8 @@ def constraint_for(dist=None, param=None):
 
 
 if __name__ == '__main__':
+  # Hypothesis often finds numerical near misses.  Debugging them is much aided
+  # by seeing all the digits of every floating point number, instead of the
+  # usual default of truncating the printed representation to 8 digits.
+  np.set_printoptions(floatmode='unique', precision=None)
   tf.test.main()

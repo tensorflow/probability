@@ -45,6 +45,7 @@ __all__ = [
     'test_graph_mode_only',
     'test_seed',
     'test_seed_stream',
+    'floats_near',
     'DiscreteScalarDistributionTestHelpers',
     'TestCase',
     'VectorDistributionTestHelpers',
@@ -542,6 +543,34 @@ def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
       arguments or command line flags.
   """
   return SeedStream(test_seed(hardcoded_seed), salt=salt)
+
+
+def floats_near(target, how_many, dtype=np.float32):
+  """Returns all the floats nearest the given target.
+
+  This is useful for brute-force testing for situations where round-off errors
+  may violate software invariants (e.g., interpolation result falling outside
+  the interval being interpolated into).
+
+  This implementation may itself have numerical infelicities, so may contain
+  gaps and duplicates, but should be pretty good for non-zero (and non-denormal)
+  targets.
+
+  Args:
+    target: Float near which to produce candidates.
+    how_many: How many candidates to produce.
+    dtype: The floating point type of outputs to emit.  The returned values
+      are supposed to densely cover the space of floats representable in this
+      dtype near the target.
+
+  Returns:
+    floats: A 1-D numpy array of `how_many` floats of the requested type,
+      densely covering the space of representable floats near `target`.
+  """
+  eps = np.finfo(dtype).eps
+  offset = eps * how_many / 2
+  return np.linspace(target * (1. - offset), target * (1. + offset),
+                     how_many, dtype=dtype)
 
 
 class DiscreteScalarDistributionTestHelpers(object):

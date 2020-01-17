@@ -137,6 +137,19 @@ class ShiftedScaledSigmoidBijectorTest(test_util.TestCase):
       bijector = tfb.Sigmoid(low=low, high=high, validate_args=True)
       self.evaluate(bijector.forward(3.))
 
+  def testEdgeCaseRequiringClipping(self):
+    np.set_printoptions(floatmode='unique', precision=None)
+    lo = np.float32(0.010489981)
+    hi = test_util.floats_near(
+        0.010499111, 100, dtype=np.float32)[:, np.newaxis]
+    self.assertAllEqual([100, 1], hi.shape)
+    xs = test_util.floats_near(9.814646, 100, dtype=np.float32)
+    bijector = tfb.Sigmoid(low=lo, high=hi, validate_args=True)
+    answers = bijector.forward(xs)
+    self.assertAllEqual([100, 100], answers.shape)
+    for ans1, hi1 in zip(self.evaluate(answers), hi):
+      self.assertAllLessEqual(ans1, hi1)
+
 
 if __name__ == '__main__':
   tf.test.main()
