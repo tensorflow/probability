@@ -100,7 +100,7 @@ class _CholeskyExtend(test_util.TestCase):
 
     new_chol = tfp.math.cholesky_concat(
         chol, k.matrix(xsys, ys) + jitter(z)[:, n:])
-    self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=1e-5)
+    self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
 
 
 @test_util.test_all_tf_execution_regimes
