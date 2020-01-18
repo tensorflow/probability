@@ -335,6 +335,17 @@ class DeferredTensorBehavesLikeTensorTest(test_util.TestCase):
         for _ in iter(x):
           pass
 
+  def testMethodNumpy(self):
+    x_ = np.array([0., 1.])
+    x = tfp.util.DeferredTensor(tf.Variable(x_), tf.math.exp)
+    self.evaluate([v.initializer for v in x.trainable_variables])
+    if tf.executing_eagerly():
+      self.assertAllEqual(tf.math.exp(x_).numpy(), x.numpy())
+    else:
+      with self.assertRaises(TypeError):
+        for _ in iter(x):
+          pass
+
 
 if __name__ == '__main__':
   tf.test.main()

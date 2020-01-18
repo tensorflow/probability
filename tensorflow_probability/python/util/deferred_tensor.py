@@ -288,6 +288,10 @@ class DeferredTensor(tf.Module):
     """The string name of this object."""
     return self._name
 
+  def numpy(self):
+    """Returns (copy of) deferred values as a NumPy array or scalar."""
+    return self._value().numpy()
+
   def set_shape(self, shape):
     """Updates the shape of this pretransformed_input.
 
