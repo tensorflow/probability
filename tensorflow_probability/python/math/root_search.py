@@ -75,7 +75,7 @@ def secant_root(objective_fn,
       value will be used instead.
       Default value: `initial_position * (1 + 1e-4) + sign(initial_position) *
         1e-4`.
-    value_at_position: Optional `Tensor` or Pyhon float representing the value
+    value_at_position: Optional `Tensor` or Python float representing the value
       of `objective_fn` at `initial_position`. If specified, this argument must
       have the same shape and dtype as `initial_position`. If not specified, the
       value will be evaluated during the search.
