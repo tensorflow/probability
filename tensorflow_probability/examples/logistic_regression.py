@@ -217,8 +217,8 @@ def main(argv):
 
   # Define and train a bayesian logistic regression model.
   model = create_model(FLAGS.num_examples, NUM_DIMENSIONS)
-  model.fit_generator(toy_logistic_sequence, epochs=FLAGS.num_epochs,
-                      shuffle=True)
+  model.fit(toy_logistic_sequence, epochs=FLAGS.num_epochs,
+            shuffle=True)
   # Visualize some draws from the weights posterior.
   candidate_w_bs = [(model.layers[-1].kernel_posterior.sample().numpy(),
                      model.layers[-1].bias_posterior.sample().numpy())

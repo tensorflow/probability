@@ -213,7 +213,7 @@ def create_model():
   # the model), to the cross entropy loss, effectively
   # calcuating the (negated) Evidence Lower Bound Loss (ELBO)
   model.compile(optimizer, loss='categorical_crossentropy',
-                metrics=['accuracy'])
+                metrics=['accuracy'], experimental_run_tf_function=False)
   return model
 
 
@@ -274,7 +274,7 @@ class MNISTSequence(tf.keras.utils.Sequence):
               as one-hot (categorical) values.
     '''
     images = images/255.
-    images = np.expand_dims(images, axis=4)
+    images = np.expand_dims(images, axis=3)
 
     labels = tf.keras.utils.to_categorical(labels)
     return images, labels
