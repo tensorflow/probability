@@ -32,6 +32,27 @@ class BinomialTest(test_util.TestCase):
   def setUp(self):
     self._rng = np.random.RandomState(42)
 
+  def testAssertionsOneOfProbsAndLogits(self):
+    with self.assertRaisesRegex(
+        ValueError, 'Construct `Binomial` with `probs` or `logits`'):
+      self.evaluate(tfd.Binomial(total_count=10))
+
+    with self.assertRaisesRegexp(ValueError, 'but not both'):
+      self.evaluate(tfd.Binomial(total_count=10, probs=0.5, logits=0.))
+
+  def testInvalidProbabilities(self):
+    invalid_probabilities = [1.01, 2.]
+    for p in invalid_probabilities:
+      with self.assertRaisesOpError('probs has components greater than 1'):
+        dist = tfd.Binomial(total_count=10, probs=p, validate_args=True)
+        self.evaluate(dist.probs_parameter())
+
+    invalid_probabilities = [-0.01, -3.]
+    for p in invalid_probabilities:
+      with self.assertRaisesOpError('x >= 0 did not hold'):
+        dist = tfd.Binomial(total_count=10, probs=p, validate_args=True)
+        self.evaluate(dist.probs_parameter())
+
   def testSimpleShapes(self):
     p = np.float32(np.random.beta(1, 1))
     binom = tfd.Binomial(total_count=1., probs=p, validate_args=True)
@@ -274,6 +295,24 @@ class BinomialFromVariableTest(test_util.TestCase):
     self.evaluate(x.assign(-x))
     with self.assertRaisesOpError('`total_count` must be non-negative.'):
       self.evaluate(d.mean())
+
+  def testAssertionsProbsMutation(self):
+    probs = tf.Variable([0.5])
+
+    d = tfd.Binomial(total_count=10, probs=probs, validate_args=True)
+    self.evaluate([v.initializer for v in d.variables])
+    self.evaluate(d.probs_parameter())
+
+    self.evaluate(probs.assign([1.25]))
+    with self.assertRaisesOpError('probs has components greater than 1'):
+      self.evaluate(d.probs_parameter())
+
+    self.evaluate(probs.assign([-0.5]))
+    with self.assertRaisesOpError('x >= 0 did not hold'):
+      self.evaluate(d.probs_parameter())
+
+    self.evaluate(probs.assign([0.75]))
+    self.evaluate(d.probs_parameter())
 
 
 if __name__ == '__main__':
