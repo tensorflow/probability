@@ -262,11 +262,14 @@ class Binomial(distribution.Distribution):
         dtype=self.dtype,
         seed=seed)[..., 0]
 
-  def _mean(self):
-    return self._total_count * self._probs_parameter_no_checks()
+  def _mean(self, probs=None):
+    if probs is None:
+      probs = self._probs_parameter_no_checks()
+    return self._total_count * probs
 
   def _variance(self):
-    return self._mean() * (1. - self._probs_parameter_no_checks())
+    probs = self._probs_parameter_no_checks()
+    return self._mean(probs) * (1. - probs)
 
   @distribution_util.AppendDocstring(
       """Note that when `(1 + total_count) * probs` is an integer, there are
@@ -304,15 +307,30 @@ class Binomial(distribution.Distribution):
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
-    if is_init == tensor_util.is_ref(self.total_count):
-      return []
-    total_count = tf.convert_to_tensor(self.total_count)
-    msg1 = 'Argument `total_count` must be non-negative.'
-    msg2 = 'Argument `total_count` cannot contain fractional components.'
-    return [
-        assert_util.assert_non_negative(total_count, message=msg1),
-        distribution_util.assert_integer_form(total_count, message=msg2),
-    ]
+
+    assertions = []
+
+    if is_init != tensor_util.is_ref(self.total_count):
+      total_count = tf.convert_to_tensor(self.total_count)
+      msg1 = 'Argument `total_count` must be non-negative.'
+      msg2 = 'Argument `total_count` cannot contain fractional components.'
+      assertions += [
+          assert_util.assert_non_negative(total_count, message=msg1),
+          distribution_util.assert_integer_form(total_count, message=msg2),
+      ]
+
+    if self._probs is not None:
+      if is_init != tensor_util.is_ref(self._probs):
+        probs = tf.convert_to_tensor(self._probs)
+        one = tf.constant(1., probs.dtype)
+        assertions += [
+            assert_util.assert_non_negative(
+                probs, message='probs has components less than 0.'),
+            assert_util.assert_less_equal(
+                probs, one, message='probs has components greater than 1.')
+        ]
+
+    return assertions
 
   def _sample_control_dependencies(self, counts):
     """Check counts for proper values."""
