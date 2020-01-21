@@ -1162,6 +1162,19 @@ class ReproducibilityTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class EventSpaceBijectorsTest(test_util.TestCase):
 
+  def check_bad_loc_scale(self, dist):
+    if hasattr(dist, 'loc') and hasattr(dist, 'scale'):
+      try:
+        loc_ = tf.convert_to_tensor(dist.loc)
+        scale_ = tf.convert_to_tensor(dist.scale)
+      except (ValueError, TypeError):
+        # If they're not Tensor-convertible, don't try to check them.  This is
+        # the case, in, for example, multivariate normal, where the scale is a
+        # `LinearOperator`.
+        return
+      loc, scale = self.evaluate([loc_, scale_])
+      hp.assume(np.all(np.abs(loc / scale) < 1e7))
+
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testDistribution(self, data):
@@ -1176,6 +1189,8 @@ class EventSpaceBijectorsTest(test_util.TestCase):
         distributions(
             enable_vars=enable_vars,
             eligibility_filter=(lambda name: name not in broken_dists)))
+    self.evaluate([var.initializer for var in dist.variables])
+    self.check_bad_loc_scale(dist)
 
     event_space_bijector = dist._experimental_default_event_space_bijector()
     if event_space_bijector is None:
@@ -1198,7 +1213,6 @@ class EventSpaceBijectorsTest(test_util.TestCase):
         tfp_hps.constrained_tensors(
             tfp_hps.identity_fn, total_sample_shape.as_list()))
     x = event_space_bijector(y)
-    self.evaluate([var.initializer for var in dist.variables])
     with tf.control_dependencies(dist._sample_control_dependencies(x)):
       self.evaluate(tf.identity(x))
 
