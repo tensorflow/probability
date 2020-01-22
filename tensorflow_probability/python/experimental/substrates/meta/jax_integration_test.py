@@ -35,7 +35,7 @@ class JaxIntegrationTest(absltest.TestCase):
   def testBijector(self):
 
     def f(x):
-      return tfb.Gumbel(loc=np.arange(3.).astype(np.float32)).forward(x)
+      return tfb.GumbelCDF(loc=np.arange(3.).astype(np.float32)).forward(x)
 
     vecf = jax.vmap(f, in_axes=(0,))
 

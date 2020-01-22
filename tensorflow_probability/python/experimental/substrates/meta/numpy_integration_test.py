@@ -34,7 +34,7 @@ class NumpyIntegrationTest(absltest.TestCase):
   def testBijector(self):
 
     def f(x):
-      return tfb.Gumbel(loc=np.arange(3.)).forward(x)
+      return tfb.GumbelCDF(loc=np.arange(3.)).forward(x)
 
     f(0.)
     f(np.array([1, 2, 3.]))
