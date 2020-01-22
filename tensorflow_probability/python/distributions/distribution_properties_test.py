@@ -858,18 +858,24 @@ def base_distributions(draw,
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
 
+  # Draw raw parameters
   params_kwargs = draw(
       broadcasting_params(
           dist_name, batch_shape, event_dim=event_dim, enable_vars=enable_vars))
+  hp.note('Forming dist {} with raw parameters {}'.format(
+      dist_name, params_kwargs))
+
+  # Constrain them to legal values
   params_constrained = constraint_for(dist_name)(params_kwargs)
 
   # Sometimes the "distribution constraint" fn may replace c2t-tracking
   # DeferredTensor params with Tensor params (e.g. fix_triangular). In such
   # cases, we preserve the c2t-tracking DeferredTensors by wrapping them but
-  # ignoring the value.
+  # ignoring the value.  We similarly reinstate raw tf.Variables, so they
+  # appear in the distribution's `variables` list and can be initialized.
   for k in params_constrained:
     if (k in params_kwargs and
-        isinstance(params_kwargs[k], tfp_util.DeferredTensor) and
+        isinstance(params_kwargs[k], (tfp_util.DeferredTensor, tf.Variable)) and
         params_kwargs[k] is not params_constrained[k]):
 
       def constrained_value(v, val=params_constrained[k]):
@@ -890,8 +896,11 @@ def base_distributions(draw,
     # an error in testDistribution when `log_prob` is called on a sample.
     params_constrained['input_output_cholesky'] = True
 
+  # Actually construct the distribution
   dist_cls = INSTANTIABLE_BASE_DISTS[dist_name].cls
   result_dist = dist_cls(**params_constrained)
+
+  # Check that the batch shape came out as expected
   if batch_shape != result_dist.batch_shape:
     msg = ('Distributions strategy generated a bad batch shape '
            'for {}, should have been {}.').format(result_dist, batch_shape)
