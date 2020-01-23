@@ -116,8 +116,6 @@ multi_substrate_py_library(
         ":variational_gaussian_process",
         ":vector_diffeomixture",
         ":vector_exponential_diag",
-        ":vector_laplace_diag",
-        ":vector_sinh_arcsinh_diag",
         ":von_mises",
         ":von_mises_fisher",
         ":wishart",
@@ -1427,17 +1425,6 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
-    name = "vector_laplace_diag",
-    srcs = ["vector_laplace_diag.py"],
-    deps = [
-        ":vector_laplace_linear_operator",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:tensor_util",
-    ],
-)
-
-multi_substrate_py_library(
     name = "vector_laplace_linear_operator",
     srcs = ["vector_laplace_linear_operator.py"],
     deps = [
@@ -1450,22 +1437,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "vector_sinh_arcsinh_diag",
-    srcs = ["vector_sinh_arcsinh_diag.py"],
-    deps = [
-        ":normal",
-        ":transformed_distribution",
-        # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:affine",
-        "//tensorflow_probability/python/bijectors:chain",
-        "//tensorflow_probability/python/bijectors:sinh_arcsinh",
-        "//tensorflow_probability/python/internal:distribution_util",
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -2638,28 +2609,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "vector_exponential_diag_test",
     srcs = ["vector_exponential_diag_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "vector_laplace_diag_test",
-    srcs = ["vector_laplace_diag_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "vector_sinh_arcsinh_diag_test",
-    srcs = ["vector_sinh_arcsinh_diag_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
