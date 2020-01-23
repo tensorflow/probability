@@ -255,46 +255,6 @@ py_test(
 )
 
 py_binary(
-    name = "latent_dirichlet_allocation_edward2",
-    srcs = ["latent_dirichlet_allocation_edward2.py"],
-    python_version = "PY2",
-    srcs_version = "PY2AND3",
-    deps = [":latent_dirichlet_allocation_edward2_lib"],
-)
-
-py_library(
-    name = "latent_dirichlet_allocation_edward2_lib",
-    srcs = ["latent_dirichlet_allocation_edward2.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # absl/flags dep,
-        # numpy dep,
-        # scipy dep,
-        # six dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_test(
-    name = "latent_dirichlet_allocation_edward2_test",
-    size = "small",
-    srcs = ["latent_dirichlet_allocation_edward2.py"],
-    args = [
-        "--fake_data",
-        "--max_steps=5",
-        "--delete_existing",
-        "--viz_steps=5",
-        "--learning_rate=1e-7",
-    ],
-    main = "latent_dirichlet_allocation_edward2.py",
-    srcs_version = "PY2AND3",
-    deps = [
-        ":latent_dirichlet_allocation_edward2_lib",
-    ],
-)
-
-py_binary(
     name = "logistic_regression",
     srcs = ["logistic_regression.py"],
     python_version = "PY2",
