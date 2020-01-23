@@ -97,7 +97,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertAllEqual(joint.event_shape, [[], [], []])
     self.assertAllEqual(joint.batch_shape, [[], [], []])
 
-    ds, _ = joint.sample_distributions()
+    ds, _ = joint.sample_distributions(seed=test_util.test_seed())
     self.assertLen(ds, 3)
     self.assertIsInstance(ds[0], tfd.Bernoulli)
     self.assertIsInstance(ds[1], tfd.Bernoulli)
@@ -147,7 +147,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertAllEqual(joint.event_shape, [[], [], [20], [20]])
     self.assertAllEqual(joint.batch_shape, [[], [], [], []])
 
-    ds, _ = joint.sample_distributions()
+    ds, _ = joint.sample_distributions(seed=test_util.test_seed())
     self.assertLen(ds, 4)
     self.assertIsInstance(ds[0], tfd.Gamma)
     self.assertIsInstance(ds[1], tfd.Exponential)
@@ -354,8 +354,12 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     # Destructure vector-valued Tensors into Python lists, to mimic the values
     # a user might type.
+    def _convert_ndarray_to_list(x):
+      if isinstance(x, np.ndarray) and x.ndim > 0:
+        return list(x)
+      return x
     value = tf.nest.map_structure(
-        lambda x: list(x) if isinstance(x, np.ndarray) else x,
+        _convert_ndarray_to_list,
         self.evaluate(d.sample(seed=test_util.test_seed())))
     value_with_names = list(zip(d._flat_resolve_names(), value))
 
@@ -605,7 +609,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertAllEqual(sorted(sample_dtype._fields),
                         sorted(joint.sample(
                             seed=test_util.test_seed())._fields))
-    ds, xs = joint.sample_distributions([2, 3])
+    ds, xs = joint.sample_distributions([2, 3], seed=test_util.test_seed())
     tf.nest.assert_same_structure(sample_dtype, ds)
     tf.nest.assert_same_structure(sample_dtype, xs)
     self.assertEqual([3, 4], joint.log_prob(
@@ -711,6 +715,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     lp = dist.log_prob(z)
     self.assertEqual(lp.shape, [7, 9])
 
+  @test_util.jax_disable_variable_test
   def test_latent_dirichlet_allocation(self):
     """Tests Latent Dirichlet Allocation joint model.
 
@@ -774,12 +779,15 @@ class JointDistributionCoroutineTest(test_util.TestCase):
                         (grads[0].shape, grads[1].shape))
     self.assertAllNotNone(grads)
 
+  @test_util.jax_disable_test_missing_functionality(
+      'Graph tensors are unsupported in JAX backend.')
   def test_cache_doesnt_leak_graph_tensors(self):
     if not tf.executing_eagerly():
       return
 
     def dist():
-      random_rank = tf.cast(3.5 + tf.random.uniform([]), tf.int32)
+      random_rank = tf.cast(3.5 + tf.random.uniform(
+          [], seed=test_util.test_seed()), tf.int32)
       yield Root(tfd.Normal(loc=0., scale=tf.ones([random_rank])))
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
