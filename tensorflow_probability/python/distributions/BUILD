@@ -1997,7 +1997,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "joint_distribution_coroutine_test",
     srcs = ["joint_distribution_coroutine_test.py"],
-    jax_tags = ["notap"],
+    jax_size = "medium",
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2010,7 +2010,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "joint_distribution_named_test",
     srcs = ["joint_distribution_named_test.py"],
-    jax_tags = ["notap"],
+    jax_size = "medium",
     numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
@@ -2023,7 +2023,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "joint_distribution_sequential_test",
     srcs = ["joint_distribution_sequential_test.py"],
-    jax_tags = ["notap"],
+    jax_size = "medium",
     numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,

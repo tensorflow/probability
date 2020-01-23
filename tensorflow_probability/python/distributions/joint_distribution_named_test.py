@@ -83,7 +83,7 @@ class JointDistributionNamedTest(test_util.TestCase):
     # We'll verify the shapes work as intended when we plumb these back into the
     # respective log_probs.
 
-    ds, _ = d.sample_distributions(value=xs)
+    ds, _ = d.sample_distributions(value=xs, seed=test_util.test_seed())
     self.assertLen(ds, 5)
     self.assertIsInstance(ds['e'], tfd.Independent)
     self.assertIsInstance(ds['scale'], tfd.Gamma)
@@ -146,7 +146,7 @@ class JointDistributionNamedTest(test_util.TestCase):
     # We'll verify the shapes work as intended when we plumb these back into the
     # respective log_probs.
 
-    ds, _ = d.sample_distributions(value=xs)
+    ds, _ = d.sample_distributions(value=xs, seed=test_util.test_seed())
     self.assertLen(ds, 5)
     self.assertIsInstance(ds.e, tfd.Independent)
     self.assertIsInstance(ds.scale, tfd.Gamma)
@@ -208,7 +208,7 @@ class JointDistributionNamedTest(test_util.TestCase):
     # We'll verify the shapes work as intended when we plumb these back into the
     # respective log_probs.
 
-    ds, _ = d.sample_distributions(value=xs)
+    ds, _ = d.sample_distributions(value=xs, seed=test_util.test_seed())
     self.assertLen(ds, 5)
     values = tuple(ds.values())
     self.assertIsInstance(values[0], tfd.Independent)
@@ -279,8 +279,12 @@ class JointDistributionNamedTest(test_util.TestCase):
 
     # Destructure vector-valued Tensors into Python lists, to mimic the values
     # a user might type.
+    def _convert_ndarray_to_list(x):
+      if isinstance(x, np.ndarray) and x.ndim > 0:
+        return list(x)
+      return x
     sample = tf.nest.map_structure(
-        lambda x: list(x) if isinstance(x, np.ndarray) else x,
+        _convert_ndarray_to_list,
         self.evaluate(d.sample(seed=test_util.test_seed())))
     sample_dict = dict(sample)
 
@@ -533,7 +537,7 @@ class JointDistributionNamedTest(test_util.TestCase):
     x = d.sample(seed=test_util.test_seed())
     self.assertLen(x, 7)
 
-    ds, s = d.sample_distributions()
+    ds, s = d.sample_distributions(seed=test_util.test_seed())
     self.assertEqual(ds['x'].parameters['df'], s['df'])
     self.assertEqual(ds['x'].parameters['loc'], s['loc'])
     self.assertEqual(ds['x'].parameters['scale'], s['scale'])
