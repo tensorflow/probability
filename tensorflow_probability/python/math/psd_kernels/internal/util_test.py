@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -172,6 +173,35 @@ class UtilTest(test_util.TestCase):
     _, grad_safe_sqrt = value_and_gradient(
         util.sqrt_with_finite_grads, x)
     self.assertAllEqual(*self.evaluate([grad_tf_sqrt, grad_safe_sqrt]))
+
+  @parameterized.parameters(
+      {'feature_ndims': 1, 'dims': 3},
+      {'feature_ndims': 1, 'dims': 4},
+      {'feature_ndims': 2, 'dims': 2},
+      {'feature_ndims': 2, 'dims': 3},
+      {'feature_ndims': 3, 'dims': 2},
+      {'feature_ndims': 3, 'dims': 3})
+  def testPairwiseSquareDistanceMatrix(self, feature_ndims, dims):
+    batch_shape = [2, 3]
+    seed_stream = test_util.test_seed_stream('pairwise_square_distance')
+    x1 = tf.random.normal(
+        dtype=np.float64, shape=batch_shape + [dims] * feature_ndims,
+        seed=seed_stream())
+    x2 = tf.random.normal(
+        dtype=np.float64, shape=batch_shape + [dims] * feature_ndims,
+        seed=seed_stream())
+    pairwise_square_distance = util.pairwise_square_distance_matrix(
+        x1, x2, feature_ndims)
+
+    x1_pad = util.pad_shape_with_ones(
+        x1, ndims=1, start=-(feature_ndims + 1))
+    x2_pad = util.pad_shape_with_ones(
+        x2, ndims=1, start=-(feature_ndims + 2))
+    actual_square_distance = util.sum_rightmost_ndims_preserving_shape(
+        tf.math.squared_difference(x1_pad, x2_pad), feature_ndims)
+    pairwise_square_distance_, actual_square_distance_ = self.evaluate([
+        pairwise_square_distance, actual_square_distance])
+    self.assertAllClose(pairwise_square_distance_, actual_square_distance_)
 
 
 if __name__ == '__main__':

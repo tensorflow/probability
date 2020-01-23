@@ -87,7 +87,7 @@ class _KumaraswamyTransformedTest(test_util.TestCase):
         _numpy_exp_quad_matrix(
             amplitude[..., None, None], inner_length_scale, z,
             feature_ndims=feature_ndims),
-        self.evaluate(kum_kernel.matrix(z, z)))
+        self.evaluate(kum_kernel.matrix(z, z)), rtol=1e-5)
 
   @parameterized.parameters(
       {'feature_ndims': 1, 'dims': 3},
