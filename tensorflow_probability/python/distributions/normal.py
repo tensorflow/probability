@@ -219,7 +219,7 @@ class Normal(distribution.Distribution):
     return self.loc * tf.ones_like(self.scale)
 
   def _quantile(self, p):
-    return special_math.ndtri(p) * self.scale + self.loc
+    return tf.math.ndtri(p) * self.scale + self.loc
 
   def _stddev(self):
     return self.scale * tf.ones_like(self.loc)

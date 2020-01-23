@@ -25,7 +25,6 @@ import numpy as np
 from scipy import special as sp_special
 from scipy import stats as sp_stats
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import special_math
@@ -53,58 +52,6 @@ def _make_grid(dtype, grid_spec):
 GridSpec = collections.namedtuple("GridSpec", ["min", "max", "shape"])
 
 ErrorSpec = collections.namedtuple("ErrorSpec", ["rtol", "atol"])
-
-
-@test_util.test_all_tf_execution_regimes
-class NdtriTest(test_util.TestCase):
-
-  def assertAllFinite(self, x):
-    is_finite = np.isfinite(x)
-    all_true = np.ones_like(is_finite, dtype=np.bool)
-    self.assertAllEqual(all_true, is_finite)
-
-  def testNdtri(self):
-    """Verifies that ndtri computation is correct."""
-
-    p = np.linspace(0., 1., 50).astype(np.float64)
-    # Quantile performs piecewise rational approximation so adding some
-    # sp_special input values to make sure we hit all the pieces.
-    p = np.hstack((p, np.exp(-32), 1. - np.exp(-32), np.exp(-2),
-                   1. - np.exp(-2)))
-    expected_x = sp_special.ndtri(p)
-    x = special_math.ndtri(p)
-    self.assertAllClose(expected_x, self.evaluate(x), atol=0.)
-
-  def testNdtriDynamicShape(self):
-    """Verifies that ndtri computation is correct."""
-    p_ = np.linspace(0., 1., 50).astype(np.float32)
-    p = tf1.placeholder_with_default(p_, shape=None)
-    self.assertAllClose(sp_special.ndtri(p_),
-                        self.evaluate(special_math.ndtri(p)),
-                        atol=0.)
-
-  def _baseNdtriFiniteGradientTest(self, dtype):
-    """Verifies that ndtri has finite gradients at interesting points."""
-    # Tests gradients at 0, 1, and piece-wise boundaries.
-    p = tf.constant(
-        np.array([
-            0.,
-            np.exp(-32.),
-            np.exp(-2.),
-            1. - np.exp(-2.),
-            1. - np.exp(-32.),
-            1.,
-        ]).astype(dtype))
-    # Not having the lambda sanitzer means we'd get an `IndexError` whenever
-    # the user supplied function has default args.
-    _, grads = value_and_gradient(special_math.ndtri, p)
-    self.assertAllFinite(self.evaluate(grads[0]))
-
-  def testNdtriFiniteGradientFloat32(self):
-    self._baseNdtriFiniteGradientTest(np.float32)
-
-  def testNdtriFiniteGradientFloat64(self):
-    self._baseNdtriFiniteGradientTest(np.float64)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -296,25 +243,6 @@ class NdtrGradientTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class LogNdtrGradientTest(NdtrGradientTest):
   _use_log = True
-
-
-@test_util.test_all_tf_execution_regimes
-class ErfInvTest(test_util.TestCase):
-
-  def testErfInvValues(self):
-    x = np.linspace(0., 1., 50).astype(np.float64)
-    self.assertAllClose(sp_special.erfinv(x),
-                        self.evaluate(special_math.erfinv(x)),
-                        atol=0)
-
-  def testErfInvIntegerInput(self):
-    with self.assertRaises(TypeError):
-      x = np.array([1, 2, 3]).astype(np.int32)
-      special_math.erfinv(x)
-
-    with self.assertRaises(TypeError):
-      x = np.array([1, 2, 3]).astype(np.int64)
-      special_math.erfinv(x)
 
 
 @test_util.test_all_tf_execution_regimes

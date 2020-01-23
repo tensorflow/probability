@@ -27,7 +27,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -63,7 +62,7 @@ class ProbitBernoulliTest(test_util.TestCase):
     p = [0.01, 0.99, 0.42]
     dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
     self.assertAllClose(
-        sp_special.ndtri(p), self.evaluate(dist.probits_parameter()))
+        tf.math.ndtri(p), self.evaluate(dist.probits_parameter()))
 
   def testInvalidP(self):
     invalid_ps = [1.01, 2.]
@@ -161,7 +160,7 @@ class ProbitBernoulliTest(test_util.TestCase):
   def testPmfWithP(self):
     p = [[0.2, 0.4], [0.3, 0.6]]
     self._testPmf(probs=p, validate_args=True)
-    self._testPmf(probits=sp_special.ndtri(p), validate_args=True)
+    self._testPmf(probits=tf.math.ndtri(p), validate_args=True)
 
   def testPmfWithFloatArgReturnsXEntropy(self):
     p = [[0.2], [0.4], [0.3], [0.6]]
@@ -307,7 +306,7 @@ class ProbitBernoulliTest(test_util.TestCase):
     x = tf.constant([-1., 0.5, 1.])
     d = tfd.ProbitBernoulli(probits=x, validate_args=True)
     self.assertAllClose(
-        *self.evaluate([special_math.ndtri(d.prob(1.)),
+        *self.evaluate([tf.math.ndtri(d.prob(1.)),
                         d.probits_parameter()]),
         atol=0,
         rtol=1e-4)
@@ -318,7 +317,7 @@ class ProbitBernoulliTest(test_util.TestCase):
     x = tf.constant([0.1, 0.5, 0.4])
     d = tfd.ProbitBernoulli(probs=x, validate_args=True)
     self.assertAllClose(
-        *self.evaluate([special_math.ndtri(d.prob(1.)),
+        *self.evaluate([tf.math.ndtri(d.prob(1.)),
                         d.probits_parameter()]),
         atol=0,
         rtol=1e-4)

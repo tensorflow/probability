@@ -73,6 +73,7 @@ __all__ = [
     'equal',
     'erf',
     'erfc',
+    'erfinv',
     'exp',
     'expm1',
     'floor',
@@ -106,6 +107,7 @@ __all__ = [
     'minimum',
     'multiply',
     'multiply_no_nan',
+    'ndtri',
     'negative',
     # 'nextafter',
     'not_equal',
@@ -407,6 +409,10 @@ erfc = utils.copy_docstring(
     tf.math.erfc,
     lambda x, name=None: scipy_special.erfc(x))
 
+erfinv = utils.copy_docstring(
+    tf.math.erfinv,
+    lambda x, name=None: scipy_special.erfinv(x))
+
 exp = utils.copy_docstring(
     tf.math.exp,
     lambda x, name=None: np.exp(x))
@@ -598,6 +604,10 @@ def _multiply_no_nan(x, y, name=None):  # pylint: disable=unused-argument
 
 multiply_no_nan = utils.copy_docstring(
     tf.math.multiply_no_nan, _multiply_no_nan)
+
+ndtri = utils.copy_docstring(
+    tf.math.ndtri,
+    lambda x, name=None: scipy_special.ndtri(x))
 
 negative = utils.copy_docstring(
     tf.math.negative,

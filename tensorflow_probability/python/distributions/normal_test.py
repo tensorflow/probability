@@ -310,8 +310,8 @@ class NormalTest(test_util.TestCase):
   def _baseQuantileFiniteGradientAtDifficultPoints(self, dtype):
     mu = tf.constant(dtype(0))
     sigma = tf.constant(dtype(1))
-    p = tf.constant(dtype([0., np.exp(-32.), np.exp(-2.),
-                           1. - np.exp(-2.), 1. - np.exp(-32.), 1.]))
+    p = tf.constant(dtype([np.exp(-32.), np.exp(-2.),
+                           1. - np.exp(-2.), 1. - np.exp(-8.)]))
     value, grads = tfp.math.value_and_gradient(
         lambda m, p_: tfd.Normal(loc=m, scale=sigma, validate_args=True).  # pylint: disable=g-long-lambda
         quantile(p_), [mu, p])
