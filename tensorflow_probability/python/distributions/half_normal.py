@@ -28,7 +28,6 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -173,7 +172,7 @@ class HalfNormal(distribution.Distribution):
     return self.scale * np.sqrt(2.0) / np.sqrt(np.pi)
 
   def _quantile(self, p):
-    return np.sqrt(2.0) * self.scale * special_math.erfinv(p)
+    return np.sqrt(2.0) * self.scale * tf.math.erfinv(p)
 
   def _mode(self):
     return tf.zeros(self.batch_shape_tensor())

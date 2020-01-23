@@ -72,7 +72,7 @@ class NormalCDF(bijector.Bijector):
 
   def _inverse(self, y):
     with tf.control_dependencies(self._assertions(y)):
-      return special_math.ndtri(y)
+      return tf.math.ndtri(y)
 
   def _forward_log_det_jacobian(self, x):
     return -0.5 * np.log(2 * np.pi) - tf.square(x) / 2.

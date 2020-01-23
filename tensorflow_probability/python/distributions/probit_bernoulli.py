@@ -173,7 +173,7 @@ class ProbitBernoulli(distribution.Distribution):
   def _probits_parameter_no_checks(self):
     if self._probits is None:
       probs = tf.convert_to_tensor(self._probs)
-      return special_math.ndtri(probs)
+      return tf.math.ndtri(probs)
     return tf.identity(self._probits)
 
   def probs_parameter(self, name=None):

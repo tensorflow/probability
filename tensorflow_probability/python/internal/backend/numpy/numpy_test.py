@@ -623,6 +623,7 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
              [single_arrays(elements=non_zero_floats(-1e4, 1e4))]),
     TestCase('math.erf', [single_arrays()]),
     TestCase('math.erfc', [single_arrays()]),
+    TestCase('math.erfinv', [single_arrays(elements=floats(-1., 1.))]),
     TestCase('math.exp',  # TODO(b/147394924): max_value=1e3
              [single_arrays(elements=floats(min_value=-1e3, max_value=85))]),
     TestCase('math.expm1',
@@ -639,6 +640,7 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
              [single_arrays(elements=floats(min_value=-100.))]),
     TestCase('math.logical_not',
              [single_arrays(dtype=np.bool, elements=hps.booleans())]),
+    TestCase('math.ndtri', [single_arrays(elements=floats(0., 1.))]),
     TestCase('math.negative', [single_arrays()]),
     TestCase('math.reciprocal', [single_arrays()]),
     TestCase('math.rint', [single_arrays()]),
