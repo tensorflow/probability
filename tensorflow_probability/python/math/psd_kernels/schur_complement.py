@@ -300,6 +300,34 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
     # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2)
     return k12 - k1z_kzzinv_kz2
 
+  def _matrix(self, x1, x2):
+    k12 = self.base_kernel.matrix(x1, x2)
+    if self._is_fixed_inputs_empty():
+      return k12
+
+    fixed_inputs = tf.convert_to_tensor(self._fixed_inputs)
+
+    # Shape: bc(Bk, B1, Bz) + E1 + [ez]
+    k1z = self.base_kernel.matrix(x1, fixed_inputs)
+
+    # Shape: bc(Bk, B2, Bz) + E2 + [ez]
+    k2z = self.base_kernel.matrix(x2, fixed_inputs)
+
+    # Shape: bc(Bz, Bk) + [ez, ez]
+    div_mat_chol = self._divisor_matrix_cholesky(
+        fixed_inputs=fixed_inputs)
+
+    div_mat_chol_linop = tf.linalg.LinearOperatorLowerTriangular(div_mat_chol)
+
+    # Shape: bc(Bz, Bk, B2) + [ez] + E1
+    cholinv_kz1 = div_mat_chol_linop.solve(k1z, adjoint_arg=True)
+    # Shape: bc(Bz, Bk, B2) + [ez] + E2
+    cholinv_kz2 = div_mat_chol_linop.solve(k2z, adjoint_arg=True)
+    k1z_kzzinv_kz2 = tf.linalg.matmul(
+        cholinv_kz1, cholinv_kz2, transpose_a=True)
+    # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2)
+    return k12 - k1z_kzzinv_kz2
+
   @property
   def fixed_inputs(self):
     return self._fixed_inputs

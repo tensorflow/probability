@@ -26,8 +26,10 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
-    'pad_shape_with_ones',
     'maybe_get_common_dtype',
+    'pad_shape_with_ones',
+    'pairwise_square_distance_matrix',
+    'pairwise_square_distance_tensor',
     'sum_rightmost_ndims_preserving_shape',
 ]
 
@@ -187,3 +189,102 @@ def maybe_get_common_dtype(arg_list):
   if all(a is None for a in arg_list):
     return None
   return dtype_util.common_dtype(arg_list, tf.float32)
+
+
+def pairwise_square_distance_matrix(x1, x2, feature_ndims):
+  """Returns pairwise square distance between x1 and x2.
+
+  Given `x1` and `x2`, Tensors with shape `[..., N, D1, ... Dk]` and
+  `[..., M, D1, ... Dk]`, compute the pairwise distance matrix `a_ij` of shape
+  `[..., N, M]`, where each entry `a_ij` is the square of the euclidean norm of
+  `x1[..., i, ...] - x2[..., j, ...]`.
+
+  The approach uses the fact that (where k = 1).
+  ```none
+    a_ij = sum_d (x1[i, d] - x2[j, d]) ** 2 =
+    sum_d x1[i, d] ** 2 + x2[j, d] ** 2 - 2 * x1[i, d] * x2[j, d]
+  ```
+
+  The latter term can be written as a matmul between `x1` and `x2`.
+  This reduces the memory from the naive approach of computing the
+  squared difference of `x1` and `x2` by a factor of `(prod_k D_k) ** 2`.
+  This is at the cost of the computation being more numerically unstable.
+
+  Args:
+    x1: Floating point `Tensor` with shape `B1 + [N] + [D1, ..., Dk]`,
+      where `B1` is a (possibly empty) batch shape.
+    x2: Floating point `Tensor` with shape `B2 + [M] + [D1, ..., Dk]`,
+      where `B2` is a (possibly empty) batch shape that broadcasts
+      with `B1`.
+    feature_ndims: The number of dimensions to consider for the euclidean
+      norm. This is `k` from above.
+  Returns:
+    `Tensor` of shape `[..., N, M]` representing the pairwise square
+    distance matrix.
+  """
+  row_norm_x1 = sum_rightmost_ndims_preserving_shape(
+      tf.square(x1), feature_ndims)[..., tf.newaxis]
+  row_norm_x2 = sum_rightmost_ndims_preserving_shape(
+      tf.square(x2), feature_ndims)[..., tf.newaxis, :]
+
+  x1 = tf.reshape(x1, tf.concat(
+      [tf.shape(x1)[:-feature_ndims], [
+          prefer_static.reduce_prod(tf.shape(x1)[-feature_ndims:])]], axis=0))
+  x2 = tf.reshape(x2, tf.concat(
+      [tf.shape(x2)[:-feature_ndims], [
+          prefer_static.reduce_prod(tf.shape(x2)[-feature_ndims:])]], axis=0))
+  pairwise_sq = row_norm_x1 + row_norm_x2 - 2 * tf.linalg.matmul(
+      x1, x2, transpose_b=True)
+  pairwise_sq = tf.clip_by_value(pairwise_sq, 0., np.inf)
+  return pairwise_sq
+
+
+def pairwise_square_distance_tensor(
+    x1, x2, feature_ndims, x1_example_ndims=1, x2_example_ndims=1):
+  """Returns pairwise distance between x1 and x2.
+
+  This method is a generalization `pairwise_square_distance_matrix`.
+  Given `x1` and `x2`, Tensors with shape `[..., N1, ... Nm, D1, ... Dk]` and
+  `[..., M1, ... Ml, D1, ... Dk]`, compute the pairwise distance tensor `A` of
+  shape `[..., N1, ... Nm, M1, ... Ml]`, where `m` is `x1_example_ndims` and
+  `l` is `x2_example_ndims`.
+
+  Args:
+    x1: Floating point `Tensor` with shape `B1 + E1 + [D1, ..., Dk]`,
+      where `B1` is a (possibly empty) batch shape, and `E1` is a list
+      of `x1_example_ndims` values.
+    x2: Floating point `Tensor` with shape `B2 + [M] + [D1, ..., Dk]`,
+      where `B2` is a (possibly empty) batch shape that broadcasts
+      with `B1`, and `E2` is a list of `x1_example_ndims` values.
+    feature_ndims: The number of dimensions to consider for the euclidean
+      norm. This is `k` from above.
+    x1_example_ndims: Integer for number of example dimensions in `x1`. This is
+      `len(E1)`.
+    x2_example_ndims: Integer for number of example dimensions in `x2`. This is
+      `len(E2)`.
+  Returns:
+    `Tensor` of shape `bc(B1, B2) + E1 + E2` representing the pairwise square
+    distance tensor.
+  """
+  # Collapse all the example dimensions and then expand after.
+  x1_shape = tf.shape(x1)
+  x1_example_shape = x1_shape[
+      -(feature_ndims + x1_example_ndims):-feature_ndims]
+
+  x2_shape = tf.shape(x2)
+  x2_example_shape = x2_shape[
+      -(feature_ndims + x2_example_ndims):-feature_ndims]
+
+  x1 = tf.reshape(x1, tf.concat(
+      [x1_shape[:-(feature_ndims + x1_example_ndims)],
+       [-1],
+       x1_shape[-feature_ndims:]], axis=0))
+  x2 = tf.reshape(x2, tf.concat(
+      [x2_shape[:-(feature_ndims + x2_example_ndims)],
+       [-1],
+       x2_shape[-feature_ndims:]], axis=0))
+  pairwise = pairwise_square_distance_matrix(
+      x1, x2, feature_ndims=feature_ndims)
+  # Now we need to undo the transformation.
+  return tf.reshape(pairwise, tf.concat([
+      tf.shape(pairwise)[:-2], x1_example_shape, x2_example_shape], axis=0))
