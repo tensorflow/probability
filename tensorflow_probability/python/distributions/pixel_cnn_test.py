@@ -72,6 +72,7 @@ class PixelCnnTest(test_util.TestCase):
 
     h = self._make_fake_conditional()
     def g(x):
+      x = (2. * (x - 0) / (self.high - 0)) - 1.
       inputs = [x, h] if h is not None else x
       params = dist.network(inputs)
       out = self._apply_channel_conditioning(dist, x, *params)
