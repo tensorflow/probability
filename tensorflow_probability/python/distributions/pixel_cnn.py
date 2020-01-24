@@ -122,9 +122,10 @@ class PixelCNN(distribution.Distribution):
   batch_size = 16
   train_it = train_data.map(image_preprocess).batch(batch_size).shuffle(1000)
 
+  image_shape = (28, 28, 1)
   # Define a Pixel CNN network
   dist = tfd.PixelCNN(
-      image_shape=(28, 28, 1),
+      image_shape=image_shape,
       num_resnet=1,
       num_hierarchies=2,
       num_filters=32,
@@ -133,7 +134,7 @@ class PixelCNN(distribution.Distribution):
   )
 
   # Define the model input
-  image_input = tfkl.Input(shape=input_shape)
+  image_input = tfkl.Input(shape=image_shape)
 
   # Define the log likelihood for the loss fn
   log_prob = dist.log_prob(image_input)
