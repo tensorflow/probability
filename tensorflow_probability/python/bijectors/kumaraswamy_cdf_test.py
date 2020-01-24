@@ -120,9 +120,9 @@ class KumaraswamyTest(test_util.TestCase):
     self.evaluate(x.initializer)
     with self.assertRaisesOpError(
         'Argument `concentration1` must be positive.'):
-      b = tfb.Kumaraswamy(concentration0=1.,
-                          concentration1=x,
-                          validate_args=True)
+      b = tfb.KumaraswamyCDF(concentration0=1.,
+                             concentration1=x,
+                             validate_args=True)
       self.evaluate(b.forward_event_shape_tensor([1, 2, 3]))
     with self.assertRaisesOpError(
         'Argument `concentration0` must be positive.'):
