@@ -60,7 +60,7 @@ class PixelCnnTest(test_util.TestCase):
         size=self.batch_shape + self.image_shape).astype(np.float32)
 
   def _make_fake_conditional(self):
-    return
+    return None
 
   def _make_fake_inputs(self):
     return self._make_fake_images()
@@ -70,7 +70,7 @@ class PixelCnnTest(test_util.TestCase):
 
   def _get_single_pixel_logit_gradients(self, dist, logit_ind, pixel_ind):
 
-    h = self._make_fake_conditional()
+    h = self._make_fake_conditional() # pylint: disable=assignment-from-none
     def g(x):
       x = (2. * (x - 0) / (self.high - 0)) - 1.
       inputs = [x, h] if h is not None else x
@@ -118,7 +118,7 @@ class PixelCnnTest(test_util.TestCase):
   def testLogProb(self):
     dist = self._make_pixel_cnn()
     images = self._make_fake_images()
-    h = self._make_fake_conditional()
+    h = self._make_fake_conditional() # pylint: disable=assignment-from-none
 
     self.evaluate([v.initializer for v in dist.network.weights])
     log_prob_values = self.evaluate(dist.log_prob(images, conditional_input=h))
@@ -131,7 +131,7 @@ class PixelCnnTest(test_util.TestCase):
   def testSample(self):
 
     num_samples = 2
-    h = self._make_fake_conditional()
+    h = self._make_fake_conditional() # pylint: disable=assignment-from-none
 
     # Weight normalization and data-dependent initialization work only in Eager
     # so we enable them only if executing eagerly. We use them only in this
@@ -220,7 +220,7 @@ class PixelCnnTest(test_util.TestCase):
 
   def testDtype(self):
     inputs = self._make_fake_images()
-    h = self._make_fake_conditional()
+    h = self._make_fake_conditional() # pylint: disable=assignment-from-none
     dist = self._make_pixel_cnn()
     num_samples = 4
 
