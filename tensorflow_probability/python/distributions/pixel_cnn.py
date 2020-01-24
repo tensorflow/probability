@@ -444,7 +444,7 @@ class PixelCNN(distribution.Distribution):
       num_coeffs = num_channels * (num_channels - 1) // 2
       loc_tensors = tf.split(locs, num_channels, axis=-1)
       coef_tensors = tf.split(coeffs, num_coeffs, axis=-1)
-      channel_tensors = tf.split(value, num_channels, axis=-1)
+      channel_tensors = tf.split(transformed_value, num_channels, axis=-1)
 
       coef_count = 0
       for i in range(num_channels):
