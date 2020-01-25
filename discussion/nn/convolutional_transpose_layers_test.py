@@ -83,7 +83,7 @@ class BnnEndToEnd(object):
         # No activation.
         # nn.util.trace('deconv3'),  # [2, 28, 28, 1]
 
-        nn.Lambda(eval_final_fn=lambda loc: tfd.Independent(  # pylint: disable=g-long-lambda
+        nn.Lambda(eval_fn=lambda loc: tfd.Independent(  # pylint: disable=g-long-lambda
             tfb.Sigmoid()(tfd.Normal(loc, scale)),
             reinterpreted_batch_ndims=3), also_track=scale),
         # nn.util.trace('head'),     # [b, 28, 28, 1]

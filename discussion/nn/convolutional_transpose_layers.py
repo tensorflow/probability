@@ -302,10 +302,10 @@ class ConvolutionTransposeVariationalReparameterization(
       nn.util.trace('deconv3'),  # [2, 28, 28, 1]
 
       nn.Lambda(
-          eval_final_fn=lambda loc: (
+          eval_fn=lambda loc: (
               tfd.Independent(tfb.Sigmoid()(tfd.Normal(loc, scale)),
                               reinterpreted_batch_ndims=3)),
-              also_track=scale),
+          also_track=scale),
       nn.util.trace('head'),  # [b, 28, 28, 1]
   ], name='bayesian_autoencoder')
 
