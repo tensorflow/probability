@@ -48,28 +48,20 @@ these standards.
     if callable(inputs):
       return Sequential([inputs, self], **kwargs)
     self._extra_loss = self._extra_result = None
-    y0 = self.eval(inputs, **kwargs)
-    y1 = self.eval_final(y0, **kwargs)
-    return y1
+    return self.eval(inputs, **kwargs)
   ```
 
-  Users are expected to override one or both of `eval` and/or `eval_final`.
+  Users are expected to override `eval`.
 
 7. The `eval` function should have arguments `self, inputs, is_training=True,
    **kwargs` where `inputs` is the output of the previous layer. The `eval`
    function return only `tf.Tensor`s or objects convertible to `tf.Tensor`s. We
    encourage using `@tf.function` decoration of the `eval` function.
 
-8. The `eval_final` function should have arguments `self, inputs,
-   is_training=True, **kwargs` where `inputs` is the output of `eval`. The
-   `eval_function` can return and anything and may or may not be decorated with
-   `@tf.function`. (It will be `@tf.function` decorated when doing so does not
-   require `tf.Tensor` return types.)
-
-9. `tfp.nn.Layer`s may return "side results" by either setting the `extra_loss`
+8. `tfp.nn.Layer`s may return "side results" by either setting the `extra_loss`
    member or `extra_results` member. If these properties exist, they will be
    lifted from graph mode to eager mode upon completion of `__call__`.
 
-10. [Aspirational] All `tfp.nn.Layer` instances should support arbitrary input
-    batch shape (e.g., for bootstrap) and batches of parameters (e.g., for Monte
-    Carlo approximations under weight uncertainty).
+9. [Aspirational] All `tfp.nn.Layer` instances should support arbitrary input
+   batch shape (e.g., for bootstrap) and batches of parameters (e.g., for Monte
+   Carlo approximations under weight uncertainty).

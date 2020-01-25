@@ -181,10 +181,10 @@ class AffineVariationalReparameterization(
       nn.util.trace('affine1'),  # [b, 9]
 
       nn.Lambda(
-          eval_final_fn=lambda loc: tfb.SoftmaxCentered()(
+          eval_fn=lambda loc: tfb.SoftmaxCentered()(
               tfd.Independent(tfd.Normal(loc, scale),
                               reinterpreted_batch_ndims=1)),
-              also_track=scale),
+          also_track=scale),
       nn.util.trace('head'),  # [b, 10]
   ], name='bayesian_neural_network')
 
@@ -264,6 +264,8 @@ class AffineVariationalReparameterization(
       name: ...
         Default value: `None` (i.e., `'AffineVariationalReparameterization'`).
     """
+    self._make_posterior_fn = make_posterior_fn  # For variable tracking.
+    self._make_prior_fn = make_prior_fn  # For variable tracking.
     super(AffineVariationalReparameterization, self).__init__(
         posterior=make_posterior_fn(
             [input_size, output_size], [output_size], dtype,
@@ -387,6 +389,8 @@ class AffineVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
       name: ...
         Default value: `None` (i.e., `'AffineVariationalFlipout'`).
     """
+    self._make_posterior_fn = make_posterior_fn  # For variable tracking.
+    self._make_prior_fn = make_prior_fn  # For variable tracking.
     super(AffineVariationalFlipout, self).__init__(
         posterior=make_posterior_fn(
             [input_size, output_size], [output_size], dtype,
@@ -518,6 +522,8 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
       name: ...
         Default value: `None` (i.e., `'AffineVariationalFlipout'`).
     """
+    self._make_posterior_fn = make_posterior_fn  # For variable tracking.
+    self._make_prior_fn = make_prior_fn  # For variable tracking.
     super(AffineVariationalReparameterizationLocal, self).__init__(
         posterior=make_posterior_fn(
             [input_size, output_size], [output_size], dtype,

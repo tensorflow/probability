@@ -68,7 +68,7 @@ class BnnEndToEnd(object):
             penalty_weight=1. / n),
         # nn.util.trace('affine1'),  # [b, 9]
         nn.Lambda(
-            eval_final_fn=lambda loc: tfb.SoftmaxCentered()(  # pylint: disable=g-long-lambda
+            eval_fn=lambda loc: tfb.SoftmaxCentered()(  # pylint: disable=g-long-lambda
                 tfd.Independent(tfd.Normal(loc, scale),
                                 reinterpreted_batch_ndims=1)),
             also_track=scale),

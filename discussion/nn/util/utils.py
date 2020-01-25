@@ -187,7 +187,7 @@ def _dummy_context():
 
 
 def make_fit_op(loss_fn, optimizer, trainable_variables,
-                grad_summary_fn=None, xla_compile=True):
+                grad_summary_fn=None, tf_function=True, xla_compile=True):
   """One training step.
 
   Args:
@@ -203,8 +203,11 @@ def make_fit_op(loss_fn, optimizer, trainable_variables,
       `loss_fn` with respect to `trainable_variables`. For example,
       `lambda grads: tf.nest.map_structure(tf.norm, grads)`.
       Default value: `None` (i.e., no summarization is made).
+    tf_function: `bool` representing whether the resulting function should be
+      `tf.function` decoreated.
+      Default value: `True`.
     xla_compile: `bool` representing whether XLA compilation should be
-      performed.
+      performed. (This argument is ignored if the function is executed eagerly.)
       Default value: `True`.
 
   Returns:
@@ -212,11 +215,15 @@ def make_fit_op(loss_fn, optimizer, trainable_variables,
       such that when called `trainable_variables` are updated per the logic of
       `optimizer.apply_gradients`.
   """
-  @tf.function(autograph=False)
+  maybe_tf_function = (tf.function(autograph=False) if tf_function
+                       else _dummy_context())
+  @maybe_tf_function
   def fit_op(*args, **kwargs):
     """Performs one gradient descent update to `trainable_variables`."""
-    with (tf.xla.experimental.jit_scope(compile_ops=True)
-          if not tf.executing_eagerly() and xla_compile else _dummy_context()):
+    maybe_xla_compile = (tf.xla.experimental.jit_scope(compile_ops=True)
+                         if not tf.executing_eagerly() and xla_compile
+                         else _dummy_context())
+    with maybe_xla_compile:
       with tf.GradientTape(watch_accessed_variables=False) as tape:
         tf.nest.map_structure(tape.watch, trainable_variables)
         loss, other = loss_fn(*args, **kwargs)
@@ -227,9 +234,8 @@ def make_fit_op(loss_fn, optimizer, trainable_variables,
       if grad_summary_fn is not None:
         return loss, other, grad_summary_fn(grads)
       return loss, other
-  # Didn't see a way to use the following since we can't assume the
-  # arguments are coercible to `tf.Tensor`s.
-  # return tf.xla.experimental.compile(fit)
+  # Note: we can't do `return tf.xla.experimental.compile(fit)` since we can't
+  # assume the function arguments are coercible to `tf.Tensor`s.
   return fit_op
 
 
@@ -408,7 +414,9 @@ def make_kernel_bias(
     bias_shape,
     dtype=tf.float32,
     kernel_initializer=None,
-    bias_initializer=None):
+    bias_initializer=None,
+    kernel_name='kernel',
+    bias_name='bias'):
   """Creates kernel and bias as `tf.Variable`s."""
   # http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf, Equation 16.
   # ==> lim = np.sqrt(6. / max(2., float(fan_in + fan_out)))
@@ -418,6 +426,6 @@ def make_kernel_bias(
     if initializer is None:
       initializer = tf.initializers.glorot_normal()
     return tf.Variable(initializer(shape, dtype), name=name)
-  kernel = _make(kernel_shape, 'kernel', kernel_initializer)
-  bias = _make(bias_shape, 'bias', bias_initializer)
+  kernel = _make(kernel_shape, kernel_name, kernel_initializer)
+  bias = _make(bias_shape, bias_name, bias_initializer)
   return kernel, bias

@@ -55,9 +55,8 @@ def kl_divergence_monte_carlo(q, r, w):
       axis=())
 
 
-def kl_divergence_exact(q, r, w):
+def kl_divergence_exact(q, r, w):  # pylint: disable=unused-argument
   """Exact KL Divergence."""
-  del w
   return kl_lib.kl_divergence(q, r)
 
 
@@ -139,7 +138,6 @@ class VariationalLayer(layers_lib.Layer):
   def posterior_value_fn(self):
     return self._posterior_value_fn
 
-  # @tf.function(autograph=False, experimental_compile=True)
   def eval(self, inputs, is_training=True, **kwargs):
     inputs = tf.convert_to_tensor(inputs, dtype=self.dtype, name='inputs')
     w = self.posterior_value_fn(self.posterior, seed=self._seed())  # pylint: disable=not-callable
@@ -152,7 +150,7 @@ class VariationalLayer(layers_lib.Layer):
     outputs = self._eval(inputs, w, **kwargs)
     self._set_extra_loss(penalty)
     self._set_extra_result(w)
-    return outputs, self.extra_loss, self.extra_result
+    return outputs
 
   def _eval(self, inputs, weights):
     raise NotImplementedError('Subclass failed to implement `_eval`.')
@@ -195,7 +193,7 @@ class VariationalReparameterizationKernelBiasLayer(VariationalLayer):
     if kernel is not None:
       y = self._apply_kernel_fn(y, kernel)
     if bias is not None:
-      y = tf.nn.bias_add(y, bias)
+      y = y + bias
     return y
 
 
@@ -256,7 +254,7 @@ class VariationalFlipoutKernelBiasLayer(VariationalLayer):
       y += self._apply_kernel_fn(x, kernel_loc)
 
     if bias is not None:
-      y = tf.nn.bias_add(y, bias)
+      y = y + bias
 
     return y
 
