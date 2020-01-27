@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import collections
 import contextlib
+import functools
 import sys
 
 import matplotlib.pyplot as plt
@@ -52,6 +53,7 @@ __all__ = [
     'make_kernel_bias_posterior_mvn_diag',
     'make_kernel_bias_prior_spike_and_slab',
     'negloglik',
+    'tfcompile',
     'trace',
     'tune_dataset',
     'variables_load',
@@ -186,6 +188,76 @@ def _dummy_context():
   yield
 
 
+def tfcompile(func=None,
+              tf_function=True,
+              xla_best_effort=True,
+              xla_compile_all=False):
+  """Centralizes TF compilation related options.
+
+  Args:
+    func: Python `callable` to wrapped with the specified TF compilation
+      directives.
+      Default value: `None`.
+    tf_function: `bool` representing whether the resulting function should be
+      `tf.function` decoreated.
+      Default value: `True`.
+    xla_best_effort: `bool` representing whether XLA auto-clustering compilation
+      should be performed. (This argument is ignored if the function is executed
+      eagerly.)
+      Default value: `True`.
+    xla_compile_all: `bool` representing whether XLA compilation should be
+      performed. (This argument overrides both `tf_function` and
+      `xla_best_effort`.
+      Default value: `False`.
+
+  Returns:
+    wrapped_func: A Python `callable` with the specified compilation directives
+      embedded.
+
+  ### Example Usage
+
+  ```python
+  # Use style #1.
+  @tfp_nn.util.tfcompile(xla_compile_all=True)
+  def foo(...):
+       ...
+
+  # Use style #2.
+  def foo(...):
+    ...
+  foo = tfp_nn.util.tfcompile(xla_compile_all=True)(foo)
+  ```
+
+  """
+  # Note: xla_compile_all overrides both tf_function and xla_best_effort.
+  tf_function = tf_function or xla_compile_all
+  xla_best_effort = xla_best_effort and not xla_compile_all
+  maybe_tf_function = (tf.function(autograph=False,
+                                   experimental_compile=xla_compile_all)
+                       if tf_function else _dummy_context())
+  def decorator(f):
+    @functools.wraps(f)
+    @maybe_tf_function
+    def wrapped(*args, **kwargs):
+      maybe_xla_best_effort = (tf.xla.experimental.jit_scope(compile_ops=True)
+                               if not tf.executing_eagerly() and xla_best_effort
+                               else _dummy_context())
+      with maybe_xla_best_effort:
+        return f(*args, **kwargs)
+    return wrapped
+
+  if func is None:
+    # This branch handles the following use case:
+    #   @tfcompile(...)
+    #   def foo(...):
+    #      ...
+    return decorator
+  else:
+    # This branch handles the following use case:
+    #   foo = tfcompile(...)(foo)
+    return decorator(func)
+
+
 def make_fit_op(loss_fn, optimizer, trainable_variables,
                 grad_summary_fn=None, tf_function=True, xla_compile=True):
   """One training step.
@@ -201,7 +273,8 @@ def make_fit_op(loss_fn, optimizer, trainable_variables,
     grad_summary_fn: Python `callable` which takes a `trainable_variables`-like
       structure of `tf.Tensor`s representing the gradient of the result of
       `loss_fn` with respect to `trainable_variables`. For example,
-      `lambda grads: tf.nest.map_structure(tf.norm, grads)`.
+      `lambda grads: tf.nest.map_structure(
+         lambda x: 0. if x is None else tf.norm(x), grads)`.
       Default value: `None` (i.e., no summarization is made).
     tf_function: `bool` representing whether the resulting function should be
       `tf.function` decoreated.
@@ -215,43 +288,40 @@ def make_fit_op(loss_fn, optimizer, trainable_variables,
       such that when called `trainable_variables` are updated per the logic of
       `optimizer.apply_gradients`.
   """
-  maybe_tf_function = (tf.function(autograph=False) if tf_function
-                       else _dummy_context())
-  @maybe_tf_function
+  @tfcompile(tf_function=tf_function, xla_best_effort=xla_compile)
   def fit_op(*args, **kwargs):
     """Performs one gradient descent update to `trainable_variables`."""
-    maybe_xla_compile = (tf.xla.experimental.jit_scope(compile_ops=True)
-                         if not tf.executing_eagerly() and xla_compile
-                         else _dummy_context())
-    with maybe_xla_compile:
-      with tf.GradientTape(watch_accessed_variables=False) as tape:
-        tf.nest.map_structure(tape.watch, trainable_variables)
-        loss, other = loss_fn(*args, **kwargs)
-      grads = tape.gradient(loss, trainable_variables)
-      optimizer.apply_gradients(list(zip(
-          tf.nest.flatten(grads),
-          tf.nest.flatten(trainable_variables))))
-      if grad_summary_fn is not None:
-        return loss, other, grad_summary_fn(grads)
-      return loss, other
+    with tf.GradientTape(watch_accessed_variables=False) as tape:
+      tf.nest.map_structure(tape.watch, trainable_variables)
+      loss, other = loss_fn(*args, **kwargs)
+    grads = tape.gradient(loss, trainable_variables)
+    optimizer.apply_gradients(list(zip(
+        tf.nest.flatten(grads),
+        tf.nest.flatten(trainable_variables))))
+    if grad_summary_fn is not None:
+      return loss, other, grad_summary_fn(grads)
+    return loss, other
   # Note: we can't do `return tf.xla.experimental.compile(fit)` since we can't
   # assume the function arguments are coercible to `tf.Tensor`s.
   return fit_op
 
 
-def flatten_rightmost(x, ndims=3):
+def flatten_rightmost(ndims=3):
   """Flatten rightmost dims."""
-  leftmost_ndims = prefer_static.rank(x) - ndims
-  new_shape = prefer_static.pad(
-      prefer_static.shape(x)[:leftmost_ndims],
-      paddings=[[0, 1]],
-      constant_values=-1)
-  y = tf.reshape(x, new_shape)
-  if x.shape.ndims is not None:
-    d = x.shape[leftmost_ndims:]
-    d = np.prod(d) if d.is_fully_defined() else None
-    y.set_shape(x.shape[:leftmost_ndims].concatenate(d))
-  return y
+  def flatten_rightmost_layer(x):
+    """Implementation of `flatten_rightmost`."""
+    leftmost_ndims = prefer_static.rank(x) - ndims
+    new_shape = prefer_static.pad(
+        prefer_static.shape(x)[:leftmost_ndims],
+        paddings=[[0, 1]],
+        constant_values=-1)
+    y = tf.reshape(x, new_shape)
+    if x.shape.ndims is not None:
+      d = x.shape[leftmost_ndims:]
+      d = np.prod(d) if d.is_fully_defined() else None
+      y.set_shape(x.shape[:leftmost_ndims].concatenate(d))
+    return y
+  return flatten_rightmost_layer
 
 
 def trace(name=None):
@@ -271,28 +341,32 @@ def trace(name=None):
   return _trace
 
 
-def expand_dims(x, axis, name=None):
+def expand_dims(axis, name=None):
   """Like `tf.expand_dims` but accepts a vector of axes to expand."""
-  with tf.name_scope(name or 'expand_dims'):
-    x = tf.convert_to_tensor(x, name='x')
-    axis = tf.convert_to_tensor(axis, dtype_hint=tf.int32, name='axis')
-    nx = prefer_static.rank(x)
-    na = prefer_static.size(axis)
-    is_neg_axis = axis < 0
-    k = prefer_static.reduce_sum(prefer_static.cast(is_neg_axis, axis.dtype))
-    axis = prefer_static.where(is_neg_axis, axis + nx, axis)
-    axis = prefer_static.sort(axis)
-    axis_neg, axis_pos = prefer_static.split(axis, [k, -1])
-    idx = prefer_static.argsort(prefer_static.concat([
-        axis_pos,
-        prefer_static.range(nx),
-        axis_neg,
-    ], axis=0), stable=True)
-    shape = prefer_static.pad(prefer_static.shape(x),
-                              paddings=[[na - k, k]],
-                              constant_values=1)
-    shape = prefer_static.gather(shape, idx)
-    return tf.reshape(x, shape)
+  def expand_dims_layer(x):
+    """Implementation of `expand_dims`."""
+    with tf.name_scope(name or 'expand_dims'):
+      x = tf.convert_to_tensor(x, name='x')
+      new_axis = tf.convert_to_tensor(axis, dtype_hint=tf.int32, name='axis')
+      nx = prefer_static.rank(x)
+      na = prefer_static.size(new_axis)
+      is_neg_axis = new_axis < 0
+      k = prefer_static.reduce_sum(
+          prefer_static.cast(is_neg_axis, new_axis.dtype))
+      new_axis = prefer_static.where(is_neg_axis, new_axis + nx, new_axis)
+      new_axis = prefer_static.sort(new_axis)
+      axis_neg, axis_pos = prefer_static.split(new_axis, [k, -1])
+      idx = prefer_static.argsort(prefer_static.concat([
+          axis_pos,
+          prefer_static.range(nx),
+          axis_neg,
+      ], axis=0), stable=True)
+      shape = prefer_static.pad(prefer_static.shape(x),
+                                paddings=[[na - k, k]],
+                                constant_values=1)
+      shape = prefer_static.gather(shape, idx)
+      return tf.reshape(x, shape)
+  return expand_dims_layer
 
 
 def variables_save(filename, variables):

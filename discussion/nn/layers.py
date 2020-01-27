@@ -92,7 +92,7 @@ class Sequential(Layer):
       raise tf.errors.InvalidArgumentError(
           'Argument `layers` must contain at least one element.')
     name = name or '_'.join([_try_get_name(x) for x in layers])
-    self._layers = layers
+    self._layers = tuple(layers)
     self._also_track = also_track
     super(Sequential, self).__init__(name=name)
 
@@ -119,7 +119,8 @@ class Sequential(Layer):
     return x
 
   def __getitem__(self, i):
-    return Sequential(self.layers[i])
+    return Sequential(
+        self.layers[i], also_track=self._also_track, name=self.name)
 
 
 class Lambda(Layer):
@@ -209,16 +210,20 @@ def _try_get_extra_results(layer):
 
 def _try_call(fn, args, kwargs):
   """Convenience function for evaluating argument `fn`."""
-  if fn is None:
-    return args[0]
   try:
-    return fn(*args, **kwargs)
-  except TypeError:
-    # Don't return from here or else we'll pick up a nested exception.
-    # Seeing TypeError here isn't really an exception since it only means we
-    # need to call `fn` differently).
-    pass
-  return fn(*args)
+    if fn is None:
+      return args[0]
+    try:
+      return fn(*args, **kwargs)
+    except TypeError:
+      # Don't return from here or else we'll pick up a nested exception.
+      # Seeing TypeError here isn't really an exception since it only means we
+      # need to call `fn` differently).
+      pass
+    return fn(*args)
+  except:
+    print('------ EXCEPTION in {} ------'.format(_try_get_name(fn)))
+    raise
 
 
 def _try_get_name(fn, name_fallback='unknown'):

@@ -80,6 +80,7 @@ py_library(
         "//tensorflow_probability/python/distributions:distribution",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
