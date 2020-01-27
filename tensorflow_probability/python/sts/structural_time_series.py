@@ -174,12 +174,12 @@ class StructuralTimeSeries(object):
       params_sample_shape: Number of possible worlds to sample iid from the
         parameter prior, or more generally, `Tensor` `int` shape to fill with
         iid samples.
-          Default value: [] (i.e., draw a single sample and don't expand the
+          Default value: `[]` (i.e., draw a single sample and don't expand the
           shape).
       trajectories_sample_shape: For each sampled set of parameters, number
         of trajectories to sample, or more generally, `Tensor` `int` shape to
         fill with iid samples.
-        Default value: [] (i.e., draw a single sample and don't expand the
+        Default value: `[]` (i.e., draw a single sample and don't expand the
           shape).
       seed: Python `int` random seed.
 
