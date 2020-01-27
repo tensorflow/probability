@@ -128,10 +128,10 @@ def effective_sample_size(states,
 
   * `filter_beyond_positive_pairs` -- reversible MCMC chains produce
     an auto-correlation sequence with the property that pairwise sums of the
-    elements of that sequence are positive [1] (i.e. `R_{2k} + R_{2k + 1} > 0`
-    for `k in {0, ..., N/2}`). Deviations are only possible due to noise. This
-    method truncates the auto-correlation sequence where the pairwise sums
-    become non-positive.
+    elements of that sequence are positive [Geyer][1], i.e.
+    `R_{2k} + R_{2k + 1} > 0` for `k in {0, ..., N/2}`. Deviations are only
+    possible due to noise. This method truncates the auto-correlation sequence
+    where the pairwise sums become non-positive.
 
   The arguments `filter_beyond_lag`, `filter_threshold` and
   `filter_beyond_positive_pairs` are filters intended to remove noisy tail terms
