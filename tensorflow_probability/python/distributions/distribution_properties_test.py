@@ -1161,10 +1161,12 @@ class ReproducibilityTest(test_util.TestCase):
   def testDistribution(self, dist_name, data):
     dist = data.draw(distributions(dist_name=dist_name, enable_vars=False))
     seed = test_util.test_seed()
-    s1 = self.evaluate(dist.sample(50, seed=seed))
+    with tfp_hps.no_tf_rank_errors():
+      s1 = self.evaluate(dist.sample(50, seed=seed))
     if tf.executing_eagerly():
       tf.random.set_seed(seed)
-    s2 = self.evaluate(dist.sample(50, seed=seed))
+    with tfp_hps.no_tf_rank_errors():
+      s2 = self.evaluate(dist.sample(50, seed=seed))
     self.assertAllEqual(s1, s2)
 
 
