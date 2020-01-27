@@ -99,7 +99,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
     # We'll verify the shapes work as intended when we plumb these back into the
     # respective log_probs.
 
-    ds, _ = d.sample_distributions(value=xs)
+    ds, _ = d.sample_distributions(value=xs, seed=test_util.test_seed())
     self.assertLen(ds, 5)
     self.assertIsInstance(ds[0], tfd.Independent)
     self.assertIsInstance(ds[1], tfd.Gamma)
@@ -342,8 +342,12 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
     # Destructure vector-valued Tensors into Python lists, to mimic the values
     # a user might type.
+    def _convert_ndarray_to_list(x):
+      if isinstance(x, np.ndarray) and x.ndim > 0:
+        return list(x)
+      return x
     value = tf.nest.map_structure(
-        lambda x: list(x) if isinstance(x, np.ndarray) else x,
+        _convert_ndarray_to_list,
         self.evaluate(d.sample(seed=test_util.test_seed())))
     value_with_names = list(zip(d._flat_resolve_names(), value))
 
@@ -398,7 +402,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
     lp = self.evaluate(joint.log_prob(x))
     lp_with_tensor_as_list = self.evaluate(
         joint.log_prob(x_with_tensor_as_list))
-    self.assertAllEqual(lp, lp_with_tensor_as_list)
+    self.assertAllClose(lp, lp_with_tensor_as_list, rtol=3e-7, atol=5e-7)
 
   def test_matrix_factorization(self):
     # A matrix factorization model based on
@@ -455,6 +459,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
     lp = dist.log_prob(z)
     self.assertEqual(lp.shape, [7, 9])
 
+  @test_util.jax_disable_variable_test
   def test_latent_dirichlet_allocation(self):
     """Tests Latent Dirichlet Allocation joint model.
 
@@ -524,15 +529,16 @@ class JointDistributionSequentialTest(test_util.TestCase):
 
   def test_poisson_switchover_graphical_model(self):
     # Build a pretend dataset.
+    seed = test_util.test_seed_stream(salt='poisson')
     n = [43, 31]
     count_data = tf.cast(
         tf.concat([
-            tfd.Poisson(rate=15.).sample(n[0], seed=1),
-            tfd.Poisson(rate=25.).sample(n[1], seed=2),
+            tfd.Poisson(rate=15.).sample(n[0], seed=seed()),
+            tfd.Poisson(rate=25.).sample(n[1], seed=seed()),
         ], axis=0),
         dtype=tf.float32)
     count_data = self.evaluate(count_data)
-    n = np.sum(n).astype(np.float32)
+    n = np.sum(n)
 
     # Make model.
     gather = lambda tau, lambda_: tf.gather(  # pylint: disable=g-long-lambda

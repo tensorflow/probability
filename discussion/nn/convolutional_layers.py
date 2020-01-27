@@ -23,7 +23,9 @@ from discussion.nn import layers as layers_lib
 from discussion.nn import util as nn_util_lib
 from discussion.nn import variational_base as vi_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -97,6 +99,7 @@ class Convolution(layers_lib.KernelBiasLayer):
       init_bias_fn=tf.zeros,  # Same as Keras.
       # Misc
       dtype=tf.float32,
+      batch_size=0,
       name=None):
     """Constructs layer.
 
@@ -150,19 +153,35 @@ class Convolution(layers_lib.KernelBiasLayer):
         Default value: `tf.zeros`.
       dtype: ...
         Default value: `tf.float32`.
+      batch_size: ...
+        Default value: `0`.
       name: ...
         Default value: `None` (i.e., `'Convolution'`).
     """
     filter_shape = prepare_tuple_argument(
-        filter_shape, rank, 'filter_shape')
-    kernel_shape = filter_shape + (input_size, output_size)
+        filter_shape, rank, arg_name='filter_shape')
+    if batch_size == 0:
+      kernel_shape = filter_shape + (input_size, output_size)
+      bias_shape = (output_size,)
+      apply_kernel_fn = _make_convolution_fn(
+          rank, strides, padding, dilations)
+    else:
+      kernel_shape = (batch_size,) + filter_shape + (input_size, output_size)
+      bias_shape = (batch_size, output_size)
+      apply_kernel_fn = lambda x, k: convolution_batch(  # pylint: disable=g-long-lambda
+          x, k,
+          rank=rank,
+          strides=strides,
+          padding=padding,
+          data_format='NHWBC',
+          dilations=dilations)
     kernel, bias = make_kernel_bias_fn(
-        kernel_shape, [output_size], dtype, init_kernel_fn, init_bias_fn)
+        kernel_shape, bias_shape, dtype, init_kernel_fn, init_bias_fn)
+    self._make_kernel_bias_fn = make_kernel_bias_fn  # For tracking.
     super(Convolution, self).__init__(
         kernel=kernel,
         bias=bias,
-        apply_kernel_fn=_make_convolution_fn(
-            rank, strides, padding, dilations),
+        apply_kernel_fn=apply_kernel_fn,
         dtype=dtype,
         name=name)
 
@@ -266,17 +285,17 @@ class ConvolutionVariationalReparameterization(
       tf.nn.elu,
       nn.util.trace('conv1'),  # [b, 14, 14, 32]
 
-      nn.util.flatten_rightmost,
+      nn.util.flatten_rightmost(ndims=3),
       nn.util.trace('flat1'),  # [b, 14 * 14 * 32]
 
       BayesAffine(14 * 14 * 32, np.prod(target_shape) - 1),
       nn.util.trace('affine1'),  # [b, 9]
 
       nn.Lambda(
-          eval_final_fn=lambda loc: tfb.SoftmaxCentered()(
+          eval_fn=lambda loc: tfb.SoftmaxCentered()(
               tfd.Independent(tfd.Normal(loc, scale),
                               reinterpreted_batch_ndims=1)),
-              also_track=scale),
+          also_track=scale),
       nn.util.trace('head'),  # [b, 10]
   ], name='bayesian_neural_network')
 
@@ -404,8 +423,10 @@ class ConvolutionVariationalReparameterization(
         `'ConvolutionVariationalReparameterization'`).
     """
     filter_shape = prepare_tuple_argument(
-        filter_shape, rank, 'filter_shape')
+        filter_shape, rank, arg_name='filter_shape')
     kernel_shape = filter_shape + (input_size, output_size)
+    self._make_posterior_fn = make_posterior_fn  # For variable tracking.
+    self._make_prior_fn = make_prior_fn  # For variable tracking.
     super(ConvolutionVariationalReparameterization, self).__init__(
         posterior=make_posterior_fn(
             kernel_shape, [output_size], dtype, init_kernel_fn, init_bias_fn),
@@ -583,8 +604,10 @@ class ConvolutionVariationalFlipout(
         `'ConvolutionVariationalFlipout'`).
     """
     filter_shape = prepare_tuple_argument(
-        filter_shape, rank, 'filter_shape')
+        filter_shape, rank, arg_name='filter_shape')
     kernel_shape = filter_shape + (input_size, output_size)
+    self._make_posterior_fn = make_posterior_fn  # For variable tracking.
+    self._make_prior_fn = make_prior_fn  # For variable tracking.
     super(ConvolutionVariationalFlipout, self).__init__(
         posterior=make_posterior_fn(
             kernel_shape, [output_size], dtype, init_kernel_fn, init_bias_fn),
@@ -611,6 +634,9 @@ def _make_convolution_fn(rank, strides, padding, dilations):
       data_format,
   ] = prepare_conv_args(rank, strides, padding, dilations)
   def op(x, kernel):
+    dtype = dtype_util.common_dtype([x, kernel], dtype_hint=tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype, name='x')
+    kernel = tf.convert_to_tensor(kernel, dtype=dtype, name='kernel')
     return tf.nn.convolution(
         x, kernel,
         strides=strides,
@@ -651,9 +677,9 @@ def prepare_conv_args(rank, strides, padding, dilations):
   valid_rank = {1, 2, 3}
   if rank not in valid_rank:
     raise ValueError('Argument `rank` must be in {}.'.format(valid_rank))
-  strides = prepare_tuple_argument(strides, rank, 'strides')
+  strides = prepare_tuple_argument(strides, rank, arg_name='strides')
   padding = _prepare_padding_argument(padding)
-  dilations = prepare_tuple_argument(dilations, rank, 'dilations')
+  dilations = prepare_tuple_argument(dilations, rank, arg_name='dilations')
   data_format = {1: 'NWC', 2: 'NHWC', 3: 'NDHWC'}.get(rank)
   return rank, strides, padding, dilations, data_format
 
@@ -695,3 +721,68 @@ def _prepare_padding_argument(x):
     raise ValueError('Argument `padding` must be convertible to a tuple '
                      'or one of {}; saw: "{}".'.format(valid_values, padding))
   return padding
+
+
+def convolution_batch(x, kernel, rank, strides, padding, data_format=None,
+                      dilations=None, name=None):
+  """Like `tf.nn.conv2d` except applies batch of kernels to batch of `x`."""
+  if rank != 2:
+    raise NotImplementedError('Argument `rank` currently only supports `2`; '
+                              'saw "{}".'.format(rank))
+  if data_format is not None and data_format.upper() != 'NHWBC':
+    raise ValueError('Argument `data_format` currently only supports "NHWBC"; '
+                     'saw "{}".'.format(data_format))
+  with tf.name_scope(name or 'conv2d_nhwbc'):
+    # Prepare arguments.
+    [
+        rank,
+        _,  # strides
+        padding,
+        dilations,
+        data_format,
+    ] = prepare_conv_args(rank, strides, padding, dilations)
+    strides = prepare_tuple_argument(
+        strides, rank + 2, arg_name='strides')
+
+    dtype = dtype_util.common_dtype([x, kernel], dtype_hint=tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype, name='x')
+    kernel = tf.convert_to_tensor(kernel, dtype=dtype, name='kernel')
+
+    x_shape = prefer_static.shape(x)
+    x_shape_ = x.shape
+    x = tf.reshape(
+        x,  # [n, h, w, b, c]
+        shape=prefer_static.pad(x_shape[:-2],
+                                paddings=[[0, 1]],
+                                constant_values=-1))  # [n, h, w, bc]
+
+    kernel_shape = prefer_static.shape(kernel)  # [b, fh, fw, c, c']
+    kernel_shape_ = kernel.shape
+    kernel = tf.transpose(kernel, [1, 2, 0, 3, 4])
+    kernel = tf.reshape(
+        kernel,  # [fh, fw, b, c, c']
+        shape=prefer_static.concat([
+            kernel_shape[1:-2],
+            [-1, kernel_shape[-1]],
+        ], axis=0))  # [fh, fw, bc, c']
+
+    y = tf.nn.depthwise_conv2d(
+        x, kernel,
+        strides=strides,
+        padding=padding,
+        data_format='NHWC',
+        dilations=dilations)
+    #  SAME: y.shape = [n, h,      w,      bcc']
+    # VALID: y.shape = [n, h-fh+1, w-fw+1, bcc']
+    y = tf.reshape(
+        y,
+        shape=prefer_static.concat([
+            prefer_static.shape(y)[:-1],
+            kernel_shape[:1],
+            kernel_shape[-2:],
+        ], axis=0))  # [n, h, w, b, c, c']
+    y = tf.reduce_sum(y, axis=-2)  # [n, h, w, b, c']
+    tensorshape_util.set_shape(
+        y.shape,
+        tensorshape_util.concatenate(x_shape_[:-1], kernel_shape_[-1]))
+    return y

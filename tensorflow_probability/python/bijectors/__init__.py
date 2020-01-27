@@ -47,7 +47,6 @@ from tensorflow_probability.python.bijectors.identity import Identity
 from tensorflow_probability.python.bijectors.inline import Inline
 from tensorflow_probability.python.bijectors.invert import Invert
 from tensorflow_probability.python.bijectors.iterated_sigmoid_centered import IteratedSigmoidCentered
-from tensorflow_probability.python.bijectors.kumaraswamy_cdf import Kumaraswamy
 from tensorflow_probability.python.bijectors.kumaraswamy_cdf import KumaraswamyCDF
 from tensorflow_probability.python.bijectors.masked_autoregressive import AutoregressiveNetwork
 from tensorflow_probability.python.bijectors.masked_autoregressive import masked_autoregressive_default_template
@@ -113,7 +112,6 @@ __all__ = [
     "Inline",
     "Invert",
     "IteratedSigmoidCentered",
-    "Kumaraswamy",
     "KumaraswamyCDF",
     "Log",
     "Log1p",

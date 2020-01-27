@@ -51,6 +51,7 @@ class Affine(layers_lib.KernelBiasLayer):
       init_kernel_fn=None,
       init_bias_fn=None,
       dtype=tf.float32,
+      batch_size=0,
       name=None):
     """Constructs layer.
 
@@ -65,16 +66,28 @@ class Affine(layers_lib.KernelBiasLayer):
         Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
       dtype: ...
         Default value: `tf.float32`.
+      batch_size: ...
+        Default value: `0`.
       name: ...
         Default value: `None` (i.e., `'Affine'`).
     """
+    if batch_size == 0:
+      kernel_shape = (input_size, output_size)
+      bias_shape = (output_size,)
+      apply_kernel_fn = tf.matmul
+    else:
+      kernel_shape = (batch_size, input_size, output_size)
+      bias_shape = (batch_size, output_size)
+      # apply_kernel_fn = lambda x, k: tf.matmul(
+      #     x[..., tf.newaxis, :], k)[..., 0, :]
+      apply_kernel_fn = lambda x, k: tf.linalg.matvec(k, x, adjoint_a=True)
     kernel, bias = make_kernel_bias_fn(
-        [input_size, output_size], [output_size], dtype,
-        init_kernel_fn, init_bias_fn)
+        kernel_shape, bias_shape, dtype, init_kernel_fn, init_bias_fn)
+    self._make_kernel_bias_fn = make_kernel_bias_fn  # For tracking.
     super(Affine, self).__init__(
         kernel=kernel,
         bias=bias,
-        apply_kernel_fn=tf.matmul,
+        apply_kernel_fn=apply_kernel_fn,
         dtype=dtype,
         name=name)
 
@@ -174,17 +187,17 @@ class AffineVariationalReparameterization(
       tf.nn.elu,
       nn.util.trace('conv1'),  # [b, 14, 14, 32]
 
-      nn.util.flatten_rightmost,
+      nn.util.flatten_rightmost(ndims=3),
       nn.util.trace('flat1'),  # [b, 14 * 14 * 32]
 
       BayesAffine(14 * 14 * 32, np.prod(target_shape) - 1),
       nn.util.trace('affine1'),  # [b, 9]
 
       nn.Lambda(
-          eval_final_fn=lambda loc: tfb.SoftmaxCentered()(
+          eval_fn=lambda loc: tfb.SoftmaxCentered()(
               tfd.Independent(tfd.Normal(loc, scale),
                               reinterpreted_batch_ndims=1)),
-              also_track=scale),
+          also_track=scale),
       nn.util.trace('head'),  # [b, 10]
   ], name='bayesian_neural_network')
 
@@ -264,6 +277,8 @@ class AffineVariationalReparameterization(
       name: ...
         Default value: `None` (i.e., `'AffineVariationalReparameterization'`).
     """
+    self._make_posterior_fn = make_posterior_fn  # For variable tracking.
+    self._make_prior_fn = make_prior_fn  # For variable tracking.
     super(AffineVariationalReparameterization, self).__init__(
         posterior=make_posterior_fn(
             [input_size, output_size], [output_size], dtype,
@@ -387,6 +402,8 @@ class AffineVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
       name: ...
         Default value: `None` (i.e., `'AffineVariationalFlipout'`).
     """
+    self._make_posterior_fn = make_posterior_fn  # For variable tracking.
+    self._make_prior_fn = make_prior_fn  # For variable tracking.
     super(AffineVariationalFlipout, self).__init__(
         posterior=make_posterior_fn(
             [input_size, output_size], [output_size], dtype,
@@ -518,6 +535,8 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
       name: ...
         Default value: `None` (i.e., `'AffineVariationalFlipout'`).
     """
+    self._make_posterior_fn = make_posterior_fn  # For variable tracking.
+    self._make_prior_fn = make_prior_fn  # For variable tracking.
     super(AffineVariationalReparameterizationLocal, self).__init__(
         posterior=make_posterior_fn(
             [input_size, output_size], [output_size], dtype,

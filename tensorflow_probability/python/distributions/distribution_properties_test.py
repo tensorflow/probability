@@ -1240,6 +1240,7 @@ class DistributionSlicingTest(test_util.TestCase):
       return
     sliced_zeros = np.zeros(batch_shape)[slices]
     sliced_dist = dist[slices]
+    hp.note('Using sliced distribution {}.'.format(sliced_dist))
 
     # Check that slicing modifies batch shape as expected.
     self.assertAllEqual(sliced_zeros.shape, sliced_dist.batch_shape)
@@ -1297,11 +1298,11 @@ class DistributionSlicingTest(test_util.TestCase):
     possibly_nonpacket_sliced_lp = sliced_lp.reshape(-1)[-3:]
 
     # TODO(b/140229057): Resolve nan disagreement between eigen vec/scalar paths
-    hasnan = (np.isnan(possibly_nonpacket_lp) |
-              np.isnan(possibly_nonpacket_sliced_lp))
-    possibly_nonpacket_lp = np.where(hasnan, 0, possibly_nonpacket_lp)
+    finite = (np.isfinite(possibly_nonpacket_lp) &
+              np.isfinite(possibly_nonpacket_sliced_lp))
+    possibly_nonpacket_lp = np.where(finite, possibly_nonpacket_lp, 0)
     possibly_nonpacket_sliced_lp = np.where(
-        hasnan, 0, possibly_nonpacket_sliced_lp)
+        finite, possibly_nonpacket_sliced_lp, 0)
     self.assertAllClose(
         possibly_nonpacket_lp, possibly_nonpacket_sliced_lp,
         rtol=0.4, atol=1e-4)

@@ -78,7 +78,9 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/opensource/discussion/nn/util",
         "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 

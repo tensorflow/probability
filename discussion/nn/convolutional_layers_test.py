@@ -61,14 +61,14 @@ class BnnEndToEnd(object):
                   penalty_weight=1. / n),
         tf.nn.elu,
         # nn.util.trace('conv1'),    # [b, 14, 14, 32]
-        nn.util.flatten_rightmost,
+        nn.util.flatten_rightmost(ndims=3),
         # nn.util.trace('flat1'),    # [b, 14 * 14 * 32]
         nn.AffineVariationalReparameterization(
             14 * 14 * 32, np.prod(target_shape) - 1,
             penalty_weight=1. / n),
         # nn.util.trace('affine1'),  # [b, 9]
         nn.Lambda(
-            eval_final_fn=lambda loc: tfb.SoftmaxCentered()(  # pylint: disable=g-long-lambda
+            eval_fn=lambda loc: tfb.SoftmaxCentered()(  # pylint: disable=g-long-lambda
                 tfd.Independent(tfd.Normal(loc, scale),
                                 reinterpreted_batch_ndims=1)),
             also_track=scale),

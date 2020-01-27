@@ -21,17 +21,14 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     'KumaraswamyCDF',
-    'Kumaraswamy',
 ]
 
 
@@ -138,34 +135,3 @@ class KumaraswamyCDF(bijector.Bijector):
           self.concentration1,
           message='Argument `concentration1` must be positive.'))
     return assertions
-
-
-class Kumaraswamy(invert.Invert):
-  """Computes the inverse of the Kumaraswamy CDF."""
-
-  @deprecation.deprecated(
-      '2020-01-20',
-      'Kumaraswamy is deprecated, use Invert(KumaraswamyCDF(...)) instead.',
-      warn_once=True)
-
-  def __init__(self,
-               concentration1=1.,
-               concentration0=1.,
-               validate_args=False,
-               name='kumaraswamy'):
-    with tf.name_scope(name) as name:
-      kumaraswamy_cdf = KumaraswamyCDF(
-          concentration1=concentration1,
-          concentration0=concentration0,
-          validate_args=validate_args,
-          name=name)
-      super(Kumaraswamy, self).__init__(
-          bijector=kumaraswamy_cdf, validate_args=validate_args, name=name)
-
-  @property
-  def concentration1(self):
-    return self.bijector.concentration1
-
-  @property
-  def concentration0(self):
-    return self.bijector.concentration0

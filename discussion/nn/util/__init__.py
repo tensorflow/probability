@@ -25,6 +25,7 @@ from discussion.nn.util.utils import make_kernel_bias
 from discussion.nn.util.utils import make_kernel_bias_posterior_mvn_diag
 from discussion.nn.util.utils import make_kernel_bias_prior_spike_and_slab
 from discussion.nn.util.utils import negloglik
+from discussion.nn.util.utils import tfcompile
 from discussion.nn.util.utils import trace
 from discussion.nn.util.utils import tune_dataset
 from discussion.nn.util.utils import variables_load
@@ -42,6 +43,7 @@ _allowed_symbols = [
     'make_kernel_bias_posterior_mvn_diag',
     'make_kernel_bias_prior_spike_and_slab',
     'negloglik',
+    'tfcompile',
     'trace',
     'tune_dataset',
     'variables_load',

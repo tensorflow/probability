@@ -667,38 +667,41 @@ def no_tf_rank_errors():
   # have larger "event" shapes than the distribution itself.
   input_dims_pat = r'Unhandled input dimensions (8|9|[1-9][0-9]+)'
   input_rank_pat = r'inputs rank not in \[0,([6-9]|[1-9][0-9]+)\]'
+  add_pat_1 = _rank_broadcasting_error_pattern(5, 6, 'Op:AddV2')
+  add_pat_2 = _rank_broadcasting_error_pattern(6, 5, 'Op:AddV2')
   sub_pat_1 = _rank_broadcasting_error_pattern(5, 6, 'Op:Sub')
   sub_pat_2 = _rank_broadcasting_error_pattern(6, 5, 'Op:Sub')
+  mul_pat_1 = _rank_broadcasting_error_pattern(5, 6, 'Op:Mul')
+  mul_pat_2 = _rank_broadcasting_error_pattern(6, 5, 'Op:Mul')
   sq_diff_pat_1 = _rank_broadcasting_error_pattern(5, 6, 'Op:SquaredDifference')
   sq_diff_pat_2 = _rank_broadcasting_error_pattern(6, 5, 'Op:SquaredDifference')
   try:
     yield
   except tf.errors.UnimplementedError as e:
     # TODO(b/138385438): This really shouldn't be so complicated.
+    # Bug requesting that TF increase the rank limit: b/137689241.
     msg = str(e)
     if re.search(_rank_broadcasting_error_pattern(9, 9), msg):
       # We asked some TF op (SelectV2?) to broadcast Tensors of rank >= 9.
-      # Let's not.
       hp.assume(False)
-    elif re.search(_rank_broadcasting_error_pattern(6, 6, 'Op:Mul'), msg):
-      # We asked Op:Mul to broadcast Tensors of rank >= 6.  b/137689241.
-      # Let's not.
+    elif (re.search(add_pat_1, msg) or re.search(add_pat_2, msg)):
+      # We asked Op:AddV2 to broadcast Tensors one of whose ranks >= 6.
       hp.assume(False)
     elif (re.search(sub_pat_1, msg) or re.search(sub_pat_2, msg)):
       # We asked Op:Sub to broadcast Tensors one of whose ranks >= 6.
-      # Let's not.
+      hp.assume(False)
+    elif (re.search(mul_pat_1, msg) or re.search(mul_pat_2, msg)):
+      # We asked Op:Mul to broadcast Tensors one of whose ranks >= 6.
       hp.assume(False)
     elif (re.search(sq_diff_pat_1, msg) or re.search(sq_diff_pat_2, msg)):
       # We asked Op:SquaredDifference to broadcast Tensors one of whose ranks >=
-      # 6.  Let's not.
+      # 6.
       hp.assume(False)
     elif re.search(input_dims_pat, msg):
       # We asked some TF op (StridedSlice?) to operate on a Tensor of rank >= 8.
-      # Let's not.
       hp.assume(False)
     elif re.search(input_rank_pat, msg):
       # We asked some TF op (PadV2?) to operate on a Tensor of rank >= 7.
-      # Let's not.
       hp.assume(False)
     else:
       raise

@@ -34,7 +34,7 @@ tfd = tfp.distributions
 
 
 class Layer(tf.Module):
-  """A `callable` `tf.Module` characterized by `eval_final(eval(input))`."""
+  """A `callable` `tf.Module` characterized by `eval(input)`."""
 
   def __init__(self, name=None):
     name = name_util.strip_invalid_chars(name or type(self).__name__)
@@ -50,20 +50,9 @@ class Layer(tf.Module):
   def extra_result(self):
     return self._extra_result
 
-  # @tf.function(autograph=False, experimental_compile=True)
   def eval(self, inputs, is_training=True, **kwargs):
     self._set_extra_loss(None)
     self._set_extra_result(None)
-    return inputs, self.extra_loss, self.extra_result
-
-  def eval_final(self, inputs, is_training=True, **kwargs):
-    try:
-      inputs, extra_loss, extra_result = inputs
-    except ValueError if tf.executing_eagerly() else TypeError:
-      extra_loss = self.extra_loss
-      extra_result = self.extra_result
-    self._set_extra_loss(extra_loss)
-    self._set_extra_result(extra_result)
     return inputs
 
   def summary(self):
@@ -79,11 +68,10 @@ class Layer(tf.Module):
     if callable(inputs):
       return Sequential([inputs, self], **kwargs)
     self._extra_loss = self._extra_result = None
-    y0 = self.eval(inputs, **kwargs)
-    y1 = self.eval_final(y0, **kwargs)
+    y = self.eval(inputs, **kwargs)
     # TODO(jvdillon): Consider adding provenance.
-    # y1.__tfp_nn_provenancy = self
-    return y1
+    # y.__tfp_nn_provenance = self
+    return y
 
   def __repr__(self):
     return '<{}: name={}>'.format(type(self).__name__, self.name)
@@ -103,8 +91,8 @@ class Sequential(Layer):
     if not layers:
       raise tf.errors.InvalidArgumentError(
           'Argument `layers` must contain at least one element.')
-    name = name or '_'.join([_try_get_name(x, 'unknown') for x in layers])
-    self._layers = layers
+    name = name or '_'.join([_try_get_name(x) for x in layers])
+    self._layers = tuple(layers)
     self._also_track = also_track
     super(Sequential, self).__init__(name=name)
 
@@ -112,67 +100,27 @@ class Sequential(Layer):
   def layers(self):
     return self._layers
 
-  # @tf.function(autograph=False, experimental_compile=True)
   def eval(self, inputs, is_training=True, **kwargs):
     kwargs.update({'is_training': is_training})
     all_extras = []
-    def _try_get_extra_results(layer):
-      all_extras.append((
-          getattr(layer, 'extra_loss', None),
-          getattr(layer, 'extra_result', None),
-      ))
-
     x = inputs
-    for layer in self.layers[:-1]:
+    for layer in self.layers:
       _try_set_extra_results(layer, loss=None, result=None)
       x = _try_call(layer, [x], kwargs)
-      _try_get_extra_results(layer)
-
-    last_layer = self.layers[-1]
-    _try_set_extra_results(last_layer, loss=None, result=None)
-    last_layer_eval_fn = getattr(last_layer, 'eval', None)
-    if not(callable(last_layer_eval_fn) and
-           callable(getattr(last_layer, 'eval_final', None))):
-      last_layer_eval_fn = last_layer
-    x = _try_call(last_layer_eval_fn, [x], kwargs)
-    _try_get_extra_results(last_layer)
-
-    non_none_extra_losses = [loss for (loss, _) in all_extras
-                             if loss is not None]
-    sum_extra_losses_sans_last = (tf.add_n(non_none_extra_losses)
-                                  if non_none_extra_losses else None)
-    self._set_extra_loss(None)
-    self._set_extra_result((sum_extra_losses_sans_last, all_extras))
-    return x, self.extra_result
-
-  def eval_final(self, inputs, is_training=True, **kwargs):
-    x, (sum_extra_losses_sans_last, all_extras) = inputs
-    kwargs.update({'is_training': is_training})
-
-    # Copy over additional results from eval since the current additional
-    # results are GraphTensors.
-    for layer, (loss, result) in zip(self.layers, all_extras):
-      _try_set_extra_results(layer, loss=loss, result=result)
-
-    # Complete the call contract for the finalmost layer.
-    last_layer = self.layers[-1]
-    last_layer_eval_final_fn = getattr(last_layer, 'eval_final', None)
-    if (callable(last_layer_eval_final_fn) and
-        callable(getattr(last_layer, 'eval', None))):
-      x = _try_call(last_layer_eval_final_fn, [x], kwargs)
-
-    # Add in the finalmost additional result. We must do this here (vs in
-    # `eval`) since the extra_result is not guaranteed valid until after
-    # `eval_final` is called.
-    self._set_extra_loss(_try_add(
-        sum_extra_losses_sans_last,
-        getattr(last_layer, 'extra_loss', None)))
+      extra_loss, extra_result = _try_get_extra_results(layer)
+      all_extras.append((extra_loss, extra_result))
+      _try_set_extra_results(layer, loss=extra_loss, result=extra_result)
+    non_none_extra_losses = [extra_loss for (extra_loss, _) in all_extras
+                             if extra_loss is not None]
+    sum_extra_losses = (sum(non_none_extra_losses)
+                        if non_none_extra_losses else None)
+    self._set_extra_loss(sum_extra_losses)
     self._set_extra_result(None)
-
     return x
 
   def __getitem__(self, i):
-    return Sequential(self.layers[i])
+    return Sequential(
+        self.layers[i], also_track=self._also_track, name=self.name)
 
 
 class Lambda(Layer):
@@ -180,52 +128,28 @@ class Lambda(Layer):
 
   def __init__(self,
                eval_fn=None,
-               eval_final_fn=None,
                extra_loss_fn=None,
-               extra_loss_final_fn=None,
                also_track=None,
                name=None):
-    if eval_fn is not None and not callable(eval_fn):
+    if not callable(eval_fn):
       raise tf.errors.InvalidArgumentError(
           'Argument `eval_fn` must be `callable`.')
-    if eval_final_fn is not None and not callable(eval_final_fn):
-      raise tf.errors.InvalidArgumentError(
-          'Argument `eval_final_fn` must be `callable`.')
-    if not callable(eval_fn) and not callable(eval_final_fn):
-      raise tf.errors.InvalidArgumentError(
-          'At least one of arguments `eval_fn` and `eval_final_fn` must '
-          'be `callable`.')
-    fn = eval_fn if callable(eval_fn) else eval_final_fn
-    name = name or _try_get_name(fn)
+    name = name or _try_get_name(eval_fn)
     self._eval_fn = eval_fn
-    self._eval_final_fn = eval_final_fn
     self._extra_loss_fn = extra_loss_fn
-    self._extra_loss_final_fn = extra_loss_final_fn
     self._also_track = also_track
     super(Lambda, self).__init__(name=name)
 
-  # @tf.function(autograph=False, experimental_compile=True)
   def eval(self, inputs, is_training=True, **kwargs):
     kwargs.update({'is_training': is_training})
-    self._last_call = None
     if self._eval_fn is not None:
-      r = self._last_call = _try_call(self._eval_fn, [inputs], kwargs)
+      r = _try_call(self._eval_fn, [inputs], kwargs)
     else:
       r = inputs
+    self._last_call = r  # For variable tracking purposes.
     self._set_extra_loss(None if self._extra_loss_fn is None else
                          _try_call(self._extra_loss_fn, [r], kwargs))
     self._set_extra_result(None)
-    return r, self.extra_loss, self.extra_result
-
-  def eval_final(self, inputs, is_training=True, **kwargs):
-    r, extra_loss, extra_result = inputs
-    kwargs.update({'is_training': is_training})
-    if self._eval_final_fn is not None:
-      r = self._last_call = _try_call(self._eval_final_fn, [r], kwargs)
-    if self._extra_loss_final_fn is not None:
-      extra_loss = _try_call(self._extra_loss_final_fn, [r, extra_loss], kwargs)
-    self._set_extra_loss(extra_loss)
-    self._set_extra_result(extra_result)
     return r
 
 
@@ -256,14 +180,13 @@ class KernelBiasLayer(Layer):
   def bias(self):
     return self._bias
 
-  # @tf.function(autograph=False, experimental_compile=True)
   def eval(self, x, is_training=True):
     x = tf.convert_to_tensor(x, dtype_hint=self.dtype, name='x')
     y = x
     if self.kernel is not None:
       y = self._apply_kernel_fn(y, self.kernel)
     if self.bias is not None:
-      y = tf.nn.bias_add(y, self.bias)
+      y = y + self.bias
     return y
 
 
@@ -277,24 +200,32 @@ def _try_set_extra_results(layer, loss, result):
     set_fn(result)
 
 
+def _try_get_extra_results(layer):
+  """Convenience function for getting side data."""
+  return (
+      getattr(layer, 'extra_loss', None),
+      getattr(layer, 'extra_result', None),
+  )
+
+
 def _try_call(fn, args, kwargs):
   """Convenience function for evaluating argument `fn`."""
-  if fn is None:
-    return args[0]
   try:
-    return fn(*args, **kwargs)
-  except TypeError:
+    if fn is None:
+      return args[0]
+    try:
+      return fn(*args, **kwargs)
+    except TypeError:
+      # Don't return from here or else we'll pick up a nested exception.
+      # Seeing TypeError here isn't really an exception since it only means we
+      # need to call `fn` differently).
+      pass
     return fn(*args)
+  except:
+    print('------ EXCEPTION in {} ------'.format(_try_get_name(fn)))
+    raise
 
 
-def _try_add(x, y):
-  if x is None:
-    return y
-  if y is None:
-    return x
-  return x + y
-
-
-def _try_get_name(fn, name_fallback=None):
-  return (getattr(fn, 'name', None) or
-          getattr(fn, '__name__', name_fallback))
+def _try_get_name(fn, name_fallback='unknown'):
+  return str(getattr(fn, 'name', None) or
+             getattr(fn, '__name__', name_fallback))

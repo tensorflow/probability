@@ -50,7 +50,6 @@ class AffineMeanFieldNormal(nn.Layer):
   def bias(self):
     return self._bias
 
-  @tf.function(autograph=False, experimental_compile=True)
   def eval(self, x, is_training=True):
     if (isinstance(x, tfd.Independent) and
         isinstance(x.distribution, tfd.Normal)):
@@ -58,14 +57,8 @@ class AffineMeanFieldNormal(nn.Layer):
     else:
       x = tf.convert_to_tensor(x, dtype_hint=tf.float32, name='x')
     y = self.bias + tf.matmul(x, self.kernel)
-    extra_loss = tf.norm(y, axis=-1)
-    extra_result = tf.shape(x)
-    return y, extra_loss, extra_result
-
-  def eval_final(self, inputs, is_training=True):
-    y, extra_loss, extra_result = inputs
-    self._set_extra_loss(extra_loss)
-    self._set_extra_result(extra_result)
+    self._set_extra_loss(tf.norm(y, axis=-1))
+    self._set_extra_result(tf.shape(x))
     return tfd.Independent(tfd.Normal(loc=y, scale=1),
                            reinterpreted_batch_ndims=1)
 
@@ -138,9 +131,8 @@ class LambdaTest(test_util.TestCase):
     shift = tf.Variable(1.)
     scale = tfp.util.TransformedVariable(1., tfb.Exp())
     f = nn.Lambda(
-        eval_fn=lambda x: x + shift,
-        eval_final_fn=lambda x: tfd.Normal(loc=x, scale=scale),
-        extra_loss_fn=tf.norm,
+        eval_fn=lambda x: tfd.Normal(loc=x + shift, scale=scale),
+        extra_loss_fn=lambda x: tf.norm(x.loc),
         # `scale` will be tracked through the distribution but not `shift`.
         also_track=shift)
     x = tf.zeros([1, 2])

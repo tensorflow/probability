@@ -39,6 +39,7 @@ class PixelCnnTest(test_util.TestCase):
     self.batch_shape = (2,)
     self.image_shape = tf.TensorShape((8, 8, 3))
     self.high = 10
+    self.low = 0
     self.h_shape = None
     self.num_logistic_mix = 1
 
@@ -51,11 +52,13 @@ class PixelCnnTest(test_util.TestCase):
         num_filters=1,
         num_logistic_mix=self.num_logistic_mix,
         high=self.high,
+        low=self.low,
         use_weight_norm=use_weight_norm_and_data_init,
         use_data_init=use_weight_norm_and_data_init)
 
   def _make_fake_images(self):
     return np.random.randint(
+        self.low,
         self.high,
         size=self.batch_shape + self.image_shape).astype(np.float32)
 
@@ -72,6 +75,7 @@ class PixelCnnTest(test_util.TestCase):
 
     h = self._make_fake_conditional()
     def g(x):
+      x = (2. * (x - self.low) / (self.high - self.low)) - 1.
       inputs = [x, h] if h is not None else x
       params = dist.network(inputs)
       out = self._apply_channel_conditioning(dist, x, *params)
@@ -145,7 +149,7 @@ class PixelCnnTest(test_util.TestCase):
 
     self.assertAllEqual(sample_shape + self.image_shape,
                         self.evaluate(tf.shape(samples)))
-    self.assertAllInRange(samples, 0., self.high)
+    self.assertAllInRange(samples, self.low, self.high)
     self.assertLessEqual(np.unique(samples).size, self.high+1)
 
     sample_rng_1 = dist.sample(
@@ -242,6 +246,7 @@ class PixelCnnTest(test_util.TestCase):
         num_logistic_mix=2,
         dtype=tf.float64,
         high=self.high,
+        low=self.low,
         use_weight_norm=False,
         use_data_init=False)
 
