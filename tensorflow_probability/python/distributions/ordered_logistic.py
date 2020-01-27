@@ -37,8 +37,8 @@ class OrderedLogistic(distribution.Distribution):
   """Ordered logistic distribution
 
   The OrderedLogistic distribution is parameterized by a location and a set of
-  cutpoints. It is defined over the integers `{0, 1, ..., K-1}` where `K` is the
-  number of cutpoints.
+  cutpoints. It is defined over the integers `{0, 1, ..., K}` when there are
+  `K-1` cutpoints.
 
   One often useful way to interpret this distribution is by imagining a draw
   from a latent/unobserved logistic distribution with location `location` and
