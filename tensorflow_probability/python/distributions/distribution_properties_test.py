@@ -1294,7 +1294,7 @@ class DistributionSlicingTest(test_util.TestCase):
     packetized_lp = lp[slices].reshape(-1)[:-3]
     packetized_sliced_lp = sliced_lp.reshape(-1)[:-3]
     rtol = (0.1 if any(
-        x in dist.name for x in ('Geometric', 'Beta', 'Dirichlet')) else 0.02)
+        x in dist.name for x in ('Geometric', 'Beta', 'Dirichlet')) else 0.05)
     self.assertAllClose(packetized_lp, packetized_sliced_lp, rtol=rtol)
     possibly_nonpacket_lp = lp[slices].reshape(-1)[-3:]
     possibly_nonpacket_sliced_lp = sliced_lp.reshape(-1)[-3:]
