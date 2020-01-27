@@ -279,7 +279,7 @@ class ConvolutionTransposeVariationalReparameterization(
       tf.nn.elu,
       nn.util.trace('conv1'),  # [b, 14, 14, 32]
 
-      nn.util.flatten_rightmost,
+      nn.util.flatten_rightmost(ndims=3),
       nn.util.trace('flat1'),  # [b, 14 * 14 * 32]
 
       nn.AffineVariationalReparameterization(
