@@ -479,6 +479,17 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
   some toy generated data.
 
   ```python
+  import matplotlib.pyplot as plt
+  import numpy as np
+  import tensorflow.compat.v2 as tf
+  import tensorflow_probability as tfp
+
+  tf.enable_v2_behavior()
+
+  tfb = tfp.bijectors
+  tfd = tfp.distributions
+  tfk = tfp.math.psd_kernels
+
   # We'll use double precision throughout for better numerics.
   dtype = np.float64
 
@@ -487,9 +498,9 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
   true_observation_noise_variance_ = dtype(1e-1) ** 2
 
   num_training_points_ = 100
-  x_train_ = np.stack(
-      [np.random.uniform(-6., 0., [num_training_points_/ 2 , 1]),
-       np.random.uniform(1., 10., [num_training_points_/ 2 , 1])],
+  x_train_ = np.concatenate(
+      [np.random.uniform(-6., 0., [num_training_points_ // 2 , 1]),
+      np.random.uniform(1., 10., [num_training_points_ // 2 , 1])],
       axis=0).astype(dtype)
   y_train_ = (f(x_train_) +
               np.random.normal(
@@ -498,23 +509,22 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
 
   # Create kernel with trainable parameters, and trainable observation noise
   # variance variable. Each of these is constrained to be positive.
-  amplitude = tf.math.softplus(tf.Variable(-1., dtype=dtype, name='amplitude'))
-  length_scale = (1e-5 +
-                  tf.math.softplus(
-                      tf.Variable(-3., dtype=dtype, name='length_scale')))
+  amplitude = tfp.util.TransformedVariable(
+      1., tfb.Softplus(), dtype=dtype, name='amplitude')
+  length_scale = tfp.util.TransformedVariable(
+      1., tfb.Softplus(), dtype=dtype, name='length_scale')
   kernel = tfk.ExponentiatedQuadratic(
       amplitude=amplitude,
       length_scale=length_scale)
 
-  observation_noise_variance = tf.math.softplus(
-      tf.Variable(0, dtype=dtype, name='observation_noise_variance'))
+  observation_noise_variance = tfp.util.TransformedVariable(
+      1., tfb.Softplus(), dtype=dtype, name='observation_noise_variance')
 
   # Create trainable inducing point locations and variational parameters.
   num_inducing_points_ = 20
-
   inducing_index_points = tf.Variable(
-      initial_inducing_points_, dtype=dtype,
-      name='inducing_index_points')
+      np.linspace(-5., 5., num_inducing_points_)[..., np.newaxis],
+      dtype=dtype, name='inducing_index_points')
   variational_inducing_observations_loc = tf.Variable(
       np.zeros([num_inducing_points_], dtype=dtype),
       name='variational_inducing_observations_loc')
@@ -529,7 +539,6 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
                               num_predictive_index_points_,
                               dtype=dtype)[..., np.newaxis]
 
-
   # Construct our variational GP Distribution instance.
   vgp = tfd.VariationalGaussianProcess(
       kernel,
@@ -543,31 +552,31 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
 
   # For training, we use some simplistic numpy-based minibatching.
   batch_size = 64
-  x_train_batch = tf.placeholder(dtype, [batch_size, 1], name='x_train_batch')
-  y_train_batch = tf.placeholder(dtype, [batch_size], name='y_train_batch')
 
-  # Create the loss function we want to optimize.
-  loss = vgp.variational_loss(
-      observations=y_train_batch,
-      observation_index_points=x_train_batch,
-      kl_weight=float(batch_size) / float(num_training_points_))
+  optimizer = tf.optimizers.Adam(learning_rate=.1)
 
-  optimizer = tf.train.AdamOptimizer()
-  train_op = optimizer.minimize(loss)
+  @tf.function
+  def optimize(x_train_batch, y_train_batch):
+    with tf.GradientTape() as tape:
+      # Create the loss function we want to optimize.
+      loss = vgp.variational_loss(
+          observations=y_train_batch,
+          observation_index_points=x_train_batch,
+          kl_weight=float(batch_size) / float(num_training_points_))
+    grads = tape.gradient(loss, vgp.trainable_variables)
+    optimizer.apply_gradients(zip(grads, vgp.trainable_variables))
+    return loss
 
   num_iters = 10000
   num_logs = 10
-  with tf.Session() as sess:
-    for i in range(num_iters):
-      batch_idxs = np.random.randint(num_training_points_, size=[batch_size])
-      x_train_batch_ = x_train_[batch_idxs, ...]
-      y_train_batch_ = y_train_[batch_idxs]
+  for i in range(num_iters):
+    batch_idxs = np.random.randint(num_training_points_, size=[batch_size])
+    x_train_batch = x_train_[batch_idxs, ...]
+    y_train_batch = y_train_[batch_idxs]
+    loss = optimize(x_train_batch, y_train_batch)
 
-      [_, loss_] = sess.run([train_op, loss],
-                            feed_dict={x_train_batch: x_train_batch_,
-                                       y_train_batch: y_train_batch_})
-      if i % (num_iters / num_logs) == 0 or i + 1 == num_iters:
-        print(i, loss_)
+    if i % (num_iters / num_logs) == 0 or i + 1 == num_iters:
+      print(i, loss.numpy())
 
   # Generate a plot with
   #   - the posterior predictive mean
@@ -577,24 +586,18 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
   #   - 50 posterior predictive samples
 
   num_samples = 50
-  [
-      samples_,
-      mean_,
-      inducing_index_points_,
-      variational_loc_,
-  ] = sess.run([
-      vgp.sample(num_samples),
-      vgp.mean(),
-      inducing_index_points,
-      variational_inducing_observations_loc
-  ])
+  samples = vgp.sample(num_samples).numpy()
+  mean = vgp.mean().numpy()
+  inducing_index_points_ = inducing_index_points.numpy()
+  variational_loc = variational_inducing_observations_loc.numpy()
+
   plt.figure(figsize=(15, 5))
-  plt.scatter(inducing_index_points_[..., 0], variational_loc_
+  plt.scatter(inducing_index_points_[..., 0], variational_loc,
               marker='x', s=50, color='k', zorder=10)
   plt.scatter(x_train_[..., 0], y_train_, color='#00ff00', zorder=9)
-  plt.plot(np.tile(index_points_[..., 0], num_samples),
-           samples_.T, color='r', alpha=.1)
-  plt.plot(index_points_, mean_, color='k')
+  plt.plot(np.tile(index_points_, (num_samples)),
+            samples.T, color='r', alpha=.1)
+  plt.plot(index_points_, mean, color='k')
   plt.plot(index_points_, f(index_points_), color='b')
   ```
 
@@ -617,26 +620,23 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
 
   # Create kernel with trainable parameters, and trainable observation noise
   # variance variable. Each of these is constrained to be positive.
-  amplitude = (tf.math.softplus(
-    tf.Variable(.54, dtype=dtype, name='amplitude', use_resource=True)))
-  length_scale = (
-    1e-5 +
-    tf.math.softplus(
-      tf.Variable(.54, dtype=dtype, name='length_scale', use_resource=True)))
+  amplitude = tfp.util.TransformedVariable(
+      1., tfb.Softplus(), dtype=dtype, name='amplitude')
+  length_scale = tfp.util.TransformedVariable(
+      1., tfb.Softplus(), dtype=dtype, name='length_scale')
   kernel = tfk.ExponentiatedQuadratic(
       amplitude=amplitude,
       length_scale=length_scale)
 
-  observation_noise_variance = tf.math.softplus(
-      tf.Variable(
-        .54, dtype=dtype, name='observation_noise_variance', use_resource=True))
+  observation_noise_variance = tfp.util.TransformedVariable(
+      1., tfb.Softplus(), dtype=dtype, name='observation_noise_variance')
 
   # Create trainable inducing point locations and variational parameters.
   num_inducing_points_ = 10
 
   inducing_index_points = tf.Variable(
       np.linspace(-10., 10., num_inducing_points_)[..., np.newaxis],
-      dtype=dtype, name='inducing_index_points', use_resource=True)
+      dtype=dtype, name='inducing_index_points')
 
   variational_loc, variational_scale = (
       tfd.VariationalGaussianProcess.optimal_variational_posterior(
@@ -664,61 +664,54 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
 
   # For training, we use some simplistic numpy-based minibatching.
   batch_size = 64
-  x_train_batch = tf.placeholder(dtype, [batch_size, 1], name='x_train_batch')
-  y_train_batch = tf.placeholder(dtype, [batch_size], name='y_train_batch')
 
-  # Create the loss function we want to optimize.
-  loss = vgp.variational_loss(
-      observations=y_train_batch,
-      observation_index_points=x_train_batch,
-      kl_weight=float(batch_size) / float(num_training_points_))
+  optimizer = tf.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
 
-  optimizer = tf.train.AdamOptimizer(learning_rate=.01)
-  train_op = optimizer.minimize(loss)
+  @tf.function
+  def optimize(x_train_batch, y_train_batch):
+    with tf.GradientTape() as tape:
+      # Create the loss function we want to optimize.
+      loss = vgp.variational_loss(
+          observations=y_train_batch,
+          observation_index_points=x_train_batch,
+          kl_weight=float(batch_size) / float(num_training_points_))
+    grads = tape.gradient(loss, vgp.trainable_variables)
+    optimizer.apply_gradients(zip(grads, vgp.trainable_variables))
+    return loss
 
   num_iters = 300
   num_logs = 10
-  with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
-    for i in range(num_iters):
-      batch_idxs = np.random.randint(num_training_points_, size=[batch_size])
-      x_train_batch_ = x_train_[batch_idxs, ...]
-      y_train_batch_ = y_train_[batch_idxs]
+  for i in range(num_iters):
+    batch_idxs = np.random.randint(num_training_points_, size=[batch_size])
+    x_train_batch_ = x_train_[batch_idxs, ...]
+    y_train_batch_ = y_train_[batch_idxs]
 
-      [_, loss_] = sess.run([train_op, loss],
-                            feed_dict={x_train_batch: x_train_batch_,
-                                       y_train_batch: y_train_batch_})
-      if i % (num_iters / num_logs) == 0 or i + 1 == num_iters:
-        print(i, loss_)
+    loss = optimize(x_train_batch, y_train_batch)
+    if i % (num_iters / num_logs) == 0 or i + 1 == num_iters:
+      print(i, loss.numpy())
 
-    # Generate a plot with
-    #   - the posterior predictive mean
-    #   - training data
-    #   - inducing index points (plotted vertically at the mean of the
-    #     variational posterior over inducing point function values)
-    #   - 50 posterior predictive samples
+  # Generate a plot with
+  #   - the posterior predictive mean
+  #   - training data
+  #   - inducing index points (plotted vertically at the mean of the
+  #     variational posterior over inducing point function values)
+  #   - 50 posterior predictive samples
 
-    num_samples = 50
-    [
-        samples_,
-        mean_,
-        inducing_index_points_,
-        variational_loc_,
-    ] = sess.run([
-        vgp.sample(num_samples),
-        vgp.mean(),
-        inducing_index_points,
-        variational_loc
-    ])
-    plt.figure(figsize=(15, 5))
-    plt.scatter(inducing_index_points_[..., 0], variational_loc_,
-                marker='x', s=50, color='k', zorder=10)
-    plt.scatter(x_train_[..., 0], y_train_, color='#00ff00', alpha=.1, zorder=9)
-    plt.plot(np.tile(index_points_, num_samples),
-             samples_.T, color='r', alpha=.1)
-    plt.plot(index_points_, mean_, color='k')
-    plt.plot(index_points_, f(index_points_), color='b')
+  num_samples = 50
 
+  samples_ = vgp.sample(num_samples).numpy()
+  mean_ = vgp.mean().numpy()
+  inducing_index_points_ = inducing_index_points.numpy()
+  variational_loc_ = variational_loc.numpy()
+
+  plt.figure(figsize=(15, 5))
+  plt.scatter(inducing_index_points_[..., 0], variational_loc_,
+              marker='x', s=50, color='k', zorder=10)
+  plt.scatter(x_train_[..., 0], y_train_, color='#00ff00', alpha=.1, zorder=9)
+  plt.plot(np.tile(index_points_, num_samples),
+            samples_.T, color='r', alpha=.1)
+  plt.plot(index_points_, mean_, color='k')
+  plt.plot(index_points_, f(index_points_), color='b')
   ```
 
   #### References
