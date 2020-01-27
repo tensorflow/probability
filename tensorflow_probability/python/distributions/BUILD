@@ -95,6 +95,7 @@ multi_substrate_py_library(
         ":normal",
         ":normal_conjugate_posteriors",
         ":onehot_categorical",
+        ":ordered_logistic",
         ":pareto",
         ":pert",
         ":pixel_cnn",
@@ -1045,6 +1046,25 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "ordered_logistic",
+    srcs = ["ordered_logistic.py"],
+    deps = [
+        ":distribution",
+        ":kullback_leibler",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math",
     ],
 )
 
@@ -2350,6 +2370,19 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "ordered_logistic_test",
+    srcs = ["ordered_logistic_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "pareto_test",
     size = "medium",
     srcs = ["pareto_test.py"],
@@ -2837,6 +2870,7 @@ exports_files(
         "normal.py",
         "normal_conjugate_posteriors.py",
         "onehot_categorical.py",
+        "ordered_logistic.py",
         "pareto.py",
         "pert.py",
         "plackett_luce.py",

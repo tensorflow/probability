@@ -77,6 +77,7 @@ from tensorflow_probability.python.distributions.mvn_tril import MultivariateNor
 from tensorflow_probability.python.distributions.negative_binomial import NegativeBinomial
 from tensorflow_probability.python.distributions.normal import Normal
 from tensorflow_probability.python.distributions.onehot_categorical import OneHotCategorical
+from tensorflow_probability.python.distributions.ordered_logistic import OrderedLogistic
 from tensorflow_probability.python.distributions.pareto import Pareto
 from tensorflow_probability.python.distributions.pert import PERT
 from tensorflow_probability.python.distributions.pixel_cnn import PixelCNN
@@ -216,6 +217,7 @@ __all__ = [
     'MixtureSameFamily',
     'ExpRelaxedOneHotCategorical',
     'OneHotCategorical',
+    'OrderedLogistic',
     'Pareto',
     'PERT',
     'PlackettLuce',
