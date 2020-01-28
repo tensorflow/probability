@@ -114,6 +114,29 @@ class OrderedLogisticTest(test_util.TestCase):
     entropy = self.evaluate(dist.entropy())
     self.assertAllClose(expected_entropy, entropy)
 
+  def testKL(self):
+    for batch_size in [1, 10]:
+      cutpoints = tf.constant([-1., 1., 2.], dtype=tf.float64)
+      a_location = self._rng.randn(batch_size)
+      b_location = self._rng.randn(batch_size)
+
+      a = tfd.OrderedLogistic(cutpoints, a_location, validate_args=True)
+      b = tfd.OrderedLogistic(cutpoints, b_location, validate_args=True)
+
+      a_cat = tfd.Categorical(
+          logits=a.categorical_log_probs(), validate_args=True)
+      b_cat = tfd.Categorical(
+          logits=b.categorical_log_probs(), validate_args=True)
+
+      kl = self.evaluate(tfd.kl_divergence(a, b))
+      self.assertEqual(kl.shape, (batch_size,))
+
+      kl_expected = self.evaluate(tfd.kl_divergence(a_cat, b_cat))
+      self.assertAllClose(kl, kl_expected)
+
+      kl_same = self.evaluate(tfd.kl_divergence(a, a))
+      self.assertAllClose(kl_same, np.zeros_like(kl_expected))
+
   def testUnorderedCutpointsFails(self):
     with self.assertRaisesRegexp(
         ValueError, 'Argument `cutpoints` must be non-decreasing.'):
