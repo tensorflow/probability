@@ -306,8 +306,8 @@ class OrderedLogistic(distribution.Distribution):
     assertions.append(
         assert_util.assert_less_equal(
             x, tf.cast(self._num_categories(), x.dtype),
-            message=('OrderedLogistic samples must be between `0` and `n-1` '
-                     'where `n` is the number of categories.')))
+            message=('OrderedLogistic samples must be between `0` and `K-1` '
+                     'where `K` is the number of categories.')))
     return assertions
 
 
