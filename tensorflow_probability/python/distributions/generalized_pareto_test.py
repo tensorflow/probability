@@ -178,7 +178,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     hp.assume(expected > 0)
     # scipy gets bad answers for very small concentrations even in 64-bit.
     # https://github.com/scipy/scipy/issues/11168
-    hp.assume(conc > 1e-5)
+    hp.assume(conc > 1e-4)
     self.assertEqual(dist.batch_shape, dist.variance().shape)
     actual = self.evaluate(dist.variance())
     msg = ('Location: {}, scale: {}, concentration: {}, '
