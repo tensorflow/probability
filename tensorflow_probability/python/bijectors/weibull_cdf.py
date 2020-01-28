@@ -167,11 +167,9 @@ class Weibull(WeibullCDF):
                concentration=1.,
                validate_args=False,
                name='weibull'):
-    parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(Weibull, self).__init__(
           scale=scale,
           concentration=concentration,
           validate_args=validate_args,
-          parameters=parameters,
           name=name)
