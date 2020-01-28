@@ -86,37 +86,36 @@ class SliceSampler(kernel_base.TransitionKernel):
   distribution using slice sampling.
 
   ```python
-    import tensorflow as tf
-    import tensorflow_probability as tfp
-    import numpy as np
+  import tensorflow.compat.v2 as tf
+  import tensorflow_probability as tfp
+  import numpy as np
 
-    tfd = tfp.distributions
+  tf.enable_v2_behavior()
 
-    dtype = np.float32
+  dtype = np.float32
 
-    target = tfd.Normal(loc=dtype(0), scale=dtype(1))
+  target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
-    samples, _ = tfp.mcmc.sample_chain(
-        num_results=1000,
-        current_state=dtype(1),
-        kernel=tfp.mcmc.SliceSampler(
-            target.log_prob,
-            step_size=1.0,
-            max_doublings=5,
-            seed=1234),
-        num_burnin_steps=500,
-        parallel_iterations=1)  # For determinism.
+  samples = tfp.mcmc.sample_chain(
+      num_results=1000,
+      current_state=dtype(1),
+      kernel=tfp.mcmc.SliceSampler(
+          target.log_prob,
+          step_size=1.0,
+          max_doublings=5,
+          seed=1234),
+      num_burnin_steps=500,
+      trace_fn=None,
+      parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.reduce_mean(samples, axis=0)
-    sample_std = tf.sqrt(
-      tf.reduce_mean(tf.squared_difference(samples, sample_mean),
-                     axis=0))
+  sample_mean = tf.reduce_mean(samples, axis=0)
+  sample_std = tf.sqrt(
+      tf.reduce_mean(
+          tf.math.squared_difference(samples, sample_mean),
+          axis=0))
 
-    with tf.Session() as sess:
-      [sample_mean, sample_std] = sess.run([sample_mean, sample_std])
-
-    print "Sample mean: ", sample_mean
-    print "Sample Std: ", sample_std
+  print('Sample mean: ', sample_mean.numpy())
+  print('Sample Std: ', sample_std.numpy())
   ```
 
   #### Sample from a Two Dimensional Normal.
@@ -125,59 +124,52 @@ class SliceSampler(kernel_base.TransitionKernel):
   distribution using slice sampling.
 
   ```python
-    import tensorflow as tf
-    import tensorflow_probability as tfp
-    import numpy as np
+  import tensorflow.compat.v2 as tf
+  import tensorflow_probability as tfp
+  import numpy as np
 
-    tfd = tfp.distributions
+  tf.enable_v2_behavior()
 
-    dtype = np.float32
-    true_mean = dtype([0, 0])
-    true_cov = dtype([[1, 0.5], [0.5, 1]])
-    num_results = 500
-    num_chains = 50
+  dtype = np.float32
+  true_mean = dtype([0, 0])
+  true_cov = dtype([[1, 0.5], [0.5, 1]])
+  num_results = 500
+  num_chains = 50
 
-    # Target distribution is defined through the Cholesky decomposition
-    chol = tf.linalg.cholesky(true_cov)
-    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+  # Target distribution is defined through the Cholesky decomposition
+  chol = tf.linalg.cholesky(true_cov)
+  target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
-    # Assume that the state is passed as a list of 1-d tensors `x` and `y`.
-    # Then the target log-density is defined as follows:
-    def target_log_prob(x, y):
-      # Stack the input tensors together
-      z = tf.stack([x, y], axis=-1) - true_mean
-      return target.log_prob(z)
+  # Initial state of the chain
+  init_state = np.ones([num_chains, 2], dtype=dtype)
 
-    # Initial state of the chain
-    init_state = [np.ones([num_chains, 1], dtype=dtype),
-                  np.ones([num_chains, 1], dtype=dtype)]
-
-    # Run Slice Samper for `num_results` iterations for `num_chains`
-    # independent chains:
-    [x, y], _ = tfp.mcmc.sample_chain(
+  # Run Slice Samper for `num_results` iterations for `num_chains`
+  # independent chains:
+  @tf.function
+  def run_mcmc():
+    states = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.SliceSampler(
-            target_log_prob_fn=target_log_prob,
+            target_log_prob_fn=target.log_prob,
             step_size=1.0,
             max_doublings=5,
             seed=47),
         num_burnin_steps=200,
         num_steps_between_results=1,
+        trace_fn=None,
         parallel_iterations=1)
+    return states
 
-    states = tf.stack([x, y], axis=-1)
-    sample_mean = tf.reduce_mean(states, axis=[0, 1])
-    z = states - sample_mean
-    sample_cov = tf.reduce_mean(tf.matmul(z, z, transpose_a=True),
-                                axis=[0, 1])
+  states = run_mcmc()
 
-    with tf.Session() as sess:
-      [sample_mean, sample_cov] = sess.run([
-          sample_mean, sample_cov])
+  sample_mean = tf.reduce_mean(states, axis=[0, 1])
+  z = (states - sample_mean)[..., tf.newaxis]
+  sample_cov = tf.reduce_mean(
+      tf.matmul(z, tf.transpose(z, [0, 1, 3, 2])), [0, 1])
 
-    print "sample_mean: ", sample_mean
-    print "sample_cov: ", sample_cov
+  print('sample mean', sample_mean.numpy())
+  print('sample covariance matrix', sample_cov.numpy())
   ```
 
   ### References
@@ -359,7 +351,7 @@ def _choose_random_direction(current_state_parts, batch_rank, seed=None):
   # Sum squares over all of the input components. Note this takes all
   # components into account.
   sum_squares = sum(
-      tf.reduce_sum(
+      tf.reduce_sum(  # pylint: disable=g-complex-comprehension
           rnd_direction**2.,
           axis=tf.range(batch_rank, tf.rank(rnd_direction)),
           keepdims=True) for rnd_direction in rnd_direction_parts)
@@ -483,9 +475,8 @@ def _sample_next(target_log_prob_fn,
       padded_alphas = [_right_pad(alpha, final_rank=part_rank)
                        for part_rank in state_part_ranks]
 
-      state_parts = [state_part + padded_alpha
-                     * direction_part for state_part, direction_part,
-                     padded_alpha in
+      state_parts = [state_part + padded_alpha * direction_part
+                     for state_part, direction_part, padded_alpha in
                      zip(current_state_parts, direction, padded_alphas)]
       return state_parts
 

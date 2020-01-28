@@ -82,52 +82,12 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   distribution using MALA with `step_size` equal to 0.75.
 
   ```python
-  import tensorflow as tf
-  import tensorflow_probability as tfp
-  import numpy as np
-
-  tfd = tfp.distributions
-
-  dtype = np.float32
-
-  with tf.Session(graph=tf.Graph()) as sess:
-    # Target distribution is Standard Univariate Normal
-    target = tfd.Normal(loc=dtype(0), scale=dtype(1))
-
-    # Define MALA sampler with `step_size` equal to 0.75
-    samples, _ = tfp.mcmc.sample_chain(
-        num_results=1000,
-        current_state=dtype(1),
-        kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-            target_log_prob_fn=target.log_prob,
-            step_size=0.75,
-            seed=42),
-        num_burnin_steps=500,
-        parallel_iterations=1)  # For determinism.
-
-    sample_mean = tf.reduce_mean(samples, axis=0)
-    sample_std = tf.sqrt(
-        tf.reduce_mean(tf.squared_difference(samples, sample_mean),
-                       axis=0))
-
-    sess.graph.finalize()  # No more graph building.
-
-    [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
-
-  print('sample mean', sample_mean_)
-  print('sample standard deviation', sample_std_)
-  ```
-
-  ##### Same example but in eager mode.
-
-  ```python
-  import tensorflow as tf
+  import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
   import numpy as np
   import matplotlib.pyplot as plt
 
-  # Support for eager execution
-  tf.enable_eager_execution()
+  tf.enable_v2_behavior()
 
   tfd = tfp.distributions
   dtype = np.float32
@@ -139,7 +99,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
     return target.log_prob(x)
 
   # Define MALA sampler with `step_size` equal to 0.75
-  samples, _ = tfp.mcmc.sample_chain(
+  samples = tfp.mcmc.sample_chain(
       num_results=1000,
       current_state=dtype(1),
       kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
@@ -147,12 +107,14 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
           step_size=0.75,
           seed=42),
       num_burnin_steps=500,
+      trace_fn=None,
       parallel_iterations=1)  # For determinism.
 
   sample_mean = tf.reduce_mean(samples, axis=0)
   sample_std = tf.sqrt(
-      tf.reduce_mean(tf.squared_difference(samples, sample_mean),
-                     axis=0))
+      tf.reduce_mean(
+          tf.math.squared_difference(samples, sample_mean),
+          axis=0))
 
   print('sample mean', sample_mean)
   print('sample standard deviation', sample_std)
@@ -169,11 +131,11 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   In this example we also consider a non-constant volatility function.
 
   ```python
-  import tensorflow as tf
+  import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
   import numpy as np
 
-  tfd = tfp.distributions
+  tf.enable_v2_behavior()
 
   dtype = np.float32
   true_mean = dtype([0, 0, 0])
@@ -181,53 +143,40 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   num_results = 500
   num_chains = 500
 
-  with tf.Session(graph=tf.Graph()) as sess:
-    # Target distribution is defined through the Cholesky decomposition
-    chol = tf.linalg.cholesky(true_cov)
-    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+  # Target distribution is defined through the Cholesky decomposition
+  chol = tf.linalg.cholesky(true_cov)
+  target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
-    # Assume that the state is passed as a list of tensors `x` and `y`.
-    # Then the target log-density is defined as follows:
-    def target_log_prob(x, y):
-      # Stack the input tensors together
-      z = tf.concat([x, y], axis=-1) - true_mean
-      return target.log_prob(z)
+  # Here we define the volatility function to be non-constant
+  def volatility_fn(x):
+    # Stack the input tensors together
+    return 1. / (0.5 + 0.1 * tf.math.abs(x))
 
-    # Here we define the volatility function to be non-constant
-    def volatility_fn(x, y):
-      # Stack the input tensors together
-      return [1. / (0.5 + 0.1 * tf.sqrt(x * x)),
-              1. / (0.5 + 0.1 *tf.sqrt(y * y))]
+  # Initial state of the chain
+  init_state = np.ones([num_chains, 3], dtype=dtype)
 
-    # Initial state of the chain
-    init_state = [np.ones([num_chains, 2], dtype=dtype),
-                  np.ones([num_chains, 1], dtype=dtype)]
+  # Run MALA with normal proposal for `num_results` iterations for
+  # `num_chains` independent chains:
+  states = tfp.mcmc.sample_chain(
+      num_results=num_results,
+      current_state=init_state,
+      kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+          target_log_prob_fn=target.log_prob,
+          step_size=.1,
+          volatility_fn=volatility_fn,
+          seed=42),
+      num_burnin_steps=200,
+      num_steps_between_results=1,
+      trace_fn=None,
+      parallel_iterations=1)
 
-    # Run MALA with normal proposal for `num_results` iterations for
-    # `num_chains` independent chains:
-    states, _ = tfp.mcmc.sample_chain(
-        num_results=num_results,
-        current_state=init_state,
-        kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-            target_log_prob_fn=target_log_prob,
-            step_size=.1,
-            volatility_fn=volatility_fn,
-            seed=42),
-        num_burnin_steps=200,
-        num_steps_between_results=1,
-        parallel_iterations=1)
+  sample_mean = tf.reduce_mean(states, axis=[0, 1])
+  x = (states - sample_mean)[..., tf.newaxis]
+  sample_cov = tf.reduce_mean(
+      tf.matmul(x, tf.transpose(x, [0, 1, 3, 2])), [0, 1])
 
-    states = tf.concat(states, axis=-1)
-    sample_mean = tf.reduce_mean(states, axis=[0, 1])
-    x = (states - sample_mean)[..., tf.newaxis]
-    sample_cov = tf.reduce_mean(
-        tf.matmul(x, tf.transpose(x, [0, 1, 3, 2])), [0, 1])
-
-    [sample_mean_, sample_cov_] = sess.run([
-        sample_mean, sample_cov])
-
-  print('sample mean', sample_mean_)
-  print('sample covariance matrix', sample_cov_)
+  print('sample mean', sample_mean.numpy())
+  print('sample covariance matrix', sample_cov.numpy())
   ```
 
   #### References
