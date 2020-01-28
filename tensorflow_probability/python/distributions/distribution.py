@@ -1078,8 +1078,8 @@ class Distribution(_BaseDistribution):
 
   def _call_quantile(self, value, name, **kwargs):
     with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+      dtype = tf.float32 if tf.nest.is_nested(self.dtype) else self.dtype
+      value = tf.convert_to_tensor(value, name='value', dtype_hint=dtype)
       return self._quantile(value, **kwargs)
 
   def quantile(self, value, name='quantile', **kwargs):
