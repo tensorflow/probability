@@ -61,6 +61,7 @@ class Scale(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([scale], dtype_hint=tf.float32)
       self._scale = tensor_util.convert_nonref_to_tensor(
@@ -71,6 +72,7 @@ class Scale(bijector.Bijector):
           is_constant_jacobian=True,
           validate_args=validate_args,
           dtype=dtype,
+          parameters=parameters,
           name=name)
 
   @property

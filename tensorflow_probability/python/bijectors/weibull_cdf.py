@@ -69,6 +69,7 @@ class WeibullCDF(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [scale, concentration], dtype_hint=tf.float32)
@@ -79,6 +80,7 @@ class WeibullCDF(bijector.Bijector):
       super(WeibullCDF, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property
@@ -165,9 +167,11 @@ class Weibull(WeibullCDF):
                concentration=1.,
                validate_args=False,
                name='weibull'):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(Weibull, self).__init__(
           scale=scale,
           concentration=concentration,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)

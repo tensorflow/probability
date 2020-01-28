@@ -61,6 +61,7 @@ class CategoricalToDiscrete(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name):
       dtype = dtype_util.common_dtype([map_values], tf.float32)
       self._map_values = tensor_util.convert_nonref_to_tensor(
@@ -69,6 +70,7 @@ class CategoricalToDiscrete(bijector.Bijector):
           forward_min_event_ndims=0,
           is_constant_jacobian=True,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   def _forward(self, x):

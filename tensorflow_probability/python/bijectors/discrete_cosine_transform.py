@@ -61,8 +61,9 @@ class DiscreteCosineTransform(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    # TODO(b/115910664): Support other DCT types.
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
+      # TODO(b/115910664): Support other DCT types.
       if dct_type not in (2, 3):
         raise NotImplementedError('`type` must be one of 2 or 3')
       self._dct_type = dct_type
@@ -71,6 +72,7 @@ class DiscreteCosineTransform(bijector.Bijector):
           inverse_min_event_ndims=1,
           is_constant_jacobian=True,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   def _forward(self, x):

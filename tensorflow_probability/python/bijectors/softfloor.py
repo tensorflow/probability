@@ -103,6 +103,7 @@ class Softfloor(bijector.Bijector):
                temperature,
                validate_args=False,
                name='softfloor'):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [temperature], dtype_hint=tf.float32)
@@ -112,6 +113,7 @@ class Softfloor(bijector.Bijector):
           forward_min_event_ndims=0,
           validate_args=validate_args,
           dtype=dtype,
+          parameters=parameters,
           name=name)
 
   @classmethod

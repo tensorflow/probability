@@ -63,6 +63,7 @@ class Sigmoid(bijector.Bijector):
     Raises:
       ValueError: If exactly one of `low` and `high` is specified.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       if low is None and high is None:
         self._is_standard_sigmoid = True
@@ -78,6 +79,7 @@ class Sigmoid(bijector.Bijector):
       super(Sigmoid, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @classmethod

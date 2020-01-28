@@ -97,11 +97,13 @@ class CorrelationCholesky(bijector.Bijector):
   """
 
   def __init__(self, validate_args=False, name='correlation_cholesky'):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(CorrelationCholesky, self).__init__(
           validate_args=validate_args,
           forward_min_event_ndims=1,
           inverse_min_event_ndims=2,
+          parameters=parameters,
           name=name)
 
   def _forward_event_shape(self, input_shape):

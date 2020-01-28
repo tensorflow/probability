@@ -184,8 +184,8 @@ class RealNVP(bijector_lib.Bijector):
       ValueError: If both or none of `shift_and_log_scale_fn` and `bijector_fn`
           are specified.
     """
+    parameters = dict(locals())
     name = name or 'real_nvp'
-
     with tf.name_scope(name) as name:
       # At construction time, we don't know input_depth.
       self._input_depth = None
@@ -235,6 +235,7 @@ class RealNVP(bijector_lib.Bijector):
           forward_min_event_ndims=1,
           is_constant_jacobian=is_constant_jacobian,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property

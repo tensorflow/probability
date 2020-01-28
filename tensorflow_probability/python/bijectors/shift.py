@@ -59,6 +59,7 @@ class Shift(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([shift], dtype_hint=tf.float32)
       self._shift = tensor_util.convert_nonref_to_tensor(
@@ -68,6 +69,7 @@ class Shift(bijector.Bijector):
           is_constant_jacobian=True,
           dtype=dtype,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property

@@ -59,11 +59,13 @@ class CholeskyToInvCholesky(bijector.Bijector):
   """
 
   def __init__(self, validate_args=False, name="cholesky_to_inv_cholesky"):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       self._cholesky = CholeskyOuterProduct()
       super(CholeskyToInvCholesky, self).__init__(
           forward_min_event_ndims=2,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   def _forward(self, x):

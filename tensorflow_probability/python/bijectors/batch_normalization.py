@@ -147,6 +147,7 @@ class BatchNormalization(bijector.Bijector):
         `tf.layers.BatchNormalization`, or if it is specified with `renorm=True`
         or a virtual batch size.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       # Scale must be positive.
       g_constraint = lambda x: tf.nn.relu(x) + 1e-6
@@ -161,6 +162,7 @@ class BatchNormalization(bijector.Bijector):
       super(BatchNormalization, self).__init__(
           forward_min_event_ndims=forward_min_event_ndims,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   def _validate_bn_layer(self, layer):

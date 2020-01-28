@@ -120,6 +120,7 @@ class ScaleMatvecLU(bijector.Bijector):
       ValueError: If both/neither `channels` and `lower_upper`/`permutation` are
         specified.
     """
+    parameters = dict(locals())
     with tf.name_scope(name or 'ScaleMatvecLU') as name:
       self._lower_upper = tensor_util.convert_nonref_to_tensor(
           lower_upper, dtype_hint=tf.float32, name='lower_upper')
@@ -130,6 +131,7 @@ class ScaleMatvecLU(bijector.Bijector):
           is_constant_jacobian=True,
           forward_min_event_ndims=1,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property
@@ -280,6 +282,7 @@ class MatvecLU(bijector.Bijector):
       ValueError: If both/neither `channels` and `lower_upper`/`permutation` are
         specified.
     """
+    parameters = dict(locals())
     with tf.name_scope(name or 'MatvecLU') as name:
       self._lower_upper = tensor_util.convert_nonref_to_tensor(
           lower_upper, dtype_hint=tf.float32, name='lower_upper')
@@ -290,6 +293,7 @@ class MatvecLU(bijector.Bijector):
           is_constant_jacobian=True,
           forward_min_event_ndims=1,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property

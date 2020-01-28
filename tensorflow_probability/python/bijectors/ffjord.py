@@ -297,6 +297,7 @@ class FFJORD(bijector.Bijector):
         back to float32.
       name: Python `str` name prefixed to Ops created by this function.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       self._initial_time = initial_time
       self._final_time = final_time
@@ -315,6 +316,7 @@ class FFJORD(bijector.Bijector):
           forward_min_event_ndims=0,
           dtype=dtype,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   def _solve_ode(self, ode_fn, state):

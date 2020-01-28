@@ -42,7 +42,7 @@ class Invert(bijector_lib.Bijector):
 
   """
 
-  def __init__(self, bijector, validate_args=False, name=None):
+  def __init__(self, bijector, validate_args=False, parameters=None, name=None):
     """Creates a `Bijector` which swaps the meaning of `inverse` and `forward`.
 
     Note: An inverted bijector's `inverse_log_det_jacobian` is often more
@@ -59,9 +59,12 @@ class Invert(bijector_lib.Bijector):
       bijector: Bijector instance.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
+      parameters: Locals dict captured by subclass constructor, to be used for
+        copy/slice re-instantiation operators.
       name: Python `str`, name given to ops managed by this object.
     """
 
+    parameters = dict(locals()) if parameters is None else parameters
     if not bijector._is_injective:  # pylint: disable=protected-access
       raise NotImplementedError(
           "Invert is not implemented for non-injective bijectors.")
@@ -75,6 +78,7 @@ class Invert(bijector_lib.Bijector):
           is_constant_jacobian=bijector.is_constant_jacobian,
           validate_args=validate_args,
           dtype=bijector.dtype,
+          parameters=parameters,
           name=name)
 
   def forward_event_shape(self, input_shape):

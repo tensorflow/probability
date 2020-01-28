@@ -57,6 +57,7 @@ class GeneralizedPareto(bijector_lib.Bijector):
                concentration,
                validate_args=False,
                name='generalized_pareto'):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [loc, scale, concentration], dtype_hint=tf.float32)
@@ -72,6 +73,7 @@ class GeneralizedPareto(bijector_lib.Bijector):
           validate_args=validate_args,
           forward_min_event_ndims=0,
           dtype=dtype,
+          parameters=parameters,
           name=name)
 
   def _is_increasing(self):

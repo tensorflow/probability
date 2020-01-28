@@ -87,6 +87,7 @@ class ScaleMatvecDiag(scale_matvec_linear_operator.ScaleMatvecLinearOperator):
     Raises:
       ValueError: if `scale_diag` is not specified.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       if dtype is None:
         dtype = dtype_util.common_dtype([scale_diag, scale_diag])
@@ -100,4 +101,5 @@ class ScaleMatvecDiag(scale_matvec_linear_operator.ScaleMatvecLinearOperator):
               is_non_singular=True),
           adjoint=adjoint,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)

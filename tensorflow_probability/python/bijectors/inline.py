@@ -99,6 +99,7 @@ class Inline(bijector.Bijector):
     Raises:
       TypeError: If any of the non-`None` `*_fn` arguments are not callable.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       self._maybe_implement(forward_fn, '_forward', 'forward_fn')
       self._maybe_implement(inverse_fn, '_inverse', 'inverse_fn')
@@ -127,6 +128,7 @@ class Inline(bijector.Bijector):
           inverse_min_event_ndims=inverse_min_event_ndims,
           is_constant_jacobian=is_constant_jacobian,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   def _maybe_implement(self, fn, lhs_name, rhs_name):

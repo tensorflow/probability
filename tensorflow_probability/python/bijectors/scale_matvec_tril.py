@@ -85,6 +85,7 @@ class ScaleMatvecTriL(scale_matvec_linear_operator.ScaleMatvecLinearOperator):
     Raises:
       ValueError: if `scale_tril` is not specified.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       if dtype is None:
         dtype = dtype_util.common_dtype([scale_tril])
@@ -98,4 +99,5 @@ class ScaleMatvecTriL(scale_matvec_linear_operator.ScaleMatvecLinearOperator):
               is_non_singular=True),
           adjoint=adjoint,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)

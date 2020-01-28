@@ -44,10 +44,12 @@ class Tanh(bijector.Bijector):
   """
 
   def __init__(self, validate_args=False, name="tanh"):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(Tanh, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @classmethod

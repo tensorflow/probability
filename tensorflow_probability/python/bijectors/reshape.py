@@ -145,6 +145,7 @@ class Reshape(bijector.Bijector):
        has non-vector shape (`rank > 1`), or if their sizes do not
        match.
     """
+    parameters = dict(locals())
     with tf.name_scope(name or 'reshape') as name:
       dtype = dtype_util.common_dtype(
           [event_shape_out, event_shape_in], dtype_hint=tf.int32)
@@ -173,6 +174,7 @@ class Reshape(bijector.Bijector):
           inverse_min_event_ndims=inverse_min_event_ndims_,
           is_constant_jacobian=True,
           validate_args=validate_args,
+          parameters=parameters,
           name=name or 'reshape')
 
   def _parameter_control_dependencies(self, is_init):

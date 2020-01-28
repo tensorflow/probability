@@ -42,6 +42,7 @@ class PowerTransform(bijector.Bijector):
   def __init__(self,
                power=0.,
                validate_args=False,
+               parameters=None,
                name='power_transform'):
     """Instantiates the `PowerTransform` bijector.
 
@@ -50,11 +51,14 @@ class PowerTransform(bijector.Bijector):
         `Y = g(X) = (1 + X * c)**(1 / c)` where `c` is the `power`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
+      parameters: Locals dict captured by subclass constructor, to be used for
+        copy/slice re-instantiation operators.
       name: Python `str` name given to ops managed by this object.
 
     Raises:
       ValueError: if `power < 0` or is not known statically.
     """
+    parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name) as name:
       power = tf.get_static_value(tf.convert_to_tensor(power, name='power'))
       if power is None or power < 0:
@@ -63,6 +67,7 @@ class PowerTransform(bijector.Bijector):
       super(PowerTransform, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property

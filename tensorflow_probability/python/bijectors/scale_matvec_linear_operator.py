@@ -66,6 +66,7 @@ class ScaleMatvecLinearOperator(bijector.Bijector):
                scale,
                adjoint=False,
                validate_args=False,
+               parameters=None,
                name='scale_matvec_linear_operator'):
     """Instantiates the `ScaleMatvecLinearOperator` bijector.
 
@@ -77,12 +78,15 @@ class ScaleMatvecLinearOperator(bijector.Bijector):
         Default value: `False`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
+      parameters: Locals dict captured by subclass constructor, to be used for
+        copy/slice re-instantiation operators.
       name: Python `str` name given to ops managed by this object.
 
     Raises:
       TypeError: if `scale` is not a `LinearOperator`.
       ValueError: if not `scale.is_non_singular`.
     """
+    parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([scale], dtype_hint=tf.float32)
       if not isinstance(scale, tf.linalg.LinearOperator):
@@ -96,6 +100,7 @@ class ScaleMatvecLinearOperator(bijector.Bijector):
           is_constant_jacobian=True,
           dtype=dtype,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property

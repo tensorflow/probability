@@ -351,6 +351,7 @@ class Affine(bijector.Bijector):
       TypeError: if `shift` has different `dtype` from `scale` arguments.
     """
     # Ambiguous definition of low rank update.
+    parameters = dict(locals())
     if scale_perturb_diag is not None and scale_perturb_factor is None:
       raise ValueError("When scale_perturb_diag is specified, "
                        "scale_perturb_factor must be specified.")
@@ -412,6 +413,7 @@ class Affine(bijector.Bijector):
           is_constant_jacobian=True,
           dtype=dtype,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   def _create_scale_operator(self, identity_multiplier, diag, tril,
