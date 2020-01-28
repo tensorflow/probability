@@ -275,7 +275,7 @@ class Beta(distribution.Distribution):
 
   def _log_unnormalized_prob(self, x, concentration1, concentration0):
     return (tf.math.xlogy(concentration1 - 1., x) +
-            (concentration0 - 1.) * tf.math.log1p(-x))
+            tf.math.xlog1py(concentration0 - 1., -x))
 
   def _log_normalization(self, concentration1, concentration0):
     return (tf.math.lgamma(concentration1) + tf.math.lgamma(concentration0) -

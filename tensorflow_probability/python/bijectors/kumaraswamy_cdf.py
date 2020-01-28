@@ -108,7 +108,7 @@ class KumaraswamyCDF(bijector.Bijector):
     return (tf.math.log(concentration1) +
             tf.math.log(concentration0) +
             tf.math.xlogy(concentration1 - 1, x) +
-            (concentration0 - 1) * tf.math.log1p(-x**concentration1))
+            tf.math.xlog1py(concentration0 - 1, -x**concentration1))
 
   def _maybe_assert_valid(self, x):
     if not self.validate_args:

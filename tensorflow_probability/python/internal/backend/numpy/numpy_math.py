@@ -159,6 +159,7 @@ __all__ = [
     # 'unsorted_segment_sum',
     'xdivy',
     'xlogy',
+    'xlog1py',
     # 'zero_fraction',
     'zeta',
 ]
@@ -839,10 +840,11 @@ xdivy = utils.copy_docstring(
 
 xlogy = utils.copy_docstring(
     tf.math.xlogy,
-    lambda x, y, name=None: (  # pylint: disable=unused-argument,g-long-lambda
-        np.where(np.equal(x, 0.),
-                 np.zeros_like(np.multiply(x, y)),
-                 np.multiply(x, np.log(y)))))
+    lambda x, y, name=None: scipy_special.xlogy(x, y))
+
+xlog1py = utils.copy_docstring(
+    tf.math.xlog1py,
+    lambda x, y, name=None: scipy_special.xlog1py(x, y))
 
 # zero_fraction = utils.copy_docstring(
 #     tf.math.zero_fraction,

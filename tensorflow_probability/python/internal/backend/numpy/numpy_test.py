@@ -697,6 +697,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
              [n_same_shape(n=2, elements=[floats(), non_zero_floats()])]),
     TestCase('math.xlogy',
              [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
+    TestCase('math.xlog1py',
+             [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
     TestCase(
         'random.categorical', [
             hps.tuples(
