@@ -37,21 +37,87 @@ class OrderedLogistic(distribution.Distribution):
   """Ordered logistic distribution
 
   The OrderedLogistic distribution is parameterized by a location and a set of
-  cutpoints. It is defined over the integers `{0, 1, ..., K}` when there are
-  `K-1` cutpoints.
+  cutpoints. It is defined over the integers `{0, 1, ..., K}` for `K-1`
+  non-decreasing cutpoints.
 
   One often useful way to interpret this distribution is by imagining a draw
   from a latent/unobserved logistic distribution with location `location` and
-  scale `1` and then only considering which of the `cutpoints` this draw falls
-  in.
+  scale `1` and then only considering the index of the bin defined by the `K-1`
+  cutpoints this draw falls between.
+
+  This distribution can be useful for modelling outcomes which have inherent
+  ordering but no real numerical values, for example modelling the outcome of a
+  survey question where the responses are `[bad, mediocre, good]`, which would
+  be coded as `[0, 1, 2]`.
 
   #### Mathematical Details
 
-  TODO
+  The survival function (s) is:
+
+  ```none
+  s(x; c, eta) = P(X > x)
+               = sigmoid(eta - concat([-inf, c, inf])[x+1])
+  ```
+
+  where `location = eta` is the location of a latent logistic distribution and
+  `cutpoints = c` define points to split up this latent distribution. The
+  concatenation of the cutpoints, `concat([-inf, c, inf])`, ensures that `s(K) =
+  P(X > K) = 0` and `s(-1) = P(X > -1) = 1` which aids in the definition of the
+  probability mass function (pmf):
+
+  ```none
+  pmf(x; c, eta) = P(X > x-1) - P(x > x)
+                 = s(x-1; c, eta) - s(x; c, eta)
+  ```
 
   #### Examples
 
-  TODO
+  Create a symmetric 4-class distribution:
+
+  ```python
+  import tensorflow_probability as tfp
+  tfd = tfp.distributions
+
+  dist = tfd.OrderedLogistic(cutpoints=[-2., 0., 2.], location=0.)
+
+  dist.categorical_probs()
+  # ==> array([0.11920293, 0.38079706, 0.3807971 , 0.11920291], dtype=float32)
+  ```
+
+  Create a batch of 3 4-class distributions via batching the location of the
+  underlying latent logistic distribution. Additionally, compared to the above
+  example, the cutpoints have moved closer together/to zero, thus the
+  probability of a latent draw falling in the inner two categories has shrunk
+  for the `location = 0` case:
+
+  ```python
+  dist = tfd.OrderedLogistic(cutpoints=[-1., 0., 1.], location=[-1., 0., 1.])
+
+  dist.categorical_probs()
+  # ==> array([[0.5       , 0.23105855, 0.1497385 , 0.11920291],
+               [0.2689414 , 0.23105861, 0.23105855, 0.26894143],
+               [0.11920293, 0.14973842, 0.23105861, 0.5       ]], dtype=float32)
+
+  ```
+
+  Some further functionallity:
+
+  ```python
+  dist = tfd.OrderedLogistic(cutpoints=[-1., 0., 2.], location=0.)
+
+  dist.prob([0, 3])
+  # ==> array([0.2689414 , 0.11920291], dtype=float32)
+
+  dist.log_prob(1)
+  # ==> -1.4650838
+
+  dist.sample(3)
+  # ==> array([0, 1, 1], dtype=int32)
+
+  dist.entropy()
+  # ==> 1.312902
+  ```
+
   """
 
   def __init__(
@@ -65,7 +131,24 @@ class OrderedLogistic(distribution.Distribution):
   ):
     """Initialize Ordered Logistic distributions
 
-    TODO
+    Args:
+      cutpoints: An N-D floating point `Tensor`, `N >= 1`, representing the
+        points which split up a latent logistic distribution. The first `N - 1`
+        dimensions index into a batch of independent distributions and the last
+        dimension represents a vector of cutpoints. The vector of cutpoints
+        should be non-decreasing, which is only checked if `validate_args=True`.
+      location: A floating point `Tensor`, representing the mean(s) of the
+        latent logistic distribution(s).
+      dtype: The type of the event samples (default: int32).
+      validate_args: Python `bool`, default `False`. When `True` distribution
+        parameters are checked for validity despite possibly degrading runtime
+        performance. When `False` invalid inputs may silently render incorrect
+        outputs.
+      allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
+        (e.g. mode) use the value "`NaN`" to indicate the result is
+        undefined. When `False`, an exception is raised if one or more of the
+        statistic's batch members are undefined.
+      name: Python `str` name prefixed to Ops created by this class.
     """
 
     parameters = dict(locals())
