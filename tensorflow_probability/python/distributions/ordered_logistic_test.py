@@ -116,7 +116,7 @@ class OrderedLogisticTest(test_util.TestCase):
 
   def testUnorderedCutpointsFails(self):
     with self.assertRaisesRegexp(
-          ValueError, 'Argument `cutpoints` must be non-decreasing.'):
+        ValueError, 'Argument `cutpoints` must be non-decreasing.'):
       dist = tfd.OrderedLogistic([1., 0.9], 0.0, validate_args=True)
       self.evaluate(dist.mode())
 
