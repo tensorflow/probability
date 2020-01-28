@@ -475,16 +475,11 @@ def fit_with_hmc(model,
 
   ```python
   samples, kernel_results = tfp.sts.fit_with_hmc(model, observed_time_series)
-
-  with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
-    samples_, kernel_results_ = sess.run((samples, kernel_results))
-
   print("acceptance rate: {}".format(
-    np.mean(kernel_results_.inner_results.is_accepted, axis=0)))
+    np.mean(kernel_results.inner_results.inner_results.is_accepted, axis=0)))
   print("posterior means: {}".format(
     {param.name: np.mean(param_draws, axis=0)
-     for (param, param_draws) in zip(model.parameters, samples_)}))
+     for (param, param_draws) in zip(model.parameters, samples)}))
   ```
 
   We can also run multiple chains. This may help diagnose convergence issues
@@ -496,33 +491,28 @@ def fit_with_hmc(model,
 
   samples, kernel_results = tfp.sts.fit_with_hmc(
     model, observed_time_series, chain_batch_shape=[10])
-
-  with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
-    samples_, kernel_results_ = sess.run((samples, kernel_results))
-
   print("acceptance rate: {}".format(
-    np.mean(kernel_results_.inner_results.inner_results.is_accepted, axis=0)))
+    np.mean(kernel_results.inner_results.inner_results.is_accepted, axis=0)))
 
   # Plot the sampled traces for each parameter. If the chains have mixed, their
   # traces should all cover the same region of state space, frequently crossing
   # over each other.
-  for (param, param_draws) in zip(model.parameters, samples_):
+  for (param, param_draws) in zip(model.parameters, samples):
     if param.prior.event_shape.ndims > 0:
       print("Only plotting traces for scalar parameters, skipping {}".format(
         param.name))
       continue
     plt.figure(figsize=[10, 4])
     plt.title(param.name)
-    plt.plot(param_draws)
+    plt.plot(param_draws.numpy())
     plt.ylabel(param.name)
     plt.xlabel("HMC step")
 
   # Combining the samples from multiple chains into a single dimension allows
   # us to easily pass sampled parameters to downstream forecasting methods.
-  combined_samples_ = [np.reshape(param_draws,
-                                  [-1] + list(param_draws.shape[2:]))
-                       for param_draws in samples_]
+  combined_samples = [np.reshape(param_draws,
+                                 [-1] + list(param_draws.shape[2:]))
+                      for param_draws in samples]
   ```
 
   For greater flexibility, you may prefer to implement your own sampler using
