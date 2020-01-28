@@ -130,7 +130,8 @@ augment_kl_xent_docs(_sys.modules[__name__])
 del augment_kl_xent_docs
 del _sys
 
-# pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member,g-bad-import-order
+# pylint: enable=unused-import,wildcard-import,g-importing-member,g-bad-import-order
+# pylint: enable=line-too-long
 
 __all__ = [
     'FULLY_REPARAMETERIZED',
