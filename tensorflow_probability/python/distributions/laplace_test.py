@@ -128,6 +128,18 @@ class LaplaceTest(test_util.TestCase):
     expected_cdf = sp_stats.laplace.logcdf(x, loc_v, scale=scale_v)
     self.assertAllClose(self.evaluate(cdf), expected_cdf)
 
+  def testLaplaceQuantile(self):
+    qs = self.evaluate(
+        tf.concat(
+            [[0., 1],
+             tf.random.uniform([10], minval=.1, maxval=.9,
+                               seed=test_util.test_seed())],
+            axis=0))
+    d = tfd.Laplace(loc=1., scale=1.3, validate_args=True)
+    vals = d.quantile(qs)
+    self.assertAllClose([-np.inf, np.inf], vals[:2])
+    self.assertAllClose(qs[2:], d.cdf(vals[2:]))
+
   def testLaplaceLogSurvivalFunction(self):
     batch_size = 6
     loc = tf.constant([2.0] * batch_size)
