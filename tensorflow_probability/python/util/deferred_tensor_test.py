@@ -343,7 +343,7 @@ class DeferredTensorBehavesLikeTensorTest(test_util.TestCase):
     if tf.executing_eagerly():
       self.assertAllEqual(tf.math.exp(x_).numpy(), x.numpy())
     else:
-      with self.assertRaises(AttributeError):
+      with self.assertRaises(TypeError):
         x.numpy()
 
 

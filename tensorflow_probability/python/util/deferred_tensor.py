@@ -290,7 +290,14 @@ class DeferredTensor(tf.Module):
 
   def numpy(self):
     """Returns (copy of) deferred values as a NumPy array or scalar."""
-    return self._value().numpy()
+    try:
+      return self._value().numpy()
+    except AttributeError:
+      if isinstance(self._value(), tf.Tensor):
+        raise TypeError(
+            "'{}.numpy()' only works in eager mode.".format(type(self).__name__))
+      else:
+        raise
 
   def set_shape(self, shape):
     """Updates the shape of this pretransformed_input.
