@@ -137,6 +137,15 @@ class OrderedLogisticTest(test_util.TestCase):
       kl_same = self.evaluate(tfd.kl_divergence(a, a))
       self.assertAllClose(kl_same, np.zeros_like(kl_expected))
 
+  def testLatentLogistic(self):
+    loc = [-0.123, 0.456]
+    cutpoints = [-2.5, 0.42]
+    latent = tfd.Logistic(loc, scale=1.)
+    ordered = tfd.OrderedLogistic(cutpoints, loc)
+    ordered_cdf = self.evaluate(ordered.cdf([0, 1]))
+    latent_cdf = self.evaluate(latent.cdf(cutpoints))
+    self.assertAllClose(ordered_cdf, latent_cdf)
+
   def testUnorderedCutpointsFails(self):
     with self.assertRaisesRegexp(
         ValueError, 'Argument `cutpoints` must be non-decreasing.'):
