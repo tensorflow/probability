@@ -177,8 +177,7 @@ class OrderedLogistic(distribution.Distribution):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
-          name=name,
-      )
+          name=name)
 
   @classmethod
   def _params_event_ndims(cls):
