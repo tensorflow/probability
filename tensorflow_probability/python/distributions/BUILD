@@ -71,8 +71,10 @@ multi_substrate_py_library(
         ":inverse_gamma",
         ":inverse_gaussian",
         ":joint_distribution",
+        ":joint_distribution_auto_batched",
         ":joint_distribution_coroutine",
         ":joint_distribution_named",
+        ":joint_distribution_sample_path_mixin",
         ":joint_distribution_sequential",
         ":kullback_leibler",
         ":kumaraswamy",
@@ -686,6 +688,21 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "joint_distribution_auto_batched",
+    srcs = ["joint_distribution_auto_batched.py"],
+    deps = [
+        ":joint_distribution_coroutine",
+        ":joint_distribution_named",
+        ":joint_distribution_sample_path_mixin",
+        ":joint_distribution_sequential",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
     name = "joint_distribution_coroutine",
     srcs = ["joint_distribution_coroutine.py"],
     deps = [
@@ -704,6 +721,18 @@ multi_substrate_py_library(
         ":distribution",
         ":joint_distribution_sequential",
         "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "joint_distribution_sample_path_mixin",
+    srcs = ["joint_distribution_sample_path_mixin.py"],
+    deps = [
+        ":joint_distribution",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -1990,6 +2019,19 @@ multi_substrate_py_test(
         ":normal",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "joint_distribution_auto_batched_test",
+    size = "medium",
+    srcs = ["joint_distribution_auto_batched_test.py"],
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
