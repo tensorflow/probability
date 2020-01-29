@@ -217,21 +217,15 @@ class OrderedLogistic(distribution.Distribution):
         shape=tf.concat([[n], self._batch_shape_tensor()], axis=0))
 
   def _batch_shape_tensor(self, cutpoints=None, location=None):
-    if cutpoints is None:
-      first_cutpoint = self.cutpoints[..., 0]
-    else:
-      first_cutpoint = cutpoints[..., 0]
-
-    if location is None:
-      location = self.location
-
+    cutpoints = self.cutpoints if cutpoints is None else cutpoints
+    location = self.location if location is None else location
     return prefer_static.broadcast_shape(
-        prefer_static.shape(first_cutpoint),
+        prefer_static.shape(cutpoints)[:-1],
         prefer_static.shape(location))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
-        self.location.shape, self.cutpoints[..., 0].shape)
+        self.location.shape, self.cutpoints.shape[:-1])
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
