@@ -180,6 +180,10 @@ class OrderedLogistic(distribution.Distribution):
           name=name,
       )
 
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(cutpoints=1, location=0)
+
   @property
   def cutpoints(self):
     """Input argument `cutpoints`"""
