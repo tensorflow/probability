@@ -24,12 +24,10 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     'WeibullCDF',
-    'Weibull',
 ]
 
 
@@ -152,24 +150,3 @@ class WeibullCDF(bijector.Bijector):
           self.concentration,
           message='Argument `concentration` must be positive.'))
     return assertions
-
-
-class Weibull(WeibullCDF):
-  """Computes the Weibull CDF."""
-
-  @deprecation.deprecated(
-      '2020-01-20',
-      'Weibull is deprecated, use WeibullCDF(...) instead.',
-      warn_once=True)
-
-  def __init__(self,
-               scale=1.,
-               concentration=1.,
-               validate_args=False,
-               name='weibull'):
-    with tf.name_scope(name) as name:
-      super(Weibull, self).__init__(
-          scale=scale,
-          concentration=concentration,
-          validate_args=validate_args,
-          name=name)
