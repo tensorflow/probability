@@ -102,7 +102,7 @@ class OrderedLogisticTest(test_util.TestCase):
   def testSample(self):
     # as per `testProbs`
     dist = tfd.OrderedLogistic([-1., 0., 1.], 0.)
-    samples = self.evaluate(dist.sample(100000, seed=test_util.test_seed()))
+    samples = self.evaluate(dist.sample(int(1e5), seed=test_util.test_seed()))
     expected_probs = [0.2689414, 0.2310586, 0.23105857, 0.26894143]
     for k, p in enumerate(expected_probs):
       self.assertAllClose(np.mean(samples == k), p, atol=0.01)
