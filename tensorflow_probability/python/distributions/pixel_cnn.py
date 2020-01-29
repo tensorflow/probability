@@ -318,6 +318,11 @@ class PixelCNN(distribution.Distribution):
           use_data_init=use_data_init,
           dtype=dtype)
 
+      image_shape = tensorshape_util.constant_value_as_shape(image_shape)
+      conditional_shape = (None if conditional_shape is None
+                           else tensorshape_util.constant_value_as_shape(
+                               conditional_shape))
+
       image_input_shape = tensorshape_util.concatenate([None], image_shape)
       if conditional_shape is None:
         input_shape = image_input_shape

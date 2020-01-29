@@ -276,6 +276,22 @@ class ConditionalPixelCnnTest(PixelCnnTest):
     return [tf.keras.layers.Input(shape=self.image_shape),
             tf.keras.layers.Input(shape=self.h_shape)]
 
+  def testScalarConditional(self):
+    dist = tfd.PixelCNN(
+        image_shape=self.image_shape,
+        conditional_shape=(),
+        num_resnet=2,
+        num_hierarchies=2,
+        num_filters=3,
+        num_logistic_mix=2,
+        high=self.high,
+        low=self.low)
+
+    self.evaluate([v.initializer for v in dist.network.weights])
+    self.evaluate(
+        dist.log_prob(
+            dist.sample(conditional_input=1.),
+            conditional_input=0.))
 
 if __name__ == '__main__':
   tf.test.main()
