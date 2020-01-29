@@ -75,6 +75,7 @@ TF2_FRIENDLY_DISTS = (
     'Multinomial',
     'NegativeBinomial',
     'OneHotCategorical',
+    'OrderedLogistic',
     'Pareto',
     'PERT',
     'PlackettLuce',
