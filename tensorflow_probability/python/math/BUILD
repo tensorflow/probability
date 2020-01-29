@@ -176,7 +176,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "linalg_test",
-    size = "small",
+    size = "medium",
     srcs = ["linalg_test.py"],
     jax_size = "medium",
     numpy_tags = ["notap"],

@@ -1999,6 +1999,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "inverse_gaussian_test",
+    size = "medium",
     srcs = ["inverse_gaussian_test.py"],
     deps = [
         # numpy dep,
@@ -2293,6 +2294,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "mvn_tril_test",
+    size = "medium",
     srcs = ["mvn_tril_test.py"],
     numpy_tags = ["notap"],
     shard_count = 5,
