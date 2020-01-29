@@ -34,7 +34,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 
 class OrderedLogistic(distribution.Distribution):
-  """Ordered logistic distribution
+  """Ordered logistic distribution.
 
   The OrderedLogistic distribution is parameterized by a location and a set of
   cutpoints. It is defined over the integers `{0, 1, ..., K}` for `K-1`
@@ -129,7 +129,7 @@ class OrderedLogistic(distribution.Distribution):
       allow_nan_stats=True,
       name="OrderedLogistic",
   ):
-    """Initialize Ordered Logistic distributions
+    """Initialize Ordered Logistic distributions.
 
     Args:
       cutpoints: An N-D floating point `Tensor`, `N >= 1`, representing the
@@ -185,16 +185,16 @@ class OrderedLogistic(distribution.Distribution):
 
   @property
   def cutpoints(self):
-    """Input argument `cutpoints`"""
+    """Input argument `cutpoints`."""
     return self._cutpoints
 
   @property
   def location(self):
-    """Input argument `location`"""
+    """Input argument `location`."""
     return self._location
 
   def categorical_log_probs(self):
-    """Matrix of predicted log probabilities for each category"""
+    """Matrix of predicted log probabilities for each category."""
     log_survival = tf.math.log_sigmoid(
         self.location[..., tf.newaxis] -
         self._augmented_cutpoints[tf.newaxis, ...])
@@ -205,7 +205,7 @@ class OrderedLogistic(distribution.Distribution):
     return tf.reshape(log_probs, shape)
 
   def categorical_probs(self):
-    """Matrix of predicted log probabilities for each category"""
+    """Matrix of predicted probabilities for each category."""
     return tf.math.exp(self.categorical_log_probs())
 
   def _sample_n(self, n, seed=None):
