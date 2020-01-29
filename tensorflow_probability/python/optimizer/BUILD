@@ -39,6 +39,7 @@ py_library(
         ":proximal_hessian_sparse",
         ":sgld",
         ":variational_sgd",
+        "//tensorflow_probability/python/optimizer/convergence_criteria",
         "//tensorflow_probability/python/optimizer/linesearch",
     ],
 )

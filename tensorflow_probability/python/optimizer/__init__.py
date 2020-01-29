@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.optimizer import convergence_criteria
 from tensorflow_probability.python.optimizer import linesearch
 from tensorflow_probability.python.optimizer.bfgs import minimize as bfgs_minimize
 from tensorflow_probability.python.optimizer.bfgs_utils import converged_all
@@ -48,6 +49,7 @@ _allowed_symbols = [
     'proximal_hessian_sparse_one_step',
     'linesearch',
     'StochasticGradientLangevinDynamics',
+    'convergence_criteria',
     'VariationalSGD',
 ]
 
