@@ -51,7 +51,7 @@ class OrderedLogisticTest(test_util.TestCase):
               tf.constant([1., 2.], dtype=tf.float64), batch_shape + [2])
           location = self._rng.randn(*batch_shape)
 
-        dist = tfd.OrderedLogistic(cutpoints, location)
+        dist = tfd.OrderedLogistic(cutpoints=cutpoints, location=location)
 
         self.assertAllEqual(dist.batch_shape, batch_shape)
         self.assertAllEqual(
@@ -83,7 +83,7 @@ class OrderedLogisticTest(test_util.TestCase):
     # P(Y = 2) = sigmoid(0) - sigmoid(-1) = 0.23105857
     # P(Y = 3) = sigmoid(-1) = 0.26894143
     expected_probs = [0.2689414, 0.2310586, 0.23105857, 0.26894143]
-    dist = tfd.OrderedLogistic([-1., 0., 1.], 0.)
+    dist = tfd.OrderedLogistic(cutpoints=[-1., 0., 1.], location=0.)
 
     categorical_probs = self.evaluate(dist.categorical_probs())
     self.assertAllClose(expected_probs, categorical_probs, atol=1e-6)
@@ -95,20 +95,21 @@ class OrderedLogisticTest(test_util.TestCase):
     # 2 cutpoints i.e. 3 possible outcomes. 3 "batched" distributions with the
     # logistic distribution location well within the large cutpoint spacing so
     # mode is obvious
-    dist = tfd.OrderedLogistic([-10., 10.], [-20., 0., 20.])
+    dist = tfd.OrderedLogistic(cutpoints=[-10., 10.], location=[-20., 0., 20.])
     mode = self.evaluate(dist.mode())
     self.assertAllEqual([0, 1, 2], mode)
 
   def testSample(self):
     # as per `testProbs`
-    dist = tfd.OrderedLogistic([-1., 0., 1.], 0.)
+    dist = tfd.OrderedLogistic(cutpoints=[-1., 0., 1.], location=0.)
     samples = self.evaluate(dist.sample(int(1e5), seed=test_util.test_seed()))
     expected_probs = [0.2689414, 0.2310586, 0.23105857, 0.26894143]
     for k, p in enumerate(expected_probs):
       self.assertAllClose(np.mean(samples == k), p, atol=0.01)
 
   def testEntropy(self):
-    dist = tfd.OrderedLogistic([-4.2, 0., 0.123], [-3.14, 0.321])
+    dist = tfd.OrderedLogistic(
+        cutpoints=[-4.2, 0., 0.123], location=[-3.14, 0.321])
     categorical_dist = tfd.Categorical(dist.categorical_log_probs())
     expected_entropy = self.evaluate(categorical_dist.entropy())
     entropy = self.evaluate(dist.entropy())
@@ -120,8 +121,10 @@ class OrderedLogisticTest(test_util.TestCase):
       a_location = self._rng.randn(batch_size)
       b_location = self._rng.randn(batch_size)
 
-      a = tfd.OrderedLogistic(cutpoints, a_location, validate_args=True)
-      b = tfd.OrderedLogistic(cutpoints, b_location, validate_args=True)
+      a = tfd.OrderedLogistic(
+          cutpoints=cutpoints, location=a_location, validate_args=True)
+      b = tfd.OrderedLogistic(
+          cutpoints=cutpoints, location=b_location, validate_args=True)
 
       a_cat = tfd.Categorical(
           logits=a.categorical_log_probs(), validate_args=True)
@@ -138,10 +141,10 @@ class OrderedLogisticTest(test_util.TestCase):
       self.assertAllClose(kl_same, np.zeros_like(kl_expected))
 
   def testLatentLogistic(self):
-    loc = [-0.123, 0.456]
+    location = [-0.123, 0.456]
     cutpoints = [-2.5, 0.42]
-    latent = tfd.Logistic(loc, scale=1.)
-    ordered = tfd.OrderedLogistic(cutpoints, loc)
+    latent = tfd.Logistic(loc=location, scale=1.)
+    ordered = tfd.OrderedLogistic(cutpoints=cutpoints, location=location)
     ordered_cdf = self.evaluate(ordered.cdf([0, 1]))
     latent_cdf = self.evaluate(latent.cdf(cutpoints))
     self.assertAllClose(ordered_cdf, latent_cdf)
@@ -149,7 +152,8 @@ class OrderedLogisticTest(test_util.TestCase):
   def testUnorderedCutpointsFails(self):
     with self.assertRaisesRegexp(
         ValueError, 'Argument `cutpoints` must be non-decreasing.'):
-      dist = tfd.OrderedLogistic([1., 0.9], 0.0, validate_args=True)
+      dist = tfd.OrderedLogistic(
+          cutpoints=[1., 0.9], location=0.0, validate_args=True)
       self.evaluate(dist.mode())
 
 if __name__ == '__main__':
