@@ -77,7 +77,7 @@ def tfp_hp_settings(default_max_examples=None, **kwargs):
       deadline=None,
       suppress_health_check=[hp.HealthCheck.too_slow],
       max_examples=hypothesis_max_examples(default=default_max_examples),
-      print_blob=hp.PrintSettings.ALWAYS)
+      print_blob=True)
   kwds.update(kwargs)
   def decorator(test_method):
     seed = hypothesis_reproduction_seed()
