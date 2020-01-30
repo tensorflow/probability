@@ -1734,6 +1734,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "dirichlet_test",
     srcs = ["dirichlet_test.py"],
+    jax_size = "medium",
     deps = [
         # numpy dep,
         # scipy dep,
