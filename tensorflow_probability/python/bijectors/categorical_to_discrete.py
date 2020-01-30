@@ -111,9 +111,8 @@ class CategoricalToDiscrete(bijector.Bijector):
         candidates = tf.identity(candidates)
     candidate_selector = tf.stack([
         tf.range(tf.size(flat_y), dtype=tf.int32),
-        tf.argmin([lower_cand_diff, upper_cand_diff], output_type=tf.int32)
-    ],
-                                  axis=-1)
+        tf.argmin([lower_cand_diff, upper_cand_diff],
+                  output_type=tf.int32)], axis=-1)
     return tf.reshape(
         tf.gather_nd(candidates, candidate_selector), shape=y.shape)
 

@@ -27,11 +27,14 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import ops
+from tensorflow_probability.python.internal.backend.numpy.linalg_impl import einsum
 from tensorflow_probability.python.internal.backend.numpy.linalg_impl import norm
+from tensorflow_probability.python.internal.backend.numpy.linalg_impl import tensordot
 
 
 __all__ = [
     'concat',
+    'einsum',
     'expand_dims',
     'fill',
     'gather',
@@ -55,6 +58,7 @@ __all__ = [
     'split',
     'squeeze',
     'stack',
+    'tensordot',
     'tile',
     'transpose',
     'unstack',
@@ -62,10 +66,8 @@ __all__ = [
     'zeros',
     'zeros_like',
     # 'boolean_mask',
-    # 'einsum',
     # 'foldl',
     # 'foldr',
-    # 'tensordot',
 ]
 
 
@@ -201,10 +203,19 @@ def _searchsorted(  # pylint: disable=unused-argument
     sorted_sequence,
     values,
     side='left',
-    out_type=tf.int32,
+    out_type=np.int32,
     name=None):
-  return np.searchsorted(
-      sorted_sequence, values, side=side, sorter=None).astype(out_type)
+  """Find indices for insertion for list to remain sorted."""
+  # JAX doesn't support searchsorted at the moment, so we do a very naive way
+  # of search sorting. We also don't use np.searchsorted in the numpy backend
+  # because it doesn't support batching.
+  sorted_sequence = sorted_sequence[..., np.newaxis, :]
+  values = values[..., :, np.newaxis]
+  if side == 'left':
+    is_in_right_location = sorted_sequence < values
+  elif side == 'right':
+    is_in_right_location = sorted_sequence <= values
+  return np.sum(is_in_right_location, axis=-1).astype(out_type)
 
 
 def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin,unused-argument

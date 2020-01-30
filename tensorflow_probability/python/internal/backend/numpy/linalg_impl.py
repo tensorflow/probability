@@ -51,6 +51,7 @@ __all__ = [
     'slogdet',
     'solve',
     'tensordot',
+    'trace',
     'triangular_solve',
     # 'cross',
     # 'eigh',
@@ -67,7 +68,6 @@ __all__ = [
     # 'svd',
     # 'tensor_diag',
     # 'tensor_diag_part',
-    # 'trace',
     # 'tridiagonal_solve',
 ]
 
@@ -270,6 +270,11 @@ def _tensordot(a, b, axes, name=None):  # pylint: disable=redefined-outer-name
   return np.tensordot(a, b, axes=axes)
 
 
+def _trace(x, name=None):
+  del name
+  return np.trace(x, axis1=-1, axis2=-2)
+
+
 def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):  # pylint: disable=redefined-outer-name
   """Scipy solve does not broadcast, so we must do so explicitly."""
   del name
@@ -395,6 +400,10 @@ solve = utils.copy_docstring(tf.linalg.solve, _solve)
 tensordot = utils.copy_docstring(
     tf.linalg.tensordot,
     _tensordot)
+
+trace = utils.copy_docstring(
+    tf.linalg.trace,
+    _trace)
 
 triangular_solve = utils.copy_docstring(
     tf.linalg.triangular_solve,

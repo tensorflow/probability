@@ -52,10 +52,13 @@ multi_substrate_py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "statistical_testing_test",
     size = "small",
     srcs = ["statistical_testing_test.py"],
+    jax_size = "medium",
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     shard_count = 4,
     deps = [
         ":statistical_testing",

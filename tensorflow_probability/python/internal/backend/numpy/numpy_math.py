@@ -27,6 +27,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import _reverse
+from tensorflow_probability.python.internal.backend.numpy.ops import _convert_to_tensor
 from tensorflow_probability.python.internal.backend.numpy.ops import _custom_gradient
 
 scipy_special = utils.try_import('scipy.special')
@@ -78,6 +79,7 @@ __all__ = [
     'expm1',
     'floor',
     'floordiv',
+    'floormod',
     'greater',
     'greater_equal',
     'igamma',
@@ -105,6 +107,7 @@ __all__ = [
     'logical_xor',
     'maximum',
     'minimum',
+    'mod',
     'multiply',
     'multiply_no_nan',
     'ndtri',
@@ -255,7 +258,17 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
 
 
 def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argument,redefined-builtin
-  raise NotImplementedError
+  n = int(input.shape[-1] - 1)
+  # For the values, we sort the negative entries and choose the smallest ones
+  # and negate. This is equivalent to choosing the largest entries
+  # For the indices, we could argsort and reverse the entries and choose the
+  # first k entries. However, this does not work in the case of ties, since the
+  # first index a value occurs at is preferred. Thus we also reverse the input
+  # to ensure the last tied value becomes first, and subtract this off from the
+  # last index since the list is reversed.
+  return (-np.sort(-input, axis=-1)[..., :k],
+          (n - (np.argsort(input[..., ::-1],
+                           kind='stable', axis=-1)[..., ::-1]))[..., :k])
 
 
 # --- Begin Public Functions --------------------------------------------------
@@ -299,7 +312,8 @@ argmax = utils.copy_docstring(
 argmin = utils.copy_docstring(
     tf.math.argmin,
     lambda input, axis=None, output_type=tf.int64, name=None: (  # pylint: disable=g-long-lambda
-        np.argmin(input, axis=0 if axis is None else _astuple(axis))
+        np.argmin(_convert_to_tensor(
+            input), axis=0 if axis is None else _astuple(axis))
         .astype(utils.numpy_dtype(output_type))))
 
 asin = utils.copy_docstring(
@@ -429,6 +443,10 @@ floor = utils.copy_docstring(
 floordiv = utils.copy_docstring(
     tf.math.floordiv,
     lambda x, y, name=None: np.floor_divide(x, y))
+
+floormod = utils.copy_docstring(
+    tf.math.floormod,
+    lambda x, y, name=None: np.mod(x, y))
 
 greater = utils.copy_docstring(
     tf.math.greater,
@@ -591,6 +609,10 @@ maximum = utils.copy_docstring(
 
 minimum = utils.copy_docstring(
     tf.math.minimum, _minimum)
+
+mod = utils.copy_docstring(
+    tf.math.mod,
+    lambda x, y, name=None: np.mod(x, y))
 
 multiply = utils.copy_docstring(
     tf.math.multiply,

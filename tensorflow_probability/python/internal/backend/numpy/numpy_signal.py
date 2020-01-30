@@ -66,30 +66,30 @@ ifft3d = utils.copy_docstring(
 
 rfft = utils.copy_docstring(
     tf.signal.rfft,
-    lambda input, fft_length=None, name=None: np.fft.rfft(  # pylint:disable=g-long-lambda
-        input, n=fft_length, axis=[-1]))
+    lambda input, fft_length=None, name=None: np.fft.rfftn(  # pylint:disable=g-long-lambda
+        input, s=fft_length, axes=[-1]))
 
 rfft2d = utils.copy_docstring(
     tf.signal.rfft2d,
-    lambda input, fft_length=None, name=None: np.fft.rfft2d(  # pylint:disable=g-long-lambda
+    lambda input, fft_length=None, name=None: np.fft.rfftn(  # pylint:disable=g-long-lambda
         input, s=fft_length, axes=[-2, -1]))
 
 rfft3d = utils.copy_docstring(
     tf.signal.rfft3d,
-    lambda input, fft_length=None, name=None: np.fft.rfft3d(  # pylint:disable=g-long-lambda
-        input, s=fft_length, axis=[-3, -2, -1]))
+    lambda input, fft_length=None, name=None: np.fft.rfftn(  # pylint:disable=g-long-lambda
+        input, s=fft_length, axes=[-3, -2, -1]))
 
 irfft = utils.copy_docstring(
     tf.signal.irfft,
-    lambda input, fft_length=None, name=None: np.fft.irfft(  # pylint:disable=g-long-lambda
-        input, n=fft_length, axis=[-1]))
+    lambda input, fft_length=None, name=None: np.fft.irfftn(  # pylint:disable=g-long-lambda
+        input, s=fft_length, axes=[-1]))
 
 irfft2d = utils.copy_docstring(
     tf.signal.irfft2d,
-    lambda input, fft_length=None, name=None: np.fft.irfft2d(  # pylint:disable=g-long-lambda
+    lambda input, fft_length=None, name=None: np.fft.irfftn(  # pylint:disable=g-long-lambda
         input, s=fft_length, axes=[-2, -1]))
 
 irfft3d = utils.copy_docstring(
     tf.signal.irfft3d,
-    lambda input, fft_length=None, name=None: np.fft.irfft3d(  # pylint:disable=g-long-lambda
-        input, s=fft_length, axis=[-3, -2, -1]))
+    lambda input, fft_length=None, name=None: np.fft.irfftn(  # pylint:disable=g-long-lambda
+        input, s=fft_length, axes=[-3, -2, -1]))

@@ -2382,7 +2382,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "pert_test",
     srcs = ["pert_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2577,7 +2576,6 @@ multi_substrate_py_test(
     name = "triangular_test",
     size = "medium",
     srcs = ["triangular_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
