@@ -312,6 +312,11 @@ class OrderedLogistic(distribution.Distribution):
 def _kl_ordered_logistic_ordered_logistic(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b), a and b OrderedLogistic.
 
+  This function utilises the `OrderedLogistic` `categorical_log_probs` member
+  function to implement KL divergence for discrete probability distributions as
+  described in
+  e.g. [Wikipedia](https://en.wikipedia.org/wiki/Kullback-Leibler_divergence).
+
   Args:
     a: instance of a OrderedLogistic distribution object.
     b: instance of a OrderedLogistic distribution object.
