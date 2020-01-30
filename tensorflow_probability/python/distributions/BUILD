@@ -1597,7 +1597,6 @@ multi_substrate_py_test(
     name = "beta_test",
     srcs = ["beta_test.py"],
     jax_size = "medium",
-    jax_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -1986,6 +1985,7 @@ multi_substrate_py_test(
     name = "inverse_gamma_test",
     size = "medium",
     srcs = ["inverse_gamma_test.py"],
+    jax_size = "large",
     jax_tags = ["notap"],
     shard_count = 5,
     deps = [
