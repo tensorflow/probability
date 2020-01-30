@@ -203,7 +203,7 @@ class EndToEndTest(test_util.TestCase):
 
       def __init__(self, input_shape, encoded_size, train_size):
         super(Encoder, self).__init__()
-        self._layers = [
+        self._sub_layers = [
             tfkl.Flatten(),
             tfkl.Dense(10, activation='relu'),
             tfkl.Dense(tfpl.MultivariateNormalTriL.params_size(encoded_size)),
@@ -215,21 +215,21 @@ class EndToEndTest(test_util.TestCase):
         ]
 
       def call(self, inputs):
-        return functools.reduce(lambda x, f: f(x), self._layers, inputs)
+        return functools.reduce(lambda x, f: f(x), self._sub_layers, inputs)
 
     class Decoder(tfk.Model):
       """Decoder."""
 
       def __init__(self, output_shape):
         super(Decoder, self).__init__()
-        self._layers = [
+        self._sub_layers = [
             tfkl.Dense(10, activation='relu'),
             tfkl.Dense(tfpl.IndependentBernoulli.params_size(output_shape)),
             tfpl.IndependentBernoulli(output_shape, tfd.Bernoulli.logits),
         ]
 
       def call(self, inputs):
-        return functools.reduce(lambda x, f: f(x), self._layers, inputs)
+        return functools.reduce(lambda x, f: f(x), self._sub_layers, inputs)
 
     encoder = Encoder(self.input_shape, self.encoded_size, self.train_size)
     decoder = Decoder(self.input_shape)
