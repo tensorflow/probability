@@ -37,18 +37,18 @@ class OrderedLogistic(distribution.Distribution):
   """Ordered logistic distribution.
 
   The OrderedLogistic distribution is parameterized by a location and a set of
-  cutpoints. It is defined over the integers `{0, 1, ..., K}` for `K-1`
+  cutpoints. It is defined over the integers `{0, 1, ..., K}` for `K`
   non-decreasing cutpoints.
 
   One often useful way to interpret this distribution is by imagining a draw
   from a latent/unobserved logistic distribution with location `location` and
-  scale `1` and then only considering the index of the bin defined by the `K-1`
+  scale `1` and then only considering the index of the bin defined by the `K`
   cutpoints this draw falls between.
 
   This distribution can be useful for modelling outcomes which have inherent
   ordering but no real numerical values, for example modelling the outcome of a
   survey question where the responses are `[bad, mediocre, good]`, which would
-  be coded as `[0, 1, 2]`.
+  be coded as `[0, 1, 2]` and the model would contain two cutpoints (`K = 2`).
 
   #### Mathematical Details
 
@@ -132,12 +132,11 @@ class OrderedLogistic(distribution.Distribution):
     """Initialize Ordered Logistic distributions.
 
     Args:
-      cutpoints: An N-D floating point `Tensor`, `N >= 1`, representing the
-        points which split up a latent logistic distribution. The first `N - 1`
-        dimensions index into a batch of independent distributions and the last
-        dimension represents a vector of cutpoints. The vector of cutpoints
-        should be non-decreasing, which is only checked if `validate_args=True`.
-      location: A floating point `Tensor`, representing the mean(s) of the
+      cutpoints: A floating-point `Tensor` with shape `[B1, ..., Bb, K]` where
+        `b >= 0` indicates the number of batch dimensions. Each entry is then a
+        `K`-length vector of cutpoints. The vector of cutpoints should be
+        non-decreasing, which is only checked if `validate_args=True`.
+      location: A floating-point `Tensor`, representing the mean(s) of the
         latent logistic distribution(s).
       dtype: The type of the event samples (default: int32).
       validate_args: Python `bool`, default `False`. When `True` distribution
@@ -305,8 +304,8 @@ class OrderedLogistic(distribution.Distribution):
     assertions.append(
         assert_util.assert_less_equal(
             x, tf.cast(self._num_categories(), x.dtype),
-            message=('OrderedLogistic samples must be between `0` and `K-1` '
-                     'where `K` is the number of categories.')))
+            message=('OrderedLogistic samples must be `>= 0` and `<= K` '
+                     'where `K` is the number of cutpoints.')))
     return assertions
 
 
