@@ -28,7 +28,15 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal.backend import numpy as nptf
-from tensorflow.python import pywrap_tensorflow as c_api  # pylint: disable=g-direct-tensorflow-import
+
+# Try catch required to avoid breaking Probability opensource presubmits.
+# TODO(amitpatankar): Remove this once tf-nightly has latest code.
+# pylint: disable=g-import-not-at-top
+try:
+  from tensorflow.python.client import pywrap_tf_session as c_api  # pylint: disable=g-direct-tensorflow-import
+except ImportError:
+  from tensorflow.python import pywrap_tensorflow as c_api  # pylint: disable=g-direct-tensorflow-import
+
 from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
