@@ -65,6 +65,7 @@ FILENAMES = [
     "linear_operator_adjoint",
     "linear_operator_algebra",
     "linear_operator_block_diag",
+    "linear_operator_block_lower_triangular",
     "linear_operator_circulant",
     "linear_operator_composition",
     "linear_operator_diag",
