@@ -16,7 +16,7 @@
 #   TensorFlow Probability utility functions.
 
 # [internal] load python3.bzl
-load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_library", "multi_substrate_py_test")
+load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_test", "multi_substrate_py_library")
 
 package(
     default_visibility = [
