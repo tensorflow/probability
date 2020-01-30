@@ -718,7 +718,6 @@ multi_substrate_py_library(
     name = "joint_distribution_named",
     srcs = ["joint_distribution_named.py"],
     deps = [
-        ":distribution",
         ":joint_distribution_sequential",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
@@ -740,10 +739,10 @@ multi_substrate_py_library(
     name = "joint_distribution_sequential",
     srcs = ["joint_distribution_sequential.py"],
     deps = [
-        ":distribution",
         ":joint_distribution",
         ":kullback_leibler",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/util:seed_stream",
     ],

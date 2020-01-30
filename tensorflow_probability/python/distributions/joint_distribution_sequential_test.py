@@ -575,27 +575,91 @@ class JointDistributionSequentialTest(test_util.TestCase):
             joint.sample(batch_shape, seed=test_util.test_seed())).shape)
 
   def test_default_event_space_bijector(self):
-    joint = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-            tfd.HalfNormal(2.5),
-            tfd.Exponential(2),
-        ],
-        validate_args=True)
-    for b in joint._experimental_default_event_space_bijector():
-      self.assertIsInstance(b, tfp.bijectors.Bijector)
+    dist_fns = [
+        tfd.LogNormal(0., 1., validate_args=True),
+        lambda h: tfd.Independent(  # pylint: disable=g-long-lambda
+            tfd.Uniform([0., 0.], h, validate_args=True)),
+        lambda s: tfd.Normal(0., s, validate_args=True)
+    ]
 
-    joint = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),          # 0
-            lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),  # 1
-            tfd.HalfNormal(2.5),                                           # 2
-        ],
-        validate_args=True)
+    jd = tfd.JointDistributionSequential(dist_fns, validate_args=True)
+    joint_bijector = jd._experimental_default_event_space_bijector()
 
-    with self.assertRaisesRegex(
-        NotImplementedError, 'all elements of `model` are `tfp.distribution`s'):
-      joint._experimental_default_event_space_bijector()
+    # define a sample in the unconstrained space and construct the component
+    # distributions
+    x = [tf.constant(w) for w in [-0.2, [0.3, 0.1], -1.]]
+    bijectors = []
+    y = []
+
+    b = dist_fns[0]._experimental_default_event_space_bijector()
+    bijectors.append(b)
+    y.append(b(x[0]))
+    for i in range(1, 3):
+      b = dist_fns[i](y[i - 1])._experimental_default_event_space_bijector()
+      y.append(b(x[i]))
+      bijectors.append(b)
+
+    # Test forward and inverse values.
+    self.assertAllClose(joint_bijector.forward(x), y)
+    self.assertAllClose(joint_bijector.inverse(y), x)
+
+    # Test forward log det Jacobian via finite differences.
+    event_ndims = [0, 1, 0]
+    delta = 0.01
+
+    fldj = joint_bijector.forward_log_det_jacobian(x, event_ndims)
+    forward_plus = [b.forward(x[i] + delta) for i, b in enumerate(bijectors)]
+    forward_minus = [b.forward(x[i] - delta) for i, b in enumerate(bijectors)]
+    fldj_fd = tf.reduce_sum(
+        [tf.reduce_sum(tf.math.log((p - m) / (2. * delta)))
+         for p, m in zip(forward_plus, forward_minus)])
+    self.assertAllClose(self.evaluate(fldj), self.evaluate(fldj_fd), rtol=1e-5)
+
+    # Test inverse log det Jacobian via finite differences.
+    delta = 0.001
+    y = [tf.constant(w) for w in [0.8, [0.4, 0.3], -0.05]]
+    ildj = joint_bijector.inverse_log_det_jacobian(y, event_ndims)
+
+    bijectors = []
+    bijectors.append(dist_fns[0]._experimental_default_event_space_bijector())
+    for i in range(1, 3):
+      bijectors.append(
+          dist_fns[i](y[i - 1])._experimental_default_event_space_bijector())
+
+    inverse_plus = [b.inverse(y[i] + delta) for i, b in enumerate(bijectors)]
+    inverse_minus = [b.inverse(y[i] - delta) for i, b in enumerate(bijectors)]
+    ildj_fd = tf.reduce_sum(
+        [tf.reduce_sum(tf.math.log((p - m) / (2. * delta)))
+         for p, m in zip(inverse_plus, inverse_minus)])
+    self.assertAllClose(self.evaluate(ildj), self.evaluate(ildj_fd), rtol=1e-4)
+
+    # test event shapes
+    event_shapes = [[2, None], [2], [4]]
+    self.assertAllEqual(
+        [shape.as_list()
+         for shape in joint_bijector.forward_event_shape(event_shapes)],
+        [bijectors[i].forward_event_shape(event_shapes[i]).as_list()
+         for i in range(3)])
+    self.assertAllEqual(
+        [shape.as_list()
+         for shape in joint_bijector.inverse_event_shape(event_shapes)],
+        [bijectors[i].inverse_event_shape(event_shapes[i]).as_list()
+         for i in range(3)])
+
+    event_shapes = [[3], [3, 2], []]
+    forward_joint_event_shape = joint_bijector.forward_event_shape_tensor(
+        event_shapes)
+    inverse_joint_event_shape = joint_bijector.inverse_event_shape_tensor(
+        event_shapes)
+    for i in range(3):
+      self.assertAllEqual(
+          self.evaluate(forward_joint_event_shape[i]),
+          self.evaluate(
+              bijectors[i].forward_event_shape_tensor(event_shapes[i])))
+      self.assertAllEqual(
+          self.evaluate(inverse_joint_event_shape[i]),
+          self.evaluate(
+              bijectors[i].inverse_event_shape_tensor(event_shapes[i])))
 
 
 class ResolveDistributionNamesTest(test_util.TestCase):
