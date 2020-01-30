@@ -164,13 +164,6 @@ class OrderedLogistic(distribution.Distribution):
       self._location = tensor_util.convert_nonref_to_tensor(
           location, dtype_hint=float_dtype, name="location")
 
-      inf = tf.broadcast_to(
-          tf.constant(np.inf, dtype=float_dtype),
-          prefer_static.shape(self._cutpoints[..., :1]))
-
-      self._augmented_cutpoints = tf.concat([-inf, cutpoints, inf], axis=-1)
-      self._num_categories = tf.shape(cutpoints, out_type=dtype)[-1] + 1
-
       super(OrderedLogistic, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
@@ -197,20 +190,29 @@ class OrderedLogistic(distribution.Distribution):
     """Matrix of predicted log probabilities for each category."""
     log_survival = tf.math.log_sigmoid(
         self.location[..., tf.newaxis] -
-        self._augmented_cutpoints[tf.newaxis, ...])
+        self._augmented_cutpoints()[tf.newaxis, ...])
     log_probs = tfp_math.log_sub_exp(
         log_survival[..., :-1], log_survival[..., 1:])
     shape = tf.concat(
-        [self._batch_shape_tensor(), [self._num_categories]], axis=0)
+        [self._batch_shape_tensor(), [self._num_categories()]], axis=0)
     return tf.reshape(log_probs, shape)
 
   def categorical_probs(self):
     """Matrix of predicted probabilities for each category."""
     return tf.math.exp(self.categorical_log_probs())
 
+  def _augmented_cutpoints(self):
+    inf = tf.fill(
+        prefer_static.shape(self.cutpoints[..., :1]),
+        tf.constant(np.inf, dtype=self.cutpoints.dtype))
+    return tf.concat([-inf, self.cutpoints, inf], axis=-1)
+
+  def _num_categories(self):
+    return prefer_static.shape(self.cutpoints, out_type=self.dtype)[-1] + 1
+
   def _sample_n(self, n, seed=None):
     logits = tf.reshape(
-        self.categorical_log_probs(), [-1, self._num_categories])
+        self.categorical_log_probs(), [-1, self._num_categories()])
     draws = tf.random.categorical(logits, n, dtype=self.dtype, seed=seed)
     return tf.reshape(
         tf.transpose(draws),
@@ -244,7 +246,7 @@ class OrderedLogistic(distribution.Distribution):
   def _log_survival_function(self, x):
     return tf.math.log_sigmoid(
         self.location -
-        tf.gather(self._augmented_cutpoints, x + 1, axis=-1))
+        tf.gather(self._augmented_cutpoints(), x + 1, axis=-1))
 
   def _entropy(self):
     log_probs = self.categorical_log_probs()
