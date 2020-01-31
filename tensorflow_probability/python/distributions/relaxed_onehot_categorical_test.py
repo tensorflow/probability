@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 from scipy.special import gamma
 import tensorflow.compat.v1 as tf1
@@ -251,14 +252,14 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     self.assertAllClose(np.ones(5),
                         self.evaluate(d.prob(np.zeros((5, 1)))))
 
-  def testDTypes(self):
+  @parameterized.parameters(tf.float16, tf.float32, tf.float64)
+  def testDTypes(self, dtype):
     # check that sampling and log_prob work for a range of dtypes
-    for dtype in (tf.float16, tf.float32, tf.float64):
-      logits = tf.random.uniform(
-          shape=[3, 3], dtype=dtype, seed=test_util.test_seed())
-      dist = tfd.RelaxedOneHotCategorical(
-          temperature=0.5, logits=logits, validate_args=True)
-      dist.log_prob(dist.sample(seed=test_util.test_seed()))
+    logits = tf.random.uniform(
+        shape=[3, 3], dtype=dtype, seed=test_util.test_seed())
+    dist = tfd.RelaxedOneHotCategorical(
+        temperature=0.5, logits=logits, validate_args=True)
+    dist.log_prob(dist.sample(seed=test_util.test_seed()))
 
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])

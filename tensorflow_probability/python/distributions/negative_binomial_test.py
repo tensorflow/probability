@@ -132,7 +132,7 @@ class NegativeBinomialTest(test_util.TestCase):
     negbinom = tfd.NegativeBinomial(
         total_count=total_count, probs=probs, validate_args=True)
 
-    with self.assertRaisesOpError('Condition x == y'):
+    with self.assertRaisesOpError('cannot contain fractional components'):
       self.evaluate(negbinom.log_prob(x))
 
     with self.assertRaisesOpError('Condition x >= 0'):
@@ -295,8 +295,9 @@ class NegativeBinomialFromVariableTest(test_util.TestCase):
       self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertionsTotalCountMutation(self):
-    x = tf.Variable([5., 3., 1.])
-    d = tfd.NegativeBinomial(total_count=x, probs=0.7, validate_args=True)
+    x = tf.Variable([5., 3., 1.], dtype=tf.float32)
+    d = tfd.NegativeBinomial(
+        total_count=x, probs=0.7, validate_args=True)
     self.evaluate(x.initializer)
     self.evaluate(d.sample(seed=test_util.test_seed()))
     with tf.control_dependencies([x.assign([-5., 3., 1.])]):

@@ -645,6 +645,7 @@ multi_substrate_py_library(
     srcs = ["sinh_arcsinh.py"],
     deps = [
         ":bijector",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
@@ -1300,7 +1301,6 @@ multi_substrate_py_test(
     name = "permute_test",
     size = "small",
     srcs = ["permute_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",

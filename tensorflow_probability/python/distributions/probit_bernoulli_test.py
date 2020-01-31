@@ -62,7 +62,7 @@ class ProbitBernoulliTest(test_util.TestCase):
     p = [0.01, 0.99, 0.42]
     dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
     self.assertAllClose(
-        tf.math.ndtri(p), self.evaluate(dist.probits_parameter()))
+        sp_special.ndtri(p), self.evaluate(dist.probits_parameter()))
 
   def testInvalidP(self):
     invalid_ps = [1.01, 2.]
@@ -160,7 +160,7 @@ class ProbitBernoulliTest(test_util.TestCase):
   def testPmfWithP(self):
     p = [[0.2, 0.4], [0.3, 0.6]]
     self._testPmf(probs=p, validate_args=True)
-    self._testPmf(probits=tf.math.ndtri(p), validate_args=True)
+    self._testPmf(probits=sp_special.ndtri(p), validate_args=True)
 
   def testPmfWithFloatArgReturnsXEntropy(self):
     p = [[0.2], [0.4], [0.3], [0.6]]
@@ -236,6 +236,8 @@ class ProbitBernoulliTest(test_util.TestCase):
     x = dist.sample(1, seed=test_util.test_seed())
     self.assertAllEqual((1, 2), tensorshape_util.as_list(x.shape))
 
+  @test_util.jax_disable_test_missing_functionality(
+      'JAX does not return None for gradients.')
   def testNotReparameterized(self):
     p = tf.constant([0.2, 0.6])
     _, grad_p = tfp.math.value_and_gradient(

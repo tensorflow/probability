@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
@@ -37,7 +38,7 @@ class SinhArcsinhTest(test_util.TestCase):
     multiplier = 2.0 / np.sinh(np.arcsinh(2.0) * tailweight)
     bijector = tfb.SinhArcsinh(
         skewness=skewness, tailweight=tailweight, validate_args=True)
-    self.assertStartsWith(bijector.name, "sinh_arcsinh")
+    self.assertStartsWith(bijector.name, 'sinh_arcsinh')
     x = np.array([[[-2.01], [2.], [1e-4]]]).astype(np.float32)
     y = np.sinh((np.arcsinh(x) + skewness) * tailweight) * multiplier
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
@@ -110,71 +111,71 @@ class SinhArcsinhTest(test_util.TestCase):
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, x, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
 
-  def testBijectorEndpoints(self):
-    for dtype in (np.float32, np.float64):
-      bijector = tfb.SinhArcsinh(
-          skewness=dtype(0.), tailweight=dtype(1.), validate_args=True)
-      bounds = np.array(
-          [np.finfo(dtype).min, np.finfo(dtype).max], dtype=dtype)
-      # Note that the above bijector is the identity bijector. Hence, the
-      # log_det_jacobian will be 0. Because of this we use atol.
-      bijector_test_util.assert_bijective_and_finite(
-          bijector, bounds, bounds, eval_func=self.evaluate, event_ndims=0,
-          atol=2e-6)
+  @parameterized.parameters(np.float32, np.float64)
+  def testBijectorEndpoints(self, dtype):
+    bijector = tfb.SinhArcsinh(
+        skewness=dtype(0.), tailweight=dtype(1.), validate_args=True)
+    bounds = np.array(
+        [np.finfo(dtype).min, np.finfo(dtype).max], dtype=dtype)
+    # Note that the above bijector is the identity bijector. Hence, the
+    # log_det_jacobian will be 0. Because of this we use atol.
+    bijector_test_util.assert_bijective_and_finite(
+        bijector, bounds, bounds, eval_func=self.evaluate, event_ndims=0,
+        atol=2e-6)
 
-  def testBijectorOverRange(self):
-    for dtype in (np.float32, np.float64):
-      skewness = np.array([1.2, 5.], dtype=dtype)
-      tailweight = np.array([2., 10.], dtype=dtype)
-      # The inverse will be defined up to where sinh is valid, which is
-      # arcsinh(np.finfo(dtype).max).
-      log_boundary = np.log(
-          np.sinh(np.arcsinh(np.finfo(dtype).max) / tailweight - skewness))
-      x = np.array([
-          np.logspace(-2, log_boundary[0], base=np.e, num=1000),
-          np.logspace(-2, log_boundary[1], base=np.e, num=1000)
-      ], dtype=dtype)
-      # Ensure broadcasting works.
-      x = np.swapaxes(x, 0, 1)
-      multiplier = 2. / np.sinh(np.arcsinh(2.) * tailweight)
-      y = np.sinh((np.arcsinh(x) + skewness) * tailweight) * multiplier
-      bijector = tfb.SinhArcsinh(
-          skewness=skewness, tailweight=tailweight, validate_args=True)
+  @parameterized.parameters(np.float32, np.float64)
+  def testBijectorOverRange(self, dtype):
+    skewness = np.array([1.2, 5.], dtype=dtype)
+    tailweight = np.array([2., 10.], dtype=dtype)
+    # The inverse will be defined up to where sinh is valid, which is
+    # arcsinh(np.finfo(dtype).max).
+    log_boundary = np.log(
+        np.sinh(np.arcsinh(np.finfo(dtype).max) / tailweight - skewness))
+    x = np.array([
+        np.logspace(-2, log_boundary[0], base=np.e, num=1000),
+        np.logspace(-2, log_boundary[1], base=np.e, num=1000)
+    ], dtype=dtype)
+    # Ensure broadcasting works.
+    x = np.swapaxes(x, 0, 1)
+    multiplier = 2. / np.sinh(np.arcsinh(2.) * tailweight)
+    y = np.sinh((np.arcsinh(x) + skewness) * tailweight) * multiplier
+    bijector = tfb.SinhArcsinh(
+        skewness=skewness, tailweight=tailweight, validate_args=True)
 
+    self.assertAllClose(
+        y, self.evaluate(bijector.forward(x)), rtol=1e-4, atol=0.)
+    self.assertAllClose(
+        x, self.evaluate(bijector.inverse(y)), rtol=1e-4, atol=0.)
+
+    # On IBM PPC systems, longdouble (np.float128) is same as double except
+    # that it can have more precision. Type double being of 8 bytes, can't
+    # hold square of max of float64 (which is also 8 bytes).
+    # Below test fails due to overflow error giving inf. This check avoids
+    # that error by skipping square calculation and corresponding assert.
+
+    if (np.amax(y) <= np.sqrt(np.finfo(np.float128).max) and
+        np.fabs(np.amin(y)) <= np.sqrt(np.fabs(np.finfo(np.float128).min))):
+
+      # Do the numpy calculation in float128 to avoid inf/nan.
+      y_float128 = np.float128(y)
       self.assertAllClose(
-          y, self.evaluate(bijector.forward(x)), rtol=1e-4, atol=0.)
-      self.assertAllClose(
-          x, self.evaluate(bijector.inverse(y)), rtol=1e-4, atol=0.)
-
-      # On IBM PPC systems, longdouble (np.float128) is same as double except
-      # that it can have more precision. Type double being of 8 bytes, can't
-      # hold square of max of float64 (which is also 8 bytes).
-      # Below test fails due to overflow error giving inf. This check avoids
-      # that error by skipping square calculation and corresponding assert.
-
-      if (np.amax(y) <= np.sqrt(np.finfo(np.float128).max) and
-          np.fabs(np.amin(y)) <= np.sqrt(np.fabs(np.finfo(np.float128).min))):
-
-        # Do the numpy calculation in float128 to avoid inf/nan.
-        y_float128 = np.float128(y)
-        self.assertAllClose(
-            np.log(np.cosh(
-                np.arcsinh(y_float128 / multiplier)
-                / tailweight - skewness) / np.sqrt(
-                    (y_float128 / multiplier)**2 + 1))
-            - np.log(tailweight) - np.log(multiplier),
-            self.evaluate(
-                bijector.inverse_log_det_jacobian(y, event_ndims=0)),
-            rtol=1e-4,
-            atol=0.)
-      self.assertAllClose(
-          self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=0)),
-          self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=0)),
+          np.log(np.cosh(
+              np.arcsinh(y_float128 / multiplier)
+              / tailweight - skewness) / np.sqrt(
+                  (y_float128 / multiplier)**2 + 1))
+          - np.log(tailweight) - np.log(multiplier),
+          self.evaluate(
+              bijector.inverse_log_det_jacobian(y, event_ndims=0)),
           rtol=1e-4,
           atol=0.)
+    self.assertAllClose(
+        self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=0)),
+        self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=0)),
+        rtol=1e-4,
+        atol=0.)
 
   def testZeroTailweightRaises(self):
-    with self.assertRaisesOpError("Argument `tailweight` must be positive"):
+    with self.assertRaisesOpError('Argument `tailweight` must be positive'):
       self.evaluate(
           tfb.SinhArcsinh(tailweight=0., validate_args=True).forward(1.0))
 
@@ -189,10 +190,10 @@ class SinhArcsinhTest(test_util.TestCase):
     self.evaluate(x.initializer)
     self.assertIs(x, b.tailweight)
     self.assertEqual((), self.evaluate(b.forward(0.5)).shape)
-    with self.assertRaisesOpError("Argument `tailweight` must be positive."):
+    with self.assertRaisesOpError('Argument `tailweight` must be positive.'):  # pylint:disable=g-error-prone-assert-raises
       with tf.control_dependencies([x.assign(-1.)]):
         self.assertEqual((), self.evaluate(b.forward(0.5)).shape)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

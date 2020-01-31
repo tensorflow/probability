@@ -157,7 +157,7 @@ class NegativeBinomial(distribution.Distribution):
     rate = tf.random.gamma(
         shape=[n],
         alpha=self.total_count,
-        beta=tf.exp(-logits),
+        beta=tf.math.exp(-logits),
         dtype=self.dtype,
         seed=stream())
     return tf.random.poisson(
