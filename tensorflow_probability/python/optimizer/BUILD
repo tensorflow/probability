@@ -56,7 +56,7 @@ py_library(
 
 py_test(
     name = "sgld_test",
-    size = "small",
+    size = "medium",
     srcs = ["sgld_test.py"],
     deps = [
         # numpy dep,

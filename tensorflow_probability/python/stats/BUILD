@@ -145,6 +145,7 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["sample_stats_test.py"],
     numpy_tags = ["notap"],
+    shard_count = 5,
     deps = [
         # numpy dep,
         # tensorflow dep,

@@ -1911,6 +1911,7 @@ multi_substrate_py_test(
     name = "half_cauchy_test",
     srcs = ["half_cauchy_test.py"],
     numpy_tags = ["notap"],
+    shard_count = 5,
     deps = [
         # numpy dep,
         # scipy dep,

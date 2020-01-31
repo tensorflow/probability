@@ -54,7 +54,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "statistical_testing_test",
-    size = "small",
+    size = "medium",
     srcs = ["statistical_testing_test.py"],
     jax_size = "medium",
     jax_tags = ["notap"],
