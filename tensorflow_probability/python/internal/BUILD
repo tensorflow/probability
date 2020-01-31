@@ -255,6 +255,19 @@ py_library(
     ],
 )
 
+py_test(
+    name = "tensorshape_util_test",
+    size = "small",
+    srcs = ["tensorshape_util_test.py"],
+    deps = [
+        ":tensorshape_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
 py_library(
     name = "vectorization_util",
     srcs = ["vectorization_util.py"],

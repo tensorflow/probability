@@ -281,8 +281,8 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     self._verifyPdfWithNumpy(vmf)
 
   def testSampleAndPdfConsistency5d(self):
-    mean_dir = tf.math.l2_normalize([[1., 2, 3, 4, 5], [-2, -3, -1, 0, 1]],
-                                    axis=-1)
+    mean_dir = tf.math.l2_normalize(
+        [[1., 2, 3, 4, 5], [-2, -3, -1, 0, 1]], axis=-1)
     # TODO(bjp): Numerical instability 0 < k < 1e-2 concentrations.
     # Should resolve by eliminating the bessel_i recurrence in favor of
     # a more stable algorithm, e.g. cephes.

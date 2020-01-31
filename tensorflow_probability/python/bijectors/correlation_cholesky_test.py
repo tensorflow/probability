@@ -210,7 +210,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
         concentration=np.float64(concentration),
         input_output_cholesky=True)
     batch_size = 10
-    y = self.evaluate(lkj_dist.sample([batch_size]))
+    y = self.evaluate(lkj_dist.sample([batch_size], seed=test_util.test_seed()))
     x = self.evaluate(bijector.inverse(y))
 
     fldj = bijector.forward_log_det_jacobian(x, event_ndims=1)

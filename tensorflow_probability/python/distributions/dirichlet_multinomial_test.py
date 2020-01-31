@@ -397,12 +397,15 @@ class DirichletMultinomialTest(test_util.TestCase):
     self.evaluate(dist.prob(counts))  # Should not raise.
 
   def testSampleUnbiasedNonScalarBatch(self):
+    seed_stream = test_util.test_seed_stream()
+    concentration = 1. + 2. * tf.random.uniform(
+        shape=[4, 3, 2], dtype=np.float32, seed=seed_stream())
     dist = tfd.DirichletMultinomial(
         total_count=5.,
-        concentration=1. + 2. * self._rng.rand(4, 3, 2).astype(np.float32),
+        concentration=concentration,
         validate_args=True)
-    n = int(3e3)
-    x = dist.sample(n, seed=test_util.test_seed())
+    n = int(5e3)
+    x = dist.sample(n, seed=seed_stream())
     sample_mean = tf.reduce_mean(x, axis=0)
     # Cyclically rotate event dims left.
     x_centered = tf.transpose(a=x - sample_mean, perm=[1, 2, 3, 0])
@@ -426,15 +429,18 @@ class DirichletMultinomialTest(test_util.TestCase):
         actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
 
   def testSampleUnbiasedScalarBatch(self):
+    seed_stream = test_util.test_seed_stream()
+    concentration = 1. + 2. * tf.random.uniform(
+        shape=[4], dtype=np.float32, seed=seed_stream())
     dist = tfd.DirichletMultinomial(
         total_count=5.,
-        concentration=1. + 2. * self._rng.rand(4).astype(np.float32),
+        concentration=concentration,
         validate_args=True)
-    n = int(5e3)
-    x = dist.sample(n, seed=test_util.test_seed())
+    n = int(1e4)
+    x = dist.sample(n, seed=seed_stream())
     sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean  # Already transposed to [n, 2].
-    sample_covariance = tf.matmul(
+    sample_covariance = tf.linalg.matmul(
         x_centered, x_centered, adjoint_a=True) / n
     [
         sample_mean_,
@@ -448,10 +454,10 @@ class DirichletMultinomialTest(test_util.TestCase):
         dist.covariance(),
     ])
     self.assertAllEqual([4], sample_mean.shape)
-    self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.20)
+    self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.25)
     self.assertAllEqual([4, 4], sample_covariance.shape)
     self.assertAllClose(
-        actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
+        actual_covariance_, sample_covariance_, atol=0., rtol=0.25)
 
   def testNotReparameterized(self):
     if tf1.control_flow_v2_enabled():

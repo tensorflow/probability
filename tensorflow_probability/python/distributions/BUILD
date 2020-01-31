@@ -2621,7 +2621,6 @@ multi_substrate_py_test(
     name = "variational_gaussian_process_test",
     size = "medium",
     srcs = ["variational_gaussian_process_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2661,6 +2660,7 @@ multi_substrate_py_test(
     name = "von_mises_fisher_test",
     size = "medium",
     srcs = ["von_mises_fisher_test.py"],
+    jax_size = "large",
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [

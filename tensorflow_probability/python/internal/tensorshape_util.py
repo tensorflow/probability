@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as onp
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow.python.framework import ops  # pylint: disable=g-direct-tensorflow-import
@@ -63,6 +65,10 @@ def as_list(x):
 def _cast_tensorshape(x, x_type):
   if issubclass(x_type, tf.TensorShape):
     return x
+  if issubclass(x_type, onp.ndarray):
+    # np.ndarray default constructor will place x
+    # as the shape, which we don't want.
+    return onp.array(as_list(x), dtype=onp.int32)
   return x_type(as_list(x))
 
 

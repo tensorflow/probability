@@ -58,11 +58,10 @@ __all__ = [
     # 'eigvalsh',
     # 'expm',
     # 'global_norm',
-    # 'l2_normalize',
     # 'logdet',
     # 'logm',
     # 'lstsq',
-    # 'norm',
+    # 'l2_normalize'
     # 'qr',
     # 'sqrtm',
     # 'svd',
@@ -367,9 +366,7 @@ try:
 except AttributeError:
   pass
 
-norm = utils.copy_docstring(
-    tf.norm,
-    _norm)
+norm = utils.copy_docstring(tf.norm, _norm)
 
 # TODO(b/140157055): Remove the try/except.
 pinv = lambda input, name=None: np.linalg.pinv(input)

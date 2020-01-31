@@ -44,6 +44,7 @@ __all__ = [
     'softmax',
     'softplus',
     'sigmoid_cross_entropy_with_logits',
+    'softmax_cross_entropy_with_logits',
     'sparse_softmax_cross_entropy_with_logits',
     'top_k',
 ]
@@ -76,6 +77,10 @@ def _sparse_softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,u
       axis=-1)
   cost = np.reshape(cost, labels_shape)
   return cost
+
+
+def _softmax_cross_entropy_with_logits(labels, logits, name=None):  # pylint: disable=unused-argument
+  raise NotImplementedError
 
 
 # --- Begin Public Functions --------------------------------------------------
@@ -119,3 +124,8 @@ sigmoid_cross_entropy_with_logits = utils.copy_docstring(
 sparse_softmax_cross_entropy_with_logits = utils.copy_docstring(
     tf.nn.sparse_softmax_cross_entropy_with_logits,
     _sparse_softmax_cross_entropy_with_logits)
+
+
+softmax_cross_entropy_with_logits = utils.copy_docstring(
+    tf.nn.softmax_cross_entropy_with_logits,
+    _softmax_cross_entropy_with_logits)

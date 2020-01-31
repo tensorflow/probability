@@ -55,8 +55,6 @@ DISABLED_BY_PKG = {
     'mcmc':
         ('nuts', 'sample_annealed_importance', 'sample_halton_sequence',
          'slice_sampler_kernel'),
-    'stats':
-        ('calibration', 'quantiles', 'ranking')
 }
 LIBS = ('bijectors', 'distributions', 'math', 'mcmc', 'stats', 'util')
 INTERNALS = ('assert_util', 'distribution_util', 'dtype_util',
