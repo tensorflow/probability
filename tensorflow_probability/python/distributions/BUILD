@@ -1453,22 +1453,6 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
-    name = "vector_laplace_linear_operator",
-    srcs = ["vector_laplace_linear_operator.py"],
-    deps = [
-        ":laplace",
-        ":transformed_distribution",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:affine_linear_operator",
-        "//tensorflow_probability/python/bijectors:identity",
-        "//tensorflow_probability/python/internal:distribution_util",
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-    ],
-)
-
-multi_substrate_py_library(
     name = "von_mises",
     srcs = ["von_mises.py"],
     deps = [
@@ -2849,7 +2833,6 @@ exports_files(
         "vector_exponential_diag.py",
         "vector_exponential_linear_operator.py",
         "vector_laplace_diag.py",
-        "vector_laplace_linear_operator.py",
         "vector_sinh_arcsinh_diag.py",
         "von_mises.py",
         "von_mises_fisher.py",
