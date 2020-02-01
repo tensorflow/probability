@@ -17,6 +17,8 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
+from itertools import product
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -43,40 +45,39 @@ class OrderedLogisticTest(test_util.TestCase):
     self._rng = np.random.RandomState(test_util.test_seed())
     super(OrderedLogisticTest, self).setUp()
 
-  def testBatchShapes(self):
+  @parameterized.parameters(
+      product(["cutpoints", "location", "both"], [[], [1], [1, 2, 3]])
+  )
+  def testBatchShapes(self, test, batch_shape):
 
-    for test in ["cutpoints", "location", "both"]:
+    if test == "cutpoints":
+      cutpoints = self._random_cutpoints(batch_shape + [2])
+      location = tf.constant(0., dtype=tf.float64)
+    elif test == "location":
+      cutpoints = tf.constant([1., 2.], dtype=tf.float64)
+      location = self._random_location(batch_shape)
+    elif test == "both":
+      cutpoints = self._random_cutpoints(batch_shape + [2])
+      location = self._random_location(batch_shape)
 
-      for batch_shape in ([], [1], [1, 2, 3]):
+    dist = tfd.OrderedLogistic(cutpoints=cutpoints, location=location)
 
-        if test == "cutpoints":
-          cutpoints = self._random_cutpoints(batch_shape + [2])
-          location = tf.constant(0., dtype=tf.float64)
-        elif test == "location":
-          cutpoints = tf.constant([1., 2.], dtype=tf.float64)
-          location = self._random_location(batch_shape)
-        elif test == "both":
-          cutpoints = self._random_cutpoints(batch_shape + [2])
-          location = self._random_location(batch_shape)
+    self.assertAllEqual(dist.batch_shape, batch_shape)
+    self.assertAllEqual(
+        self.evaluate(dist.batch_shape_tensor()), batch_shape)
 
-        dist = tfd.OrderedLogistic(cutpoints=cutpoints, location=location)
+    self.assertAllEqual(dist.event_shape, [])
+    self.assertAllEqual(self.evaluate(dist.event_shape_tensor()), [])
 
-        self.assertAllEqual(dist.batch_shape, batch_shape)
-        self.assertAllEqual(
-            self.evaluate(dist.batch_shape_tensor()), batch_shape)
+    log_probs_shape = tf.shape(dist.categorical_log_probs())
+    self.assertAllEqual(self.evaluate(log_probs_shape), batch_shape + [3])
 
-        self.assertAllEqual(dist.event_shape, [])
-        self.assertAllEqual(self.evaluate(dist.event_shape_tensor()), [])
+    sample_shape = tf.shape(dist.sample(seed=test_util.test_seed()))
+    self.assertAllEqual(self.evaluate(sample_shape), batch_shape)
 
-        log_probs_shape = tf.shape(dist.categorical_log_probs())
-        self.assertAllEqual(self.evaluate(log_probs_shape), batch_shape + [3])
-
-        sample_shape = tf.shape(dist.sample(seed=test_util.test_seed()))
-        self.assertAllEqual(self.evaluate(sample_shape), batch_shape)
-
-        sample_shape_n = tf.shape(
-            dist.sample([4, 5], seed=test_util.test_seed()))
-        self.assertAllEqual(self.evaluate(sample_shape_n), [4, 5] + batch_shape)
+    sample_shape_n = tf.shape(
+        dist.sample([4, 5], seed=test_util.test_seed()))
+    self.assertAllEqual(self.evaluate(sample_shape_n), [4, 5] + batch_shape)
 
   def testProbs(self):
 
@@ -133,30 +134,30 @@ class OrderedLogisticTest(test_util.TestCase):
     entropy = self.evaluate(dist.entropy())
     self.assertAllClose(sampled_entropy, entropy, atol=0.01)
 
-  def testKLAgainstCategoricalDistribution(self):
-    for batch_size in [1, 10]:
-      cutpoints = self._random_cutpoints([100])
-      a_location = self._random_location([batch_size])
-      b_location = self._random_location([batch_size])
+  @parameterized.parameters(1, 10, 25)
+  def testKLAgainstCategoricalDistribution(self, batch_size):
+    cutpoints = self._random_cutpoints([100])
+    a_location = self._random_location([batch_size])
+    b_location = self._random_location([batch_size])
 
-      a = tfd.OrderedLogistic(
-          cutpoints=cutpoints, location=a_location, validate_args=True)
-      b = tfd.OrderedLogistic(
-          cutpoints=cutpoints, location=b_location, validate_args=True)
+    a = tfd.OrderedLogistic(
+        cutpoints=cutpoints, location=a_location, validate_args=True)
+    b = tfd.OrderedLogistic(
+        cutpoints=cutpoints, location=b_location, validate_args=True)
 
-      a_cat = tfd.Categorical(
-          logits=a.categorical_log_probs(), validate_args=True)
-      b_cat = tfd.Categorical(
-          logits=b.categorical_log_probs(), validate_args=True)
+    a_cat = tfd.Categorical(
+        logits=a.categorical_log_probs(), validate_args=True)
+    b_cat = tfd.Categorical(
+        logits=b.categorical_log_probs(), validate_args=True)
 
-      kl = self.evaluate(tfd.kl_divergence(a, b))
-      self.assertEqual(kl.shape, (batch_size,))
+    kl = self.evaluate(tfd.kl_divergence(a, b))
+    self.assertEqual(kl.shape, (batch_size,))
 
-      kl_expected = self.evaluate(tfd.kl_divergence(a_cat, b_cat))
-      self.assertAllClose(kl, kl_expected)
+    kl_expected = self.evaluate(tfd.kl_divergence(a_cat, b_cat))
+    self.assertAllClose(kl, kl_expected)
 
-      kl_same = self.evaluate(tfd.kl_divergence(a, a))
-      self.assertAllClose(kl_same, np.zeros_like(kl_expected))
+    kl_same = self.evaluate(tfd.kl_divergence(a, a))
+    self.assertAllClose(kl_same, np.zeros_like(kl_expected))
 
   def testKLAgainstSampling(self):
     a_cutpoints = self._random_cutpoints([4])
