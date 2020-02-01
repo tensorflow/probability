@@ -27,6 +27,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
 
@@ -729,7 +730,8 @@ class _HiddenMarkovModelTest(
     observations_permuted = tf.transpose(
         a=tf.gather(tf.transpose(a=permutations)[..., tf.newaxis],
                     observations,
-                    batch_dims=observations.shape.ndims-1)[..., 0])
+                    batch_dims=(
+                        tensorshape_util.rank(observations.shape) - 1))[..., 0])
 
     [num_steps] = self.make_placeholders([16])
     model = tfd.HiddenMarkovModel(

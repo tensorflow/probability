@@ -21,7 +21,6 @@ from __future__ import print_function
 import functools
 
 import numpy as np
-import numpy as onp  # JAX rewrites numpy import  # pylint: disable=reimported
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import util as tfp_util
@@ -1074,7 +1073,7 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
       qf_loc = self.mean(index_points=observation_index_points)
       qf_scale = self.stddev(index_points=observation_index_points)
 
-      grid, weights = onp.polynomial.hermite.hermgauss(quadrature_size)
+      grid, weights = np.polynomial.hermite.hermgauss(quadrature_size)
       grid = grid.astype(dtype_util.as_numpy_dtype(self._dtype))
       weights = weights.astype(dtype_util.as_numpy_dtype(self._dtype))
 

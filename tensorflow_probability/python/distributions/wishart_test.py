@@ -89,9 +89,11 @@ class WishartTest(test_util.TestCase):
     self.assertAllEqual([2, 2], self.evaluate(wish.event_shape_tensor()))
     self.assertAllEqual([3], tensorshape_util.as_list(wish.batch_shape))
     self.assertAllEqual([3], self.evaluate(wish.batch_shape_tensor()))
-    self.assertAllEqual([4, 3, 2, 2], wish.sample(sample_shape=(4,)).shape)
+    self.assertAllEqual([4, 3, 2, 2], wish.sample(
+        sample_shape=(4,), seed=test_util.test_seed()).shape)
     self.assertAllEqual([4, 3, 2, 2],
-                        self.evaluate(tf.shape(wish.sample(sample_shape=(4,)))))
+                        self.evaluate(tf.shape(wish.sample(
+                            sample_shape=(4,), seed=test_util.test_seed()))))
 
   def testMean(self):
     scale = make_pd(1., 2)

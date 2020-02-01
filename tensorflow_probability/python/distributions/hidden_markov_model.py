@@ -312,7 +312,7 @@ class HiddenMarkovModel(distribution.Distribution):
       # the transition matrix must be square. But TensorFlow might
       # not know this so we explicitly tell it that the result has the
       # same shape.
-      result.set_shape(init_shape)
+      tensorshape_util.set_shape(result, init_shape)
       return result
 
     def _scan_multiple_steps():
