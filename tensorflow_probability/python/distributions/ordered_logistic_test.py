@@ -24,13 +24,23 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
+tfb = tfp.bijectors
+
+
 
 
 @test_util.test_all_tf_execution_regimes
 class OrderedLogisticTest(test_util.TestCase):
 
+  def _random_cutpoints(self, shape):
+    return self._ordered.inverse(self._rng.randn(*shape))
+
+  def _random_location(self, shape):
+    return self._rng.randn(*shape)
+
   def setUp(self):
-    self._rng = np.random.RandomState(123)
+    self._ordered = tfb.Ordered()
+    self._rng = np.random.RandomState(test_util.test_seed())
     super(OrderedLogisticTest, self).setUp()
 
   def testBatchShapes(self):
@@ -40,16 +50,14 @@ class OrderedLogisticTest(test_util.TestCase):
       for batch_shape in ([], [1], [1, 2, 3]):
 
         if test == "cutpoints":
-          cutpoints = tf.broadcast_to(
-              tf.constant([1., 2.], dtype=tf.float64), batch_shape + [2])
+          cutpoints = self._random_cutpoints(batch_shape + [2])
           location = tf.constant(0., dtype=tf.float64)
         elif test == "location":
           cutpoints = tf.constant([1., 2.], dtype=tf.float64)
-          location = self._rng.randn(*batch_shape)
+          location = self._random_location(batch_shape)
         elif test == "both":
-          cutpoints = tf.broadcast_to(
-              tf.constant([1., 2.], dtype=tf.float64), batch_shape + [2])
-          location = self._rng.randn(*batch_shape)
+          cutpoints = self._random_cutpoints(batch_shape + [2])
+          location = self._random_location(batch_shape)
 
         dist = tfd.OrderedLogistic(cutpoints=cutpoints, location=location)
 
@@ -108,8 +116,9 @@ class OrderedLogisticTest(test_util.TestCase):
       self.assertAllClose(np.mean(samples == k), p, atol=0.01)
 
   def testEntropy(self):
-    dist = tfd.OrderedLogistic(
-        cutpoints=[-4.2, 0., 0.123], location=[-3.14, 0.321])
+    cutpoints = self._random_cutpoints([3])
+    location = self._random_location([2])
+    dist = tfd.OrderedLogistic(cutpoints=cutpoints, location=location)
     categorical_dist = tfd.Categorical(dist.categorical_log_probs())
     expected_entropy = self.evaluate(categorical_dist.entropy())
     entropy = self.evaluate(dist.entropy())
@@ -117,9 +126,9 @@ class OrderedLogisticTest(test_util.TestCase):
 
   def testKL(self):
     for batch_size in [1, 10]:
-      cutpoints = tf.constant([-1., 1., 2.], dtype=tf.float64)
-      a_location = self._rng.randn(batch_size)
-      b_location = self._rng.randn(batch_size)
+      cutpoints = self._random_cutpoints([100])
+      a_location = self._random_location([batch_size])
+      b_location = self._random_location([batch_size])
 
       a = tfd.OrderedLogistic(
           cutpoints=cutpoints, location=a_location, validate_args=True)
@@ -141,8 +150,8 @@ class OrderedLogisticTest(test_util.TestCase):
       self.assertAllClose(kl_same, np.zeros_like(kl_expected))
 
   def testLatentLogistic(self):
-    location = [-0.123, 0.456]
-    cutpoints = [-2.5, 0.42]
+    location = self._random_location([2])
+    cutpoints = self._random_cutpoints([2])
     latent = tfd.Logistic(loc=location, scale=1.)
     ordered = tfd.OrderedLogistic(cutpoints=cutpoints, location=location)
     ordered_cdf = self.evaluate(ordered.cdf([0, 1]))
