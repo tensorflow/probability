@@ -390,7 +390,6 @@ def maybe_assert_categorical_param_correctness(
       assertions.append(assert_util.assert_rank_at_least(x, 1, message=msg))
 
   if not validate_args:
-    assert not assertions  # Should never happen.
     return []
 
   if logits is not None:
