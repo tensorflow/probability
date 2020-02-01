@@ -70,7 +70,7 @@ Inherits From: [`Distribution`](../../tfp/distributions/Distribution.md)
 <!-- Placeholder for "Used in" -->
 
 This distribution is parameterized by `probs`, a (batch of) probabilities for
-drawing a `1` and `total_count`, the number of trials per draw from the
+drawing a `1`, and `total_count`, the number of trials per draw from the
 Binomial.
 
 #### Mathematical Details
