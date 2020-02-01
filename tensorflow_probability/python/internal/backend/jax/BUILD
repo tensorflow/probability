@@ -141,7 +141,7 @@ py3_test(
     srcs = ["numpy_test.py"],
     main = "numpy_test.py",
     python_version = "PY3",
-    shard_count = 5,
+    shard_count = 8,
     tags = ["tfp_jax"],
     deps = [
         ":jax",

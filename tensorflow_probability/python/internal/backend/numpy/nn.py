@@ -73,7 +73,9 @@ def _sparse_softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,u
   labels = numpy_array.one_hot(labels, num_classes)
 
   cost = -np.sum(
-      labels * (logits - reduce_logsumexp(logits, axis=-1, keepdims=True)),
+      np.where(labels == 0, np.zeros_like(labels),
+               labels * (logits - reduce_logsumexp(
+                   logits, axis=-1, keepdims=True))),
       axis=-1)
   cost = np.reshape(cost, labels_shape)
   return cost

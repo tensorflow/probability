@@ -339,7 +339,7 @@ py_test(
     name = "numpy_test",
     size = "small",
     srcs = ["numpy_test.py"],
-    shard_count = 5,
+    shard_count = 8,
     tags = ["tfp_numpy"],
     deps = [
         ":numpy",

@@ -377,6 +377,24 @@ def top_k_params(draw):
   return array, k
 
 
+@hps.composite
+def sparse_xent_params(draw):
+  num_classes = draw(hps.integers(1, 6))
+  batch_shape = draw(shapes(min_dims=1))
+  labels = single_arrays(
+      batch_shape=batch_shape,
+      shape=hps.just(tuple()),
+      dtype=np.int32,
+      elements=hps.integers(0, num_classes - 1))
+  logits = single_arrays(
+      batch_shape=batch_shape,
+      shape=hps.just((num_classes,)),
+      elements=hps.floats(min_value=-1e5, max_value=1e5))
+  return draw(
+      hps.fixed_dictionaries(dict(
+          labels=labels, logits=logits)).map(Kwargs))
+
+
 # __Currently untested:__
 # broadcast_dynamic_shape
 # broadcast_static_shape
@@ -754,6 +772,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
              [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
     TestCase('math.xlog1py',
              [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
+    TestCase('nn.sparse_softmax_cross_entropy_with_logits',
+             [sparse_xent_params()], rtol=1e-4, atol=1e-4),
     TestCase(
         'random.categorical', [
             hps.tuples(
