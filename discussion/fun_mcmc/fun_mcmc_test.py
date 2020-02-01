@@ -172,6 +172,15 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual(4., x)
     self.assertAllEqual([2., 4.], trace)
 
+  def testTraceDynamic(self):
+
+    @tf.function
+    def trace_n(num_steps):
+      return fun_mcmc.trace(0, lambda x: (x + 1, ()), num_steps)[0]
+
+    x = trace_n(5)
+    self.assertAllEqual(5, x)
+
   def testTraceMask(self):
 
     def fun(x):

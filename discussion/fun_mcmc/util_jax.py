@@ -57,6 +57,7 @@ def unflatten_tree(tree, xs):
 
 def map_tree_up_to(shallow, fn, tree, *rest):
   """`map_tree` with recursion depth defined by depth of `shallow`."""
+
   def wrapper(_, *rest):
     return fn(*rest)
 
@@ -94,6 +95,7 @@ def random_normal(shape, dtype, seed):
 
 def _searchsorted(a, v):
   """Returns where `v` can be inserted so that `a` remains sorted."""
+
   def cond(state):
     low_idx, high_idx = state
     return low_idx < high_idx
@@ -125,22 +127,52 @@ def random_categorical(logits, num_samples, seed):
 
 def trace(state, fn, num_steps, **_):
   """Implementation of `trace` operator, without the calling convention."""
-  # We need the shapes and dtypes of the untraced outputs of `fn`.
-  _, untraced_spec, _ = jax.eval_shape(
+  # We need the shapes and dtypes of the outputs of `fn`.
+  _, untraced_spec, traced_spec = jax.eval_shape(
       fn, map_tree(lambda s: jax.ShapeDtypeStruct(s.shape, s.dtype), state))
+  untraced_init = map_tree(lambda spec: np.zeros(spec.shape, spec.dtype),
+                           untraced_spec)
 
-  def wrapper(state_untraced, _):
-    state, untraced, traced = fn(state_untraced[0])
-    return (state, untraced), traced
+  try:
+    num_steps = int(num_steps)
+    use_scan = True
+  except TypeError:
+    use_scan = False
+    if flatten_tree(traced_spec):
+      raise ValueError(
+          'Cannot trace values when `num_steps` is not statically known. Pass '
+          'False to `trace_mask` or return an empty structure (e.g. `()`) as '
+          'the extra output.')
 
-  (state, untraced), traced = lax.scan(
-      wrapper,
-      (
-          state,
-          map_tree(lambda spec: np.zeros(spec.shape, spec.dtype),
-                   untraced_spec),
-      ),
-      xs=None,
-      length=num_steps,
-  )
+  if use_scan:
+
+    def wrapper(state_untraced, _):
+      state, _ = state_untraced
+      state, untraced, traced = fn(state)
+      return (state, untraced), traced
+
+    (state, untraced), traced = lax.scan(
+        wrapper,
+        (state, untraced_init),
+        xs=None,
+        length=num_steps,
+    )
+  else:
+    trace_arrays = map_tree(
+        lambda spec: np.zeros((num_steps,) + spec.shape, spec.dtype),
+        traced_spec)
+
+    def wrapper(i, state_untraced_traced):
+      state, _, trace_arrays = state_untraced_traced
+      state, untraced, traced = fn(state)
+      trace_arrays = map_tree(lambda a, e: jax.ops.index_update(a, i, e),
+                              trace_arrays, traced)
+      return (state, untraced, trace_arrays)
+
+    state, untraced, traced = lax.fori_loop(
+        0,
+        num_steps,
+        wrapper,
+        (state, untraced_init, trace_arrays),
+    )
   return state, untraced, traced

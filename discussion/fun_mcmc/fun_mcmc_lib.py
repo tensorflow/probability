@@ -214,19 +214,19 @@ def trace(
     return (
         util.map_tree_up_to(
             trace_mask,
-            lambda m, s: s if m else (),
+            lambda m, s: () if m else s,
             trace_mask,
             trace_element,
         ),
         util.map_tree_up_to(
             trace_mask,
-            lambda m, s: () if m else s,
+            lambda m, s: s if m else (),
             trace_mask,
             trace_element,
         ),
     )
 
-  def combine_trace(traced, untraced):
+  def combine_trace(untraced, traced):
     # Reconstitute the structure returned by `trace_fn`, with leaves replaced
     # with traced and untraced elements according to the trace_mask. This is the
     # inverse operation of `split_trace`.
@@ -240,7 +240,7 @@ def trace(
     state, extra = util.map_tree(tf.convert_to_tensor,
                                  call_transition_operator(fn, state))
     trace_element = util.map_tree(tf.convert_to_tensor, trace_fn(state, extra))
-    traced, untraced = split_trace(trace_element)
+    untraced, traced = split_trace(trace_element)
     return state, untraced, traced
 
   state = util.map_tree(lambda t: (t if t is None else tf.convert_to_tensor(t)),
@@ -253,7 +253,7 @@ def trace(
       parallel_iterations=parallel_iterations,
   )
 
-  return state, combine_trace(traced, untraced)
+  return state, combine_trace(untraced, traced)
 
 
 def _tree_repr(tree: Any) -> Text:
