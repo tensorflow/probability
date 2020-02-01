@@ -191,14 +191,14 @@ class OrderedLogistic(distribution.Distribution):
     return self._location
 
   def categorical_log_probs(self):
-    """Matrix of predicted log probabilities for each category."""
+    """Log probabilities for the `K+1` ordered categories."""
     log_survival = tf.math.log_sigmoid(
         self.location[..., tf.newaxis] - self._augmented_cutpoints())
     return tfp_math.log_sub_exp(
         log_survival[..., :-1], log_survival[..., 1:])
 
   def categorical_probs(self):
-    """Matrix of predicted probabilities for each category."""
+    """Probabilities for the `K+1` ordered categories."""
     return tf.math.exp(self.categorical_log_probs())
 
   def _augmented_cutpoints(self):
