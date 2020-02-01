@@ -326,7 +326,7 @@ def main(argv):
         #                   ~= 1/n * sum_{i=1}^n p(heldout | model_i)
         # where model_i is a draw from the posterior p(model|train).
         print(" ... Running monte carlo inference")
-        probs = np.asarray([model.predict_generator(heldout_seq, verbose=1)
+        probs = np.asarray([model.predict(heldout_seq, verbose=1)
                             for _ in range(FLAGS.num_monte_carlo)])
         mean_probs = np.mean(probs, axis=0)
         heldout_log_prob = np.mean(np.log(mean_probs))
