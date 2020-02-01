@@ -427,7 +427,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     scale = tf.linalg.LinearOperatorDiag([self._input(3.)],
                                          is_non_singular=True)
     mvt_dist = tfd.MultivariateStudentTLinearOperator(
-        loc=[self._input(2.)],
+        loc=self._input([2.]),
         df=self._input(5.),
         scale=scale,
         validate_args=True)

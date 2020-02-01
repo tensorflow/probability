@@ -271,7 +271,8 @@ class BinomialTest(test_util.TestCase):
     logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
     self.assertAllClose(
         *self.evaluate([logit(d.prob(1.)), d.logits_parameter()]),
-        atol=0, rtol=1e-4)
+        # Set atol because logit(0.5) == 0.
+        atol=1e-6, rtol=1e-4)
     self.assertAllClose(
         *self.evaluate([d.prob(1.), d.probs_parameter()]),
         atol=0, rtol=1e-4)

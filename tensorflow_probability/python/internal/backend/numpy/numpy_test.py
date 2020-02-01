@@ -816,25 +816,41 @@ def _maybe_convert_to_tensors(args):
 
 class NumpyTest(test_util.TestCase):
 
-  def test_convert_to_tensor(self):
+  def _base_test_convert_to_tensor(self, nmpy):
     convert_to_tensor = numpy_backend.convert_to_tensor
     self.assertEqual(
-        np.complex64,
-        convert_to_tensor(np.complex64(1 + 2j), dtype_hint=tf.int32).dtype)
+        nmpy.complex64,
+        convert_to_tensor(nmpy.complex64(1 + 2j), dtype_hint=tf.int32).dtype)
     self.assertEqual(
-        np.complex64,
-        convert_to_tensor(np.complex64(1 + 2j), dtype_hint=tf.float64).dtype)
-    self.assertEqual(np.float64,
+        nmpy.complex64,
+        convert_to_tensor(nmpy.complex64(1 + 2j), dtype_hint=tf.float64).dtype)
+    self.assertEqual(nmpy.float64,
                      convert_to_tensor(1., dtype_hint=tf.int32).dtype)
-    self.assertEqual(np.int32, convert_to_tensor(1, dtype_hint=tf.int32).dtype)
-    self.assertEqual(np.float32,
-                     convert_to_tensor(1, dtype_hint=tf.float32).dtype)
-    self.assertEqual(np.complex64,
-                     convert_to_tensor(1., dtype_hint=tf.complex64).dtype)
-    self.assertEqual(np.int64, convert_to_tensor(1, dtype_hint=tf.int64).dtype)
     self.assertEqual(
-        np.int32,
-        convert_to_tensor(np.int32(False), dtype_hint=tf.bool).dtype)
+        nmpy.int32, convert_to_tensor(1, dtype_hint=tf.int32).dtype)
+    self.assertEqual(nmpy.float32,
+                     convert_to_tensor(1, dtype_hint=tf.float32).dtype)
+    self.assertEqual(nmpy.complex64,
+                     convert_to_tensor(1., dtype_hint=tf.complex64).dtype)
+    self.assertEqual(
+        nmpy.int64, convert_to_tensor(1, dtype_hint=tf.int64).dtype)
+    self.assertEqual(
+        nmpy.int32,
+        convert_to_tensor(nmpy.int32(False), dtype_hint=tf.bool).dtype)
+
+  def test_convert_to_tensor(self):
+    self._base_test_convert_to_tensor(np)
+
+  def test_convert_to_tensor_numpy_array(self):
+    if not JAX_MODE:
+      self.skipTest('Check non-device arrays in JAX.')
+    self._base_test_convert_to_tensor(onp)
+
+  def test_convert_to_tensor_scalar_default(self):
+    convert_to_tensor = numpy_backend.convert_to_tensor
+    self.assertEqual(np.complex128, convert_to_tensor(1. + 2j).dtype)
+    self.assertEqual(np.float32, convert_to_tensor(1.).dtype)
+    self.assertEqual(np.int32, convert_to_tensor(1).dtype)
 
   def test_convert_to_tensor_dimension(self):
     convert_to_tensor = numpy_backend.convert_to_tensor

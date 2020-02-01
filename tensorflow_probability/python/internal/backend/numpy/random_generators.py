@@ -104,12 +104,16 @@ def _gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None,
 
 
 def _gamma_jax(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):  # pylint: disable=unused-argument
+  """JAX-based reparameterized gamma sampler."""
   dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
   shape = _ensure_tuple(shape) + _bcast_shape((), [alpha, beta])
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
   if seed is None:
     raise ValueError('Must provide PRNGKey to sample in JAX.')
-  samps = jaxrand.gamma(key=seed, a=alpha, shape=shape, dtype=dtype)
+  # TODO(srvasude): Sample in the given dtype once
+  # https://github.com/google/jax/issues/2130 is fixed.
+  samps = jaxrand.gamma(
+      key=seed, a=alpha, shape=shape, dtype=np.float64).astype(dtype)
   return samps if beta is None else samps / beta
 
 
