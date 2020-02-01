@@ -310,15 +310,16 @@ def main(argv):
 
   print(" ... Training convolutional neural network")
   for epoch in range(FLAGS.num_epochs):
-    epoch_accuracy = []
+    epoch_accuracy, epoch_loss = [], []
     for step, (batch_x, batch_y) in enumerate(train_seq):
-      batch_accuracy = model.train_on_batch(
-          batch_x, batch_y)[1]
+      batch_loss, batch_accuracy = model.train_on_batch(
+          batch_x, batch_y)
       epoch_accuracy.append(batch_accuracy)
+      epoch_loss.append(batch_loss)
 
       if step % 100 == 0:
-        print('Epoch: {}, Batch index: {}, Accuracy: {:.3f}'.format(
-            epoch, step, np.mean(epoch_accuracy)))
+        print('Epoch: {}, Batch index: {}, Loss: {:.3f}, Accuracy: {:.3f}'.format(
+          epoch, step, np.mean(epoch_loss), np.mean(epoch_accuracy)))
 
       if (step+1) % FLAGS.viz_steps == 0:
         # Compute log prob of heldout set by averaging draws from the model:
