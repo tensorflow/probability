@@ -115,7 +115,7 @@ class OrderedLogisticTest(test_util.TestCase):
     for k, p in enumerate(expected_probs):
       self.assertAllClose(np.mean(samples == k), p, atol=0.01)
 
-  def testEntropy(self):
+  def testEntropyAgainstCategoricalDistribution(self):
     cutpoints = self._random_cutpoints([3])
     location = self._random_location([2])
     dist = tfd.OrderedLogistic(cutpoints=cutpoints, location=location)
@@ -124,7 +124,16 @@ class OrderedLogisticTest(test_util.TestCase):
     entropy = self.evaluate(dist.entropy())
     self.assertAllClose(expected_entropy, entropy)
 
-  def testKL(self):
+  def testEntropyAgainstSampling(self):
+    cutpoints = self._random_cutpoints([4])
+    location = self._random_location([])
+    dist = tfd.OrderedLogistic(cutpoints=cutpoints, location=location)
+    samples = dist.sample(int(1e5), seed=test_util.test_seed())
+    sampled_entropy = self.evaluate(-tf.reduce_mean(dist.log_prob(samples)))
+    entropy = self.evaluate(dist.entropy())
+    self.assertAllClose(sampled_entropy, entropy, atol=0.01)
+
+  def testKLAgainstCategoricalDistribution(self):
     for batch_size in [1, 10]:
       cutpoints = self._random_cutpoints([100])
       a_location = self._random_location([batch_size])
@@ -148,6 +157,21 @@ class OrderedLogisticTest(test_util.TestCase):
 
       kl_same = self.evaluate(tfd.kl_divergence(a, a))
       self.assertAllClose(kl_same, np.zeros_like(kl_expected))
+
+  def testKLAgainstSampling(self):
+    a_cutpoints = self._random_cutpoints([4])
+    b_cutpoints = self._random_cutpoints([4])
+    location = self._random_location([])
+
+    a = tfd.OrderedLogistic(cutpoints=a_cutpoints, location=location)
+    b = tfd.OrderedLogistic(cutpoints=b_cutpoints, location=location)
+
+    samples = a.sample(int(1e5), seed=test_util.test_seed())
+    sampled_kl = self.evaluate(
+        tf.reduce_mean(a.log_prob(samples) - b.log_prob(samples)))
+    kl = self.evaluate(tfd.kl_divergence(a, b))
+
+    self.assertAllClose(sampled_kl, kl, atol=0.01)
 
   def testLatentLogistic(self):
     location = self._random_location([2])
