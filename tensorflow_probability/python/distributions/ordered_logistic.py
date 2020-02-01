@@ -43,7 +43,36 @@ class OrderedLogistic(distribution.Distribution):
   One often useful way to interpret this distribution is by imagining a draw
   from a latent/unobserved logistic distribution with location `location` and
   scale `1` and then only considering the index of the bin defined by the `K`
-  cutpoints this draw falls between.
+  cutpoints this draw falls between. An example implementation of this idea is
+  as follows:
+
+  ```python
+  cutpoints = [0.0, 1.0]
+  location = 0.5
+
+  def probs_from_latent(latent):
+    augmented_cutpoints = tf.concat([[-np.inf], cutpoints, [np.inf]], axis=0)
+    below = latent[..., tf.newaxis] < augmented_cutpoints[1:]
+    above = latent[..., tf.newaxis] > augmented_cutpoints[:-1]
+    return tf.cast(below & above, tf.float32)
+
+  latent_and_ordered_logistic = tfd.JointDistributionSequential([
+    tfd.Logistic(loc=location, scale=1.),
+    lambda l: tfd.Categorical(probs=probs_from_latent(l), dtype=tf.float32)
+  ])
+
+  tf.stack(latent_and_ordered_logistic.sample(5), axis=1)
+  # ==> array([[ 0.6434291,  1.       ],
+               [ 3.0963311,  2.       ],
+               [-1.2692463,  0.       ],
+               [-3.3595495,  0.       ],
+               [ 0.8468886,  1.       ]], dtype=float32)
+  ```
+
+  which displays that latent draws < `cutpoints[0] = 0.` are category 0, latent
+  draws between `cutpoints[0] = 0.` and `cutpoints[1] = 1.` are category 1, and
+  finally latent draws > `cutpoints[1] = 1.` (the final cutpoint in this
+  example) are the top category of 2.
 
   This distribution can be useful for modelling outcomes which have inherent
   ordering but no real numerical values, for example modelling the outcome of a
