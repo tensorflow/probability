@@ -136,8 +136,13 @@ class OrderedLogistic(distribution.Distribution):
         `b >= 0` indicates the number of batch dimensions. Each entry is then a
         `K`-length vector of cutpoints. The vector of cutpoints should be
         non-decreasing, which is only checked if `validate_args=True`.
-      location: A floating-point `Tensor`, representing the mean(s) of the
-        latent logistic distribution(s).
+      location: A floating-point `Tensor` with shape `[B1, ..., Bb]` where `b >=
+        0` indicates the number of batch dimensions. The entries represent the
+        mean(s) of the latent logistic distribution(s). Different batch shapes
+        for `cutpoints` and `location` are permitted, with the distribution
+        `batch_shape` being `tf.shape(location[..., tf.newaxis] -
+        cutpoints)[:-1]` assuming the subtraction is a valid broadcasting
+        operation.
       dtype: The type of the event samples (default: int32).
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
@@ -188,13 +193,9 @@ class OrderedLogistic(distribution.Distribution):
   def categorical_log_probs(self):
     """Matrix of predicted log probabilities for each category."""
     log_survival = tf.math.log_sigmoid(
-        self.location[..., tf.newaxis] -
-        self._augmented_cutpoints()[tf.newaxis, ...])
-    log_probs = tfp_math.log_sub_exp(
+        self.location[..., tf.newaxis] - self._augmented_cutpoints())
+    return tfp_math.log_sub_exp(
         log_survival[..., :-1], log_survival[..., 1:])
-    shape = tf.concat(
-        [self._batch_shape_tensor(), [self._num_categories()]], axis=0)
-    return tf.reshape(log_probs, shape)
 
   def categorical_probs(self):
     """Matrix of predicted probabilities for each category."""
