@@ -67,7 +67,7 @@ class Binomial(distribution.Distribution):
   """Binomial distribution.
 
   This distribution is parameterized by `probs`, a (batch of) probabilities for
-  drawing a `1` and `total_count`, the number of trials per draw from the
+  drawing a `1`, and `total_count`, the number of trials per draw from the
   Binomial.
 
   #### Mathematical Details
