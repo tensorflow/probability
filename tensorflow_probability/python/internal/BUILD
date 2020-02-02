@@ -49,6 +49,33 @@ multi_substrate_py_library(
     ],
 )
 
+multi_substrate_py_library(
+    name = "batched_rejection_sampler",
+    srcs = ["batched_rejection_sampler.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "batched_rejection_sampler_test",
+    size = "small",
+    srcs = ["batched_rejection_sampler_test.py"],
+    # TODO(b/148640931): Current version produces identical random values across
+    # separate loop iterations in numpy / JAX, leading to infinite loops.
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
+    deps = [
+        ":batched_rejection_sampler",
+        ":test_util",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
 py_library(
     name = "docstring_util",
     srcs = [
