@@ -2074,6 +2074,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "laplace_test",
+    size = "medium",
     srcs = ["laplace_test.py"],
     deps = [
         # numpy dep,
