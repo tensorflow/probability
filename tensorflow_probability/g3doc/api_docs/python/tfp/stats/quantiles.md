@@ -25,7 +25,7 @@ tfp.stats.quantiles(
     num_quantiles,
     axis=None,
     interpolation=None,
-    keep_dims=False,
+    keepdims=False,
     validate_args=False,
     name=None
 )
@@ -71,7 +71,7 @@ The exact number of data points in each interval depends on the size of
     * nearest: `i` or `j`, whichever is nearest.
     * midpoint: (i + j) / 2. `linear` and `midpoint` interpolation do not
       work with integer dtypes.
-* <b>`keep_dims`</b>:  Python `bool`. If `True`, the last dimension is kept with size 1
+* <b>`keepdims`</b>:  Python `bool`. If `True`, the last dimension is kept with size 1
   If `False`, the last dimension is removed from the output shape.
 * <b>`validate_args`</b>:  Whether to add runtime checks of argument validity. If
   False, and arguments are incorrect, correct behavior is not guaranteed.
@@ -83,7 +83,7 @@ The exact number of data points in each interval depends on the size of
 
 * <b>`cut_points`</b>:  A `rank(x) + 1 - len(axis)` dimensional `Tensor` with same
 `dtype` as `x` and shape `[num_quantiles + 1, ...]` where the trailing shape
-is that of `x` without the dimensions in `axis` (unless `keep_dims is True`)
+is that of `x` without the dimensions in `axis` (unless `keepdims is True`)
 
 
 #### Raises:

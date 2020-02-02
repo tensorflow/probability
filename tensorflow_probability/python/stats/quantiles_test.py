@@ -425,13 +425,13 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
       self.assertAllEqual((2,), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
-  def test_two_dim_even_input_and_keep_dims_true(self):
+  def test_two_dim_even_input_and_keepdims_true(self):
     x = np.array([[1., 2., 4., 50.], [1., 2., -4., 5.]]).T
     for q in [0, 10, 25, 49.9, 50, 50.01, 90, 95, 100]:
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation, keepdims=True, axis=0)
       pct = tfp.stats.percentile(
-          x, q=q, interpolation=self._interpolation, keep_dims=True, axis=[0])
+          x, q=q, interpolation=self._interpolation, keepdims=True, axis=[0])
       self.assertAllEqual((1, 2), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
@@ -463,7 +463,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
       expected_percentile = np.percentile(
           x, q=q, interpolation=self._interpolation, axis=axis, keepdims=True)
       pct = tfp.stats.percentile(
-          x, q=q, interpolation=self._interpolation, axis=axis, keep_dims=True)
+          x, q=q, interpolation=self._interpolation, axis=axis, keepdims=True)
       self.assertAllEqual(expected_percentile.shape, pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
@@ -481,7 +481,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
           q=0.77,
           interpolation=self._interpolation,
           axis=axis,
-          keep_dims=True)
+          keepdims=True)
       self.assertAllEqual(expected_percentile.shape, pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
@@ -510,7 +510,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
           q=0.77,
           interpolation=self._interpolation,
           axis=axis,
-          keep_dims=True)
+          keepdims=True)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_with_integer_dtype(self):

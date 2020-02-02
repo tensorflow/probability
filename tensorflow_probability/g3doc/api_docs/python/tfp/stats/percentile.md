@@ -25,7 +25,7 @@ tfp.stats.percentile(
     q,
     axis=None,
     interpolation=None,
-    keep_dims=False,
+    keepdims=False,
     validate_args=False,
     preserve_gradients=True,
     name=None
@@ -71,7 +71,7 @@ Compare to `numpy.percentile`.
     * nearest: `i` or `j`, whichever is nearest.
     * midpoint: (i + j) / 2.
   `linear` and `midpoint` interpolation do not work with integer dtypes.
-* <b>`keep_dims`</b>:  Python `bool`. If `True`, the last dimension is kept with size 1
+* <b>`keepdims`</b>:  Python `bool`. If `True`, the last dimension is kept with size 1
   If `False`, the last dimension is removed from the output shape.
 * <b>`validate_args`</b>:  Whether to add runtime checks of argument validity. If
   False, and arguments are incorrect, correct behavior is not guaranteed.

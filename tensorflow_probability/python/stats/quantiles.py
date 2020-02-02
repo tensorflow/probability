@@ -406,7 +406,7 @@ def percentile(x,
                q,
                axis=None,
                interpolation=None,
-               keep_dims=False,
+               keepdims=False,
                validate_args=False,
                preserve_gradients=True,
                name=None):
@@ -445,7 +445,7 @@ def percentile(x,
         * nearest: `i` or `j`, whichever is nearest.
         * midpoint: (i + j) / 2.
       `linear` and `midpoint` interpolation do not work with integer dtypes.
-    keep_dims:  Python `bool`. If `True`, the last dimension is kept with size 1
+    keepdims:  Python `bool`. If `True`, the last dimension is kept with size 1
       If `False`, the last dimension is removed from the output shape.
     validate_args:  Whether to add runtime checks of argument validity. If
       False, and arguments are incorrect, correct behavior is not guaranteed.
@@ -607,14 +607,14 @@ def percentile(x,
       gathered_y = tf.where(nan_batch_members, nan, gathered_y)
 
     # Expand dimensions if requested
-    if keep_dims:
+    if keepdims:
       if axis is None:
         ones_vec = tf.ones(
             shape=[_get_best_effort_ndims(x) + _get_best_effort_ndims(q)],
             dtype=tf.int32)
         gathered_y *= tf.ones(ones_vec, dtype=x.dtype)
       else:
-        gathered_y = _insert_back_keep_dims(gathered_y, axis)
+        gathered_y = _insert_back_keepdims(gathered_y, axis)
 
     # If q is a scalar, then result has the right shape.
     # If q is a vector, then result has trailing dim of shape q.shape, which
@@ -626,7 +626,7 @@ def quantiles(x,
               num_quantiles,
               axis=None,
               interpolation=None,
-              keep_dims=False,
+              keepdims=False,
               validate_args=False,
               name=None):
   """Compute quantiles of `x` along `axis`.
@@ -665,7 +665,7 @@ def quantiles(x,
         * nearest: `i` or `j`, whichever is nearest.
         * midpoint: (i + j) / 2. `linear` and `midpoint` interpolation do not
           work with integer dtypes.
-    keep_dims:  Python `bool`. If `True`, the last dimension is kept with size 1
+    keepdims:  Python `bool`. If `True`, the last dimension is kept with size 1
       If `False`, the last dimension is removed from the output shape.
     validate_args:  Whether to add runtime checks of argument validity. If
       False, and arguments are incorrect, correct behavior is not guaranteed.
@@ -674,7 +674,7 @@ def quantiles(x,
   Returns:
     cut_points:  A `rank(x) + 1 - len(axis)` dimensional `Tensor` with same
     `dtype` as `x` and shape `[num_quantiles + 1, ...]` where the trailing shape
-    is that of `x` without the dimensions in `axis` (unless `keep_dims is True`)
+    is that of `x` without the dimensions in `axis` (unless `keepdims is True`)
 
   Raises:
     ValueError:  If argument 'interpolation' is not an allowed type.
@@ -716,7 +716,7 @@ def quantiles(x,
             num=num_quantiles + 1),
         axis=axis,
         interpolation=interpolation,
-        keep_dims=keep_dims,
+        keepdims=keepdims,
         validate_args=validate_args,
         preserve_gradients=False)
 
@@ -797,7 +797,7 @@ def _get_best_effort_ndims(x,
   return tf.rank(x)
 
 
-def _insert_back_keep_dims(x, axis):
+def _insert_back_keepdims(x, axis):
   """Insert the dims in `axis` back as singletons after being removed.
 
   Args:
