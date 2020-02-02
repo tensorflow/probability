@@ -80,7 +80,8 @@ install_python_packages() {
   pip install tf-nightly==$TF_VERSION_STR
 
   # The following unofficial dependencies are used only by tests.
-  pip install hypothesis matplotlib mock scipy
+  # TODO(b/148685448): Unpin Hypothesis version.
+  pip install hypothesis==4.36.0 matplotlib mock scipy
 
   # Install additional TFP dependencies.
   pip install decorator cloudpickle
