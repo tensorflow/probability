@@ -316,7 +316,6 @@ class OrderedLogistic(distribution.Distribution):
             assert_util.assert_rank_at_least(cutpoints, 1, message=msg))
 
     if not self.validate_args:
-      assert not assertions  # Should never happen.
       return []
 
     if is_init != tensor_util.is_ref(self.cutpoints):
