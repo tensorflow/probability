@@ -167,9 +167,11 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
 ]
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
+    'Binomial',  # Numeric inconsistency: b/147743999
     'Categorical',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'DirichletMultinomial',  # Same as Multinomial.
     'FiniteDiscrete',  # No converter for SparseSoftmaxCrossEntropyWithLogits
+    'NegativeBinomial',  # Numeric inconsistency: b/147743999
     'Multinomial',  # Seemingly runs, but gives `NaN`s sometimes.
     'OneHotCategorical',  # Seemingly runs, but gives `NaN`s sometimes.
     'PlackettLuce',  # Shape error because pfor gather ignores `batch_dims`.
@@ -1356,8 +1358,6 @@ class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
           lambda i: dist.sample(seed=seed), tf.range(num_samples)))
     hp.note('Drew samples {}'.format(sample))
 
-    tfp_hps.guitar_skip_if_matches('NegativeBinomial', dist_name, 'b/147743999')
-    tfp_hps.guitar_skip_if_matches('Binomial', dist_name, 'b/147743999')
     if dist_name not in LOGPROB_AUTOVECTORIZATION_IS_BROKEN:
       pfor_lp = tf.vectorized_map(dist.log_prob, tf.convert_to_tensor(sample))
       batch_lp = dist.log_prob(sample)
