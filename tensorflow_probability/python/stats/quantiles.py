@@ -402,9 +402,9 @@ def histogram(x,
     return counts
 
 @deprecation.deprecated_args(
-  '2020-05-03',
-  '`keep_dims` is deprecated, use `keepdims` instead.',
-  'keep_dims')
+    '2020-05-03',
+    '`keep_dims` is deprecated, use `keepdims` instead.',
+    'keep_dims')
 def percentile(x,
                q,
                axis=None,
@@ -629,9 +629,9 @@ def percentile(x,
     return distribution_util.rotate_transpose(gathered_y, tf.rank(q))
 
 @deprecation.deprecated_args(
-  '2020-05-03',
-  '`keep_dims` is deprecated, use `keepdims` instead.',
-  'keep_dims')
+    '2020-05-03',
+    '`keep_dims` is deprecated, use `keepdims` instead.',
+    'keep_dims')
 def quantiles(x,
               num_quantiles,
               axis=None,
