@@ -401,12 +401,16 @@ def histogram(x,
           tf.TensorShape([n_edges - 1]).concatenate(counts.shape[1:]))
     return counts
 
-
+@deprecation.deprecated_args(
+      '2020-05-03',
+      '`keep_dims` is deprecated, use `keepdims` instead.',
+      'keep_dims')
 def percentile(x,
                q,
                axis=None,
                interpolation=None,
                keepdims=False,
+               keep_dims=None,
                validate_args=False,
                preserve_gradients=True,
                name=None):
@@ -447,6 +451,7 @@ def percentile(x,
       `linear` and `midpoint` interpolation do not work with integer dtypes.
     keepdims:  Python `bool`. If `True`, the last dimension is kept with size 1
       If `False`, the last dimension is removed from the output shape.
+    keep_dims: deprecated, use keepdims instead.
     validate_args:  Whether to add runtime checks of argument validity. If
       False, and arguments are incorrect, correct behavior is not guaranteed.
     preserve_gradients:  Python `bool`.  If `True`, ensure that gradient w.r.t
@@ -497,6 +502,8 @@ def percentile(x,
   ```
 
   """
+  keepdims = keepdims if keep_dims is None else keep_dims
+  del keep_dims
   name = name or 'percentile'
   allowed_interpolations = {'linear', 'lower', 'higher', 'nearest', 'midpoint'}
 
@@ -621,12 +628,16 @@ def percentile(x,
     # needs to be rotated to dim 0.
     return distribution_util.rotate_transpose(gathered_y, tf.rank(q))
 
-
+@deprecation.deprecated_args(
+      '2020-05-03',
+      '`keep_dims` is deprecated, use `keepdims` instead.',
+      'keep_dims')
 def quantiles(x,
               num_quantiles,
               axis=None,
               interpolation=None,
               keepdims=False,
+              keep_dims=None,
               validate_args=False,
               name=None):
   """Compute quantiles of `x` along `axis`.
@@ -667,6 +678,7 @@ def quantiles(x,
           work with integer dtypes.
     keepdims:  Python `bool`. If `True`, the last dimension is kept with size 1
       If `False`, the last dimension is removed from the output shape.
+    keep_dims: deprecated, use keepdims instead.
     validate_args:  Whether to add runtime checks of argument validity. If
       False, and arguments are incorrect, correct behavior is not guaranteed.
     name:  A Python string name to give this `Op`.  Default is 'percentile'

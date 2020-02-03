@@ -26,6 +26,7 @@ tfp.stats.quantiles(
     axis=None,
     interpolation=None,
     keepdims=False,
+    keep_dims=None,
     validate_args=False,
     name=None
 )
@@ -73,6 +74,7 @@ The exact number of data points in each interval depends on the size of
       work with integer dtypes.
 * <b>`keepdims`</b>:  Python `bool`. If `True`, the last dimension is kept with size 1
   If `False`, the last dimension is removed from the output shape.
+* <b>`keep_dims`</b>:  deprecated, use `keepdims` instead.
 * <b>`validate_args`</b>:  Whether to add runtime checks of argument validity. If
   False, and arguments are incorrect, correct behavior is not guaranteed.
 * <b>`name`</b>:  A Python string name to give this `Op`.  Default is 'percentile'
