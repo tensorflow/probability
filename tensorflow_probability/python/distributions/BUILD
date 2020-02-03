@@ -1822,6 +1822,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "gaussian_process_test",
     srcs = ["gaussian_process_test.py"],
+    jax_size = "medium",  # Due to GaussianProcessDynamicTest.testShapes
     deps = [
         ":distributions",
         # numpy dep,
@@ -2560,6 +2561,7 @@ multi_substrate_py_test(
     srcs = ["triangular_test.py"],
     jax_size = "large",
     numpy_tags = ["notap"],
+    shard_count = 4,
     deps = [
         # numpy dep,
         # scipy dep,
