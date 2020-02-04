@@ -139,7 +139,7 @@ py_library(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//third_party/tensorflow/contrib:contrib_py",
+        # tensorflow/contrib :contrib_py dep,
     ],
 )
 
@@ -160,6 +160,7 @@ py3_test(
     main = "disentangled_vae.py",
     python_version = "PY3",
     tags = [
+        "no-oss-ci",
         "tf2-kokoro-broken",
         # TODO(b/147689726) Re-enable this test after contrib references are
         # rm'ed.
@@ -177,7 +178,10 @@ py3_test(
     main = "disentangled_vae_test.py",
     python_version = "PY3",
     shard_count = 2,
-    tags = ["tf2-kokoro-broken"],
+    tags = [
+        "no-oss-ci",
+        "tf2-kokoro-broken",
+    ],
     deps = [
         ":disentangled_vae_lib",
         # numpy dep,
@@ -319,7 +323,7 @@ py_library(
         # absl/flags dep,
         # six dep,
         # tensorflow dep,
-        "//third_party/tensorflow/contrib/lookup:lookup_py",
+        # tensorflow/contrib /lookup:lookup_py dep,
     ],
 )
 
