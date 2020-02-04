@@ -60,9 +60,9 @@ __all__ = [
     'call_fn',
     'call_potential_fn',
     'call_potential_fn_with_grads',
+    'call_transition_operator',
     'call_transport_map',
     'call_transport_map_with_ldj',
-    'call_transition_operator',
     'gaussian_momentum_sample',
     'gradient_descent_step',
     'GradientDescentExtra',
@@ -107,6 +107,10 @@ __all__ = [
     'RunningVarianceState',
     'ruth4_step',
     'sign_adaptation',
+    'simple_dual_averages_init',
+    'simple_dual_averages_step',
+    'SimpleDualAveragesExtra',
+    'SimpleDualAveragesState',
     'spliting_integrator_step',
     'State',
     'trace',
@@ -451,6 +455,7 @@ def call_transport_map_with_ldj(
     extra: Second output of `fn`.
     ldj: Log-det jacobian of `fn`.
   """
+
   def wrapper(args):
     return call_transport_map(fn, args)
 
@@ -574,8 +579,7 @@ def reparameterize_potential_fn(
       state, map_extra, ldj = call_transport_map_with_ldj(
           transport_map_fn, transformed_state)
     else:
-      state, map_extra = call_transport_map(transport_map_fn,
-                                            transformed_state)
+      state, map_extra = call_transport_map(transport_map_fn, transformed_state)
 
     potential, extra = call_potential_fn(potential_fn, state)
 
@@ -1538,7 +1542,6 @@ def gradient_descent_step(
 RandomWalkMetropolisState = collections.namedtuple(
     'RandomWalkMetropolisState', 'state, target_log_prob, state_extra')
 
-
 RandomWalkMetropolisExtra = collections.namedtuple(
     'RandomWalkMetropolisExtra',
     'is_accepted, log_accept_ratio, proposal_extra, proposed_rwm_state')
@@ -1757,7 +1760,8 @@ def running_covariance_init(shape: IntTensor,
       num_points=util.map_tree(lambda _: tf.zeros([], tf.int32), dtype),
       mean=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
       covariance=util.map_tree_up_to(
-          dtype, lambda shape, dtype: tf.zeros(  # pylint: disable=g-long-lambda
+          dtype,
+          lambda shape, dtype: tf.zeros(  # pylint: disable=g-long-lambda
               tf.concat(
                   [
                       tf.convert_to_tensor(shape),
@@ -1765,7 +1769,9 @@ def running_covariance_init(shape: IntTensor,
                   ],
                   axis=0,
               ),
-              dtype=dtype), shape, dtype),
+              dtype=dtype),
+          shape,
+          dtype),
   )
 
 
@@ -1973,8 +1979,7 @@ def potential_scale_reduction_init(shape,
   # We are wrapping running variance so that the user doesn't get the chance to
   # set the reduction axis, which would break the assumptions of
   # `potential_scale_reduction_extract`.
-  return PotentialScaleReductionState(
-      *running_variance_init(shape, dtype))
+  return PotentialScaleReductionState(*running_variance_init(shape, dtype))
 
 
 def potential_scale_reduction_step(
@@ -2273,3 +2278,108 @@ def make_surrogate_loss_fn(
     return grad_wrapper(*util.flatten_tree((args, kwargs)))
 
   return loss_fn
+
+
+SimpleDualAveragesState = collections.namedtuple(
+    'SimpleDualAveragesState', 'state, step, grad_running_mean_state')
+SimpleDualAveragesExtra = collections.namedtuple('SimpleDualAveragesExtra',
+                                                 'loss, loss_extra, grads')
+
+
+def simple_dual_averages_init(
+    state: FloatNest,
+    grad_mean_smoothing_steps: IntNest = 0,
+) -> SimpleDualAveragesState:
+  """Initialize Simple Dual Averages state.
+
+  Note that the `state` argument only affects the initial value read from the
+  state, it has no effect on any other step of the algorithm. Typically, you'd
+  set this to the same value as `shrink_point`.
+
+  Args:
+    state: The state of the problem.
+    grad_mean_smoothing_steps: Smoothes out the initial gradient running mean.
+      For some algorithms it improves stability to make this non-zero.
+
+  Returns:
+    sda_state: `SimpleDualAveragesState`.
+  """
+  grad_rms = running_mean_init(
+      util.map_tree(lambda s: s.shape, state),
+      util.map_tree(lambda s: s.dtype, state))
+  grad_rms = grad_rms._replace(
+      num_points=util.map_tree(lambda _: grad_mean_smoothing_steps,
+                               grad_rms.num_points))
+
+  return SimpleDualAveragesState(
+      state=state,
+      # The algorithm assumes this starts at 1.
+      step=1,
+      grad_running_mean_state=grad_rms,
+  )
+
+
+def simple_dual_averages_step(
+    sda_state: SimpleDualAveragesState,
+    loss_fn: PotentialFn,
+    shrink_weight: FloatNest,
+    shrink_point: State = 0.,
+) -> Tuple[SimpleDualAveragesState, SimpleDualAveragesExtra]:
+  """Performs one step of the Simple Dual Averages algorithm [1].
+
+  This function implements equation 3.4 from [1], with the following choices:
+
+  ```none
+  d(x) = 0.5 * (x - shrink_point)**2
+  mu_k = shrink_weight / step**0.5
+  ```
+
+  Strictly speaking, this algorithm only applies to convex problems. The
+  `loss_fn` need not have true gradients: sub-gradients are sufficient. The
+  sequence of `state` is not actually convergent. To get a convergent sequence,
+  you can compute a running mean of `state` (e.g. using `running_mean_step`),
+  although that is not the sole choice.
+
+  Args:
+    sda_state: `SimpleDualAveragesState`.
+    loss_fn: A function whose output will be minimized.
+    shrink_weight: Weight of the shrinkage term. Must broadcast with `state`.
+    shrink_point: Where the algorithm initially shrinks `state` to. Must
+      broadcast with `state`.
+
+  Returns:
+    sda_state: `SimpleDualAveragesState`.
+    sda_extra: `SimpleDualAveragesExtra`.
+
+  #### References
+
+  [1]: Nesterov, Y. (2009). Primal-dual subgradient methods for convex problems.
+       Mathematical Programming, 120(1), 221-259.
+  """
+  state = sda_state.state
+  step = sda_state.step
+  step_f = tf.cast(step, tf.float32)
+  shrink_point = maybe_broadcast_structure(shrink_point, state)
+  shrink_weight = maybe_broadcast_structure(shrink_weight, state)
+
+  loss, loss_extra, grads = call_potential_fn_with_grads(loss_fn, state)
+
+  grad_rms, _ = running_mean_step(sda_state.grad_running_mean_state, grads)
+
+  def _one_part(shrink_point, shrink_weight, grad_running_mean):
+    return shrink_point - tf.sqrt(step_f) / shrink_weight * grad_running_mean
+
+  state = util.map_tree(_one_part, shrink_point, shrink_weight, grad_rms.mean)
+
+  sda_state = SimpleDualAveragesState(
+      state=state,
+      step=step + 1,
+      grad_running_mean_state=grad_rms,
+  )
+  sda_extra = SimpleDualAveragesExtra(
+      loss=loss,
+      loss_extra=loss_extra,
+      grads=grads,
+  )
+
+  return sda_state, sda_extra

@@ -80,6 +80,10 @@ from discussion.fun_mcmc.fun_mcmc_lib import RunningMeanState
 from discussion.fun_mcmc.fun_mcmc_lib import RunningVarianceState
 from discussion.fun_mcmc.fun_mcmc_lib import ruth4_step
 from discussion.fun_mcmc.fun_mcmc_lib import sign_adaptation
+from discussion.fun_mcmc.fun_mcmc_lib import simple_dual_averages_init
+from discussion.fun_mcmc.fun_mcmc_lib import simple_dual_averages_step
+from discussion.fun_mcmc.fun_mcmc_lib import SimpleDualAveragesExtra
+from discussion.fun_mcmc.fun_mcmc_lib import SimpleDualAveragesState
 from discussion.fun_mcmc.fun_mcmc_lib import spliting_integrator_step
 from discussion.fun_mcmc.fun_mcmc_lib import State
 from discussion.fun_mcmc.fun_mcmc_lib import trace
@@ -147,6 +151,10 @@ __all__ = [
     'ruth4_step',
     'set_backend',
     'sign_adaptation',
+    'simple_dual_averages_init',
+    'simple_dual_averages_step',
+    'SimpleDualAveragesExtra',
+    'SimpleDualAveragesState',
     'spliting_integrator_step',
     'State',
     'TENSORFLOW',
