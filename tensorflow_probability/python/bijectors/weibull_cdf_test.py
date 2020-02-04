@@ -94,11 +94,12 @@ class WeibullCDFBijectorTest(test_util.TestCase):
     scale = tf.Variable(1.)
     b = tfb.WeibullCDF(
         concentration=concentration, scale=scale, validate_args=True)
-    # Use identities so that static asserts don't catch the error earlier
+    # Use Variables so that static asserts don't catch the error earlier
     # and raise 'Forward transformation input must be at least 0'
-    minus_1 = tf.identity(tf.convert_to_tensor(-1.))
-    minus_3 = tf.identity(tf.convert_to_tensor(-3.))
-    self.evaluate([concentration.initializer, scale.initializer])
+    minus_1 = tf.Variable(-1.)
+    minus_3 = tf.Variable(-3.)
+    self.evaluate([concentration.initializer, scale.initializer,
+                   minus_1.initializer, minus_3.initializer])
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       with tf.control_dependencies([scale.assign(minus_1)]):
         self.evaluate(b.forward(minus_3))
@@ -109,11 +110,12 @@ class WeibullCDFBijectorTest(test_util.TestCase):
     scale = tf.Variable(1.)
     b = tfb.WeibullCDF(
         concentration=concentration, scale=scale, validate_args=True)
-    # Use identities so that static asserts don't catch the error earlier
+    # Use Variables so that static asserts don't catch the error earlier
     # and raise 'Forward transformation input must be at least 0'
-    minus_1 = tf.identity(tf.convert_to_tensor(-1.))
-    minus_3 = tf.identity(tf.convert_to_tensor(-3.))
-    self.evaluate([concentration.initializer, scale.initializer])
+    minus_1 = tf.Variable(-1.)
+    minus_3 = tf.Variable(-3.)
+    self.evaluate([concentration.initializer, scale.initializer,
+                   minus_1.initializer, minus_3.initializer])
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
       with tf.control_dependencies([concentration.assign(minus_1)]):
         self.evaluate(b.forward(minus_3))

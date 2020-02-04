@@ -104,15 +104,16 @@ class ExpSinSquaredTest(test_util.TestCase):
         ).shape)
 
   def testValidateArgs(self):
-    # Wrap -1 const in identity so that asserts don't fire at ExpSinSquared
+    # Wrap -1 const in Variable so that asserts don't fire at ExpSinSquared
     # construction time.
-    minus_1 = tf.identity(tf.convert_to_tensor(-1.))
+    minus_1 = tf.Variable(-1.)
+    k = tfp.math.psd_kernels.ExpSinSquared(
+        amplitude=minus_1,
+        length_scale=minus_1,
+        period=minus_1,
+        validate_args=True)
+    self.evaluate(minus_1.initializer)
     with self.assertRaisesOpError('must be positive'):
-      k = tfp.math.psd_kernels.ExpSinSquared(
-          amplitude=minus_1,
-          length_scale=minus_1,
-          period=minus_1,
-          validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
     if not tf.executing_eagerly():
