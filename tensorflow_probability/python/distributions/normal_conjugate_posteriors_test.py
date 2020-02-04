@@ -160,6 +160,8 @@ class NormalTest(test_util.TestCase):
     self.assertAllClose(
         candidate_posterior_prec_, posterior_prec_, atol=atol, rtol=rtol)
 
+  @test_util.jax_disable_test_missing_functionality(
+      "JAX uses Gaussian elimination which leads to numerical instability.")
   def testMVNConjugateLinearUpdateSupportsBatchShape(self):
     strm = test_util.test_seed_stream()
     num_latents = 2
@@ -193,8 +195,7 @@ class NormalTest(test_util.TestCase):
         observation=observation,
         candidate_posterior_mean=posterior_mean,
         candidate_posterior_prec=posterior_prec.to_dense(),
-        atol=1e-4,
-        rtol=2e-2)  # TODO(b/148735777): Lower this to something reasonable.
+        rtol=1e-5)
 
   def testMVNConjugateLinearUpdatePreservesStructuredLinops(self):
     strm = test_util.test_seed_stream()
