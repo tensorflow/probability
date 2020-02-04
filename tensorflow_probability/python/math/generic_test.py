@@ -240,9 +240,9 @@ class SoftplusInverseTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test  # TODO(sharadmv): fix Numpy test
   def testNumbers(self):
-    for t in [np.float16, np.float32, np.float64]:
-      lower = {np.float16: -15, np.float32: -50, np.float64: -50}.get(t, -100)
-      upper = {np.float16: 50, np.float32: 50, np.float64: 50}.get(t, 100)
+    for t in [np.float32, np.float64]:
+      lower = {np.float32: -50, np.float64: -50}.get(t, -100)
+      upper = {np.float32: 50, np.float64: 50}.get(t, 100)
       self._testSoftplus(
           np.array(np.linspace(lower, upper, int(1e3)).astype(t)).reshape(
               [2, -1]),
