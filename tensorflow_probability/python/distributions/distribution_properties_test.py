@@ -1257,7 +1257,7 @@ class DistributionSlicingTest(test_util.TestCase):
     # Check that sampling of sliced distributions executes.
     with tfp_hps.no_tf_rank_errors():
       samples = self.evaluate(dist.sample(seed=strm()))
-      sliced_samples = self.evaluate(sliced_dist.sample(seed=strm()))
+      sliced_dist_samples = self.evaluate(sliced_dist.sample(seed=strm()))
 
     # Come up with the slices for samples (which must also include event dims).
     sample_slices = (
@@ -1268,12 +1268,14 @@ class DistributionSlicingTest(test_util.TestCase):
     sample_slices += tuple([slice(None)] *
                            tensorshape_util.rank(dist.event_shape))
 
+    sliced_samples = samples[sample_slices]
+
     # Report sub-sliced samples (on which we compare log_prob) to hypothesis.
-    hp.note('Sample(s) for testing log_prob ' + str(samples[sample_slices]))
+    hp.note('Sample(s) for testing log_prob ' + str(sliced_samples))
 
     # Check that sampling a sliced distribution produces the same shape as
     # slicing the samples from the original.
-    self.assertAllEqual(samples[sample_slices].shape, sliced_samples.shape)
+    self.assertAllEqual(sliced_samples.shape, sliced_dist_samples.shape)
 
     # Check that a sliced distribution can compute the log_prob of its own
     # samples (up to numerical validation errors).
@@ -1285,31 +1287,24 @@ class DistributionSlicingTest(test_util.TestCase):
         #     validate_args checks.
         # We only tolerate this case for the non-sliced dist.
         return
-      sliced_lp = self.evaluate(sliced_dist.log_prob(samples[sample_slices]))
+      sliced_lp = self.evaluate(sliced_dist.log_prob(sliced_samples))
 
     # Check that the sliced dist's log_prob agrees with slicing the original's
     # log_prob.
-    # TODO(b/128708201): Better numerics for Geometric/Beta?
-    # Eigen can return quite different results for packet vs non-packet ops.
-    # To work around this, we use a much larger rtol for the last 3
-    # (assuming packet size 4) elements.
-    packetized_lp = lp[slices].reshape(-1)[:-3]
-    packetized_sliced_lp = sliced_lp.reshape(-1)[:-3]
-    rtol = (0.1 if any(
-        x in dist.name for x in ('Geometric', 'Beta', 'Dirichlet')) else 0.05)
-    self.assertAllClose(packetized_lp, packetized_sliced_lp, rtol=rtol)
-    possibly_nonpacket_lp = lp[slices].reshape(-1)[-3:]
-    possibly_nonpacket_sliced_lp = sliced_lp.reshape(-1)[-3:]
 
-    # TODO(b/140229057): Resolve nan disagreement between eigen vec/scalar paths
-    finite = (np.isfinite(possibly_nonpacket_lp) &
-              np.isfinite(possibly_nonpacket_sliced_lp))
-    possibly_nonpacket_lp = np.where(finite, possibly_nonpacket_lp, 0)
-    possibly_nonpacket_sliced_lp = np.where(
-        finite, possibly_nonpacket_sliced_lp, 0)
-    self.assertAllClose(
-        possibly_nonpacket_lp, possibly_nonpacket_sliced_lp,
-        rtol=0.4, atol=1e-4)
+    # This `hp.assume` is suppressing array sizes that cause the sliced and
+    # non-sliced distribution to follow different Eigen code paths.  Those
+    # different code paths lead to arbitrarily large variations in the results
+    # at parameter settings that Hypothesis is all too good at finding.  Since
+    # the purpose of this test is just to check that we got slicing right, those
+    # discrepancies are a distraction.
+    # TODO(b/140229057): Remove this `hp.assume`, if and when Eigen's numerics
+    # become index-independent.
+    all_packetized = samples.size % 4 == 0 and sliced_samples.size % 4 == 0
+    all_non_packetized = samples.size < 4 and sliced_samples.size < 4
+    hp.assume(all_packetized or all_non_packetized)
+
+    self.assertAllClose(lp[slices], sliced_lp)
 
   def _run_test(self, data):
     def ok(name):
