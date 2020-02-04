@@ -400,7 +400,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
 
     samples_ = np.concatenate(samples, axis=-1)
     sample_mean = np.mean(samples_, 0)
-    self.assertAllClose(sample_mean, true_mean, atol=0.1, rtol=0.1)
+    self.assertAllClose(sample_mean, true_mean, atol=0.15, rtol=0.1)
 
 if __name__ == '__main__':
   tf.test.main()
