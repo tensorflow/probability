@@ -222,7 +222,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     conc = tf.constant(2.0)
     _, grads = tfp.math.value_and_gradient(
         lambda *args: tfd.GeneralizedPareto(*args, validate_args=True).sample(  # pylint: disable=g-long-lambda
-            100), [loc, scale, conc])
+            100, seed=test_util.test_seed()), [loc, scale, conc])
     self.assertLen(grads, 3)
     self.assertAllNotNone(grads)
 

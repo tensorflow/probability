@@ -778,12 +778,17 @@ softmax = utils.copy_docstring(
     _softmax)
 
 
+# TODO(srvasude): Remove this once
+# https://github.com/google/jax/issues/2107 is fixed.
 @_custom_gradient
 def _softplus(x, name=None):  # pylint: disable=unused-argument
+  # TODO(b/146563881): Investigate improving numerical accuracy here.
   def grad(dy):
     return dy * scipy_special.expit(x)
-  # TODO(b/146563881): Investigate improving numerical accuracy here.
-  return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.), grad
+  if not JAX_MODE:
+    return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.), grad
+  return jax.nn.softplus(x), grad
+
 
 softplus = utils.copy_docstring(
     tf.math.softplus,

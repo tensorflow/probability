@@ -419,9 +419,12 @@ class IndependentDistributionTest(test_util.TestCase):
     # `dist.distribution.event_shape_tensor()`.
 
     for method in ('batch_shape_tensor', 'event_shape_tensor',
-                   'mode', 'stddev', 'sample', 'entropy'):
+                   'mode', 'stddev', 'entropy'):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=4):
         getattr(dist, method)()
+
+    with tfp_hps.assert_no_excessive_var_usage('sample', max_permissible=4):
+      dist.sample(seed=test_util.test_seed())
 
     for method in ('log_prob', 'log_cdf', 'prob', 'cdf'):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=4):
@@ -446,9 +449,12 @@ class IndependentDistributionTest(test_util.TestCase):
         reinterpreted_batch_ndims=None, validate_args=True)
 
     for method in ('batch_shape_tensor', 'event_shape_tensor',
-                   'mean', 'variance', 'sample'):
+                   'mean', 'variance'):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=4):
         getattr(dist, method)()
+
+    with tfp_hps.assert_no_excessive_var_usage('sample', max_permissible=4):
+      dist.sample(seed=test_util.test_seed())
 
     # In addition to the four reads of `loc`, `scale` described above in
     # `testExcessiveConcretizationOfParams`, the methods below have two more
@@ -472,6 +478,8 @@ class IndependentDistributionTest(test_util.TestCase):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=8):
         getattr(dist, method)(np.zeros((4, 5, 2, 3)))
 
+  @test_util.jax_disable_test_missing_functionality(
+      'Shape sizes are statically known in JAX.')
   def testChangingVariableShapes(self):
     if not tf.executing_eagerly():
       return

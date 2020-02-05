@@ -130,11 +130,6 @@ relu = utils.copy_docstring(
     lambda features, name=None: np.max(features, 0))
 
 
-softplus = utils.copy_docstring(
-    tf.nn.softplus,
-    lambda features, name=None: np.log(1 + np.exp(features)))
-
-
 sigmoid_cross_entropy_with_logits = utils.copy_docstring(
     tf.nn.sigmoid_cross_entropy_with_logits,
     _sigmoid_cross_entropy_with_logits)
