@@ -357,7 +357,7 @@ class DeferredTensor(tf.Module):
 
 
 class TransformedVariable(DeferredTensor):
-  """Variable tracking object which applies function upon `convert_to_tensor`.
+  """Variable tracking object which applies a bijector upon `convert_to_tensor`.
 
   #### Example
 
