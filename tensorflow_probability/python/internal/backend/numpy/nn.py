@@ -55,6 +55,8 @@ def _sigmoid_cross_entropy_with_logits(  # pylint: disable=invalid-name,unused-a
     labels=None,
     logits=None,
     name=None):
+  if _sentinel is not None:
+    raise ValueError('Pass in `label` and `logits` parameters as kwargs')
   return (np.maximum(logits, 0)
           - logits * labels + np.log1p(np.exp(-np.abs(logits))))
 
@@ -64,7 +66,9 @@ def _sparse_softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,u
     labels=None,
     logits=None,
     name=None):
-  """Softmax cross entropy with logits."""
+  """Sparse Softmax cross entropy with logits."""
+  if _sentinel is not None:
+    raise ValueError('Pass in `label` and `logits` parameters as kwargs')
   labels_shape = labels.shape
   num_classes = logits.shape[-1]
   logits = np.reshape(logits, [-1, num_classes])
@@ -81,8 +85,21 @@ def _sparse_softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,u
   return cost
 
 
-def _softmax_cross_entropy_with_logits(labels, logits, name=None):  # pylint: disable=unused-argument
-  raise NotImplementedError
+def _softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,unused-argument
+    _sentinel=None,
+    labels=None,
+    logits=None,
+    axis=-1,
+    name=None):
+  """Softmax cross entropy with logits."""
+  if _sentinel is not None:
+    raise ValueError('Pass in `label` and `logits` parameters as kwargs')
+  cost = -np.sum(
+      np.where(labels == 0, np.zeros_like(labels),
+               labels * (logits - reduce_logsumexp(
+                   logits, axis=axis, keepdims=True))),
+      axis=axis)
+  return cost.astype(logits.dtype)
 
 
 # --- Begin Public Functions --------------------------------------------------

@@ -417,7 +417,7 @@ class LKJ(distribution.Distribution):
       concentration = (
           tf.convert_to_tensor(self.concentration
                                if concentration is None else concentration))
-      logpi = np.log(np.pi)
+      logpi = float(np.log(np.pi))
       ans = tf.zeros_like(concentration)
       for k in range(1, self.dimension):
         ans = ans + logpi * (k / 2.)

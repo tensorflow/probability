@@ -372,8 +372,13 @@ class NumpyVariable(wrapt.ObjectProxy):
     if dtype is not None:
       v = v.astype(utils.numpy_dtype(dtype))
     super(NumpyVariable, self).__init__(v)
+    self._self_name = name
     self.initializer = None
   # pylint: enable=unused-argument
+
+  @property
+  def name(self):
+    return self._self_name if self._self_name is not None else str(id(self))
 
   def __array__(self, dtype=None):
     if dtype is not None:

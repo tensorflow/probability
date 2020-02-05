@@ -233,6 +233,17 @@ def nonsingular_matrices(draw):
   return mat * signs
 
 
+@hps.composite
+def batched_probabilities(draw, batch_shape, num_classes):
+  probs = draw(single_arrays(
+      batch_shape=batch_shape,
+      shape=hps.just((num_classes,)),
+      dtype=np.float32, elements=floats()))
+  probs = onp.exp(probs - onp.max(
+      probs, axis=-1, keepdims=True))
+  return probs / probs.sum(keepdims=True, axis=-1)
+
+
 def tensorshapes_to_tuples(tensorshapes):
   return tuple(tuple(tensorshape.as_list()) for tensorshape in tensorshapes)
 
@@ -386,6 +397,21 @@ def sparse_xent_params(draw):
       shape=hps.just(tuple()),
       dtype=np.int32,
       elements=hps.integers(0, num_classes - 1))
+  logits = single_arrays(
+      batch_shape=batch_shape,
+      shape=hps.just((num_classes,)),
+      elements=hps.floats(min_value=-1e5, max_value=1e5))
+  return draw(
+      hps.fixed_dictionaries(dict(
+          labels=labels, logits=logits)).map(Kwargs))
+
+
+@hps.composite
+def xent_params(draw):
+  num_classes = draw(hps.integers(1, 6))
+  batch_shape = draw(shapes(min_dims=1))
+  labels = batched_probabilities(  # pylint:disable=no-value-for-parameter
+      batch_shape=batch_shape, num_classes=num_classes)
   logits = single_arrays(
       batch_shape=batch_shape,
       shape=hps.just((num_classes,)),
@@ -774,6 +800,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
              [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
     TestCase('nn.sparse_softmax_cross_entropy_with_logits',
              [sparse_xent_params()], rtol=1e-4, atol=1e-4),
+    TestCase('nn.softmax_cross_entropy_with_logits',
+             [xent_params()], rtol=1e-4, atol=1e-4),
     TestCase(
         'random.categorical', [
             hps.tuples(

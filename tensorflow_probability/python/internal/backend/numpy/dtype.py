@@ -56,6 +56,9 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+
+
 def _complex(real, imag, name=None):  # pylint: disable=unused-argument
   dtype = utils.common_dtype([real, imag], dtype_hint=float32)
   real = np.array(real, dtype=dtype)
@@ -85,6 +88,11 @@ complex128 = np.complex128
 complex64 = np.complex64
 
 double = np.double
+
+
+if JAX_MODE:
+  bfloat16 = np.bfloat16
+  __all__.append('bfloat16')
 
 float16 = np.float16
 

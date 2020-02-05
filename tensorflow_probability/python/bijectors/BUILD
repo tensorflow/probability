@@ -1380,7 +1380,6 @@ multi_substrate_py_test(
     name = "reshape_test",
     size = "small",
     srcs = ["reshape_test.py"],
-    jax_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
