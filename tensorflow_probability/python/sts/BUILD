@@ -84,8 +84,9 @@ py_library(
 
 py_test(
     name = "decomposition_test",
-    size = "small",
+    size = "medium",
     srcs = ["decomposition_test.py"],
+    shard_count = 6,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

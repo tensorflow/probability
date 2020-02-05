@@ -96,13 +96,15 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
   samples from the variational posterior:
 
   ```python
-    (variational_loss,
-     variational_distributions) = tfp.sts.build_factored_variational_loss(
-       model=model, observed_time_series=observed_time_series)
+    surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
+      model=model)
+    loss_curve = tfp.vi.fit_surrogate_posterior(
+      target_log_prob_fn=model.joint_log_prob(observed_time_series),
+      surrogate_posterior=surrogate_posterior,
+      optimizer=tf.optimizers.Adam(learning_rate=0.1),
+      num_steps=200)
+    samples = surrogate_posterior.sample(30)
 
-    # OMITTED: take steps to optimize variational loss
-
-    samples = {k: q.sample(30) for (k, q) in variational_distributions.items()}
     one_step_predictive_dist = tfp.sts.one_step_predictive(
       model, observed_time_series, parameter_samples=samples)
   ```
@@ -241,16 +243,18 @@ def forecast(model,
   samples from the variational posterior:
 
   ```python
-    (variational_loss,
-     variational_distributions) = tfp.sts.build_factored_variational_loss(
-       model=model, observed_time_series=observed_time_series)
+    surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
+      model=model)
+    loss_curve = tfp.vi.fit_surrogate_posterior(
+      target_log_prob_fn=model.joint_log_prob(observed_time_series),
+      surrogate_posterior=surrogate_posterior,
+      optimizer=tf.optimizers.Adam(learning_rate=0.1),
+      num_steps=200)
+    samples = surrogate_posterior.sample(30)
 
-    # OMITTED: take steps to optimize variational loss
-
-    samples = {k: q.sample(30) for (k, q) in variational_distributions.items()}
     forecast_dist = tfp.sts.forecast(model, observed_time_series,
-                                         parameter_samples=samples,
-                                         num_steps_forecast=50)
+                                     parameter_samples=samples,
+                                     num_steps_forecast=50)
   ```
 
   We can visualize the forecast by plotting:

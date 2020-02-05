@@ -23,7 +23,6 @@ import warnings
 
 # Dependency imports
 import numpy as np
-import numpy as onp  # JAX rewrites numpy import  # pylint: disable=reimported
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
@@ -505,7 +504,7 @@ def enable_store_parameters_in_results(kernel):
 def _is_tensor_like(param):
   if is_list_like(param):
     return all([_is_tensor_like(p) for p in param])
-  return isinstance(param, tf.Tensor) or (np.array(param).dtype != onp.object)
+  return isinstance(param, tf.Tensor) or (np.array(param).dtype != np.object)
 
 
 def warn_if_parameters_are_not_simple_tensors(params_dict):

@@ -364,7 +364,7 @@ def main(argv):
     variables = (probabilistic_grammar.variables
                  + probabilistic_grammar_variational.variables)
     grads = tape.gradient(loss, variables)
-    grads_and_vars = zip(grads, variables)
+    grads_and_vars = list(zip(grads, variables))
     optimizer.apply_gradients(grads_and_vars, global_step)
 
     if step % 500 == 0:

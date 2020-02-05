@@ -151,7 +151,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
     probs = self._build_tensor([0.2, 0.8])
     dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
-    samples = self.evaluate(dist.sample(5000, seed=1234))
+    samples = self.evaluate(dist.sample(5000, seed=test_util.test_seed()))
     self.assertAllEqual((5000,), self._get_shape(samples))
     self.assertAllClose(np.mean(samples), dist.mean(), atol=0.1)
     self.assertAllClose(np.std(samples), dist.stddev(), atol=0.1)
@@ -161,7 +161,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
     probs = self._build_tensor([0.2, 0.8])
     dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
-    samples = self.evaluate(dist.sample(5000, seed=1234))
+    samples = self.evaluate(dist.sample(5000, seed=test_util.test_seed()))
     self.assertAllClose(np.mean(samples), dist.mean(), atol=0.1)
     self.assertAllClose(np.std(samples), dist.stddev(), atol=0.1)
 
@@ -311,7 +311,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
     probs = self._build_tensor([[0.2, 0.8], [0.8, 0.2]])
     dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
-    samples = self.evaluate(dist.sample(5000, seed=1234))
+    samples = self.evaluate(dist.sample(5000, seed=test_util.test_seed()))
     self.assertAllEqual((5000, 2), self._get_shape(samples))
     self.assertAllClose(np.mean(samples, axis=0), dist.mean(), atol=0.1)
     self.assertAllClose(np.std(samples, axis=0), dist.stddev(), atol=0.1)

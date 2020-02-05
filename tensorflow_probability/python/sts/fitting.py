@@ -32,8 +32,6 @@ from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.distributions import transformed_distribution as transformed_distribution_lib
 from tensorflow_probability.python.sts.internal import util as sts_util
 
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
-
 
 def sample_uniform_initial_state(parameter,
                                  return_constrained=True,
@@ -151,6 +149,7 @@ def build_factored_surrogate_posterior(
     loss_curve = tfp.vi.fit_surrogate_posterior(
       target_log_prob_fn=model.joint_log_prob(observed_time_series),
       surrogate_posterior=surrogate_posterior,
+      optimizer=tf.optimizers.Adam(learning_rate=0.1),
       num_steps=200)
     posterior_samples = surrogate_posterior.sample(50)
 
@@ -193,176 +192,6 @@ def build_factored_surrogate_posterior(
           param, batch_shape=batch_shape, seed=seed())
     return joint_distribution_named_lib.JointDistributionNamed(
         variational_posterior)
-
-
-@deprecation.deprecated(
-    '2019-10-01',
-    '`tfp.sts.build_factored_variational_loss` is deprecated. Use'
-    '`tfp.sts.build_factored_surrogate_posterior` and '
-    '`tfp.vi.monte_carlo_variational_loss` (or `tfp.vi.fit_surrogate_posterior`'
-    ' to automate the optimization loop) instead.',
-    warn_once=True)
-def build_factored_variational_loss(model,
-                                    observed_time_series,
-                                    init_batch_shape=(),
-                                    seed=None,
-                                    name=None):
-  """Build a loss function for variational inference in STS models.
-
-  Variational inference searches for the distribution within some family of
-  approximate posteriors that minimizes a divergence between the approximate
-  posterior `q(z)` and true posterior `p(z|observed_time_series)`. By converting
-  inference to optimization, it's generally much faster than sampling-based
-  inference algorithms such as HMC. The tradeoff is that the approximating
-  family rarely contains the true posterior, so it may miss important aspects of
-  posterior structure (in particular, dependence between variables) and should
-  not be blindly trusted. Results may vary; it's generally wise to compare to
-  HMC to evaluate whether inference quality is sufficient for your task at hand.
-
-  This method constructs a loss function for variational inference using the
-  Kullback-Liebler divergence `KL[q(z) || p(z|observed_time_series)]`, with an
-  approximating family given by independent Normal distributions transformed to
-  the appropriate parameter space for each parameter. Minimizing this loss (the
-  negative ELBO) maximizes a lower bound on the log model evidence `-log
-  p(observed_time_series)`. This is equivalent to the 'mean-field' method
-  implemented in [1]. and is a standard approach. The resulting posterior
-  approximations are unimodal; they will tend to underestimate posterior
-  uncertainty when the true posterior contains multiple modes (the `KL[q||p]`
-  divergence encourages choosing a single mode) or dependence between variables.
-
-  Args:
-    model: An instance of `StructuralTimeSeries` representing a
-      time-series model. This represents a joint distribution over
-      time-series and their parameters with batch shape `[b1, ..., bN]`.
-    observed_time_series: `float` `Tensor` of shape
-      `concat([sample_shape, model.batch_shape, [num_timesteps, 1]]) where
-      `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-      dimension may (optionally) be omitted if `num_timesteps > 1`. May
-      optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
-      a mask `Tensor` to specify timesteps with missing observations.
-    init_batch_shape: Batch shape (Python `tuple`, `list`, or `int`) of initial
-      states to optimize in parallel.
-      Default value: `()`. (i.e., just run a single optimization).
-    seed: Python integer to seed the random number generator.
-    name: Python `str` name prefixed to ops created by this function.
-      Default value: `None` (i.e., 'build_factored_variational_loss').
-
-  Returns:
-    variational_loss: `float` `Tensor` of shape
-      `concat([init_batch_shape, model.batch_shape])`, encoding a stochastic
-      estimate of an upper bound on the negative model evidence `-log p(y)`.
-      Minimizing this loss performs variational inference; the gap between the
-      variational bound and the true (generally unknown) model evidence
-      corresponds to the divergence `KL[q||p]` between the approximate and true
-      posterior.
-    variational_distributions: `collections.OrderedDict` giving
-      the approximate posterior for each model parameter. The keys are
-      Python `str` parameter names in order, corresponding to
-      `[param.name for param in model.parameters]`. The values are
-      `tfd.Distribution` instances with batch shape
-      `concat([init_batch_shape, model.batch_shape])`; these will typically be
-      of the form `tfd.TransformedDistribution(tfd.Normal(...),
-      bijector=param.bijector)`.
-
-  #### Examples
-
-  Assume we've built a structural time-series model:
-
-  ```python
-    day_of_week = tfp.sts.Seasonal(
-        num_seasons=7,
-        observed_time_series=observed_time_series,
-        name='day_of_week')
-    local_linear_trend = tfp.sts.LocalLinearTrend(
-        observed_time_series=observed_time_series,
-        name='local_linear_trend')
-    model = tfp.sts.Sum(components=[day_of_week, local_linear_trend],
-                        observed_time_series=observed_time_series)
-  ```
-
-  To run variational inference, we simply construct the loss and optimize
-  it:
-
-  ```python
-    (variational_loss,
-     variational_distributions) = tfp.sts.build_factored_variational_loss(
-       model=model, observed_time_series=observed_time_series)
-
-    train_op = tf.train.AdamOptimizer(0.1).minimize(variational_loss)
-    with tf.Session() as sess:
-      sess.run(tf.global_variables_initializer())
-
-      for step in range(200):
-        _, loss_ = sess.run((train_op, variational_loss))
-
-        if step % 20 == 0:
-          print("step {} loss {}".format(step, loss_))
-
-      posterior_samples_ = sess.run({
-        param_name: q.sample(50)
-        for param_name, q in variational_distributions.items()})
-  ```
-
-  As a more complex example, we might try to avoid local optima by optimizing
-  from multiple initializations in parallel, and selecting the result with the
-  lowest loss:
-
-  ```python
-    (variational_loss,
-     variational_distributions) = tfp.sts.build_factored_variational_loss(
-       model=model, observed_time_series=observed_time_series,
-       init_batch_shape=[10])
-
-    train_op = tf.train.AdamOptimizer(0.1).minimize(variational_loss)
-    with tf.Session() as sess:
-      sess.run(tf.global_variables_initializer())
-
-      for step in range(200):
-        _, loss_ = sess.run((train_op, variational_loss))
-
-        if step % 20 == 0:
-          print("step {} losses {}".format(step, loss_))
-
-      # Draw multiple samples to reduce Monte Carlo error in the optimized
-      # variational bounds.
-      avg_loss = np.mean(
-        [sess.run(variational_loss) for _ in range(25)], axis=0)
-      best_posterior_idx = np.argmin(avg_loss, axis=0).astype(np.int32)
-  ```
-
-  #### References
-
-  [1]: Alp Kucukelbir, Dustin Tran, Rajesh Ranganath, Andrew Gelman, and
-       David M. Blei. Automatic Differentiation Variational Inference. In
-       _Journal of Machine Learning Research_, 2017.
-       https://arxiv.org/abs/1603.00788
-
-  """
-
-  with tf.name_scope(name or 'build_factored_variational_loss') as name:
-    seed = tfp_util.SeedStream(
-        seed, salt='StructuralTimeSeries_build_factored_variational_loss')
-
-    variational_posterior = build_factored_surrogate_posterior(
-        model, batch_shape=init_batch_shape, seed=seed())
-
-    # Multiple initializations (similar to HMC chains) manifest as an extra
-    # param batch dimension, so we need to add corresponding batch dimension(s)
-    # to `observed_time_series`.
-    observed_time_series = sts_util.pad_batch_dimension_for_multiple_chains(
-        observed_time_series, model, chain_batch_shape=init_batch_shape)
-
-    loss = vi.monte_carlo_variational_loss(
-        model.joint_log_prob(observed_time_series),
-        surrogate_posterior=variational_posterior,
-        sample_size=1,
-        seed=seed())
-
-    ds, _ = variational_posterior._flat_sample_distributions()  # pylint: disable=protected-access
-    ds_dict = variational_posterior._model_unflatten(ds)  # pylint: disable=protected-access
-    variational_distributions = collections.OrderedDict([
-        (p.name, ds_dict[p.name]) for p in model.parameters])
-    return loss, variational_distributions
 
 
 def fit_with_hmc(model,
@@ -475,16 +304,11 @@ def fit_with_hmc(model,
 
   ```python
   samples, kernel_results = tfp.sts.fit_with_hmc(model, observed_time_series)
-
-  with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
-    samples_, kernel_results_ = sess.run((samples, kernel_results))
-
   print("acceptance rate: {}".format(
-    np.mean(kernel_results_.inner_results.is_accepted, axis=0)))
+    np.mean(kernel_results.inner_results.inner_results.is_accepted, axis=0)))
   print("posterior means: {}".format(
     {param.name: np.mean(param_draws, axis=0)
-     for (param, param_draws) in zip(model.parameters, samples_)}))
+     for (param, param_draws) in zip(model.parameters, samples)}))
   ```
 
   We can also run multiple chains. This may help diagnose convergence issues
@@ -496,33 +320,28 @@ def fit_with_hmc(model,
 
   samples, kernel_results = tfp.sts.fit_with_hmc(
     model, observed_time_series, chain_batch_shape=[10])
-
-  with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
-    samples_, kernel_results_ = sess.run((samples, kernel_results))
-
   print("acceptance rate: {}".format(
-    np.mean(kernel_results_.inner_results.inner_results.is_accepted, axis=0)))
+    np.mean(kernel_results.inner_results.inner_results.is_accepted, axis=0)))
 
   # Plot the sampled traces for each parameter. If the chains have mixed, their
   # traces should all cover the same region of state space, frequently crossing
   # over each other.
-  for (param, param_draws) in zip(model.parameters, samples_):
+  for (param, param_draws) in zip(model.parameters, samples):
     if param.prior.event_shape.ndims > 0:
       print("Only plotting traces for scalar parameters, skipping {}".format(
         param.name))
       continue
     plt.figure(figsize=[10, 4])
     plt.title(param.name)
-    plt.plot(param_draws)
+    plt.plot(param_draws.numpy())
     plt.ylabel(param.name)
     plt.xlabel("HMC step")
 
   # Combining the samples from multiple chains into a single dimension allows
   # us to easily pass sampled parameters to downstream forecasting methods.
-  combined_samples_ = [np.reshape(param_draws,
-                                  [-1] + list(param_draws.shape[2:]))
-                       for param_draws in samples_]
+  combined_samples = [np.reshape(param_draws,
+                                 [-1] + list(param_draws.shape[2:]))
+                      for param_draws in samples]
   ```
 
   For greater flexibility, you may prefer to implement your own sampler using

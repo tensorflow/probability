@@ -77,10 +77,12 @@ class AbsoluteValue(bijector.Bijector):
         `inverse_log_det_jacobian` are non-negative.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(AbsoluteValue, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   def _is_increasing(self):

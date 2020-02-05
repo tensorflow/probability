@@ -17,8 +17,8 @@
 # [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_library",
     "multi_substrate_py_test",
+    "multi_substrate_py_library",
 )
 
 licenses(["notice"])  # Apache 2.0
@@ -140,6 +140,7 @@ multi_substrate_py_test(
     name = "matern_test",
     size = "small",
     srcs = ["matern_test.py"],
+    jax_size = "medium",
     numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,

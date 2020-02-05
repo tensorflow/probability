@@ -294,6 +294,8 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
         broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,
                             enable_vars=enable_vars))
   ctor = getattr(tfb, bijector_name)
+  hp.note('Forming {} bijector with params {}.'.format(
+      bijector_name, bijector_params))
   return ctor(validate_args=True, **bijector_params)
 
 
@@ -609,4 +611,5 @@ def constraint_for(bijector_name=None, param=None):
 
 if __name__ == '__main__':
   tf.enable_v2_behavior()
+  np.set_printoptions(floatmode='unique', precision=None)
   tf.test.main()

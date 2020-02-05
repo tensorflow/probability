@@ -104,8 +104,11 @@ class _VariationalInferenceTests(object):
     observed_time_series = self._build_tensor(
         -1e8 + 1e6 * np.random.randn(num_timesteps))
     model = self._build_model(observed_time_series)
-    variational_loss, _ = tfp.sts.build_factored_variational_loss(
-        model=model, observed_time_series=observed_time_series)
+    surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
+        model=model)
+    variational_loss = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=model.joint_log_prob(observed_time_series),
+        surrogate_posterior=surrogate_posterior)
     self.evaluate(tf1.global_variables_initializer())
     loss_ = self.evaluate(variational_loss)
     self.assertTrue(np.isfinite(loss_))

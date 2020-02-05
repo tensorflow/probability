@@ -463,9 +463,9 @@ class WishartLinearOperator(distribution.Distribution):
       df_val = np.asarray(df_val)
       dim_val = np.asarray(dim_val)
       if not dim_val.shape:
-        dim_val = [dim_val]
+        dim_val = dim_val[np.newaxis, ...]
       if not df_val.shape:
-        df_val = [df_val]
+        df_val = df_val[np.newaxis, ...]
       if np.any(df_val < dim_val):
         raise ValueError(msg.format(df_val, dim_val))
 

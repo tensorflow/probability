@@ -16,6 +16,13 @@
 
 # [internal] load python3.bzl
 
+# py_test rules are rewritten to py3_test on export to OSS, for reasons of
+# reversibility of import<->export transforms. This is only necessary until we
+# eliminate all py2and3_test targets, after which everything can safely use
+# py_test, interanlly and externally, and no rewrites will be needed.
+# @unused  <-- satisfy buildifier errors
+load("//tensorflow_probability/python:build_defs.bzl", "py3_test")
+
 licenses(["notice"])  # Apache 2.0
 
 package(
@@ -34,7 +41,7 @@ py_test(
     ],
 )
 
-py_test(
+py3_test(
     name = "jax_integration_test",
     srcs = ["jax_integration_test.py"],
     python_version = "PY3",

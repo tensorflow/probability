@@ -18,8 +18,8 @@
 # [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_library",
     "multi_substrate_py_test",
+    "multi_substrate_py_library",
 )
 
 licenses(["notice"])  # Apache 2.0
@@ -46,6 +46,33 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_library(
+    name = "batched_rejection_sampler",
+    srcs = ["batched_rejection_sampler.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "batched_rejection_sampler_test",
+    size = "small",
+    srcs = ["batched_rejection_sampler_test.py"],
+    # TODO(b/148640931): Current version produces identical random values across
+    # separate loop iterations in numpy / JAX, leading to infinite loops.
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
+    deps = [
+        ":batched_rejection_sampler",
+        ":test_util",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
     ],
 )
 
@@ -252,6 +279,19 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "tensorshape_util_test",
+    size = "small",
+    srcs = ["tensorshape_util_test.py"],
+    deps = [
+        ":tensorshape_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

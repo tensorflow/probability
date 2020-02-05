@@ -150,8 +150,9 @@ class JointDistribution(distribution_lib.Distribution):
 
   Subclasses initialize:
 
-  - `_single_sample_distributions`: an iterable sequence of distributions
-    which are known at `__init__` or `None`.
+  - `_single_sample_distributions`: an empty dictionary, which will hold a
+      mapping from graph id to a prototypical list of component distributions
+      sampled from the model.
   """
 
   def _get_single_sample_distributions(self, candidate_dists=None):
@@ -334,7 +335,8 @@ class JointDistribution(distribution_lib.Distribution):
     """
     with self._name_and_control_scope(name):
       xs = self._map_measure_over_dists('log_prob', value)
-      return self._model_unflatten(xs)
+      return self._model_unflatten(
+          maybe_check_wont_broadcast(xs, self.validate_args))
 
   def prob_parts(self, value, name='prob_parts'):
     """Log probability density/mass function.
@@ -351,7 +353,8 @@ class JointDistribution(distribution_lib.Distribution):
     """
     with self._name_and_control_scope(name):
       xs = self._map_measure_over_dists('prob', value)
-      return self._model_unflatten(xs)
+      return self._model_unflatten(
+          maybe_check_wont_broadcast(xs, self.validate_args))
 
   def is_scalar_event(self, name='is_scalar_event'):
     """Indicates that `event_shape == []`.
@@ -364,7 +367,10 @@ class JointDistribution(distribution_lib.Distribution):
     """
     with self._name_and_control_scope(name):
       return self._model_unflatten(
-          self._map_attr_over_dists('is_scalar_event'))
+          [self._is_scalar_helper(shape, shape_tensor)  # pylint: disable=g-complex-comprehension
+           for (shape, shape_tensor) in zip(
+               self._model_flatten(self.event_shape),
+               self._model_flatten(self.event_shape_tensor()))])
 
   def is_scalar_batch(self, name='is_scalar_batch'):
     """Indicates that `batch_shape == []`.
@@ -381,7 +387,7 @@ class JointDistribution(distribution_lib.Distribution):
 
   def _log_prob(self, value):
     xs = self._map_measure_over_dists('log_prob', value)
-    return sum(xs)
+    return sum(maybe_check_wont_broadcast(xs, self.validate_args))
 
   @distribution_util.AppendDocstring(kwargs_dict={
       'value': ('`Tensor`s structured like `type(model)` used to parameterize '
@@ -397,9 +403,7 @@ class JointDistribution(distribution_lib.Distribution):
     if any(x is None for x in tf.nest.flatten(value)):
       raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
     ds, xs = self._call_flat_sample_distributions(value=value, seed=42)
-    return maybe_check_wont_broadcast(
-        (getattr(d, attr)(x) for d, x in zip(ds, xs)),
-        self.validate_args)
+    return (getattr(d, attr)(x) for d, x in zip(ds, xs))
 
   def _map_attr_over_dists(self, attr, dists=None):
     dists = (self._get_single_sample_distributions()

@@ -25,7 +25,6 @@ import collections
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 
@@ -413,9 +412,7 @@ class JointDistributionNamedTest(test_util.TestCase):
       getattr(d, attr)()
 
   @parameterized.parameters(
-      'quantile', 'log_cdf', 'cdf',
-      'log_survival_function', 'survival_function',
-  )
+      'log_cdf', 'cdf', 'log_survival_function', 'survival_function')
   def test_notimplemented_evaluative_statistic(self, attr):
     d = tfd.JointDistributionNamed(dict(logits=tfd.Normal(0., 1.),
                                         x=tfd.Bernoulli(probs=0.5)),
@@ -424,6 +421,15 @@ class JointDistributionNamedTest(test_util.TestCase):
         NotImplementedError,
         attr + ' is not implemented: JointDistributionNamed'):
       getattr(d, attr)(dict(logits=0., x=0.5))
+
+  def test_notimplemented_quantile(self):
+    d = tfd.JointDistributionNamed(dict(logits=tfd.Normal(0., 1.),
+                                        x=tfd.Bernoulli(probs=0.5)),
+                                   validate_args=True)
+    with self.assertRaisesWithPredicateMatch(
+        NotImplementedError,
+        'quantile is not implemented: JointDistributionNamed'):
+      d.quantile(0.5)
 
   def test_copy(self):
     pgm = dict(logits=tfd.Normal(0., 1.), probs=tfd.Bernoulli(logits=0.5))
@@ -556,20 +562,28 @@ class JointDistributionNamedTest(test_util.TestCase):
         x    =          tfd.StudentT),
                                    validate_args=True)
     # pylint: enable=bad-whitespace
-    with self.assertRaisesRegex(
-        NotImplementedError, 'all elements of `model` are `tfp.distribution`s'):
-      d._experimental_default_event_space_bijector()
 
-    d = tfd.JointDistributionNamed(
-        dict(e=tfd.Independent(tfd.Exponential(rate=[10, 12]), 1),
-             x=tfd.Normal(loc=1, scale=1.),
-             s=tfd.HalfNormal(2.5)),
-        validate_args=True)
-    for b in d._model_flatten(d._experimental_default_event_space_bijector()):
-      self.assertIsInstance(b, tfb.Bijector)
-    self.assertSetEqual(set(d.model.keys()),
-                        set(d._experimental_default_event_space_bijector(
-                            ).keys()))
+    # The event space bijector is inherited from `JointDistributionSequential`
+    # and is tested more thoroughly in the tests for that class.
+    b = d._experimental_default_event_space_bijector()
+    y = self.evaluate(d.sample(seed=test_util.test_seed()))
+    y_ = self.evaluate(b.forward(b.inverse(y)))
+    self.assertAllClose(y, y_)
+
+    # Verify that event shapes are passed through and flattened/unflattened
+    # correctly.
+    forward_event_shapes = b.forward_event_shape(d.event_shape)
+    inverse_event_shapes = b.inverse_event_shape(d.event_shape)
+    self.assertEqual(forward_event_shapes, d.event_shape)
+    self.assertEqual(inverse_event_shapes, d.event_shape)
+
+    # Verify that the outputs of other methods have the correct dict structure.
+    forward_event_shape_tensors = b.forward_event_shape_tensor(
+        d.event_shape_tensor())
+    inverse_event_shape_tensors = b.inverse_event_shape_tensor(
+        d.event_shape_tensor())
+    for item in [forward_event_shape_tensors, inverse_event_shape_tensors]:
+      self.assertSetEqual(set(self.evaluate(item).keys()), set(d.model.keys()))
 
 
 if __name__ == '__main__':

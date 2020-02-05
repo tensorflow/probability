@@ -215,7 +215,7 @@ class NutsTest(test_util.TestCase):
       # should still conserve it (with a smaller step size).
       return tfb.Sigmoid()(beta)
     self.evaluate(assert_univariate_target_conservation(
-        self, mk_sigmoid_beta, step_size=0.02, stackless=False))
+        self, mk_sigmoid_beta, step_size=1e-4, stackless=False))
 
   @parameterized.parameters(
       (3, 50000,),
@@ -282,7 +282,7 @@ class NutsTest(test_util.TestCase):
       # nuts should still conserve it (with a smaller step size).
       return tfb.Sigmoid()(beta)
     self.evaluate(assert_univariate_target_conservation(
-        self, mk_sigmoid_beta, step_size=0.02, stackless=True))
+        self, mk_sigmoid_beta, step_size=1e-4, stackless=True))
 
   def _correlated_mvn_nuts(self, dim, step_size, num_steps):
     # The correlated MVN example is taken from the NUTS paper

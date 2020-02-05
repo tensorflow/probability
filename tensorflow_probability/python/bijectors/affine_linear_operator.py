@@ -95,6 +95,7 @@ class AffineLinearOperator(bijector.Bijector):
       TypeError: if `shift.dtype` does not match `scale.dtype`.
       ValueError: if not `scale.is_non_singular`.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([shift, scale], dtype_hint=tf.float32)
       self._shift = tensor_util.convert_nonref_to_tensor(
@@ -111,6 +112,7 @@ class AffineLinearOperator(bijector.Bijector):
           is_constant_jacobian=True,
           dtype=dtype,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property

@@ -59,7 +59,7 @@ class PermuteBijectorTest(test_util.TestCase):
         bijector.forward_log_det_jacobian(expected_x, event_ndims=1),
         bijector.inverse_log_det_jacobian(expected_y, event_ndims=1),
     ])
-    self.assertStartsWith(bijector.name, "permute")
+    self.assertStartsWith(bijector.name, 'permute')
     self.assertAllEqual(expected_permutation, permutation_)
     self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
@@ -87,6 +87,8 @@ class PermuteBijectorTest(test_util.TestCase):
         bijector, x, y, eval_func=self.evaluate, event_ndims=2, rtol=1e-6,
         atol=0)
 
+  @test_util.jax_disable_test_missing_functionality(
+      'Test specific to Keras with losing shape information.')
   def testPreservesShape(self):
     # TODO(b/131157549, b/131124359): Test should not be needed. Consider
     # deleting when underlying issue with constant eager tensors is fixed.
@@ -101,7 +103,7 @@ class PermuteBijectorTest(test_util.TestCase):
     self.assertAllEqual(inverse_y.shape.as_list(), [None, 3])
 
   def testNonPermutationAssertion(self):
-    message = "must contain exactly one of each of"
+    message = 'must contain exactly one of each of'
     with self.assertRaisesRegexp(Exception, message):
       permutation = np.int32([1, 0, 1])
       bijector = tfb.Permute(permutation=permutation, validate_args=True)
@@ -109,7 +111,7 @@ class PermuteBijectorTest(test_util.TestCase):
       _ = self.evaluate(bijector.forward(x))
 
   def testVariableNonPermutationAssertion(self):
-    message = "must contain exactly one of each of"
+    message = 'must contain exactly one of each of'
     permutation = tf.Variable(np.int32([1, 0, 1]))
     self.evaluate(permutation.initializer)
     with self.assertRaisesRegexp(Exception, message):
@@ -118,7 +120,7 @@ class PermuteBijectorTest(test_util.TestCase):
       _ = self.evaluate(bijector.forward(x))
 
   def testModifiedVariableNonPermutationAssertion(self):
-    message = "must contain exactly one of each of"
+    message = 'must contain exactly one of each of'
     permutation = tf.Variable(np.int32([1, 0, 2]))
     self.evaluate(permutation.initializer)
     bijector = tfb.Permute(permutation=permutation, validate_args=True)
@@ -128,7 +130,7 @@ class PermuteBijectorTest(test_util.TestCase):
         _ = self.evaluate(bijector.forward(x))
 
   def testPermutationTypeAssertion(self):
-    message = "should be `int`-like"
+    message = 'should be `int`-like'
     with self.assertRaisesRegexp(Exception, message):
       permutation = np.float32([2, 0, 1])
       bijector = tfb.Permute(permutation=permutation, validate_args=True)
@@ -136,5 +138,5 @@ class PermuteBijectorTest(test_util.TestCase):
       _ = self.evaluate(bijector.forward(x))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

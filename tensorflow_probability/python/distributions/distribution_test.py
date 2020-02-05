@@ -519,6 +519,14 @@ class DistributionTest(test_util.TestCase):
     ):
       list(normal)
 
+  def testQuantileOutOfBounds(self):
+    normal = tfd.Normal(loc=0., scale=1., validate_args=True)
+    self.evaluate(normal.quantile(0.01))
+    with self.assertRaisesOpError(r'must be >= 0'):
+      self.evaluate(normal.quantile(-.01))
+    with self.assertRaisesOpError(r'must be <= 1'):
+      self.evaluate(normal.quantile(1.01))
+
 
 class Dummy(tfd.Distribution):
 

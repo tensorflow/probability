@@ -125,6 +125,7 @@ class Transpose(bijector.Bijector):
       NotImplementedError: if `rightmost_transposed_ndims` is not known prior to
         graph execution.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       # We need to determine `forward_min_event_ndims` statically, which
       # requires that we know `rightmost_transposed_ndims` statically.
@@ -177,6 +178,7 @@ class Transpose(bijector.Bijector):
           forward_min_event_ndims=rightmost_transposed_ndims_,
           is_constant_jacobian=True,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property

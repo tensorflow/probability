@@ -64,6 +64,7 @@ class KumaraswamyCDF(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration0, concentration1],
                                       dtype_hint=tf.float32)
@@ -74,6 +75,7 @@ class KumaraswamyCDF(bijector.Bijector):
       super(KumaraswamyCDF, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property
@@ -108,7 +110,7 @@ class KumaraswamyCDF(bijector.Bijector):
     return (tf.math.log(concentration1) +
             tf.math.log(concentration0) +
             tf.math.xlogy(concentration1 - 1, x) +
-            (concentration0 - 1) * tf.math.log1p(-x**concentration1))
+            tf.math.xlog1py(concentration0 - 1, -x**concentration1))
 
   def _maybe_assert_valid(self, x):
     if not self.validate_args:

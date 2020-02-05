@@ -179,7 +179,7 @@ class OneHotCategoricalTest(test_util.TestCase):
 
   def testSample(self):
     probs = [[[0.2, 0.8], [0.4, 0.6]]]
-    dist = tfd.OneHotCategorical(tf.math.log(probs) - 50., validate_args=True)
+    dist = tfd.OneHotCategorical(np.log(probs) - 50., validate_args=True)
     n = 100
     samples = dist.sample(n, seed=test_util.test_seed())
     self.assertEqual(samples.dtype, tf.int32)
@@ -190,7 +190,7 @@ class OneHotCategoricalTest(test_util.TestCase):
 
   def testSampleWithSampleShape(self):
     probs = [[[0.2, 0.8], [0.4, 0.6]]]
-    dist = tfd.OneHotCategorical(tf.math.log(probs) - 50., validate_args=True)
+    dist = tfd.OneHotCategorical(np.log(probs) - 50., validate_args=True)
     samples = dist.sample((100, 100), seed=test_util.test_seed())
     prob = dist.prob(samples)
     prob_val = self.evaluate(prob)

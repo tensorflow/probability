@@ -25,7 +25,6 @@ from __future__ import print_function
 
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.internal import dtype_util
@@ -233,7 +232,8 @@ def _compute_calibration_bin_statistics(
 
   # Collect predicted probabilities of decisions
   pred = tf.nn.softmax(logits, axis=1)
-  prob_y = tf1.batch_gather(pred, pred_y[:, tf.newaxis])  # p(pred_y | x)
+  prob_y = tf.gather(
+      pred, pred_y[:, tf.newaxis], batch_dims=-1)  # p(pred_y | x)
   prob_y = tf.reshape(prob_y, (tf.size(prob_y),))
 
   # Compute b/z histogram statistics:

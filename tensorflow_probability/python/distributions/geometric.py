@@ -173,9 +173,7 @@ class Geometric(distribution.Distribution):
     if not self.validate_args:
       # For consistency with cdf, we take the floor.
       x = tf.floor(x)
-    safe_domain = tf.where(
-        tf.equal(x, 0.), tf.zeros_like(probs), probs)
-    return x * tf.math.log1p(-safe_domain) + tf.math.log(probs)
+    return tf.math.xlog1py(x, -probs) + tf.math.log(probs)
 
   def _entropy(self):
     logits, probs = self._logits_and_probs_no_checks()

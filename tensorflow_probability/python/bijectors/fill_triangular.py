@@ -77,6 +77,7 @@ class FillTriangular(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       self._upper = upper
       super(FillTriangular, self).__init__(
@@ -84,6 +85,7 @@ class FillTriangular(bijector.Bijector):
           inverse_min_event_ndims=2,
           is_constant_jacobian=True,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   def _forward(self, x):

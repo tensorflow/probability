@@ -35,11 +35,25 @@ __all__ = [
 class CorrelationCholesky(bijector.Bijector):
   """Maps unconstrained reals to Cholesky-space correlation matrices.
 
-  This bijector is a mapping between `R^{n}` and the `n`-dimensional manifold of
-  Cholesky-space correlation matrices embedded in `R^{m^2}`, where `n` is the
-  `(m - 1)`th triangular number; i.e. `n = 1 + 2 + ... + (m - 1)`.
-
   #### Mathematical Details
+
+  This bijector provides a change of variables from unconstrained reals to a
+  parameterization of the CholeskyLKJ distribution. The CholeskyLKJ distribution
+  [1] is a distribution on the set of Cholesky factors of positive definite
+  correlation matrices. The CholeskyLKJ probability density function is
+  obtained from the LKJ density on n x n matrices as follows:
+
+    1 = int p(A | eta) dA
+      = int Z(eta) * det(A) ** (eta - 1) dA
+      = int Z(eta) L_ii ** {(n - i - 1) + 2 * (eta - 1)} ^dL_ij (0 <= i < j < n)
+
+  where Z(eta) is the normalizer; the matrix L is the Cholesky factor of the
+  correlation matrix A; and ^dL_ij denotes the wedge product (or differential)
+  of the strictly lower triangular entries of L. The entries L_ij are
+  constrained such that each entry lies in [-1, 1] and the norm of each row is
+  1. The norm includes the diagonal; which is not included in the wedge product.
+  To preserve uniqueness, we further specify that the diagonal entries are
+  positive.
 
   The image of unconstrained reals under the `CorrelationCholesky` bijector is
   the set of correlation matrices which are positive definite. A [correlation
@@ -66,10 +80,14 @@ class CorrelationCholesky(bijector.Bijector):
   This is a consequence of the fact that `R` is symmetric positive definite with
   1s on the main diagonal.
 
-  The CholeskyLKJ distribution [2] is a distribution on the set of Cholesky
-  factors of positive definite correlation matrices. The `CorrelationCholesky`
-  bijector provides a bijective mapping from unconstrained reals to the support
-  of the CholeskyLKJ distribution.
+  We choose the mapping from x in `R^{m}` to `R^{n^2}` where `m` is the
+  `(n - 1)`th triangular number; i.e. `m = 1 + 2 + ... + (n - 1)`.
+
+    L_ij = x_i,j / s_i (for i < j)
+    L_ii = 1 / s_i
+
+  where s_i = sqrt(1 + x_i,0^2 + x_i,1^2 + ... + x_(i,i-1)^2). We can check that
+  the required constraints on the image are satisfied.
 
   #### Examples
 
@@ -97,11 +115,13 @@ class CorrelationCholesky(bijector.Bijector):
   """
 
   def __init__(self, validate_args=False, name='correlation_cholesky'):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(CorrelationCholesky, self).__init__(
           validate_args=validate_args,
           forward_min_event_ndims=1,
           inverse_min_event_ndims=2,
+          parameters=parameters,
           name=name)
 
   def _forward_event_shape(self, input_shape):
@@ -187,42 +207,32 @@ class CorrelationCholesky(bijector.Bijector):
     # the ILDJs of each row's mapping.
     #
     # To compute the ILDJ for each row's mapping, consider the forward mapping
-    # `f_k` restricted to the `k`th (1-indexed) row. It maps unconstrained reals
-    # in `R^{k-1}` to unit vectors in `R^k`. `f_k : R^{k-1} -> R^k` is given by:
+    # `f_k` restricted to the `k`th (0-indexed) row. It maps unconstrained reals
+    # in `R^k` to the unit disk in `R^k`. `f_k : R^k -> R^k` is:
     #
-    #   f(x_1, x_2, ... x_{k-1}) = (x_1/s, x_2/s, ..., x_{k-1}/s, 1/s)
+    #   f(x_1, x_2, ... x_k) = (x_1/s, x_2/s, ..., x_k/s)
     #
-    # where `s = norm(x_1, x_2, ..., x_{k-1}, 1)`.
+    # where `s = norm(x_1, x_2, ..., x_k, 1)`.
     #
-    # The change in infinitesimal `k-1`-dimensional volume (or surface area) is
-    # given by sqrt(|det J^T J|); where J is the `k x (k-1)` Jacobian matrix.
+    # The change in infinitesimal `k`-dimensional volume is given by
+    # |det(J)|; where J is the `k x k` Jacobian matrix.
     #
-    # Claim: sqrt(|det(J^T J)|) = s^{-k}.
+    # Claim: |det(J)| = s^{-(k + 2)}.
     #
     # Proof: We compute the entries of the Jacobian matrix J:
     #
-    #     J_{i, j} =  -x_j / s^3           if i == k
-    #     J_{i, j} =  (s^2 - x_i^2) / s^3  if i == j and i < k
-    #     J_{i, j} = -(x_i * x_j) / s^3    if i != j and i < k
+    #     J_ij =  (s^2 - x_i^2) / s^3  if i == j
+    #     J_ij = -(x_i * x_j) / s^3    if i != j
     #
-    #   By spherical symmetry, the volume element depends only on `s`; w.l.o.g.
-    #   we can assume that `x_1 = r` and `x_2, ..., x_n = 0`; where
-    #   `r^2 + 1 = s^2`.
-    #
-    #   We can write `J^T = [A|B]` where `A` is a diagonal matrix of rank `k-1`
-    #   with diagonal `(1/s^3, 1/s, 1/s, ..., 1/s)`; and `B` is a column vector
-    #   of size `k-1`, with entries (-r/s^3, 0, 0, ..., 0). Hence,
-    #
-    #     det(J^T J) = det(diag((r^2 + 1) / s^6, 1/s^2, ..., s^2))
-    #                = s^{-2k}.
-    #
-    #   Or, sqrt(|det(J^T J)|) = s^{-k}.
-    #
-    # Hence, the forward log det jacobian (FLDJ) for the `k`th row is given by
-    # `-k * log(s)`. The ILDJ is equal to negative FLDJ at the pre-image, or,
-    # `k * log(s)`; where `s` is the reciprocal of the `k`th diagonal entry.
+    #   We multiply each row by s^3, which contributes a factor of s^{-3k} to
+    #   det(J). The remaining matrix can be written as s^2 I - xx^T. By the
+    #   matrix determinant lemma
+    #   (https://en.wikipedia.org/wiki/Matrix_determinant_lemma),
+    #   det(s^2 I - xx^T) = s^{2k} (1 - (x^Tx / s^2)) = s^{2k - 2}. The last
+    #   equality follows from s^2 - x^Tx = s^2 - sum x_i^2 = 1. Hence,
+    #   det(J) = s^{-3k} s^{2k - 2} = s^{-(k + 2)}.
     #
     n = prefer_static.shape(y)[-1]
     return -tf.reduce_sum(
-        tf.range(1, n + 1, dtype=y.dtype) * tf.math.log(tf.linalg.diag_part(y)),
+        tf.range(2, n + 2, dtype=y.dtype) * tf.math.log(tf.linalg.diag_part(y)),
         axis=-1)

@@ -172,6 +172,15 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual(4., x)
     self.assertAllEqual([2., 4.], trace)
 
+  def testTraceDynamic(self):
+
+    @tf.function
+    def trace_n(num_steps):
+      return fun_mcmc.trace(0, lambda x: (x + 1, ()), num_steps)[0]
+
+    x = trace_n(5)
+    self.assertAllEqual(5, x)
+
   def testTraceMask(self):
 
     def fun(x):
@@ -826,6 +835,29 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(1., x[-1], atol=1e-3)
     self.assertAllClose(2., y[-1], atol=1e-3)
     self.assertAllClose(0., loss[-1], atol=1e-3)
+
+  def testSimpleDualAverages(self):
+
+    def loss_fn(x, y):
+      return tf.square(x - 1.) + tf.square(y - 2.), []
+
+    def kernel(sda_state, rms_state):
+      sda_state, _ = fun_mcmc.simple_dual_averages_step(sda_state, loss_fn, 1.)
+      rms_state, _ = fun_mcmc.running_mean_step(rms_state, sda_state.state)
+      return (sda_state, rms_state), rms_state.mean
+
+    _, (x, y) = fun_mcmc.trace(
+        (
+            fun_mcmc.simple_dual_averages_init([tf.zeros([]),
+                                                tf.zeros([])]),
+            fun_mcmc.running_mean_init([[], []], [tf.float32, tf.float32]),
+        ),
+        kernel,
+        num_steps=1000,
+    )
+
+    self.assertAllClose(1., x[-1], atol=1e-1)
+    self.assertAllClose(2., y[-1], atol=1e-1)
 
   def testRandomWalkMetropolis(self):
     num_steps = 1000

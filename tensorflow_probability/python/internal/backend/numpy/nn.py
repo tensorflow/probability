@@ -44,6 +44,7 @@ __all__ = [
     'softmax',
     'softplus',
     'sigmoid_cross_entropy_with_logits',
+    'softmax_cross_entropy_with_logits',
     'sparse_softmax_cross_entropy_with_logits',
     'top_k',
 ]
@@ -54,6 +55,8 @@ def _sigmoid_cross_entropy_with_logits(  # pylint: disable=invalid-name,unused-a
     labels=None,
     logits=None,
     name=None):
+  if _sentinel is not None:
+    raise ValueError('Pass in `label` and `logits` parameters as kwargs')
   return (np.maximum(logits, 0)
           - logits * labels + np.log1p(np.exp(-np.abs(logits))))
 
@@ -63,7 +66,9 @@ def _sparse_softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,u
     labels=None,
     logits=None,
     name=None):
-  """Softmax cross entropy with logits."""
+  """Sparse Softmax cross entropy with logits."""
+  if _sentinel is not None:
+    raise ValueError('Pass in `label` and `logits` parameters as kwargs')
   labels_shape = labels.shape
   num_classes = logits.shape[-1]
   logits = np.reshape(logits, [-1, num_classes])
@@ -72,10 +77,29 @@ def _sparse_softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,u
   labels = numpy_array.one_hot(labels, num_classes)
 
   cost = -np.sum(
-      labels * (logits - reduce_logsumexp(logits, axis=-1, keepdims=True)),
+      np.where(labels == 0, np.zeros_like(labels),
+               labels * (logits - reduce_logsumexp(
+                   logits, axis=-1, keepdims=True))),
       axis=-1)
   cost = np.reshape(cost, labels_shape)
   return cost
+
+
+def _softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,unused-argument
+    _sentinel=None,
+    labels=None,
+    logits=None,
+    axis=-1,
+    name=None):
+  """Softmax cross entropy with logits."""
+  if _sentinel is not None:
+    raise ValueError('Pass in `label` and `logits` parameters as kwargs')
+  cost = -np.sum(
+      np.where(labels == 0, np.zeros_like(labels),
+               labels * (logits - reduce_logsumexp(
+                   logits, axis=axis, keepdims=True))),
+      axis=axis)
+  return cost.astype(logits.dtype)
 
 
 # --- Begin Public Functions --------------------------------------------------
@@ -106,11 +130,6 @@ relu = utils.copy_docstring(
     lambda features, name=None: np.max(features, 0))
 
 
-softplus = utils.copy_docstring(
-    tf.nn.softplus,
-    lambda features, name=None: np.log(1 + np.exp(features)))
-
-
 sigmoid_cross_entropy_with_logits = utils.copy_docstring(
     tf.nn.sigmoid_cross_entropy_with_logits,
     _sigmoid_cross_entropy_with_logits)
@@ -119,3 +138,8 @@ sigmoid_cross_entropy_with_logits = utils.copy_docstring(
 sparse_softmax_cross_entropy_with_logits = utils.copy_docstring(
     tf.nn.sparse_softmax_cross_entropy_with_logits,
     _sparse_softmax_cross_entropy_with_logits)
+
+
+softmax_cross_entropy_with_logits = utils.copy_docstring(
+    tf.nn.softmax_cross_entropy_with_logits,
+    _softmax_cross_entropy_with_logits)

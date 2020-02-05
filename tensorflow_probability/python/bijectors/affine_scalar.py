@@ -95,6 +95,7 @@ class AffineScalar(bijector.Bijector):
     Raises:
       ValueError: If both `scale` and `log_scale` are specified.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [shift, scale, log_scale], dtype_hint=tf.float32)
@@ -115,6 +116,7 @@ class AffineScalar(bijector.Bijector):
           is_constant_jacobian=True,
           validate_args=validate_args,
           dtype=dtype,
+          parameters=parameters,
           name=name)
 
   @property

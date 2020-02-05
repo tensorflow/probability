@@ -76,17 +76,28 @@ class _NullContext(object):
     return False  # False values do not suppress exceptions.
 
 
-def _broadcast_static_shape(shape_x, shape_y, as_tensorshape=False):
+def _base_broadcast_static_shape(
+    shape_x, shape_y, as_tensorshape=False, static_shape=False):
   shape_x = TensorShape(shape_x)
   shape_y = TensorShape(shape_y)
   shape_xy = tf.broadcast_static_shape(shape_x, shape_y)
   if as_tensorshape:
     return shape_xy
+  if static_shape:
+    return onp.array(shape_xy.as_list(), dtype=onp.int32)
   return np.array(shape_xy.as_list(), dtype=np.int32)
 
 
+def _broadcast_static_shape(shape_x, shape_y):
+  return _base_broadcast_static_shape(shape_x, shape_y, static_shape=True)
+
+
+def _broadcast_dynamic_shape(shape_x, shape_y):
+  return _base_broadcast_static_shape(shape_x, shape_y, static_shape=False)
+
+
 def _constant(value, dtype=None, shape=None, name='Const'):  # pylint: disable=unused-argument
-  x = np.array(value, dtype=None if dtype is None else utils.numpy_dtype(dtype))
+  x = convert_to_tensor(value, dtype=dtype)
   if shape is None:
     return x
   return np.reshape(x, shape)
@@ -115,6 +126,13 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
     value = _dimension_value(value)
   elif isinstance(value, TensorShape):
     value = value.as_list()
+  # In JAX mode, onp.ndarray/onp.generic are not identified as Tensor's.
+  # By default, use the dtype of the values passed in.
+  elif hasattr(value, 'dtype'):
+    if dtype is not None:
+      dtype = utils.numpy_dtype(dtype)
+      return np.array(value).astype(dtype)
+    return np.array(value)
   if dtype is None and dtype_hint is not None:
     dtype_hint = utils.numpy_dtype(dtype_hint)
     value = np.array(value)
@@ -133,7 +151,20 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
                 or np.issubdtype(dtype_hint, np.complexfloating)):
           return value
     return value.astype(dtype_hint)
-  return np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
+
+  np_value = np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
+  # We have no hints. By default JAX (in x64 mode) and Numpy default to
+  # {int64,float64} which does not match with TF's default.
+  if dtype is None and dtype_hint is None:
+    # If the integer doesn't fit in int32, return an int64. This matches TF.
+    if isinstance(value, int):
+      if value > onp.iinfo(onp.int32).max or value < onp.iinfo(onp.int32).min:
+        return np.array(value, dtype=np.int64)
+    if np.issubdtype(np_value.dtype, np.floating):
+      return np_value.astype(np.float32)
+    if np.issubdtype(np_value.dtype, np.integer):
+      return np_value.astype(np.int32)
+  return np_value
 
 
 def _dimension_value(dimension):
@@ -175,16 +206,14 @@ class GradientTape(object):
 
 
 broadcast_dynamic_shape = utils.copy_docstring(
-    tf.broadcast_dynamic_shape,
-    _broadcast_static_shape)
+    tf.broadcast_static_shape, _broadcast_dynamic_shape)
 
 broadcast_static_shape = utils.copy_docstring(
-    tf.broadcast_static_shape,
-    _broadcast_static_shape)
+    tf.broadcast_static_shape, _broadcast_static_shape)
 
 broadcast_static_shape_as_tensorshape = utils.copy_docstring(
     tf.broadcast_static_shape,
-    functools.partial(_broadcast_static_shape, as_tensorshape=True))
+    functools.partial(_base_broadcast_static_shape, as_tensorshape=True))
 
 broadcast_to = utils.copy_docstring(
     tf.broadcast_to,
@@ -343,8 +372,13 @@ class NumpyVariable(wrapt.ObjectProxy):
     if dtype is not None:
       v = v.astype(utils.numpy_dtype(dtype))
     super(NumpyVariable, self).__init__(v)
+    self._self_name = name
     self.initializer = None
   # pylint: enable=unused-argument
+
+  @property
+  def name(self):
+    return self._self_name if self._self_name is not None else str(id(self))
 
   def __array__(self, dtype=None):
     if dtype is not None:

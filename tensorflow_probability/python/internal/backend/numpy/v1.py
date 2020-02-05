@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal.backend.numpy import initializers
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.ops import convert_to_tensor
 from tensorflow_probability.python.internal.backend.numpy.ops import Module
 from tensorflow_probability.python.internal.backend.numpy.ops import name_scope
 from tensorflow_probability.python.internal.backend.numpy.ops import Variable
@@ -81,7 +82,7 @@ def _get_variable(  # pylint: disable=unused-argument
 
 
 def _placeholder_with_default(input, shape, name=None):  # pylint: disable=redefined-builtin,unused-argument
-  x = np.array(input)
+  x = convert_to_tensor(input)
   if hasattr(shape, 'as_list'):
     shape = shape.as_list()
   if shape is None or any(s is None for s in shape):

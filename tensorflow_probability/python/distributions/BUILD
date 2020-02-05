@@ -19,8 +19,8 @@
 # [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_library",
     "multi_substrate_py_test",
+    "multi_substrate_py_library",
 )
 
 licenses(["notice"])  # Apache 2.0
@@ -71,8 +71,10 @@ multi_substrate_py_library(
         ":inverse_gamma",
         ":inverse_gaussian",
         ":joint_distribution",
+        ":joint_distribution_auto_batched",
         ":joint_distribution_coroutine",
         ":joint_distribution_named",
+        ":joint_distribution_sample_path_mixin",
         ":joint_distribution_sequential",
         ":kullback_leibler",
         ":kumaraswamy",
@@ -687,6 +689,21 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "joint_distribution_auto_batched",
+    srcs = ["joint_distribution_auto_batched.py"],
+    deps = [
+        ":joint_distribution_coroutine",
+        ":joint_distribution_named",
+        ":joint_distribution_sample_path_mixin",
+        ":joint_distribution_sequential",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
     name = "joint_distribution_coroutine",
     srcs = ["joint_distribution_coroutine.py"],
     deps = [
@@ -702,9 +719,20 @@ multi_substrate_py_library(
     name = "joint_distribution_named",
     srcs = ["joint_distribution_named.py"],
     deps = [
-        ":distribution",
         ":joint_distribution_sequential",
         "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "joint_distribution_sample_path_mixin",
+    srcs = ["joint_distribution_sample_path_mixin.py"],
+    deps = [
+        ":joint_distribution",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -712,10 +740,10 @@ multi_substrate_py_library(
     name = "joint_distribution_sequential",
     srcs = ["joint_distribution_sequential.py"],
     deps = [
-        ":distribution",
         ":joint_distribution",
         ":kullback_leibler",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -1445,22 +1473,6 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
-    name = "vector_laplace_linear_operator",
-    srcs = ["vector_laplace_linear_operator.py"],
-    deps = [
-        ":laplace",
-        ":transformed_distribution",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:affine_linear_operator",
-        "//tensorflow_probability/python/bijectors:identity",
-        "//tensorflow_probability/python/internal:distribution_util",
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-    ],
-)
-
-multi_substrate_py_library(
     name = "von_mises",
     srcs = ["von_mises.py"],
     deps = [
@@ -1589,7 +1601,6 @@ multi_substrate_py_test(
     name = "beta_test",
     srcs = ["beta_test.py"],
     jax_size = "medium",
-    jax_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -1602,7 +1613,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "binomial_test",
     srcs = ["binomial_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -1727,6 +1737,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "dirichlet_test",
     srcs = ["dirichlet_test.py"],
+    jax_size = "medium",
     deps = [
         # numpy dep,
         # scipy dep,
@@ -1793,7 +1804,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "finite_discrete_test",
     srcs = ["finite_discrete_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -1832,6 +1842,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "gaussian_process_test",
     srcs = ["gaussian_process_test.py"],
+    jax_size = "medium",  # Due to GaussianProcessDynamicTest.testShapes
     deps = [
         ":distributions",
         # numpy dep,
@@ -1904,6 +1915,7 @@ multi_substrate_py_test(
     name = "half_cauchy_test",
     srcs = ["half_cauchy_test.py"],
     numpy_tags = ["notap"],
+    shard_count = 5,
     deps = [
         # numpy dep,
         # scipy dep,
@@ -1978,6 +1990,7 @@ multi_substrate_py_test(
     name = "inverse_gamma_test",
     size = "medium",
     srcs = ["inverse_gamma_test.py"],
+    jax_size = "large",
     jax_tags = ["notap"],
     shard_count = 5,
     deps = [
@@ -1991,6 +2004,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "inverse_gaussian_test",
+    size = "medium",
     srcs = ["inverse_gaussian_test.py"],
     deps = [
         # numpy dep,
@@ -2010,6 +2024,19 @@ multi_substrate_py_test(
         ":normal",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "joint_distribution_auto_batched_test",
+    size = "medium",
+    srcs = ["joint_distribution_auto_batched_test.py"],
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -2068,6 +2095,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "laplace_test",
+    size = "medium",
     srcs = ["laplace_test.py"],
     deps = [
         # numpy dep,
@@ -2099,12 +2127,11 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "lkj_test",
     size = "medium",
-    srcs = [
-        "lkj_test.py",
-    ],
+    srcs = ["lkj_test.py"],
     jax_size = "large",
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
+    shard_count = 3,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -2189,7 +2216,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "multinomial_test",
     srcs = ["multinomial_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2272,6 +2298,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "mvn_tril_test",
+    size = "medium",
     srcs = ["mvn_tril_test.py"],
     numpy_tags = ["notap"],
     shard_count = 5,
@@ -2317,7 +2344,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "normal_conjugate_posteriors_test",
     srcs = ["normal_conjugate_posteriors_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # tensorflow dep,
@@ -2329,7 +2355,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "onehot_categorical_test",
     srcs = ["onehot_categorical_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2372,7 +2397,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "pert_test",
     srcs = ["pert_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2443,7 +2467,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "probit_bernoulli_test",
     srcs = ["probit_bernoulli_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2524,7 +2547,6 @@ multi_substrate_py_test(
     name = "student_t_test",
     srcs = ["student_t_test.py"],
     jax_size = "medium",
-    jax_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2568,8 +2590,9 @@ multi_substrate_py_test(
     name = "triangular_test",
     size = "medium",
     srcs = ["triangular_test.py"],
-    jax_tags = ["notap"],
+    jax_size = "large",
     numpy_tags = ["notap"],
+    shard_count = 4,
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2614,7 +2637,6 @@ multi_substrate_py_test(
     name = "variational_gaussian_process_test",
     size = "medium",
     srcs = ["variational_gaussian_process_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2654,8 +2676,10 @@ multi_substrate_py_test(
     name = "von_mises_fisher_test",
     size = "medium",
     srcs = ["von_mises_fisher_test.py"],
+    jax_size = "large",
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
+    shard_count = 5,
     deps = [
         ":von_mises_fisher",
         # numpy dep,
@@ -2842,7 +2866,6 @@ exports_files(
         "vector_exponential_diag.py",
         "vector_exponential_linear_operator.py",
         "vector_laplace_diag.py",
-        "vector_laplace_linear_operator.py",
         "vector_sinh_arcsinh_diag.py",
         "von_mises.py",
         "von_mises_fisher.py",

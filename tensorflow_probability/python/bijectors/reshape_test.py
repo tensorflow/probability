@@ -311,8 +311,7 @@ class ReshapeBijectorTestStatic(test_util.TestCase, _ReshapeBijectorTest):
                   validate_args=True)
 
   def testInputOutputMismatchOpError(self):
-    self._testInputOutputMismatchOpError(
-        '(Input to reshape|Cannot reshape a tensor with|cannot reshape array)')
+    self._testInputOutputMismatchOpError('reshape')
 
   def testCheckingVariableShape(self):
     shape_out = tf.Variable([-2, 10])
@@ -390,8 +389,7 @@ class ReshapeBijectorTestDynamic(test_util.TestCase, _ReshapeBijectorTest):
         bijector.forward_event_shape(tf.TensorShape(None)).ndims)
 
   def testInputOutputMismatchOpError(self):
-    self._testInputOutputMismatchOpError(
-        '(Input to reshape|Cannot reshape a tensor with|cannot reshape array)')
+    self._testInputOutputMismatchOpError('reshape')
 
   def testMultipleUnspecifiedDimensionsOpError(self):
     with self.assertRaisesError('must have at most one `-1`.'):

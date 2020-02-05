@@ -61,10 +61,12 @@ class MatrixInverseTriL(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(MatrixInverseTriL, self).__init__(
           forward_min_event_ndims=2,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   def _forward(self, x):

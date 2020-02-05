@@ -56,8 +56,11 @@ from tensorflow_probability.python.distributions.inverse_gamma import InverseGam
 from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
 from tensorflow_probability.python.distributions.joint_distribution import JointDistribution
 from tensorflow_probability.python.distributions.joint_distribution_coroutine import JointDistributionCoroutine
+from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionCoroutineAutoBatched
 from tensorflow_probability.python.distributions.joint_distribution_named import JointDistributionNamed
+from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionNamedAutoBatched
 from tensorflow_probability.python.distributions.joint_distribution_sequential import JointDistributionSequential
+from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionSequentialAutoBatched
 from tensorflow_probability.python.distributions.kumaraswamy import Kumaraswamy
 from tensorflow_probability.python.distributions.laplace import Laplace
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import LinearGaussianStateSpaceModel
@@ -172,8 +175,11 @@ __all__ = [
     'InverseGamma',
     'JointDistribution',
     'JointDistributionCoroutine',
+    'JointDistributionCoroutineAutoBatched',
     'JointDistributionNamed',
+    'JointDistributionNamedAutoBatched',
     'JointDistributionSequential',
+    'JointDistributionSequentialAutoBatched',
     'Kumaraswamy',
     'LinearGaussianStateSpaceModel',
     'Laplace',

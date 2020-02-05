@@ -64,6 +64,7 @@ class GumbelCDF(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, scale], dtype_hint=tf.float32)
       self._loc = tensor_util.convert_nonref_to_tensor(
@@ -73,6 +74,7 @@ class GumbelCDF(bijector.Bijector):
       super(GumbelCDF, self).__init__(
           validate_args=validate_args,
           forward_min_event_ndims=0,
+          parameters=parameters,
           name=name)
 
   @property

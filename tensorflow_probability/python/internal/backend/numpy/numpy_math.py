@@ -27,6 +27,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import _reverse
+from tensorflow_probability.python.internal.backend.numpy.ops import _convert_to_tensor
 from tensorflow_probability.python.internal.backend.numpy.ops import _custom_gradient
 
 scipy_special = utils.try_import('scipy.special')
@@ -78,6 +79,7 @@ __all__ = [
     'expm1',
     'floor',
     'floordiv',
+    'floormod',
     'greater',
     'greater_equal',
     'igamma',
@@ -105,6 +107,7 @@ __all__ = [
     'logical_xor',
     'maximum',
     'minimum',
+    'mod',
     'multiply',
     'multiply_no_nan',
     'ndtri',
@@ -159,6 +162,7 @@ __all__ = [
     # 'unsorted_segment_sum',
     'xdivy',
     'xlogy',
+    'xlog1py',
     # 'zero_fraction',
     'zeta',
 ]
@@ -212,6 +216,11 @@ _cumprod = functools.partial(_cumop, np.cumprod, initial_value=1.)
 _cumsum = functools.partial(_cumop, np.cumsum, initial_value=0.)
 
 
+def _l2_normalize(x, axis=None, epsilon=1e-12, name=None):  # pylint: disable=unused-argument
+  x = _convert_to_tensor(x)
+  return x / np.linalg.norm(x, ord=2, axis=axis, keepdims=True)
+
+
 def _lbeta(x, name=None):  # pylint: disable=unused-argument
   x = np.array(x)
   log_prod_gamma_x = np.sum(scipy_special.gammaln(x), axis=-1)
@@ -254,7 +263,17 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
 
 
 def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argument,redefined-builtin
-  raise NotImplementedError
+  n = int(input.shape[-1] - 1)
+  # For the values, we sort the negative entries and choose the smallest ones
+  # and negate. This is equivalent to choosing the largest entries
+  # For the indices, we could argsort and reverse the entries and choose the
+  # first k entries. However, this does not work in the case of ties, since the
+  # first index a value occurs at is preferred. Thus we also reverse the input
+  # to ensure the last tied value becomes first, and subtract this off from the
+  # last index since the list is reversed.
+  return (-np.sort(-input, axis=-1)[..., :k],
+          (n - (np.argsort(input[..., ::-1],
+                           kind='stable', axis=-1)[..., ::-1]))[..., :k])
 
 
 # --- Begin Public Functions --------------------------------------------------
@@ -298,7 +317,8 @@ argmax = utils.copy_docstring(
 argmin = utils.copy_docstring(
     tf.math.argmin,
     lambda input, axis=None, output_type=tf.int64, name=None: (  # pylint: disable=g-long-lambda
-        np.argmin(input, axis=0 if axis is None else _astuple(axis))
+        np.argmin(_convert_to_tensor(
+            input), axis=0 if axis is None else _astuple(axis))
         .astype(utils.numpy_dtype(output_type))))
 
 asin = utils.copy_docstring(
@@ -429,6 +449,10 @@ floordiv = utils.copy_docstring(
     tf.math.floordiv,
     lambda x, y, name=None: np.floor_divide(x, y))
 
+floormod = utils.copy_docstring(
+    tf.math.floormod,
+    lambda x, y, name=None: np.mod(x, y))
+
 greater = utils.copy_docstring(
     tf.math.greater,
     lambda x, y, name=None: np.greater(x, y))
@@ -478,10 +502,7 @@ is_strictly_increasing = utils.copy_docstring(
     tf.math.is_strictly_increasing,
     lambda x, name=None: np.all(x[1:] > x[:-1]))
 
-l2_normalize = utils.copy_docstring(
-    tf.math.l2_normalize,
-    lambda x, axis=None, epsilon=1e-12, name=None: (  # pylint: disable=g-long-lambda
-        x / np.linalg.norm(x, ord=2, axis=axis, keepdims=True)))
+l2_normalize = utils.copy_docstring(tf.math.l2_normalize, _l2_normalize)
 
 lbeta = utils.copy_docstring(
     tf.math.lbeta,
@@ -590,6 +611,10 @@ maximum = utils.copy_docstring(
 
 minimum = utils.copy_docstring(
     tf.math.minimum, _minimum)
+
+mod = utils.copy_docstring(
+    tf.math.mod,
+    lambda x, y, name=None: np.mod(x, y))
 
 multiply = utils.copy_docstring(
     tf.math.multiply,
@@ -753,12 +778,17 @@ softmax = utils.copy_docstring(
     _softmax)
 
 
+# TODO(srvasude): Remove this once
+# https://github.com/google/jax/issues/2107 is fixed.
 @_custom_gradient
 def _softplus(x, name=None):  # pylint: disable=unused-argument
+  # TODO(b/146563881): Investigate improving numerical accuracy here.
   def grad(dy):
     return dy * scipy_special.expit(x)
-  # TODO(b/146563881): Investigate improving numerical accuracy here.
-  return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.), grad
+  if not JAX_MODE:
+    return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.), grad
+  return jax.nn.softplus(x), grad
+
 
 softplus = utils.copy_docstring(
     tf.math.softplus,
@@ -839,10 +869,11 @@ xdivy = utils.copy_docstring(
 
 xlogy = utils.copy_docstring(
     tf.math.xlogy,
-    lambda x, y, name=None: (  # pylint: disable=unused-argument,g-long-lambda
-        np.where(np.equal(x, 0.),
-                 np.zeros_like(np.multiply(x, y)),
-                 np.multiply(x, np.log(y)))))
+    lambda x, y, name=None: scipy_special.xlogy(x, y))
+
+xlog1py = utils.copy_docstring(
+    tf.math.xlog1py,
+    lambda x, y, name=None: scipy_special.xlog1py(x, y))
 
 # zero_fraction = utils.copy_docstring(
 #     tf.math.zero_fraction,

@@ -95,22 +95,37 @@ class ExponentiatedQuadraticTest(test_util.TestCase):
         ).shape)
 
   def testValidateArgs(self):
-    # Wrap -1 const in identity so that asserts don't fire at ExpSinSquared
-    # construction time.
-    minus_1 = tf.identity(tf.convert_to_tensor(-1.))
     with self.assertRaisesOpError('must be positive'):
       k = tfp.math.psd_kernels.ExponentiatedQuadratic(
-          minus_1, minus_1, validate_args=True)
+          -1., 1., validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
-    if not tf.executing_eagerly():
-      with self.assertRaisesOpError('must be positive'):
-        self.evaluate(k.apply([1.], [1.]))
+    with self.assertRaisesOpError('must be positive'):
+      tfp.math.psd_kernels.ExponentiatedQuadratic(
+          2., -2., validate_args=True)
+      self.evaluate(k.apply([1.], [1.]))
 
     # But `None`'s are ok
     k = tfp.math.psd_kernels.ExponentiatedQuadratic(
         None, None, validate_args=True)
     self.evaluate(k.apply([1.], [1.]))
+
+  @test_util.jax_disable_variable_test
+  def testValidateVariableArgs(self):
+    amplitude = tf.Variable(1.)
+    length_scale = tf.Variable(1.)
+    k = tfp.math.psd_kernels.ExponentiatedQuadratic(amplitude, length_scale,
+                                                    validate_args=True)
+    self.evaluate([v.initializer for v in k.variables])
+
+    with self.assertRaisesOpError('must be positive'):
+      with tf.control_dependencies([amplitude.assign(-1.)]):
+        self.evaluate(k.apply([1.], [1.]))
+
+    with self.assertRaisesOpError('must be positive'):
+      with tf.control_dependencies([amplitude.assign(2.),
+                                    length_scale.assign(-1.)]):
+        self.evaluate(k.apply([3.], [3.]))
 
 
 if __name__ == '__main__':

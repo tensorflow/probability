@@ -30,7 +30,6 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.ops.linalg import linear_operator_util  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -90,8 +89,7 @@ def cholesky_concat(chol, cols, name=None):
     cols = tf.convert_to_tensor(cols, name='cols', dtype=dtype)
     n = prefer_static.shape(chol)[-1]
     mat_nm, mat_mm = cols[..., :n, :], cols[..., n:, :]
-    solved_nm = linear_operator_util.matrix_triangular_solve_with_broadcast(
-        chol, mat_nm)
+    solved_nm = tf.linalg.triangular_solve(chol, mat_nm)
     lower_right_mm = tf.linalg.cholesky(
         mat_mm - tf.matmul(solved_nm, solved_nm, adjoint_a=True))
     lower_left_mn = tf.math.conj(tf.linalg.matrix_transpose(solved_nm))
@@ -389,11 +387,9 @@ def lu_solve(lower_upper, perm, rhs,
     lower = tf.linalg.set_diag(
         tf.linalg.band_part(lower_upper, num_lower=-1, num_upper=0),
         tf.ones(tf.shape(lower_upper)[:-1], dtype=lower_upper.dtype))
-    return linear_operator_util.matrix_triangular_solve_with_broadcast(
+    return tf.linalg.triangular_solve(
         lower_upper,  # Only upper is accessed.
-        linear_operator_util.matrix_triangular_solve_with_broadcast(
-            lower, permuted_rhs),
-        lower=False)
+        tf.linalg.triangular_solve(lower, permuted_rhs), lower=False)
 
 
 def lu_matrix_inverse(lower_upper, perm, validate_args=False, name=None):

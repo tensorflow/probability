@@ -417,7 +417,7 @@ class LKJ(distribution.Distribution):
       concentration = (
           tf.convert_to_tensor(self.concentration
                                if concentration is None else concentration))
-      logpi = np.log(np.pi)
+      logpi = float(np.log(np.pi))
       ans = tf.zeros_like(concentration)
       for k in range(1, self.dimension):
         ans = ans + logpi * (k / 2.)
@@ -439,9 +439,6 @@ class LKJ(distribution.Distribution):
     answer = tf.eye(
         num_rows=self.dimension, batch_shape=batch,
         dtype=concentration.dtype)
-    # set_shape only necessary because tf.eye doesn't do it itself: b/111413915
-    shape = answer.shape[:-2].concatenate([self.dimension, self.dimension])
-    tensorshape_util.set_shape(answer, shape)
     return answer
 
   # TODO(b/146522000): The output of tfb.CorrelationCholesky() can have

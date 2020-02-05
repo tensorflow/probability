@@ -294,6 +294,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
       ValueError: If both or none of `shift_and_log_scale_fn` and `bijector_fn`
           are specified.
     """
+    parameters = dict(locals())
     name = name or 'masked_autoregressive_flow'
     with tf.name_scope(name) as name:
       self._unroll_loop = unroll_loop
@@ -321,6 +322,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
           forward_min_event_ndims=self._event_ndims,
           is_constant_jacobian=is_constant_jacobian,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   def _forward(self, x, **kwargs):

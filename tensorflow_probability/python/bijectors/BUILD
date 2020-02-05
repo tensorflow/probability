@@ -19,8 +19,8 @@
 # [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_library",
     "multi_substrate_py_test",
+    "multi_substrate_py_library",
 )
 
 licenses(["notice"])  # Apache 2.0
@@ -645,6 +645,7 @@ multi_substrate_py_library(
     srcs = ["sinh_arcsinh.py"],
     deps = [
         ":bijector",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
@@ -981,7 +982,6 @@ multi_substrate_py_test(
     name = "categorical_to_discrete_test",
     size = "small",
     srcs = ["categorical_to_discrete_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
@@ -1034,7 +1034,6 @@ multi_substrate_py_test(
     name = "correlation_cholesky_test",
     size = "medium",
     srcs = ["correlation_cholesky_test.py"],
-    jax_size = "large",
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
@@ -1042,8 +1041,14 @@ multi_substrate_py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:beta",
+        "//tensorflow_probability/python/distributions:cholesky_lkj",
         "//tensorflow_probability/python/distributions:lkj",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/mcmc:hmc",
+        "//tensorflow_probability/python/mcmc:sample",
+        "//tensorflow_probability/python/mcmc:transformed_kernel",
     ],
 )
 
@@ -1301,7 +1306,6 @@ multi_substrate_py_test(
     name = "permute_test",
     size = "small",
     srcs = ["permute_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
@@ -1376,7 +1380,6 @@ multi_substrate_py_test(
     name = "reshape_test",
     size = "small",
     srcs = ["reshape_test.py"],
-    jax_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",

@@ -57,10 +57,12 @@ class Expm1(bijector.Bijector):
   def __init__(self,
                validate_args=False,
                name='expm1'):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(Expm1, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @classmethod
@@ -88,7 +90,11 @@ class Log1p(invert.Invert):
   """Compute `Y = log1p(X)`. This is `Invert(Expm1())`."""
 
   def __init__(self, validate_args=False, name='log1p'):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       bij = Expm1(validate_args=validate_args)
       super(Log1p, self).__init__(
-          bijector=bij, validate_args=validate_args, name=name)
+          bijector=bij,
+          validate_args=validate_args,
+          parameters=parameters,
+          name=name)

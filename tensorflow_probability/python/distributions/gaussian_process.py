@@ -136,8 +136,10 @@ class GaussianProcess(distribution.Distribution):
 
   ```python
   import numpy as np
-  import tensorflow as tf
+  import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
+
+  tf.enable_v2_behavior()
 
   tfd = tfp.distributions
   psd_kernels = tfp.math.psd_kernels
@@ -178,22 +180,26 @@ class GaussianProcess(distribution.Distribution):
 
   # Define a kernel with trainable parameters.
   kernel = psd_kernels.ExponentiatedQuadratic(
-      amplitude=tf.get_variable('amplitude', shape=(), dtype=np.float64),
-      length_scale=tf.get_variable('length_scale', shape=(), dtype=np.float64))
+      amplitude=tf.Variable(1., dtype=np.float64, name='amplitude'),
+      length_scale=tf.Variable(1., dtype=np.float64, name='length_scale'))
 
   gp = tfd.GaussianProcess(kernel, observed_index_points)
-  neg_log_likelihood = -gp.log_prob(observed_values)
 
-  optimize = tf.train.AdamOptimizer().minimize(neg_log_likelihood)
+  optimizer = tf.optimizers.Adam()
 
-  with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
+  @tf.function
+  def optimize():
+    with tf.GradientTape() as tape:
+      loss = -gp.log_prob(observed_values)
+    grads = tape.gradient(loss, gp.trainable_variables)
+    optimizer.apply_gradients(zip(grads, gp.trainable_variables))
+    return loss
 
-    for i in range(1000):
-      _, neg_log_likelihood_ = sess.run([optimize, neg_log_likelihood])
-      if i % 100 == 0:
-        print("Step {}: NLL = {}".format(i, neg_log_likelihood_))
-    print("Final NLL = {}".format(neg_log_likelihood_))
+  for i in range(1000):
+    neg_log_likelihood = optimize()
+    if i % 100 == 0:
+      print("Step {}: NLL = {}".format(i, neg_log_likelihood))
+  print("Final NLL = {}".format(neg_log_likelihood))
   ```
 
   """

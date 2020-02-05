@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 from scipy import stats as sp_stats
 
@@ -157,27 +158,27 @@ class HalfNormalTest(test_util.TestCase):
     expected_x = sp_stats.halfnorm(scale=scale).ppf(p)
     self.assertAllClose(expected_x, self.evaluate(x), atol=0)
 
-  def testFiniteGradients(self):
-    for dtype in [np.float32, np.float64]:
-      scale = tf.Variable(dtype(3.0))
-      x = np.array([0.01, 0.1, 1., 5., 10.]).astype(dtype)
-      def half_normal_function(name, x):
-        def half_normal(scale):
-          return getattr(tfd.HalfNormal(scale=scale, validate_args=True), name)(
-              x)
+  @parameterized.parameters(np.float32, np.float64)
+  def testFiniteGradients(self, dtype):
+    scale = tf.Variable(dtype(3.0))
+    x = np.array([0.01, 0.1, 1., 5., 10.]).astype(dtype)
+    def half_normal_function(name, x):
+      def half_normal(scale):
+        return getattr(tfd.HalfNormal(scale=scale, validate_args=True), name)(
+            x)
 
-        return half_normal
+      return half_normal
 
-      self.evaluate(scale.initializer)
-      for func_name in [
-          'cdf', 'log_cdf', 'survival_function',
-          'log_prob', 'prob', 'log_survival_function',
-      ]:
-        print(func_name)
-        value, grads = self.evaluate(tfp.math.value_and_gradient(
-            half_normal_function(func_name, x), scale))
-        self.assertAllFinite(value)
-        self.assertAllFinite(grads)
+    self.evaluate(scale.initializer)
+    for func_name in [
+        'cdf', 'log_cdf', 'survival_function',
+        'log_prob', 'prob', 'log_survival_function',
+    ]:
+      print(func_name)
+      value, grads = self.evaluate(tfp.math.value_and_gradient(
+          half_normal_function(func_name, x), scale))
+      self.assertAllFinite(value)
+      self.assertAllFinite(grads)
 
   def testHalfNormalEntropy(self):
     scale = np.array([[1.0, 2.0, 3.0]])

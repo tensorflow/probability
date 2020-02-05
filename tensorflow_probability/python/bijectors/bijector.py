@@ -624,6 +624,7 @@ class Bijector(tf.Module):
                dtype=None,
                forward_min_event_ndims=None,
                inverse_min_event_ndims=None,
+               parameters=None,
                name=None):
     """Constructs Bijector.
 
@@ -655,6 +656,8 @@ class Bijector(tf.Module):
       inverse_min_event_ndims: Python `integer` indicating the minimum number of
         dimensions `inverse` operates on. Will be set to
         `forward_min_event_ndims` by default, if no value is provided.
+      parameters: Python `dict` of parameters used to instantiate this
+        `Bijector`.
       name: The name to give Ops created by the initializer.
 
     Raises:
@@ -670,6 +673,7 @@ class Bijector(tf.Module):
     name = name_util.strip_invalid_chars(name)
     super(Bijector, self).__init__(name=name)
     self._name = name
+    self._parameters = self._no_dependency(parameters)
 
     self._graph_parents = self._no_dependency(graph_parents or [])
 
@@ -776,6 +780,15 @@ class Bijector(tf.Module):
   def name(self):
     """Returns the string name of this `Bijector`."""
     return self._name
+
+  @property
+  def parameters(self):
+    """Dictionary of parameters used to instantiate this `Bijector`."""
+    # Remove "self", "__class__", or other special variables. These can appear
+    # if the subclass used:
+    # `parameters = dict(locals())`.
+    return {k: v for k, v in self._parameters.items()
+            if not k.startswith('__') and k != 'self'}
 
   def __call__(self, value, name=None, **kwargs):
     """Applies or composes the `Bijector`, depending on input type.

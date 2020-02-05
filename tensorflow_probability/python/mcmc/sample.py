@@ -106,8 +106,8 @@ def sample_chain(
   states with decreased autocorrelation.  See [Owen (2017)][1]. Such "thinning"
   is made possible by setting `num_steps_between_results > 0`. The chain then
   takes `num_steps_between_results` extra steps between the steps that make it
-  into the results. The extra steps are never materialized (in calls to
-  `sess.run`), and thus do not increase memory requirements.
+  into the results. The extra steps are never materialized, and thus do not
+  increase memory requirements.
 
   Warning: when setting a `seed` in the `kernel`, ensure that `sample_chain`'s
   `parallel_iterations=1`, otherwise results will not be reproducible.

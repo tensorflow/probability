@@ -27,9 +27,42 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import cholesky_lkj
 from tensorflow_probability.python.distributions import lkj
+from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc import hmc
+from tensorflow_probability.python.mcmc import sample
+from tensorflow_probability.python.mcmc import transformed_kernel
+
+
+# Bijector for converting the image of CorrelationCholesky bijector to
+# unconstrained space; by only considering the strictly lower triangular entries
+# of the output matrices.
+class OutputToUnconstrained(tfb.Bijector):
+
+  def __init__(self, name="output_to_unconstrained"):
+    parameters = dict(locals())
+    with tf.name_scope(name) as name:
+      super(OutputToUnconstrained, self).__init__(
+          validate_args=True,
+          forward_min_event_ndims=2,
+          inverse_min_event_ndims=1,
+          parameters=parameters,
+          name=name)
+
+  def _forward(self, x):
+    x = tf.convert_to_tensor(x)
+    # Remove the first row and last column so we can extract strictly
+    # lower triangular entries.
+    n = x.shape[-1]
+    t = tf.linalg.band_part(x[..., 1:, :-1], num_lower=n - 1, num_upper=0)
+    return tfb.FillTriangular().inverse(t)
+
+  def _inverse_log_det_jacobian(self, y):
+    return tf.zeros_like(y[..., 0])
 
 
 @test_util.test_all_tf_execution_regimes
@@ -50,7 +83,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
     x_ = self.evaluate(b.inverse(y))
     self.assertAllClose(x, x_, atol=1e-5, rtol=1e-5)
 
-    expected_fldj = -0.5 * np.sum([2, 3, 4] * np.log([2, 9, 100]))
+    expected_fldj = -0.5 * np.sum([3, 4, 5] * np.log([2, 9, 100]))
 
     fldj = self.evaluate(b.forward_log_det_jacobian(x, event_ndims=1))
     self.assertAllClose(expected_fldj, fldj)
@@ -77,7 +110,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
     self.assertAllClose(x, x_, atol=1e-5, rtol=1e-5)
 
     expected_fldj = -0.5 * np.sum(
-        [2, 3, 4] * np.log([[2, 9, 100], [2, 81, 36]]), axis=-1)
+        [3, 4, 5] * np.log([[2, 9, 100], [2, 81, 36]]), axis=-1)
 
     fldj = self.evaluate(b.forward_log_det_jacobian(x, event_ndims=1))
     self.assertAllClose(expected_fldj, fldj)
@@ -131,6 +164,73 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
       self.evaluate(
           b.inverse_event_shape_tensor(tensorshape_util.as_list(y_shape_bad)))
 
+  @test_util.test_graph_mode_only
+  def testSampleMarginals(self):
+    # Verify that the marginals of the LKJ distribution are distributed
+    # according to a (scaled) Beta distribution. The LKJ distributed samples are
+    # obtained by sampling a CholeskyLKJ distribution using HMC and the
+    # CorrelationCholesky bijector.
+    dim = 4
+    concentration = np.array(2.5, dtype=np.float64)
+    beta_concentration = np.array(.5 * dim + concentration - 1, np.float64)
+    beta_dist = beta.Beta(
+        concentration0=beta_concentration, concentration1=beta_concentration)
+
+    inner_kernel = hmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=cholesky_lkj.CholeskyLKJ(
+            dimension=dim, concentration=concentration).log_prob,
+        num_leapfrog_steps=3,
+        step_size=0.3,
+        seed=test_util.test_seed())
+
+    kernel = transformed_kernel.TransformedTransitionKernel(
+        inner_kernel=inner_kernel, bijector=tfb.CorrelationCholesky())
+
+    num_chains = 10
+    num_total_samples = 30000
+
+    # Make sure that we have enough samples to catch a wrong sampler to within
+    # a small enough discrepancy.
+    self.assertLess(
+        self.evaluate(
+            st.min_num_samples_for_dkwm_cdf_test(
+                discrepancy=0.04, false_fail_rate=1e-9, false_pass_rate=1e-9)),
+        num_total_samples)
+
+    @tf.function  # Ensure that MCMC sampling is done efficiently.
+    def sample_mcmc_chain():
+      return sample.sample_chain(
+          num_results=num_total_samples // num_chains,
+          num_burnin_steps=1000,
+          current_state=tf.eye(dim, batch_shape=[num_chains], dtype=tf.float64),
+          trace_fn=lambda _, pkr: pkr.inner_results.is_accepted,
+          kernel=kernel,
+          parallel_iterations=1)
+
+    # Draw samples from the HMC chains.
+    chol_lkj_samples, is_accepted = self.evaluate(sample_mcmc_chain())
+
+    # Ensure that the per-chain acceptance rate is high enough.
+    self.assertAllGreater(np.mean(is_accepted, axis=0), 0.8)
+
+    # Transform from Cholesky LKJ samples to LKJ samples.
+    lkj_samples = tf.matmul(chol_lkj_samples, chol_lkj_samples, adjoint_b=True)
+    lkj_samples = tf.reshape(lkj_samples, shape=[num_total_samples, dim, dim])
+
+    # Only look at the entries strictly below the diagonal which is achieved by
+    # the OutputToUnconstrained bijector. Also scale the marginals from the
+    # range [-1,1] to [0,1].
+    scaled_lkj_samples = .5 * (OutputToUnconstrained().forward(lkj_samples) + 1)
+
+    # Each of the off-diagonal marginals should be distributed according to a
+    # Beta distribution.
+    for i in range(dim * (dim - 1) // 2):
+      self.evaluate(
+          st.assert_true_cdf_equal_by_dkwm(
+              scaled_lkj_samples[..., i],
+              cdf=beta_dist.cdf,
+              false_fail_rate=1e-9))
+
   def testTheoreticalFldj(self):
     bijector = tfb.CorrelationCholesky()
     x = np.linspace(-50, 50, num=30).reshape(5, 6).astype(np.float64)
@@ -149,7 +249,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
         x,
         event_ndims=1,
         inverse_event_ndims=2,
-        output_to_unconstrained=tfb.Invert(tfb.FillTriangular()))
+        output_to_unconstrained=OutputToUnconstrained())
     self.assertAllClose(
         self.evaluate(fldj_theoretical),
         self.evaluate(fldj),
@@ -175,10 +275,10 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
         x_, self.evaluate(bijector.inverse(y)), atol=1e-5, rtol=1e-5)
 
     fldj = bijector.forward_log_det_jacobian(x, event_ndims=forward_event_ndims)
-    self.assertAllClose(-np.log(2), self.evaluate(fldj))
+    self.assertAllClose(-3 * 0.5 * np.log(2), self.evaluate(fldj))
 
     ildj = bijector.inverse_log_det_jacobian(y, event_ndims=inverse_event_ndims)
-    self.assertAllClose(np.log(2), ildj)
+    self.assertAllClose(3 * 0.5 * np.log(2), ildj)
 
   @parameterized.parameters(itertools.product([2, 3, 4, 5, 6, 7], [1., 2., 3.]))
   def testBijectiveWithLKJSamples(self, dimension, concentration):
@@ -210,7 +310,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
         concentration=np.float64(concentration),
         input_output_cholesky=True)
     batch_size = 10
-    y = self.evaluate(lkj_dist.sample([batch_size]))
+    y = self.evaluate(lkj_dist.sample([batch_size], seed=test_util.test_seed()))
     x = self.evaluate(bijector.inverse(y))
 
     fldj = bijector.forward_log_det_jacobian(x, event_ndims=1)
@@ -219,7 +319,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
         x,
         event_ndims=1,
         inverse_event_ndims=2,
-        output_to_unconstrained=tfb.Invert(tfb.FillTriangular()))
+        output_to_unconstrained=OutputToUnconstrained())
     self.assertAllClose(
         self.evaluate(fldj_theoretical),
         self.evaluate(fldj),

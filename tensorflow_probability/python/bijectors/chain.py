@@ -143,7 +143,11 @@ class Chain(bijector.Bijector):
 
   """
 
-  def __init__(self, bijectors=None, validate_args=False, name=None):
+  def __init__(self,
+               bijectors=None,
+               validate_args=False,
+               parameters=None,
+               name=None):
     """Instantiates `Chain` bijector.
 
     Args:
@@ -151,12 +155,15 @@ class Chain(bijector.Bijector):
         bijector equivalent to the `Identity` bijector.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
+      parameters: Locals dict captured by subclass constructor, to be used for
+        copy/slice re-instantiation operators.
       name: Python `str`, name given to ops managed by this object. Default:
         E.g., `Chain([Exp(), Softplus()]).name == "chain_of_exp_of_softplus"`.
 
     Raises:
       ValueError: if bijectors have different dtypes.
     """
+    parameters = dict(locals()) if parameters is None else parameters
     if name is None:
       name = ("identity" if not bijectors else
               "_of_".join(["chain"] + [b.name for b in bijectors]))
@@ -191,6 +198,7 @@ class Chain(bijector.Bijector):
           is_constant_jacobian=all(b.is_constant_jacobian for b in bijectors),
           validate_args=validate_args,
           dtype=dtype,
+          parameters=parameters,
           name=name)
 
   @property

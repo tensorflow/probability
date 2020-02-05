@@ -82,11 +82,11 @@ class WeibullCDFBijectorTest(test_util.TestCase):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       b = tfb.WeibullCDF(
           concentration=1., scale=-1., validate_args=True)
-      self.evaluate(b.forward(-3.))
+      self.evaluate(b.forward(3.))
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
       b = tfb.WeibullCDF(
           concentration=-1., scale=1., validate_args=True)
-      self.evaluate(b.forward(-3.))
+      self.evaluate(b.inverse(0.5))
 
   @test_util.jax_disable_variable_test
   def testVariableAssertsScale(self):
@@ -94,14 +94,10 @@ class WeibullCDFBijectorTest(test_util.TestCase):
     scale = tf.Variable(1.)
     b = tfb.WeibullCDF(
         concentration=concentration, scale=scale, validate_args=True)
-    # Use identities so that static asserts don't catch the error earlier
-    # and raise 'Forward transformation input must be at least 0'
-    minus_1 = tf.identity(tf.convert_to_tensor(-1.))
-    minus_3 = tf.identity(tf.convert_to_tensor(-3.))
     self.evaluate([concentration.initializer, scale.initializer])
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      with tf.control_dependencies([scale.assign(minus_1)]):
-        self.evaluate(b.forward(minus_3))
+      with tf.control_dependencies([scale.assign(-1.)]):
+        self.evaluate(b.forward(3.))
 
   @test_util.jax_disable_variable_test
   def testVariableAssertsConcentration(self):
@@ -109,14 +105,10 @@ class WeibullCDFBijectorTest(test_util.TestCase):
     scale = tf.Variable(1.)
     b = tfb.WeibullCDF(
         concentration=concentration, scale=scale, validate_args=True)
-    # Use identities so that static asserts don't catch the error earlier
-    # and raise 'Forward transformation input must be at least 0'
-    minus_1 = tf.identity(tf.convert_to_tensor(-1.))
-    minus_3 = tf.identity(tf.convert_to_tensor(-3.))
     self.evaluate([concentration.initializer, scale.initializer])
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
-      with tf.control_dependencies([concentration.assign(minus_1)]):
-        self.evaluate(b.forward(minus_3))
+      with tf.control_dependencies([concentration.assign(-1.)]):
+        self.evaluate(b.inverse(0.5))
 
 
 if __name__ == '__main__':

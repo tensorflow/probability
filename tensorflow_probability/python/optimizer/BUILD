@@ -39,6 +39,7 @@ py_library(
         ":proximal_hessian_sparse",
         ":sgld",
         ":variational_sgd",
+        "//tensorflow_probability/python/optimizer/convergence_criteria",
         "//tensorflow_probability/python/optimizer/linesearch",
     ],
 )
@@ -55,7 +56,7 @@ py_library(
 
 py_test(
     name = "sgld_test",
-    size = "small",
+    size = "medium",
     srcs = ["sgld_test.py"],
     deps = [
         # numpy dep,

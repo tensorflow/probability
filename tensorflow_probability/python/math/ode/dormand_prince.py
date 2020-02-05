@@ -292,7 +292,7 @@ class DormandPrince(base.Solver):
               _, solver_internal_state, diagnostics, solutions_arrays
           ] = tf.while_loop(iterate_cond, advance_to_solution_time, [
               0, solver_internal_state, diagnostics, solutions_arrays
-          ], back_prop=False)
+          ])
 
         times = times_array.stack()
         stack_components = lambda x: x.stack()
@@ -542,7 +542,7 @@ def _dense_solutions_to_final_time(
       solver_state, diagnostics, solutions_arrays, times_array
   ] = tf.while_loop(step_cond, step_and_record, [
       solver_state, diagnostics, solutions_arrays, times_array
-  ], back_prop=False)
+  ])
   # Interpolating the last time point, updating the state and write results.
   y, coefficients = _interpolate_solution_at(
       final_time, solver_state, validate_args)
@@ -603,7 +603,7 @@ def _advance_to_solution_time(
       return times_array[time_id] >= solver_state.current_time
 
     solver_state, diagnostics = tf.while_loop(
-        step_cond, step_fn, (solver_state, diagnostics), back_prop=False)
+        step_cond, step_fn, (solver_state, diagnostics))
     y, _ = _interpolate_solution_at(
         times_array[time_id], solver_state, validate_args)
     solutions_arrays = _write_solution_components(y, solutions_arrays, time_id)

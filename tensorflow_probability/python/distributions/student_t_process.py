@@ -118,8 +118,10 @@ class StudentTProcess(distribution.Distribution):
 
   ```python
   import numpy as np
-  import tensorflow as tf
+  import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
+
+  tf.enable_v2_behavior()
 
   tfd = tfp.distributions
   psd_kernels = tfp.math.psd_kernels
@@ -133,7 +135,7 @@ class StudentTProcess(distribution.Distribution):
   # Define a kernel with default parameters.
   kernel = psd_kernels.ExponentiatedQuadratic()
 
-  tp = tfd.StudentTProcess(df=3., kernel, index_points)
+  tp = tfd.StudentTProcess(3., kernel, index_points)
 
   samples = tp.sample(10)
   # ==> 10 independently drawn, joint samples at `index_points`
@@ -142,7 +144,7 @@ class StudentTProcess(distribution.Distribution):
       df=3.,
       kernel=kernel,
       index_points=index_points)
-  noisy_samples = noise_tp.sample(10)
+  noisy_samples = noisy_tp.sample(10)
   # ==> 10 independently drawn, noisy joint samples at `index_points`
   ```
 
@@ -158,27 +160,33 @@ class StudentTProcess(distribution.Distribution):
   # Squeeze to take the shape from [50, 1] to [50].
   observed_values = f(observed_index_points)
 
-  amplitude=tf.get_variable('amplitude', np.float32)
-  length_scale=tf.get_variable('length_scale', np.float32)
+  amplitude = tfp.util.TransformedVariable(
+      1., tfp.bijectors.Softplus(), dtype=np.float64, name='amplitude')
+  length_scale = tfp.util.TransformedVariable(
+      1., tfp.bijectors.Softplus(), dtype=np.float64, name='length_scale')
 
   # Define a kernel with trainable parameters.
   kernel = psd_kernels.ExponentiatedQuadratic(
-      amplitude=tf.math.softplus(amplitude),
-      length_scale=tf.math.softplus(length_scale))
+      amplitude=amplitude,
+      length_scale=length_scale)
 
-  tp = tfp.StudentTProcess(df=3., kernel, observed_index_points)
-  neg_log_likelihood = -tp.log_prob(observed_values)
+  tp = tfd.StudentTProcess(3., kernel, observed_index_points)
 
-  optimize = tf.train.AdamOptimize().minimize(neg_log_likelihood)
+  optimizer = tf.optimizers.Adam()
 
-  with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
+  @tf.function
+  def optimize():
+    with tf.GradientTape() as tape:
+      loss = -tp.log_prob(observed_values)
+    grads = tape.gradient(loss, tp.trainable_variables)
+    optimizer.apply_gradients(zip(grads, tp.trainable_variables))
+    return loss
 
-    for i in range(1000):
-      _, nll_ = sess.run([optimize, nll])
-      if i % 100 == 0:
-        print("Step {}: NLL = {}".format(i, nll_))
-    print("Final NLL = {}".format(nll_))
+  for i in range(1000):
+    nll = optimize()
+    if i % 100 == 0:
+      print("Step {}: NLL = {}".format(i, nll))
+  print("Final NLL = {}".format(nll))
   ```
 
   #### References

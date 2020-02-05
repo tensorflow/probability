@@ -15,11 +15,10 @@
 # Description:
 #   Statistical Ops.
 
-# [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_library",
     "multi_substrate_py_test",
+    "multi_substrate_py_library",
 )
 
 package(
@@ -36,11 +35,6 @@ multi_substrate_py_library(
     name = "stats",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    substrates_omit_deps = [
-        ":calibration",
-        ":quantiles",
-        ":ranking",
-    ],
     deps = [
         ":calibration",
         ":leave_one_out",
@@ -65,10 +59,11 @@ multi_substrate_py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "leave_one_out_test",
     size = "small",
     srcs = ["leave_one_out_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -88,10 +83,12 @@ multi_substrate_py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "moving_stats_test",
     size = "medium",
     srcs = ["moving_stats_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -100,7 +97,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "ranking",
     srcs = ["ranking.py"],
     srcs_version = "PY2AND3",
@@ -111,10 +108,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "ranking_test",
     size = "medium",
     srcs = ["ranking_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -145,6 +144,7 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["sample_stats_test.py"],
     numpy_tags = ["notap"],
+    shard_count = 5,
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -153,7 +153,7 @@ multi_substrate_py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "quantiles",
     srcs = ["quantiles.py"],
     srcs_version = "PY2AND3",
@@ -168,10 +168,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "quantiles_test",
     size = "medium",
     srcs = ["quantiles_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -180,7 +182,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "calibration",
     srcs = ["calibration.py"],
     srcs_version = "PY2AND3",
@@ -193,10 +195,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "calibration_test",
     size = "small",
     srcs = ["calibration_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/logging dep,
         # absl/testing:parameterized dep,
@@ -208,11 +212,14 @@ py_test(
 )
 
 exports_files(
-    ["leave_one_out.py"],
-    visibility = ["//tensorflow_probability:__subpackages__"],
-)
-
-exports_files(
-    ["moving_stats.py"],
+    [
+        "__init__.py",
+        "calibration.py",
+        "leave_one_out.py",
+        "moving_stats.py",
+        "quantiles.py",
+        "ranking.py",
+        "sample_stats.py",
+    ],
     visibility = ["//tensorflow_probability:__subpackages__"],
 )

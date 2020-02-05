@@ -200,7 +200,7 @@ class NutsTest(test_util.TestCase):
     sigmoid_beta_dist = tfb.Identity(tfb.Sigmoid())(
         tfd.Beta(concentration0=1., concentration1=2.))
     self.evaluate(assert_univariate_target_conservation(
-        self, sigmoid_beta_dist, step_size=0.02))
+        self, sigmoid_beta_dist, step_size=1e-3))
 
   @parameterized.parameters(
       (3, 50000,),
