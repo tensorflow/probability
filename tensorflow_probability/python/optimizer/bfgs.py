@@ -78,6 +78,7 @@ def minimize(value_and_gradients_function,
              max_iterations=50,
              parallel_iterations=1,
              stopping_condition=None,
+             validate_args=True,
              name=None):
   """Applies the BFGS algorithm to minimize a differentiable function.
 
@@ -161,6 +162,10 @@ def minimize(value_and_gradients_function,
       which only stops when all batch members have either converged or failed.
       An alternative is tfp.optimizer.converged_any which stops as soon as one
       batch member has converged, or when all have failed.
+    validate_args: Python `bool`, default `True`. When `True` optimizer
+      parameters are checked for validity despite possibly degrading runtime
+      performance. When `False` invalid inputs may silently render incorrect
+      outputs.
     name: (Optional) Python str. The name prefixed to the ops created by this
       function. If not supplied, the default name 'minimize' is used.
 
@@ -226,7 +231,10 @@ def minimize(value_and_gradients_function,
           initial_inverse_hessian_estimate,
           dtype=dtype,
           name='initial_inv_hessian')
-      control_inputs = _inv_hessian_control_inputs(initial_inv_hessian)
+      if validate_args:
+        control_inputs = _inv_hessian_control_inputs(initial_inv_hessian)
+      else:
+        control_inputs = None
       hessian_shape = tf.concat([batch_shape, [domain_size, domain_size]], 0)
       initial_inv_hessian = tf.broadcast_to(initial_inv_hessian, hessian_shape)
 

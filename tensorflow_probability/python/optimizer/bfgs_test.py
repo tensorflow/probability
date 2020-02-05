@@ -101,6 +101,11 @@ class BfgsTest(test_util.TestCase):
           quadratic, initial_position=start, tolerance=1e-8,
           initial_inverse_hessian_estimate=bad_inv_hessian))
 
+    # simply checking that this runs
+    _ = self.evaluate(tfp.optimizer.bfgs_minimize(
+        quadratic, initial_position=start, tolerance=1e-8,
+        initial_inverse_hessian_estimate=bad_inv_hessian, validate_args=False))
+
   def test_asymmetric_inverse_hessian_spec(self):
     """Checks that specifying a asymmetric inverse hessian fails."""
     minimum = np.array([1.0, 1.0], dtype=np.float32)
