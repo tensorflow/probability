@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -402,13 +403,18 @@ def histogram(x,
     return counts
 
 
+@deprecation.deprecated_args(
+    '2020-05-03',
+    '`keep_dims` is deprecated, use `keepdims` instead.',
+    'keep_dims')
 def percentile(x,
                q,
                axis=None,
                interpolation=None,
-               keep_dims=False,
+               keepdims=False,
                validate_args=False,
                preserve_gradients=True,
+               keep_dims=None,
                name=None):
   """Compute the `q`-th percentile(s) of `x`.
 
@@ -445,7 +451,7 @@ def percentile(x,
         * nearest: `i` or `j`, whichever is nearest.
         * midpoint: (i + j) / 2.
       `linear` and `midpoint` interpolation do not work with integer dtypes.
-    keep_dims:  Python `bool`. If `True`, the last dimension is kept with size 1
+    keepdims:  Python `bool`. If `True`, the last dimension is kept with size 1
       If `False`, the last dimension is removed from the output shape.
     validate_args:  Whether to add runtime checks of argument validity. If
       False, and arguments are incorrect, correct behavior is not guaranteed.
@@ -453,6 +459,7 @@ def percentile(x,
       the percentile `q` is preserved in the case of linear interpolation.
       If `False`, the gradient will be (incorrectly) zero when `q` corresponds
       to a point in `x`.
+    keep_dims: deprecated, use keepdims instead.
     name:  A Python string name to give this `Op`.  Default is 'percentile'
 
   Returns:
@@ -497,6 +504,8 @@ def percentile(x,
   ```
 
   """
+  keepdims = keepdims if keep_dims is None else keep_dims
+  del keep_dims
   name = name or 'percentile'
   allowed_interpolations = {'linear', 'lower', 'higher', 'nearest', 'midpoint'}
 
@@ -607,14 +616,14 @@ def percentile(x,
       gathered_y = tf.where(nan_batch_members, nan, gathered_y)
 
     # Expand dimensions if requested
-    if keep_dims:
+    if keepdims:
       if axis is None:
         ones_vec = tf.ones(
             shape=[_get_best_effort_ndims(x) + _get_best_effort_ndims(q)],
             dtype=tf.int32)
         gathered_y *= tf.ones(ones_vec, dtype=x.dtype)
       else:
-        gathered_y = _insert_back_keep_dims(gathered_y, axis)
+        gathered_y = _insert_back_keepdims(gathered_y, axis)
 
     # If q is a scalar, then result has the right shape.
     # If q is a vector, then result has trailing dim of shape q.shape, which
@@ -622,12 +631,17 @@ def percentile(x,
     return distribution_util.rotate_transpose(gathered_y, tf.rank(q))
 
 
+@deprecation.deprecated_args(
+    '2020-05-03',
+    '`keep_dims` is deprecated, use `keepdims` instead.',
+    'keep_dims')
 def quantiles(x,
               num_quantiles,
               axis=None,
               interpolation=None,
-              keep_dims=False,
+              keepdims=False,
               validate_args=False,
+              keep_dims=None,
               name=None):
   """Compute quantiles of `x` along `axis`.
 
@@ -665,16 +679,17 @@ def quantiles(x,
         * nearest: `i` or `j`, whichever is nearest.
         * midpoint: (i + j) / 2. `linear` and `midpoint` interpolation do not
           work with integer dtypes.
-    keep_dims:  Python `bool`. If `True`, the last dimension is kept with size 1
+    keepdims:  Python `bool`. If `True`, the last dimension is kept with size 1
       If `False`, the last dimension is removed from the output shape.
     validate_args:  Whether to add runtime checks of argument validity. If
       False, and arguments are incorrect, correct behavior is not guaranteed.
+    keep_dims: deprecated, use keepdims instead.
     name:  A Python string name to give this `Op`.  Default is 'percentile'
 
   Returns:
     cut_points:  A `rank(x) + 1 - len(axis)` dimensional `Tensor` with same
     `dtype` as `x` and shape `[num_quantiles + 1, ...]` where the trailing shape
-    is that of `x` without the dimensions in `axis` (unless `keep_dims is True`)
+    is that of `x` without the dimensions in `axis` (unless `keepdims is True`)
 
   Raises:
     ValueError:  If argument 'interpolation' is not an allowed type.
@@ -702,6 +717,8 @@ def quantiles(x,
   ```
 
   """
+  keepdims = keepdims if keep_dims is None else keep_dims
+  del keep_dims
   with tf.name_scope(name or 'quantiles'):
     x = tf.convert_to_tensor(x, name='x')
     return percentile(
@@ -716,7 +733,7 @@ def quantiles(x,
             num=num_quantiles + 1),
         axis=axis,
         interpolation=interpolation,
-        keep_dims=keep_dims,
+        keepdims=keepdims,
         validate_args=validate_args,
         preserve_gradients=False)
 
@@ -797,7 +814,7 @@ def _get_best_effort_ndims(x,
   return tf.rank(x)
 
 
-def _insert_back_keep_dims(x, axis):
+def _insert_back_keepdims(x, axis):
   """Insert the dims in `axis` back as singletons after being removed.
 
   Args:
