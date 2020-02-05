@@ -1034,15 +1034,21 @@ multi_substrate_py_test(
     name = "correlation_cholesky_test",
     size = "medium",
     srcs = ["correlation_cholesky_test.py"],
-    jax_size = "large",
+    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:beta",
+        "//tensorflow_probability/python/distributions:cholesky_lkj",
         "//tensorflow_probability/python/distributions:lkj",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/mcmc:hmc",
+        "//tensorflow_probability/python/mcmc:sample",
+        "//tensorflow_probability/python/mcmc:transformed_kernel",
     ],
 )
 
