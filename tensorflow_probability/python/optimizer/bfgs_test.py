@@ -101,6 +101,11 @@ class BfgsTest(test_util.TestCase):
           quadratic, initial_position=start, tolerance=1e-8,
           initial_inverse_hessian_estimate=bad_inv_hessian))
 
+    # simply checking that this runs
+    _ = self.evaluate(tfp.optimizer.bfgs_minimize(
+        quadratic, initial_position=start, tolerance=1e-8,
+        initial_inverse_hessian_estimate=bad_inv_hessian, validate_args=False))
+
   def test_asymmetric_inverse_hessian_spec(self):
     """Checks that specifying a asymmetric inverse hessian fails."""
     minimum = np.array([1.0, 1.0], dtype=np.float32)
@@ -182,7 +187,7 @@ class BfgsTest(test_util.TestCase):
     self.assertTrue(results.converged)
     final_gradient = results.objective_gradient
     final_gradient_norm = _norm(final_gradient)
-    print (final_gradient_norm)
+    print(final_gradient_norm)
     self.assertLessEqual(final_gradient_norm, 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
@@ -253,7 +258,7 @@ class BfgsTest(test_util.TestCase):
       start = tf.constant(start, dtype=dtype)
       results = self.evaluate(tfp.optimizer.bfgs_minimize(
           himmelblau, initial_position=start, tolerance=1e-8))
-      print (results)
+      print(results)
       self.assertTrue(results.converged)
       self.assertArrayNear(results.position,
                            np.array(expected_minima, dtype=dtype),
