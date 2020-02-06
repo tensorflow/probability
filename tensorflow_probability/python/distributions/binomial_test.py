@@ -201,6 +201,21 @@ class BinomialTest(test_util.TestCase):
     self.assertEqual((3,), binom.mode().shape)
     self.assertAllClose(expected_modes, self.evaluate(binom.mode()))
 
+  def testBinomialModeExtremeValues(self):
+    n = [51., 52.]
+
+    p = 1.
+    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    expected_modes = n
+    self.assertEqual((2,), binom.mode().shape)
+    self.assertAllClose(expected_modes, self.evaluate(binom.mode()))
+
+    p = 0.
+    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    expected_modes = [0., 0.]
+    self.assertEqual((2,), binom.mode().shape)
+    self.assertAllClose(expected_modes, self.evaluate(binom.mode()))
+
   def testBinomialMultipleMode(self):
     n = 9.
     p = [0.1, 0.2, 0.7]

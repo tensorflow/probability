@@ -277,8 +277,11 @@ class Binomial(distribution.Distribution):
       `(1 + total_count) * probs - 1` are both modes. Here we return only the
       larger of the two modes.""")
   def _mode(self):
-    return tf.floor(
-        (1. + self._total_count) * self._probs_parameter_no_checks())
+    total_count = tf.convert_to_tensor(self._total_count)
+    return tf.math.minimum(
+        total_count,
+        tf.floor(
+            (1. + total_count) * self._probs_parameter_no_checks()))
 
   def logits_parameter(self, name=None):
     """Logits computed from non-`None` input arg (`probs` or `logits`)."""
