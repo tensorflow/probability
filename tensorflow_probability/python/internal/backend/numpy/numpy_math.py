@@ -27,6 +27,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import _reverse
+from tensorflow_probability.python.internal.backend.numpy.numpy_array import one_hot
 from tensorflow_probability.python.internal.backend.numpy.ops import _convert_to_tensor
 from tensorflow_probability.python.internal.backend.numpy.ops import _custom_gradient
 
@@ -61,7 +62,7 @@ __all__ = [
     'betainc',
     'bincount',
     'ceil',
-    # 'confusion_matrix',
+    'confusion_matrix',
     'conj',
     'cos',
     'cosh',
@@ -159,7 +160,7 @@ __all__ = [
     # 'unsorted_segment_min',
     # 'unsorted_segment_prod',
     # 'unsorted_segment_sqrt_n',
-    # 'unsorted_segment_sum',
+    'unsorted_segment_sum',
     'xdivy',
     'xlogy',
     'xlog1py',
@@ -188,7 +189,39 @@ def _astuple(x):
 
 def _bincount(arr, weights=None, minlength=None, maxlength=None,  # pylint: disable=unused-argument
               dtype=tf.int32, name=None):  # pylint: disable=unused-argument
-  return np.bincount(arr, weights, minlength).astype(utils.numpy_dtype(dtype))
+  """Counts number of occurences of each value in `arr`."""
+  if not JAX_MODE:
+    return np.bincount(arr, weights, minlength).astype(utils.numpy_dtype(dtype))
+
+  dtype = utils.numpy_dtype(dtype)
+  num_buckets = np.max(arr) + 1
+  if minlength is not None:
+    num_buckets = np.maximum(num_buckets, minlength)
+  if maxlength is not None:
+    num_buckets = np.minimum(num_buckets, maxlength)
+  one_hots = one_hot(arr, num_buckets)
+  # Reduce over every dimension except the last one.
+  axes = tuple(range(0, one_hots.ndim - 1))
+  if weights is not None:
+    return np.sum(
+        one_hots * weights[..., np.newaxis], axis=axes).astype(dtype)
+  return np.sum(one_hots, axis=axes).astype(dtype)
+
+
+def _confusion_matrix(
+    labels, predictions, num_classes=None, weights=None,
+    dtype=tf.int32, name=None):
+  """Return confusion matrix between predictions and labels."""
+  del name
+  if num_classes is None:
+    num_classes = np.maximum(np.max(predictions), np.max(labels)) + 1
+  cmatrix = np.zeros([num_classes, num_classes], dtype=utils.numpy_dtype(dtype))
+  if weights is None:
+    weights = 1
+  if not JAX_MODE:
+    np.add.at(cmatrix, [labels, predictions], weights)
+    return cmatrix
+  return jax.ops.index_add(cmatrix, [labels, predictions], weights)
 
 
 def _cumop(op, x, axis=0, exclusive=False, reverse=False, initial_value=None):
@@ -274,6 +307,14 @@ def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argume
   return (-np.sort(-input, axis=-1)[..., :k],
           (n - (np.argsort(input[..., ::-1],
                            kind='stable', axis=-1)[..., ::-1]))[..., :k])
+
+
+def _unsorted_segment_sum(data, segment_ids, num_segments, name=None):
+  del name
+  if not JAX_MODE:
+    raise NotImplementedError
+  sums = np.zeros(num_segments)
+  return jax.ops.index_add(sums, jax.ops.index[segment_ids], data)
 
 
 # --- Begin Public Functions --------------------------------------------------
@@ -362,17 +403,14 @@ betainc = utils.copy_docstring(
     lambda a, b, x, name=None: scipy_special.betainc(a, b, x))
 
 bincount = utils.copy_docstring(
-    tf.math.bincount,
-    _bincount)
+    tf.math.bincount, _bincount)
 
 ceil = utils.copy_docstring(
     tf.math.ceil,
     lambda x, name=None: np.ceil(x))
 
-# confusion_matrix = utils.copy_docstring(
-#     tf.math.confusion_matrix,
-#     lambda labels, predictions, num_classes=None, weights=None,
-#     dtype=tf.int32, name=None: ...)
+confusion_matrix = utils.copy_docstring(
+    tf.math.confusion_matrix, _confusion_matrix)
 
 conj = utils.copy_docstring(
     tf.math.conj,
@@ -855,10 +893,9 @@ truediv = utils.copy_docstring(
 #     lambda data, segment_ids, num_segments, name=None: (
 #         np.unsorted_segment_sqrt_n))
 
-# unsorted_segment_sum = utils.copy_docstring(
-#     tf.math.unsorted_segment_sum,
-#     lambda data, segment_ids, num_segments, name=None: (
-#         np.unsorted_segment_sum))
+unsorted_segment_sum = utils.copy_docstring(
+    tf.math.unsorted_segment_sum,
+    _unsorted_segment_sum)
 
 xdivy = utils.copy_docstring(
     tf.math.xdivy,

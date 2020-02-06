@@ -308,6 +308,52 @@ def gamma_params():
 
 
 @hps.composite
+def bincount_params(draw):
+  num_buckets = draw(hps.integers(2, 20))
+  minlength = draw(hps.one_of(
+      hps.just(None),
+      hps.integers(num_buckets, num_buckets + 3),
+  ))
+  arr = draw(single_arrays(dtype=np.int32,
+                           shape=hps.just(tuple()),
+                           batch_shape=(num_buckets,),
+                           elements=hps.integers(
+                               0, num_buckets - 1)))
+  weights = draw(hps.one_of(
+      hps.just(None),
+      single_arrays(dtype=np.int32,
+                    shape=hps.just(tuple()),
+                    batch_shape=(num_buckets,),
+                    elements=hps.integers(0, 4))))
+  return arr, weights, minlength
+
+
+@hps.composite
+def confusion_matrix_params(draw):
+  num_labels = draw(hps.integers(1, 8))
+  labels = draw(single_arrays(
+      dtype=np.int32,
+      shape=hps.just(tuple()),
+      batch_shape=(num_labels,),
+      elements=hps.integers(0, num_labels - 1)))
+  predictions = draw(single_arrays(
+      dtype=np.int32,
+      shape=hps.just(tuple()),
+      batch_shape=(num_labels,),
+      elements=hps.integers(0, num_labels - 1)))
+  num_classes = draw(hps.one_of(
+      hps.just(None),
+      hps.integers(num_labels, num_labels + 3)))
+  weights = draw(hps.one_of(
+      hps.just(None),
+      single_arrays(dtype=np.int32,
+                    shape=hps.just(tuple()),
+                    batch_shape=(num_labels,),
+                    elements=hps.integers(0, 4))))
+  return labels, predictions, num_classes, weights
+
+
+@hps.composite
 def gather_params(draw):
   params_shape = shapes(min_dims=1)
   params = draw(single_arrays(shape=params_shape))
@@ -389,6 +435,24 @@ def top_k_params(draw):
 
 
 @hps.composite
+def histogram_fixed_width_bins_params(draw):
+  values = draw(single_arrays(
+      dtype=np.float32,
+      shape=shapes(min_dims=1),
+      elements=hps.floats(min_value=-1e5, max_value=1e5)
+  ))
+  vmin, vmax = np.min(values), np.max(values)
+  value_min = draw(hps.one_of(
+      hps.just(vmin),
+      hps.just(vmin - 3))).astype(np.float32)
+  value_max = draw(hps.one_of(
+      hps.just(vmax),
+      hps.just(vmax + 3))).astype(np.float32)
+  nbins = draw(hps.integers(2, 10))
+  return values, [value_min, value_max], nbins
+
+
+@hps.composite
 def sparse_xent_params(draw):
   num_classes = draw(hps.integers(1, 6))
   batch_shape = draw(shapes(min_dims=1))
@@ -427,7 +491,6 @@ def xent_params(draw):
 # broadcast_to
 # math.accumulate_n
 # math.betainc
-# math.bincount
 # math.igamma
 # math.igammac
 # math.lbeta
@@ -530,8 +593,8 @@ NUMPY_TEST_CASES = [
     #         varargs=None,
     #         keywords=None,
     #         defaults=(None, None, None, tf.int32, None))
-    TestCase('math.bincount', []),
-
+    TestCase('math.bincount', [bincount_params()]),
+    TestCase('math.confusion_matrix', [confusion_matrix_params()]),
     TestCase('math.top_k', [top_k_params()]),
 
     # ArgSpec(args=['chol', 'rhs', 'name'], varargs=None, keywords=None,
@@ -831,6 +894,10 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('searchsorted', [searchsorted_params()]),
     TestCase('one_hot', [one_hot_params()]),
     TestCase('slice', [sliceable_and_slices()]),
+
+    # Misc
+    TestCase('histogram_fixed_width_bins',
+             [histogram_fixed_width_bins_params()]),
 ]
 
 

@@ -233,7 +233,7 @@ def _compute_calibration_bin_statistics(
   # Collect predicted probabilities of decisions
   pred = tf.nn.softmax(logits, axis=1)
   prob_y = tf.gather(
-      pred, pred_y[:, tf.newaxis], batch_dims=-1)  # p(pred_y | x)
+      pred, pred_y[:, tf.newaxis], batch_dims=1)  # p(pred_y | x)
   prob_y = tf.reshape(prob_y, (tf.size(prob_y),))
 
   # Compute b/z histogram statistics:

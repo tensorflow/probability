@@ -619,7 +619,7 @@ class PercentileTestWithLinearInterpolation(
 
   def test_grads_at_sample_pts_with_yes_preserve_gradients(self):
     dist = tfp.distributions.Normal(np.float64(0), np.float64(1))
-    x = dist.sample(10001, seed=0)
+    x = dist.sample(10001, seed=test_util.test_seed())
     # 50th quantile will lie exactly on a data point.
     # 49.123... will not
     q = tf.constant(np.array([50, 49.123456789]))  # Percentiles, in [0, 100]
