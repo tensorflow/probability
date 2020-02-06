@@ -1811,7 +1811,7 @@ class VariationalGaussianProcess(DistributionLambda):
       mean_fn=None,
       jitter=1e-6,
       convert_to_tensor_fn=tfd.Distribution.sample,
-      name=None):
+      **kwargs):
     """Construct a VariationalGaussianProcess Layer.
 
     Args:
@@ -1846,8 +1846,7 @@ class VariationalGaussianProcess(DistributionLambda):
       convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
         instance and returns a `tf.Tensor`-like object. For examples, see
         `class` docstring.
-      name: name to give to this layer and the scope of ops and variables it
-        contains.
+      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
@@ -1866,7 +1865,8 @@ class VariationalGaussianProcess(DistributionLambda):
                 self._unconstrained_observation_noise_variance),
             jitter=self._jitter),
         convert_to_tensor_fn=convert_to_tensor_fn,
-        dtype=kernel_provider.dtype)
+        dtype=kernel_provider.dtype,
+        **kwargs)
 
     tmp_kernel = kernel_provider.kernel
     self._dtype = tmp_kernel.dtype.as_numpy_dtype
