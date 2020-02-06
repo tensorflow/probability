@@ -331,7 +331,7 @@ class ConvVariational(object):
     bias_divergence = MockKLDivergence(
         result=tf.random.uniform([], seed=seed()))
 
-    tf1.set_random_seed(5995)
+    tf.random.set_seed(5995)
     layer = layer_class(
         filters=filters,
         kernel_size=kernel_size,
@@ -428,7 +428,7 @@ class ConvVariational(object):
            depth=depth, height=height, width=width, channels=channels,
            filters=filters, seed=44)
 
-      tf1.set_random_seed(5995)
+      tf.random.set_seed(5995)
 
       convolution_op = nn_ops.Convolution(
           tf.TensorShape(inputs.shape),

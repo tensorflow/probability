@@ -290,7 +290,7 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
   dtype = np.float32
   num_samples = 500
   dims = 10
-  tf.compat.v1.random.set_random_seed(10014)
+  tf.random.set_seed(10014)
   np.random.seed(10014)
 
   weights_prior_true_scale = np.array(0.3, dtype)
@@ -615,7 +615,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       # TODO(b/68017812): Re-enable once TFE supports `tf.random_shuffle` seed.
       raise NotImplementedError('Specifying a `seed` when running eagerly is '
                                 'not currently supported. To run in Eager '
-                                'mode with a seed, use `tf.set_random_seed`.')
+                                'mode with a seed, use `tf.random.set_seed`.')
     if not store_parameters_in_results:
       mcmc_util.warn_if_parameters_are_not_simple_tensors(
           dict(step_size=step_size, num_leapfrog_steps=num_leapfrog_steps))

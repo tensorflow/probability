@@ -33,7 +33,7 @@ class LeapfrogIntegratorTest(test_util.TestCase):
     self._shape_param = 5.
     self._rate_param = 10.
 
-    tf1.random.set_random_seed(10003)
+    tf.random.set_seed(10003)
     np.random.seed(10003)
 
   def assertAllFinite(self, x):
@@ -53,12 +53,12 @@ class LeapfrogIntegratorTest(test_util.TestCase):
         self._shape_param * x - self._rate_param * tf.exp(x),
         axis=event_dims)
 
-  def _integrator_conserves_energy(self, x, independent_chain_ndims):
+  def _integrator_conserves_energy(self, x, independent_chain_ndims, seed):
     event_dims = tf.range(independent_chain_ndims, tf.rank(x))
 
     target_fn = lambda x: self._log_gamma_log_prob(x, event_dims)
 
-    m = tf.random.normal(tf.shape(x))
+    m = tf.random.normal(tf.shape(x), seed=seed)
     log_prob_0 = target_fn(x)
     old_energy = -log_prob_0 + 0.5 * tf.reduce_sum(m**2., axis=event_dims)
 
@@ -91,8 +91,12 @@ class LeapfrogIntegratorTest(test_util.TestCase):
       independent_chain_ndims: Python `int` scalar representing the number of
         dims associated with independent chains.
     """
-    x = tf.constant(np.random.rand(50, 10, 2), np.float32)
-    self._integrator_conserves_energy(x, independent_chain_ndims)
+    seed_stream = test_util.test_seed_stream()
+    x = self.evaluate(0.1 * tf.random.normal(
+        shape=(50, 10, 2), seed=seed_stream()))
+    x = tf.constant(x)
+    self._integrator_conserves_energy(
+        x, independent_chain_ndims, seed=seed_stream())
 
   def testIntegratorEnergyConservationNullShape(self):
     self._integrator_conserves_energy_wrapper(0)

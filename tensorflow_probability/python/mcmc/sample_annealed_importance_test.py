@@ -31,8 +31,10 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 
 
-_maybe_seed = lambda s: tf1.set_random_seed(s) if tf.executing_eagerly(
-) else s
+def _maybe_seed(s):
+  if tf.executing_eagerly():
+    return tf.random.set_seed(s)
+  return s
 
 
 @test_util.test_all_tf_execution_regimes
@@ -42,7 +44,7 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
     self._shape_param = 5.
     self._rate_param = 10.
 
-    tf1.random.set_random_seed(10003)
+    tf.random.set_seed(10003)
     np.random.seed(10003)
 
   def _log_gamma_log_prob(self, x, event_dims=()):

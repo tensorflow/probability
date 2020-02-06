@@ -22,7 +22,6 @@ from absl import logging
 from absl.testing import parameterized
 
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -49,7 +48,7 @@ def _set_seed():
   # TODO(b/68017812): Deprecate once TFE supports seed.
   seed_stream = test_util.test_seed_stream()
   if tf.executing_eagerly():
-    tf1.set_random_seed(seed_stream())
+    tf.random.set_seed(seed_stream())
     return None
   return seed_stream()
 
@@ -145,7 +144,7 @@ class DefaultSwapProposedFnTest(test_util.TestCase):
 class REMCTest(test_util.TestCase):
 
   def setUp(self):
-    tf1.set_random_seed(123)
+    tf.random.set_seed(123)
     super(REMCTest, self).setUp()
 
   def _checkNormalREMCSampling(self,

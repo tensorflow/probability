@@ -1951,7 +1951,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "independent_test",
     srcs = ["independent_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     tags = ["no_windows"],  # TODO: needs investigation on Windows
     deps = [

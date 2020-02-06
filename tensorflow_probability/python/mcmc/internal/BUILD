@@ -97,7 +97,6 @@ multi_substrate_py_test(
     name = "leapfrog_integrator_test",
     size = "small",
     srcs = ["leapfrog_integrator_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         ":leapfrog_integrator",

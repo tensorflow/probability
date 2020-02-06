@@ -24,7 +24,6 @@ import warnings
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -84,7 +83,7 @@ class SampleChainTest(test_util.TestCase):
       return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
     if tf.executing_eagerly():
-      tf1.set_random_seed(54)
+      tf.random.set_seed(54)
     states, _ = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=[dtype(-2), dtype(2)],
