@@ -48,6 +48,7 @@ multi_substrate_py_library(
         ":random_ops",
         ":root_search",
         ":sparse",
+        ":special",
         "//tensorflow_probability/python/math/ode",
         "//tensorflow_probability/python/math/psd_kernels",
     ],
@@ -345,6 +346,34 @@ py_test(
     ],
 )
 
+multi_substrate_py_library(
+    name = "special",
+    srcs = [
+        "special.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "special_test",
+    size = "small",
+    srcs = ["special_test.py"],
+    jax_tags = ["notap"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
 exports_files(
     [
         "generic.py",
@@ -353,6 +382,7 @@ exports_files(
         "gradient_test.py",
         "linalg.py",
         "numeric.py",
+        "special.py",
     ],
     visibility = ["//tensorflow_probability:__subpackages__"],
 )

@@ -52,6 +52,8 @@ from tensorflow_probability.python.math.random_ops import random_rademacher
 from tensorflow_probability.python.math.random_ops import random_rayleigh
 from tensorflow_probability.python.math.root_search import secant_root
 from tensorflow_probability.python.math.sparse import dense_to_sparse
+from tensorflow_probability.python.math.special import lambertw
+from tensorflow_probability.python.math.special import lambertw_winitzki_approx
 
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
@@ -66,6 +68,8 @@ _allowed_symbols = [
     'fill_triangular',
     'fill_triangular_inverse',
     'interp_regular_1d_grid',
+    'lambertw',
+    'lambertw_winitzki_approx',
     'log1mexp',
     'log1psquare',
     'log_add_exp',
