@@ -129,7 +129,7 @@ def auto_correlation(x,
     x_rotated = distribution_util.rotate_transpose(x, shift)
 
     if center:
-      x_rotated -= tf.reduce_mean(x_rotated, axis=-1, keepdims=True)
+      x_rotated = x_rotated - tf.reduce_mean(x_rotated, axis=-1, keepdims=True)
 
     # x_len = N / 2 from above explanation.  The length of x along axis.
     # Get a value for x_len that works in all cases.
