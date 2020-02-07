@@ -99,9 +99,26 @@ install_python_packages() {
 call_with_log_folding install_bazel
 call_with_log_folding install_python_packages
 
-# Get a shard of tests.
-shard_tests=$(bazel query 'tests(//tensorflow_probability/...)' |
-  awk -v n=${NUM_SHARDS} -v s=${SHARD} 'NR%n == s' )
+test_tags_to_skip="(gpu|requires-gpu-sm35|notap|no-oss-ci|tfp_jax|tf2-broken|tf2-kokoro-broken)"
+
+# Given a test size (small, medium, large), a number of shards and a shard ID,
+# query and print a list of tests of the given size to run in the given shard.
+query_and_shard_tests_by_size() {
+  size=$1
+  bazel_query="attr(size, ${size}, tests(//tensorflow_probability/...)) \
+               except \
+               attr(tags, \"${test_tags_to_skip}\", \
+                    tests(//tensorflow_probability/...))"
+  bazel query ${bazel_query} \
+    | awk -v n=${NUM_SHARDS} -v s=${SHARD} 'NR%n == s'
+}
+
+# Generate a list of tests for this shard, consisting of a subset of tests of
+# each size (small, medium and large). By evenly splitting the various test
+# sizes across shards, we help ensure the shards have comparable runtimes.
+sharded_tests="$(query_and_shard_tests_by_size small)"
+sharded_tests="${shard_tests} $(query_and_shard_tests_by_size medium)"
+sharded_tests="${shard_tests} $(query_and_shard_tests_by_size large)"
 
 # Run tests. Notes on less obvious options:
 #   --notest_keep_going -- stop running tests as soon as anything fails. This is
@@ -109,19 +126,17 @@ shard_tests=$(bazel query 'tests(//tensorflow_probability/...)' |
 #     jobs with a bunch of other TensorFlow projects.
 #   --test_timeout -- comma separated values correspond to various test sizes
 #     (short, moderate, long or eternal)
-#   --test_tag_filters -- skip tests whose 'tags' arg (if present) includes any
-#     of the comma-separated entries
 #   --action_env -- specify environment vars to pass through to action
 #     environment. (We need these in order to run inside a virtualenv.)
 #     See https://github.com/bazelbuild/bazel/issues/6648 and b/121259040.
-echo "${shard_tests}" \
+echo "${sharded_tests}" \
   | xargs bazel test \
     --compilation_mode=opt \
     --copt=-O3 \
     --copt=-march=native \
     --notest_keep_going \
-    --test_tag_filters=-gpu,-requires-gpu-sm35,-notap,-no-oss-ci,-tfp_jax,-tf2-broken,-tf2-kokoro-broken \
     --test_timeout 300,450,1200,3600 \
+    --test_env=TFP_HYPOTHESIS_MAX_EXAMPLES=2 \
     --action_env=PATH \
     --action_env=LD_LIBRARY_PATH \
     --test_output=errors
