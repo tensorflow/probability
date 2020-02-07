@@ -23,7 +23,6 @@ NO_REWRITE_NEEDED = [
     "internal:tensorshape_util",
     "layers",
     "math:minimize",
-    "math:root_search",
     "math:sparse",
     "math/ode",
     "optimizer/convergence_criteria",

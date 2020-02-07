@@ -296,21 +296,24 @@ def secant_root(objective_fn,
     assertions = []
     if validate_args:
       assertions += [
-          tf.Assert(
-              tf.reduce_all(position_tolerance > zero), [position_tolerance]),
-          tf.Assert(tf.reduce_all(value_tolerance > zero), [value_tolerance]),
-          tf.Assert(
-              tf.reduce_all(max_iterations >= num_iterations),
-              [max_iterations]),
+          tf.debugging.assert_greater(
+              position_tolerance, zero,
+              message='`position_tolerance` must be greater than 0.'),
+          tf.debugging.assert_greater(
+              value_tolerance, zero,
+              message='`value_tolerance` must be greater than 0.'),
+          tf.debugging.assert_greater_equal(
+              max_iterations, num_iterations,
+              message='`max_iterations` must be nonnegative.')
       ]
 
     with tf.control_dependencies(assertions):
       root, value_at_root, num_iterations, _, _ = tf.while_loop(
           cond=_should_continue,
           body=_body,
-          loop_vars=[
+          loop_vars=(
               position, value_at_position, num_iterations, step, finished
-          ])
+          ))
 
   return RootSearchResults(
       estimated_root=root,

@@ -145,7 +145,8 @@ class RootSearchTest(test_util.TestCase):
     f = lambda x: (3 * x**2 - 1) / 2.
 
     guess = tf.constant(-2, dtype=tf.float64)
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError(
+        '`position_tolerance` must be greater than 0.'):
       self.evaluate(
           tfp.math.secant_root(
               f, guess, position_tolerance=-1e-8, validate_args=True))
@@ -154,7 +155,7 @@ class RootSearchTest(test_util.TestCase):
     f = lambda x: (3 * x**2 - 1) / 2.
 
     guess = tf.constant(-2, dtype=tf.float64)
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('`value_tolerance` must be greater than 0.'):
       self.evaluate(
           tfp.math.secant_root(
               f, guess, value_tolerance=-1e-8, validate_args=True))
@@ -163,7 +164,7 @@ class RootSearchTest(test_util.TestCase):
     f = lambda x: (3 * x**2 - 1) / 2.
 
     guess = tf.constant(-2, dtype=tf.float64)
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('`max_iterations` must be nonnegative.'):
       self.evaluate(
           tfp.math.secant_root(f, guess, max_iterations=-1, validate_args=True))
 

@@ -100,6 +100,8 @@ def _constant(value, dtype=None, shape=None, name='Const'):  # pylint: disable=u
   x = convert_to_tensor(value, dtype=dtype)
   if shape is None:
     return x
+  if not x.shape:
+    return np.full(shape, x)
   return np.reshape(x, shape)
 
 

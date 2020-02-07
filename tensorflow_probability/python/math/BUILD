@@ -298,7 +298,7 @@ multi_substrate_py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "root_search",
     srcs = [
         "root_search.py",
@@ -310,7 +310,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "root_search_test",
     size = "small",
     srcs = ["root_search_test.py"],
