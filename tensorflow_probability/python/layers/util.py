@@ -133,7 +133,7 @@ def default_mean_field_normal_fn(
   """Creates a function to build Normal distributions with trainable params.
 
   This function produces a closure which produces `tfd.Normal`
-  parameterized by a loc` and `scale` each created using `tf.get_variable`.
+  parameterized by a `loc` and `scale` each created using `tf.get_variable`.
 
   Args:
     is_singular: Python `bool` if `True`, forces the special case limit of
