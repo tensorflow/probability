@@ -47,7 +47,7 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import variational_gaussian_process as variational_gaussian_process_lib
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.layers.internal import distribution_tensor_coercible as dtc
-from tensorflow_probability.python.layers.internal import tensor_tuple as tensor_tuple
+from tensorflow_probability.python.layers.internal import tensor_tuple as tens_tuple
 from tensorflow.python.keras.utils import tf_utils as keras_tf_utils  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -171,7 +171,7 @@ class DistributionLambda(tf.keras.layers.Lambda, tf.Module):
       d = make_distribution_fn(*fargs, **fkwargs)
       value_is_seq = isinstance(d.dtype, collections.Sequence)
       maybe_composite_convert_to_tensor_fn = (
-          (lambda d: tensor_tuple.TensorTuple(convert_to_tensor_fn(d)))
+          (lambda d: tens_tuple.TensorTuple(convert_to_tensor_fn(d)))
           if value_is_seq else convert_to_tensor_fn)
       distribution = dtc._TensorCoercible(  # pylint: disable=protected-access
           distribution=d,
