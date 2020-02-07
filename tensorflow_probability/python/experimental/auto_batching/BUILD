@@ -276,6 +276,7 @@ py_test(
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

@@ -30,6 +30,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.auto_batching import backend_test_lib as backend_test
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst
 from tensorflow_probability.python.experimental.auto_batching import tf_backend
+from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
 
 # TODO(b/127689162): Restore testing complex dtypes.
@@ -64,9 +65,7 @@ class TFVariableTest(test_util.TestCase, backend_test.VariableTestCase):
         exception_types=(ValueError, tf.errors.InvalidArgumentError))
 
   @hp.given(hps.data())
-  @hp.settings(
-      deadline=None,
-      max_examples=100)
+  @tfp_hps.tfp_hp_settings()
   def testTFVariableRandomOps(self, data):
     # Hypothesis strategy:
     # Generate a random max stack depth and value shape
