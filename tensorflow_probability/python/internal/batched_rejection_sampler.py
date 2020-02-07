@@ -21,6 +21,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
@@ -127,7 +128,7 @@ def batched_rejection_sampler(proposal, target, seed=None, name=None):
       proposed_samples, proposed_values = proposal(seed_stream())
       good_samples_mask = tf.less_equal(
           proposed_values * tf.random.uniform(
-              proposed_samples.shape, maxval=1., seed=seed_stream()),
+              prefer_static.shape(proposed_samples), seed=seed_stream()),
           target(proposed_samples))
       return proposed_samples, good_samples_mask
 

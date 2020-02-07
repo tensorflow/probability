@@ -18,6 +18,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 from scipy import stats as sp_stats
 
@@ -61,7 +62,10 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
     self.assertAllEqual(negative_values, negative_values_2)
     self.assertAllEqual(values, values_2)
 
-  def testBatchedRejectionBetaSample(self):
+  @parameterized.named_parameters(
+      dict(testcase_name='static', is_static=True),
+      dict(testcase_name='dynamic', is_static=False))
+  def testBatchedRejectionBetaSample(self, is_static):
     seed = test_util.test_seed()
 
     # We build a rejection sampler for two beta distributions (in a batch): a
@@ -74,10 +78,11 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
 
     target = tfd.Beta(alpha, beta).prob
 
-    def proposal(seed_stream):
-      seed_stream = SeedStream(seed, 'proposal')
-      uniform_samples = tfd.Uniform().sample([samples_per_distribution, 2],
-                                             seed=seed_stream())
+    def proposal(seed):
+      # Test static and dynamic shape of proposed samples.
+      uniform_samples = self.maybe_static(
+          tf.random.uniform([samples_per_distribution, 2], seed=seed),
+          is_static)
       return uniform_samples, tf.ones_like(uniform_samples) * upper_bounds
 
     all_samples, _ = self.evaluate(brs.batched_rejection_sampler(

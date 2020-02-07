@@ -54,6 +54,7 @@ multi_substrate_py_library(
     srcs = ["batched_rejection_sampler.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
