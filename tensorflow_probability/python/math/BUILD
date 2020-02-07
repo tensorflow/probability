@@ -233,7 +233,7 @@ multi_substrate_py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "numeric_test",
     size = "small",
     srcs = [
