@@ -117,8 +117,8 @@ query_and_shard_tests_by_size() {
 # each size (small, medium and large). By evenly splitting the various test
 # sizes across shards, we help ensure the shards have comparable runtimes.
 sharded_tests="$(query_and_shard_tests_by_size small)"
-sharded_tests="${shard_tests} $(query_and_shard_tests_by_size medium)"
-sharded_tests="${shard_tests} $(query_and_shard_tests_by_size large)"
+sharded_tests="${sharded_tests} $(query_and_shard_tests_by_size medium)"
+sharded_tests="${sharded_tests} $(query_and_shard_tests_by_size large)"
 
 # Run tests. Notes on less obvious options:
 #   --notest_keep_going -- stop running tests as soon as anything fails. This is
