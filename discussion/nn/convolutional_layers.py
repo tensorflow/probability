@@ -25,7 +25,6 @@ from discussion.nn import variational_base as vi_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
-from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -99,7 +98,7 @@ class Convolution(layers_lib.KernelBiasLayer):
       init_bias_fn=tf.zeros,  # Same as Keras.
       # Misc
       dtype=tf.float32,
-      batch_size=0,
+      batch_shape=(),
       name=None):
     """Constructs layer.
 
@@ -153,21 +152,22 @@ class Convolution(layers_lib.KernelBiasLayer):
         Default value: `tf.zeros`.
       dtype: ...
         Default value: `tf.float32`.
-      batch_size: ...
-        Default value: `0`.
+      batch_shape: ...
+        Default value: `()`.
       name: ...
         Default value: `None` (i.e., `'Convolution'`).
     """
     filter_shape = prepare_tuple_argument(
         filter_shape, rank, arg_name='filter_shape')
-    if batch_size == 0:
+    if not batch_shape:
       kernel_shape = filter_shape + (input_size, output_size)
       bias_shape = (output_size,)
       apply_kernel_fn = _make_convolution_fn(
           rank, strides, padding, dilations)
     else:
-      kernel_shape = (batch_size,) + filter_shape + (input_size, output_size)
-      bias_shape = (batch_size, output_size)
+      batch_shape = tuple(batch_shape)
+      kernel_shape = batch_shape + filter_shape + (input_size, output_size)
+      bias_shape = batch_shape + (output_size,)
       apply_kernel_fn = lambda x, k: convolution_batch(  # pylint: disable=g-long-lambda
           x, k,
           rank=rank,
@@ -252,7 +252,7 @@ class ConvolutionVariationalReparameterization(
   train_size = datasets_info.splits['train'].num_examples
   train_dataset = nn.util.tune_dataset(
       train_dataset,
-      batch_size=batch_size,
+      batch_shape=(batch_size,),
       shuffle_size=int(train_size / 7),
       preprocess_fn=_preprocess)
   train_iter = iter(train_dataset)
@@ -741,31 +741,56 @@ def convolution_batch(x, kernel, rank, strides, padding, data_format=None,
         dilations,
         data_format,
     ] = prepare_conv_args(rank, strides, padding, dilations)
-    strides = prepare_tuple_argument(
-        strides, rank + 2, arg_name='strides')
+    strides = prepare_tuple_argument(strides, rank + 2, arg_name='strides')
 
     dtype = dtype_util.common_dtype([x, kernel], dtype_hint=tf.float32)
     x = tf.convert_to_tensor(x, dtype=dtype, name='x')
     kernel = tf.convert_to_tensor(kernel, dtype=dtype, name='kernel')
 
-    x_shape = prefer_static.shape(x)
-    x_shape_ = x.shape
-    x = tf.reshape(
-        x,  # [n, h, w, b, c]
-        shape=prefer_static.pad(x_shape[:-2],
-                                paddings=[[0, 1]],
-                                constant_values=-1))  # [n, h, w, bc]
-
-    kernel_shape = prefer_static.shape(kernel)  # [b, fh, fw, c, c']
-    kernel_shape_ = kernel.shape
-    kernel = tf.transpose(kernel, [1, 2, 0, 3, 4])
+    # Step 1: Transpose and double flatten kernel.
+    # kernel.shape = B + F + [c, c']. Eg: [b, fh, fw, c, c']
+    kernel_shape = prefer_static.shape(kernel)
+    kernel_batch_shape, kernel_event_shape = prefer_static.split(
+        kernel_shape,
+        num_or_size_splits=[-1, rank + 2])
+    kernel_batch_size = prefer_static.reduce_prod(kernel_batch_shape)
+    kernel_ndims = prefer_static.rank(kernel)
+    kernel_batch_ndims = kernel_ndims - rank - 2
+    perm = prefer_static.concat([
+        prefer_static.range(kernel_batch_ndims, kernel_batch_ndims + rank),
+        prefer_static.range(0, kernel_batch_ndims),
+        prefer_static.range(kernel_batch_ndims + rank, kernel_ndims),
+    ], axis=0)  # Eg, [1, 2, 0, 3, 4]
+    kernel = tf.transpose(kernel, perm=perm)  # F + B + [c, c']
     kernel = tf.reshape(
-        kernel,  # [fh, fw, b, c, c']
+        kernel,
         shape=prefer_static.concat([
-            kernel_shape[1:-2],
-            [-1, kernel_shape[-1]],
-        ], axis=0))  # [fh, fw, bc, c']
+            kernel_event_shape[:rank],
+            [kernel_batch_size * kernel_event_shape[-2],
+             kernel_event_shape[-1]],
+        ], axis=0))  # F + [bc, c']
 
+    # Step 2: Double flatten x.
+    # x.shape = N + D + B + [c]
+    x_shape = prefer_static.shape(x)
+    [
+        x_sample_shape,
+        x_rank_shape,
+        x_batch_shape,
+        x_channel_shape,
+    ] = prefer_static.split(
+        x_shape,
+        num_or_size_splits=[-1, rank, kernel_batch_ndims, 1])
+    x = tf.reshape(
+        x,  # N + D + B + [c]
+        shape=prefer_static.concat([
+            [prefer_static.reduce_prod(x_sample_shape)],
+            x_rank_shape,
+            [prefer_static.reduce_prod(x_batch_shape) *
+             prefer_static.reduce_prod(x_channel_shape)],
+        ], axis=0))  # [n] + D + [bc]
+
+    # Step 3: Apply convolution.
     y = tf.nn.depthwise_conv2d(
         x, kernel,
         strides=strides,
@@ -774,15 +799,17 @@ def convolution_batch(x, kernel, rank, strides, padding, data_format=None,
         dilations=dilations)
     #  SAME: y.shape = [n, h,      w,      bcc']
     # VALID: y.shape = [n, h-fh+1, w-fw+1, bcc']
+
+    # Step 4: Reshape/reduce for output.
+    y_shape = prefer_static.shape(y)
     y = tf.reshape(
         y,
         shape=prefer_static.concat([
-            prefer_static.shape(y)[:-1],
-            kernel_shape[:1],
-            kernel_shape[-2:],
-        ], axis=0))  # [n, h, w, b, c, c']
-    y = tf.reduce_sum(y, axis=-2)  # [n, h, w, b, c']
-    tensorshape_util.set_shape(
-        y.shape,
-        tensorshape_util.concatenate(x_shape_[:-1], kernel_shape_[-1]))
+            x_sample_shape,
+            y_shape[1:-1],
+            kernel_batch_shape,
+            kernel_event_shape[-2:],
+        ], axis=0))  # N + D' + B + [c, c']
+    y = tf.reduce_sum(y, axis=-2)  # N + D' + B + [c']
+
     return y

@@ -51,7 +51,7 @@ class Affine(layers_lib.KernelBiasLayer):
       init_kernel_fn=None,
       init_bias_fn=None,
       dtype=tf.float32,
-      batch_size=0,
+      batch_shape=(),
       name=None):
     """Constructs layer.
 
@@ -66,18 +66,19 @@ class Affine(layers_lib.KernelBiasLayer):
         Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
       dtype: ...
         Default value: `tf.float32`.
-      batch_size: ...
-        Default value: `0`.
+      batch_shape: ...
+        Default value: `()`.
       name: ...
         Default value: `None` (i.e., `'Affine'`).
     """
-    if batch_size == 0:
+    if not batch_shape:
       kernel_shape = (input_size, output_size)
       bias_shape = (output_size,)
       apply_kernel_fn = tf.matmul
     else:
-      kernel_shape = (batch_size, input_size, output_size)
-      bias_shape = (batch_size, output_size)
+      batch_shape = tuple(batch_shape)
+      kernel_shape = batch_shape + (input_size, output_size)
+      bias_shape = batch_shape + (output_size,)
       # apply_kernel_fn = lambda x, k: tf.matmul(
       #     x[..., tf.newaxis, :], k)[..., 0, :]
       apply_kernel_fn = lambda x, k: tf.linalg.matvec(k, x, adjoint_a=True)
@@ -158,7 +159,7 @@ class AffineVariationalReparameterization(
   train_size = datasets_info.splits['train'].num_examples
   train_dataset = nn.util.tune_dataset(
       train_dataset,
-      batch_size=batch_size,
+      batch_shape=(batch_size,),
       shuffle_size=int(train_size / 7),
       preprocess_fn=_preprocess)
   train_iter = iter(train_dataset)
