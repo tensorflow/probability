@@ -169,7 +169,7 @@ maf = tfd.TransformedDistribution(
 
 x = maf.sample()  # Expensive; uses `tf.while_loop`, no Bijector caching.
 maf.log_prob(x)   # Almost free; uses Bijector caching.
-maf.log_prob(tf.zeros([dims]))  # Cheap; no `tf.while_loop` despite no Bijector caching.
+maf.log_prob(tf.zeros(dims))  # Cheap; no `tf.while_loop` despite no Bijector caching.
 
 # [Papamakarios et al. (2016)][3] also describe an Inverse Autoregressive
 # Flow [(Kingma et al., 2016)][2]:
@@ -182,7 +182,7 @@ iaf = tfd.TransformedDistribution(
 
 x = iaf.sample()  # Cheap; no `tf.while_loop` despite no Bijector caching.
 iaf.log_prob(x)   # Almost free; uses Bijector caching.
-iaf.log_prob(tf.zeros([dims]))  # Expensive; uses `tf.while_loop`, no Bijector caching.
+iaf.log_prob(tf.zeros(dims))  # Expensive; uses `tf.while_loop`, no Bijector caching.
 
 # In many (if not most) cases the default `shift_and_log_scale_fn` will be a
 # poor choice. Here's an example of using a 'shift only' version and with a
