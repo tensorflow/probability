@@ -47,7 +47,7 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import variational_gaussian_process as variational_gaussian_process_lib
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.layers.internal import distribution_tensor_coercible as dtc
-from tensorflow_probability.python.layers.internal import tensor_tuple as tens_tuple
+from tensorflow_probability.python.layers.internal import tensor_tuple as tensor_tuple
 from tensorflow.python.keras.utils import tf_utils as keras_tf_utils  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -171,7 +171,7 @@ class DistributionLambda(tf.keras.layers.Lambda, tf.Module):
       d = make_distribution_fn(*fargs, **fkwargs)
       value_is_seq = isinstance(d.dtype, collections.Sequence)
       maybe_composite_convert_to_tensor_fn = (
-          (lambda d: tens_tuple.TensorTuple(convert_to_tensor_fn(d)))
+          (lambda d: tensor_tuple.TensorTuple(convert_to_tensor_fn(d)))
           if value_is_seq else convert_to_tensor_fn)
       distribution = dtc._TensorCoercible(  # pylint: disable=protected-access
           distribution=d,
@@ -1811,7 +1811,7 @@ class VariationalGaussianProcess(DistributionLambda):
       mean_fn=None,
       jitter=1e-6,
       convert_to_tensor_fn=tfd.Distribution.sample,
-      **kwargs):
+      name=None):
     """Construct a VariationalGaussianProcess Layer.
 
     Args:
@@ -1846,7 +1846,8 @@ class VariationalGaussianProcess(DistributionLambda):
       convert_to_tensor_fn: Python `callable` that takes a `tfd.Distribution`
         instance and returns a `tf.Tensor`-like object. For examples, see
         `class` docstring.
-      **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
+      name: name to give to this layer and the scope of ops and variables it
+        contains.
     """
     convert_to_tensor_fn = _get_convert_to_tensor_fn(convert_to_tensor_fn)
 
@@ -1866,7 +1867,7 @@ class VariationalGaussianProcess(DistributionLambda):
             jitter=self._jitter),
         convert_to_tensor_fn=convert_to_tensor_fn,
         dtype=kernel_provider.dtype,
-        **kwargs)
+        name=name)
 
     tmp_kernel = kernel_provider.kernel
     self._dtype = tmp_kernel.dtype.as_numpy_dtype
