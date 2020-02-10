@@ -1230,6 +1230,46 @@ class EventSpaceBijectorsTest(test_util.TestCase):
       self.evaluate(tf.identity(x))
 
 
+def _all_ok(thing, one_ok):
+  if isinstance(thing, (tfd.Distribution, tfb.Bijector)):
+    dist = thing
+    answer = True
+    for _, param in dist.parameters.items():
+      answer &= _all_ok(param, one_ok)
+    if isinstance(thing, tfd.TransformedDistribution):
+      answer &= one_ok(thing.batch_shape)
+    return answer
+  elif tf.is_tensor(thing):
+    return one_ok(thing.shape)
+  else:
+    # Assume the thing is some Python constant like a string or a boolean
+    return True
+
+
+def _all_packetized(thing):
+  def one_ok(shape):
+    ans = tf.TensorShape(shape).num_elements() > 1
+    for dim in tf.TensorShape(shape):
+      ans &= dim % 4 == 0
+    if ans:
+      hp.note('Presuming shape {} is packetized'.format(shape))
+    else:
+      hp.note('Not presuming shape {} is packetized'.format(shape))
+    return ans
+  return _all_ok(thing, one_ok)
+
+
+def _all_non_packetized(thing):
+  def one_ok(shape):
+    ans = tf.TensorShape(shape).num_elements() < 4
+    if ans:
+      hp.note('Presuming shape {} is non-packetized'.format(shape))
+    else:
+      hp.note('Not presuming shape {} is non-packetized'.format(shape))
+    return ans
+  return _all_ok(thing, one_ok)
+
+
 @test_util.test_all_tf_execution_regimes
 class DistributionSlicingTest(test_util.TestCase):
 
@@ -1300,11 +1340,17 @@ class DistributionSlicingTest(test_util.TestCase):
     # discrepancies are a distraction.
     # TODO(b/140229057): Remove this `hp.assume`, if and when Eigen's numerics
     # become index-independent.
-    all_packetized = samples.size % 4 == 0 and sliced_samples.size % 4 == 0
-    all_non_packetized = samples.size < 4 and sliced_samples.size < 4
+    all_packetized = (
+        _all_packetized(dist) and _all_packetized(sliced_dist) and
+        _all_packetized(samples) and _all_packetized(sliced_samples))
+    hp.note('Packetization check {}'.format(all_packetized))
+    all_non_packetized = (
+        _all_non_packetized(dist) and _all_non_packetized(sliced_dist) and
+        _all_non_packetized(samples) and _all_non_packetized(sliced_samples))
+    hp.note('Non-packetization check {}'.format(all_non_packetized))
     hp.assume(all_packetized or all_non_packetized)
 
-    self.assertAllClose(lp[slices], sliced_lp)
+    self.assertAllClose(lp[slices], sliced_lp, rtol=1e-5)
 
   def _run_test(self, data):
     def ok(name):

@@ -2324,7 +2324,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "normal_conjugate_posteriors_test",
     srcs = ["normal_conjugate_posteriors_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",

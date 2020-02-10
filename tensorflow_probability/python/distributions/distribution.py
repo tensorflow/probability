@@ -338,11 +338,10 @@ class Distribution(_BaseDistribution):
   The batch shape is determined by broadcasting together the parameters.
 
   The shape of arguments to `__init__`, `cdf`, `log_cdf`, `prob`, and
-  `log_prob` reflect this broadcasting, as does the return value of `sample` and
-  `sample_n`.
+  `log_prob` reflect this broadcasting, as does the return value of `sample`.
 
   `sample_n_shape = [n] + batch_shape + event_shape`, where `sample_n_shape` is
-  the shape of the `Tensor` returned from `sample_n`, `n` is the number of
+  the shape of the `Tensor` returned from `sample(n)`, `n` is the number of
   samples, `batch_shape` defines how many independent distributions there are,
   and `event_shape` defines the shape of samples from each of those independent
   distributions. Samples are independent along the `batch_shape` dimensions, but
@@ -369,7 +368,7 @@ class Distribution(_BaseDistribution):
   # Sampling returns a sample per distribution. `samples` has shape
   # [5, 2, 2], which is [n] + batch_shape + event_shape, where n=5,
   # batch_shape=[2, 2], and event_shape=[].
-  samples = u.sample_n(5)
+  samples = u.sample(5)
 
   # The broadcasting holds across methods. Here we use `cdf` as an example. The
   # same holds for `log_cdf` and the likelihood functions.

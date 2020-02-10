@@ -164,7 +164,8 @@ class GeneralizedParetoTest(test_util.TestCase):
     expected = sp_stats.genpareto(np.float64(conc), loc=np.float64(loc),
                                   scale=np.float64(scale)).mean()
     actual = self.evaluate(dist.mean())
-    self.assertAllClose(expected, actual, rtol=5e-4)
+    # There is an unavoidable catastropic cancellation for means near 0
+    self.assertAllClose(expected, actual, rtol=5e-4, atol=1e-4)
 
   @hp.given(generalized_paretos(batch_shape=[]))
   @tfp_hps.tfp_hp_settings()
