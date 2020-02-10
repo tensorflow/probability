@@ -34,14 +34,32 @@ from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 @mcmc_util.make_innermost_setter
 def hmc_like_step_size_setter_fn(kernel_results, new_step_size):
-  return kernel_results._replace(
-      accepted_results=kernel_results.accepted_results._replace(
-          step_size=new_step_size))
+  """Setter for `step_size` so it can be adapted."""
+  # For some `TransitionKernels` (e.g. `MetropolisHastings`), `step_size` is
+  # nested inside another `kernel_results` member. Here, we handle the special
+  # case in which that member is called `accepted_results`.
+  # Note that the `make_innermost_setter` wrapper above handles the relatively
+  # common case of that member being called `inner_results`.
+  if hasattr(kernel_results, 'accepted_results'):
+    return kernel_results._replace(
+        accepted_results=kernel_results.accepted_results._replace(
+            step_size=new_step_size))
+  else:
+    return kernel_results._replace(step_size=new_step_size)
 
 
 @mcmc_util.make_innermost_getter
 def hmc_like_step_size_getter_fn(kernel_results):
-  return kernel_results.accepted_results.step_size
+  """Getter for `step_size` so it can be inspected."""
+  # For some `TransitionKernels` (e.g. `MetropolisHastings`), `step_size` is
+  # nested inside another `kernel_results` member. Here, we handle the special
+  # case in which that member is called `accepted_results`.
+  # Note that the `make_innermost_getter` wrapper above handles the relatively
+  # common case of that member being called `inner_results`.
+  if hasattr(kernel_results, 'accepted_results'):
+    return kernel_results.accepted_results.step_size
+  else:
+    return kernel_results.step_size
 
 
 @mcmc_util.make_innermost_getter

@@ -508,12 +508,6 @@ class NutsTest(test_util.TestCase):
               bijector=unconstraining_bijectors),
           target_accept_prob=.8,
           num_adaptation_steps=burnin,
-          step_size_setter_fn=lambda pkr, new_step_size: pkr._replace(  # pylint: disable=g-long-lambda
-              inner_results=pkr.inner_results._replace(step_size=new_step_size)
-          ),
-          step_size_getter_fn=lambda pkr: pkr.inner_results.step_size,
-          log_accept_prob_getter_fn=lambda pkr: pkr.inner_results.
-          log_accept_ratio,
       )
 
       # Sampling from the chain and get diagnostics
