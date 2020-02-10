@@ -151,7 +151,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   tfd = tfp.distributions
   tfb = tfp.bijectors
 
-  dims = 5
+  dims = 2
 
   # A common choice for a normalizing flow is to use a Gaussian for the base
   # distribution.  (However, any continuous distribution would work.) E.g.,
@@ -164,7 +164,8 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
 
   x = maf.sample()  # Expensive; uses `tf.while_loop`, no Bijector caching.
   maf.log_prob(x)   # Almost free; uses Bijector caching.
-  maf.log_prob(0.)  # Cheap; no `tf.while_loop` despite no Bijector caching.
+  # Cheap; no `tf.while_loop` despite no Bijector caching.
+  maf.log_prob(tf.zeros(dims))
 
   # [Papamakarios et al. (2016)][3] also describe an Inverse Autoregressive
   # Flow [(Kingma et al., 2016)][2]:
@@ -177,7 +178,8 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
 
   x = iaf.sample()  # Cheap; no `tf.while_loop` despite no Bijector caching.
   iaf.log_prob(x)   # Almost free; uses Bijector caching.
-  iaf.log_prob(0.)  # Expensive; uses `tf.while_loop`, no Bijector caching.
+  # Expensive; uses `tf.while_loop`, no Bijector caching.
+  iaf.log_prob(tf.zeros(dims))
 
   # In many (if not most) cases the default `shift_and_log_scale_fn` will be a
   # poor choice.  Here's an example of using a 'shift only' version and with a
