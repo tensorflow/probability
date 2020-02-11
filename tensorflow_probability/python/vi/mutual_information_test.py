@@ -44,7 +44,9 @@ class MutualInformationTest(tfp_test_util.TestCase):
         scale=2.0,
         size=[13, 17])
 
-    batch_size, rho, dim = 10000, 0.8, 2
+    batch_size = 1000
+    rho = 0.8
+    dim = 2
     x, eps = tf.split(value=tf.random.normal(shape=(2*batch_size, dim),
                                              seed=self.seed),
                       num_or_size_splits=2, axis=0)
