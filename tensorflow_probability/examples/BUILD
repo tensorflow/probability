@@ -58,11 +58,12 @@ py_library(
 
 py3_test(
     name = "bayesian_neural_network_test",
-    size = "small",
+    size = "medium",
     srcs = ["bayesian_neural_network.py"],
     args = [
         "--fake_data",
-        "--max_steps=5",
+        "--num_epochs=1",
+        "--viz_steps=1000",
     ],
     main = "bayesian_neural_network.py",
     python_version = "PY3",
@@ -305,7 +306,6 @@ py3_test(
     args = [
         "--num_examples=32",
         "--batch_size=8",
-        "--max_steps=50",
     ],
     main = "logistic_regression.py",
     python_version = "PY3",
