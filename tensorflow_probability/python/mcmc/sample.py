@@ -293,10 +293,10 @@ def sample_chain(
   _, log_accept_ratio = sample_chain(trace_fn=trace_log_accept_ratio)
   _, kernel_results = sample_chain(trace_fn=trace_everything)
 
-  acceptance_prob = tf.math.exp(tf.minimum(log_accept_ratio_, 0.))
+  acceptance_prob = tf.math.exp(tf.minimum(log_accept_ratio, 0.))
   # Equivalent to, but more efficient than:
   acceptance_prob = tf.math.exp(tf.minimum(
-      kernel_results.log_accept_ratio_, 0.))
+      kernel_results.log_accept_ratio, 0.))
   ```
 
   #### References

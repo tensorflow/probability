@@ -166,7 +166,8 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
                                pkr.inner_results.log_accept_ratio])
 
   # ~0.75
-  p_accept = tf.math.exp(tfp.math.reduce_logmeanexp(min(log_accept_ratio, 0.)))
+  p_accept = tf.math.exp(tfp.math.reduce_logmeanexp(tf.minimum(
+      log_accept_ratio, 0.)))
   ```
   #### References
 
