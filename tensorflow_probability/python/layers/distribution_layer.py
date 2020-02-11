@@ -1866,7 +1866,8 @@ class VariationalGaussianProcess(DistributionLambda):
                 self._unconstrained_observation_noise_variance),
             jitter=self._jitter),
         convert_to_tensor_fn=convert_to_tensor_fn,
-        dtype=kernel_provider.dtype)
+        dtype=kernel_provider.dtype,
+        name=name)
 
     tmp_kernel = kernel_provider.kernel
     self._dtype = tmp_kernel.dtype.as_numpy_dtype
