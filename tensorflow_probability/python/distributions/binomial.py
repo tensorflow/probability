@@ -230,12 +230,7 @@ class Binomial(distribution.Distribution):
 
   def _cdf(self, counts):
     probs = self._probs_parameter_no_checks()
-    if not (tensorshape_util.is_fully_defined(counts.shape) and
-            tensorshape_util.is_fully_defined(probs.shape) and
-            tensorshape_util.is_compatible_with(counts.shape, probs.shape)):
-      # If both shapes are well defined and equal, we skip broadcasting.
-      probs = probs + tf.zeros_like(counts)
-      counts = counts + tf.zeros_like(probs)
+    probs, counts = _maybe_broadcast(probs, counts)
 
     return _bdtr(k=counts, n=tf.convert_to_tensor(self.total_count), p=probs)
 
@@ -350,9 +345,22 @@ class Binomial(distribution.Distribution):
 
 
 def _log_unnormalized_prob(logits, counts, total_count):
-  return counts * logits - total_count * tf.math.softplus(logits)
+  """Log unnormalized probability."""
+  return (-tf.math.multiply_no_nan(tf.math.softplus(-logits), counts) -
+          tf.math.multiply_no_nan(
+              tf.math.softplus(logits), total_count - counts))
 
 
 def _log_normalization(counts, total_count):
   return (tf.math.lgamma(1. + total_count - counts) +
           tf.math.lgamma(1. + counts) - tf.math.lgamma(1. + total_count))
+
+
+def _maybe_broadcast(a, b):
+  if not (tensorshape_util.is_fully_defined(a.shape) and
+          tensorshape_util.is_fully_defined(b.shape) and
+          tensorshape_util.is_compatible_with(a.shape, b.shape)):
+    # If both shapes are well defined and equal, we skip broadcasting.
+    b = b + tf.zeros_like(a)
+    a = a + tf.zeros_like(b)
+  return a, b

@@ -131,6 +131,16 @@ class BinomialTest(test_util.TestCase):
     self.evaluate(binom.prob([1.0, 2.5, 1.5]))
     self.evaluate(binom.cdf([1.0, 2.5, 1.5]))
 
+  def testPmfAndCdfExtremeProbs(self):
+    n = 5.
+    p = [0., 1.]
+    counts = [[0.], [3.], [5.]]
+    binom = tfd.Binomial(total_count=n, probs=p, validate_args=True)
+    self.assertAllClose(self.evaluate(binom.prob(counts)),
+                        [[1., 0.], [0., 0.], [0., 1.]])
+    self.assertAllClose(self.evaluate(binom.cdf(counts)),
+                        [[1., 0.], [1., 0.], [1., 1.]])
+
   def testPmfAndCdfBothZeroBatches(self):
     # Both zero-batches.  No broadcast
     p = 0.5
