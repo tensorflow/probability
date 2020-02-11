@@ -417,6 +417,8 @@ pad = _prefer_static(tf.pad, nptf.pad)
 range = _prefer_static(tf.range, nptf.range)  # pylint: disable=redefined-builtin
 reduce_all = _prefer_static(tf.reduce_all, nptf.reduce_all)
 reduce_any = _prefer_static(tf.reduce_any, nptf.reduce_any)
+reduce_max = _prefer_static(tf.reduce_max, nptf.reduce_max)
+reduce_min = _prefer_static(tf.reduce_min, nptf.reduce_min)
 reduce_prod = _prefer_static(tf.reduce_prod, nptf.reduce_prod)
 reduce_sum = _prefer_static(tf.reduce_sum, nptf.reduce_sum)
 reshape = _prefer_static(tf.reshape, nptf.reshape)
