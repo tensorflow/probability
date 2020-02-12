@@ -31,7 +31,7 @@ __all__ = [
 
 
 def batched_las_vegas_algorithm(
-    batched_las_vegas_trial, seed=None, name=None):
+    batched_las_vegas_trial_fn, seed=None, name=None):
   """Batched Las Vegas Algorithm.
 
   This utility encapsulates the notion of a 'batched las_vegas_algorithm'
@@ -50,7 +50,7 @@ def batched_las_vegas_algorithm(
   deliberately left unspecified.
 
   Args:
-    batched_las_vegas_trial: A callable that takes a Python integer PRNG seed
+    batched_las_vegas_trial_fn: A callable that takes a Python integer PRNG seed
       and returns two values. (1) A structure of Tensors containing the results
       of the computation, all with a shape broadcastable with (2) a boolean mask
       representing whether each batch point succeeded.
@@ -70,14 +70,17 @@ def batched_las_vegas_algorithm(
   """
   with tf.name_scope(name or 'batched_las_vegas_algorithm'):
     seed_stream = SeedStream(seed, 'batched_las_vegas_algorithm')
-    values, good_values_mask = batched_las_vegas_trial(seed_stream())
+    values, good_values_mask = batched_las_vegas_trial_fn(seed_stream())
     num_iters = tf.constant(1)
 
     def cond(unused_values, good_values_mask, unused_num_iters):
       return tf.math.logical_not(tf.reduce_all(good_values_mask))
 
     def body(values, good_values_mask, num_iters):
-      new_values, new_good_values_mask = batched_las_vegas_trial(seed_stream())
+      """Batched Las Vegas Algorithm body."""
+
+      new_values, new_good_values_mask = batched_las_vegas_trial_fn(
+          seed_stream())
 
       values = tf.nest.map_structure(
           lambda new, old: tf.where(new_good_values_mask, new, old),
@@ -93,43 +96,48 @@ def batched_las_vegas_algorithm(
     return values, num_iters
 
 
-def batched_rejection_sampler(proposal, target, seed=None, name=None):
+def batched_rejection_sampler(
+    proposal_fn, target_fn, seed=None, dtype=tf.float32, name=None):
   """Generic batched rejection sampler.
 
   In each iteration, the sampler generates a batch of proposed samples and
-  proposal heights by calling `proposal`. For each such sample point S, a
+  proposal heights by calling `proposal_fn`. For each such sample point S, a
   uniform random variate U is generated and the sample is accepted if U *
   height(S) <= target(S). The batched rejection sampler keeps track of which
   batch points have been accepted, and continues generating new batches until
   all batch points have been acceped.
 
-  The values returned by `proposal` should satisfy the desiderata of rejection
-  sampling: proposed samples should be drawn independently from a valid
-  distribution on some domain D that includes the domain of `target`, and the
-  proposal must upper bound the target: for all points S in D, height(S) >=
-  target(S).
+  The values returned by `proposal_fn` should satisfy the desiderata of
+  rejection sampling: proposed samples should be drawn independently from a
+  valid distribution on some domain D that includes the domain of `target_fn`,
+  and the proposal must upper bound the target: for all points S in D, height(S)
+  >= target(S).
 
   Args:
-    proposal: A callable that takes a Python integer PRNG seed and returns a set
-      of proposed samples and the value of the proposal at the samples.
-    target: A callable that takes a tensor of samples and returns the value of
-      the target at the samples.
+    proposal_fn: A callable that takes a Python integer PRNG seed and returns a
+      set of proposed samples and the value of the proposal at the samples.
+    target_fn: A callable that takes a tensor of samples and returns the value
+      of the target at the samples.
     seed: Python integer or `tfp.util.SeedStream` instance, for seeding PRNG.
+    dtype: The TensorFlow dtype used internally by `proposal_fn` and
+      `target_fn`.  Default value: `tf.float32`.
     name: A name to prepend to created ops.
       Default value: `'batched_rejection_sampler'`.
 
   Returns:
     results, num_iters: A tensor of samples from the target and a scalar int32
-    tensor, the number of calls to `proposal`.
+    tensor, the number of calls to `proposal_fn`.
   """
   with tf.name_scope(name or 'batched_rejection_sampler'):
     def randomized_computation(seed):
       seed_stream = SeedStream(seed, 'batched_rejection_sampler')
-      proposed_samples, proposed_values = proposal(seed_stream())
+      proposed_samples, proposed_values = proposal_fn(seed_stream())
       good_samples_mask = tf.less_equal(
           proposed_values * tf.random.uniform(
-              prefer_static.shape(proposed_samples), seed=seed_stream()),
-          target(proposed_samples))
+              prefer_static.shape(proposed_samples),
+              seed=seed_stream(),
+              dtype=dtype),
+          target_fn(proposed_samples))
       return proposed_samples, good_samples_mask
 
     return batched_las_vegas_algorithm(randomized_computation, seed)

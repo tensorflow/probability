@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import batched_rejection_sampler as brs
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
@@ -63,30 +64,34 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
     self.assertAllEqual(values, values_2)
 
   @parameterized.named_parameters(
-      dict(testcase_name='static', is_static=True),
-      dict(testcase_name='dynamic', is_static=False))
-  def testBatchedRejectionBetaSample(self, is_static):
+      dict(testcase_name='_static_float32', is_static=True, dtype=tf.float32),
+      dict(testcase_name='_static_float64', is_static=True, dtype=tf.float64),
+      dict(testcase_name='_dynamic_float32', is_static=False, dtype=tf.float32),
+      dict(testcase_name='_dynamic_float64', is_static=False, dtype=tf.float64))
+  def testBatchedRejectionBetaSample(self, is_static, dtype):
     seed = test_util.test_seed()
 
     # We build a rejection sampler for two beta distributions (in a batch): a
     # beta(2, 5) and a beta(2, 2). Eyeballing an image on the wikipedia page,
     # these are upper bounded by rectangles of heights 2.5 and 1.6 respectively.
-    alpha = np.array([2.], dtype=np.float32)
-    beta = np.array([5., 2.], dtype=np.float32)
-    upper_bounds = tf.constant([2.5, 1.6], dtype=tf.float32)
+    numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+    alpha = np.array([2.], dtype=numpy_dtype)
+    beta = np.array([5., 2.], dtype=numpy_dtype)
+    upper_bounds = tf.constant([2.5, 1.6], dtype=dtype)
     samples_per_distribution = 10000
 
-    target = tfd.Beta(alpha, beta).prob
+    target_fn = tfd.Beta(alpha, beta).prob
 
-    def proposal(seed):
+    def proposal_fn(seed):
       # Test static and dynamic shape of proposed samples.
       uniform_samples = self.maybe_static(
-          tf.random.uniform([samples_per_distribution, 2], seed=seed),
+          tf.random.uniform(
+              [samples_per_distribution, 2], seed=seed, dtype=dtype),
           is_static)
       return uniform_samples, tf.ones_like(uniform_samples) * upper_bounds
 
     all_samples, _ = self.evaluate(brs.batched_rejection_sampler(
-        proposal, target, seed=seed))
+        proposal_fn, target_fn, seed=seed, dtype=dtype))
 
     for i in range(beta.shape[0]):
       samples = all_samples[:, i]
@@ -98,7 +103,7 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
 
     # Check for reproducibility.
     all_samples_2, _ = self.evaluate(brs.batched_rejection_sampler(
-        proposal, target, seed=seed))
+        proposal_fn, target_fn, seed=seed, dtype=dtype))
     self.assertAllEqual(all_samples, all_samples_2)
 
 if __name__ == '__main__':
