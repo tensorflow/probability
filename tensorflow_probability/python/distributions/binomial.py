@@ -17,15 +17,22 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# Dependency imports
+import numpy as np
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import multinomial
+from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import batched_rejection_sampler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math.random_ops import random_rademacher
+from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 _binomial_sample_note = """
@@ -61,6 +68,108 @@ def _bdtr(k, n, p):
   safe_dn = tf.where(k_eq_n, ones, n - k)
   dk = tf.math.betainc(a=safe_dn, b=k + 1, x=1 - p)
   return tf.where(k_eq_n, ones, dk)
+
+
+def _log_concave_rejection_sampler(
+    log_concave_distribution,
+    sample_shape=(),
+    distribution_minimum=None,
+    distribution_maximum=None,
+    seed=None):
+  """Utility for rejection sampling from log-concave discrete distributions.
+
+  This utility constructs an easy-to-sample-from upper bound for a discrete
+  univariate log-concave distribution (for discrete univariate distributions, a
+  necessary and sufficient condition is p_k^2 >= p_{k-1} p_{k+1} for all k).
+  The method requires that the mode of the distribution is known. While a better
+  method can likely be derived for any given distribution, this method is
+  general and easy to implement. The expected number of iterations is bounded by
+  4+m, where m is the probability of the mode. For details, see [(Devroye,
+  1979)][1].
+
+  Args:
+   log_concave_distribution: An object satisfying TensorFlow Probability shape
+      semantics [(Dillon et al., 2017)][2] and having `mode` and `prob` methods.
+      The caller is responsible for ensuring that discreteness and log-concavity
+      hold.
+    sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
+    distribution_minimum: Tensor of type `distribution.dtype`. The minimum value
+      taken by the distribution. The `prob` method will only be called on values
+      greater than equal to the specified minimum. The shape must broadcast with
+      the batch shape of the distribution. If unspecified, the domain is treated
+      as unbounded below.
+    distribution_maximum: Tensor of type `distribution.dtype`. The maximum value
+      taken by the distribution. See `distribution_minimum` for details.
+    seed: Python integer or `tfp.util.SeedStream` instance, for seeding PRNG.
+
+  Returns:
+    samples: a `Tensor` with prepended dimensions `sample_shape`.
+
+  #### References
+
+  [1] Luc Devroye. A Simple Generator for Discrete Log-Concave
+      Distributions. Computing, 1987.
+
+  [2] Dillon et al. TensorFlow Distributions. 2017.
+      https://arxiv.org/abs/1711.10604
+  """
+  dtype = log_concave_distribution.dtype
+
+  mode = log_concave_distribution.mode()
+  mode = tf.broadcast_to(
+      mode,
+      tf.concat((sample_shape, prefer_static.shape(mode)), axis=0))
+
+  mode_height = log_concave_distribution.prob(mode)
+  mode_shape = prefer_static.shape(mode)
+
+  top_width = 1. + mode_height / 2.  # w in ref [1].
+  top_fraction = top_width / (1 + top_width)
+  exponential_distribution = exponential.Exponential(
+      rate=tf.constant(1., dtype=dtype))  # E in ref [1].
+
+  if distribution_minimum is None:
+    distribution_minimum = tf.constant(-np.inf, dtype)
+  if distribution_maximum is None:
+    distribution_maximum = tf.constant(np.inf, dtype)
+
+  def proposal(seed):
+    """Proposal for log-concave rejection sampler."""
+    seed_stream = SeedStream(seed, 'log_concave_rejection_sampler_proposal')
+
+    top_lobe_fractions = tf.random.uniform(
+        mode_shape, seed=seed_stream(), dtype=dtype)  # V in ref [1].
+    top_offsets = top_lobe_fractions * top_width / mode_height
+
+    exponential_samples = exponential_distribution.sample(
+        mode_shape, seed=seed_stream())  # E in ref [1].
+    exponential_height = (exponential_distribution.prob(exponential_samples) *
+                          mode_height)
+    exponential_offsets = (top_width + exponential_samples) / mode_height
+
+    top_selector = tf.random.uniform(
+        mode_shape, seed=seed_stream(), dtype=dtype)  # U in ref [1].
+    on_top_mask = tf.less_equal(top_selector, top_fraction)
+
+    unsigned_offsets = tf.where(on_top_mask, top_offsets, exponential_offsets)
+    offsets = tf.round(
+        random_rademacher(mode_shape, seed=seed_stream(), dtype=dtype) *
+        unsigned_offsets)
+
+    potential_samples = mode + offsets
+    envelope_height = tf.where(on_top_mask, mode_height, exponential_height)
+
+    return potential_samples, envelope_height
+
+  def target(values):
+    in_range_mask = (
+        (values >= distribution_minimum) & (values <= distribution_maximum))
+    in_range_values = tf.where(in_range_mask, values, 0.)
+    return tf.where(in_range_mask,
+                    log_concave_distribution.prob(in_range_values), 0.)
+
+  return batched_rejection_sampler.batched_rejection_sampler(
+      proposal, target, seed, dtype=dtype)[0]  # Discard `num_iters`.
 
 
 class Binomial(distribution.Distribution):
@@ -236,26 +345,8 @@ class Binomial(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_binomial_sample_note)
   def _sample_n(self, n, seed=None):
-    # Need to create logits corresponding to [p, 1 - p].
-    # Note that for this distributions, logits corresponds to
-    # inverse sigmoid(p) while in multivariate distributions,
-    # such as multinomial this corresponds to log(p).
-    # Because of this, when we construct the logits for the multinomial
-    # sampler, we'll have to be careful.
-    # log(p) = log(sigmoid(logits)) = logits - softplus(logits)
-    # log(1 - p) = log(1 - sigmoid(logits)) = -softplus(logits)
-    # Because softmax is invariant to a constant shift in all inputs,
-    # we can offset the logits by softplus(logits) so that we can use
-    # [logits, 0.] as our input.
-    orig_logits = self._logits_parameter_no_checks()
-    logits = tf.stack([orig_logits, tf.zeros_like(orig_logits)], axis=-1)
-    return multinomial.draw_sample(
-        num_samples=n,
-        num_classes=2,
-        logits=logits,
-        num_trials=tf.cast(self.total_count, dtype=tf.int32),
-        dtype=self.dtype,
-        seed=seed)[..., 0]
+    return _log_concave_rejection_sampler(
+        self, [n], tf.zeros((), dtype=self.dtype), self.total_count, seed)
 
   def _mean(self, probs=None):
     if probs is None:

@@ -23,6 +23,7 @@ from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions.binomial import _log_concave_rejection_sampler
 from tensorflow_probability.python.internal import test_util
 
 
@@ -31,6 +32,7 @@ class BinomialTest(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
+    super(BinomialTest, self).setUp()
 
   def testAssertionsOneOfProbsAndLogits(self):
     with self.assertRaisesRegex(
@@ -237,6 +239,31 @@ class BinomialTest(test_util.TestCase):
     self.assertEqual((3,), binom.mode().shape)
     self.assertAllClose(expected_modes, self.evaluate(binom.mode()))
 
+  def testUnivariateLogConcaveDistributionRejectionSamplerGeometric(self):
+    seed = test_util.test_seed()
+    n = int(1e5)
+
+    probs = np.float32([0.7, 0.8, 0.3, 0.2])
+    geometric = tfd.Geometric(probs=probs)
+    x = _log_concave_rejection_sampler(
+        geometric, sample_shape=[n], distribution_minimum=0, seed=seed)
+
+    x = x + 1  ## scipy.stats.geom is 1-indexed instead of 0-indexed.
+    sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)
+    [
+        sample_mean_,
+        sample_variance_,
+    ] = self.evaluate([
+        sample_mean,
+        sample_variance,
+    ])
+    self.assertAllEqual([4], sample_mean.shape)
+    self.assertAllClose(
+        stats.geom.mean(probs), sample_mean_, atol=0., rtol=0.10)
+    self.assertAllEqual([4], sample_variance.shape)
+    self.assertAllClose(
+        stats.geom.var(probs), sample_variance_, atol=0., rtol=0.20)
+
   def testSampleUnbiasedNonScalarBatch(self):
     probs = self._rng.rand(4, 3).astype(np.float32)
     counts = np.float32([4, 11., 20.])
@@ -278,6 +305,16 @@ class BinomialTest(test_util.TestCase):
     self.assertAllEqual([4], sample_variance.shape)
     self.assertAllClose(
         stats.binom.var(counts, probs), sample_variance_, atol=0., rtol=0.20)
+
+  def testSampleExtremeValues(self):
+    total_count = tf.constant(17., dtype=tf.float32)
+    probs = tf.constant([0., 1.], dtype=tf.float32)
+    dist = tfd.Binomial(
+        total_count=total_count, probs=probs, validate_args=True)
+    samples, expected_samples = self.evaluate(
+        (dist.sample(seed=test_util.test_seed()),
+         total_count * probs))
+    self.assertAllEqual(samples, expected_samples)
 
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])

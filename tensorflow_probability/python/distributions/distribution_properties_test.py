@@ -21,6 +21,7 @@ from __future__ import print_function
 import collections
 import functools
 import inspect
+import sys
 
 from absl import logging
 from absl.testing import parameterized
@@ -127,6 +128,7 @@ INSTANTIABLE_BUT_NOT_SLICABLE = (
 )
 
 EXTRA_TENSOR_CONVERSION_DISTS = {
+    'Binomial': sys.maxsize,  # binomial rejection sampler converts many times
     'RelaxedBernoulli': 1,
     'WishartTriL': 3,  # not concretizing linear operator scale
     'Chi': 2,  # subclasses `Chi2`, runs redundant checks on `df` parameter

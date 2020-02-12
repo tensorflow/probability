@@ -194,14 +194,19 @@ multi_substrate_py_library(
     srcs = ["binomial.py"],
     deps = [
         ":distribution",
-        ":multinomial",
+        ":exponential",
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:batched_rejection_sampler",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math:random_ops",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -1592,7 +1597,9 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "binomial_test",
+    size = "medium",
     srcs = ["binomial_test.py"],
+    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,

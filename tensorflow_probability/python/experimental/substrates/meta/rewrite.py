@@ -57,9 +57,9 @@ DISABLED_BY_PKG = {
          'slice_sampler_kernel'),
 }
 LIBS = ('bijectors', 'distributions', 'math', 'mcmc', 'stats', 'util')
-INTERNALS = ('assert_util', 'distribution_util', 'dtype_util',
-             'hypothesis_testlib', 'prefer_static', 'special_math',
-             'tensor_util', 'test_combinations', 'test_util')
+INTERNALS = ('assert_util', 'batched_rejection_sampler', 'distribution_util',
+             'dtype_util', 'hypothesis_testlib', 'prefer_static',
+             'special_math', 'tensor_util', 'test_combinations', 'test_util')
 
 PRIVATE_TF_PKGS = ('array_ops', 'random_ops')
 
