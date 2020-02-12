@@ -68,6 +68,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'ScaleTriL',
     'Sigmoid',
     'SinhArcsinh',
+    'SoftClip',
     'Softfloor',
     'Softplus',
     'Softsign',

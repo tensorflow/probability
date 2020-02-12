@@ -87,6 +87,7 @@ multi_substrate_py_library(
         ":shift",
         ":sigmoid",
         ":sinh_arcsinh",
+        ":soft_clip",
         ":softfloor",
         ":softmax_centered",
         ":softplus",
@@ -651,6 +652,19 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "soft_clip",
+    srcs = ["soft_clip.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math",
     ],
 )
 
@@ -1432,6 +1446,32 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "soft_clip_test",
+    size = "small",
+    srcs = ["soft_clip_test.py"],
+    numpy_tags = ["notap"],  # TODO(b/149350565): remove this.
+    deps = [
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "softfloor_test",
+    size = "small",
+    srcs = ["softfloor_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "softmax_centered_test",
     size = "small",
     srcs = ["softmax_centered_test.py"],
@@ -1496,19 +1536,6 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "softfloor_test",
-    size = "small",
-    srcs = ["softfloor_test.py"],
-    deps = [
-        ":bijector_test_util",
-        ":bijectors",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -1649,7 +1676,9 @@ exports_files(
         "sigmoid_test.py",
         "sinh_arcsinh.py",
         "sinh_arcsinh_test.py",
+        "soft_clip.py",
         "softfloor.py",
+        "soft_clip_test.py",
         "softfloor_test.py",
         "softmax_centered.py",
         "softmax_centered_test.py",

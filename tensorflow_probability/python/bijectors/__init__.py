@@ -72,6 +72,7 @@ from tensorflow_probability.python.bijectors.scale_matvec_tril import ScaleMatve
 from tensorflow_probability.python.bijectors.shift import Shift
 from tensorflow_probability.python.bijectors.sigmoid import Sigmoid
 from tensorflow_probability.python.bijectors.sinh_arcsinh import SinhArcsinh
+from tensorflow_probability.python.bijectors.soft_clip import SoftClip
 from tensorflow_probability.python.bijectors.softfloor import Softfloor
 from tensorflow_probability.python.bijectors.softmax_centered import SoftmaxCentered
 from tensorflow_probability.python.bijectors.softplus import Softplus
@@ -135,6 +136,7 @@ __all__ = [
     "Shift",
     "Sigmoid",
     "SinhArcsinh",
+    "SoftClip",
     "Softfloor",
     "SoftmaxCentered",
     "Softplus",
