@@ -102,7 +102,7 @@ class JointDistributionNamed(
   # ==> A scalar `Tensor` representing the total log prob under all five
   #     distributions.
 
-  joint._resolve_graph()
+  joint.resolve_graph()
   # ==> (('e', ()),
   #      ('g', ('e',)),
   #      ('n', ()),
@@ -200,11 +200,6 @@ class JointDistributionNamed(
     if hasattr(xs, 'get'):
       return tuple(xs.get(n, None) for n in self._dist_fn_name)
     return tuple(getattr(xs, n) for n in self._dist_fn_name)
-
-  def _resolve_graph(self, distribution_names=None, leaf_name='x'):
-    return tuple(zip(self._dist_fn_name,
-                     [() if x is None else x
-                      for x in self._dist_fn_args]))
 
   def _flat_resolve_names(self, distribution_names=None, leaf_name='x'):
     return self._dist_fn_name
